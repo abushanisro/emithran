@@ -172,7 +172,7 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   // Railway provides PORT environment variable automatically
-  const port = process.env.PORT || configService.get('PORT', 4000);
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : configService.get<number>('PORT', 4000);
   await app.listen(port);
 
   const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
