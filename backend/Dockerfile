@@ -43,8 +43,7 @@ USER nestjs
 EXPOSE 4000
 
 # Set environment
-ENV NODE_ENV=production \
-    PORT=4000
+ENV NODE_ENV=production
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
