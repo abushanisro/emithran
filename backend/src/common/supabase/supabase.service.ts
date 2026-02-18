@@ -16,9 +16,11 @@ export class SupabaseService {
     this.supabaseServiceKey = this.configService.get<string>('SUPABASE_SERVICE_KEY') || '';
 
     if (!this.supabaseUrl || !this.supabaseAnonKey || !this.supabaseServiceKey) {
-      throw new Error(
-        'SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_KEY must be set in environment variables'
+      console.warn(
+        'SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_KEY must be set in environment variables. Some features may not work correctly.'
       );
+      // Don't throw error to allow app to start for health checks
+      return;
     }
 
     // Admin client with SERVICE ROLE key for operations that bypass RLS
@@ -54,6 +56,10 @@ export class SupabaseService {
   }
 
   async verifyToken(token: string): Promise<any> {
+    if (!this.adminClient) {
+      throw new UnauthorizedException('Supabase not configured');
+    }
+
     const { data, error } = await this.adminClient.auth.getUser(token);
 
     if (error) {
@@ -66,10 +72,16 @@ export class SupabaseService {
   }
 
   getAdminClient(): SupabaseClient {
+    if (!this.adminClient) {
+      throw new Error('Supabase not configured');
+    }
     return this.adminClient;
   }
 
   get client(): SupabaseClient {
+    if (!this.adminClient) {
+      throw new Error('Supabase not configured');
+    }
     return this.adminClient;
   }
 
@@ -78,6 +90,11 @@ export class SupabaseService {
    * This is essential after DDL operations (CREATE TABLE, ALTER TABLE, etc.)
    */
   async reloadSchemaCache(): Promise<boolean> {
+    if (!this.supabaseUrl || !this.supabaseServiceKey) {
+      console.warn('Supabase not configured - cannot reload schema cache');
+      return false;
+    }
+    
     try {
       // PostgREST exposes a special endpoint to reload its schema cache
       const response = await fetch(`${this.supabaseUrl}/rest/v1/`, {
