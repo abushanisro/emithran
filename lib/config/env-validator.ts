@@ -112,7 +112,7 @@ class EnvironmentValidator {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-      const response = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/health`, {
+      const response = await fetch(`${apiUrl.replace('/api/v1', '')}/ping`, {
         method: 'GET',
         signal: controller.signal,
       });

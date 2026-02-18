@@ -31,7 +31,7 @@ export const config = {
     // Use server-side URL when running on server (Docker network), client-side URL in browser
     baseUrl: (typeof window === 'undefined'
       ? process.env.API_URL
-      : process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:4000/api/v1',
+      : process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:4000/v1/api',
 
     // Timeout Configuration - 2026 Best Practice: Balance between fast fail and database operations
     timeout: process.env.NODE_ENV === 'development' ? 15000 : 30000,
