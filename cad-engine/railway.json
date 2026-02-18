@@ -1,0 +1,22 @@
+{
+  "build": {
+    "builder": "dockerfile",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
+    "startCommand": "conda run --no-capture-output -n cad-env python main.py"
+  },
+  "variables": {
+    "PORT": "5000",
+    "NODE_ENV": "production",
+    "PYTHONUNBUFFERED": "1",
+    "CORS_ORIGINS": "https://mithran-six.vercel.app,https://mithran-production.up.railway.app",
+    "MAX_FILE_SIZE_MB": "50",
+    "RATE_LIMIT_PER_MINUTE": "10",
+    "LINEAR_DEFLECTION": "0.1",
+    "ANGULAR_DEFLECTION": "0.5",
+    "LOG_LEVEL": "info"
+  }
+}
