@@ -83,10 +83,10 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
   controllers: [AppController],
   providers: [
     SupabaseService,
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: SupabaseAuthGuard,
-    // },
+    {
+      provide: APP_GUARD,
+      useClass: SupabaseAuthGuard,
+    },
   ],
 })
 export class AppModule {}
