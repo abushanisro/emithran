@@ -18,3 +18,4 @@ export * from './useRawMaterials';
 export * from './useProcesses';
 export * from './useProcessRoutes';
 export * from './useAuthEnabled';
+export * from './useCadEngine';
