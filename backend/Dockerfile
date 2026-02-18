@@ -1,40 +1,28 @@
-# Multi-stage build for optimal image size
-FROM node:20-alpine AS dependencies
+# Simplified single-stage build for Railway
+FROM node:20-alpine
 
-# Install dumb-init for proper signal handling
+# Install system dependencies
 RUN apk add --no-cache dumb-init
 
+# Set working directory
 WORKDIR /app
 
-# Copy package files first for better Docker layer caching
+# Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including devDependencies for build)
-RUN npm ci --include=dev
+# Install dependencies
+RUN npm ci --legacy-peer-deps
 
-# Build stage
-FROM dependencies AS build
-
+# Copy source code
 COPY . .
-RUN npm run build && npm prune --production
 
-# Production stage
-FROM node:20-alpine AS production
+# Build application
+RUN npm run build
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
-
-# Create app directory
-WORKDIR /app
-
-# Create non-root user for security
+# Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nestjs -u 1001 -G nodejs
-
-# Copy built application and production dependencies
-COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
-COPY --from=build --chown=nestjs:nodejs /app/node_modules ./node_modules
-COPY --from=build --chown=nestjs:nodejs /app/package*.json ./
+    adduser -S nestjs -u 1001 -G nodejs && \
+    chown -R nestjs:nodejs /app
 
 # Switch to non-root user
 USER nestjs
@@ -45,6 +33,6 @@ EXPOSE 4000
 # Set environment
 ENV NODE_ENV=production
 
-# Use dumb-init to handle signals properly
+# Use dumb-init for signal handling
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/main.js"]
