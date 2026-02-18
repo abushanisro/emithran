@@ -59,6 +59,7 @@ async function bootstrap() {
         'http://localhost:3000',
         'http://127.0.0.1:3000',
         'https://mithran-six.vercel.app',
+        'https://jubilant-adventure-production.up.railway.app',
       ];
       if (!requestOrigin || allowedOrigins.includes(requestOrigin) || allowedOrigins.some(o => requestOrigin.startsWith(o))) {
         callback(null, true);
