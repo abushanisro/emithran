@@ -1,29 +1,51 @@
-FROM node:20.11.1-alpine3.19 AS builder
+# Multi-stage build for optimal image size
+FROM node:20-alpine AS dependencies
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
 
 WORKDIR /app
 
+# Copy package files first for better Docker layer caching
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+
+# Install all dependencies (including devDependencies for build)
+RUN npm ci --include=dev
+
+# Build stage
+FROM dependencies AS build
 
 COPY . .
-RUN npm run build
+RUN npm run build && npm prune --production
 
-FROM node:20.11.1-alpine3.19 AS production
+# Production stage
+FROM node:20-alpine AS production
 
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create app directory
 WORKDIR /app
 
-ENV NODE_ENV=production
-
-COPY package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-
+# Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nestjs -u 1001 && \
-    chown -R nestjs:nodejs /app
+    adduser -S nestjs -u 1001 -G nodejs
 
+# Copy built application and production dependencies
+COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=build --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=build --chown=nestjs:nodejs /app/package*.json ./
+
+# Switch to non-root user
 USER nestjs
 
+# Expose port
 EXPOSE 4000
 
-CMD ["node", "dist/main"]
+# Set environment
+ENV NODE_ENV=production \
+    PORT=4000
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/main.js"]
