@@ -3,7 +3,7 @@ FROM node:20.11.1-alpine3.19 AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 RUN npm run build

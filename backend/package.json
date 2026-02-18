@@ -1,7 +1,7 @@
 {
   "name": "api-gateway",
   "version": "1.0.0",
-  "description": "mithran API Gateway - Central entry point for all microservices",
+  "description": "mithran API Gateway - Central entry point for all microservices - v2",
   "author": "mithran Team",
   "private": true,
   "license": "UNLICENSED",
@@ -20,7 +20,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typecheck": "tsc --noEmit",
-    "prebuild": "rm -rf dist",
+    "prebuild": "rimraf dist",
     "db:migrate": "ts-node -r tsconfig-paths/register scripts/run-migrations.ts migrate",
     "db:migrate:reset": "ts-node -r tsconfig-paths/register scripts/run-migrations.ts reset",
     "env:validate": "ts-node -r tsconfig-paths/register scripts/validate-env.ts"
@@ -63,7 +63,7 @@
     "rxjs": "^7.8.1",
     "snake-case": "^3.0.4",
     "typeorm": "^0.3.28",
-    "uuid": "^13.0.0",
+    "uuid": "^9.0.0",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
