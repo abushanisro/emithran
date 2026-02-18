@@ -27,19 +27,22 @@ export class Logger implements NestLoggerService {
             }),
           ),
         }),
-        new DailyRotateFile({
-          filename: 'logs/application-%DATE%.log',
-          datePattern: 'YYYY-MM-DD',
-          maxSize: '20m',
-          maxFiles: '14d',
-        }),
-        new DailyRotateFile({
-          filename: 'logs/error-%DATE%.log',
-          datePattern: 'YYYY-MM-DD',
-          level: 'error',
-          maxSize: '20m',
-          maxFiles: '30d',
-        }),
+        // File logging disabled in production (Railway doesn't support persistent logs)
+        ...(process.env.NODE_ENV !== 'production' ? [
+          new DailyRotateFile({
+            filename: 'logs/application-%DATE%.log',
+            datePattern: 'YYYY-MM-DD',
+            maxSize: '20m',
+            maxFiles: '14d',
+          }),
+          new DailyRotateFile({
+            filename: 'logs/error-%DATE%.log',
+            datePattern: 'YYYY-MM-DD',
+            level: 'error',
+            maxSize: '20m',
+            maxFiles: '30d',
+          }),
+        ] : []),
       ],
     });
   }

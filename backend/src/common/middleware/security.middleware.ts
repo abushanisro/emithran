@@ -87,6 +87,7 @@ export class SecurityMiddleware implements NestMiddleware {
     // CORS headers (if not already handled by CORS middleware)
     const origin = req.get('Origin');
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+      process.env.CORS_ORIGIN || 'https://mithran-six.vercel.app',
       'http://localhost:3000',
       'https://localhost:3000'
     ];
