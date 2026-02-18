@@ -9,7 +9,7 @@
  * Following industry best practices for health checks
  */
 
-import { Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get, Post, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthCheckService, HealthCheck, HealthCheckResult } from '@nestjs/terminus';
 import { SupabaseHealthIndicator } from './indicators/supabase.health';
@@ -17,7 +17,7 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Health')
-@Controller({ path: 'api/health', version: '1' })
+@Controller({ path: 'api/health', version: VERSION_NEUTRAL })
 @Public() // Health checks should be publicly accessible for monitoring
 export class HealthController {
   constructor(
