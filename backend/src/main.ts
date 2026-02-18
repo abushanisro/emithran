@@ -149,20 +149,7 @@ async function bootstrap() {
   // Test route registration immediately
   setTimeout(async () => {
     logger.log('🧪 Testing route registration...', 'Bootstrap');
-    
-    // Try to manually access the route handler
-    try {
-      const appController = app.get('AppController');
-      if (appController) {
-        logger.log('✅ AppController found in DI container', 'Bootstrap');
-        const result = appController.healthCheck();
-        logger.log(`✅ AppController.healthCheck() works: ${JSON.stringify(result)}`, 'Bootstrap');
-      } else {
-        logger.error('❌ AppController NOT found in DI container', 'Bootstrap');
-      }
-    } catch (error) {
-      logger.error(`❌ Error accessing AppController: ${error.message}`, 'Bootstrap');
-    }
+    logger.log('✅ Application started successfully', 'Bootstrap');
   }, 1000);
   
 

@@ -17,7 +17,7 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Health')
-@Controller('api/health')
+@Controller({ path: 'api/health', version: '1' })
 @Public() // Health checks should be publicly accessible for monitoring
 export class HealthController {
   constructor(
