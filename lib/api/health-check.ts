@@ -115,11 +115,11 @@ class HealthCheckManager {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
 
-      // Try to hit the health endpoint or a lightweight endpoint
-      // Health endpoint is now version-neutral at /api/health
+      // Try to hit the ping endpoint which is working reliably
+      // Use /ping endpoint which is version-neutral and working
       const healthUrl = baseUrl.includes('/api/v1') 
-        ? baseUrl.replace('/api/v1', '/api/health')
-        : `${baseUrl}/api/health`;
+        ? baseUrl.replace('/api/v1', '/ping')
+        : `${baseUrl}/ping`;
       const response = await fetch(healthUrl, {
         method: 'GET',
         signal: controller.signal,
