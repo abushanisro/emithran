@@ -1,7 +1,7 @@
-import { Controller, Get, Logger } from '@nestjs/common';
+import { Controller, Get, Logger, VERSION_NEUTRAL } from '@nestjs/common';
 import { Public } from './common/decorators/public.decorator';
 
-@Controller()
+@Controller({ version: VERSION_NEUTRAL })
 export class AppController {
   private readonly logger = new Logger(AppController.name);
 
