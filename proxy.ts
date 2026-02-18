@@ -49,7 +49,7 @@ function addSecurityHeaders(response: NextResponse) {
 
   // CSP with proper nonce
   const csp = isProduction 
-    ? `default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vercel.live; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'`
+    ? `default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vercel.live https://*.railway.app https://mithran-production.up.railway.app; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'`
     : `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws://localhost:* http://localhost:* https://*.supabase.co wss://*.supabase.co; font-src 'self' https://fonts.gstatic.com; object-src 'none'`
   
   response.headers.set('Content-Security-Policy', csp)
