@@ -27,8 +27,8 @@ RUN addgroup -g 1001 -S nodejs && \
 # Switch to non-root user
 USER nestjs
 
-# Expose port
-EXPOSE 4000
+# Expose port (Railway will override with dynamic port)
+EXPOSE $PORT
 
 # Set environment
 ENV NODE_ENV=production

@@ -173,10 +173,10 @@ async function bootstrap() {
 
   // Railway provides PORT environment variable automatically
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : configService.get<number>('PORT', 4000);
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
-  const baseUrl = publicDomain ? `https://${publicDomain}` : `http://localhost:${port}`;
+  const baseUrl = publicDomain ? `https://${publicDomain}` : `http://0.0.0.0:${port}`;
   
   logger.log(`API Gateway running on: ${baseUrl}`, 'Bootstrap');
   logger.log(`API Documentation: ${baseUrl}/docs`, 'Bootstrap');
