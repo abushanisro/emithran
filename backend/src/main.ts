@@ -59,8 +59,9 @@ async function bootstrap() {
         'http://localhost:3000',
         'http://127.0.0.1:3000',
         'https://mithran-six.vercel.app',
-        'https://jubilant-adventure-production.up.railway.app',
-      ];
+        // Railway public domain (automatically available in production)
+        process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null,
+      ].filter(Boolean);
       if (!requestOrigin || allowedOrigins.includes(requestOrigin) || allowedOrigins.some(o => requestOrigin.startsWith(o))) {
         callback(null, true);
       } else {
@@ -170,11 +171,15 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  const port = configService.get('PORT', 4000);
+  // Railway provides PORT environment variable automatically
+  const port = process.env.PORT || configService.get('PORT', 4000);
   await app.listen(port);
 
-  logger.log(`API Gateway running on: http://localhost:${port}`, 'Bootstrap');
-  logger.log(`API Documentation: http://localhost:${port}/docs`, 'Bootstrap');
+  const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+  const baseUrl = publicDomain ? `https://${publicDomain}` : `http://localhost:${port}`;
+  
+  logger.log(`API Gateway running on: ${baseUrl}`, 'Bootstrap');
+  logger.log(`API Documentation: ${baseUrl}/docs`, 'Bootstrap');
 }
 
 bootstrap();
