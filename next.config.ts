@@ -86,6 +86,8 @@ const nextConfig: NextConfig = {
 
   // Enable compression
   compress: true,
+  
+  // Force rebuild - updated CSP for Railway backend
 
   // Disable x-powered-by header for security
   poweredByHeader: false,
