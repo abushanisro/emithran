@@ -4,13 +4,18 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "copy .env.development .env && next dev",
+    "dev:prod": "copy .env.prod .env && next dev",
     "build": "next build",
+    "build:dev": "copy .env.development .env && next build",
+    "build:prod": "copy .env.prod .env && next build",
     "start": "node .next/standalone/server.js",
     "start:production": "NODE_ENV=production node .next/standalone/server.js",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "echo 'No tests specified' && exit 0"
+    "test": "echo 'No tests specified' && exit 0",
+    "switch:dev": "copy .env.development .env && echo Switched to development environment",
+    "switch:prod": "copy .env.prod .env && echo Switched to production environment"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

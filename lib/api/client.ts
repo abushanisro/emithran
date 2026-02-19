@@ -14,6 +14,7 @@
  */
 
 import { config as appConfig } from '../config';
+import { apiConfig } from './config';
 import { supabase } from '../supabase/client';
 
 import { CircuitBreaker, CircuitBreakerError } from './circuit-breaker';
@@ -81,7 +82,7 @@ class ApiClient {
   private rateLimitMiddleware = createRateLimitMiddleware();
 
   constructor() {
-    this.baseUrl = appConfig.api.baseUrl;
+    this.baseUrl = apiConfig.endpoints.api.v1;
     this.loadTokens();
 
     // Initialize circuit breaker
@@ -102,8 +103,8 @@ class ApiClient {
       // Perform initial health check
       this.initializeHealthCheck();
 
-      // Start periodic monitoring
-      healthCheckManager.startMonitoring(this.baseUrl);
+      // Start periodic monitoring using gateway URL for health checks
+      healthCheckManager.startMonitoring(apiConfig.endpoints.gateway);
 
       // Update environment validator when health status changes
       healthCheckManager.addListener((health) => {
@@ -135,7 +136,7 @@ class ApiClient {
    */
   private async initializeHealthCheck(): Promise<void> {
     try {
-      const result = await healthCheckManager.performHealthCheck(this.baseUrl);
+      const result = await healthCheckManager.performHealthCheck(apiConfig.endpoints.gateway);
       envValidator.setApiReachable(result.status !== ServiceStatus.UNHEALTHY);
     } catch (error) {
       // Health check failed - service is unavailable

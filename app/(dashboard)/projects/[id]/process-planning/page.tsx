@@ -162,9 +162,20 @@ const handleModelMeasurements = (_data: any) => {
     
   };
 
-  // Fetch data with loading and error states
-  const { data: bomsData, isLoading: bomsLoading, error: bomsError } = useBOMs({ projectId });
+  // Fetch data with loading and error states - force fresh data with higher limit
+  const { data: bomsData, isLoading: bomsLoading, error: bomsError, refetch: refetchBOMs } = useBOMs({ 
+    projectId,
+    limit: 50,  // Increase limit to ensure we get all BOMs
+    page: 1     // Ensure we start from page 1
+  });
   const boms = bomsData?.boms || [];
+  
+
+  // Force refetch on mount to ensure fresh data
+  useEffect(() => {
+    // Clear any cached queries and refetch
+    refetchBOMs();
+  }, [projectId, refetchBOMs]);
 
   const { data: bomItemsData, isLoading: bomItemsLoading, error: bomItemsError } = useBOMItems(selectedBomId);
   const bomItems = bomItemsData?.items || [];

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsUUID, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsNumber, Min, Max, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateBOMDto {
@@ -20,6 +20,12 @@ export class CreateBOMDto {
   @IsOptional()
   @IsString()
   version?: string;
+
+  @ApiPropertyOptional({ enum: ['draft', 'approved', 'released', 'obsolete'] })
+  @IsOptional()
+  @IsString()
+  @IsIn(['draft', 'approved', 'released', 'obsolete'])
+  status?: string;
 }
 
 export class UpdateBOMDto extends PartialType(CreateBOMDto) {}

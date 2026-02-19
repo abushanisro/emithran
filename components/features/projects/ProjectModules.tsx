@@ -100,12 +100,8 @@ export function ProjectModules({ projectId, bomCount, firstBomId }: ProjectModul
       status: bomCount > 0 ? ('active' as const) : ('available' as const),
       itemCount: bomCount,
       onClick: () => {
-        // If there's already a BOM, go directly to it, otherwise go to the list/create page
-        if (firstBomId) {
-          router.push(`/projects/${projectId}/bom/${firstBomId}`);
-        } else {
-          router.push(`/projects/${projectId}/bom`);
-        }
+        // Navigate to global BOM management page with project context
+        router.push(`/bom?projectId=${projectId}`);
       },
     },
     {

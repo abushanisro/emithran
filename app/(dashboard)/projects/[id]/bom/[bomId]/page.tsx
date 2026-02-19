@@ -405,11 +405,11 @@ export default function
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => router.push(`/projects/${projectId}`)}
+            onClick={() => router.push(`/bom?projectId=${projectId}`)}
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Project
+            Back to BOM Management
           </Button>
           <Button
             variant="outline"

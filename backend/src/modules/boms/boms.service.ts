@@ -106,6 +106,7 @@ export class BOMsService {
     if (updateBOMDto.name !== undefined) updateData.name = updateBOMDto.name;
     if (updateBOMDto.description !== undefined) updateData.description = updateBOMDto.description;
     if (updateBOMDto.version !== undefined) updateData.version = updateBOMDto.version;
+    if (updateBOMDto.status !== undefined) updateData.status = updateBOMDto.status;
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
