@@ -392,12 +392,6 @@ export default function
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Workflow Navigation */}
-      <WorkflowNavigation 
-        currentModuleId="bom" 
-        projectId={projectId}
-      />
-      
       <PageHeader
         title={bom.name}
         description={bom.description}
@@ -666,6 +660,12 @@ export default function
         onClose={() => setViewingItem(null)}
         onUpdate={() => refetchBOMItems()}
         preferredView={preferredView}
+      />
+
+      {/* Workflow Navigation - Bottom */}
+      <WorkflowNavigation 
+        currentModuleId="bom" 
+        projectId={projectId}
       />
     </div>
   );

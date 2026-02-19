@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useBOMs, useCreateBOM, useUpdateBOM, useDeleteBOM } from '@/lib/api/hooks/useBOM';
 import { useProjects } from '@/lib/api/hooks/useProjects';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -587,6 +588,14 @@ export default function BOMManagementPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Workflow Navigation - Bottom */}
+      {projectId && (
+        <WorkflowNavigation 
+          currentModuleId="bom" 
+          projectId={projectId}
+        />
+      )}
     </div>
   );
 }

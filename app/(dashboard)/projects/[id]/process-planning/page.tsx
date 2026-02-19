@@ -477,45 +477,20 @@ const handleModelMeasurements = (_data: any) => {
 
             {/* BOM SELECTION CARD WITH FILTERS - HIGHLIGHTED */}
             {!bomsLoading && !bomsError && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2">
-                  <div className="border-2 border-primary/50 rounded-lg bg-primary/5 p-1">
-                    <BOMSelectionCard
-                      boms={transformedBoms}
-                      selectedBomId={selectedBomId}
-                      selectedPartNumber={selectedPartNumber}
-                      searchTerm={searchTerm}
-                      statusFilter={statusFilter}
-                      typeFilter={typeFilter}
-                      onBomChange={handleBomChange}
-                      onPartChange={setSelectedPartNumber}
-                      onSearchChange={setSearchTerm}
-                      onStatusFilterChange={setStatusFilter}
-                      onTypeFilterChange={setTypeFilter}
-                    />
-                  </div>
-                </div>
-
-                {/* Quick Actions & BOM Info - Compact */}
-                <div className="space-y-3">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Quick Actions</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <Button className="w-full justify-start" variant="outline" size="sm">
-                        Create New BOM
-                      </Button>
-                      <Button className="w-full justify-start" variant="outline" size="sm">
-                        Batch Process
-                      </Button>
-                      <Button className="w-full justify-start" variant="outline" size="sm">
-                        Export Report
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                </div>
+              <div className="border-2 border-primary/50 rounded-lg bg-primary/5 p-1">
+                <BOMSelectionCard
+                  boms={transformedBoms}
+                  selectedBomId={selectedBomId}
+                  selectedPartNumber={selectedPartNumber}
+                  searchTerm={searchTerm}
+                  statusFilter={statusFilter}
+                  typeFilter={typeFilter}
+                  onBomChange={handleBomChange}
+                  onPartChange={setSelectedPartNumber}
+                  onSearchChange={setSearchTerm}
+                  onStatusFilterChange={setStatusFilter}
+                  onTypeFilterChange={setTypeFilter}
+                />
               </div>
             )}
 
