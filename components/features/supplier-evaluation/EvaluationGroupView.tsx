@@ -541,7 +541,7 @@ We look forward to your competitive proposal and establishing a successful partn
               </div>
               
               <Tabs value={activeBomTab} onValueChange={setActiveBomTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-5 bg-muted rounded-lg p-1 h-10">
+                <TabsList className="grid w-full grid-cols-4 bg-muted rounded-lg p-1 h-10">
                   <TabsTrigger 
                     value="overview" 
                     className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
@@ -565,12 +565,6 @@ We look forward to your competitive proposal and establishing a successful partn
                     className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
                   >
                     Supplier Analysis
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="reports" 
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
-                  >
-                    Reports & Export
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="overview" className="mt-0">
@@ -1174,14 +1168,6 @@ We look forward to your competitive proposal and establishing a successful partn
                   </div>
                 </TabsContent>
 
-                <TabsContent value="reports" className="mt-0">
-                  <div className="p-6">
-                    <div className="text-center py-8 text-gray-400">
-                      <div className="text-sm">Reports & Export content</div>
-                      <div className="text-xs mt-1">Generate reports and export data</div>
-                    </div>
-                  </div>
-                </TabsContent>
               </Tabs>
             </div>
           </CardContent>

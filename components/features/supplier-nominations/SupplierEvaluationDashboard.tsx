@@ -33,7 +33,7 @@ const getCostScore = (evaluation: VendorEvaluation, evaluationData?: any, realTi
         return evaluationData.cost_analysis.score;
     }
 
-    // Cost Competancy is derived from cost-related criteria scores
+    // Cost Competency is derived from cost-related criteria scores
     const costCriteria = evaluation.scores.filter(score =>
         score.criteriaId.toLowerCase().includes('cost') ||
         score.criteriaId.toLowerCase().includes('price') ||

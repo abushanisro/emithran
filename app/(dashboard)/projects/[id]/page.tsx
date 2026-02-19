@@ -152,9 +152,9 @@ export default function ProjectDetail() {
                 <DollarSign className="h-6 w-6 text-green-600" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-medium">Quoted Cost</p>
+                <p className="text-xs text-muted-foreground font-medium">Target Cost</p>
                 <p className="text-xl font-bold text-foreground">
-                  {project.quotedCost ? `$${Number(project.quotedCost).toLocaleString()}` : '-'}
+                  {project.targetPrice ? `₹${Number(project.targetPrice).toLocaleString()}` : '-'}
                 </p>
               </div>
             </div>

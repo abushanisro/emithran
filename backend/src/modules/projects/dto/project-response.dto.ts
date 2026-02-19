@@ -28,8 +28,8 @@ export class ProjectResponseDto {
   @ApiProperty({ enum: ProjectStatus, example: ProjectStatus.ACTIVE })
   status: ProjectStatus;
 
-  @ApiProperty({ example: 50000, required: false })
-  quotedCost?: number;
+  @ApiProperty({ example: 3750000, required: false, description: 'Target price in rupees' })
+  targetPrice?: number;
 
   @ApiProperty({ example: '2025-01-15T10:30:00Z' })
   createdAt: string;
@@ -54,7 +54,7 @@ export class ProjectResponseDto {
     dto.state = row.state || undefined;
     dto.city = row.city || undefined;
     dto.status = row.status;
-    dto.quotedCost = row.quoted_cost ? Number(row.quoted_cost) : undefined;
+    dto.targetPrice = row.target_price ? Number(row.target_price) : undefined;
     dto.createdAt = row.created_at;
     dto.updatedAt = row.updated_at;
 

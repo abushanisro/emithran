@@ -70,7 +70,7 @@ export default function DashboardPage() {
   }));
 
   // Cost summary
-  const totalQuoted = projects.reduce((sum, p) => sum + (Number(p.quotedCost) || 0), 0);
+  const totalQuoted = projects.reduce((sum, p) => sum + (Number(p.targetPrice) || 0), 0);
   const totalShould = projects.reduce((sum, p) => sum + (Number(p.shouldCost) || 0), 0);
   const savings = totalQuoted - totalShould;
   const savingsPercent = totalQuoted > 0 ? ((savings / totalQuoted) * 100).toFixed(1) : '0';

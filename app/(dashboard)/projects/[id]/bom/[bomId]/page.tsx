@@ -16,7 +16,6 @@ import {
   Plus,
   Download,
   Upload,
-  Save,
   FileSpreadsheet,
   Settings,
   FileText,
@@ -379,16 +378,6 @@ export default function
     input.click();
   };
 
-  // Save changes (currently just a placeholder - add actual save logic)
-  const handleSaveChanges = async () => {
-    try {
-      toast.success('Changes saved successfully');
-      
-      // For now, this might just be a confirmation that auto-save is working
-    } catch (error) {
-      toast.error('Failed to save changes');
-    }
-  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -429,13 +418,6 @@ export default function
           >
             <Download className="h-4 w-4" />
             Export
-          </Button>
-          <Button
-            className="gap-2"
-            onClick={handleSaveChanges}
-          >
-            <Save className="h-4 w-4" />
-            Save Changes
           </Button>
         </div>
       </PageHeader>

@@ -46,7 +46,7 @@ export default function Projects() {
   const [projectToEdit, setProjectToEdit] = useState<any>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [quotedCost, setQuotedCost] = useState('');
+  const [targetPrice, setTargetPrice] = useState('');
   const [status, setStatus] = useState<'draft' | 'active' | 'completed' | 'on_hold' | 'cancelled'>('draft');
 
   // Open dialog if ?new=true in URL
@@ -70,14 +70,14 @@ export default function Projects() {
         name,
         description: description || undefined,
         status,
-        quotedCost: quotedCost ? parseFloat(quotedCost) : undefined,
+        targetPrice: targetPrice ? parseFloat(targetPrice) : undefined,
       },
       {
         onSuccess: (data) => {
           setCreateOpen(false);
           setName('');
           setDescription('');
-          setQuotedCost('');
+          setTargetPrice('');
           router.push(`/projects/${data.id}`);
         },
       }
@@ -99,7 +99,7 @@ export default function Projects() {
     setProjectToEdit(project);
     setName(project.name);
     setDescription(project.description || '');
-    setQuotedCost(project.quotedCost ? project.quotedCost.toString() : '');
+    setTargetPrice(project.targetPrice ? project.targetPrice.toString() : '');
     setStatus(project.status);
     setEditOpen(true);
   };
@@ -114,7 +114,7 @@ export default function Projects() {
           name,
           description: description || undefined,
           status,
-          quotedCost: quotedCost ? parseFloat(quotedCost) : undefined,
+          targetPrice: targetPrice ? parseFloat(targetPrice) : undefined,
         },
       },
       {
@@ -123,7 +123,7 @@ export default function Projects() {
           setProjectToEdit(null);
           setName('');
           setDescription('');
-          setQuotedCost('');
+          setTargetPrice('');
           setStatus('draft');
         },
       }
@@ -303,10 +303,10 @@ export default function Projects() {
                     )}
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Quoted Cost</span>
+                        <span className="text-muted-foreground">Target Cost</span>
                         <span className="font-semibold">
-                          {project.quotedCost
-                            ? `$${Number(project.quotedCost).toLocaleString()}`
+                          {project.targetPrice
+                            ? `₹${Number(project.targetPrice).toLocaleString()}`
                             : '-'}
                         </span>
                       </div>
@@ -373,19 +373,19 @@ export default function Projects() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="quotedCost">Quoted Cost ($)</Label>
+              <Label htmlFor="targetPrice">Target Cost (₹)</Label>
               <Input
-                id="quotedCost"
+                id="targetPrice"
                 type="number"
                 min="0"
                 max="99999999.99"
                 step="0.01"
-                value={quotedCost}
-                onChange={(e) => setQuotedCost(e.target.value)}
+                value={targetPrice}
+                onChange={(e) => setTargetPrice(e.target.value)}
                 placeholder="0.00"
               />
               <p className="text-xs text-muted-foreground">
-                Maximum: $99,999,999.99
+                Maximum: ₹99,999,999.99
               </p>
             </div>
             <div className="grid gap-2">
@@ -452,19 +452,19 @@ export default function Projects() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-quotedCost">Quoted Cost ($)</Label>
+              <Label htmlFor="edit-targetPrice">Target Cost (₹)</Label>
               <Input
-                id="edit-quotedCost"
+                id="edit-targetPrice"
                 type="number"
                 min="0"
                 max="99999999.99"
                 step="0.01"
-                value={quotedCost}
-                onChange={(e) => setQuotedCost(e.target.value)}
+                value={targetPrice}
+                onChange={(e) => setTargetPrice(e.target.value)}
                 placeholder="0.00"
               />
               <p className="text-xs text-muted-foreground">
-                Maximum: $99,999,999.99
+                Maximum: ₹99,999,999.99
               </p>
             </div>
             <div className="grid gap-2">
@@ -491,7 +491,7 @@ export default function Projects() {
                 setProjectToEdit(null);
                 setName('');
                 setDescription('');
-                setQuotedCost('');
+                setTargetPrice('');
                 setStatus('draft');
               }}
               disabled={updateMutation.isPending}

@@ -43,16 +43,16 @@ export class CreateProjectDto {
   status?: ProjectStatus;
 
   @ApiPropertyOptional({
-    example: 50000,
-    description: 'Quoted cost in dollars (max: 99,999,999.99)',
+    example: 3750000,
+    description: 'Target price in rupees (max: ₹9,99,99,999.99)',
     minimum: 0,
     maximum: 99999999.99
   })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0, { message: 'Quoted cost must be a non-negative number' })
-  @Max(99999999.99, { message: 'Quoted cost cannot exceed $99,999,999.99' })
-  quotedCost?: number;
+  @Min(0, { message: 'Target price must be a non-negative number' })
+  @Max(99999999.99, { message: 'Target price cannot exceed ₹9,99,99,999.99' })
+  targetPrice?: number;
 }
 
 export class UpdateProjectDto extends PartialType(CreateProjectDto) {}

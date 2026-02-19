@@ -2,7 +2,7 @@
 
 // Updated: Fixed functional navigation and Quick Actions - Version 3.0
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,9 +12,8 @@ import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { Viewer2D } from '@/components/ui/viewer-2d';
 import { apiClient } from '@/lib/api/client';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, TrendingUp, DollarSign, Package, Cog, PieChart, BarChart3, Target, Calculator, FileDown } from 'lucide-react';
+import { Badge } from '@/components/ui/badge'; 
+import { ArrowLeft, DollarSign } from 'lucide-react';
 
 // Reset circuit breaker on page load if it's stuck
 if (typeof window !== 'undefined') {
@@ -29,99 +28,17 @@ import { RawMaterialsSection } from '@/components/features/process-planning/RawM
 import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
 import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
 import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
-import { BomCostReport } from '@/components/features/process-planning/BomCostReport';
-import { ProjectBomCostSummary } from '@/components/features/process-planning/ProjectBomCostSummary';
-import { CostDataProvider, useCostData } from '@/lib/providers/cost-data-provider';
-import { costEngine } from '@/lib/services/cost-engine';
+import { CostDataProvider } from '@/lib/providers/cost-data-provider';
 import { CostAnalysisEngine } from '@/components/features/cost-analysis/CostAnalysisEngine';
 import { BomCostReportWrapper } from '@/components/features/cost-analysis/BomCostReportWrapper';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 
-// Chart components - using a simple chart implementation
-const CustomPieChart = ({ data, colors }: { data: any[], colors: string[] }) => {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-  let currentAngle = 0;
-  
-  return (
-    <div className="relative w-48 h-48 mx-auto">
-      <svg width="192" height="192" className="transform -rotate-90">
-        {data.map((item, index) => {
-          const percentage = item.value / total;
-          const angle = percentage * 360;
-          const startAngle = currentAngle;
-          const endAngle = currentAngle + angle;
-          
-          const startX = 96 + 80 * Math.cos((startAngle - 90) * Math.PI / 180);
-          const startY = 96 + 80 * Math.sin((startAngle - 90) * Math.PI / 180);
-          const endX = 96 + 80 * Math.cos((endAngle - 90) * Math.PI / 180);
-          const endY = 96 + 80 * Math.sin((endAngle - 90) * Math.PI / 180);
-          
-          const largeArcFlag = angle > 180 ? 1 : 0;
-          
-          const pathData = [
-            `M 96 96`,
-            `L ${startX} ${startY}`,
-            `A 80 80 0 ${largeArcFlag} 1 ${endX} ${endY}`,
-            'Z'
-          ].join(' ');
-          
-          currentAngle += angle;
-          
-          return (
-            <path
-              key={index}
-              d={pathData}
-              fill={colors[index % colors.length]}
-              className="hover:opacity-80 transition-opacity"
-            />
-          );
-        })}
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg font-bold">₹{total.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground">Total</p>
-        </div>
-      </div>
-    </div>
-  );
-};
 
-const CustomBarChart = ({ data, colors }: { data: any[], colors: string[] }) => {
-  const maxValue = Math.max(...data.map(item => item.value));
-  
-  return (
-    <div className="space-y-3">
-      {data.map((item, index) => (
-        <div key={index} className="flex items-center gap-3">
-          <div className="w-24 text-xs font-medium truncate">{item.name}</div>
-          <div className="flex-1 relative">
-            <div className="bg-muted rounded-full h-6 relative overflow-hidden">
-              <div 
-                className="h-full rounded-full transition-all duration-300 flex items-center justify-end pr-2"
-                style={{ 
-                  width: `${(item.value / maxValue) * 100}%`,
-                  backgroundColor: colors[index % colors.length]
-                }}
-              >
-                <span className="text-xs font-medium text-white">
-                  ₹{item.value.toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="w-16 text-xs text-right">
-            {((item.value / maxValue) * 100).toFixed(1)}%
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 function ProcessPlanningPageContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = params.id as string;
   const [selectedBomId, setSelectedBomId] = useState<string>('');
   const [selectedPartNumber, setSelectedPartNumber] = useState<string>('');
@@ -130,7 +47,11 @@ function ProcessPlanningPageContent() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [file3dUrl, setFile3dUrl] = useState<string | null>(null);
   const [file2dUrl, setFile2dUrl] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    // Initialize tab from URL parameter, default to 'overview'
+    const tabParam = searchParams.get('tab');
+    return (tabParam && ['overview', 'process', 'costing'].includes(tabParam)) ? tabParam : 'overview';
+  });
 
   // Edit mode states for part details
   const [isEditingPartDetails, setIsEditingPartDetails] = useState(false);
@@ -158,24 +79,46 @@ function ProcessPlanningPageContent() {
     inspectionLevel: 'Level II',
   });
 
-const handleModelMeasurements = (_data: any) => {
-    
+  const handleModelMeasurements = (_data: any) => {
+
   };
 
   // Fetch data with loading and error states - force fresh data with higher limit
-  const { data: bomsData, isLoading: bomsLoading, error: bomsError, refetch: refetchBOMs } = useBOMs({ 
+  const { data: bomsData, isLoading: bomsLoading, error: bomsError, refetch: refetchBOMs } = useBOMs({
     projectId,
     limit: 50,  // Increase limit to ensure we get all BOMs
     page: 1     // Ensure we start from page 1
   });
   const boms = bomsData?.boms || [];
-  
+
 
   // Force refetch on mount to ensure fresh data
   useEffect(() => {
     // Clear any cached queries and refetch
     refetchBOMs();
   }, [projectId, refetchBOMs]);
+
+  // Sync activeTab with URL parameter changes
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['overview', 'process', 'costing'].includes(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams, activeTab]);
+
+  // Handler for tab changes - updates both state and URL
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    // Update URL with new tab parameter
+    const newSearchParams = new URLSearchParams(searchParams.toString());
+    if (newTab === 'overview') {
+      newSearchParams.delete('tab'); // Remove tab param for default tab
+    } else {
+      newSearchParams.set('tab', newTab);
+    }
+    const newUrl = `${window.location.pathname}${newSearchParams.toString() ? '?' + newSearchParams.toString() : ''}`;
+    router.push(newUrl);
+  };
 
   const { data: bomItemsData, isLoading: bomItemsLoading, error: bomItemsError } = useBOMItems(selectedBomId);
   const bomItems = bomItemsData?.items || [];
@@ -244,9 +187,9 @@ const handleModelMeasurements = (_data: any) => {
     setTypeFilter('all');
   };
 
-// Quick Action handlers
+  // Quick Action handlers
 
-// Navigation handlers
+  // Navigation handlers
   const tabs = ['overview', 'process', 'costing'];
   const currentTabIndex = tabs.indexOf(activeTab);
 
@@ -270,7 +213,7 @@ const handleModelMeasurements = (_data: any) => {
   };
 
   const handleSavePartDetails = () => {
-    
+
     setIsEditingPartDetails(false);
     // Here you would typically call an API to update the BOM item
   };
@@ -388,13 +331,13 @@ const handleModelMeasurements = (_data: any) => {
         </div>
 
         {/* WORKFLOW NAVIGATION */}
-        <WorkflowNavigation 
+        <WorkflowNavigation
           currentModuleId={activeTab === 'overview' ? 'bom' : activeTab === 'process' ? 'process' : 'costing'}
           projectId={projectId}
         />
 
         {/* TAB INTERFACE */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <div className="flex items-center justify-between">
             <TabsList className="grid grid-cols-3 h-10">
               <TabsTrigger value="overview" className="text-xs">
@@ -523,7 +466,7 @@ const handleModelMeasurements = (_data: any) => {
                       <div
                         key={item.id}
                         className={`rounded-lg border bg-card text-card-foreground shadow-sm border-l-4 ${item.itemType === 'assembly' ? 'border-l-emerald-500' :
-                            item.itemType === 'sub_assembly' ? 'border-l-blue-500' : 'border-l-amber-500'
+                          item.itemType === 'sub_assembly' ? 'border-l-blue-500' : 'border-l-amber-500'
                           }`}
                       >
                         <div className="p-4">
@@ -538,8 +481,8 @@ const handleModelMeasurements = (_data: any) => {
                                   <Badge
                                     variant="outline"
                                     className={`text-xs ${item.itemType === 'assembly' ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' :
-                                        item.itemType === 'sub_assembly' ? 'bg-blue-500/10 text-blue-700 border-blue-500/20' :
-                                          'bg-amber-500/10 text-amber-700 border-amber-500/20'
+                                      item.itemType === 'sub_assembly' ? 'bg-blue-500/10 text-blue-700 border-blue-500/20' :
+                                        'bg-amber-500/10 text-amber-700 border-amber-500/20'
                                       }`}
                                   >
                                     {item.itemType === 'assembly' ? 'Assembly' :
@@ -1086,7 +1029,7 @@ const handleModelMeasurements = (_data: any) => {
                 {/* Packaging & Logistics Section */}
                 <PackagingLogisticsSection bomItemId={selectedItem.id} />
 
-{/* Procured Parts Section */}
+                {/* Procured Parts Section */}
                 <ProcuredPartsSection bomItemId={selectedItem.id} />
               </>
             ) : (
@@ -1104,12 +1047,12 @@ const handleModelMeasurements = (_data: any) => {
             {selectedBomId ? (
               <div className="space-y-6">
                 {/* Cost Analysis Engine - Overview and Charts */}
-                <CostAnalysisEngine 
+                <CostAnalysisEngine
                   bomId={selectedBomId}
                   bomName={boms.find(b => b.id === selectedBomId)?.name || "Assembly"}
                   itemCount={bomItems.length || 2}
                 />
-                
+
                 {/* Detailed BOM Cost Report - Part-by-Part Breakdown */}
                 <div className="border-t border-border pt-6">
                   <div className="mb-4">
@@ -1118,9 +1061,9 @@ const handleModelMeasurements = (_data: any) => {
                       Comprehensive part-by-part cost analysis with raw materials, processes, and margins
                     </p>
                   </div>
-                  <BomCostReportWrapper 
-                    bomId={selectedBomId} 
-                    bomName={boms.find(b => b.id === selectedBomId)?.name || "Assembly"} 
+                  <BomCostReportWrapper
+                    bomId={selectedBomId}
+                    bomName={boms.find(b => b.id === selectedBomId)?.name || "Assembly"}
                   />
                 </div>
               </div>
@@ -1133,7 +1076,7 @@ const handleModelMeasurements = (_data: any) => {
                     <p className="text-sm text-muted-foreground mb-4">
                       Go to Project Overview to select a BOM and the cost analysis engine will automatically calculate comprehensive cost breakdowns
                     </p>
-                    <Button 
+                    <Button
                       onClick={() => setActiveTab('overview')}
                       variant="outline"
                       className="mx-auto"

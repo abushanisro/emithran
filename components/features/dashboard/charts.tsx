@@ -24,7 +24,7 @@ const CHART_COLORS = [
 interface CostChartProps {
   projects: Array<{
     name?: string;
-    quotedCost?: number | string;
+    targetPrice?: number | string;
     shouldCost?: number | string;
   }>;
 }
@@ -36,7 +36,7 @@ export function CostChart({ projects }: CostChartProps) {
         <BarChart
           data={projects.slice(0, 8).map((p) => ({
             name: p.name?.substring(0, 15) || 'Unnamed',
-            quoted: Number(p.quotedCost) || 0,
+            quoted: Number(p.targetPrice) || 0,
             should: Number(p.shouldCost) || 0,
           }))}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
@@ -60,7 +60,7 @@ export function CostChart({ projects }: CostChartProps) {
               boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             }}
           />
-          <Bar dataKey="quoted" name="Quoted Cost" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} />
+          <Bar dataKey="quoted" name="Target Cost" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} />
           <Bar dataKey="should" name="Should Cost" fill="hsl(var(--chart-2))" radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>

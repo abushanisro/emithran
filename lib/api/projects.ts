@@ -12,7 +12,7 @@ export type Project = {
   state?: string;
   city?: string;
   status: 'draft' | 'active' | 'completed' | 'on_hold' | 'cancelled';
-  quotedCost?: number;
+  targetPrice?: number;
   shouldCost?: number;
   createdAt: string;
   updatedAt: string;
@@ -25,7 +25,7 @@ export type CreateProjectData = {
   state?: string;
   city?: string;
   status?: Project['status'];
-  quotedCost?: number;
+  targetPrice?: number;
 };
 
 export type UpdateProjectData = Partial<CreateProjectData>;

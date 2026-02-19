@@ -22,7 +22,7 @@ export class BOMsService {
     let queryBuilder = this.supabaseService
       .getClient(accessToken)
       .from('boms')
-      .select('*', { count: 'exact' })
+      .select('id, name, description, project_id, version, status, user_id, created_at, updated_at', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -60,7 +60,7 @@ export class BOMsService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('boms')
-      .select('*')
+      .select('id, name, description, project_id, version, status, user_id, created_at, updated_at')
       .eq('id', id)
       .single();
 
@@ -102,7 +102,12 @@ export class BOMsService {
     // Verify BOM exists and belongs to user
     await this.findOne(id, userId, accessToken);
 
-    const updateData: any = {};
+    const updateData: Partial<{
+      name: string;
+      description: string;
+      version: string;
+      status: string;
+    }> = {};
     if (updateBOMDto.name !== undefined) updateData.name = updateBOMDto.name;
     if (updateBOMDto.description !== undefined) updateData.description = updateBOMDto.description;
     if (updateBOMDto.version !== undefined) updateData.version = updateBOMDto.version;

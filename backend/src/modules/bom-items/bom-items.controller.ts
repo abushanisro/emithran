@@ -66,9 +66,25 @@ export class BOMItemsController {
     return this.bomItemsService.update(id, updateBOMItemDto, user.id, token);
   }
 
+  @Get(':id/dependencies')
+  @ApiOperation({ summary: 'Check BOM item delete dependencies' })
+  @ApiResponse({ status: 200, description: 'Dependencies checked successfully' })
+  async checkDeleteDependencies(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+    return this.bomItemsService.checkDeleteDependencies(id, user.id, token);
+  }
+
+  @Delete(':id/force')
+  @ApiOperation({ summary: 'Force delete BOM item with cascade cleanup' })
+  @ApiResponse({ status: 200, description: 'BOM item force deleted successfully' })
+  async forceRemove(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+    // This calls the same cascade delete but with explicit force intent
+    return this.bomItemsService.remove(id, user.id, token);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete BOM item' })
   @ApiResponse({ status: 200, description: 'BOM item deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot delete - item has dependencies' })
   async remove(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
     return this.bomItemsService.remove(id, user.id, token);
   }
