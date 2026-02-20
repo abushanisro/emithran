@@ -32,15 +32,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Environment files - NEVER commit credentials
+# Environment files - Active environment file only (templates are committed)
 .env
 .env*.local
 .env.local
-.env.development
-.env.development.local
 .env.test.local
-.env.production
-.env.production.local
 /backend/.env
 /backend/.env.local
 /backend/.env.development

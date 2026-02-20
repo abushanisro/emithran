@@ -31,6 +31,18 @@ export class ProjectResponseDto {
   @ApiProperty({ example: 3750000, required: false, description: 'Target price in rupees' })
   targetPrice?: number;
 
+  @ApiProperty({ example: 'Automotive', required: false })
+  industry?: string;
+
+  @ApiProperty({ example: 50000, required: false, description: 'Estimated annual volume' })
+  estimatedAnnualVolume?: number;
+
+  @ApiProperty({ example: 2500.00, required: false, description: 'Target BOM cost' })
+  targetBomCost?: number;
+
+  @ApiProperty({ example: 'USD', required: false, description: 'Target BOM cost currency' })
+  targetBomCostCurrency?: string;
+
   @ApiProperty({ example: '2025-01-15T10:30:00Z' })
   createdAt: string;
 
@@ -55,6 +67,10 @@ export class ProjectResponseDto {
     dto.city = row.city || undefined;
     dto.status = row.status;
     dto.targetPrice = row.target_price ? Number(row.target_price) : undefined;
+    dto.industry = row.industry || undefined;
+    dto.estimatedAnnualVolume = row.estimated_annual_volume ? Number(row.estimated_annual_volume) : undefined;
+    dto.targetBomCost = row.target_bom_cost ? Number(row.target_bom_cost) : undefined;
+    dto.targetBomCostCurrency = row.target_bom_cost_currency || undefined;
     dto.createdAt = row.created_at;
     dto.updatedAt = row.updated_at;
 

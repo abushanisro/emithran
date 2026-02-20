@@ -61,7 +61,7 @@ export function AppSidebar() {
     return pathname.startsWith(path);
   };
 
-  const userInitials = (user as any)?.fullName
+  const userInitials = (user as any)?.user_metadata?.full_name
     ?.split(' ')
     .map((n: string) => n[0])
     .join('')
@@ -157,7 +157,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {(user as any)?.fullName || 'User'}
+                {(user as any)?.user_metadata?.full_name || 'User'}
               </p>
               <p className="text-xs text-sidebar-foreground/50 truncate">
                 {user?.email}

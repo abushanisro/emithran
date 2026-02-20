@@ -21,7 +21,9 @@ import {
   FileText,
   Calendar,
   Shield,
-  Truck
+  Truck,
+  FolderKanban,
+  CircleCheckBig
 } from 'lucide-react';
 import { 
   WORKFLOW_MODULES, 
@@ -63,6 +65,9 @@ export const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
   const previousModule = getPreviousModule(currentModuleId);
   const progress = getModuleProgress(currentModuleId);
   const currentModule = WORKFLOW_MODULES.find(m => m.id === currentModuleId);
+  
+  // Check if workflow is completed (at the last module with 100% progress)
+  const isWorkflowComplete = !nextModule && progress >= 100;
 
   const handleModuleNavigation = (module: WorkflowModule) => {
     const route = module.route.replace('[id]', projectId);
@@ -136,6 +141,64 @@ export const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
                 </div>
               );
             })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show celebration when workflow is complete
+  if (isWorkflowComplete) {
+    return (
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            {/* Back Button */}
+            <div className="flex items-center gap-4">
+              {previousModule && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleModuleNavigation(previousModule)}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  {previousModule.name}
+                </Button>
+              )}
+            </div>
+
+            {/* Celebration Content */}
+            <div className="flex-1 mx-6">
+              <div className="text-center space-y-4">
+                <div>
+                  <h3 className="text-xl font-bold text-foreground mb-2">🎉 Workflow Complete!</h3>
+                  <p className="text-muted-foreground">
+                    Congratulations! You have successfully completed the entire manufacturing workflow from BOM to delivery.
+                  </p>
+                </div>
+                <div className="flex justify-center gap-3">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Export Report
+                  </Button>
+                  <Button 
+                    onClick={() => router.push('/projects')}
+                    className="flex items-center gap-2"
+                  >
+                    Start New Project
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Complete Badge */}
+            <div>
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />
+                100% Complete
+              </Badge>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -23,13 +23,12 @@ export class SecurityMiddleware implements NestMiddleware {
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
-        "frame-ancestors 'none'",
+        "frame-ancestors 'self' https://*.supabase.co",
         "upgrade-insecure-requests"
       ].join('; ')
     );
 
-    // X-Frame-Options (clickjacking protection)
-    res.setHeader('X-Frame-Options', 'DENY');
+    // X-Frame-Options removed - using CSP frame-ancestors instead for better control
 
     // X-Content-Type-Options (MIME type sniffing protection)
     res.setHeader('X-Content-Type-Options', 'nosniff');

@@ -535,6 +535,18 @@ class ApiClient {
         requestInit.body = JSON.stringify(requestConfig.body);
       }
 
+      // Debug logging in development (only for debugging issues)
+      // if (process.env.NODE_ENV === 'development' && method === 'PUT') {
+      //   console.log('🚀 PUT Request Debug:', {
+      //     url: requestConfig.url,
+      //     method,
+      //     headers: requestInit.headers,
+      //     body: requestConfig.body,
+      //     envApiUrl: process.env.NEXT_PUBLIC_API_URL,
+      //     baseUrl: this.baseURL
+      //   });
+      // }
+
       try {
         const startTime = Date.now();
 
@@ -613,6 +625,19 @@ class ApiClient {
           }
           // Record error metric
           tracker.recordError(response.status, data.error?.code || 'HTTP_ERROR');
+
+          // Debug logging for 400 errors in development (only for debugging issues)
+          // if (process.env.NODE_ENV === 'development' && response.status === 400) {
+          //   console.group('❌ 400 Bad Request Debug');
+          //   console.log('URL:', requestConfig.url);
+          //   console.log('Method:', method);
+          //   console.log('Request Body:', requestConfig.body);
+          //   console.log('Response Status:', response.status);
+          //   console.log('Response Data:', data);
+          //   console.log('Error Details:', data.error);
+          //   console.log('Response Headers:', Object.fromEntries(response.headers.entries()));
+          //   console.groupEnd();
+          // }
 
           // Silent mode: return null instead of throwing (prevents console errors)
           if (silent) {

@@ -330,12 +330,6 @@ function ProcessPlanningPageContent() {
           )}
         </div>
 
-        {/* WORKFLOW NAVIGATION */}
-        <WorkflowNavigation
-          currentModuleId={activeTab === 'overview' ? 'bom' : activeTab === 'process' ? 'process' : 'costing'}
-          projectId={projectId}
-        />
-
         {/* TAB INTERFACE */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <div className="flex items-center justify-between">
@@ -1073,22 +1067,21 @@ function ProcessPlanningPageContent() {
                   <div className="text-center">
                     <DollarSign className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">Select a BOM to Start Cost Analysis</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Go to Project Overview to select a BOM and the cost analysis engine will automatically calculate comprehensive cost breakdowns
+                    <p className="text-sm text-muted-foreground">
+                      Select a BOM from the Project Overview tab to begin comprehensive cost analysis
                     </p>
-                    <Button
-                      onClick={() => setActiveTab('overview')}
-                      variant="outline"
-                      className="mx-auto"
-                    >
-                      Go to Project Overview
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
           </TabsContent>
         </Tabs>
+
+        {/* WORKFLOW NAVIGATION */}
+        <WorkflowNavigation
+          currentModuleId={activeTab === 'overview' ? 'process' : activeTab === 'process' ? 'process-planning' : 'costing'}
+          projectId={projectId}
+        />
       </div>
     </div>
   );

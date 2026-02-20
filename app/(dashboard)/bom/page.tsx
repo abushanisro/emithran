@@ -309,12 +309,6 @@ export default function BOMManagementPage() {
                   ? 'Try adjusting your search query'
                   : 'Create your first BOM from a project'}
               </p>
-              {!searchQuery && (
-                <Button onClick={() => router.push('/projects')}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Go to Projects
-                </Button>
-              )}
             </div>
           ) : (
             <div className="rounded-md border">

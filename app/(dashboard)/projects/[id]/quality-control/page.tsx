@@ -43,12 +43,6 @@ export default function QualityControlPage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-[1800px] mx-auto space-y-6">
-        {/* Workflow Navigation */}
-        <WorkflowNavigation 
-          currentModuleId="quality-control" 
-          projectId={projectId}
-        />
-        
         {/* BREADCRUMB & HEADER */}
         <div className="flex items-center justify-between">
           <div className="space-y-1">
@@ -334,6 +328,12 @@ export default function QualityControlPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Workflow Navigation */}
+        <WorkflowNavigation 
+          currentModuleId="quality-control" 
+          projectId={projectId}
+        />
       </div>
     </div>
   );

@@ -435,8 +435,8 @@ export function IsProjectName(message?: string, options?: ValidationOptions) {
     IsString({ message: 'Project name must be text' }),
     MinLength(2, { message: 'Project name must be at least 2 characters long' }),
     MaxLength(100, { message: 'Project name must be no more than 100 characters long' }),
-    Matches(/^[a-zA-Z0-9\s\-_\.]+$/, { 
-      message: 'Project name can only contain letters, numbers, spaces, hyphens, underscores, and periods' 
+    Matches(/^[a-zA-Z0-9\s\-_\.\u2013\u2014\u00A0\u2019\u201C\u201D\(\)\[\]\/\&\,\:\;]+$/, { 
+      message: 'Project name can only contain letters, numbers, spaces, hyphens, dashes, underscores, periods, and common punctuation' 
     }),
     IsNotEmpty({ message: 'Project name is required' })
   );

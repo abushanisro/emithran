@@ -31,7 +31,9 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Get all projects with pagination' })
   @ApiResponse({ status: 200, description: 'Projects retrieved successfully', type: ProjectListResponseDto })
   async findAll(@Query() query: QueryProjectsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProjectListResponseDto> {
-    return this.projectsService.findAll(query, user.id, token);
+    const userId = user?.id || 'dev-user';
+    const accessToken = token || '';
+    return this.projectsService.findAll(query, userId, accessToken);
   }
 
   @Get(':id')

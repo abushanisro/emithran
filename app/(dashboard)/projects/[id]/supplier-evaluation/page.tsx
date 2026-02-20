@@ -112,12 +112,6 @@ export default function SupplierEvaluationPage() {
   if (currentView === 'dashboard') {
     return (
       <div className="space-y-6">
-        {/* Workflow Navigation */}
-        <WorkflowNavigation 
-          currentModuleId="supplier-evaluation" 
-          projectId={projectId}
-        />
-        
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push(`/projects/${projectId}`)}>
             <ArrowLeft className="h-4 w-4" />
@@ -141,6 +135,12 @@ export default function SupplierEvaluationPage() {
           open={newEvaluationDialogOpen}
           onOpenChange={setNewEvaluationDialogOpen}
           onSuccess={handleEvaluationSuccess}
+        />
+
+        {/* Workflow Navigation */}
+        <WorkflowNavigation 
+          currentModuleId="supplier-evaluation" 
+          projectId={projectId}
         />
       </div>
     );

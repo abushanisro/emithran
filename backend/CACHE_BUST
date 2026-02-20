@@ -1,5 +1,0 @@
-Build timestamp: 2026-02-18-14:20
-UUID fix: v9.0.0
-Health check: /ping
-Force rebuild: BACKEND-ONLY-V2
-Railway cache invalidation: DELETE ALL CACHE

@@ -76,16 +76,16 @@ export default function SupplierNominationMainPage() {
   
   return (
     <div className="space-y-6">
-      {/* Workflow Navigation */}
-      <WorkflowNavigation 
-        currentModuleId="supplier-nomination" 
-        projectId={projectId}
-      />
-      
       <SupplierNominationsDashboard
         projectId={projectId}
         selectedBomId={selectedBomId || undefined}
         onSelectNomination={handleSelectNomination}
+      />
+
+      {/* Workflow Navigation */}
+      <WorkflowNavigation 
+        currentModuleId="supplier-nomination" 
+        projectId={projectId}
       />
     </div>
   );

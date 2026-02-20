@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Edit2, Check, X, Mail, Plus, Trash2, Users, ChevronDown, Shield, Eye, UserCog } from 'lucide-react';
+import { Edit2, Check, X, Mail, Plus, Trash2, Users, ChevronDown, Shield, Eye, UserCog, Wrench, PenTool, ShoppingCart, ClipboardCheck, DollarSign, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { useProjectTeam, useAddTeamMember, useRemoveTeamMember, useUpdateTeamMember } from '@/lib/api/hooks/useProjectTeam';
 import { TeamMemberRole } from '@/lib/api/project-team';
@@ -34,8 +34,12 @@ interface ProjectDetailsCardProps {
     updatedAt: string;
     createdBy?: string;
     updatedBy?: string;
+    industry?: string;
+    estimatedAnnualVolume?: number;
+    targetBomCost?: number;
+    targetBomCostCurrency?: string;
   };
-  onUpdate?: (data: { name?: string; description?: string; country?: string; state?: string; city?: string }) => Promise<void>;
+  onUpdate?: (data: { name?: string; description?: string; country?: string; state?: string; city?: string; industry?: string; estimatedAnnualVolume?: number; targetBomCost?: number; targetBomCostCurrency?: string }) => Promise<void>;
 }
 
 export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProps) {
@@ -176,6 +180,20 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
         return <Shield className="h-3 w-3" />;
       case 'admin':
         return <UserCog className="h-3 w-3" />;
+      case 'project_manager':
+        return <Settings className="h-3 w-3" />;
+      case 'design_engineer':
+        return <PenTool className="h-3 w-3" />;
+      case 'manufacturing_engineer':
+        return <Wrench className="h-3 w-3" />;
+      case 'procurement_manager':
+        return <ShoppingCart className="h-3 w-3" />;
+      case 'quality_engineer':
+        return <ClipboardCheck className="h-3 w-3" />;
+      case 'finance_analyst':
+        return <DollarSign className="h-3 w-3" />;
+      case 'member':
+        return <Users className="h-3 w-3" />;
       case 'viewer':
         return <Eye className="h-3 w-3" />;
       default:
@@ -189,10 +207,22 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
         return 'Full access - Can edit project, manage team, delete project';
       case 'admin':
         return 'Can edit project and manage team members';
+      case 'project_manager':
+        return 'BOM, Process Planning, Supplier Management & Team Management';
+      case 'design_engineer':
+        return 'BOM Management, Technical Drawings & CAD Access';
+      case 'manufacturing_engineer':
+        return 'Process Planning, Costing & Production Planning';
+      case 'procurement_manager':
+        return 'Supplier Evaluation, Nomination & Cost Analysis';
+      case 'quality_engineer':
+        return 'Quality Control, Inspection Plans & Compliance';
+      case 'finance_analyst':
+        return 'Cost Validation, Financial Analysis & Reporting';
       case 'member':
         return 'Can edit project data (BOM, processes, etc.)';
       case 'viewer':
-        return 'Can only view project (read-only access)';
+        return 'Read-only access to assigned modules';
       default:
         return '';
     }
@@ -468,6 +498,47 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
           </div>
         </div>
 
+        {/* Project Summary Snapshot */}
+        <div className="pt-4 border-t border-border">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-foreground">Project Summary Snapshot</h3>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Industry</label>
+              <div className="text-base">
+                {project.industry ? (
+                  <span className="capitalize">{project.industry.replace('-', ' ')}</span>
+                ) : (
+                  <span className="text-muted-foreground italic">Not specified</span>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Estimated Annual Volume</label>
+              <div className="text-base">
+                {project.estimatedAnnualVolume ? (
+                  <span>{project.estimatedAnnualVolume.toLocaleString()} units</span>
+                ) : (
+                  <span className="text-muted-foreground italic">Not specified</span>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Target BOM Cost</label>
+              <div className="text-base">
+                {project.targetBomCost ? (
+                  <span>
+                    {project.targetBomCostCurrency || 'USD'} {project.targetBomCost.toLocaleString()}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground italic">Not specified</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Team Members Section */}
         <div className="pt-4 border-t border-border">
           <div className="flex items-center justify-between mb-4">
@@ -621,33 +692,90 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                             <ChevronDown className="h-3 w-3 ml-1.5 opacity-50" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuContent align="end" className="w-64">
                           <DropdownMenuLabel>Change Role</DropdownMenuLabel>
                           <DropdownMenuSeparator />
+                          
                           <DropdownMenuItem
-                            onClick={() => handleUpdateRole(member.id, 'admin')}
-                            disabled={member.role === 'admin'}
+                            onClick={() => handleUpdateRole(member.id, 'project_manager')}
+                            disabled={member.role === 'project_manager'}
                           >
-                            <UserCog className="h-4 w-4 mr-2" />
+                            <Settings className="h-4 w-4 mr-2" />
                             <div>
-                              <div className="font-medium">Admin</div>
+                              <div className="font-medium">Project Manager</div>
                               <div className="text-xs text-muted-foreground">
-                                Can edit & manage team
+                                All modules + team management
                               </div>
                             </div>
                           </DropdownMenuItem>
+                          
                           <DropdownMenuItem
-                            onClick={() => handleUpdateRole(member.id, 'member')}
-                            disabled={member.role === 'member'}
+                            onClick={() => handleUpdateRole(member.id, 'design_engineer')}
+                            disabled={member.role === 'design_engineer'}
                           >
-                            <Users className="h-4 w-4 mr-2" />
+                            <PenTool className="h-4 w-4 mr-2" />
                             <div>
-                              <div className="font-medium">Member</div>
+                              <div className="font-medium">Design Engineer</div>
                               <div className="text-xs text-muted-foreground">
-                                Can edit project data
+                                BOM Management & CAD access
                               </div>
                             </div>
                           </DropdownMenuItem>
+                          
+                          <DropdownMenuItem
+                            onClick={() => handleUpdateRole(member.id, 'manufacturing_engineer')}
+                            disabled={member.role === 'manufacturing_engineer'}
+                          >
+                            <Wrench className="h-4 w-4 mr-2" />
+                            <div>
+                              <div className="font-medium">Manufacturing Engineer</div>
+                              <div className="text-xs text-muted-foreground">
+                                Process Planning & Costing
+                              </div>
+                            </div>
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuItem
+                            onClick={() => handleUpdateRole(member.id, 'procurement_manager')}
+                            disabled={member.role === 'procurement_manager'}
+                          >
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            <div>
+                              <div className="font-medium">Procurement Manager</div>
+                              <div className="text-xs text-muted-foreground">
+                                Supplier Evaluation & Nomination
+                              </div>
+                            </div>
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuItem
+                            onClick={() => handleUpdateRole(member.id, 'quality_engineer')}
+                            disabled={member.role === 'quality_engineer'}
+                          >
+                            <ClipboardCheck className="h-4 w-4 mr-2" />
+                            <div>
+                              <div className="font-medium">Quality Engineer</div>
+                              <div className="text-xs text-muted-foreground">
+                                Quality Control & Compliance
+                              </div>
+                            </div>
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuItem
+                            onClick={() => handleUpdateRole(member.id, 'finance_analyst')}
+                            disabled={member.role === 'finance_analyst'}
+                          >
+                            <DollarSign className="h-4 w-4 mr-2" />
+                            <div>
+                              <div className="font-medium">Finance Analyst</div>
+                              <div className="text-xs text-muted-foreground">
+                                Cost Analysis & Financial Reporting
+                              </div>
+                            </div>
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuSeparator />
+                          
                           <DropdownMenuItem
                             onClick={() => handleUpdateRole(member.id, 'viewer')}
                             disabled={member.role === 'viewer'}
@@ -656,7 +784,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                             <div>
                               <div className="font-medium">Viewer</div>
                               <div className="text-xs text-muted-foreground">
-                                Read-only access
+                                Read-only access to modules
                               </div>
                             </div>
                           </DropdownMenuItem>

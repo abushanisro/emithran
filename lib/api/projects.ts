@@ -14,6 +14,10 @@ export type Project = {
   status: 'draft' | 'active' | 'completed' | 'on_hold' | 'cancelled';
   targetPrice?: number;
   shouldCost?: number;
+  industry?: string;
+  estimatedAnnualVolume?: number;
+  targetBomCost?: number;
+  targetBomCostCurrency?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -26,6 +30,10 @@ export type CreateProjectData = {
   city?: string;
   status?: Project['status'];
   targetPrice?: number;
+  industry?: string;
+  estimatedAnnualVolume?: number;
+  targetBomCost?: number;
+  targetBomCostCurrency?: string;
 };
 
 export type UpdateProjectData = Partial<CreateProjectData>;

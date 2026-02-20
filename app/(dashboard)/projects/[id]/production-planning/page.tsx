@@ -53,12 +53,6 @@ export default function ProjectProductionPlanningPage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-[1800px] mx-auto space-y-6">
-        {/* Workflow Navigation */}
-        <WorkflowNavigation 
-          currentModuleId="production-planning" 
-          projectId={projectId}
-        />
-        
         {/* BREADCRUMB & HEADER */}
         <div className="flex items-center justify-between">
           <div className="space-y-1">
@@ -328,6 +322,12 @@ export default function ProjectProductionPlanningPage() {
         <CreateProductionLotModal
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
+          projectId={projectId}
+        />
+
+        {/* Workflow Navigation */}
+        <WorkflowNavigation 
+          currentModuleId="production-planning" 
           projectId={projectId}
         />
       </div>

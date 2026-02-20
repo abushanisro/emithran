@@ -17,14 +17,7 @@ import {
   type PartWiseCostBaseData,
   type BulkUpdatePartWiseCostAnalysisData
 } from '@/lib/api/supplier-nominations';
-import {
-  getCostAnalysis,
-  initializeCostAnalysis,
-  batchUpdateCostAnalysis,
-  transformCostAnalysisToComponentData,
-  transformComponentDataToCostAnalysis,
-  type CostCompetencyAnalysis
-} from '@/lib/api/cost-competency';
+
 import {
   Table,
   TableBody,
@@ -42,8 +35,7 @@ import {
   BarChart3,
   Edit,
   Save,
-  Package,
-  ChevronDown
+  Package
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -77,7 +69,7 @@ function calculatePartSummary(
     .filter(ca => ca.overallRank != null && ca.overallRank > 0)
     .sort((a, b) => (a.overallRank || Infinity) - (b.overallRank || Infinity))[0];
 
-  const topVendor = bestRankedVendor 
+  const topVendor = bestRankedVendor
     ? vendors.find(v => v.id === bestRankedVendor.vendorId) || null
     : (vendors.length > 0 ? vendors[0] : null);
 
@@ -105,11 +97,10 @@ function transformPartWiseCostToComponentData(
   baseData: PartWiseCostBaseData | null,
   vendors: Array<{ id: string; name: string }>
 ): CostCompetencyData[] {
-  const numVendors = vendors.length;
-  
+
   // Create vendor mapping for consistent ordering
   const vendorOrder = vendors.map(v => v.id);
-  
+
   const result: CostCompetencyData[] = [
     {
       id: 1,
@@ -259,7 +250,7 @@ function transformPartWiseCostToComponentData(
       isRanking: true
     }
   ];
-  
+
   return result;
 }
 
@@ -270,13 +261,13 @@ function transformComponentDataToPartWise(
   bomItemId: string
 ): BulkUpdatePartWiseCostAnalysisData {
   const vendorOrder = vendors.map(v => v.id);
-  
+
   // Transform base data
   const baseData: any = {
     nominationId,
     bomItemId
   };
-  
+
   costData.forEach(item => {
     switch (item.costComponent) {
       case "Raw Material Cost":
@@ -311,7 +302,7 @@ function transformComponentDataToPartWise(
         break;
     }
   });
-  
+
   // Transform vendor data
   const vendorCostData: any[] = vendorOrder.map((vendorId, vendorIndex) => {
     const vendorData: any = {
@@ -319,10 +310,10 @@ function transformComponentDataToPartWise(
       bomItemId,
       vendorId
     };
-    
+
     costData.forEach(item => {
       if (item.isRanking) return; // Skip ranking rows
-      
+
       switch (item.costComponent) {
         case "Raw Material Cost":
           vendorData.rawMaterialCost = Math.round((item.supplierValues[vendorIndex] || 0) * 100) / 100;
@@ -356,10 +347,10 @@ function transformComponentDataToPartWise(
           break;
       }
     });
-    
+
     return vendorData;
   });
-  
+
   return {
     baseData,
     vendorCostData
@@ -494,18 +485,18 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
 
   // BOM Part Selection State - now using nomination BOM parts
   const [selectedBomItemId, setSelectedBomItemId] = useState<string>('');
-  
+
   // Use nomination BOM parts directly
   const availableBomParts = nominationBomParts || [];
-  
+
   // Auto-select first BOM part when parts become available
   React.useEffect(() => {
     if (availableBomParts.length > 0 && !selectedBomItemId) {
-      setSelectedBomItemId(availableBomParts[0].bomItemId);
+      setSelectedBomItemId(availableBomParts[0]?.bomItemId ?? '');
     }
   }, [availableBomParts, selectedBomItemId]);
 
-const [costData, setCostData] = useState<CostCompetencyData[]>([]);
+  const [costData, setCostData] = useState<CostCompetencyData[]>([]);
   const [isLoadingCostData, setIsLoadingCostData] = useState(false);
   const [isEditingCost, setIsEditingCost] = useState(false);
   const [editingCostValues, setEditingCostValues] = useState<Record<string, any>>({});
@@ -578,12 +569,12 @@ const [costData, setCostData] = useState<CostCompetencyData[]>([]);
           // Single re-fetch after initialization
           const newPartWiseResult = await getPartWiseCostAnalysis(nominationId, selectedBomItemId);
           const transformedData = transformPartWiseCostToComponentData(
-            newPartWiseResult.costAnalysis, 
-            newPartWiseResult.baseData, 
+            newPartWiseResult.costAnalysis,
+            newPartWiseResult.baseData,
             vendors
           );
           setCostData(transformedData);
-          
+
           // Update part-wise summary for overview
           setPartWiseSummary(prev => ({
             ...prev,
@@ -591,12 +582,12 @@ const [costData, setCostData] = useState<CostCompetencyData[]>([]);
           }));
         } else {
           const transformedData = transformPartWiseCostToComponentData(
-            partWiseResult.costAnalysis, 
-            partWiseResult.baseData, 
+            partWiseResult.costAnalysis,
+            partWiseResult.baseData,
             vendors
           );
           setCostData(transformedData);
-          
+
           // Update part-wise summary for overview
           setPartWiseSummary(prev => ({
             ...prev,
@@ -908,7 +899,7 @@ const [costData, setCostData] = useState<CostCompetencyData[]>([]);
       if (!selectedBomItemId) {
         throw new Error('No BOM part selected for cost analysis');
       }
-      
+
       const bulkUpdateData = transformComponentDataToPartWise(updatedCostData, vendors, nominationId, selectedBomItemId);
       await bulkUpdatePartWiseCostAnalysis(nominationId, selectedBomItemId, bulkUpdateData);
 
@@ -944,7 +935,8 @@ const [costData, setCostData] = useState<CostCompetencyData[]>([]);
   };
 
   // Handle weight changes with API integration
-  const handleWeightChange = async (type: 'cost' | 'developmentCost' | 'leadTime', value: number) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleWeightChange = async (type: 'cost' | 'developmentCost' | 'leadTime', value: number) => {
     const newWeights = { ...factorWeights, [type]: value };
 
     // Validate weights sum to 100 (with tolerance for floating point precision)
@@ -1061,7 +1053,8 @@ const [costData, setCostData] = useState<CostCompetencyData[]>([]);
     return <TrendingDown className="h-3 w-3" />;
   };
 
-  const getBestSupplier = () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _getBestSupplier = () => {
     if (supplierSummary.length === 0) return 'No suppliers';
 
     const bestRank = Math.min(...supplierSummary.map(s => s.rank));
@@ -1136,7 +1129,7 @@ const [costData, setCostData] = useState<CostCompetencyData[]>([]);
                           <p className="text-gray-400 text-xs">Part: {part.partNumber}</p>
                         )}
                       </div>
-                      <Badge 
+                      <Badge
                         variant={selectedBomItemId === part.bomItemId ? "default" : "outline"}
                         className={selectedBomItemId === part.bomItemId ? "bg-blue-600" : "border-gray-600"}
                       >
@@ -1167,7 +1160,7 @@ const [costData, setCostData] = useState<CostCompetencyData[]>([]);
                           {partSummary.bestScore > 0 ? partSummary.bestScore.toFixed(2) : "No data"}
                         </span>
                       </div>
-                      
+
                       {/* Net Price (if available) */}
                       {partSummary.lowestCost > 0 && (
                         <div className="flex items-center justify-between">
