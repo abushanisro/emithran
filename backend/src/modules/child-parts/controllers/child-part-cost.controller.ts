@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 /**
  * Child Part Cost Controller
  *

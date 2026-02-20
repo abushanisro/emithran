@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -56,7 +57,7 @@ export class ProcessRoutesController {
   })
   async findAll(
     @Query() query: QueryProcessRoutesDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<PaginatedProcessRoutesResponseDto> {
     return this.processRoutesService.findAll(query, user.id, token);
@@ -72,7 +73,7 @@ export class ProcessRoutesController {
   @ApiResponse({ status: 404, description: 'Process route not found' })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteResponseDto> {
     return this.processRoutesService.findOne(id, user.id, token);
@@ -87,7 +88,7 @@ export class ProcessRoutesController {
   })
   async create(
     @Body() createDto: CreateProcessRouteDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteResponseDto> {
     return this.processRoutesService.create(createDto, user.id, token);
@@ -104,7 +105,7 @@ export class ProcessRoutesController {
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateProcessRouteDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteResponseDto> {
     return this.processRoutesService.update(id, updateDto, user.id, token);
@@ -117,7 +118,7 @@ export class ProcessRoutesController {
   @ApiResponse({ status: 404, description: 'Process route not found' })
   async delete(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<void> {
     return this.processRoutesService.delete(id, user.id, token);
@@ -137,7 +138,7 @@ export class ProcessRoutesController {
   async submitForReview(
     @Param('id') id: string,
     @Body() dto: WorkflowTransitionDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteResponseDto> {
     return this.processRoutesService.submitForReview(id, dto, user.id, token);
@@ -153,7 +154,7 @@ export class ProcessRoutesController {
   async approve(
     @Param('id') id: string,
     @Body() dto: WorkflowTransitionDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteResponseDto> {
     return this.processRoutesService.approve(id, dto, user.id, token);
@@ -169,7 +170,7 @@ export class ProcessRoutesController {
   async reject(
     @Param('id') id: string,
     @Body() dto: WorkflowTransitionDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteResponseDto> {
     return this.processRoutesService.reject(id, dto, user.id, token);
@@ -185,7 +186,7 @@ export class ProcessRoutesController {
   async activate(
     @Param('id') id: string,
     @Body() dto: WorkflowTransitionDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteResponseDto> {
     return this.processRoutesService.activate(id, dto, user.id, token);
@@ -201,7 +202,7 @@ export class ProcessRoutesController {
   async archive(
     @Param('id') id: string,
     @Body() dto: WorkflowTransitionDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteResponseDto> {
     return this.processRoutesService.archive(id, dto, user.id, token);
@@ -216,7 +217,7 @@ export class ProcessRoutesController {
   })
   async getWorkflowHistory(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<WorkflowHistoryResponseDto[]> {
     return this.processRoutesService.getWorkflowHistory(id, user.id, token);
@@ -235,7 +236,7 @@ export class ProcessRoutesController {
   })
   async getSteps(
     @Param('id') routeId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteStepResponseDto[]> {
     return this.processRoutesService.getSteps(routeId, user.id, token);
@@ -251,7 +252,7 @@ export class ProcessRoutesController {
   async addStep(
     @Param('id') routeId: string,
     @Body() createDto: CreateProcessRouteStepDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteStepResponseDto> {
     // Override routeId from URL param to ensure consistency
@@ -270,7 +271,7 @@ export class ProcessRoutesController {
   async updateStep(
     @Param('stepId') stepId: string,
     @Body() updateDto: UpdateProcessRouteStepDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteStepResponseDto> {
     return this.processRoutesService.updateStep(stepId, updateDto, user.id, token);
@@ -283,7 +284,7 @@ export class ProcessRoutesController {
   @ApiResponse({ status: 404, description: 'Process route step not found' })
   async deleteStep(
     @Param('stepId') stepId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<void> {
     return this.processRoutesService.deleteStep(stepId, user.id, token);
@@ -299,7 +300,7 @@ export class ProcessRoutesController {
   async reorderSteps(
     @Param('id') routeId: string,
     @Body() dto: ReorderProcessRouteStepsDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteStepResponseDto[]> {
     return this.processRoutesService.reorderSteps(routeId, dto, user.id, token);
@@ -320,7 +321,7 @@ export class ProcessRoutesController {
     @Param('id') routeId: string,
     @Param('stepId') stepId: string,
     @Body() dto: ExecuteCalculatorDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ProcessRouteStepResponseDto> {
     return this.processRoutesService.executeCalculator(routeId, stepId, dto, user.id, token);
@@ -335,7 +336,7 @@ export class ProcessRoutesController {
   })
   async getCostSummary(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<CostSummaryResponseDto> {
     return this.processRoutesService.getCostSummary(id, user.id, token);
@@ -354,7 +355,7 @@ export class ProcessRoutesController {
   })
   async getActiveSession(
     @Query('bomItemId') bomItemId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<SessionResponseDto | null> {
     return this.processRoutesService.getActiveSession(user.id, bomItemId, token);
@@ -369,7 +370,7 @@ export class ProcessRoutesController {
   })
   async saveSession(
     @Body() dto: SaveSessionDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<SessionResponseDto> {
     return this.processRoutesService.saveSession(user.id, dto, token);
@@ -387,7 +388,7 @@ export class ProcessRoutesController {
     type: [UserRoleResponseDto],
   })
   async getUserRoles(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<UserRoleResponseDto[]> {
     return this.processRoutesService.getUserRoles(user.id, token);
@@ -402,7 +403,7 @@ export class ProcessRoutesController {
   })
   async assignRole(
     @Body() dto: AssignRoleDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<UserRoleResponseDto> {
     return this.processRoutesService.assignRole(user.id, dto, token);
@@ -419,7 +420,7 @@ export class ProcessRoutesController {
   async updateRole(
     @Param('roleId') roleId: string,
     @Body() dto: UpdateRoleDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<UserRoleResponseDto> {
     return this.processRoutesService.updateRole(roleId, dto, user.id, token);

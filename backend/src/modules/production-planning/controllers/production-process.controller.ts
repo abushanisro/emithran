@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -34,7 +35,7 @@ export class ProductionProcessController {
   @ApiResponse({ type: ProductionProcessResponseDto })
   async getProductionProcess(
     @Param('id') id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<ProductionProcessResponseDto> {
     return this.productionProcessService.getProductionProcessById(id, user.id);
   }
@@ -44,7 +45,7 @@ export class ProductionProcessController {
   @ApiOperation({ summary: 'Delete production process' })
   async deleteProductionProcess(
     @Param('id') id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<void> {
     return this.productionProcessService.deleteProductionProcess(id, user.id);
   }
@@ -54,7 +55,7 @@ export class ProductionProcessController {
   @ApiResponse({ type: [ProductionProcessResponseDto] })
   async getProcessesByLot(
     @Param('lotId') lotId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<ProductionProcessResponseDto[]> {
     return this.productionProcessService.getProcessesByLot(lotId, user.id);
   }
@@ -65,7 +66,7 @@ export class ProductionProcessController {
   async assignVendorToProcess(
     @Param('processId') processId: string,
     @Body() assignmentDto: CreateLotVendorAssignmentDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<VendorAssignmentResponseDto> {
     return this.productionProcessService.assignVendorToProcess(processId, assignmentDto, user.id);
   }
@@ -75,7 +76,7 @@ export class ProductionProcessController {
   @ApiResponse({ type: [VendorAssignmentResponseDto] })
   async getProcessVendorAssignments(
     @Param('processId') processId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<VendorAssignmentResponseDto[]> {
     return this.productionProcessService.getProcessVendorAssignments(processId, user.id);
   }
@@ -86,7 +87,7 @@ export class ProductionProcessController {
   async updateVendorAssignment(
     @Param('assignmentId') assignmentId: string,
     @Body() updateDto: UpdateLotVendorAssignmentDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<VendorAssignmentResponseDto> {
     return this.productionProcessService.updateVendorAssignment(assignmentId, updateDto, user.id);
   }

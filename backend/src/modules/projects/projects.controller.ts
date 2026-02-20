@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -29,7 +30,7 @@ export class ProjectsController {
   @Get()
   @ApiOperation({ summary: 'Get all projects with pagination' })
   @ApiResponse({ status: 200, description: 'Projects retrieved successfully', type: ProjectListResponseDto })
-  async findAll(@Query() query: QueryProjectsDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProjectListResponseDto> {
+  async findAll(@Query() query: QueryProjectsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProjectListResponseDto> {
     return this.projectsService.findAll(query, user.id, token);
   }
 
@@ -40,7 +41,7 @@ export class ProjectsController {
   @ApiResponse({ status: 400, description: 'Invalid project ID format' })
   @ApiResponse({ status: 404, description: 'Project not found or access denied' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProjectResponseDto> {
+  async findOne(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProjectResponseDto> {
     return this.projectsService.findOne(id, user.id, token);
   }
 
@@ -51,7 +52,7 @@ export class ProjectsController {
   @ApiResponse({ status: 201, description: 'Project created successfully', type: ProjectResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid input data or project name already exists' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async create(@Body() createProjectDto: CreateProjectDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProjectResponseDto> {
+  async create(@Body() createProjectDto: CreateProjectDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProjectResponseDto> {
     return this.projectsService.create(createProjectDto, user.id, token);
   }
 
@@ -63,7 +64,7 @@ export class ProjectsController {
   @ApiResponse({ status: 400, description: 'Invalid input data, project ID format, or project name already exists' })
   @ApiResponse({ status: 404, description: 'Project not found or access denied' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProjectResponseDto> {
+  async update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProjectResponseDto> {
     return this.projectsService.update(id, updateProjectDto, user.id, token);
   }
 
@@ -74,14 +75,14 @@ export class ProjectsController {
   @ApiResponse({ status: 400, description: 'Invalid project ID format' })
   @ApiResponse({ status: 404, description: 'Project not found or access denied' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async remove(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async remove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.projectsService.remove(id, user.id, token);
   }
 
   @Get(':id/cost-analysis')
   @ApiOperation({ summary: 'Get project cost analysis' })
   @ApiResponse({ status: 200, description: 'Cost analysis retrieved successfully' })
-  async getCostAnalysis(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async getCostAnalysis(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.projectsService.getCostAnalysis(id, user.id, token);
   }
 
@@ -92,28 +93,28 @@ export class ProjectsController {
   @Get(':id/team')
   @ApiOperation({ summary: 'Get project team members' })
   @ApiResponse({ status: 200, description: 'Team members retrieved successfully', type: TeamMembersListResponseDto })
-  async getTeamMembers(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string): Promise<TeamMembersListResponseDto> {
+  async getTeamMembers(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<TeamMembersListResponseDto> {
     return this.projectsService.getTeamMembers(id, user.id, token);
   }
 
   @Post(':id/team')
   @ApiOperation({ summary: 'Add team member to project' })
   @ApiResponse({ status: 201, description: 'Team member added successfully', type: TeamMemberResponseDto })
-  async addTeamMember(@Param('id') id: string, @Body() dto: AddTeamMemberDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<TeamMemberResponseDto> {
+  async addTeamMember(@Param('id') id: string, @Body() dto: AddTeamMemberDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<TeamMemberResponseDto> {
     return this.projectsService.addTeamMember(id, dto, user.id, token);
   }
 
   @Put(':id/team/:memberId')
   @ApiOperation({ summary: 'Update team member role' })
   @ApiResponse({ status: 200, description: 'Team member updated successfully', type: TeamMemberResponseDto })
-  async updateTeamMember(@Param('id') id: string, @Param('memberId') memberId: string, @Body() dto: UpdateTeamMemberDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<TeamMemberResponseDto> {
+  async updateTeamMember(@Param('id') id: string, @Param('memberId') memberId: string, @Body() dto: UpdateTeamMemberDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<TeamMemberResponseDto> {
     return this.projectsService.updateTeamMember(id, memberId, dto, user.id, token);
   }
 
   @Delete(':id/team/:memberId')
   @ApiOperation({ summary: 'Remove team member from project' })
   @ApiResponse({ status: 200, description: 'Team member removed successfully' })
-  async removeTeamMember(@Param('id') id: string, @Param('memberId') memberId: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async removeTeamMember(@Param('id') id: string, @Param('memberId') memberId: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.projectsService.removeTeamMember(id, memberId, user.id, token);
   }
 }

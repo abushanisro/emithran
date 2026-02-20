@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -108,7 +109,7 @@ export class ProcessesController {
   @Get()
   @ApiOperation({ summary: 'Get all processes' })
   @ApiResponse({ status: 200, description: 'Processes retrieved successfully', type: ProcessListResponseDto })
-  async findAll(@Query() query: QueryProcessesDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProcessListResponseDto> {
+  async findAll(@Query() query: QueryProcessesDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProcessListResponseDto> {
     return this.processesService.findAll(query, user.id, token);
   }
 
@@ -116,28 +117,28 @@ export class ProcessesController {
   @ApiOperation({ summary: 'Get process by ID' })
   @ApiResponse({ status: 200, description: 'Process retrieved successfully', type: ProcessResponseDto })
   @ApiResponse({ status: 404, description: 'Process not found' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProcessResponseDto> {
+  async findOne(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProcessResponseDto> {
     return this.processesService.findOne(id, user.id, token);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create new process' })
   @ApiResponse({ status: 201, description: 'Process created successfully', type: ProcessResponseDto })
-  async create(@Body() createProcessDto: CreateProcessDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProcessResponseDto> {
+  async create(@Body() createProcessDto: CreateProcessDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProcessResponseDto> {
     return this.processesService.create(createProcessDto, user.id, token);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Update process' })
   @ApiResponse({ status: 200, description: 'Process updated successfully', type: ProcessResponseDto })
-  async update(@Param('id') id: string, @Body() updateProcessDto: UpdateProcessDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProcessResponseDto> {
+  async update(@Param('id') id: string, @Body() updateProcessDto: UpdateProcessDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProcessResponseDto> {
     return this.processesService.update(id, updateProcessDto, user.id, token);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete process' })
   @ApiResponse({ status: 200, description: 'Process deleted successfully' })
-  async remove(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async remove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.processesService.remove(id, user.id, token);
   }
 

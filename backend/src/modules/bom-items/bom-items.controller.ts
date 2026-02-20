@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -39,44 +40,63 @@ export class BOMItemsController {
   @Get()
   @ApiOperation({ summary: 'Get all BOM items' })
   @ApiResponse({ status: 200, description: 'BOM items retrieved successfully', type: BOMItemListResponseDto })
-  async findAll(@Query() query: QueryBOMItemsDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<BOMItemListResponseDto> {
-    const { bomId, search, itemType, page, limit } = query;
-    return this.bomItemsService.findAll(bomId, search, itemType, page, limit, user.id, token);
+  async findAll(@Query() query: QueryBOMItemsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMItemListResponseDto> {
+    try {
+      this.logger.log(`Finding BOM items for user: ${user?.id || 'unknown'}`);
+      
+      if (!user?.id) {
+        throw new BadRequestException('User authentication required');
+      }
+      
+      const { bomId, search, itemType, page, limit } = query;
+      return await this.bomItemsService.findAll(bomId, search, itemType, page, limit, user.id, token);
+    } catch (error) {
+      this.logger.error(`Failed to find BOM items: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get BOM item by ID' })
   @ApiResponse({ status: 200, description: 'BOM item retrieved successfully', type: BOMItemResponseDto })
   @ApiResponse({ status: 404, description: 'BOM item not found' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string): Promise<BOMItemResponseDto> {
+  async findOne(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMItemResponseDto> {
     return this.bomItemsService.findOne(id, user.id, token);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create new BOM item' })
   @ApiResponse({ status: 201, description: 'BOM item created successfully', type: BOMItemResponseDto })
-  async create(@Body() createBOMItemDto: CreateBOMItemDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<BOMItemResponseDto> {
-    return this.bomItemsService.create(createBOMItemDto, user.id, token);
+  async create(@Body() createBOMItemDto: CreateBOMItemDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMItemResponseDto> {
+    try {
+      if (!user?.id) {
+        throw new BadRequestException('User authentication required');
+      }
+      return await this.bomItemsService.create(createBOMItemDto, user.id, token);
+    } catch (error) {
+      this.logger.error(`Failed to create BOM item: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Update BOM item' })
   @ApiResponse({ status: 200, description: 'BOM item updated successfully', type: BOMItemResponseDto })
-  async update(@Param('id') id: string, @Body() updateBOMItemDto: UpdateBOMItemDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<BOMItemResponseDto> {
+  async update(@Param('id') id: string, @Body() updateBOMItemDto: UpdateBOMItemDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMItemResponseDto> {
     return this.bomItemsService.update(id, updateBOMItemDto, user.id, token);
   }
 
   @Get(':id/dependencies')
   @ApiOperation({ summary: 'Check BOM item delete dependencies' })
   @ApiResponse({ status: 200, description: 'Dependencies checked successfully' })
-  async checkDeleteDependencies(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async checkDeleteDependencies(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.bomItemsService.checkDeleteDependencies(id, user.id, token);
   }
 
   @Delete(':id/force')
   @ApiOperation({ summary: 'Force delete BOM item with cascade cleanup' })
   @ApiResponse({ status: 200, description: 'BOM item force deleted successfully' })
-  async forceRemove(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async forceRemove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     // This calls the same cascade delete but with explicit force intent
     return this.bomItemsService.remove(id, user.id, token);
   }
@@ -85,7 +105,7 @@ export class BOMItemsController {
   @ApiOperation({ summary: 'Delete BOM item' })
   @ApiResponse({ status: 200, description: 'BOM item deleted successfully' })
   @ApiResponse({ status: 400, description: 'Cannot delete - item has dependencies' })
-  async remove(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async remove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.bomItemsService.remove(id, user.id, token);
   }
 
@@ -94,7 +114,7 @@ export class BOMItemsController {
   @ApiResponse({ status: 200, description: 'Sort order updated successfully' })
   async updateSortOrder(
     @Body() body: { items: Array<{ id: string; sortOrder: number }> },
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.bomItemsService.updateSortOrder(body.items, user.id, token);
@@ -106,7 +126,7 @@ export class BOMItemsController {
   async getFileUrl(
     @Param('id') id: string,
     @Param('fileType') fileType: '2d' | '3d',
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<{ url: string }> {
     const bomItem = await this.bomItemsService.findOne(id, user.id, token);
@@ -135,7 +155,7 @@ export class BOMItemsController {
   async uploadFiles(
     @Param('id') id: string,
     @UploadedFiles() files: { file2d?: any[]; file3d?: any[] },
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<BOMItemResponseDto> {
     // Validate files are provided before processing
@@ -242,7 +262,7 @@ export class BOMItemsController {
   @ApiResponse({ status: 400, description: 'No STEP file found or CAD engine unavailable' })
   async convertStepFile(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<BOMItemResponseDto> {
     // Get BOM item

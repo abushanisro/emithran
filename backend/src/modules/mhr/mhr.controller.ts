@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -28,7 +29,7 @@ export class MHRController {
   @Get()
   @ApiOperation({ summary: 'Get all MHR records with pagination and filters' })
   @ApiResponse({ status: 200, description: 'MHR records retrieved successfully', type: MHRListResponseDto })
-  async findAll(@Query() query: QueryMHRDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<MHRListResponseDto> {
+  async findAll(@Query() query: QueryMHRDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<MHRListResponseDto> {
     try {
       this.logger.log(`Fetching MHR records for user ${user.id}${query.search ? ` with search: ${query.search}` : ''}`);
       return await this.mhrService.findAll(query, user.id, token);
@@ -42,7 +43,7 @@ export class MHRController {
   @ApiOperation({ summary: 'Get MHR record by ID' })
   @ApiResponse({ status: 200, description: 'MHR record retrieved successfully', type: MHRResponseDto })
   @ApiResponse({ status: 404, description: 'MHR record not found' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string): Promise<MHRResponseDto> {
+  async findOne(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<MHRResponseDto> {
     try {
       this.logger.log(`Fetching MHR record ${id} for user ${user.id}`);
       return await this.mhrService.findOne(id, user.id, token);
@@ -55,7 +56,7 @@ export class MHRController {
   @Post()
   @ApiOperation({ summary: 'Create new MHR record' })
   @ApiResponse({ status: 201, description: 'MHR record created successfully', type: MHRResponseDto })
-  async create(@Body() createMHRDto: CreateMHRDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<MHRResponseDto> {
+  async create(@Body() createMHRDto: CreateMHRDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<MHRResponseDto> {
     try {
       this.logger.log(`Creating MHR record '${createMHRDto.machineName}' for user ${user.id}`);
       return await this.mhrService.create(createMHRDto, user.id, token);
@@ -68,7 +69,7 @@ export class MHRController {
   @Put(':id')
   @ApiOperation({ summary: 'Update MHR record' })
   @ApiResponse({ status: 200, description: 'MHR record updated successfully', type: MHRResponseDto })
-  async update(@Param('id') id: string, @Body() updateMHRDto: UpdateMHRDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<MHRResponseDto> {
+  async update(@Param('id') id: string, @Body() updateMHRDto: UpdateMHRDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<MHRResponseDto> {
     try {
       this.logger.log(`Updating MHR record ${id} for user ${user.id}`);
       return await this.mhrService.update(id, updateMHRDto, user.id, token);
@@ -81,7 +82,7 @@ export class MHRController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete MHR record' })
   @ApiResponse({ status: 200, description: 'MHR record deleted successfully' })
-  async remove(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async remove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     try {
       this.logger.log(`Deleting MHR record ${id} for user ${user.id}`);
       return await this.mhrService.remove(id, user.id, token);

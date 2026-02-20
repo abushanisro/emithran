@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import { 
   Controller, 
   Get, 
@@ -55,7 +56,7 @@ export class RfqController {
     type: RfqRecord
   })
   async create(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Body() createRfqDto: CreateRfqDto
   ): Promise<RfqRecord> {
     try {
@@ -80,7 +81,7 @@ export class RfqController {
     type: [RfqSummary]
   })
   async findAll(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Query('projectId') projectId?: string
   ): Promise<RfqSummary[]> {
     try {
@@ -104,7 +105,7 @@ export class RfqController {
     type: RfqTrackingResponseDto
   })
   async createTracking(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
     @Body() createTrackingDto: CreateRfqTrackingDto
   ): Promise<RfqTrackingResponseDto> {
@@ -134,7 +135,7 @@ export class RfqController {
     description: 'Project ID is required'
   })
   async getTracking(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
     @Query('projectId') projectId: string
   ): Promise<RfqTrackingResponseDto[]> {
@@ -168,7 +169,7 @@ export class RfqController {
     description: 'Project ID is required'
   })
   async getTrackingStats(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
     @Query('projectId') projectId: string
   ): Promise<RfqTrackingStatsDto> {
@@ -196,7 +197,7 @@ export class RfqController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'RFQ tracking not found' })
   async getTrackingById(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string
   ): Promise<RfqTrackingResponseDto> {
     try {
@@ -217,7 +218,7 @@ export class RfqController {
   })
   async updateTrackingStatus(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
     @Body() updateStatusDto: UpdateTrackingStatusDto
   ): Promise<{ message: string }> {
@@ -242,7 +243,7 @@ export class RfqController {
   async updateVendorResponse(
     @Param('trackingId') trackingId: string,
     @Param('vendorId') vendorId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
     @Body() updateResponseDto: UpdateVendorResponseDto
   ): Promise<{ message: string }> {
@@ -271,7 +272,7 @@ export class RfqController {
   })
   async deleteTracking(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string
   ): Promise<{ message: string }> {
     try {
@@ -299,7 +300,7 @@ export class RfqController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'RFQ not found' })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<RfqRecord> {
     try {
       this.logger.log(`Fetching RFQ ${id} for user ${user.id}`);
@@ -323,7 +324,7 @@ export class RfqController {
   })
   async sendRfq(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string
   ): Promise<{ message: string }> {
     try {
@@ -345,7 +346,7 @@ export class RfqController {
   })
   async closeRfq(
     @Param('id') id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<{ message: string }> {
     try {
       this.logger.log(`Closing RFQ ${id}`);

@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, ParseUUIDPipe, ValidationPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { VendorQuotesService } from './vendor-quotes.service';
@@ -15,7 +16,7 @@ export class VendorQuotesController {
   @ApiResponse({ status: 201, description: 'Quote created successfully' })
   async createQuote(
     @Body(ValidationPipe) createQuoteDto: CreateVendorQuoteDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.createQuote(createQuoteDto, user.id);
   }
@@ -25,7 +26,7 @@ export class VendorQuotesController {
   @ApiResponse({ status: 200, description: 'Quotes retrieved successfully' })
   async getQuotesByNomination(
     @Param('nominationId', ParseUUIDPipe) nominationId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Query('status') status?: string
   ) {
     return this.vendorQuotesService.getQuotesByNomination(nominationId, user.id, status);
@@ -36,7 +37,7 @@ export class VendorQuotesController {
   @ApiResponse({ status: 200, description: 'Quote retrieved successfully' })
   async getQuoteById(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.getQuoteById(id, user.id);
   }
@@ -47,7 +48,7 @@ export class VendorQuotesController {
   async updateQuote(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) updateQuoteDto: UpdateVendorQuoteDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.updateQuote(id, updateQuoteDto, user.id);
   }
@@ -57,7 +58,7 @@ export class VendorQuotesController {
   @ApiResponse({ status: 200, description: 'Quote deleted successfully' })
   async deleteQuote(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.deleteQuote(id, user.id);
   }
@@ -68,7 +69,7 @@ export class VendorQuotesController {
   async addLineItem(
     @Param('id', ParseUUIDPipe) quoteId: string,
     @Body(ValidationPipe) lineItemDto: VendorQuoteLineItemDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.addLineItem(quoteId, lineItemDto, user.id);
   }
@@ -80,7 +81,7 @@ export class VendorQuotesController {
     @Param('id', ParseUUIDPipe) quoteId: string,
     @Param('lineItemId', ParseUUIDPipe) lineItemId: string,
     @Body(ValidationPipe) lineItemDto: VendorQuoteLineItemDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.updateLineItem(quoteId, lineItemId, lineItemDto, user.id);
   }
@@ -91,7 +92,7 @@ export class VendorQuotesController {
   async deleteLineItem(
     @Param('id', ParseUUIDPipe) quoteId: string,
     @Param('lineItemId', ParseUUIDPipe) lineItemId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.deleteLineItem(quoteId, lineItemId, user.id);
   }
@@ -101,7 +102,7 @@ export class VendorQuotesController {
   @ApiResponse({ status: 200, description: 'Quote submitted successfully' })
   async submitQuote(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.submitQuote(id, user.id);
   }
@@ -112,7 +113,7 @@ export class VendorQuotesController {
   async approveQuote(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() reviewData: { reviewNotes?: string },
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.approveQuote(id, user.id, reviewData.reviewNotes);
   }
@@ -123,7 +124,7 @@ export class VendorQuotesController {
   async rejectQuote(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() reviewData: { reviewNotes: string },
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.rejectQuote(id, user.id, reviewData.reviewNotes);
   }
@@ -134,7 +135,7 @@ export class VendorQuotesController {
   async compareQuotes(
     @Param('nominationId', ParseUUIDPipe) nominationId: string,
     @Param('bomItemId', ParseUUIDPipe) bomItemId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.compareQuotesForBomItem(nominationId, bomItemId, user.id);
   }
@@ -144,7 +145,7 @@ export class VendorQuotesController {
   @ApiResponse({ status: 201, description: 'Vendor assigned successfully' })
   async assignVendorToBomPart(
     @Body(ValidationPipe) assignmentDto: VendorAssignmentDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.assignVendorToBomPart(assignmentDto, user.id);
   }
@@ -154,7 +155,7 @@ export class VendorQuotesController {
   @ApiResponse({ status: 200, description: 'Vendor assignments retrieved successfully' })
   async getVendorAssignments(
     @Param('nominationId', ParseUUIDPipe) nominationId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.getVendorAssignments(nominationId, user.id);
   }
@@ -165,7 +166,7 @@ export class VendorQuotesController {
   async updateVendorAssignment(
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
     @Body(ValidationPipe) updateData: Partial<VendorAssignmentDto>,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.updateVendorAssignment(assignmentId, updateData, user.id);
   }
@@ -176,7 +177,7 @@ export class VendorQuotesController {
   async calculateCompetitivenessScores(
     @Param('nominationId', ParseUUIDPipe) nominationId: string,
     @Param('bomItemId', ParseUUIDPipe) bomItemId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.calculateCompetitivenessScores(nominationId, bomItemId, user.id);
   }
@@ -188,7 +189,7 @@ export class VendorQuotesController {
   async getQuotesDashboard(
     @Param('nominationId', ParseUUIDPipe) nominationId: string,
     @Query('includeUnquoted') includeUnquoted: boolean = false,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ) {
     return this.vendorQuotesService.getQuotesDashboard(nominationId, user.id, includeUnquoted);
   }

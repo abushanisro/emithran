@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -41,7 +42,7 @@ export class VendorsController {
   @Get()
   @ApiOperation({ summary: 'Get all vendors with advanced filtering' })
   @ApiResponse({ status: 200, description: 'Vendors retrieved successfully' })
-  async findAll(@Query() query: QueryVendorsDto, @CurrentUser() user: any, @AccessToken() token: string) {
+  async findAll(@Query() query: QueryVendorsDto, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.findAll(query, user.id, token);
   }
 
@@ -56,7 +57,7 @@ export class VendorsController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadCsv(
     @UploadedFile() file: Express.Multer.File,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.vendorsService.importFromCsv(file, user.id, token);
@@ -65,7 +66,7 @@ export class VendorsController {
   @Get('equipment-types')
   @ApiOperation({ summary: 'Get all unique equipment types' })
   @ApiResponse({ status: 200, description: 'Equipment types retrieved successfully' })
-  async getEquipmentTypes(@CurrentUser() user: any, @AccessToken() token: string) {
+  async getEquipmentTypes(@CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.getEquipmentTypes(user.id, token);
   }
 
@@ -77,14 +78,14 @@ export class VendorsController {
   @ApiOperation({ summary: 'Get vendor by ID' })
   @ApiResponse({ status: 200, description: 'Vendor retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Vendor not found' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.findOne(id, user.id, token);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create new vendor' })
   @ApiResponse({ status: 201, description: 'Vendor created successfully' })
-  async create(@Body() createVendorDto: CreateVendorDto, @CurrentUser() user: any, @AccessToken() token: string) {
+  async create(@Body() createVendorDto: CreateVendorDto, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.create(createVendorDto, user.id, token);
   }
 
@@ -92,7 +93,7 @@ export class VendorsController {
   @ApiOperation({ summary: 'Update vendor' })
   @ApiResponse({ status: 200, description: 'Vendor updated successfully' })
   @ApiResponse({ status: 404, description: 'Vendor not found' })
-  async update(@Param('id', ParseUUIDPipe) id: string, @Body() updateVendorDto: UpdateVendorDto, @CurrentUser() user: any, @AccessToken() token: string) {
+  async update(@Param('id', ParseUUIDPipe) id: string, @Body() updateVendorDto: UpdateVendorDto, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.update(id, updateVendorDto, user.id, token);
   }
 
@@ -100,14 +101,14 @@ export class VendorsController {
   @ApiOperation({ summary: 'Delete vendor' })
   @ApiResponse({ status: 200, description: 'Vendor deleted successfully' })
   @ApiResponse({ status: 404, description: 'Vendor not found' })
-  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.remove(id, user.id, token);
   }
 
   @Delete()
   @ApiOperation({ summary: 'Delete all vendors' })
   @ApiResponse({ status: 200, description: 'All vendors deleted successfully' })
-  async removeAll(@CurrentUser() user: any, @AccessToken() token: string) {
+  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.removeAll(user.id, token);
   }
 
@@ -118,14 +119,14 @@ export class VendorsController {
   @Get(':vendorId/equipment')
   @ApiOperation({ summary: 'Get equipment for a vendor' })
   @ApiResponse({ status: 200, description: 'Equipment retrieved successfully' })
-  async findEquipment(@Param('vendorId', ParseUUIDPipe) vendorId: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async findEquipment(@Param('vendorId', ParseUUIDPipe) vendorId: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.findEquipment(vendorId, user.id, token);
   }
 
   @Post('equipment')
   @ApiOperation({ summary: 'Add equipment to vendor' })
   @ApiResponse({ status: 201, description: 'Equipment created successfully' })
-  async createEquipment(@Body() createEquipmentDto: CreateVendorEquipmentDto, @CurrentUser() user: any, @AccessToken() token: string) {
+  async createEquipment(@Body() createEquipmentDto: CreateVendorEquipmentDto, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.createEquipment(createEquipmentDto, user.id, token);
   }
 
@@ -133,7 +134,7 @@ export class VendorsController {
   @ApiOperation({ summary: 'Update equipment' })
   @ApiResponse({ status: 200, description: 'Equipment updated successfully' })
   @ApiResponse({ status: 404, description: 'Equipment not found' })
-  async updateEquipment(@Param('id') id: string, @Body() updateEquipmentDto: UpdateVendorEquipmentDto, @CurrentUser() user: any, @AccessToken() token: string) {
+  async updateEquipment(@Param('id') id: string, @Body() updateEquipmentDto: UpdateVendorEquipmentDto, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.updateEquipment(id, updateEquipmentDto, user.id, token);
   }
 
@@ -141,7 +142,7 @@ export class VendorsController {
   @ApiOperation({ summary: 'Delete equipment' })
   @ApiResponse({ status: 200, description: 'Equipment deleted successfully' })
   @ApiResponse({ status: 404, description: 'Equipment not found' })
-  async removeEquipment(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async removeEquipment(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.removeEquipment(id, user.id, token);
   }
 
@@ -152,14 +153,14 @@ export class VendorsController {
   @Get(':vendorId/services')
   @ApiOperation({ summary: 'Get services for a vendor' })
   @ApiResponse({ status: 200, description: 'Services retrieved successfully' })
-  async findServices(@Param('vendorId', ParseUUIDPipe) vendorId: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async findServices(@Param('vendorId', ParseUUIDPipe) vendorId: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.findServices(vendorId, user.id, token);
   }
 
   @Post('services')
   @ApiOperation({ summary: 'Add service to vendor' })
   @ApiResponse({ status: 201, description: 'Service created successfully' })
-  async createService(@Body() createServiceDto: CreateVendorServiceDto, @CurrentUser() user: any, @AccessToken() token: string) {
+  async createService(@Body() createServiceDto: CreateVendorServiceDto, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.createService(createServiceDto, user.id, token);
   }
 
@@ -167,7 +168,7 @@ export class VendorsController {
   @ApiOperation({ summary: 'Update service' })
   @ApiResponse({ status: 200, description: 'Service updated successfully' })
   @ApiResponse({ status: 404, description: 'Service not found' })
-  async updateService(@Param('id') id: string, @Body() updateServiceDto: UpdateVendorServiceDto, @CurrentUser() user: any, @AccessToken() token: string) {
+  async updateService(@Param('id') id: string, @Body() updateServiceDto: UpdateVendorServiceDto, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.updateService(id, updateServiceDto, user.id, token);
   }
 
@@ -175,7 +176,7 @@ export class VendorsController {
   @ApiOperation({ summary: 'Delete service' })
   @ApiResponse({ status: 200, description: 'Service deleted successfully' })
   @ApiResponse({ status: 404, description: 'Service not found' })
-  async removeService(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async removeService(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.removeService(id, user.id, token);
   }
 
@@ -186,14 +187,14 @@ export class VendorsController {
   @Get(':vendorId/contacts')
   @ApiOperation({ summary: 'Get contacts for a vendor' })
   @ApiResponse({ status: 200, description: 'Contacts retrieved successfully' })
-  async findContacts(@Param('vendorId', ParseUUIDPipe) vendorId: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async findContacts(@Param('vendorId', ParseUUIDPipe) vendorId: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.findContacts(vendorId, user.id, token);
   }
 
   @Post('contacts')
   @ApiOperation({ summary: 'Add contact to vendor' })
   @ApiResponse({ status: 201, description: 'Contact created successfully' })
-  async createContact(@Body() createContactDto: CreateVendorContactDto, @CurrentUser() user: any, @AccessToken() token: string) {
+  async createContact(@Body() createContactDto: CreateVendorContactDto, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.createContact(createContactDto, user.id, token);
   }
 
@@ -201,7 +202,7 @@ export class VendorsController {
   @ApiOperation({ summary: 'Update contact' })
   @ApiResponse({ status: 200, description: 'Contact updated successfully' })
   @ApiResponse({ status: 404, description: 'Contact not found' })
-  async updateContact(@Param('id') id: string, @Body() updateContactDto: UpdateVendorContactDto, @CurrentUser() user: any, @AccessToken() token: string) {
+  async updateContact(@Param('id') id: string, @Body() updateContactDto: UpdateVendorContactDto, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.updateContact(id, updateContactDto, user.id, token);
   }
 
@@ -209,7 +210,7 @@ export class VendorsController {
   @ApiOperation({ summary: 'Delete contact' })
   @ApiResponse({ status: 200, description: 'Contact deleted successfully' })
   @ApiResponse({ status: 404, description: 'Contact not found' })
-  async removeContact(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async removeContact(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.removeContact(id, user.id, token);
   }
 }

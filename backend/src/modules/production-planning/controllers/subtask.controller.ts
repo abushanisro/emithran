@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -25,7 +26,7 @@ export class SubtaskController {
   @ApiResponse({ type: SubtaskResponseDto })
   async createSubtask(
     @Body() createDto: CreateSubtaskDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<SubtaskResponseDto> {
     return this.subtaskService.createSubtask(createDto, user.id);
   }
@@ -35,7 +36,7 @@ export class SubtaskController {
   @ApiResponse({ type: SubtaskResponseDto })
   async getSubtaskById(
     @Param('id') id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<SubtaskResponseDto> {
     return this.subtaskService.getSubtaskById(id, user.id);
   }
@@ -45,7 +46,7 @@ export class SubtaskController {
   @ApiResponse({ type: [SubtaskResponseDto] })
   async getSubtasksByProcess(
     @Param('processId') processId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<SubtaskResponseDto[]> {
     return this.subtaskService.getSubtasksByProcess(processId, user.id);
   }
@@ -56,7 +57,7 @@ export class SubtaskController {
   async updateSubtask(
     @Param('id') id: string,
     @Body() updateDto: UpdateSubtaskDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<SubtaskResponseDto> {
     return this.subtaskService.updateSubtask(id, updateDto, user.id);
   }
@@ -65,7 +66,7 @@ export class SubtaskController {
   @ApiOperation({ summary: 'Delete subtask' })
   async deleteSubtask(
     @Param('id') id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: User
   ): Promise<void> {
     return this.subtaskService.deleteSubtask(id, user.id);
   }

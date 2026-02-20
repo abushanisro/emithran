@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -30,7 +31,7 @@ export class LSRController {
   @ApiResponse({ status: 409, description: 'Labour code already exists' })
   async create(
     @Body() createLSRDto: CreateLSRDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.lsrService.create(createLSRDto, user.id, token);
@@ -41,7 +42,7 @@ export class LSRController {
   @ApiResponse({ status: 200, description: 'LSR records retrieved successfully' })
   async findAll(
     @Query('search') search: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.lsrService.findAll(search, user.id, token);
@@ -54,7 +55,7 @@ export class LSRController {
   @ApiResponse({ status: 404, description: 'Labour code not found' })
   async findByLabourCode(
     @Param('labourCode') labourCode: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.lsrService.findByLabourCode(labourCode, user.id, token);
@@ -66,7 +67,7 @@ export class LSRController {
   @ApiResponse({ status: 404, description: 'LSR record not found' })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.lsrService.findOne(id, user.id, token);
@@ -79,7 +80,7 @@ export class LSRController {
   async update(
     @Param('id') id: string,
     @Body() updateLSRDto: UpdateLSRDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.lsrService.update(id, updateLSRDto, user.id, token);
@@ -92,7 +93,7 @@ export class LSRController {
   @ApiResponse({ status: 404, description: 'LSR record not found' })
   async remove(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.lsrService.remove(id, user.id, token);
@@ -104,7 +105,7 @@ export class LSRController {
   @ApiResponse({ status: 201, description: 'LSR records created successfully' })
   async bulkCreate(
     @Body() data: CreateLSRDto[],
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.lsrService.bulkCreate(data, user.id, token);

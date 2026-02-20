@@ -2,8 +2,6 @@ import { Injectable, Logger, NotFoundException, InternalServerErrorException, Ba
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AccessToken } from '../../common/decorators/access-token.decorator';
 
 @Injectable()
 export class BOMItemsService {

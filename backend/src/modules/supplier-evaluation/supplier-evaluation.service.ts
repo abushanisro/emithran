@@ -258,7 +258,7 @@ export class SupplierEvaluationService {
     ];
     
     for (const field of scoreFields) {
-      const value = dto[field];
+      const value = (dto as any)[field];
       if (value !== undefined && (value < 0 || value > 100)) {
         const fieldName = field.replace(/([A-Z])/g, ' $1').toLowerCase().replace(/^./, str => str.toUpperCase());
         throw new BadRequestException(`${fieldName} must be between 0 and 100.`);
@@ -401,7 +401,7 @@ export class SupplierEvaluationService {
     const missingScores = [];
     for (const field of requiredFields) {
       const fieldKey = field.replace(/([A-Z])/g, '_$1').toLowerCase();
-      if (!existing[fieldKey] && existing[fieldKey] !== 0) {
+      if (!(existing as any)[fieldKey] && (existing as any)[fieldKey] !== 0) {
         missingScores.push(field.replace(/([A-Z])/g, ' $1').toLowerCase());
       }
     }

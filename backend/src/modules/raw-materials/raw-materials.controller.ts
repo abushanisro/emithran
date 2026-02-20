@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -33,21 +34,21 @@ export class RawMaterialsController {
   @Get()
   @ApiOperation({ summary: 'Get all raw materials' })
   @ApiResponse({ status: 200, description: 'Raw materials retrieved successfully', type: RawMaterialListResponseDto })
-  async findAll(@Query() query: QueryRawMaterialsDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<RawMaterialListResponseDto> {
+  async findAll(@Query() query: QueryRawMaterialsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialListResponseDto> {
     return this.rawMaterialsService.findAll(query, user.id, token);
   }
 
   @Get('filter-options')
   @ApiOperation({ summary: 'Get unique filter options for raw materials' })
   @ApiResponse({ status: 200, description: 'Filter options retrieved successfully' })
-  async getFilterOptions(@CurrentUser() user: any, @AccessToken() token: string) {
+  async getFilterOptions(@CurrentUser() user: User, @AccessToken() token: string) {
     return this.rawMaterialsService.getFilterOptions(user.id, token);
   }
 
   @Get('grouped')
   @ApiOperation({ summary: 'Get raw materials grouped by material group' })
   @ApiResponse({ status: 200, description: 'Grouped materials retrieved successfully' })
-  async getGrouped(@CurrentUser() user: any, @AccessToken() token: string) {
+  async getGrouped(@CurrentUser() user: User, @AccessToken() token: string) {
     return this.rawMaterialsService.getGroupedByMaterialGroup(user.id, token);
   }
 
@@ -55,35 +56,35 @@ export class RawMaterialsController {
   @ApiOperation({ summary: 'Get raw material by ID' })
   @ApiResponse({ status: 200, description: 'Raw material retrieved successfully', type: RawMaterialResponseDto })
   @ApiResponse({ status: 404, description: 'Raw material not found' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
+  async findOne(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
     return this.rawMaterialsService.findOne(id, user.id, token);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create new raw material' })
   @ApiResponse({ status: 201, description: 'Raw material created successfully', type: RawMaterialResponseDto })
-  async create(@Body() createRawMaterialDto: CreateRawMaterialDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
+  async create(@Body() createRawMaterialDto: CreateRawMaterialDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
     return this.rawMaterialsService.create(createRawMaterialDto, user.id, token);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Update raw material' })
   @ApiResponse({ status: 200, description: 'Raw material updated successfully', type: RawMaterialResponseDto })
-  async update(@Param('id') id: string, @Body() updateRawMaterialDto: UpdateRawMaterialDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
+  async update(@Param('id') id: string, @Body() updateRawMaterialDto: UpdateRawMaterialDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
     return this.rawMaterialsService.update(id, updateRawMaterialDto, user.id, token);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete raw material' })
   @ApiResponse({ status: 200, description: 'Raw material deleted successfully' })
-  async remove(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
+  async remove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.rawMaterialsService.remove(id, user.id, token);
   }
 
   @Delete()
   @ApiOperation({ summary: 'Delete all raw materials for current user' })
   @ApiResponse({ status: 200, description: 'All raw materials deleted successfully' })
-  async removeAll(@CurrentUser() user: any, @AccessToken() token: string) {
+  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
     return this.rawMaterialsService.removeAll(user.id, token);
   }
 
@@ -95,7 +96,7 @@ export class RawMaterialsController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadExcel(
     @UploadedFile() file: Express.Multer.File,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<{ message: string; created: number; failed: number; errors?: any[] }> {
     this.logger.log(`Upload request received: ${file?.originalname || 'No file'}`, 'RawMaterialsController');

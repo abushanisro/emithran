@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Inject, forwardRef, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
@@ -30,7 +31,7 @@ export class CalculatorsController {
   @ApiResponse({ status: 200, description: 'Calculators retrieved successfully' })
   async findAll(
     @Query() query: QueryCalculatorDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.findAll(query, user.id, token);
@@ -42,7 +43,7 @@ export class CalculatorsController {
   @ApiResponse({ status: 404, description: 'Calculator not found' })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.findOne(id, user.id, token);
@@ -53,7 +54,7 @@ export class CalculatorsController {
   @ApiResponse({ status: 201, description: 'Calculator created successfully' })
   async create(
     @Body() dto: CreateCalculatorDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.create(dto, user.id, token);
@@ -65,7 +66,7 @@ export class CalculatorsController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateCalculatorDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.update(id, dto, user.id, token);
@@ -76,7 +77,7 @@ export class CalculatorsController {
   @ApiResponse({ status: 200, description: 'Calculator deleted successfully' })
   async remove(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.remove(id, user.id, token);
@@ -88,7 +89,7 @@ export class CalculatorsController {
   async execute(
     @Param('id') id: string,
     @Body() dto: ExecuteCalculatorDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.execute(id, dto, user.id, token);
@@ -102,7 +103,7 @@ export class CalculatorsController {
   @ApiOperation({ summary: 'Get all fields for a calculator' })
   async getFields(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.getFields(id, user.id, token);
@@ -113,7 +114,7 @@ export class CalculatorsController {
   async createField(
     @Param('id') id: string,
     @Body() dto: CreateFieldDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.createField(id, dto, user.id, token);
@@ -125,7 +126,7 @@ export class CalculatorsController {
     @Param('id') id: string,
     @Param('fieldId') fieldId: string,
     @Body() dto: UpdateFieldDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.updateField(id, fieldId, dto, user.id, token);
@@ -136,7 +137,7 @@ export class CalculatorsController {
   async removeField(
     @Param('id') id: string,
     @Param('fieldId') fieldId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.removeField(id, fieldId, user.id, token);
@@ -150,7 +151,7 @@ export class CalculatorsController {
   @ApiOperation({ summary: 'Get all formulas for a calculator' })
   async getFormulas(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.getFormulas(id, user.id, token);
@@ -161,7 +162,7 @@ export class CalculatorsController {
   async createFormula(
     @Param('id') id: string,
     @Body() dto: CreateFormulaDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.createFormula(id, dto, user.id, token);
@@ -173,7 +174,7 @@ export class CalculatorsController {
     @Param('id') id: string,
     @Param('formulaId') formulaId: string,
     @Body() dto: UpdateFormulaDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.updateFormula(id, formulaId, dto, user.id, token);
@@ -184,7 +185,7 @@ export class CalculatorsController {
   async removeFormula(
     @Param('id') id: string,
     @Param('formulaId') formulaId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.removeFormula(id, formulaId, user.id, token);

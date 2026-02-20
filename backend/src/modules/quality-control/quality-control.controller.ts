@@ -1,3 +1,4 @@
+interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -51,7 +52,7 @@ export class QualityControlController {
   @ApiResponse({ status: 201, description: 'Inspection created successfully' })
   async createInspection(
     @Body() createDto: CreateQualityInspectionDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
     try {
       this.logger.log(`Creating quality inspection: ${createDto.name}`);
@@ -70,7 +71,7 @@ export class QualityControlController {
   @ApiOperation({ summary: 'Get all quality inspections' })
   @ApiResponse({ status: 200, description: 'Inspections retrieved successfully' })
   async getInspections(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Query('projectId') projectId?: string,
     @Query('status') status?: string,
     @Query('type') type?: string,
@@ -94,7 +95,7 @@ export class QualityControlController {
   @ApiResponse({ status: 200, description: 'Inspection retrieved successfully' })
   async getInspectionById(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
     try {
       this.logger.log(`Fetching quality inspection ${id}`);
@@ -115,7 +116,7 @@ export class QualityControlController {
   async updateInspection(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateQualityInspectionDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
     try {
       this.logger.log(`Updating quality inspection ${id}`);
@@ -136,7 +137,7 @@ export class QualityControlController {
   @ApiResponse({ status: 200, description: 'Inspection deleted successfully' })
   async deleteInspection(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<void>> {
     try {
       this.logger.log(`Deleting quality inspection ${id}`);
@@ -161,7 +162,7 @@ export class QualityControlController {
   async submitInspectionResults(
     @Param('id', ParseUUIDPipe) inspectionId: string,
     @Body() resultsDto: InspectionResultDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<any>> {
     const result = await this.qualityInspectionService.submitInspectionResults(
       inspectionId,
@@ -176,7 +177,7 @@ export class QualityControlController {
   @ApiResponse({ status: 200, description: 'Results retrieved successfully' })
   async getInspectionResults(
     @Param('id', ParseUUIDPipe) inspectionId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<any>> {
     const result = await this.qualityInspectionService.getInspectionResults(
       inspectionId,
@@ -194,7 +195,7 @@ export class QualityControlController {
   @ApiResponse({ status: 200, description: 'Inspection started successfully' })
   async startInspection(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
     const result = await this.qualityInspectionService.startInspection(
       id,
@@ -209,7 +210,7 @@ export class QualityControlController {
   async completeInspection(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() completionData: { notes?: string; finalResult: 'pass' | 'fail' | 'conditional' },
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
     const result = await this.qualityInspectionService.completeInspection(
       id,
@@ -225,7 +226,7 @@ export class QualityControlController {
   async approveInspection(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() approvalData: { approverNotes?: string },
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
     const result = await this.qualityInspectionService.approveInspection(
       id,
@@ -241,7 +242,7 @@ export class QualityControlController {
   async rejectInspection(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() rejectionData: { rejectionReason: string; correctiveAction?: string },
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
     const result = await this.qualityInspectionService.rejectInspection(
       id,
@@ -261,7 +262,7 @@ export class QualityControlController {
   async createNonConformance(
     @Param('id', ParseUUIDPipe) inspectionId: string,
     @Body() nonConformanceData: any,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<any>> {
     const result = await this.qualityInspectionService.createNonConformance(
       inspectionId,
@@ -275,7 +276,7 @@ export class QualityControlController {
   @ApiOperation({ summary: 'Get all non-conformances' })
   @ApiResponse({ status: 200, description: 'Non-conformances retrieved successfully' })
   async getNonConformances(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Query('projectId') projectId?: string,
     @Query('status') status?: string,
     @Query('severity') severity?: string,
@@ -296,7 +297,7 @@ export class QualityControlController {
   @ApiResponse({ status: 200, description: 'Metrics retrieved successfully' })
   async getQualityMetrics(
     @Param('projectId', ParseUUIDPipe) projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ): Promise<CustomApiResponse<any>> {
@@ -319,7 +320,7 @@ export class QualityControlController {
   @ApiResponse({ status: 200, description: 'Report generated successfully' })
   async generateQualityReport(
     @Param('projectId', ParseUUIDPipe) projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Query('reportType') reportType?: string,
   ): Promise<CustomApiResponse<any>> {
     try {
@@ -345,7 +346,7 @@ export class QualityControlController {
   @ApiResponse({ status: 200, description: 'Dashboard data retrieved successfully' })
   async getQualityDashboard(
     @Param('projectId', ParseUUIDPipe) projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ): Promise<CustomApiResponse<any>> {
     try {
       this.logger.log(`Fetching quality dashboard for project ${projectId}`);
