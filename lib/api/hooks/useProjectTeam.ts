@@ -31,7 +31,17 @@ export function useAddTeamMember(projectId: string) {
       toast.success('Team member added successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to add team member');
+      if (error.status === 404) {
+        toast.error('This person hasn\'t joined the platform yet. Ask them to sign up first, then try adding them again.');
+      } else if (error.status === 400) {
+        toast.error('Please double-check the email address - it appears to be incorrect.');
+      } else if (error.status === 403) {
+        toast.error('You don\'t have permission to add team members to this project.');
+      } else if (error.status === 409) {
+        toast.error('This person is already a member of your project team.');
+      } else {
+        toast.error('Unable to add team member. Please try again or contact support.');
+      }
     },
   });
 }

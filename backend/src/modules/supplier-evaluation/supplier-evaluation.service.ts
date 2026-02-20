@@ -4,6 +4,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
@@ -72,7 +73,53 @@ export class SupplierEvaluationService {
 
     if (error) {
       this.logger.error(`Error creating evaluation: ${error.message}`, 'SupplierEvaluationService');
-      throw new InternalServerErrorException(`Failed to create evaluation: ${error.message}`);
+      
+      // Handle duplicate evaluation constraint
+      if (error.message.includes('duplicate key') && error.message.includes('supplier_evaluation_records')) {
+        if (error.message.includes('vendor_process_evaluation_unique')) {
+          throw new ConflictException(
+            'A supplier evaluation for this vendor and process combination already exists. Please update the existing evaluation instead.'
+          );
+        }
+        if (error.message.includes('vendor_bom_item_evaluation_unique')) {
+          throw new ConflictException(
+            'A supplier evaluation for this vendor and BOM item already exists. Please update the existing evaluation instead.'
+          );
+        }
+      }
+      
+      // Handle foreign key constraints
+      if (error.message.includes('violates foreign key constraint')) {
+        if (error.message.includes('vendor_id')) {
+          throw new BadRequestException('The specified vendor does not exist or you do not have access to it.');
+        }
+        if (error.message.includes('project_id')) {
+          throw new BadRequestException('The specified project does not exist or you do not have access to it.');
+        }
+        if (error.message.includes('bom_item_id')) {
+          throw new BadRequestException('The specified BOM item does not exist or has been deleted.');
+        }
+        if (error.message.includes('process_id')) {
+          throw new BadRequestException('The specified manufacturing process does not exist.');
+        }
+      }
+      
+      // Handle validation constraints
+      if (error.message.includes('violates check constraint')) {
+        if (error.message.includes('evaluation_scores_range')) {
+          throw new BadRequestException('Evaluation scores must be between 0 and 100.');
+        }
+        if (error.message.includes('evaluation_round_positive')) {
+          throw new BadRequestException('Evaluation round must be a positive number.');
+        }
+        if (error.message.includes('cost_values_positive')) {
+          throw new BadRequestException('Cost values must be positive numbers.');
+        }
+      }
+      
+      throw new InternalServerErrorException(
+        'Failed to create supplier evaluation. Please check your input and try again.'
+      );
     }
 
     // Calculate weighted score
@@ -128,7 +175,15 @@ export class SupplierEvaluationService {
 
     if (error) {
       this.logger.error(`Error fetching evaluations: ${error.message}`, 'SupplierEvaluationService');
-      throw new InternalServerErrorException(`Failed to fetch evaluations: ${error.message}`);
+      
+      // Handle access permissions
+      if (error.message.includes('row-level security policy')) {
+        throw new ForbiddenException('You do not have permission to access these supplier evaluations.');
+      }
+      
+      throw new InternalServerErrorException(
+        'Unable to retrieve supplier evaluations. Please try again later.'
+      );
     }
 
     return data.map((record) => this.mapToResponseDto(record));
@@ -152,8 +207,18 @@ export class SupplierEvaluationService {
       .eq('user_id', userId)
       .single();
 
-    if (error || !data) {
-      throw new NotFoundException(`Evaluation ${id} not found`);
+    if (error) {
+      this.logger.error(`Error fetching evaluation ${id}: ${error.message}`, 'SupplierEvaluationService');
+      
+      if (error.message.includes('row-level security policy')) {
+        throw new ForbiddenException('You do not have permission to access this supplier evaluation.');
+      }
+      
+      throw new InternalServerErrorException('Unable to retrieve the supplier evaluation. Please try again later.');
+    }
+    
+    if (!data) {
+      throw new NotFoundException(`Supplier evaluation with ID ${id} was not found or you do not have access to it.`);
     }
 
     return this.mapToResponseDto(data);
@@ -173,12 +238,39 @@ export class SupplierEvaluationService {
     // Check if evaluation exists and is not frozen
     const existing = await this.findOne(id, userId, accessToken);
     if (existing.isFrozen) {
-      throw new ForbiddenException('Cannot update frozen evaluation');
+      throw new ForbiddenException(
+        'This supplier evaluation has been approved and frozen. No further modifications are allowed. Create a new evaluation if changes are needed.'
+      );
     }
 
     // Guard recommendation status changes
     if (dto.recommendationStatus && existing.status === 'draft') {
-      throw new BadRequestException('Cannot set recommendation while evaluation is in draft status');
+      throw new BadRequestException(
+        'Cannot set recommendation status while evaluation is still in draft. Please complete the evaluation first.'
+      );
+    }
+
+    // Validate score ranges if provided
+    const scoreFields = [
+      'materialAvailabilityScore', 'equipmentCapabilityScore', 'processFeasibilityScore',
+      'qualityCertificationScore', 'financialStabilityScore', 'capacityScore', 
+      'leadTimeScore', 'costCompetitivenessScore', 'vendorRatingScore'
+    ];
+    
+    for (const field of scoreFields) {
+      const value = dto[field];
+      if (value !== undefined && (value < 0 || value > 100)) {
+        const fieldName = field.replace(/([A-Z])/g, ' $1').toLowerCase().replace(/^./, str => str.toUpperCase());
+        throw new BadRequestException(`${fieldName} must be between 0 and 100.`);
+      }
+    }
+
+    // Validate cost values if provided
+    if (dto.quotedCost !== undefined && dto.quotedCost < 0) {
+      throw new BadRequestException('Quoted cost must be a positive number.');
+    }
+    if (dto.marketAverageCost !== undefined && dto.marketAverageCost < 0) {
+      throw new BadRequestException('Market average cost must be a positive number.');
     }
 
     // Build update object
@@ -211,7 +303,27 @@ export class SupplierEvaluationService {
 
     if (error) {
       this.logger.error(`Error updating evaluation: ${error.message}`, 'SupplierEvaluationService');
-      throw new InternalServerErrorException(`Failed to update evaluation: ${error.message}`);
+      
+      // Handle concurrent update conflicts
+      if (error.message.includes('row was updated by another user')) {
+        throw new ConflictException(
+          'This evaluation has been modified by another user. Please refresh and try again.'
+        );
+      }
+      
+      // Handle validation constraints
+      if (error.message.includes('violates check constraint')) {
+        if (error.message.includes('evaluation_scores_range')) {
+          throw new BadRequestException('All evaluation scores must be between 0 and 100.');
+        }
+        if (error.message.includes('cost_values_positive')) {
+          throw new BadRequestException('Cost values must be positive numbers.');
+        }
+      }
+      
+      throw new InternalServerErrorException(
+        'Failed to update supplier evaluation. Please verify your input and try again.'
+      );
     }
 
     // Recalculate weighted score
@@ -229,7 +341,9 @@ export class SupplierEvaluationService {
     // Check if evaluation exists and is not frozen
     const existing = await this.findOne(id, userId, accessToken);
     if (existing.isFrozen) {
-      throw new ForbiddenException('Cannot delete frozen evaluation');
+      throw new ForbiddenException(
+        'This supplier evaluation has been approved and frozen. It cannot be deleted to maintain audit trail integrity.'
+      );
     }
 
     const { error } = await this.supabaseService
@@ -241,7 +355,17 @@ export class SupplierEvaluationService {
 
     if (error) {
       this.logger.error(`Error deleting evaluation: ${error.message}`, 'SupplierEvaluationService');
-      throw new InternalServerErrorException(`Failed to delete evaluation: ${error.message}`);
+      
+      // Handle foreign key constraint violations (evaluation referenced elsewhere)
+      if (error.message.includes('violates foreign key constraint')) {
+        throw new ConflictException(
+          'This supplier evaluation cannot be deleted as it is referenced by other records. Please archive it instead.'
+        );
+      }
+      
+      throw new InternalServerErrorException(
+        'Failed to delete supplier evaluation. Please try again later.'
+      );
     }
   }
 
@@ -257,7 +381,35 @@ export class SupplierEvaluationService {
 
     const existing = await this.findOne(id, userId, accessToken);
     if (existing.isFrozen) {
-      throw new ForbiddenException('Cannot change status of frozen evaluation');
+      throw new ForbiddenException(
+        'This supplier evaluation has been approved and frozen. Its status cannot be changed.'
+      );
+    }
+    
+    if (existing.status === 'completed') {
+      throw new BadRequestException(
+        'This supplier evaluation is already marked as completed.'
+      );
+    }
+    
+    // Validate that all required scores are provided before completing
+    const requiredFields = [
+      'materialAvailabilityScore', 'equipmentCapabilityScore', 'processFeasibilityScore',
+      'qualityCertificationScore', 'financialStabilityScore', 'capacityScore', 'leadTimeScore'
+    ];
+    
+    const missingScores = [];
+    for (const field of requiredFields) {
+      const fieldKey = field.replace(/([A-Z])/g, '_$1').toLowerCase();
+      if (!existing[fieldKey] && existing[fieldKey] !== 0) {
+        missingScores.push(field.replace(/([A-Z])/g, ' $1').toLowerCase());
+      }
+    }
+    
+    if (missingScores.length > 0) {
+      throw new BadRequestException(
+        `Cannot complete evaluation. Missing required scores: ${missingScores.join(', ')}. Please provide all evaluation criteria scores.`
+      );
     }
 
     const { data, error } = await this.supabaseService
@@ -274,7 +426,9 @@ export class SupplierEvaluationService {
 
     if (error) {
       this.logger.error(`Error completing evaluation: ${error.message}`, 'SupplierEvaluationService');
-      throw new InternalServerErrorException(`Failed to complete evaluation: ${error.message}`);
+      throw new InternalServerErrorException(
+        'Failed to mark evaluation as completed. Please try again later.'
+      );
     }
 
     return this.mapToResponseDto(data);
@@ -288,7 +442,22 @@ export class SupplierEvaluationService {
 
     const existing = await this.findOne(id, userId, accessToken);
     if (existing.isFrozen) {
-      throw new BadRequestException('Evaluation is already approved and frozen');
+      throw new BadRequestException(
+        'This supplier evaluation has already been approved and frozen. No further action is required.'
+      );
+    }
+    
+    if (existing.status !== 'completed') {
+      throw new BadRequestException(
+        'Only completed evaluations can be approved. Please complete the evaluation first.'
+      );
+    }
+    
+    // Validate that evaluation has recommendation status set
+    if (!existing.recommendationStatus || existing.recommendationStatus === 'pending') {
+      throw new BadRequestException(
+        'Please set a recommendation status (approved/rejected/conditional) before approving the evaluation.'
+      );
     }
 
     // Call freeze_evaluation function
@@ -301,7 +470,19 @@ export class SupplierEvaluationService {
 
     if (error) {
       this.logger.error(`Error approving evaluation: ${error.message}`, 'SupplierEvaluationService');
-      throw new InternalServerErrorException(`Failed to approve evaluation: ${error.message}`);
+      
+      // Handle specific approval errors
+      if (error.message.includes('evaluation not found')) {
+        throw new NotFoundException('The supplier evaluation to approve was not found.');
+      }
+      
+      if (error.message.includes('already frozen')) {
+        throw new BadRequestException('This evaluation has already been approved and frozen.');
+      }
+      
+      throw new InternalServerErrorException(
+        'Failed to approve and freeze the supplier evaluation. Please try again later.'
+      );
     }
 
     return { snapshotId: data };
@@ -343,8 +524,15 @@ export class SupplierEvaluationService {
         `Error checking vendor-process capability: ${error.message}`,
         'SupplierEvaluationService',
       );
+      
+      if (error.message.includes('invalid input syntax for type uuid')) {
+        throw new BadRequestException(
+          'Invalid vendor ID or process ID format provided. Please check your selection.'
+        );
+      }
+      
       throw new InternalServerErrorException(
-        'Failed to validate vendor process capability',
+        'Unable to validate vendor process capability. Please try again later.'
       );
     }
 
@@ -354,8 +542,8 @@ export class SupplierEvaluationService {
         'SupplierEvaluationService',
       );
       throw new BadRequestException(
-        `Vendor does not have registered capability for the selected manufacturing process. ` +
-        `Please select a different vendor or add process capability mapping first.`,
+        'The selected vendor does not have registered capability for the specified manufacturing process. ' +
+        'Please either select a different vendor or ensure the vendor\'s process capabilities are properly configured in the system.'
       );
     }
 
@@ -423,7 +611,9 @@ export class SupplierEvaluationService {
 
     if (error) {
       this.logger.warn(`Error updating weighted score: ${error.message}`, 'SupplierEvaluationService');
-      return evaluation; // Return original if update fails
+      // Don't throw error for weighted score calculation failures as it's not critical
+      // The evaluation can still be saved without the weighted score
+      return evaluation;
     }
 
     return data;

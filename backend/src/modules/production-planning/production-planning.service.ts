@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger, ForbiddenException, ConflictException } from '@nestjs/common';
 import { UuidValidator } from '@/common/validators/uuid.validator';
 import { SupabaseService } from '@/common/supabase/supabase.service';
 import {
@@ -57,7 +57,7 @@ export class ProductionPlanningService {
       .single();
 
     if (!bomCheck) {
-      throw new NotFoundException('BOM not found or you do not have permission to access it');
+      throw new NotFoundException('The specified BOM was not found or you do not have permission to access it. Please verify the BOM ID and try again.');
     }
 
     // Check if lot number is unique
@@ -68,7 +68,9 @@ export class ProductionPlanningService {
       .single();
 
     if (existingLot) {
-      throw new BadRequestException('Lot number already exists');
+      throw new ConflictException(
+        `Production lot number '${createDto.lotNumber}' already exists. Please choose a different lot number.`
+      );
     }
 
     // Calculate total estimated cost based on BOM
@@ -96,7 +98,36 @@ export class ProductionPlanningService {
       .single();
 
     if (error) {
-      throw new BadRequestException(`Failed to create production lot: ${error.message}`);
+      this.logger.error(`Error creating production lot: ${error.message}`, 'ProductionPlanningService');
+      
+      // Handle foreign key constraints
+      if (error.message.includes('violates foreign key constraint')) {
+        if (error.message.includes('bom_id')) {
+          throw new BadRequestException('The specified BOM does not exist or has been deleted.');
+        }
+        if (error.message.includes('created_by')) {
+          throw new BadRequestException('User account is not valid. Please log in again.');
+        }
+      }
+      
+      // Handle validation constraints
+      if (error.message.includes('violates check constraint')) {
+        if (error.message.includes('production_quantity_positive')) {
+          throw new BadRequestException('Production quantity must be greater than zero.');
+        }
+        if (error.message.includes('planned_dates_valid')) {
+          throw new BadRequestException('Planned end date must be after the planned start date.');
+        }
+      }
+      
+      // Handle duplicate constraints
+      if (error.message.includes('duplicate key') && error.message.includes('lot_number')) {
+        throw new ConflictException(
+          `Production lot number '${createDto.lotNumber}' already exists. Please choose a different lot number.`
+        );
+      }
+      
+      throw new InternalServerErrorException('Failed to create production lot. Please check your input and try again.');
     }
 
     // If specific BOM items are selected, create records for them

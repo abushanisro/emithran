@@ -88,7 +88,17 @@ export function useCreateVendor() {
       toast.success('Vendor created successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to create vendor');
+      if (error.status === 400) {
+        toast.error('Please check all required vendor information is filled out correctly.');
+      } else if (error.status === 409) {
+        toast.error('A vendor with this name or ID already exists.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to create vendors.');
+      } else if (error.status === 422) {
+        toast.error('Please ensure contact information and addresses are valid.');
+      } else {
+        toast.error('Unable to create vendor. Please try again or contact support.');
+      }
     },
   });
 }
@@ -107,7 +117,19 @@ export function useUpdateVendor() {
       toast.success('Vendor updated successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to update vendor');
+      if (error.status === 400) {
+        toast.error('Please check that all vendor information is valid.');
+      } else if (error.status === 404) {
+        toast.error('This vendor no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Another user is editing this vendor. Please refresh and try again.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to edit this vendor.');
+      } else if (error.status === 422) {
+        toast.error('Please ensure contact information and addresses are valid.');
+      } else {
+        toast.error('Unable to save changes. Please try again or contact support.');
+      }
     },
   });
 }
@@ -122,7 +144,15 @@ export function useDeleteVendor() {
       toast.success('Vendor deleted successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to delete vendor');
+      if (error.status === 404) {
+        toast.error('This vendor has already been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete vendor because it is being used in active projects or RFQs.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to delete this vendor.');
+      } else {
+        toast.error('Unable to delete vendor. Please try again or contact support.');
+      }
     },
   });
 }
@@ -137,7 +167,15 @@ export function useDeleteAllVendors() {
       toast.success(`Successfully deleted ${data.deleted} vendors`);
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to delete all vendors');
+      if (error.status === 403) {
+        toast.error('You do not have permission to delete all vendors.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete vendors because some are being used in active projects.');
+      } else if (error.status === 429) {
+        toast.error('Too many deletion requests. Please wait a moment and try again.');
+      } else {
+        toast.error('Unable to delete all vendors. Please try again or contact support.');
+      }
     },
   });
 }
@@ -177,7 +215,17 @@ export function useUploadVendorsCsv() {
       }
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to upload CSV file');
+      if (error.status === 400) {
+        toast.error('The CSV file format is invalid. Please check the column headers and data.');
+      } else if (error.status === 413) {
+        toast.error('The CSV file is too large. Please split it into smaller files.');
+      } else if (error.status === 422) {
+        toast.error('Some vendor data in the CSV is invalid. Please check the format and try again.');
+      } else if (error.status === 429) {
+        toast.error('Too many upload requests. Please wait a moment and try again.');
+      } else {
+        toast.error('Unable to upload CSV file. Please try again or contact support.');
+      }
     },
   });
 }
@@ -206,7 +254,17 @@ export function useCreateVendorEquipment() {
       toast.success('Equipment added successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to add equipment');
+      if (error.status === 400) {
+        toast.error('Please check all equipment details are filled out correctly.');
+      } else if (error.status === 404) {
+        toast.error('This vendor no longer exists. Please refresh the page.');
+      } else if (error.status === 409) {
+        toast.error('Equipment with this name already exists for this vendor.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to add equipment for this vendor.');
+      } else {
+        toast.error('Unable to add equipment. Please try again or contact support.');
+      }
     },
   });
 }
@@ -222,7 +280,17 @@ export function useUpdateVendorEquipment() {
       toast.success('Equipment updated successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to update equipment');
+      if (error.status === 400) {
+        toast.error('Please check that all equipment information is valid.');
+      } else if (error.status === 404) {
+        toast.error('This equipment no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Another user is editing this equipment. Please refresh and try again.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to edit this equipment.');
+      } else {
+        toast.error('Unable to update equipment. Please try again or contact support.');
+      }
     },
   });
 }
@@ -239,7 +307,15 @@ export function useDeleteVendorEquipment() {
       toast.success('Equipment deleted successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to delete equipment');
+      if (error.status === 404) {
+        toast.error('This equipment has already been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete equipment because it is being used in active processes.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to delete this equipment.');
+      } else {
+        toast.error('Unable to delete equipment. Please try again or contact support.');
+      }
     },
   });
 }
@@ -267,7 +343,17 @@ export function useCreateVendorService() {
       toast.success('Service added successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to add service');
+      if (error.status === 400) {
+        toast.error('Please check all service details are filled out correctly.');
+      } else if (error.status === 404) {
+        toast.error('This vendor no longer exists. Please refresh the page.');
+      } else if (error.status === 409) {
+        toast.error('Service with this name already exists for this vendor.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to add services for this vendor.');
+      } else {
+        toast.error('Unable to add service. Please try again or contact support.');
+      }
     },
   });
 }
@@ -283,7 +369,17 @@ export function useUpdateVendorService() {
       toast.success('Service updated successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to update service');
+      if (error.status === 400) {
+        toast.error('Please check that all service information is valid.');
+      } else if (error.status === 404) {
+        toast.error('This service no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Another user is editing this service. Please refresh and try again.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to edit this service.');
+      } else {
+        toast.error('Unable to update service. Please try again or contact support.');
+      }
     },
   });
 }
@@ -300,7 +396,15 @@ export function useDeleteVendorService() {
       toast.success('Service deleted successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to delete service');
+      if (error.status === 404) {
+        toast.error('This service has already been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete service because it is being used in active projects.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to delete this service.');
+      } else {
+        toast.error('Unable to delete service. Please try again or contact support.');
+      }
     },
   });
 }
@@ -328,7 +432,19 @@ export function useCreateVendorContact() {
       toast.success('Contact added successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to add contact');
+      if (error.status === 400) {
+        toast.error('Please check all contact details are filled out correctly.');
+      } else if (error.status === 404) {
+        toast.error('This vendor no longer exists. Please refresh the page.');
+      } else if (error.status === 409) {
+        toast.error('Contact with this email already exists for this vendor.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to add contacts for this vendor.');
+      } else if (error.status === 422) {
+        toast.error('Please ensure the email address and phone number are valid.');
+      } else {
+        toast.error('Unable to add contact. Please try again or contact support.');
+      }
     },
   });
 }
@@ -344,7 +460,19 @@ export function useUpdateVendorContact() {
       toast.success('Contact updated successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to update contact');
+      if (error.status === 400) {
+        toast.error('Please check that all contact information is valid.');
+      } else if (error.status === 404) {
+        toast.error('This contact no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Another user is editing this contact. Please refresh and try again.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to edit this contact.');
+      } else if (error.status === 422) {
+        toast.error('Please ensure the email address and phone number are valid.');
+      } else {
+        toast.error('Unable to update contact. Please try again or contact support.');
+      }
     },
   });
 }
@@ -361,7 +489,15 @@ export function useDeleteVendorContact() {
       toast.success('Contact deleted successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to delete contact');
+      if (error.status === 404) {
+        toast.error('This contact has already been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete contact because they are the primary contact for active projects.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to delete this contact.');
+      } else {
+        toast.error('Unable to delete contact. Please try again or contact support.');
+      }
     },
   });
 }

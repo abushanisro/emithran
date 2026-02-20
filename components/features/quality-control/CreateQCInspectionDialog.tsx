@@ -30,6 +30,7 @@ import {
   Calendar,
   Package
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { bomApi, BOM, BOMItem } from '@/lib/api/bom';
 import { useProductionLots } from '@/lib/api/hooks/useProductionPlanning';
 
@@ -124,8 +125,9 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       try {
         const response = await bomApi.getAll({ projectId });
         setBomOptions(response.boms || []);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to load BOMs:', error);
+        toast.error('Failed to load available BOMs. Please refresh the page and try again.');
       }
     };
     loadBOMs();
@@ -138,8 +140,9 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       const items = bomWithItems.items || bomWithItems.data?.items || bomWithItems.data || [];
       setBomItems(items);
       setSelectedItems([]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load BOM items:', error);
+      toast.error('Failed to load BOM items for the selected lot. Please try selecting a different lot.');
     }
   };
 
@@ -230,8 +233,24 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
   };
 
   const handleCreateInspection = async () => {
-    if (!inspectionName || !selectedBOM || selectedItems.length === 0) {
-      alert('Please fill in all required fields');
+    // Enhanced validation with specific error messages
+    if (!inspectionName.trim()) {
+      toast.error('Inspection name is required. Please enter a descriptive name for your quality inspection.');
+      return;
+    }
+
+    if (!selectedLot) {
+      toast.error('Please select a production lot for inspection. Choose from the available production lots.');
+      return;
+    }
+
+    if (!selectedBOM) {
+      toast.error('BOM information is missing. Please select a valid production lot with an associated BOM.');
+      return;
+    }
+
+    if (selectedItems.length === 0) {
+      toast.error('Please select at least one BOM part for inspection. Use the checkboxes to select parts that need quality control.');
       return;
     }
 
@@ -270,9 +289,23 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       setSelectedItems([]);
       setCustomChecklists([]);
       setSelectedStandards([]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create inspection:', error);
-      alert('Failed to create inspection. Please try again.');
+      let errorMessage = 'Failed to create quality inspection. Please try again.';
+      if (error?.message) {
+        if (error.message.includes('permission')) {
+          errorMessage = 'You do not have permission to create quality inspections. Please contact your administrator.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error occurred while creating inspection. Please check your connection and try again.';
+        } else if (error.message.includes('validation')) {
+          errorMessage = 'Invalid inspection data. Please check all required fields and try again.';
+        } else if (error.message.includes('duplicate')) {
+          errorMessage = 'An inspection with this name already exists. Please use a different name.';
+        } else {
+          errorMessage = `Failed to create inspection: ${error.message}`;
+        }
+      }
+      toast.error(errorMessage, { duration: 6000 });
     } finally {
       setLoading(false);
     }

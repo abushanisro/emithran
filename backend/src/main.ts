@@ -4,7 +4,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { CustomValidationPipe } from './common/pipes/validation.pipe';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { Logger } from './common/logger/logger.service';
@@ -101,44 +102,17 @@ async function bootstrap() {
   });
 
   app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: false,
-      forbidNonWhitelisted: false,
+    new CustomValidationPipe({
       transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: false,
       transformOptions: {
         enableImplicitConversion: true,
-      },
-      // ENTERPRISE: Provide detailed validation errors for debugging
-      enableDebugMessages: true,
-      // PRINCIPAL ENGINEER: Detailed validation error reporting
-      exceptionFactory: (errors) => {
-        const formattedErrors = errors.map(error => ({
-          property: error.property,
-          value: error.value,
-          constraints: error.constraints,
-          children: error.children?.map(child => ({
-            property: child.property,
-            value: child.value,
-            constraints: child.constraints
-          }))
-        }));
-        
-        // Log validation errors in development for principal engineer debugging
-        if (process.env.NODE_ENV === 'development') {
-          // Validation errors logged for debugging
-        }
-        
-        return new BadRequestException({
-          message: 'DTO Validation failed',
-          errors: formattedErrors,
-          timestamp: new Date().toISOString(),
-          debug: 'Check console for detailed validation errors'
-        });
       },
     }),
   );
 
-  app.useGlobalFilters(new HttpExceptionFilter(logger, configService));
+  app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(
     new LoggingInterceptor(logger),
     new TransformInterceptor(),

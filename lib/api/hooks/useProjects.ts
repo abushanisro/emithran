@@ -73,7 +73,15 @@ export function useCreateProject() {
       toast.success('Project created successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to create project');
+      if (error.status === 400) {
+        toast.error('Please check that the project name and dates are valid.');
+      } else if (error.status === 409) {
+        toast.error('A project with this name already exists.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to create projects.');
+      } else {
+        toast.error('Unable to create project. Please try again or contact support.');
+      }
     },
   });
 }
@@ -90,7 +98,17 @@ export function useUpdateProject() {
       toast.success('Project updated successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to update project');
+      if (error.status === 400) {
+        toast.error('Please check that all project information is valid.');
+      } else if (error.status === 404) {
+        toast.error('This project no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Another user is editing this project. Please refresh and try again.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to edit this project.');
+      } else {
+        toast.error('Unable to save changes. Please try again or contact support.');
+      }
     },
   });
 }
@@ -105,7 +123,15 @@ export function useDeleteProject() {
       toast.success('Project deleted successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to delete project');
+      if (error.status === 404) {
+        toast.error('This project has already been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete project because it contains BOMs, team members, or other data.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to delete this project.');
+      } else {
+        toast.error('Unable to delete project. Please try again or contact support.');
+      }
     },
   });
 }

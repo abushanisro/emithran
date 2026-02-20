@@ -21,14 +21,40 @@ export default function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Client-side validation
+    if (!email.trim()) {
+      toast.error('Please enter your email address to sign in.')
+      return
+    }
+    
+    if (!email.includes('@')) {
+      toast.error('Please enter a valid email address.')
+      return
+    }
+    
+    if (!password.trim()) {
+      toast.error('Please enter your password to sign in.')
+      return
+    }
+    
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters long.')
+      return
+    }
+    
     setLoading(true)
 
     try {
       const { error } = await signIn(email, password)
       if (!error) {
+        toast.success('Successfully signed in! Redirecting to dashboard...')
         router.push('/')
         router.refresh()
       }
+    } catch (error: any) {
+      console.error('Sign in error:', error)
+      toast.error('An unexpected error occurred during sign in. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -40,8 +66,19 @@ export default function AuthPage() {
       await signInWithGoogle()
       // The user will be redirected to Google for authentication
       // After successful auth, they'll be redirected back to /auth/callback
-    } catch (error) {
-      toast.error('Failed to sign in with Google')
+    } catch (error: any) {
+      console.error('Google sign in error:', error)
+      let errorMessage = 'Failed to sign in with Google. Please try again.'
+      if (error?.message) {
+        if (error.message.includes('popup')) {
+          errorMessage = 'Google sign in popup was blocked or closed. Please allow popups and try again.'
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error during Google sign in. Please check your connection and try again.'
+        } else if (error.message.includes('unauthorized')) {
+          errorMessage = 'Google sign in failed: Account not authorized. Please use your company email or request access.'
+        }
+      }
+      toast.error(errorMessage, { duration: 6000 })
     } finally {
       setLoading(false)
     }

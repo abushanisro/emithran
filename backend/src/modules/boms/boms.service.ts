@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMDto, UpdateBOMDto, QueryBOMsDto } from './dto/boms.dto';
 import { BOMResponseDto, BOMListResponseDto } from './dto/bom-response.dto';
+import { validate as isValidUUID } from 'uuid';
 
 @Injectable()
 export class BOMsService {
@@ -40,7 +41,7 @@ export class BOMsService {
 
     if (error) {
       this.logger.error(`Error fetching BOMs: ${error.message}`, 'BOMsService');
-      throw new InternalServerErrorException(`Failed to fetch BOMs: ${error.message}`);
+      throw new InternalServerErrorException('Unable to retrieve BOMs. Please try again later.');
     }
 
     // Transform using static DTO method (type-safe)
@@ -57,6 +58,12 @@ export class BOMsService {
   async findOne(id: string, userId: string, accessToken: string): Promise<BOMResponseDto> {
     this.logger.log(`Fetching BOM: ${id}`, 'BOMsService');
 
+    // Validate UUID format
+    if (!this.isValidUUID(id)) {
+      this.logger.warn(`Invalid UUID format provided: ${id}`, 'BOMsService');
+      throw new BadRequestException('Please provide a valid BOM ID.');
+    }
+
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('boms')
@@ -65,11 +72,30 @@ export class BOMsService {
       .single();
 
     if (error || !data) {
-      this.logger.error(`BOM not found: ${id}`, 'BOMsService');
-      throw new NotFoundException(`BOM with ID ${id} not found`);
+      // Distinguish between different error types
+      if (error?.code === 'PGRST116') {
+        // PostgreSQL "no rows returned" error
+        this.logger.warn(`BOM not found: ${id}`, 'BOMsService');
+      } else if (error) {
+        this.logger.error(`Database error while fetching BOM ${id}: ${error.message}`, 'BOMsService');
+      } else {
+        this.logger.warn(`BOM not found (no data): ${id}`, 'BOMsService');
+      }
+      throw new NotFoundException('The requested BOM could not be found or you do not have access to it.');
     }
 
     return BOMResponseDto.fromDatabase(data);
+  }
+
+  /**
+   * Validate UUID format to prevent invalid queries
+   */
+  private isValidUUID(id: string): boolean {
+    try {
+      return isValidUUID(id);
+    } catch {
+      return false;
+    }
   }
 
   async create(createBOMDto: CreateBOMDto, userId: string, accessToken: string): Promise<BOMResponseDto> {
@@ -90,7 +116,14 @@ export class BOMsService {
 
     if (error) {
       this.logger.error(`Error creating BOM: ${error.message}`, 'BOMsService');
-      throw new InternalServerErrorException(`Failed to create BOM: ${error.message}`);
+      // Check for specific database errors
+      if (error.message.includes('duplicate key') && error.message.includes('boms_name')) {
+        throw new BadRequestException('A BOM with this name already exists in this project. Please choose a different name.');
+      }
+      if (error.message.includes('foreign key') && error.message.includes('project_id')) {
+        throw new BadRequestException('The specified project does not exist or you do not have access to it.');
+      }
+      throw new InternalServerErrorException('Unable to create the BOM. Please try again later.');
     }
 
     return BOMResponseDto.fromDatabase(data);
@@ -98,6 +131,12 @@ export class BOMsService {
 
   async update(id: string, updateBOMDto: UpdateBOMDto, userId: string, accessToken: string): Promise<BOMResponseDto> {
     this.logger.log(`Updating BOM: ${id}`, 'BOMsService');
+
+    // Validate UUID format early
+    if (!this.isValidUUID(id)) {
+      this.logger.warn(`Invalid UUID format for update: ${id}`, 'BOMsService');
+      throw new BadRequestException('Please provide a valid BOM ID.');
+    }
 
     // Verify BOM exists and belongs to user
     await this.findOne(id, userId, accessToken);
@@ -123,7 +162,11 @@ export class BOMsService {
 
     if (error) {
       this.logger.error(`Error updating BOM: ${error.message}`, 'BOMsService');
-      throw new InternalServerErrorException(`Failed to update BOM: ${error.message}`);
+      // Check for specific database errors
+      if (error.message.includes('duplicate key') && error.message.includes('boms_name')) {
+        throw new BadRequestException('A BOM with this name already exists in this project. Please choose a different name.');
+      }
+      throw new InternalServerErrorException('Unable to update the BOM. Please try again later.');
     }
 
     return BOMResponseDto.fromDatabase(data);
@@ -131,6 +174,12 @@ export class BOMsService {
 
   async remove(id: string, userId: string, accessToken: string) {
     this.logger.log(`Deleting BOM: ${id}`, 'BOMsService');
+
+    // Validate UUID format early
+    if (!this.isValidUUID(id)) {
+      this.logger.warn(`Invalid UUID format for delete: ${id}`, 'BOMsService');
+      throw new BadRequestException('Please provide a valid BOM ID.');
+    }
 
     // Verify BOM exists and belongs to user
     await this.findOne(id, userId, accessToken);
@@ -143,7 +192,11 @@ export class BOMsService {
 
     if (error) {
       this.logger.error(`Error deleting BOM: ${error.message}`, 'BOMsService');
-      throw new InternalServerErrorException(`Failed to delete BOM: ${error.message}`);
+      // Check for specific database errors
+      if (error.message.includes('foreign key') || error.message.includes('violates')) {
+        throw new BadRequestException('Cannot delete this BOM because it contains items or is referenced by other data. Please remove all BOM items first.');
+      }
+      throw new InternalServerErrorException('Unable to delete the BOM. Please try again later.');
     }
 
     return { message: 'BOM deleted successfully' };

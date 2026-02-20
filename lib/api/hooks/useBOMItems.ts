@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
+import { toast } from 'sonner';
 
 export interface BOMItem {
   id: string;
@@ -127,6 +128,20 @@ export function useCreateBOMItem() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: bomItemKeys.list(variables.bomId) });
     },
+    onError: (error: any) => {
+      const status = error?.status || error?.response?.status;
+      if (status === 400) {
+        toast.error('Please check all BOM item details are filled out correctly.');
+      } else if (status === 409) {
+        toast.error('A BOM item with this part number already exists in this BOM.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to add items to this BOM.');
+      } else if (status === 422) {
+        toast.error('Please ensure quantity and volume are valid numbers.');
+      } else {
+        toast.error('Unable to create BOM item. Please try again or contact support.');
+      }
+    },
   });
 }
 
@@ -146,6 +161,22 @@ export function useUpdateBOMItem() {
         queryClient.invalidateQueries({ queryKey: bomItemKeys.detail(data.id) });
       }
     },
+    onError: (error: any) => {
+      const status = error?.status || error?.response?.status;
+      if (status === 400) {
+        toast.error('Please check that all BOM item information is valid.');
+      } else if (status === 404) {
+        toast.error('This BOM item no longer exists. It may have been deleted.');
+      } else if (status === 409) {
+        toast.error('Another user is editing this item. Please refresh and try again.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to edit this BOM item.');
+      } else if (status === 422) {
+        toast.error('Please ensure quantity and volume are valid numbers.');
+      } else {
+        toast.error('Unable to update BOM item. Please try again or contact support.');
+      }
+    },
   });
 }
 
@@ -161,6 +192,18 @@ export function useDeleteBOMItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bomItemKeys.lists() });
+    },
+    onError: (error: any) => {
+      const status = error?.status || error?.response?.status;
+      if (status === 404) {
+        toast.error('This BOM item has already been deleted.');
+      } else if (status === 409) {
+        toast.error('Cannot delete BOM item because it has child components.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to delete this BOM item.');
+      } else {
+        toast.error('Unable to delete BOM item. Please try again or contact support.');
+      }
     },
   });
 }

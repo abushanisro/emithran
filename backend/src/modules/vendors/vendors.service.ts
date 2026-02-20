@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import {
@@ -12,6 +12,7 @@ import {
   CreateVendorContactDto,
   UpdateVendorContactDto,
 } from './dto/vendor.dto';
+import { validate as isValidUUID } from 'uuid';
 
 @Injectable()
 export class VendorsService {
@@ -89,7 +90,7 @@ export class VendorsService {
 
     if (error) {
       this.logger.error(`Error fetching vendors: ${error.message}`, 'VendorsService');
-      throw new InternalServerErrorException(`Failed to fetch vendors: ${error.message}`);
+      throw new InternalServerErrorException('Unable to retrieve vendors. Please try again later.');
     }
 
     // If equipment filters are provided, filter vendors that have matching equipment
@@ -176,6 +177,12 @@ export class VendorsService {
   async findOne(id: string, userId: string, accessToken: string) {
     this.logger.log(`Fetching vendor: ${id} from shared database`, 'VendorsService');
 
+    // Validate UUID format
+    if (!this.isValidUUID(id)) {
+      this.logger.warn(`Invalid UUID format provided: ${id}`, 'VendorsService');
+      throw new BadRequestException('Please provide a valid vendor ID.');
+    }
+
     // Query vendors table directly to ensure we get the company_email field
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
@@ -186,11 +193,22 @@ export class VendorsService {
 
     if (error || !data) {
       this.logger.error(`Vendor not found: ${id}`, 'VendorsService');
-      throw new NotFoundException(`Vendor with ID ${id} not found`);
+      throw new NotFoundException('The requested vendor could not be found.');
     }
 
     // Convert snake_case to camelCase for frontend consumption
     return this.convertToCamelCase(data);
+  }
+
+  /**
+   * Validate UUID format to prevent invalid queries
+   */
+  private isValidUUID(id: string): boolean {
+    try {
+      return isValidUUID(id);
+    } catch {
+      return false;
+    }
   }
 
   async create(createVendorDto: CreateVendorDto, userId: string, accessToken: string) {
@@ -211,7 +229,14 @@ export class VendorsService {
 
     if (error) {
       this.logger.error(`Error creating vendor: ${error.message}`, 'VendorsService');
-      throw new InternalServerErrorException(`Failed to create vendor: ${error.message}`);
+      // Check for specific database errors
+      if (error.message.includes('duplicate key') && error.message.includes('vendors_supplier_code')) {
+        throw new BadRequestException('This supplier code is already in use. Please use a different code.');
+      }
+      if (error.message.includes('duplicate key') && error.message.includes('vendors_name')) {
+        throw new BadRequestException('A vendor with this name already exists. Please choose a different name.');
+      }
+      throw new InternalServerErrorException('Unable to create the vendor. Please try again later.');
     }
 
     return data;
@@ -236,7 +261,14 @@ export class VendorsService {
 
     if (error) {
       this.logger.error(`Error updating vendor: ${error.message}`, 'VendorsService');
-      throw new InternalServerErrorException(`Failed to update vendor: ${error.message}`);
+      // Check for specific database errors
+      if (error.message.includes('duplicate key') && error.message.includes('vendors_supplier_code')) {
+        throw new BadRequestException('This supplier code is already in use. Please use a different code.');
+      }
+      if (error.message.includes('duplicate key') && error.message.includes('vendors_name')) {
+        throw new BadRequestException('A vendor with this name already exists. Please choose a different name.');
+      }
+      throw new InternalServerErrorException('Unable to update the vendor. Please try again later.');
     }
 
     return data;
@@ -256,7 +288,11 @@ export class VendorsService {
 
     if (error) {
       this.logger.error(`Error deleting vendor: ${error.message}`, 'VendorsService');
-      throw new InternalServerErrorException(`Failed to delete vendor: ${error.message}`);
+      // Check for specific database errors
+      if (error.message.includes('foreign key') || error.message.includes('violates')) {
+        throw new BadRequestException('Cannot delete this vendor because it is referenced by other data (equipment, services, contacts, etc.). Please remove all related data first.');
+      }
+      throw new InternalServerErrorException('Unable to delete the vendor. Please try again later.');
     }
 
     return { message: 'Vendor deleted successfully' };

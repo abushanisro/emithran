@@ -170,9 +170,21 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         try {
           await apiClient.uploadFiles(`/bom-items/${itemId}/upload-files`, formDataUpload);
           toast.success('Files uploaded successfully');
-        } catch (uploadError) {
+        } catch (uploadError: any) {
           console.error('File upload error:', uploadError);
-          toast.error('Item saved but file upload failed');
+          let uploadErrorMessage = 'Item saved but file upload failed.';
+          if (uploadError?.message) {
+            if (uploadError.message.includes('size')) {
+              uploadErrorMessage = 'Item saved but file upload failed: File size too large. Please use smaller files.';
+            } else if (uploadError.message.includes('format')) {
+              uploadErrorMessage = 'Item saved but file upload failed: Unsupported file format. Please use PDF, STEP, STL, or image files.';
+            } else if (uploadError.message.includes('network')) {
+              uploadErrorMessage = 'Item saved but file upload failed: Network error. You can try uploading the files later.';
+            } else {
+              uploadErrorMessage = `Item saved but file upload failed: ${uploadError.message}`;
+            }
+          }
+          toast.error(uploadErrorMessage, { duration: 6000 });
         }
       }
 
@@ -185,7 +197,25 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       if (process.env.NODE_ENV === 'development') {
         console.error('Error saving BOM item:', error);
       }
-      toast.error(error?.message || 'Failed to save item');
+      
+      let errorMessage = 'Failed to save item. Please try again.';
+      if (error?.message) {
+        if (error.message.includes('duplicate')) {
+          errorMessage = 'An item with this part number already exists in the BOM. Please use a different part number.';
+        } else if (error.message.includes('validation')) {
+          errorMessage = 'Invalid item data. Please check all required fields (name, quantity, annual volume) and ensure they have valid values.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+        } else if (error.message.includes('permission')) {
+          errorMessage = 'You do not have permission to modify items in this BOM. Please contact your administrator.';
+        } else if (error.message.includes('parent')) {
+          errorMessage = 'Invalid parent item. Please ensure the parent item exists and is valid for this item type.';
+        } else {
+          errorMessage = `Failed to save item: ${error.message}`;
+        }
+      }
+      
+      toast.error(errorMessage, { duration: 6000 });
     } finally {
       setLoading(false);
     }

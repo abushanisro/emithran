@@ -101,7 +101,17 @@ export function useCreateCalculator() {
       toast.success('Calculator created successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to create calculator');
+      if (error.status === 400) {
+        toast.error('Please check all calculator details are filled out correctly.');
+      } else if (error.status === 409) {
+        toast.error('A calculator with this name already exists.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to create calculators.');
+      } else if (error.status === 422) {
+        toast.error('Please ensure all calculator configuration is valid.');
+      } else {
+        toast.error('Unable to create calculator. Please try again or contact support.');
+      }
     },
   });
 }
@@ -136,7 +146,17 @@ export function useUpdateCalculator() {
       toast.success('Calculator updated successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to update calculator');
+      if (error.status === 400) {
+        toast.error('Please check that all calculator information is valid.');
+      } else if (error.status === 404) {
+        toast.error('This calculator no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Another user is editing this calculator. Please refresh and try again.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to edit this calculator.');
+      } else {
+        toast.error('Unable to save changes. Please try again or contact support.');
+      }
     },
   });
 }
@@ -151,7 +171,15 @@ export function useDeleteCalculator() {
       toast.success('Calculator deleted successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to delete calculator');
+      if (error.status === 404) {
+        toast.error('This calculator has already been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete calculator because it is being used in active calculations.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to delete this calculator.');
+      } else {
+        toast.error('Unable to delete calculator. Please try again or contact support.');
+      }
     },
   });
 }
@@ -198,7 +226,19 @@ export function useCreateField() {
       if (context?.previousCalculator) {
         queryClient.setQueryData(calculatorKeys.detail(variables.calculatorId!), context.previousCalculator);
       }
-      toast.error(error.message || 'Failed to add field');
+      if (error.status === 400) {
+        toast.error('Please check all field details are filled out correctly.');
+      } else if (error.status === 404) {
+        toast.error('This calculator no longer exists. Please refresh the page.');
+      } else if (error.status === 409) {
+        toast.error('A field with this name already exists in this calculator.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to add fields to this calculator.');
+      } else if (error.status === 422) {
+        toast.error('Please ensure field type and validation rules are correct.');
+      } else {
+        toast.error('Unable to add field. Please try again or contact support.');
+      }
     },
     onSettled: (_, __, variables) => {
       // Always sync with server at the end
@@ -245,7 +285,19 @@ export function useUpdateField() {
       if (context?.previousCalculator) {
         queryClient.setQueryData(calculatorKeys.detail(variables.calculatorId), context.previousCalculator);
       }
-      toast.error(error.message || 'Failed to update field');
+      if (error.status === 400) {
+        toast.error('Please check that all field information is valid.');
+      } else if (error.status === 404) {
+        toast.error('This field no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Another user is editing this field. Please refresh and try again.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to edit this field.');
+      } else if (error.status === 422) {
+        toast.error('Please ensure field type and validation rules are correct.');
+      } else {
+        toast.error('Unable to update field. Please try again or contact support.');
+      }
     },
     onSettled: (_, __, variables) => {
       queryClient.invalidateQueries({ queryKey: calculatorKeys.detail(variables.calculatorId) });
@@ -279,7 +331,15 @@ export function useDeleteField() {
       if (context?.previousCalculator) {
         queryClient.setQueryData(calculatorKeys.detail(variables.calculatorId!), context.previousCalculator);
       }
-      toast.error(error.message || 'Failed to delete field');
+      if (error.status === 404) {
+        toast.error('This field has already been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete field because it is being used in formulas.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to delete this field.');
+      } else {
+        toast.error('Unable to delete field. Please try again or contact support.');
+      }
     },
     onSettled: (_, __, variables) => {
       queryClient.invalidateQueries({ queryKey: calculatorKeys.detail(variables.calculatorId!) });
@@ -325,7 +385,19 @@ export function useCreateFormula() {
       if (context?.previousCalculator) {
         queryClient.setQueryData(calculatorKeys.detail(variables.calculatorId!), context.previousCalculator);
       }
-      toast.error(error.message || 'Failed to add formula');
+      if (error.status === 400) {
+        toast.error('Please check the formula syntax and field references.');
+      } else if (error.status === 404) {
+        toast.error('This calculator no longer exists. Please refresh the page.');
+      } else if (error.status === 409) {
+        toast.error('A formula with this name already exists in this calculator.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to add formulas to this calculator.');
+      } else if (error.status === 422) {
+        toast.error('Formula contains invalid syntax or field references.');
+      } else {
+        toast.error('Unable to add formula. Please try again or contact support.');
+      }
     },
     onSettled: (_, __, variables) => {
       if (variables.calculatorId) {
@@ -347,7 +419,19 @@ export function useUpdateFormula() {
       toast.success('Formula updated successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to update formula');
+      if (error.status === 400) {
+        toast.error('Please check the formula syntax and field references.');
+      } else if (error.status === 404) {
+        toast.error('This formula no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Another user is editing this formula. Please refresh and try again.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to edit this formula.');
+      } else if (error.status === 422) {
+        toast.error('Formula contains invalid syntax or field references.');
+      } else {
+        toast.error('Unable to update formula. Please try again or contact support.');
+      }
     },
   });
 }
@@ -364,7 +448,15 @@ export function useDeleteFormula() {
       toast.success('Formula deleted successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to delete formula');
+      if (error.status === 404) {
+        toast.error('This formula has already been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete formula because it is being referenced by other formulas.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to delete this formula.');
+      } else {
+        toast.error('Unable to delete formula. Please try again or contact support.');
+      }
     },
   });
 }
@@ -383,7 +475,17 @@ export function useExecuteCalculator() {
   return useMutation({
     mutationFn: (data: ExecuteCalculatorData) => calculatorsApi.execute(data),
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to execute calculator');
+      if (error.status === 400) {
+        toast.error('Please check that all required fields have valid values.');
+      } else if (error.status === 404) {
+        toast.error('This calculator no longer exists.');
+      } else if (error.status === 422) {
+        toast.error('Calculation failed due to invalid data or formula errors.');
+      } else if (error.status === 500) {
+        toast.error('Calculation failed due to a server error. Please try again.');
+      } else {
+        toast.error('Unable to execute calculator. Please try again or contact support.');
+      }
     },
   });
 }
@@ -398,7 +500,17 @@ export function useSaveExecution() {
       toast.success('Execution saved successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to save execution');
+      if (error.status === 400) {
+        toast.error('Please ensure all execution data is valid before saving.');
+      } else if (error.status === 404) {
+        toast.error('This calculator no longer exists.');
+      } else if (error.status === 409) {
+        toast.error('An execution with this name already exists.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to save calculator executions.');
+      } else {
+        toast.error('Unable to save execution. Please try again or contact support.');
+      }
     },
   });
 }
@@ -429,7 +541,17 @@ export function useResolveDatabaseField() {
   return useMutation({
     mutationFn: (data: ResolveDatabaseFieldData) => calculatorsApi.resolveDatabaseField(data),
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to resolve database field');
+      if (error.status === 400) {
+        toast.error('Please check the database field configuration.');
+      } else if (error.status === 404) {
+        toast.error('Database table or field not found.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to access this database.');
+      } else if (error.status === 500) {
+        toast.error('Database connection error. Please try again.');
+      } else {
+        toast.error('Unable to resolve database field. Please try again or contact support.');
+      }
     },
   });
 }

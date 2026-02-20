@@ -127,7 +127,7 @@ export function BOMCreateDialog({ projectId, open, onOpenChange, onSuccess }: BO
     const itemToRemove = items.find(i => i.id === id);
 
     if (assemblies.length === 1 && itemToRemove?.itemType === BOMItemType.ASSEMBLY) {
-      toast.error('Cannot remove the only assembly');
+      toast.error('Cannot remove the only assembly. Every BOM must have at least one main assembly item. Consider adding another assembly first.');
       return;
     }
 
@@ -148,9 +148,21 @@ export function BOMCreateDialog({ projectId, open, onOpenChange, onSuccess }: BO
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate at least one item with a name
+    // Enhanced form validation
+    if (!bomData.name.trim()) {
+      toast.error('BOM name is required. Please enter a descriptive name for your Bill of Materials.');
+      return;
+    }
+
     if (items.every(item => !item.name.trim())) {
-      toast.error('Please add at least one item with a name');
+      toast.error('At least one BOM item is required. Please add items with descriptive names to complete your BOM.');
+      return;
+    }
+
+    // Validate each item has required fields
+    const invalidItems = items.filter(item => item.name.trim() && !item.quantity);
+    if (invalidItems.length > 0) {
+      toast.error(`Invalid quantities found for ${invalidItems.length} item(s). All items must have valid quantities greater than 0.`);
       return;
     }
 
@@ -215,22 +227,38 @@ export function BOMCreateDialog({ projectId, open, onOpenChange, onSuccess }: BO
           idMap.set(item.id, createdItem.id);
           successCount++;
         } catch (error: any) {
+          let errorMessage = 'Unknown error occurred';
+          if (error?.message) {
+            if (error.message.includes('duplicate')) {
+              errorMessage = 'Item with this part number already exists';
+            } else if (error.message.includes('validation')) {
+              errorMessage = 'Invalid item data provided';
+            } else if (error.message.includes('network')) {
+              errorMessage = 'Network connection failed';
+            } else if (error.message.includes('permission')) {
+              errorMessage = 'Insufficient permissions to create item';
+            } else {
+              errorMessage = error.message;
+            }
+          }
           errors.push({
             itemName: item.name,
-            error: error?.message || 'Unknown error',
+            error: errorMessage,
           });
         }
       }
 
-      // Report results
+      // Report results with detailed feedback
       if (errors.length === 0) {
-        toast.success(`BOM created successfully with ${successCount} item(s)`);
+        toast.success(`BOM "${bomData.name}" created successfully with ${successCount} item(s). You can now proceed to add technical drawings and specifications.`);
       } else if (successCount > 0) {
         toast.warning(
-          `BOM created with ${successCount} item(s). ${errors.length} item(s) failed: ${errors.map(e => e.itemName).join(', ')}`
+          `BOM "${bomData.name}" created partially. ${successCount} item(s) succeeded, ${errors.length} failed. Failed items: ${errors.map(e => `${e.itemName} (${e.error})`).slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`,
+          { duration: 8000 }
         );
       } else {
-        throw new Error('Failed to create any items');
+        const mainError = errors[0]?.error || 'Unknown error';
+        throw new Error(`Failed to create any items. Primary issue: ${mainError}. Please check your data and try again.`);
       }
 
       onOpenChange(false);
@@ -238,7 +266,21 @@ export function BOMCreateDialog({ projectId, open, onOpenChange, onSuccess }: BO
 
       router.push(`/projects/${projectId}/bom/${createdBOM.id}`);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to create BOM');
+      let errorMessage = 'Failed to create BOM. Please try again.';
+      if (error?.message) {
+        if (error.message.includes('network')) {
+          errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+        } else if (error.message.includes('permission')) {
+          errorMessage = 'You do not have permission to create BOMs in this project. Please contact your administrator.';
+        } else if (error.message.includes('validation')) {
+          errorMessage = 'Invalid BOM data provided. Please check all required fields and try again.';
+        } else if (error.message.includes('duplicate')) {
+          errorMessage = 'A BOM with this name already exists in the project. Please use a different name.';
+        } else {
+          errorMessage = `Failed to create BOM: ${error.message}`;
+        }
+      }
+      toast.error(errorMessage, { duration: 6000 });
     } finally {
       setLoading(false);
     }

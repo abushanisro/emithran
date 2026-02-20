@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Upload, FileText, Download, Zap } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CadConverterProps {
   onConversionComplete?: (result: any) => void;
@@ -43,7 +44,13 @@ export const CadConverter: React.FC<CadConverterProps> = ({
     const validation = validateFile(file);
     
     if (!validation.valid) {
-      alert(validation.error);
+      let errorMessage = validation.error || 'Invalid file selected.';
+      if (validation.error?.includes('size')) {
+        errorMessage = `File is too large. Please select a file smaller than ${formatFileSize(maxFileSize)}.`;
+      } else if (validation.error?.includes('type') || validation.error?.includes('format')) {
+        errorMessage = `Unsupported file format. Please select one of: ${supportedFormats.join(', ')}.`;
+      }
+      toast.error(errorMessage);
       return;
     }
     
@@ -84,8 +91,25 @@ export const CadConverter: React.FC<CadConverterProps> = ({
       });
       
       onConversionComplete?.(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Conversion failed:', error);
+      let errorMessage = 'CAD conversion failed. Please try again.';
+      if (error?.message) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Conversion timed out. Please try with a smaller file or check your connection.';
+        } else if (error.message.includes('format')) {
+          errorMessage = 'Unsupported or corrupted CAD file. Please check the file and try again.';
+        } else if (error.message.includes('size')) {
+          errorMessage = 'File is too large for conversion. Please use a smaller file.';
+        } else if (error.message.includes('engine')) {
+          errorMessage = 'CAD conversion engine is temporarily unavailable. Please try again later.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error during conversion. Please check your connection and try again.';
+        } else {
+          errorMessage = `Conversion failed: ${error.message}`;
+        }
+      }
+      toast.error(errorMessage, { duration: 8000 });
     }
   }, [selectedFile, convertToStl, onConversionComplete]);
 

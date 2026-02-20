@@ -9,7 +9,8 @@ import {
   Delete,
   UseGuards,
   HttpStatus,
-  BadRequestException
+  BadRequestException,
+  Logger
 } from '@nestjs/common';
 import { 
   ApiTags, 
@@ -39,6 +40,8 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 @UseGuards(SupabaseAuthGuard)
 @Controller('api/rfq')
 export class RfqController {
+  private readonly logger = new Logger(RfqController.name);
+
   constructor(
     private readonly rfqService: RfqService,
     private readonly rfqTrackingService: RfqTrackingService
@@ -55,7 +58,13 @@ export class RfqController {
     @CurrentUser() user: any,
     @Body() createRfqDto: CreateRfqDto
   ): Promise<RfqRecord> {
-    return this.rfqService.create(user.id, createRfqDto);
+    try {
+      this.logger.log(`Creating RFQ '${createRfqDto.rfqName}' for user ${user.id}`);
+      return await this.rfqService.create(user.id, createRfqDto);
+    } catch (error) {
+      this.logger.error(`Failed to create RFQ: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get()
@@ -74,7 +83,13 @@ export class RfqController {
     @CurrentUser() user: any,
     @Query('projectId') projectId?: string
   ): Promise<RfqSummary[]> {
-    return this.rfqService.findByUser(user.id, projectId);
+    try {
+      this.logger.log(`Fetching RFQs for user ${user.id}${projectId ? ` in project ${projectId}` : ''}`);
+      return await this.rfqService.findByUser(user.id, projectId);
+    } catch (error) {
+      this.logger.error(`Failed to fetch RFQs: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   // ============================================================================
@@ -93,7 +108,13 @@ export class RfqController {
     @AccessToken() token: string,
     @Body() createTrackingDto: CreateRfqTrackingDto
   ): Promise<RfqTrackingResponseDto> {
-    return this.rfqTrackingService.createTracking(user.id, token, createTrackingDto);
+    try {
+      this.logger.log(`Creating RFQ tracking for user ${user.id}`);
+      return await this.rfqTrackingService.createTracking(user.id, token, createTrackingDto);
+    } catch (error) {
+      this.logger.error(`Failed to create RFQ tracking: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get('tracking')
@@ -120,7 +141,14 @@ export class RfqController {
     if (!projectId) {
       throw new BadRequestException('Project ID is required for data isolation');
     }
-    return this.rfqTrackingService.getTrackingByUser(user.id, token, projectId);
+    
+    try {
+      this.logger.log(`Fetching RFQ tracking records for user ${user.id} in project ${projectId}`);
+      return await this.rfqTrackingService.getTrackingByUser(user.id, token, projectId);
+    } catch (error) {
+      this.logger.error(`Failed to fetch RFQ tracking records: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get('tracking/stats')
@@ -147,7 +175,14 @@ export class RfqController {
     if (!projectId) {
       throw new BadRequestException('Project ID is required for data isolation');
     }
-    return this.rfqTrackingService.getTrackingStats(user.id, token, projectId);
+    
+    try {
+      this.logger.log(`Fetching RFQ tracking stats for user ${user.id} in project ${projectId}`);
+      return await this.rfqTrackingService.getTrackingStats(user.id, token, projectId);
+    } catch (error) {
+      this.logger.error(`Failed to fetch RFQ tracking stats: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get('tracking/:id')
@@ -164,7 +199,13 @@ export class RfqController {
     @CurrentUser() user: any,
     @AccessToken() token: string
   ): Promise<RfqTrackingResponseDto> {
-    return this.rfqTrackingService.getTrackingById(id, user.id, token);
+    try {
+      this.logger.log(`Fetching RFQ tracking ${id} for user ${user.id}`);
+      return await this.rfqTrackingService.getTrackingById(id, user.id, token);
+    } catch (error) {
+      this.logger.error(`Failed to fetch RFQ tracking ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Patch('tracking/:id/status')
@@ -180,8 +221,14 @@ export class RfqController {
     @AccessToken() token: string,
     @Body() updateStatusDto: UpdateTrackingStatusDto
   ): Promise<{ message: string }> {
-    await this.rfqTrackingService.updateTrackingStatus(id, user.id, token, updateStatusDto.status);
-    return { message: 'RFQ tracking status updated successfully' };
+    try {
+      this.logger.log(`Updating RFQ tracking status ${id} to ${updateStatusDto.status}`);
+      await this.rfqTrackingService.updateTrackingStatus(id, user.id, token, updateStatusDto.status);
+      return { message: 'RFQ tracking status updated successfully' };
+    } catch (error) {
+      this.logger.error(`Failed to update RFQ tracking status ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Patch('tracking/:trackingId/vendors/:vendorId/response')
@@ -199,14 +246,20 @@ export class RfqController {
     @AccessToken() token: string,
     @Body() updateResponseDto: UpdateVendorResponseDto
   ): Promise<{ message: string }> {
-    await this.rfqTrackingService.updateVendorResponse(
-      trackingId,
-      vendorId,
-      user.id,
-      token,
-      updateResponseDto
-    );
-    return { message: 'Vendor response updated successfully' };
+    try {
+      this.logger.log(`Updating vendor response for tracking ${trackingId}, vendor ${vendorId}`);
+      await this.rfqTrackingService.updateVendorResponse(
+        trackingId,
+        vendorId,
+        user.id,
+        token,
+        updateResponseDto
+      );
+      return { message: 'Vendor response updated successfully' };
+    } catch (error) {
+      this.logger.error(`Failed to update vendor response: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Delete('tracking/:id')
@@ -221,8 +274,14 @@ export class RfqController {
     @CurrentUser() user: any,
     @AccessToken() token: string
   ): Promise<{ message: string }> {
-    await this.rfqTrackingService.deleteTracking(id, user.id, token);
-    return { message: 'RFQ tracking record deleted successfully' };
+    try {
+      this.logger.log(`Deleting RFQ tracking ${id}`);
+      await this.rfqTrackingService.deleteTracking(id, user.id, token);
+      return { message: 'RFQ tracking record deleted successfully' };
+    } catch (error) {
+      this.logger.error(`Failed to delete RFQ tracking ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   // ============================================================================
@@ -242,7 +301,13 @@ export class RfqController {
     @Param('id') id: string,
     @CurrentUser() user: any
   ): Promise<RfqRecord> {
-    return this.rfqService.findOne(id, user.id);
+    try {
+      this.logger.log(`Fetching RFQ ${id} for user ${user.id}`);
+      return await this.rfqService.findOne(id, user.id);
+    } catch (error) {
+      this.logger.error(`Failed to fetch RFQ ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Patch(':id/send')
@@ -261,8 +326,14 @@ export class RfqController {
     @CurrentUser() user: any,
     @AccessToken() token: string
   ): Promise<{ message: string }> {
-    await this.rfqService.sendRfq(id, user.id, token);
-    return { message: 'RFQ sent successfully to vendors' };
+    try {
+      this.logger.log(`Sending RFQ ${id} to vendors`);
+      await this.rfqService.sendRfq(id, user.id, token);
+      return { message: 'RFQ sent successfully to vendors' };
+    } catch (error) {
+      this.logger.error(`Failed to send RFQ ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Patch(':id/close')
@@ -276,7 +347,13 @@ export class RfqController {
     @Param('id') id: string,
     @CurrentUser() user: any
   ): Promise<{ message: string }> {
-    await this.rfqService.closeRfq(id, user.id);
-    return { message: 'RFQ closed successfully' };
+    try {
+      this.logger.log(`Closing RFQ ${id}`);
+      await this.rfqService.closeRfq(id, user.id);
+      return { message: 'RFQ closed successfully' };
+    } catch (error) {
+      this.logger.error(`Failed to close RFQ ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 }

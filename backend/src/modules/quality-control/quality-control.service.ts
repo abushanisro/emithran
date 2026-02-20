@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
 import { SupabaseService } from '@/common/supabase/supabase.service';
 
 @Injectable()
@@ -36,7 +36,21 @@ export class QualityControlService {
       const { data: inspections, error } = await query;
 
       if (error) {
-        throw error;
+        this.logger.error(`Error fetching quality inspections for project ${projectId}: ${error.message}`);
+        
+        if (error.message.includes('row-level security policy')) {
+          throw new ForbiddenException('You do not have permission to access quality data for this project.');
+        }
+        
+        if (error.message.includes('invalid input syntax for type uuid')) {
+          throw new BadRequestException('Invalid project ID format provided.');
+        }
+        
+        throw new InternalServerErrorException('Unable to retrieve quality metrics. Please try again later.');
+      }
+      
+      if (!inspections || inspections.length === 0) {
+        this.logger.log(`No quality inspections found for project ${projectId}`);
       }
 
       // Calculate metrics
@@ -49,10 +63,15 @@ export class QualityControlService {
       const completionRate = totalInspections > 0 ? ((completedInspections / totalInspections) * 100).toFixed(1) : '0';
 
       // Get non-conformances
-      const { data: nonConformances } = await this.supabase.client
+      const { data: nonConformances, error: nonConformancesError } = await this.supabase.client
         .from('quality_non_conformances')
         .select('*, quality_inspections!inspection_id(project_id)')
         .eq('quality_inspections.project_id', projectId);
+      
+      if (nonConformancesError) {
+        this.logger.warn(`Error fetching non-conformances for project ${projectId}: ${nonConformancesError.message}`);
+        // Don't throw here, continue with empty non-conformances data
+      }
 
       const totalNonConformances = nonConformances?.length || 0;
       const openNonConformances = nonConformances?.filter(nc => nc.status !== 'closed').length || 0;
@@ -87,8 +106,12 @@ export class QualityControlService {
         monthlyTrends: await this.getMonthlyTrends(projectId, userId),
       };
     } catch (error) {
-      this.logger.error('Error getting quality metrics:', error);
-      throw error;
+      if (error instanceof BadRequestException || error instanceof ForbiddenException || error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      this.logger.error(`Unexpected error getting quality metrics for project ${projectId}:`, error);
+      throw new InternalServerErrorException('An unexpected error occurred while retrieving quality metrics. Please try again later.');
     }
   }
 
@@ -97,11 +120,19 @@ export class QualityControlService {
     userId: string,
     reportType?: string,
   ): Promise<any> {
+    if (!projectId) {
+      throw new BadRequestException('Project ID is required to generate a quality report.');
+    }
+    
+    if (!userId) {
+      throw new BadRequestException('User authentication is required to generate reports.');
+    }
+    
     try {
       const metrics = await this.getQualityMetrics(projectId, userId);
       
       // Get detailed inspection data
-      const { data: inspections } = await this.supabase.client
+      const { data: inspections, error: inspectionsError } = await this.supabase.client
         .from('quality_inspections')
         .select(`
           *,
@@ -111,15 +142,30 @@ export class QualityControlService {
         `)
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
+        
+      if (inspectionsError) {
+        this.logger.error(`Error fetching detailed inspection data for report: ${inspectionsError.message}`);
+        
+        if (inspectionsError.message.includes('row-level security policy')) {
+          throw new ForbiddenException('You do not have permission to access inspection data for this project.');
+        }
+        
+        throw new InternalServerErrorException('Unable to retrieve detailed inspection data for the report.');
+      }
 
       // Get non-conformances with details
-      const { data: nonConformances } = await this.supabase.client
+      const { data: nonConformances, error: nonConformancesError } = await this.supabase.client
         .from('quality_non_conformances')
         .select(`
           *,
           quality_inspections!inspection_id (name, type)
         `)
         .eq('quality_inspections.project_id', projectId);
+        
+      if (nonConformancesError) {
+        this.logger.warn(`Error fetching non-conformances for report: ${nonConformancesError.message}`);
+        // Continue with empty non-conformances data rather than failing the entire report
+      }
 
       return {
         reportType: reportType || 'comprehensive',
@@ -131,8 +177,12 @@ export class QualityControlService {
         recommendations: this.generateRecommendations(metrics),
       };
     } catch (error) {
-      this.logger.error('Error generating quality report:', error);
-      throw error;
+      if (error instanceof BadRequestException || error instanceof ForbiddenException || error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      this.logger.error(`Unexpected error generating quality report for project ${projectId}:`, error);
+      throw new InternalServerErrorException('Failed to generate quality report. Please try again later.');
     }
   }
 
@@ -140,18 +190,31 @@ export class QualityControlService {
     projectId: string,
     userId: string,
   ): Promise<any> {
+    if (!projectId) {
+      throw new BadRequestException('Project ID is required to access the quality dashboard.');
+    }
+    
+    if (!userId) {
+      throw new BadRequestException('User authentication is required to access the dashboard.');
+    }
+    
     try {
       const metrics = await this.getQualityMetrics(projectId, userId);
       
       // Get recent activities
-      const { data: recentInspections } = await this.supabase.client
+      const { data: recentInspections, error: inspectionsError } = await this.supabase.client
         .from('quality_inspections')
         .select('*')
         .eq('project_id', projectId)
         .order('updated_at', { ascending: false })
         .limit(10);
+        
+      if (inspectionsError) {
+        this.logger.warn(`Error fetching recent inspections for dashboard: ${inspectionsError.message}`);
+        // Continue with empty inspections data
+      }
 
-      const { data: recentNonConformances } = await this.supabase.client
+      const { data: recentNonConformances, error: nonConformancesError } = await this.supabase.client
         .from('quality_non_conformances')
         .select(`
           *,
@@ -160,6 +223,11 @@ export class QualityControlService {
         .eq('quality_inspections.project_id', projectId)
         .order('created_at', { ascending: false })
         .limit(5);
+        
+      if (nonConformancesError) {
+        this.logger.warn(`Error fetching recent non-conformances for dashboard: ${nonConformancesError.message}`);
+        // Continue with empty non-conformances data
+      }
 
       return {
         metrics,
@@ -168,8 +236,12 @@ export class QualityControlService {
         alerts: this.generateQualityAlerts(metrics),
       };
     } catch (error) {
-      this.logger.error('Error getting quality dashboard:', error);
-      throw error;
+      if (error instanceof BadRequestException || error instanceof ForbiddenException || error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      this.logger.error(`Unexpected error getting quality dashboard for project ${projectId}:`, error);
+      throw new InternalServerErrorException('Failed to retrieve quality dashboard data. Please try again later.');
     }
   }
 

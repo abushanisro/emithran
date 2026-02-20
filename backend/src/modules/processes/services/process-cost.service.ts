@@ -8,7 +8,7 @@
  * @version 1.0.0
  */
 
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import {
@@ -80,7 +80,18 @@ export class ProcessCostService {
 
     if (error) {
       this.logger.error(`Error fetching process costs: ${error.message}`, 'ProcessCostService');
-      throw new InternalServerErrorException(`Failed to fetch process costs: ${error.message}`);
+      
+      // Handle access permissions
+      if (error.message.includes('row-level security policy')) {
+        throw new ForbiddenException('You do not have permission to access these process cost records.');
+      }
+      
+      // Handle invalid filter values
+      if (error.message.includes('invalid input syntax for type uuid')) {
+        throw new BadRequestException('One or more filter values have invalid format. Please check your process ID, BOM item ID filters.');
+      }
+      
+      throw new InternalServerErrorException('Unable to retrieve process cost records. Please try again later.');
     }
 
     const records = (data || []).map((row) => ProcessCostResponseDto.fromDatabase(row));
@@ -110,9 +121,23 @@ export class ProcessCostService {
       .eq('id', id)
       .single();
 
-    if (error || !data) {
+    if (error) {
+      this.logger.error(`Error fetching process cost ${id}: ${error.message}`, 'ProcessCostService');
+      
+      if (error.message.includes('row-level security policy')) {
+        throw new ForbiddenException('You do not have permission to access this process cost record.');
+      }
+      
+      if (error.message.includes('invalid input syntax for type uuid')) {
+        throw new BadRequestException('Invalid process cost ID format provided.');
+      }
+      
+      throw new InternalServerErrorException('Unable to retrieve process cost record. Please try again later.');
+    }
+    
+    if (!data) {
       this.logger.error(`Process cost not found: ${id}`, 'ProcessCostService');
-      throw new NotFoundException(`Process cost with ID ${id} not found`);
+      throw new NotFoundException(`Process cost record with ID ${id} was not found or you do not have access to it.`);
     }
 
     // Recalculate to ensure fresh values
@@ -217,7 +242,49 @@ export class ProcessCostService {
 
     if (error || !data) {
       this.logger.error(`Error creating process cost: ${error?.message}`, 'ProcessCostService');
-      throw new InternalServerErrorException(`Failed to create process cost: ${error?.message}`);
+      
+      if (error) {
+        // Handle duplicate constraint
+        if (error.message.includes('duplicate key')) {
+          throw new ConflictException(
+            'A process cost record with this configuration already exists. Please modify your input or update the existing record.'
+          );
+        }
+        
+        // Handle foreign key constraints
+        if (error.message.includes('violates foreign key constraint')) {
+          if (error.message.includes('process_id')) {
+            throw new BadRequestException('The specified process does not exist or you do not have access to it.');
+          }
+          if (error.message.includes('bom_item_id')) {
+            throw new BadRequestException('The specified BOM item does not exist or has been deleted.');
+          }
+          if (error.message.includes('mhr_id')) {
+            throw new BadRequestException('The specified MHR record does not exist or is not accessible.');
+          }
+          if (error.message.includes('user_id')) {
+            throw new BadRequestException('User account is not valid. Please log in again.');
+          }
+        }
+        
+        // Handle validation constraints
+        if (error.message.includes('violates check constraint')) {
+          if (error.message.includes('positive_rates')) {
+            throw new BadRequestException('All rate values must be positive numbers.');
+          }
+          if (error.message.includes('positive_values')) {
+            throw new BadRequestException('Time, quantity, and cost values must be positive numbers.');
+          }
+          if (error.message.includes('cycle_time_positive')) {
+            throw new BadRequestException('Cycle time must be greater than zero.');
+          }
+          if (error.message.includes('batch_size_positive')) {
+            throw new BadRequestException('Batch size must be greater than zero.');
+          }
+        }
+      }
+      
+      throw new InternalServerErrorException('Failed to create process cost record. Please check your input and try again.');
     }
 
     return ProcessCostResponseDto.fromDatabase(data);
@@ -243,9 +310,23 @@ export class ProcessCostService {
       .eq('id', id)
       .single();
 
-    if (fetchError || !existing) {
+    if (fetchError) {
+      this.logger.error(`Error fetching process cost for update ${id}: ${fetchError.message}`, 'ProcessCostService');
+      
+      if (fetchError.message.includes('row-level security policy')) {
+        throw new ForbiddenException('You do not have permission to update this process cost record.');
+      }
+      
+      if (fetchError.message.includes('invalid input syntax for type uuid')) {
+        throw new BadRequestException('Invalid process cost ID format provided.');
+      }
+      
+      throw new InternalServerErrorException('Unable to retrieve process cost record for update.');
+    }
+    
+    if (!existing) {
       this.logger.error(`Process cost not found: ${id}`, 'ProcessCostService');
-      throw new NotFoundException(`Process cost with ID ${id} not found`);
+      throw new NotFoundException(`Process cost record with ID ${id} was not found or you do not have access to it.`);
     }
 
     // Merge with update values
@@ -330,7 +411,37 @@ export class ProcessCostService {
 
     if (error || !data) {
       this.logger.error(`Error updating process cost: ${error?.message}`, 'ProcessCostService');
-      throw new NotFoundException(`Failed to update process cost with ID ${id}`);
+      
+      if (error) {
+        // Handle concurrent update conflicts
+        if (error.message.includes('row was updated by another user')) {
+          throw new ConflictException(
+            'This process cost record has been modified by another user. Please refresh and try again.'
+          );
+        }
+        
+        // Handle validation constraints
+        if (error.message.includes('violates check constraint')) {
+          if (error.message.includes('positive_rates')) {
+            throw new BadRequestException('All rate values must be positive numbers.');
+          }
+          if (error.message.includes('positive_values')) {
+            throw new BadRequestException('Time, quantity, and cost values must be positive numbers.');
+          }
+        }
+        
+        // Handle foreign key constraints
+        if (error.message.includes('violates foreign key constraint')) {
+          if (error.message.includes('process_id')) {
+            throw new BadRequestException('The specified process does not exist or you do not have access to it.');
+          }
+          if (error.message.includes('bom_item_id')) {
+            throw new BadRequestException('The specified BOM item does not exist or has been deleted.');
+          }
+        }
+      }
+      
+      throw new InternalServerErrorException('Failed to update process cost record. Please verify your input and try again.');
     }
 
     return ProcessCostResponseDto.fromDatabase(data);
@@ -350,7 +461,15 @@ export class ProcessCostService {
 
     if (error) {
       this.logger.error(`Error deleting process cost: ${error.message}`, 'ProcessCostService');
-      throw new InternalServerErrorException(`Failed to delete process cost: ${error.message}`);
+      
+      // Handle foreign key constraint violations (process cost referenced elsewhere)
+      if (error.message.includes('violates foreign key constraint')) {
+        throw new ConflictException(
+          'This process cost record cannot be deleted as it is being referenced by other calculations or processes. Please remove those references first.'
+        );
+      }
+      
+      throw new InternalServerErrorException('Failed to delete process cost record. Please try again later.');
     }
 
     return { message: 'Process cost deleted successfully' };
@@ -364,11 +483,38 @@ export class ProcessCostService {
     this.logger.log('Calculating process cost (no save)', 'ProcessCostService');
 
     try {
+      // Validate input before calculation
+      if (!input || typeof input !== 'object') {
+        throw new BadRequestException('Invalid calculation input provided.');
+      }
+      
+      if (input.cycleTime <= 0) {
+        throw new BadRequestException('Cycle time must be greater than zero for cost calculation.');
+      }
+      
+      if (input.batchSize <= 0) {
+        throw new BadRequestException('Batch size must be greater than zero for cost calculation.');
+      }
+      
       const result = this.calculationEngine.calculate(input);
       return result;
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      
       this.logger.error(`Calculation error: ${error.message}`, 'ProcessCostService');
-      throw new InternalServerErrorException(`Calculation failed: ${error.message}`);
+      
+      // Handle specific calculation errors
+      if (error.message.includes('division by zero')) {
+        throw new BadRequestException('Invalid calculation parameters detected. Please check that all time and quantity values are greater than zero.');
+      }
+      
+      if (error.message.includes('invalid number')) {
+        throw new BadRequestException('All numeric input values must be valid numbers.');
+      }
+      
+      throw new InternalServerErrorException('Process cost calculation failed due to an unexpected error. Please verify your input values.');
     }
   }
 

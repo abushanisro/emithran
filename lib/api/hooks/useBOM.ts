@@ -56,7 +56,15 @@ export function useCreateBOM() {
       toast.success('BOM created successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to create BOM');
+      if (error.status === 400) {
+        toast.error('Please check all required fields are filled out correctly.');
+      } else if (error.status === 409) {
+        toast.error('A BOM with this name already exists in the project.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to create BOMs in this project.');
+      } else {
+        toast.error('Unable to create BOM. Please try again or contact support.');
+      }
     },
   });
 }
@@ -73,7 +81,17 @@ export function useUpdateBOM() {
       toast.success('BOM updated successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to update BOM');
+      if (error.status === 400) {
+        toast.error('Please check all fields have valid information.');
+      } else if (error.status === 404) {
+        toast.error('This BOM no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Another user is editing this BOM. Please refresh and try again.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to edit this BOM.');
+      } else {
+        toast.error('Unable to save changes. Please try again or contact support.');
+      }
     },
   });
 }
@@ -88,7 +106,15 @@ export function useDeleteBOM() {
       toast.success('BOM deleted successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to delete BOM');
+      if (error.status === 404) {
+        toast.error('This BOM has already been deleted.');
+      } else if (error.status === 409) {
+        toast.error('Cannot delete BOM because it is being used by other components.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to delete this BOM.');
+      } else {
+        toast.error('Unable to delete BOM. Please try again or contact support.');
+      }
     },
   });
 }

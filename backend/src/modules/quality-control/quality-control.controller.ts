@@ -53,12 +53,17 @@ export class QualityControlController {
     @Body() createDto: CreateQualityInspectionDto,
     @CurrentUser() user: any,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
-    this.logger.log(`Creating quality inspection: ${createDto.name}`);
-    const result = await this.qualityInspectionService.createInspection(
-      createDto,
-      this.getUserId(user),
-    );
-    return createResponse(result);
+    try {
+      this.logger.log(`Creating quality inspection: ${createDto.name}`);
+      const result = await this.qualityInspectionService.createInspection(
+        createDto,
+        this.getUserId(user),
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to create quality inspection: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get('inspections')
@@ -71,11 +76,17 @@ export class QualityControlController {
     @Query('type') type?: string,
     @Query('inspector') inspector?: string,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto[]>> {
-    const result = await this.qualityInspectionService.getInspections(
-      this.getUserId(user),
-      { projectId, status, type, inspector }
-    );
-    return createResponse(result);
+    try {
+      this.logger.log(`Fetching quality inspections for user ${this.getUserId(user)}`);
+      const result = await this.qualityInspectionService.getInspections(
+        this.getUserId(user),
+        { projectId, status, type, inspector }
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to fetch quality inspections: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get('inspections/:id')
@@ -85,11 +96,17 @@ export class QualityControlController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: any,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
-    const result = await this.qualityInspectionService.getInspectionById(
-      id,
-      this.getUserId(user),
-    );
-    return createResponse(result);
+    try {
+      this.logger.log(`Fetching quality inspection ${id}`);
+      const result = await this.qualityInspectionService.getInspectionById(
+        id,
+        this.getUserId(user),
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to fetch quality inspection ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Put('inspections/:id')
@@ -100,12 +117,18 @@ export class QualityControlController {
     @Body() updateDto: UpdateQualityInspectionDto,
     @CurrentUser() user: any,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
-    const result = await this.qualityInspectionService.updateInspection(
-      id,
-      updateDto,
-      this.getUserId(user),
-    );
-    return createResponse(result);
+    try {
+      this.logger.log(`Updating quality inspection ${id}`);
+      const result = await this.qualityInspectionService.updateInspection(
+        id,
+        updateDto,
+        this.getUserId(user),
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to update quality inspection ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Delete('inspections/:id')
@@ -115,11 +138,17 @@ export class QualityControlController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: any,
   ): Promise<CustomApiResponse<void>> {
-    await this.qualityInspectionService.deleteInspection(
-      id,
-      this.getUserId(user),
-    );
-    return createResponse(undefined);
+    try {
+      this.logger.log(`Deleting quality inspection ${id}`);
+      await this.qualityInspectionService.deleteInspection(
+        id,
+        this.getUserId(user),
+      );
+      return createResponse(undefined);
+    } catch (error) {
+      this.logger.error(`Failed to delete quality inspection ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   // ============================================================================
@@ -271,12 +300,18 @@ export class QualityControlController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ): Promise<CustomApiResponse<any>> {
-    const result = await this.qualityControlService.getQualityMetrics(
-      projectId,
-      this.getUserId(user),
-      { startDate, endDate }
-    );
-    return createResponse(result);
+    try {
+      this.logger.log(`Fetching quality metrics for project ${projectId}`);
+      const result = await this.qualityControlService.getQualityMetrics(
+        projectId,
+        this.getUserId(user),
+        { startDate, endDate }
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to fetch quality metrics for project ${projectId}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get('projects/:projectId/quality-report')
@@ -287,12 +322,18 @@ export class QualityControlController {
     @CurrentUser() user: any,
     @Query('reportType') reportType?: string,
   ): Promise<CustomApiResponse<any>> {
-    const result = await this.qualityControlService.generateQualityReport(
-      projectId,
-      this.getUserId(user),
-      reportType,
-    );
-    return createResponse(result);
+    try {
+      this.logger.log(`Generating quality report for project ${projectId}, type: ${reportType || 'comprehensive'}`);
+      const result = await this.qualityControlService.generateQualityReport(
+        projectId,
+        this.getUserId(user),
+        reportType,
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to generate quality report for project ${projectId}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   // ============================================================================
@@ -306,10 +347,16 @@ export class QualityControlController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @CurrentUser() user: any,
   ): Promise<CustomApiResponse<any>> {
-    const result = await this.qualityControlService.getQualityDashboard(
-      projectId,
-      this.getUserId(user),
-    );
-    return createResponse(result);
+    try {
+      this.logger.log(`Fetching quality dashboard for project ${projectId}`);
+      const result = await this.qualityControlService.getQualityDashboard(
+        projectId,
+        this.getUserId(user),
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to fetch quality dashboard for project ${projectId}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 }

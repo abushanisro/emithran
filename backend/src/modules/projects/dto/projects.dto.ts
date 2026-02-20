@@ -3,6 +3,12 @@
 
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsString, IsOptional, IsNumber, IsEnum, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsProjectName,
+  IsOptionalString,
+  IsOptionalEnum,
+  IsOptionalPrice,
+} from '../../../common/decorators/validation.decorators';
 
 export enum ProjectStatus {
   DRAFT = 'draft',
@@ -13,33 +19,31 @@ export enum ProjectStatus {
 }
 
 export class CreateProjectDto {
-  @ApiProperty({ example: 'Project Alpha' })
-  @IsString()
+  @ApiProperty({ 
+    example: 'Project Alpha',
+    description: 'Project name (2-100 characters, letters, numbers, spaces, hyphens, underscores, and periods only)'
+  })
+  @IsProjectName()
   name: string;
 
   @ApiPropertyOptional({ example: 'Manufacturing cost analysis project' })
-  @IsOptional()
-  @IsString()
+  @IsOptionalString('Description must be text')
   description?: string;
 
   @ApiPropertyOptional({ example: 'United States' })
-  @IsOptional()
-  @IsString()
+  @IsOptionalString('Country must be text')
   country?: string;
 
   @ApiPropertyOptional({ example: 'California' })
-  @IsOptional()
-  @IsString()
+  @IsOptionalString('State must be text')
   state?: string;
 
   @ApiPropertyOptional({ example: 'San Francisco' })
-  @IsOptional()
-  @IsString()
+  @IsOptionalString('City must be text')
   city?: string;
 
   @ApiPropertyOptional({ example: ProjectStatus.DRAFT, enum: ProjectStatus })
-  @IsOptional()
-  @IsEnum(ProjectStatus)
+  @IsOptionalEnum(ProjectStatus, 'Status must be one of: draft, active, completed, on_hold, cancelled')
   status?: ProjectStatus;
 
   @ApiPropertyOptional({
@@ -48,10 +52,7 @@ export class CreateProjectDto {
     minimum: 0,
     maximum: 99999999.99
   })
-  @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0, { message: 'Target price must be a non-negative number' })
-  @Max(99999999.99, { message: 'Target price cannot exceed ₹9,99,99,999.99' })
+  @IsOptionalPrice(2, 0, 99999999.99, 'Target price must be a valid amount between ₹0 and ₹9,99,99,999.99')
   targetPrice?: number;
 }
 

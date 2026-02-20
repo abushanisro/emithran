@@ -75,8 +75,14 @@ export class ProductionPlanningController {
     @Body() createDto: CreateProductionLotDto,
     @CurrentUser() user: any,
   ): Promise<ApiResponse<ProductionLotResponseDto>> {
-    const result = await this.productionPlanningService.createProductionLot(createDto, this.getUserId(user));
-    return createResponse(result);
+    try {
+      this.logger.log(`Creating production lot '${createDto.lotNumber}' for user ${this.getUserId(user)}`);
+      const result = await this.productionPlanningService.createProductionLot(createDto, this.getUserId(user));
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to create production lot: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get('lots')
@@ -86,18 +92,34 @@ export class ProductionPlanningController {
     @Query('bomId') bomId?: string,
     @Query('priority') priority?: string,
   ): Promise<ApiResponse<ProductionLotResponseDto[]>> {
-    const result = await this.productionPlanningService.getProductionLots(this.getUserId(user), {
-      status,
-      bomId,
-      priority,
-    });
-    return createResponse(result);
+    try {
+      this.logger.log(`Fetching production lots for user ${this.getUserId(user)}`);
+      const result = await this.productionPlanningService.getProductionLots(this.getUserId(user), {
+        status,
+        bomId,
+        priority,
+      });
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to fetch production lots: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get('lots/:id')
   async getProductionLotById(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: any,
+  ): Promise<ApiResponse<ProductionLotResponseDto>> {
+    try {
+      this.logger.log(`Fetching production lot ${id} for user ${this.getUserId(user)}`);
+      const result = await this.productionPlanningService.getProductionLotById(id, this.getUserId(user));
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to fetch production lot ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
   ): Promise<ApiResponse<ProductionLotResponseDto>> {
     const result = await this.productionPlanningService.getProductionLotById(id, this.getUserId(user));
     return createResponse(result);

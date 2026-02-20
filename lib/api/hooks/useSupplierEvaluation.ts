@@ -104,7 +104,18 @@ export function useCreateSupplierEvaluation() {
       toast.success('Supplier evaluation created successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to create evaluation');
+      const status = error?.response?.status;
+      if (status === 400) {
+        toast.error('Please check all evaluation criteria are filled out correctly.');
+      } else if (status === 409) {
+        toast.error('An evaluation for this supplier and BOM item already exists.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to create supplier evaluations.');
+      } else if (status === 422) {
+        toast.error('Please ensure all scoring criteria and weights are valid.');
+      } else {
+        toast.error('Unable to create evaluation. Please try again or contact support.');
+      }
     },
   });
 }
@@ -130,7 +141,20 @@ export function useUpdateSupplierEvaluation() {
       toast.success('Evaluation updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to update evaluation');
+      const status = error?.response?.status;
+      if (status === 400) {
+        toast.error('Please check that all evaluation information is valid.');
+      } else if (status === 404) {
+        toast.error('This evaluation no longer exists. It may have been deleted.');
+      } else if (status === 409) {
+        toast.error('Another user is editing this evaluation. Please refresh and try again.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to edit this evaluation.');
+      } else if (status === 422) {
+        toast.error('Please ensure all scoring criteria and weights are valid.');
+      } else {
+        toast.error('Unable to save changes. Please try again or contact support.');
+      }
     },
   });
 }
@@ -148,7 +172,16 @@ export function useDeleteSupplierEvaluation() {
       toast.success('Evaluation deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to delete evaluation');
+      const status = error?.response?.status;
+      if (status === 404) {
+        toast.error('This evaluation has already been deleted.');
+      } else if (status === 409) {
+        toast.error('Cannot delete evaluation because it has been approved and frozen.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to delete this evaluation.');
+      } else {
+        toast.error('Unable to delete evaluation. Please try again or contact support.');
+      }
     },
   });
 }
@@ -171,7 +204,18 @@ export function useCompleteSupplierEvaluation() {
       toast.success('Evaluation marked as completed');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to complete evaluation');
+      const status = error?.response?.status;
+      if (status === 400) {
+        toast.error('Please ensure all required evaluation criteria are completed.');
+      } else if (status === 404) {
+        toast.error('This evaluation no longer exists. It may have been deleted.');
+      } else if (status === 409) {
+        toast.error('This evaluation has already been completed or is frozen.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to complete this evaluation.');
+      } else {
+        toast.error('Unable to complete evaluation. Please try again or contact support.');
+      }
     },
   });
 }
@@ -190,7 +234,18 @@ export function useApproveSupplierEvaluation() {
       toast.success('Evaluation approved and frozen. Snapshot created.');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to approve evaluation');
+      const status = error?.response?.status;
+      if (status === 400) {
+        toast.error('Evaluation must be completed before it can be approved.');
+      } else if (status === 404) {
+        toast.error('This evaluation no longer exists. It may have been deleted.');
+      } else if (status === 409) {
+        toast.error('This evaluation has already been approved and frozen.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to approve evaluations.');
+      } else {
+        toast.error('Unable to approve evaluation. Please try again or contact support.');
+      }
     },
   });
 }

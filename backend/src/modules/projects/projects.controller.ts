@@ -7,14 +7,18 @@ import {
   Body,
   Param,
   Query,
+  HttpCode,
+  HttpStatus,
+  UseFilters,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto, UpdateProjectDto, QueryProjectsDto } from './dto/projects.dto';
 import { ProjectResponseDto, ProjectListResponseDto } from './dto/project-response.dto';
 import { AddTeamMemberDto, UpdateTeamMemberDto, TeamMemberResponseDto, TeamMembersListResponseDto } from './dto/project-team-member.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { GlobalExceptionFilter } from '../../common/filters/global-exception.filter';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
@@ -31,29 +35,45 @@ export class ProjectsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get project by ID' })
+  @ApiParam({ name: 'id', description: 'Project ID', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiResponse({ status: 200, description: 'Project retrieved successfully', type: ProjectResponseDto })
-  @ApiResponse({ status: 404, description: 'Project not found' })
+  @ApiResponse({ status: 400, description: 'Invalid project ID format' })
+  @ApiResponse({ status: 404, description: 'Project not found or access denied' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   async findOne(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProjectResponseDto> {
     return this.projectsService.findOne(id, user.id, token);
   }
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create new project' })
+  @ApiBody({ type: CreateProjectDto })
   @ApiResponse({ status: 201, description: 'Project created successfully', type: ProjectResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input data or project name already exists' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   async create(@Body() createProjectDto: CreateProjectDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProjectResponseDto> {
     return this.projectsService.create(createProjectDto, user.id, token);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Update project' })
+  @ApiParam({ name: 'id', description: 'Project ID', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiBody({ type: UpdateProjectDto })
   @ApiResponse({ status: 200, description: 'Project updated successfully', type: ProjectResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input data, project ID format, or project name already exists' })
+  @ApiResponse({ status: 404, description: 'Project not found or access denied' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   async update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto, @CurrentUser() user: any, @AccessToken() token: string): Promise<ProjectResponseDto> {
     return this.projectsService.update(id, updateProjectDto, user.id, token);
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete project' })
+  @ApiOperation({ summary: 'Delete project and all associated data' })
+  @ApiParam({ name: 'id', description: 'Project ID', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiResponse({ status: 200, description: 'Project deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid project ID format' })
+  @ApiResponse({ status: 404, description: 'Project not found or access denied' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   async remove(@Param('id') id: string, @CurrentUser() user: any, @AccessToken() token: string) {
     return this.projectsService.remove(id, user.id, token);
   }

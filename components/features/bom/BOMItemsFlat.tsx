@@ -263,10 +263,24 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
     if (itemToDelete) {
       try {
         await deleteBOMItem(itemToDelete.id);
-        toast.success('Item deleted successfully');
+        toast.success(`"${itemToDelete.name}" has been deleted successfully from the BOM.`);
         refetch();
-      } catch (error) {
-        toast.error('Failed to delete item');
+      } catch (error: any) {
+        let errorMessage = 'Failed to delete item. Please try again.';
+        if (error?.message) {
+          if (error.message.includes('permission')) {
+            errorMessage = 'You do not have permission to delete this item. Please contact your administrator.';
+          } else if (error.message.includes('network')) {
+            errorMessage = 'Failed to delete item due to network error. Please check your connection and try again.';
+          } else if (error.message.includes('dependency')) {
+            errorMessage = 'Cannot delete this item because other items depend on it. Please remove child items first.';
+          } else if (error.message.includes('not found')) {
+            errorMessage = 'Item not found. It may have already been deleted.';
+          } else {
+            errorMessage = `Failed to delete item: ${error.message}`;
+          }
+        }
+        toast.error(errorMessage, { duration: 6000 });
       } finally {
         setDeleteDialogOpen(false);
         setItemToDelete(null);

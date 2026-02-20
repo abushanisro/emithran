@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { useCreateMHR, useUpdateMHR, useMHRRecord } from '@/lib/api/hooks';
 import type { CreateMHRData } from '@/lib/api/mhr';
+import { toast } from 'sonner';
 import { COMMODITY_PRESETS, getCommodityPreset, MANUFACTURING_PROCESSES } from '@/lib/constants/commodityPresets';
 import { mhrFormSchema, type MHRFormData } from '@/lib/validations/mhrValidation';
 
@@ -144,9 +145,25 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
       }
       onOpenChange(false);
       reset(getDefaultValues());
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save MHR record:', error);
-      // Error is already handled by the mutation hooks via toast
+      // Enhanced error handling beyond what mutation hooks provide
+      let errorMessage = editingId ? 'Failed to update MHR record.' : 'Failed to create MHR record.';
+      if (error?.message) {
+        if (error.message.includes('validation')) {
+          errorMessage = 'Invalid data provided. Please check all numeric fields have valid values and required fields are filled.';
+        } else if (error.message.includes('duplicate')) {
+          errorMessage = 'A machine with this name already exists. Please use a different machine name.';
+        } else if (error.message.includes('permission')) {
+          errorMessage = 'You do not have permission to save MHR records. Please contact your administrator.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error occurred. Please check your connection and try again.';
+        }
+      }
+      // Only show toast if mutation hooks haven't already shown one
+      if (!createMutation.error && !updateMutation.error) {
+        toast.error(errorMessage, { duration: 6000 });
+      }
     }
   };
 

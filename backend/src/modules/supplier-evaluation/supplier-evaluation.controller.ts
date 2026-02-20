@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupplierEvaluationService } from './supplier-evaluation.service';
@@ -27,6 +28,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Controller({ path: 'api/supplier-evaluations', version: '1' })
 @UseGuards(SupabaseAuthGuard)
 export class SupplierEvaluationController {
+  private readonly logger = new Logger(SupplierEvaluationController.name);
+
   constructor(private readonly evaluationService: SupplierEvaluationService) {}
 
   // ============================================================================
@@ -47,7 +50,13 @@ export class SupplierEvaluationController {
     @CurrentUser('id') userId: string,
     @CurrentUser('accessToken') accessToken: string,
   ): Promise<SupplierEvaluationResponseDto> {
-    return this.evaluationService.create(dto, userId, accessToken);
+    try {
+      this.logger.log(`Creating supplier evaluation for vendor ${dto.vendorId} and process ${dto.processId}`);
+      return await this.evaluationService.create(dto, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to create supplier evaluation: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get()
@@ -63,7 +72,13 @@ export class SupplierEvaluationController {
     @CurrentUser('id') userId: string,
     @CurrentUser('accessToken') accessToken: string,
   ): Promise<SupplierEvaluationResponseDto[]> {
-    return this.evaluationService.findAll(query, userId, accessToken);
+    try {
+      this.logger.log(`Fetching supplier evaluations for user ${userId}`);
+      return await this.evaluationService.findAll(query, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to fetch supplier evaluations: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get(':id')
@@ -80,7 +95,13 @@ export class SupplierEvaluationController {
     @CurrentUser('id') userId: string,
     @CurrentUser('accessToken') accessToken: string,
   ): Promise<SupplierEvaluationResponseDto> {
-    return this.evaluationService.findOne(id, userId, accessToken);
+    try {
+      this.logger.log(`Fetching supplier evaluation ${id}`);
+      return await this.evaluationService.findOne(id, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to fetch supplier evaluation ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Put(':id')
@@ -100,7 +121,13 @@ export class SupplierEvaluationController {
     @CurrentUser('id') userId: string,
     @CurrentUser('accessToken') accessToken: string,
   ): Promise<SupplierEvaluationResponseDto> {
-    return this.evaluationService.update(id, dto, userId, accessToken);
+    try {
+      this.logger.log(`Updating supplier evaluation ${id}`);
+      return await this.evaluationService.update(id, dto, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to update supplier evaluation ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Delete(':id')
@@ -115,7 +142,13 @@ export class SupplierEvaluationController {
     @CurrentUser('id') userId: string,
     @CurrentUser('accessToken') accessToken: string,
   ): Promise<void> {
-    return this.evaluationService.delete(id, userId, accessToken);
+    try {
+      this.logger.log(`Deleting supplier evaluation ${id}`);
+      return await this.evaluationService.delete(id, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to delete supplier evaluation ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   // ============================================================================
@@ -137,7 +170,13 @@ export class SupplierEvaluationController {
     @CurrentUser('id') userId: string,
     @CurrentUser('accessToken') accessToken: string,
   ): Promise<SupplierEvaluationResponseDto> {
-    return this.evaluationService.complete(id, userId, accessToken);
+    try {
+      this.logger.log(`Marking supplier evaluation ${id} as completed`);
+      return await this.evaluationService.complete(id, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to complete supplier evaluation ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Post(':id/approve')
@@ -163,6 +202,12 @@ export class SupplierEvaluationController {
     @CurrentUser('id') userId: string,
     @CurrentUser('accessToken') accessToken: string,
   ): Promise<{ snapshotId: string }> {
-    return this.evaluationService.approve(id, userId, accessToken);
+    try {
+      this.logger.log(`Approving and freezing supplier evaluation ${id}`);
+      return await this.evaluationService.approve(id, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to approve supplier evaluation ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 }

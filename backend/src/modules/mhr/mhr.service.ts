@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
@@ -93,7 +93,18 @@ export class MHRService {
 
     if (error) {
       this.logger.error(`Error fetching MHR records: ${error.message}`, 'MHRService');
-      throw new InternalServerErrorException(`Failed to fetch MHR records: ${error.message}`);
+      
+      // Handle access permissions
+      if (error.message.includes('row-level security policy')) {
+        throw new ForbiddenException('You do not have permission to access these MHR records.');
+      }
+      
+      // Handle query parameter issues
+      if (error.message.includes('invalid input syntax')) {
+        throw new BadRequestException('Invalid search parameters provided. Please check your filters and try again.');
+      }
+      
+      throw new InternalServerErrorException('Unable to retrieve MHR records. Please try again later.');
     }
 
     const records = (data || []).map(row => {
@@ -125,9 +136,19 @@ export class MHRService {
       .eq('id', id)
       .single();
 
-    if (error || !data) {
+    if (error) {
+      this.logger.error(`Error fetching MHR record ${id}: ${error.message}`, 'MHRService');
+      
+      if (error.message.includes('row-level security policy')) {
+        throw new ForbiddenException('You do not have permission to access this MHR record.');
+      }
+      
+      throw new InternalServerErrorException('Unable to retrieve MHR record. Please try again later.');
+    }
+    
+    if (!data) {
       this.logger.warn(`MHR record not found: ${id}`, 'MHRService');
-      throw new NotFoundException(`MHR record with ID ${id} not found`);
+      throw new NotFoundException(`MHR record with ID ${id} was not found or you do not have access to it.`);
     }
 
     // Recalculate to ensure accuracy (skip validation for DB data)
@@ -181,7 +202,38 @@ export class MHRService {
 
     if (error) {
       this.logger.error(`Error creating MHR record: ${error.message}`, 'MHRService');
-      throw new InternalServerErrorException(`Failed to create MHR record: ${error.message}`);
+      
+      // Handle duplicate machine name constraint
+      if (error.message.includes('duplicate key') && error.message.includes('machine_name')) {
+        throw new ConflictException(
+          'A machine with this name already exists in your workspace. Please choose a different machine name.'
+        );
+      }
+      
+      // Handle foreign key constraints
+      if (error.message.includes('violates foreign key constraint')) {
+        if (error.message.includes('user_id')) {
+          throw new BadRequestException('User account is not valid. Please log in again.');
+        }
+      }
+      
+      // Handle validation constraints
+      if (error.message.includes('violates check constraint')) {
+        if (error.message.includes('positive_values')) {
+          throw new BadRequestException('All cost and rate values must be positive numbers.');
+        }
+        if (error.message.includes('percentage_values')) {
+          throw new BadRequestException('Percentage values must be between 0 and 100.');
+        }
+        if (error.message.includes('shifts_per_day_range')) {
+          throw new BadRequestException('Shifts per day must be between 1 and 4.');
+        }
+        if (error.message.includes('hours_per_shift_range')) {
+          throw new BadRequestException('Hours per shift must be between 1 and 24.');
+        }
+      }
+      
+      throw new InternalServerErrorException('Failed to create MHR record. Please check your input and try again.');
     }
 
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
@@ -192,7 +244,7 @@ export class MHRService {
 
     if (!this.isValidUUID(id)) {
       this.logger.warn(`Invalid UUID format for update: ${id}`, 'MHRService');
-      throw new BadRequestException('Invalid MHR record ID format');
+      throw new BadRequestException('Invalid MHR record ID format provided. Please check the ID and try again.');
     }
 
     // Verify record exists
@@ -245,7 +297,32 @@ export class MHRService {
 
     if (error) {
       this.logger.error(`Error updating MHR record: ${error.message}`, 'MHRService');
-      throw new InternalServerErrorException(`Failed to update MHR record: ${error.message}`);
+      
+      // Handle concurrent update conflicts
+      if (error.message.includes('row was updated by another user')) {
+        throw new ConflictException(
+          'This MHR record has been modified by another user. Please refresh and try again.'
+        );
+      }
+      
+      // Handle duplicate machine name constraint
+      if (error.message.includes('duplicate key') && error.message.includes('machine_name')) {
+        throw new ConflictException(
+          'A machine with this name already exists in your workspace. Please choose a different machine name.'
+        );
+      }
+      
+      // Handle validation constraints
+      if (error.message.includes('violates check constraint')) {
+        if (error.message.includes('positive_values')) {
+          throw new BadRequestException('All cost and rate values must be positive numbers.');
+        }
+        if (error.message.includes('percentage_values')) {
+          throw new BadRequestException('Percentage values must be between 0 and 100.');
+        }
+      }
+      
+      throw new InternalServerErrorException('Failed to update MHR record. Please verify your input and try again.');
     }
 
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
@@ -256,7 +333,7 @@ export class MHRService {
 
     if (!this.isValidUUID(id)) {
       this.logger.warn(`Invalid UUID format for delete: ${id}`, 'MHRService');
-      throw new BadRequestException('Invalid MHR record ID format');
+      throw new BadRequestException('Invalid MHR record ID format provided. Please check the ID and try again.');
     }
 
     await this.findOne(id, userId, accessToken);
@@ -269,7 +346,15 @@ export class MHRService {
 
     if (error) {
       this.logger.error(`Error deleting MHR record: ${error.message}`, 'MHRService');
-      throw new InternalServerErrorException(`Failed to delete MHR record: ${error.message}`);
+      
+      // Handle foreign key constraint violations (MHR record referenced elsewhere)
+      if (error.message.includes('violates foreign key constraint')) {
+        throw new ConflictException(
+          'This MHR record cannot be deleted as it is being used in other calculations or processes. Please remove those references first.'
+        );
+      }
+      
+      throw new InternalServerErrorException('Failed to delete MHR record. Please try again later.');
     }
 
     return { message: 'MHR record deleted successfully' };

@@ -153,7 +153,20 @@ export function useCreateRawMaterialCost() {
       toast.success('Raw material cost added successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to add raw material cost');
+      const status = error?.status || error?.response?.status;
+      if (status === 400) {
+        toast.error('Please check all raw material cost details are filled out correctly.');
+      } else if (status === 404) {
+        toast.error('The selected BOM item or material no longer exists.');
+      } else if (status === 409) {
+        toast.error('A raw material cost record for this material already exists.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to add raw material costs.');
+      } else if (status === 422) {
+        toast.error('Please ensure unit cost and usage quantities are valid numbers.');
+      } else {
+        toast.error('Unable to add raw material cost. Please try again or contact support.');
+      }
     },
   });
 }
@@ -179,7 +192,20 @@ export function useUpdateRawMaterialCost() {
       toast.success('Raw material cost updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to update raw material cost');
+      const status = error?.status || error?.response?.status;
+      if (status === 400) {
+        toast.error('Please check that all raw material cost information is valid.');
+      } else if (status === 404) {
+        toast.error('This raw material cost record no longer exists. It may have been deleted.');
+      } else if (status === 409) {
+        toast.error('Another user is editing this raw material cost. Please refresh and try again.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to edit this raw material cost.');
+      } else if (status === 422) {
+        toast.error('Please ensure unit cost and usage quantities are valid numbers.');
+      } else {
+        toast.error('Unable to update raw material cost. Please try again or contact support.');
+      }
     },
   });
 }
@@ -204,7 +230,16 @@ export function useDeleteRawMaterialCost() {
       toast.success('Raw material cost deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to delete raw material cost');
+      const status = error?.status || error?.response?.status;
+      if (status === 404) {
+        toast.error('This raw material cost record has already been deleted.');
+      } else if (status === 409) {
+        toast.error('Cannot delete raw material cost because it is being used in calculations.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to delete this raw material cost.');
+      } else {
+        toast.error('Unable to delete raw material cost. Please try again or contact support.');
+      }
     },
   });
 }

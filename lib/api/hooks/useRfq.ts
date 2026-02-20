@@ -62,7 +62,17 @@ export function useCreateRfq() {
       toast.success('RFQ created successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to create RFQ');
+      if (error.status === 400) {
+        toast.error('Please check all RFQ details are filled out correctly.');
+      } else if (error.status === 409) {
+        toast.error('An RFQ with this reference number already exists.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to create RFQs.');
+      } else if (error.status === 422) {
+        toast.error('Please ensure vendor selection and item requirements are valid.');
+      } else {
+        toast.error('Unable to create RFQ. Please try again or contact support.');
+      }
     },
   });
 }
@@ -91,7 +101,19 @@ export function useSendRfq() {
       toast.success('RFQ sent to vendors successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to send RFQ');
+      if (error.status === 400) {
+        toast.error('Please ensure all required RFQ information is complete before sending.');
+      } else if (error.status === 404) {
+        toast.error('This RFQ no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('This RFQ has already been sent to vendors.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to send this RFQ.');
+      } else if (error.status === 422) {
+        toast.error('No valid vendor contacts found. Please check vendor email addresses.');
+      } else {
+        toast.error('Unable to send RFQ. Please try again or contact support.');
+      }
     },
   });
 }
@@ -120,7 +142,17 @@ export function useCloseRfq() {
       toast.success('RFQ closed successfully');
     },
     onError: (error: ApiError) => {
-      toast.error(error.message || 'Failed to close RFQ');
+      if (error.status === 400) {
+        toast.error('Only sent RFQs can be closed.');
+      } else if (error.status === 404) {
+        toast.error('This RFQ no longer exists. It may have been deleted.');
+      } else if (error.status === 409) {
+        toast.error('This RFQ has already been closed.');
+      } else if (error.status === 403) {
+        toast.error('You do not have permission to close this RFQ.');
+      } else {
+        toast.error('Unable to close RFQ. Please try again or contact support.');
+      }
     },
   });
 }
@@ -163,7 +195,16 @@ export function useCancelRfqTracking() {
       if (context?.previousData) {
         queryClient.setQueryData(rfqTrackingKeys.all, context.previousData);
       }
-      toast.error('Failed to cancel RFQ');
+      const apiError = error as any;
+      if (apiError?.status === 404) {
+        toast.error('This RFQ tracking record no longer exists.');
+      } else if (apiError?.status === 409) {
+        toast.error('Cannot cancel RFQ because responses have already been received.');
+      } else if (apiError?.status === 403) {
+        toast.error('You do not have permission to cancel this RFQ.');
+      } else {
+        toast.error('Unable to cancel RFQ. Please try again or contact support.');
+      }
     },
   });
 }

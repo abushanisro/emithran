@@ -23,6 +23,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
@@ -43,6 +44,8 @@ import { ProcessCostInput } from '../engines/process-cost-calculation.engine';
 @UseGuards(SupabaseAuthGuard)
 @Controller('api/process-costs')
 export class ProcessCostController {
+  private readonly logger = new Logger(ProcessCostController.name);
+
   constructor(private readonly processCostService: ProcessCostService) {}
 
   /**
@@ -70,7 +73,13 @@ export class ProcessCostController {
       // No changes needed
     }
 
-    return this.processCostService.findAll(query, userId, accessToken);
+    try {
+      this.logger.log(`Fetching process costs for user ${userId}`);
+      return await this.processCostService.findAll(query, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to fetch process costs: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   /**
@@ -89,7 +98,13 @@ export class ProcessCostController {
     @CurrentUser('id') userId: string,
     @AccessToken() accessToken: string,
   ): Promise<ProcessCostResponseDto> {
-    return this.processCostService.findOne(id, userId, accessToken);
+    try {
+      this.logger.log(`Fetching process cost ${id} for user ${userId}`);
+      return await this.processCostService.findOne(id, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to fetch process cost ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   /**
@@ -108,7 +123,13 @@ export class ProcessCostController {
     @CurrentUser('id') userId: string,
     @AccessToken() accessToken: string,
   ): Promise<ProcessCostResponseDto> {
-    return this.processCostService.create(dto, userId, accessToken);
+    try {
+      this.logger.log(`Creating process cost for user ${userId}`);
+      return await this.processCostService.create(dto, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to create process cost: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   /**
@@ -128,7 +149,13 @@ export class ProcessCostController {
     @CurrentUser('id') userId: string,
     @AccessToken() accessToken: string,
   ): Promise<ProcessCostResponseDto> {
-    return this.processCostService.update(id, dto, userId, accessToken);
+    try {
+      this.logger.log(`Updating process cost ${id} for user ${userId}`);
+      return await this.processCostService.update(id, dto, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to update process cost ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   /**
@@ -144,7 +171,13 @@ export class ProcessCostController {
     @CurrentUser('id') userId: string,
     @AccessToken() accessToken: string,
   ): Promise<void> {
-    await this.processCostService.remove(id, userId, accessToken);
+    try {
+      this.logger.log(`Deleting process cost ${id} for user ${userId}`);
+      await this.processCostService.remove(id, userId, accessToken);
+    } catch (error) {
+      this.logger.error(`Failed to delete process cost ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   /**
@@ -159,6 +192,12 @@ export class ProcessCostController {
   })
   @ApiResponse({ status: 400, description: 'Invalid input' })
   async calculateOnly(@Body() input: ProcessCostInput): Promise<any> {
-    return this.processCostService.calculateOnly(input);
+    try {
+      this.logger.log('Calculating process cost without saving');
+      return await this.processCostService.calculateOnly(input);
+    } catch (error) {
+      this.logger.error(`Failed to calculate process cost: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 }

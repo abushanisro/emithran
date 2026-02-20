@@ -14,7 +14,7 @@ function CallbackContent() {
     const handleCallback = async () => {
       try {
         if (!supabase) {
-          toast.error('Google Sign-In is not configured.')
+          toast.error('Authentication service is not available. Please contact support if this issue persists.', { duration: 8000 })
           router.push('/auth')
           return
         }
@@ -24,7 +24,15 @@ function CallbackContent() {
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
-          toast.error('Authentication failed. Please try again.')
+          let errorMessage = 'Authentication failed. Please try again.'
+          if (error.message.includes('invalid_request')) {
+            errorMessage = 'Authentication failed: Invalid request. Please try signing in again.'
+          } else if (error.message.includes('access_denied')) {
+            errorMessage = 'Authentication failed: Access denied. You may have cancelled the sign-in process.'
+          } else if (error.message.includes('network')) {
+            errorMessage = 'Authentication failed: Network error. Please check your connection and try again.'
+          }
+          toast.error(errorMessage, { duration: 6000 })
           router.push('/auth')
           return
         }
@@ -43,7 +51,13 @@ function CallbackContent() {
                 .limit(1)
 
               if (queryError) {
-                throw new Error('Failed to check authorization: ' + queryError.message)
+                let authErrorMsg = 'Unable to verify account access.'
+                if (queryError.message.includes('permission')) {
+                  authErrorMsg = 'Access verification failed: Insufficient permissions.'
+                } else if (queryError.message.includes('network')) {
+                  authErrorMsg = 'Access verification failed: Network error.'
+                }
+                throw new Error(authErrorMsg)
               }
               
               if (!(authData?.length > 0 && authData[0].is_active === true)) {
@@ -58,7 +72,7 @@ function CallbackContent() {
             }
 
             // User is authorized
-            toast.success(`Successfully signed in as ${session.user.email}!`)
+            toast.success(`Welcome back! Successfully signed in as ${session.user.email}. Redirecting to your dashboard...`)
             router.push('/')
             router.refresh()
           } catch (authCheckError) {
@@ -68,11 +82,22 @@ function CallbackContent() {
             router.push('/auth')
           }
         } else {
-          toast.error('Authentication failed. No session found.')
+          toast.error('Authentication failed: No valid session found. Please try signing in again.')
           router.push('/auth')
         }
       } catch (error: any) {
-        toast.error('An unexpected error occurred. Please try again.')
+        console.error('Auth callback error:', error)
+        let errorMessage = 'An unexpected error occurred during authentication.'
+        if (error?.message) {
+          if (error.message.includes('network')) {
+            errorMessage = 'Network error during authentication. Please check your connection and try again.'
+          } else if (error.message.includes('timeout')) {
+            errorMessage = 'Authentication timeout. Please try signing in again.'
+          } else {
+            errorMessage = `Authentication error: ${error.message}`
+          }
+        }
+        toast.error(errorMessage, { duration: 8000 })
         router.push('/auth')
       }
     }

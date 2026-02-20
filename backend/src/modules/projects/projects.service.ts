@@ -42,7 +42,7 @@ export class ProjectsService {
 
     if (error) {
       this.logger.error(`Error fetching projects: ${error.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to fetch projects: ${error.message}`);
+      throw new InternalServerErrorException('Unable to retrieve projects. Please try again later.');
     }
 
     // Transform using static DTO method (type-safe)
@@ -62,7 +62,7 @@ export class ProjectsService {
     // Validate UUID format
     if (!this.isValidUUID(id)) {
       this.logger.warn(`Invalid UUID format provided: ${id}`, 'ProjectsService');
-      throw new BadRequestException('Invalid project ID format');
+      throw new BadRequestException('Please provide a valid project ID.');
     }
 
     const { data, error } = await this.supabaseService
@@ -82,7 +82,7 @@ export class ProjectsService {
       } else {
         this.logger.warn(`Project not found (no data): ${id}`, 'ProjectsService');
       }
-      throw new NotFoundException(`Project with ID ${id} not found`);
+      throw new NotFoundException('The requested project could not be found or you do not have access to it.');
     }
 
     return ProjectResponseDto.fromDatabase(data);
@@ -120,12 +120,16 @@ export class ProjectsService {
 
     if (error) {
       this.logger.error(`Error creating project: ${error.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to create project: ${error.message}`);
+      // Check for specific database errors
+      if (error.message.includes('duplicate key') && error.message.includes('projects_name')) {
+        throw new BadRequestException('A project with this name already exists. Please choose a different name.');
+      }
+      throw new InternalServerErrorException('Unable to create the project. Please try again later.');
     }
 
     if (!data) {
       this.logger.error('Project creation returned no data', 'ProjectsService');
-      throw new InternalServerErrorException('Failed to create project: No data returned');
+      throw new InternalServerErrorException('Unable to create the project. Please try again later.');
     }
 
     return ProjectResponseDto.fromDatabase(data);
@@ -137,7 +141,7 @@ export class ProjectsService {
     // Validate UUID format early
     if (!this.isValidUUID(id)) {
       this.logger.warn(`Invalid UUID format for update: ${id}`, 'ProjectsService');
-      throw new BadRequestException('Invalid project ID format');
+      throw new BadRequestException('Please provide a valid project ID.');
     }
 
     // Verify project exists and belongs to user (RLS enforces ownership)
@@ -162,7 +166,11 @@ export class ProjectsService {
 
     if (error) {
       this.logger.error(`Error updating project: ${error.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to update project: ${error.message}`);
+      // Check for specific database errors
+      if (error.message.includes('duplicate key') && error.message.includes('projects_name')) {
+        throw new BadRequestException('A project with this name already exists. Please choose a different name.');
+      }
+      throw new InternalServerErrorException('Unable to update the project. Please try again later.');
     }
 
     return ProjectResponseDto.fromDatabase(data);
@@ -174,7 +182,7 @@ export class ProjectsService {
     // Validate UUID format early
     if (!this.isValidUUID(id)) {
       this.logger.warn(`Invalid UUID format for delete: ${id}`, 'ProjectsService');
-      throw new BadRequestException('Invalid project ID format');
+      throw new BadRequestException('Please provide a valid project ID.');
     }
 
     // Verify project exists and belongs to user (RLS enforces ownership)
@@ -226,7 +234,7 @@ export class ProjectsService {
       };
     } catch (error) {
       this.logger.error(`Unexpected error during project deletion: ${error.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to delete project: ${error.message}`);
+      throw new InternalServerErrorException('Unable to delete the project. Please try again later.');
     }
   }
 
@@ -578,7 +586,7 @@ export class ProjectsService {
     // Validate UUID format early
     if (!this.isValidUUID(id)) {
       this.logger.warn(`Invalid UUID format for cost analysis: ${id}`, 'ProjectsService');
-      throw new BadRequestException('Invalid project ID format');
+      throw new BadRequestException('Please provide a valid project ID.');
     }
 
     // Verify user owns this project
@@ -591,7 +599,7 @@ export class ProjectsService {
 
     if (error) {
       this.logger.error(`Error fetching cost analysis: ${error.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to fetch cost analysis: ${error.message}`);
+      throw new InternalServerErrorException('Unable to retrieve cost analysis. Please try again later.');
     }
 
     // RPC returns array with single row
@@ -616,7 +624,7 @@ export class ProjectsService {
     this.logger.log(`Getting team members for project: ${projectId}`, 'ProjectsService');
 
     if (!this.isValidUUID(projectId)) {
-      throw new BadRequestException('Invalid project ID format');
+      throw new BadRequestException('Please provide a valid project ID.');
     }
 
     // Verify user has access to this project
@@ -632,7 +640,7 @@ export class ProjectsService {
 
     if (error) {
       this.logger.error(`Error fetching team members: ${error.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to fetch team members: ${error.message}`);
+      throw new InternalServerErrorException('Unable to retrieve team members. Please try again later.');
     }
 
     // Fetch user details using admin client
@@ -666,7 +674,7 @@ export class ProjectsService {
     this.logger.log(`Adding team member to project: ${projectId}`, 'ProjectsService');
 
     if (!this.isValidUUID(projectId)) {
-      throw new BadRequestException('Invalid project ID format');
+      throw new BadRequestException('Please provide a valid project ID.');
     }
 
     // Verify user owns this project
@@ -678,12 +686,12 @@ export class ProjectsService {
 
     if (userError) {
       this.logger.error(`Error listing users: ${userError.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to search for user: ${userError.message}`);
+      throw new InternalServerErrorException('Unable to search for users. Please try again later.');
     }
 
     const targetUser = usersData.users.find(u => u.email === dto.email);
     if (!targetUser) {
-      throw new NotFoundException(`User with email ${dto.email} not found`);
+      throw new NotFoundException(`No user found with email address ${dto.email}. Please check the email and try again.`);
     }
 
     // Add team member
@@ -701,10 +709,10 @@ export class ProjectsService {
 
     if (error) {
       if (error.code === '23505') { // Unique constraint violation
-        throw new BadRequestException('User is already a team member');
+        throw new BadRequestException('This user is already a member of this project.');
       }
       this.logger.error(`Error adding team member: ${error.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to add team member: ${error.message}`);
+      throw new InternalServerErrorException('Unable to add team member. Please try again later.');
     }
 
     return TeamMemberResponseDto.fromDatabase({
@@ -721,7 +729,7 @@ export class ProjectsService {
     this.logger.log(`Updating team member ${memberId} in project: ${projectId}`, 'ProjectsService');
 
     if (!this.isValidUUID(projectId) || !this.isValidUUID(memberId)) {
-      throw new BadRequestException('Invalid ID format');
+      throw new BadRequestException('Please provide valid project and member IDs.');
     }
 
     // Verify user owns this project
@@ -738,7 +746,7 @@ export class ProjectsService {
 
     if (error) {
       this.logger.error(`Error updating team member: ${error.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to update team member: ${error.message}`);
+      throw new InternalServerErrorException('Unable to update team member. Please try again later.');
     }
 
     // Get user details using admin client
@@ -763,7 +771,7 @@ export class ProjectsService {
     this.logger.log(`Removing team member ${memberId} from project: ${projectId}`, 'ProjectsService');
 
     if (!this.isValidUUID(projectId) || !this.isValidUUID(memberId)) {
-      throw new BadRequestException('Invalid ID format');
+      throw new BadRequestException('Please provide valid project and member IDs.');
     }
 
     // Verify user owns this project
@@ -778,7 +786,7 @@ export class ProjectsService {
 
     if (error) {
       this.logger.error(`Error removing team member: ${error.message}`, 'ProjectsService');
-      throw new InternalServerErrorException(`Failed to remove team member: ${error.message}`);
+      throw new InternalServerErrorException('Unable to remove team member. Please try again later.');
     }
 
     return { message: 'Team member removed successfully' };

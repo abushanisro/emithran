@@ -130,7 +130,20 @@ export function useCreateProcessCost() {
       toast.success('Process cost added successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to add process cost');
+      const status = error?.status || error?.response?.status;
+      if (status === 400) {
+        toast.error('Please check all process cost details are filled out correctly.');
+      } else if (status === 404) {
+        toast.error('The selected BOM item or process no longer exists.');
+      } else if (status === 409) {
+        toast.error('A process cost record for this operation already exists.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to add process costs.');
+      } else if (status === 422) {
+        toast.error('Please ensure all rates and quantities are valid numbers.');
+      } else {
+        toast.error('Unable to add process cost. Please try again or contact support.');
+      }
     },
   });
 }
@@ -159,7 +172,20 @@ export function useUpdateProcessCost() {
       toast.success('Process cost updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to update process cost');
+      const status = error?.status || error?.response?.status;
+      if (status === 400) {
+        toast.error('Please check that all process cost information is valid.');
+      } else if (status === 404) {
+        toast.error('This process cost record no longer exists. It may have been deleted.');
+      } else if (status === 409) {
+        toast.error('Another user is editing this process cost. Please refresh and try again.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to edit this process cost.');
+      } else if (status === 422) {
+        toast.error('Please ensure all rates and quantities are valid numbers.');
+      } else {
+        toast.error('Unable to update process cost. Please try again or contact support.');
+      }
     },
   });
 }
@@ -188,7 +214,16 @@ export function useDeleteProcessCost() {
       toast.success('Process cost deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to delete process cost');
+      const status = error?.status || error?.response?.status;
+      if (status === 404) {
+        toast.error('This process cost record has already been deleted.');
+      } else if (status === 409) {
+        toast.error('Cannot delete process cost because it is being used in calculations.');
+      } else if (status === 403) {
+        toast.error('You do not have permission to delete this process cost.');
+      } else {
+        toast.error('Unable to delete process cost. Please try again or contact support.');
+      }
     },
   });
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, InternalServerErrorException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateRfqDto } from './dto/create-rfq.dto';
 import { RfqRecord, RfqSummary, RfqStatus } from './dto/rfq-response.dto';
@@ -56,7 +56,37 @@ export class RfqService {
       .single();
 
     if (error) {
-      throw new BadRequestException(`Failed to create RFQ: ${error.message}`);
+      this.logger.error(`Error creating RFQ: ${error.message}`, 'RfqService');
+      
+      // Handle duplicate RFQ number constraint
+      if (error.message.includes('duplicate key') && error.message.includes('rfq_number')) {
+        throw new ConflictException('An RFQ with this number already exists. Please try again.');
+      }
+      
+      // Handle foreign key constraints
+      if (error.message.includes('violates foreign key constraint')) {
+        if (error.message.includes('project_id')) {
+          throw new BadRequestException('The specified project does not exist or you do not have access to it.');
+        }
+        if (error.message.includes('user_id')) {
+          throw new BadRequestException('User account is not valid. Please log in again.');
+        }
+      }
+      
+      // Handle validation constraints
+      if (error.message.includes('violates check constraint')) {
+        if (error.message.includes('quote_deadline_future')) {
+          throw new BadRequestException('Quote deadline must be set to a future date.');
+        }
+        if (error.message.includes('vendor_ids_not_empty')) {
+          throw new BadRequestException('At least one vendor must be selected for the RFQ.');
+        }
+        if (error.message.includes('bom_item_ids_not_empty')) {
+          throw new BadRequestException('At least one BOM item must be selected for the RFQ.');
+        }
+      }
+      
+      throw new InternalServerErrorException('Failed to create RFQ. Please check your input and try again.');
     }
 
     return this.mapToRfqRecord(data);
@@ -85,7 +115,14 @@ export class RfqService {
     const { data, error } = await query;
 
     if (error) {
-      throw new BadRequestException(`Failed to fetch RFQs: ${error.message}`);
+      this.logger.error(`Error fetching RFQs: ${error.message}`, 'RfqService');
+      
+      // Handle access permissions
+      if (error.message.includes('row-level security policy')) {
+        throw new ForbiddenException('You do not have permission to access these RFQs.');
+      }
+      
+      throw new InternalServerErrorException('Unable to retrieve RFQs. Please try again later.');
     }
 
     return (data || []).map((row: any) => this.mapToRfqSummary(row));
@@ -99,8 +136,22 @@ export class RfqService {
       .eq('user_id', userId)
       .single();
 
-    if (error || !data) {
-      throw new NotFoundException('RFQ not found');
+    if (error) {
+      this.logger.error(`Error fetching RFQ ${id}: ${error.message}`, 'RfqService');
+      
+      if (error.message.includes('row-level security policy')) {
+        throw new ForbiddenException('You do not have permission to access this RFQ.');
+      }
+      
+      if (error.message.includes('invalid input syntax for type uuid')) {
+        throw new BadRequestException('Invalid RFQ ID format provided.');
+      }
+      
+      throw new InternalServerErrorException('Unable to retrieve RFQ details. Please try again later.');
+    }
+    
+    if (!data) {
+      throw new NotFoundException(`RFQ with ID ${id} was not found or you do not have access to it.`);
     }
 
     return this.mapToRfqRecord(data);
@@ -114,7 +165,30 @@ export class RfqService {
     this.logger.log(`RFQ details: ${JSON.stringify({ id: rfq.id, projectId: rfq.projectId, status: rfq.status })}`);
 
     if (rfq.status !== RfqStatus.DRAFT) {
-      throw new BadRequestException('RFQ has already been sent');
+      if (rfq.status === 'sent') {
+        throw new BadRequestException('This RFQ has already been sent to vendors. You cannot send it again.');
+      }
+      if (rfq.status === 'closed') {
+        throw new BadRequestException('This RFQ has been closed and cannot be sent.');
+      }
+      throw new BadRequestException(`RFQ status is '${rfq.status}' and cannot be sent. Only draft RFQs can be sent.`);
+    }
+    
+    // Validate RFQ has required data for sending
+    if (!rfq.vendorIds || rfq.vendorIds.length === 0) {
+      throw new BadRequestException('Cannot send RFQ without any vendors selected.');
+    }
+    
+    if (!rfq.bomItemIds || rfq.bomItemIds.length === 0) {
+      throw new BadRequestException('Cannot send RFQ without any BOM items selected.');
+    }
+    
+    if (!rfq.quoteDeadline) {
+      throw new BadRequestException('Cannot send RFQ without a quote deadline.');
+    }
+    
+    if (new Date(rfq.quoteDeadline) <= new Date()) {
+      throw new BadRequestException('Cannot send RFQ with a deadline that has already passed.');
     }
 
     // Use the database function to mark as sent
@@ -122,7 +196,17 @@ export class RfqService {
       .rpc('send_rfq', { p_rfq_id: id, p_user_id: userId });
 
     if (error) {
-      throw new BadRequestException(`Failed to send RFQ: ${error.message}`);
+      this.logger.error(`Error sending RFQ ${id}: ${error.message}`, 'RfqService');
+      
+      if (error.message.includes('not found')) {
+        throw new NotFoundException('The RFQ to send was not found.');
+      }
+      
+      if (error.message.includes('already sent')) {
+        throw new ConflictException('This RFQ has already been sent to vendors.');
+      }
+      
+      throw new InternalServerErrorException('Failed to send RFQ. Please try again later.');
     }
 
     this.logger.log(`RFQ ${id} marked as sent in database`);
@@ -153,7 +237,21 @@ export class RfqService {
       .rpc('close_rfq', { p_rfq_id: id, p_user_id: userId });
 
     if (error) {
-      throw new BadRequestException(`Failed to close RFQ: ${error.message}`);
+      this.logger.error(`Error closing RFQ ${id}: ${error.message}`, 'RfqService');
+      
+      if (error.message.includes('not found')) {
+        throw new NotFoundException('The RFQ to close was not found.');
+      }
+      
+      if (error.message.includes('already closed')) {
+        throw new ConflictException('This RFQ has already been closed.');
+      }
+      
+      if (error.message.includes('not sent')) {
+        throw new BadRequestException('Cannot close an RFQ that has not been sent to vendors yet.');
+      }
+      
+      throw new InternalServerErrorException('Failed to close RFQ. Please try again later.');
     }
   }
 
@@ -169,7 +267,8 @@ export class RfqService {
       .like('rfq_number', `${prefix}%`);
 
     if (error) {
-      throw new BadRequestException(`Failed to generate RFQ number: ${error.message}`);
+      this.logger.error(`Error generating RFQ number: ${error.message}`, 'RfqService');
+      throw new InternalServerErrorException('Unable to generate RFQ number. Please try again later.');
     }
 
     const nextNumber = (count || 0) + 1;
@@ -183,11 +282,21 @@ export class RfqService {
       .in('id', bomItemIds);
 
     if (error) {
-      throw new BadRequestException(`Failed to validate BOM items: ${error.message}`);
+      this.logger.error(`Error validating BOM items: ${error.message}`, 'RfqService');
+      
+      if (error.message.includes('invalid input syntax for type uuid')) {
+        throw new BadRequestException('One or more BOM item IDs have an invalid format.');
+      }
+      
+      throw new InternalServerErrorException('Unable to validate BOM items. Please try again later.');
     }
 
     if ((count || 0) !== bomItemIds.length) {
-      throw new BadRequestException('Some BOM items do not exist');
+      const foundCount = count || 0;
+      const missingCount = bomItemIds.length - foundCount;
+      throw new BadRequestException(
+        `${missingCount} of the selected BOM items ${missingCount === 1 ? 'does' : 'do'} not exist or ${missingCount === 1 ? 'is' : 'are'} no longer available. Please refresh your selection and try again.`
+      );
     }
   }
 
@@ -198,11 +307,21 @@ export class RfqService {
       .in('id', vendorIds);
 
     if (error) {
-      throw new BadRequestException(`Failed to validate vendors: ${error.message}`);
+      this.logger.error(`Error validating vendors: ${error.message}`, 'RfqService');
+      
+      if (error.message.includes('invalid input syntax for type uuid')) {
+        throw new BadRequestException('One or more vendor IDs have an invalid format.');
+      }
+      
+      throw new InternalServerErrorException('Unable to validate vendors. Please try again later.');
     }
 
     if ((count || 0) !== vendorIds.length) {
-      throw new BadRequestException('Some vendors do not exist');
+      const foundCount = count || 0;
+      const missingCount = vendorIds.length - foundCount;
+      throw new BadRequestException(
+        `${missingCount} of the selected vendors ${missingCount === 1 ? 'does' : 'do'} not exist or ${missingCount === 1 ? 'is' : 'are'} no longer available. Please refresh your vendor list and try again.`
+      );
     }
   }
 
@@ -250,7 +369,9 @@ export class RfqService {
   private async createRfqTrackingRecord(rfq: RfqRecord, userId: string, accessToken: string): Promise<void> {
     // Ensure project_id is set - critical for data isolation
     if (!rfq.projectId) {
-      throw new BadRequestException('RFQ must have a project_id for tracking');
+      throw new BadRequestException(
+        'This RFQ cannot be tracked as it is not associated with a project. Please ensure the RFQ is created within a project context.'
+      );
     }
 
     // Get vendor and BOM details

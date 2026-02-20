@@ -55,8 +55,20 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
             setFile3dUrl(response.url);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to load file URLs:', error);
+        let errorMessage = 'Failed to load technical files.';
+        if (error?.message) {
+          if (error.message.includes('permission')) {
+            errorMessage = 'Unable to access files: Permission denied.';
+          } else if (error.message.includes('network')) {
+            errorMessage = 'Unable to load files: Network connection failed.';
+          } else if (error.message.includes('not found')) {
+            errorMessage = 'Files not found on server.';
+          }
+        }
+        // Don't show toast for file loading errors in detail panel as it's not critical
+        // Files will just show as unavailable
       } finally {
         setLoading(false);
       }
@@ -67,8 +79,34 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
 
   const handleFileUpload = async () => {
     if (!item || (!selectedFile2d && !selectedFile3d)) {
-      toast.error('Please select at least one file to upload');
+      toast.error('Please select at least one file to upload. Choose a 2D drawing (PDF, PNG, JPG) or 3D model (STEP, STL, OBJ).');
       return;
+    }
+
+    // Validate file types and sizes
+    if (selectedFile2d) {
+      const validFile2dTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+      if (!validFile2dTypes.includes(selectedFile2d.type)) {
+        toast.error('Invalid 2D file type. Please select a PDF, PNG, or JPG file for technical drawings.');
+        return;
+      }
+      if (selectedFile2d.size > 50 * 1024 * 1024) { // 50MB limit
+        toast.error('2D file is too large. Please use files smaller than 50MB.');
+        return;
+      }
+    }
+
+    if (selectedFile3d) {
+      const valid3dExtensions = ['.stp', '.step', '.stl', '.obj', '.iges', '.igs'];
+      const fileExtension = selectedFile3d.name.toLowerCase().substring(selectedFile3d.name.lastIndexOf('.'));
+      if (!valid3dExtensions.includes(fileExtension)) {
+        toast.error('Invalid 3D file type. Please select a STEP, STL, OBJ, or IGES file for 3D models.');
+        return;
+      }
+      if (selectedFile3d.size > 100 * 1024 * 1024) { // 100MB limit
+        toast.error('3D file is too large. Please use files smaller than 100MB.');
+        return;
+      }
     }
 
     setUploading(true);
@@ -83,7 +121,10 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
 
       const updatedItem = await apiClient.uploadFiles<BOMItem>(`/bom-items/${item.id}/upload-files`, formData);
 
-      toast.success('Files uploaded successfully');
+      const uploadedFiles = [];
+      if (uploaded2d) uploadedFiles.push('2D drawing');
+      if (uploaded3d) uploadedFiles.push('3D model');
+      toast.success(`${uploadedFiles.join(' and ')} uploaded successfully for ${item.name}. Files are now available for viewing and download.`);
 
       // Capture which files were uploaded before clearing state
       const uploaded2d = selectedFile2d;
@@ -114,13 +155,32 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
               setFile3dUrl(response3d.url);
             }
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to load file URLs after upload:', error);
+          // Don't show error toast for post-upload file loading as files were uploaded successfully
         }
       }, 500);
     } catch (error: any) {
       console.error('Upload error:', error);
-      toast.error(error?.message || 'Failed to upload files');
+      
+      let errorMessage = 'Failed to upload files. Please try again.';
+      if (error?.message) {
+        if (error.message.includes('size')) {
+          errorMessage = 'File upload failed: One or more files exceed the size limit. Use smaller files (2D: <50MB, 3D: <100MB).';
+        } else if (error.message.includes('format') || error.message.includes('type')) {
+          errorMessage = 'File upload failed: Unsupported file format. Use PDF/PNG/JPG for 2D drawings and STEP/STL/OBJ for 3D models.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'File upload failed: Network connection error. Please check your internet and try again.';
+        } else if (error.message.includes('permission')) {
+          errorMessage = 'File upload failed: You do not have permission to upload files for this item.';
+        } else if (error.message.includes('storage')) {
+          errorMessage = 'File upload failed: Storage quota exceeded. Please contact your administrator.';
+        } else {
+          errorMessage = `File upload failed: ${error.message}`;
+        }
+      }
+      
+      toast.error(errorMessage, { duration: 8000 });
     } finally {
       setUploading(false);
     }
