@@ -1,16 +1,44 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useProductionLots } from '@/lib/api/hooks/useProductionPlanning';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Shield, CheckCircle, AlertTriangle, Clock, FileText, BarChart3, Target } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ArrowLeft, Shield, CheckCircle, AlertTriangle, Clock, FileText, BarChart3, Target, Package, Settings } from 'lucide-react';
 import Link from 'next/link';
+import CreateQCInspectionDialog from '@/components/features/quality-control/CreateQCInspectionDialog';
+
+interface ProductionLot {
+  id: string;
+  lotNumber: string;
+  productionQuantity: number;
+  status: string;
+  bom?: {
+    id: string;
+    bomName: string;
+    version: string;
+  };
+  bomItems?: BOMItem[];
+}
+
+interface BOMItem {
+  id: string;
+  name: string;
+  partNumber?: string;
+  description?: string;
+  itemType: string;
+  quantity: number;
+  unit?: string;
+  material?: string;
+}
 
 export default function QualityControlPage() {
   const params = useParams();
   const projectId = params.id as string;
+  const { data: productionLots = [], isLoading: loading, error: lotsError } = useProductionLots();
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -42,10 +70,13 @@ export default function QualityControlPage() {
               Monitor quality standards and ensure compliance across production
             </p>
           </div>
-          <Button className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Create QC Inspection
-          </Button>
+          <CreateQCInspectionDialog 
+            projectId={projectId}
+            onInspectionCreated={(inspection) => {
+              console.log('Inspection created:', inspection);
+              // Here you could refresh the inspections list or show a success message
+            }}
+          />
         </div>
 
         {/* OVERVIEW CARDS */}
@@ -56,7 +87,7 @@ export default function QualityControlPage() {
               <Shield className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">24</div>
+              <div className="text-2xl font-bold">-</div>
               <p className="text-xs text-muted-foreground">
                 Completed this month
               </p>
@@ -69,7 +100,7 @@ export default function QualityControlPage() {
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">94.2%</div>
+              <div className="text-2xl font-bold">-</div>
               <p className="text-xs text-muted-foreground">
                 Quality compliance rate
               </p>
@@ -82,7 +113,7 @@ export default function QualityControlPage() {
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
+              <div className="text-2xl font-bold">-</div>
               <p className="text-xs text-muted-foreground">
                 Requiring attention
               </p>
@@ -95,7 +126,7 @@ export default function QualityControlPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">2.3</div>
+              <div className="text-2xl font-bold">-</div>
               <p className="text-xs text-muted-foreground">
                 Hours per inspection
               </p>
@@ -103,96 +134,93 @@ export default function QualityControlPage() {
           </Card>
         </div>
 
-        {/* MAIN CONTENT */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* ACTIVE INSPECTIONS */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CheckCircle className="h-5 w-5" />
-                Active Inspections
-              </CardTitle>
-              <CardDescription>
-                Current quality control processes and their status
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Batch #PB001 - Final Inspection</p>
-                    <p className="text-sm text-muted-foreground">50 units • Inspector: John Doe</p>
+        {/* PRODUCTION PLANNING BOM INTERFACE */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Production Planning - BOM Overview
+            </CardTitle>
+            <CardDescription>
+              Production lots with lot numbers and BOM part details
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="bom-overview" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="basic" disabled className="opacity-50 cursor-not-allowed">
+                  Basic Info
+                </TabsTrigger>
+                <TabsTrigger value="bom-overview">
+                  BOM Selection
+                </TabsTrigger>
+                <TabsTrigger value="standards" disabled className="opacity-50 cursor-not-allowed">
+                  Standards
+                </TabsTrigger>
+                <TabsTrigger value="checklist" disabled className="opacity-50 cursor-not-allowed">
+                  Checklist
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="bom-overview" className="mt-6">
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-muted-foreground">Loading production lots...</p>
                   </div>
-                  <Badge>In Progress</Badge>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Batch #PB002 - Material Testing</p>
-                    <p className="text-sm text-muted-foreground">Material compliance check</p>
+                ) : (
+                  <div className="space-y-6">
+                    {productionLots.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground">No production lots found.</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Create a production lot in the Production Planning module to see BOM details here.
+                        </p>
+                      </div>
+                    ) : (
+                      productionLots.map((lot) => (
+                        <Card key={lot.id} className="border-l-4 border-l-blue-500">
+                          <CardHeader className="pb-4">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-1">
+                                <CardTitle className="text-base font-semibold">
+                                  Lot: {lot.lotNumber}
+                                </CardTitle>
+                                {lot.bom && (
+                                  <CardDescription>
+                                    BOM: {lot.bom.name} (v{lot.bom.version})
+                                  </CardDescription>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge 
+                                  variant={lot.status === 'completed' ? 'default' : 'secondary'}
+                                  className="text-xs"
+                                >
+                                  {lot.status}
+                                </Badge>
+                                <span className="text-sm text-muted-foreground">
+                                  Qty: {lot.productionQuantity}
+                                </span>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          
+                          <CardContent>
+                            <div className="text-center py-4">
+                              <p className="text-muted-foreground text-sm">
+                                Click "Create QC Inspection" to view BOM parts and create quality control reports for this lot.
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
                   </div>
-                  <Badge variant="secondary">Scheduled</Badge>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Batch #PB003 - Dimensional Check</p>
-                    <p className="text-sm text-muted-foreground">CAD vs Actual measurements</p>
-                  </div>
-                  <Badge variant="outline">Pending</Badge>
-                </div>
-                
-                <Button className="w-full">
-                  View All Inspections
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* NON-CONFORMANCES */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                Non-Conformances
-              </CardTitle>
-              <CardDescription>
-                Quality issues requiring attention and corrective action
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg border-red-200 bg-red-50">
-                  <div>
-                    <p className="font-medium">Surface Finish Issue</p>
-                    <p className="text-sm text-muted-foreground">Batch #PB001 • Raised: 2 hours ago</p>
-                  </div>
-                  <Badge variant="destructive">High</Badge>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 border rounded-lg border-yellow-200 bg-yellow-50">
-                  <div>
-                    <p className="font-medium">Dimensional Deviation</p>
-                    <p className="text-sm text-muted-foreground">Batch #PB002 • Raised: Yesterday</p>
-                  </div>
-                  <Badge variant="secondary">Medium</Badge>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 border rounded-lg border-blue-200 bg-blue-50">
-                  <div>
-                    <p className="font-medium">Material Certificate Missing</p>
-                    <p className="text-sm text-muted-foreground">Supplier documentation issue</p>
-                  </div>
-                  <Badge variant="outline">Low</Badge>
-                </div>
-                
-                <Button className="w-full">
-                  Manage Non-Conformances
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
 
         {/* QC STANDARDS & PROCEDURES */}
         <Card>
@@ -258,19 +286,19 @@ export default function QualityControlPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm">First Pass Yield</span>
-                    <span className="font-medium">92.5%</span>
+                    <span className="font-medium text-muted-foreground">-</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Defect Rate</span>
-                    <span className="font-medium">2.1%</span>
+                    <span className="font-medium text-muted-foreground">-</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Customer Complaints</span>
-                    <span className="font-medium">0.3%</span>
+                    <span className="font-medium text-muted-foreground">-</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Rework Rate</span>
-                    <span className="font-medium">1.8%</span>
+                    <span className="font-medium text-muted-foreground">-</span>
                   </div>
                 </div>
               </div>
@@ -280,19 +308,19 @@ export default function QualityControlPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm">ISO 9001 Compliance</span>
-                    <Badge variant="default">✓ Compliant</Badge>
+                    <Badge variant="outline">Not Set</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Customer QA Approval</span>
-                    <Badge variant="default">✓ Approved</Badge>
+                    <Badge variant="outline">Not Set</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Material Certificates</span>
-                    <Badge variant="secondary">Pending</Badge>
+                    <Badge variant="outline">Not Set</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Test Reports</span>
-                    <Badge variant="default">✓ Complete</Badge>
+                    <Badge variant="outline">Not Set</Badge>
                   </div>
                 </div>
               </div>

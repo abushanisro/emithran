@@ -140,6 +140,8 @@ class EnvironmentValidator {
   }
 
   private getApiUrl(): string {
+    // Server-side: prioritize server-only API_URL for security
+    // Client-side: use public API_URL
     return typeof window === 'undefined'
       ? process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || ''
       : process.env.NEXT_PUBLIC_API_URL || '';

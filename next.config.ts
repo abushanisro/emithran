@@ -99,7 +99,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vercel.live https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app; object-src 'none'; base-uri 'self'; /* Updated for Railway backend + CAD engine */"
+            value: "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vercel.live https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app; font-src 'self' https://fonts.gstatic.com https://r2cdn.perplexity.ai; object-src 'none'; base-uri 'self'; /* Updated for Railway backend + CAD engine + fonts */"
           }
         ]
       }
