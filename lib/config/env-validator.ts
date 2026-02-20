@@ -57,12 +57,20 @@ class EnvironmentValidator {
     const supabaseKey = this.getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
     const hasSupabase = !!(supabaseUrl && supabaseKey && supabaseKey.startsWith('eyJ'));
 
+    // Debug logging for production
+    if (process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
+      console.log('Environment validation - Supabase URL exists:', !!supabaseUrl);
+      console.log('Environment validation - Supabase Key exists:', !!supabaseKey);
+      console.log('Environment validation - Supabase Key format valid:', supabaseKey ? supabaseKey.startsWith('eyJ') : false);
+    }
+
     // Production-specific validations
     if (process.env.NODE_ENV === 'production') {
       if (apiUrl?.includes('localhost')) {
         errors.push('Production cannot use localhost API');
       }
-      if (!hasSupabase) {
+      // Only validate Supabase on client-side (where env vars are available)
+      if (typeof window !== 'undefined' && !hasSupabase) {
         errors.push('Supabase required in production');
       }
     }
@@ -148,7 +156,11 @@ class EnvironmentValidator {
   }
 
   private getEnvVar(key: string): string {
-    return process.env[key] || '';
+    // Try multiple sources for environment variables
+    const value = process.env[key] || 
+                  (typeof window !== 'undefined' ? (window as any)?.ENV?.[key] : '') || 
+                  '';
+    return value;
   }
 
   private isValidUrl(url: string): boolean {
