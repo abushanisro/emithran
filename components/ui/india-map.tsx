@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import 'leaflet/dist/leaflet.css';
 
 interface StateData {
   [key: string]: number;
@@ -85,6 +84,8 @@ export function IndiaMap({ stateData, className = '', showLegend = true }: India
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Load Leaflet CSS only when component mounts
+    import('leaflet/dist/leaflet.css');
     setMounted(true);
   }, []);
 

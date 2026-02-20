@@ -19,7 +19,7 @@ export class SecurityMiddleware implements NestMiddleware {
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: https:",
         "connect-src 'self' https: wss: ws:",
-        "frame-src 'none'",
+        "frame-src 'self' https://*.supabase.co",
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
