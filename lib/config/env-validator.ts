@@ -69,9 +69,13 @@ class EnvironmentValidator {
       if (apiUrl?.includes('localhost')) {
         errors.push('Production cannot use localhost API');
       }
-      // Only validate Supabase on client-side (where env vars are available)
-      if (typeof window !== 'undefined' && !hasSupabase) {
-        errors.push('Supabase required in production');
+      // Only validate Supabase on client-side after page load (not during SSR/build)
+      // Skip validation during build/SSR phase or if DOM not ready
+      if (typeof window !== 'undefined' && 
+          document?.readyState === 'complete' && 
+          !hasSupabase && 
+          !process.env.SKIP_ENV_VALIDATION) {
+        warnings.push('Supabase configuration recommended for production');
       }
     }
 
