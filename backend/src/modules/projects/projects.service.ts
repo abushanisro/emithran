@@ -423,7 +423,7 @@ export class ProjectsService {
 
       const formattedMembers = (teamMembers || []).map(member => {
         const user = userDetails[member.user_id];
-        const email = user?.email || member.email || 'unknown@example.com';
+        const email = user?.email || (member as any).email || 'unknown@example.com';
         const name = user?.user_metadata?.full_name || email?.split('@')[0] || 'Team Member';
         
         return {
@@ -585,12 +585,12 @@ export class ProjectsService {
 
         return {
           teamMember: {
-            id: newMember.id,
-            userId: newMember.user_id,
-            email: newMember.email || dto.email,
-            name: (newMember.email || dto.email)?.split('@')[0] || 'Team Member',
-            role: newMember.role,
-            addedAt: newMember.created_at,
+            id: newMember?.id,
+            userId: newMember?.user_id,
+            email: (newMember as any)?.email || dto.email,
+            name: ((newMember as any)?.email || dto.email)?.split('@')[0] || 'Team Member',
+            role: newMember?.role,
+            addedAt: newMember?.created_at,
           },
           message: 'Team member added successfully'
         };
