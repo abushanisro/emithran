@@ -211,6 +211,9 @@ export class RawMaterialCostService {
       project_id: createDto.projectId,
     };
 
+    // Debug log the data being inserted
+    this.logger.log(`Inserting data: ${JSON.stringify(recordData, null, 2)}`, 'RawMaterialCostService');
+
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_material_cost_records')
@@ -402,5 +405,39 @@ export class RawMaterialCostService {
       scrap_rate: calculationResult.scrapRate,
       calculation_breakdown: calculationResult,
     };
+  }
+
+  /**
+   * Get total raw material cost for a specific BOM item
+   */
+  async getTotalCostForBomItem(
+    bomItemId: string,
+    userId?: string,
+    accessToken?: string,
+  ): Promise<number> {
+    this.logger.log(`Calculating total raw material cost for BOM item: ${bomItemId}`, 'RawMaterialCostService');
+
+    const client = this.supabaseService.getClient(accessToken);
+
+    // Get all active raw material costs for this BOM item
+    const { data: costs, error } = await client
+      .from('raw_material_cost_records')
+      .select('total_cost_per_unit, effective_cost_per_unit')
+      .eq('bom_item_id', bomItemId)
+      .eq('is_active', true);
+
+    if (error) {
+      this.logger.error('Error fetching raw material costs for BOM item', error.message, 'RawMaterialCostService');
+      throw new InternalServerErrorException('Failed to fetch raw material costs');
+    }
+
+    // Sum up all effective costs (use effective_cost_per_unit if available, otherwise total_cost_per_unit)
+    const totalCost = costs?.reduce((sum, cost) => {
+      const costValue = cost.effective_cost_per_unit || cost.total_cost_per_unit || 0;
+      return sum + costValue;
+    }, 0) || 0;
+
+    this.logger.log(`Total raw material cost for BOM item ${bomItemId}: ${totalCost}`, 'RawMaterialCostService');
+    return totalCost;
   }
 }

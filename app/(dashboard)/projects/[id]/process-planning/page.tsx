@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
+import { useProcessPlanningSpecsByBomItem } from '@/lib/api/hooks/useProcessPlanningSpecs';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { Viewer2D } from '@/components/ui/viewer-2d';
 import { apiClient } from '@/lib/api/client';
@@ -73,10 +74,6 @@ function ProcessPlanningPageContent() {
     surfaceFinish: 'Ra 3.2 μm',
     heatTreatment: 'As Required',
     hardness: '',
-    leadTime: '15-20',
-    revision: 'Rev A',
-    qualityStandard: 'ISO 9001:2015',
-    inspectionLevel: 'Level II',
   });
 
   const handleModelMeasurements = (_data: any) => {
@@ -124,9 +121,11 @@ function ProcessPlanningPageContent() {
   const bomItems = bomItemsData?.items || [];
   const selectedItem = bomItems.find((item) => item.partNumber === selectedPartNumber);
 
-  // Clear measurements when item changes and initialize editable data
+  // Load process planning specifications for the selected BOM item
+  const { data: processSpecs, isLoading: specsLoading } = useProcessPlanningSpecsByBomItem(selectedItem?.id);
+
+  // Initialize editable data with BOM item data and process planning specifications
   useEffect(() => {
-    // Clear measurements/cache when item changes
     if (selectedItem) {
       setEditablePartData({
         partNumber: String(selectedItem.partNumber || selectedItem.id || ''),
@@ -137,22 +136,19 @@ function ProcessPlanningPageContent() {
         quantity: String(selectedItem.quantity || ''),
         unit: String(selectedItem.unit || ''),
         annualVolume: String(selectedItem.annualVolume || ''),
-        unitWeight: String(selectedItem.unitWeight || ''),
+        unitWeight: String(selectedItem.unitWeight || selectedItem.weight || ''),
         unitCost: String(selectedItem.unitCost || ''),
-        length: String(selectedItem.length || ''),
-        width: String(selectedItem.width || ''),
-        height: String(selectedItem.height || ''),
-        toleranceGrade: String(selectedItem.toleranceGrade || 'IT8'),
-        surfaceFinish: String(selectedItem.surfaceFinish || 'Ra 3.2 μm'),
-        heatTreatment: String(selectedItem.heatTreatment || 'As Required'),
-        hardness: String(selectedItem.hardness || ''),
-        leadTime: String(selectedItem.leadTime || '15-20'),
-        revision: String(selectedItem.revision || 'Rev A'),
-        qualityStandard: String(selectedItem.qualityStandard || 'ISO 9001:2015'),
-        inspectionLevel: String(selectedItem.inspectionLevel || 'Level II'),
+        length: String(selectedItem.maxLength || selectedItem.length || ''),
+        width: String(selectedItem.maxWidth || selectedItem.width || ''),
+        height: String(selectedItem.maxHeight || selectedItem.height || ''),
+        // Use process planning specifications if available, otherwise fallback to defaults
+        toleranceGrade: String(processSpecs?.toleranceGrade || 'IT8'),
+        surfaceFinish: String(processSpecs?.surfaceFinish || 'Ra 3.2 μm'),
+        heatTreatment: String(processSpecs?.heatTreatment || 'As Required'),
+        hardness: String(processSpecs?.hardness || ''),
       });
     } else {
-      // Initialize with empty strings if no item is selected
+      // Initialize with default values if no item is selected
       setEditablePartData({
         partNumber: '',
         name: '',
@@ -171,13 +167,9 @@ function ProcessPlanningPageContent() {
         surfaceFinish: 'Ra 3.2 μm',
         heatTreatment: 'As Required',
         hardness: '',
-        leadTime: '15-20',
-        revision: 'Rev A',
-        qualityStandard: 'ISO 9001:2015',
-        inspectionLevel: 'Level II',
       });
     }
-  }, [selectedItem?.id]);
+  }, [selectedItem?.id, processSpecs]);
 
   const handleBomChange = (bomId: string) => {
     setSelectedBomId(bomId);
@@ -212,10 +204,33 @@ function ProcessPlanningPageContent() {
     setIsEditingPartDetails(true);
   };
 
-  const handleSavePartDetails = () => {
+  const handleSavePartDetails = async () => {
+    if (!selectedItem || !projectId) return;
 
-    setIsEditingPartDetails(false);
-    // Here you would typically call an API to update the BOM item
+    try {
+      // Prepare manufacturing specifications for database update
+      const manufacturingSpecs = {
+        bomItemId: selectedItem.id,
+        projectId: projectId,
+        toleranceGrade: editablePartData.toleranceGrade,
+        surfaceFinish: editablePartData.surfaceFinish,
+        heatTreatment: editablePartData.heatTreatment,
+        hardness: editablePartData.hardness,
+      };
+
+      // Save manufacturing specifications to database via Process Planning API
+      await apiClient.post('/process-planning/specifications/upsert', manufacturingSpecs);
+      
+      console.log('Manufacturing specifications saved to database:', manufacturingSpecs);
+      setIsEditingPartDetails(false);
+      
+      // Show success message
+      alert('Manufacturing specifications saved successfully!');
+      
+    } catch (error) {
+      console.error('Error saving manufacturing specifications:', error);
+      alert('Failed to save manufacturing specifications. Please try again.');
+    }
   };
 
   const handleCancelEdit = () => {
@@ -229,19 +244,16 @@ function ProcessPlanningPageContent() {
         quantity: String(selectedItem.quantity || ''),
         unit: String(selectedItem.unit || ''),
         annualVolume: String(selectedItem.annualVolume || ''),
-        unitWeight: String(selectedItem.unitWeight || ''),
+        unitWeight: String(selectedItem.unitWeight || selectedItem.weight || ''),
         unitCost: String(selectedItem.unitCost || ''),
-        length: String(selectedItem.length || ''),
-        width: String(selectedItem.width || ''),
-        height: String(selectedItem.height || ''),
-        toleranceGrade: String(selectedItem.toleranceGrade || 'IT8'),
-        surfaceFinish: String(selectedItem.surfaceFinish || 'Ra 3.2 μm'),
-        heatTreatment: String(selectedItem.heatTreatment || 'As Required'),
-        hardness: String(selectedItem.hardness || ''),
-        leadTime: String(selectedItem.leadTime || '15-20'),
-        revision: String(selectedItem.revision || 'Rev A'),
-        qualityStandard: String(selectedItem.qualityStandard || 'ISO 9001:2015'),
-        inspectionLevel: String(selectedItem.inspectionLevel || 'Level II'),
+        length: String(selectedItem.maxLength || selectedItem.length || ''),
+        width: String(selectedItem.maxWidth || selectedItem.width || ''),
+        height: String(selectedItem.maxHeight || selectedItem.height || ''),
+        // Revert to saved process planning specifications
+        toleranceGrade: String(processSpecs?.toleranceGrade || 'IT8'),
+        surfaceFinish: String(processSpecs?.surfaceFinish || 'Ra 3.2 μm'),
+        heatTreatment: String(processSpecs?.heatTreatment || 'As Required'),
+        hardness: String(processSpecs?.hardness || ''),
       });
     }
     setIsEditingPartDetails(false);
@@ -829,26 +841,14 @@ function ProcessPlanningPageContent() {
                               <p className="text-xs font-medium">{editablePartData.hardness || '—'}</p>
                             )}
                           </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Lead Time</label>
-                            {isEditingPartDetails ? (
-                              <Input
-                                value={editablePartData.leadTime}
-                                onChange={(e) => setEditablePartData(prev => ({ ...prev, leadTime: e.target.value }))}
-                                className="h-7 text-xs"
-                              />
-                            ) : (
-                              <p className="text-xs font-medium">{editablePartData.leadTime}</p>
-                            )}
-                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Bottom Row - Cost, Quality, Files */}
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Bottom Row - Cost, Files */}
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <h4 className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">Cost & Quality</h4>
+                        <h4 className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">Cost</h4>
                         <div className="space-y-1">
                           <div>
                             <label className="text-xs text-muted-foreground">Unit Cost (₹)</label>
@@ -860,50 +860,6 @@ function ProcessPlanningPageContent() {
                               />
                             ) : (
                               <p className="text-xs font-medium">₹{editablePartData.unitCost || '—'}</p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Quality Standard</label>
-                            {isEditingPartDetails ? (
-                              <Input
-                                value={editablePartData.qualityStandard}
-                                onChange={(e) => setEditablePartData(prev => ({ ...prev, qualityStandard: e.target.value }))}
-                                className="h-7 text-xs"
-                              />
-                            ) : (
-                              <p className="text-xs font-medium">{editablePartData.qualityStandard}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">Documentation</h4>
-                        <div className="space-y-1">
-                          <div>
-                            <label className="text-xs text-muted-foreground">Revision</label>
-                            {isEditingPartDetails ? (
-                              <Input
-                                value={editablePartData.revision}
-                                onChange={(e) => setEditablePartData(prev => ({ ...prev, revision: e.target.value }))}
-                                className="h-7 text-xs"
-                              />
-                            ) : (
-                              <p className="text-xs font-medium">{editablePartData.revision}</p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Inspection Level</label>
-                            {isEditingPartDetails ? (
-                              <Input
-                                value={editablePartData.inspectionLevel}
-                                onChange={(e) => setEditablePartData(prev => ({ ...prev, inspectionLevel: e.target.value }))}
-                                className="h-7 text-xs"
-                              />
-                            ) : (
-                              <Badge variant="outline" className="text-xs h-5">
-                                {editablePartData.inspectionLevel}
-                              </Badge>
                             )}
                           </div>
                         </div>

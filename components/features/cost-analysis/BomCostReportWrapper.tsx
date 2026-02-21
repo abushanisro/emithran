@@ -13,8 +13,10 @@ interface BomCostReportWrapperProps {
   bomName?: string;
 }
 
-const formatCurrency = (value: number) => `₹${value.toFixed(2)}`;
-const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
+const formatCurrency = (value: number | undefined | null) => 
+  value !== undefined && value !== null ? `₹${value.toFixed(2)}` : '₹0.00';
+const formatPercentage = (value: number | undefined | null) => 
+  value !== undefined && value !== null ? `${value.toFixed(1)}%` : '0.0%';
 
 export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({ 
   bomId, 

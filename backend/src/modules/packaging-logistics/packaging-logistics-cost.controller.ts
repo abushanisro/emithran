@@ -139,4 +139,28 @@ async findAll(
   ): Promise<{ message: string }> {
     return this.packagingLogisticsCostService.delete(id, userId, accessToken);
   }
+
+  /**
+   * Get total packaging/logistics cost for a BOM item
+   */
+  @Get('bom-item/:bomItemId/total')
+  @ApiOperation({ summary: 'Get total packaging/logistics cost for a BOM item' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns total packaging/logistics cost for the BOM item',
+    schema: {
+      type: 'object',
+      properties: {
+        totalCost: { type: 'number', example: 125.75 }
+      }
+    }
+  })
+  async getTotalCostForBomItem(
+    @Param('bomItemId') bomItemId: string,
+    @CurrentUser('id') userId: string,
+    @AccessToken() accessToken?: string,
+  ): Promise<{ totalCost: number }> {
+    const totalCost = await this.packagingLogisticsCostService.getTotalCostForBomItem(bomItemId, userId, accessToken);
+    return { totalCost };
+  }
 }

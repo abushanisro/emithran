@@ -201,4 +201,28 @@ export class ProcessCostController {
       throw error;
     }
   }
+
+  /**
+   * Get total process cost for a BOM item
+   */
+  @Get('bom-item/:bomItemId/total')
+  @ApiOperation({ summary: 'Get total process cost for a BOM item' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns total process cost for the BOM item',
+    schema: {
+      type: 'object',
+      properties: {
+        totalCost: { type: 'number', example: 850.25 }
+      }
+    }
+  })
+  async getTotalCostForBomItem(
+    @Param('bomItemId') bomItemId: string,
+    @CurrentUser('id') userId: string,
+    @AccessToken() accessToken: string,
+  ): Promise<{ totalCost: number }> {
+    const totalCost = await this.processCostService.getTotalCostForBomItem(bomItemId, userId, accessToken);
+    return { totalCost };
+  }
 }

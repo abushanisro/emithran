@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { BOMsController } from './boms.controller';
 import { BOMsService } from './boms.service';
-import { BomItemCostService } from '../bom-items/services/bom-item-cost.service';
+import { BOMItemsModule } from '../bom-items/bom-items.module';
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule],
+  imports: [SupabaseModule, LoggerModule, BOMItemsModule],
   controllers: [BOMsController],
-  providers: [BOMsService, BomItemCostService],
+  providers: [BOMsService],
   exports: [BOMsService],
 })
 export class BOMsModule {}

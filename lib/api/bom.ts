@@ -106,7 +106,7 @@ export const bomApi = {
 
     const queryString = params.toString();
     return apiClient.get<BOMsResponse>(
-      `/bom${queryString ? `?${queryString}` : ''}`,
+      `/boms${queryString ? `?${queryString}` : ''}`,
     );
   },
 
@@ -115,7 +115,7 @@ export const bomApi = {
    */
   getById: async (id: string, includeItems = true): Promise<BOM> => {
     return apiClient.get<BOM>(
-      `/bom/${id}${includeItems ? '?includeItems=true' : ''}`,
+      `/boms/${id}${includeItems ? '?includeItems=true' : ''}`,
     );
   },
 
@@ -123,35 +123,35 @@ export const bomApi = {
    * Create new BOM
    */
   create: async (data: CreateBOMData): Promise<BOM> => {
-    return apiClient.post<BOM>('/bom', data) as Promise<BOM>;
+    return apiClient.post<BOM>('/boms', data) as Promise<BOM>;
   },
 
   /**
    * Update BOM
    */
   update: async (id: string, data: UpdateBOMData): Promise<BOM> => {
-    return apiClient.put<BOM>(`/bom/${id}`, data) as Promise<BOM>;
+    return apiClient.put<BOM>(`/boms/${id}`, data) as Promise<BOM>;
   },
 
   /**
    * Delete BOM
    */
   delete: async (id: string): Promise<void> => {
-    return apiClient.delete(`/bom/${id}`) as Promise<void>;
+    return apiClient.delete(`/boms/${id}`) as Promise<void>;
   },
 
   /**
    * Get BOM items
    */
   getItems: async (bomId: string): Promise<BOMItem[]> => {
-    return apiClient.get<BOMItem[]>(`/bom/${bomId}/items`);
+    return apiClient.get<BOMItem[]>(`/boms/${bomId}/items`);
   },
 
   /**
    * Add BOM item
    */
   addItem: async (bomId: string, data: CreateBOMItemData): Promise<BOMItem> => {
-    return apiClient.post<BOMItem>(`/bom/${bomId}/items`, data) as Promise<BOMItem>;
+    return apiClient.post<BOMItem>(`/boms/${bomId}/items`, data) as Promise<BOMItem>;
   },
 
   /**
@@ -162,35 +162,35 @@ export const bomApi = {
     itemId: string,
     data: UpdateBOMItemData,
   ): Promise<BOMItem> => {
-    return apiClient.put<BOMItem>(`/bom/${bomId}/items/${itemId}`, data) as Promise<BOMItem>;
+    return apiClient.put<BOMItem>(`/boms/${bomId}/items/${itemId}`, data) as Promise<BOMItem>;
   },
 
   /**
    * Delete BOM item
    */
   deleteItem: async (bomId: string, itemId: string): Promise<void> => {
-    return apiClient.delete(`/bom/${bomId}/items/${itemId}`) as Promise<void>;
+    return apiClient.delete(`/boms/${bomId}/items/${itemId}`) as Promise<void>;
   },
 
   /**
    * Get BOM cost breakdown
    */
   getCostBreakdown: async (bomId: string): Promise<BOMCostBreakdown> => {
-    return apiClient.get<BOMCostBreakdown>(`/bom/${bomId}/cost-report`);
+    return apiClient.get<BOMCostBreakdown>(`/boms/${bomId}/cost-report`);
   },
 
   /**
    * Approve BOM
    */
   approve: async (bomId: string): Promise<BOM> => {
-    return apiClient.post<BOM>(`/bom/${bomId}/approve`, {}) as Promise<BOM>;
+    return apiClient.post<BOM>(`/boms/${bomId}/approve`, {}) as Promise<BOM>;
   },
 
   /**
    * Release BOM
    */
   release: async (bomId: string): Promise<BOM> => {
-    return apiClient.post<BOM>(`/bom/${bomId}/release`, {}) as Promise<BOM>;
+    return apiClient.post<BOM>(`/boms/${bomId}/release`, {}) as Promise<BOM>;
   },
 
   /**
@@ -200,7 +200,7 @@ export const bomApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    return fetch(`${apiClient['baseUrl']}/bom/${bomId}/upload`, {
+    return fetch(`${apiClient['baseUrl']}/boms/${bomId}/upload`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiClient.getAccessToken()}`,

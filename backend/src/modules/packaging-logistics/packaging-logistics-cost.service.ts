@@ -230,4 +230,38 @@ let queryBuilder = this.supabaseService
 
     return { message: 'Packaging/logistics cost deleted successfully' };
   }
+
+  /**
+   * Get total packaging/logistics cost for a specific BOM item
+   */
+  async getTotalCostForBomItem(
+    bomItemId: string,
+    userId?: string,
+    accessToken?: string,
+  ): Promise<number> {
+    this.logger.log(`Calculating total packaging/logistics cost for BOM item: ${bomItemId}`, 'PackagingLogisticsCostService');
+
+    const client = this.supabaseService.getClient(accessToken);
+
+    // Get all active packaging/logistics costs for this BOM item
+    const { data: costs, error } = await client
+      .from('packaging_logistics_cost_records')
+      .select('total_cost')
+      .eq('bom_item_id', bomItemId)
+      .eq('is_active', true);
+
+    if (error) {
+      this.logger.error('Error fetching packaging/logistics costs for BOM item', error.message, 'PackagingLogisticsCostService');
+      throw new InternalServerErrorException('Failed to fetch packaging/logistics costs');
+    }
+
+    // Sum up all costs
+    const totalCost = costs?.reduce((sum, cost) => {
+      const costValue = cost.total_cost || 0;
+      return sum + costValue;
+    }, 0) || 0;
+
+    this.logger.log(`Total packaging/logistics cost for BOM item ${bomItemId}: ${totalCost}`, 'PackagingLogisticsCostService');
+    return totalCost;
+  }
 }

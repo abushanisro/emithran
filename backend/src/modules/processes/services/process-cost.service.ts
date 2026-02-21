@@ -557,4 +557,38 @@ export class ProcessCostService {
       calculation_breakdown: calculationResult,
     };
   }
+
+  /**
+   * Get total process cost for a specific BOM item
+   */
+  async getTotalCostForBomItem(
+    bomItemId: string,
+    userId?: string,
+    accessToken?: string,
+  ): Promise<number> {
+    this.logger.log(`Calculating total process cost for BOM item: ${bomItemId}`, 'ProcessCostService');
+
+    const client = this.supabaseService.getClient(accessToken);
+
+    // Get all active process costs for this BOM item
+    const { data: costs, error } = await client
+      .from('process_cost_records')
+      .select('total_cost_per_part, total_cost_before_scrap')
+      .eq('bom_item_id', bomItemId)
+      .eq('is_active', true);
+
+    if (error) {
+      this.logger.error('Error fetching process costs for BOM item', error.message, 'ProcessCostService');
+      throw new InternalServerErrorException('Failed to fetch process costs');
+    }
+
+    // Sum up all costs (use total_cost_per_part or total_cost_before_scrap)
+    const totalCost = costs?.reduce((sum, cost) => {
+      const costValue = cost.total_cost_per_part || cost.total_cost_before_scrap || 0;
+      return sum + costValue;
+    }, 0) || 0;
+
+    this.logger.log(`Total process cost for BOM item ${bomItemId}: ${totalCost}`, 'ProcessCostService');
+    return totalCost;
+  }
 }

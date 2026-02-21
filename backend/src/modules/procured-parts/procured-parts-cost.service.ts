@@ -242,4 +242,38 @@ export class ProcuredPartsCostService {
 
     return { message: 'Procured part cost deleted successfully' };
   }
+
+  /**
+   * Get total procured parts cost for a specific BOM item
+   */
+  async getTotalCostForBomItem(
+    bomItemId: string,
+    userId?: string,
+    accessToken?: string,
+  ): Promise<number> {
+    this.logger.log(`Calculating total procured parts cost for BOM item: ${bomItemId}`, 'ProcuredPartsCostService');
+
+    const client = this.supabaseService.getClient(accessToken);
+
+    // Get all active procured parts costs for this BOM item
+    const { data: costs, error } = await client
+      .from('procured_parts_cost_records')
+      .select('total_cost')
+      .eq('bom_item_id', bomItemId)
+      .eq('is_active', true);
+
+    if (error) {
+      this.logger.error('Error fetching procured parts costs for BOM item', error.message, 'ProcuredPartsCostService');
+      throw new InternalServerErrorException('Failed to fetch procured parts costs');
+    }
+
+    // Sum up all costs
+    const totalCost = costs?.reduce((sum, cost) => {
+      const costValue = cost.total_cost || 0;
+      return sum + costValue;
+    }, 0) || 0;
+
+    this.logger.log(`Total procured parts cost for BOM item ${bomItemId}: ${totalCost}`, 'ProcuredPartsCostService');
+    return totalCost;
+  }
 }

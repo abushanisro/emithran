@@ -65,7 +65,7 @@ const CustomPieChart = ({ data, colors }: { data: any[], colors: string[] }) => 
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-bold">₹{total.toLocaleString()}</p>
+          <p className="text-lg font-bold">₹{(total || 0).toLocaleString()}</p>
           <p className="text-xs text-muted-foreground">Total</p>
         </div>
       </div>
@@ -91,13 +91,13 @@ const CustomBarChart = ({ data, colors }: { data: any[], colors: string[] }) => 
                 }}
               >
                 <span className="text-xs font-medium text-white">
-                  ₹{item.value.toLocaleString()}
+                  ₹{(item.value || 0).toLocaleString()}
                 </span>
               </div>
             </div>
           </div>
           <div className="w-16 text-xs text-right">
-            {((item.value / maxValue) * 100).toFixed(1)}%
+            {(((item.value || 0) / (maxValue || 1)) * 100).toFixed(1)}%
           </div>
         </div>
       ))}
@@ -148,8 +148,10 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
       }
   };
 
-  const formatCurrency = (value: number) => `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-  const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
+  const formatCurrency = (value: number | undefined | null) => 
+    value !== undefined && value !== null ? `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '₹0.00';
+  const formatPercentage = (value: number | undefined | null) => 
+    value !== undefined && value !== null ? `${value.toFixed(1)}%` : '0.0%';
 
   if (isCalculating) {
     return (

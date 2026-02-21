@@ -14,18 +14,21 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { BOMsService } from './boms.service';
 import { BomItemCostService } from '../bom-items/services/bom-item-cost.service';
+import { BOMItemsService } from '../bom-items/bom-items.service';
 import { CreateBOMDto, UpdateBOMDto, QueryBOMsDto } from './dto/boms.dto';
 import { BOMResponseDto, BOMListResponseDto } from './dto/bom-response.dto';
+import { BOMItemListResponseDto } from '../bom-items/dto/bom-item-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 
 @ApiTags('BOMs')
 @ApiBearerAuth()
-@Controller({ path: 'api/bom', version: '1' })
+@Controller({ path: 'api/boms', version: '1' })
 export class BOMsController {
   constructor(
     private readonly bomsService: BOMsService,
     private readonly bomItemCostService: BomItemCostService,
+    private readonly bomItemsService: BOMItemsService,
   ) {}
 
   @Get()
@@ -41,6 +44,14 @@ export class BOMsController {
   @ApiResponse({ status: 404, description: 'BOM not found' })
   async findOne(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMResponseDto> {
     return this.bomsService.findOne(id, user.id, token);
+  }
+
+  @Get(':id/items')
+  @ApiOperation({ summary: 'Get all BOM items for a specific BOM' })
+  @ApiResponse({ status: 200, description: 'BOM items retrieved successfully', type: BOMItemListResponseDto })
+  @ApiResponse({ status: 404, description: 'BOM not found' })
+  async getBomItems(@Param('id') bomId: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMItemListResponseDto> {
+    return this.bomItemsService.findAll(bomId, undefined, undefined, undefined, undefined, user.id, token);
   }
 
   @Post()

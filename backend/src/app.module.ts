@@ -24,6 +24,7 @@ import { RfqModule } from './modules/rfq/rfq.module';
 import { SupplierNominationsModule } from './modules/supplier-nominations/supplier-nominations.module';
 import { VendorQuotesModule } from './modules/vendor-quotes/vendor-quotes.module';
 import { ProductionPlanningModule } from './modules/production-planning/production-planning.module';
+import { ProcessPlanningModule } from './modules/process-planning/process-planning.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { SupabaseService } from './common/supabase/supabase.service';
 import { SupabaseAuthGuard } from './common/guards/supabase-auth.guard';
@@ -79,6 +80,7 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     SupplierNominationsModule,
     VendorQuotesModule,
     ProductionPlanningModule,
+    ProcessPlanningModule,
   ],
   controllers: [AppController],
   providers: [
