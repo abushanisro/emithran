@@ -115,6 +115,16 @@ export const WORKFLOW_MODULES: WorkflowModule[] = [
     dependencies: ['production-planning'],
   },
   {
+    id: 'reports',
+    name: 'Project Reports',
+    description: 'Generate balloon diagrams and inspection reports',
+    route: '/projects/[id]/reports',
+    icon: 'FileText',
+    status: 'pending',
+    estimatedTime: '30 min',
+    dependencies: ['quality-control'],
+  },
+  {
     id: 'delivery',
     name: 'Delivery & Logistics',
     description: 'Final delivery and logistics coordination',
@@ -122,7 +132,7 @@ export const WORKFLOW_MODULES: WorkflowModule[] = [
     icon: 'Truck',
     status: 'pending',
     estimatedTime: '1-2 days',
-    dependencies: ['quality-control'],
+    dependencies: ['reports'],
   },
 ];
 

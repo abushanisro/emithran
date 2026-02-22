@@ -533,43 +533,6 @@ function SupplierCard({
           <div className="space-y-4 border-t border-gray-700 pt-4">
             <h4 className="text-sm font-medium text-white mb-3">Score Calculation Breakdown</h4>
 
-            {/* Cost Competency */}
-            <div className="p-4 bg-gray-700/30 rounded-lg">
-              <div className="flex items-center justify-between mb-3">
-                <h5 className="text-sm font-medium text-white">
-                  Cost Competency Analysis (70% Weight)
-                </h5>
-                <span className="text-lg font-bold text-white">{costScore.toFixed(1)}%</span>
-              </div>
-              <div className="space-y-2 text-xs">
-                {costAnalysisData
-                  .filter((item) =>
-                    ['Net Price/unit', 'Development cost', 'Lead Time Days'].includes(
-                      item.costComponent
-                    )
-                  )
-                  .map((item) => {
-                    const vendorValue = item.supplierValues[vendorIndex] || 0;
-                    const baseValue = item.baseValue || 0;
-                    const hasData = vendorValue > 0 && baseValue > 0;
-                    return (
-                      <div key={item.costComponent} className="flex justify-between items-center">
-                        <span className="text-gray-300">{item.costComponent}:</span>
-                        <div className="text-right">
-                          <span className={hasData ? 'text-white' : 'text-gray-500'}>
-                            {vendorValue > 0 ? `${vendorValue} ${item.unit || ''}` : 'No data'}
-                          </span>
-                          {baseValue > 0 && (
-                            <span className="text-gray-400 ml-2">
-                              (Base: {baseValue} {item.unit || ''})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
 
             {/* Vendor Rating */}
             <div className="p-4 bg-gray-700/30 rounded-lg">
@@ -660,7 +623,7 @@ function SupplierCard({
             </div>
 
             {/* Configured Evaluation Criteria */}
-            {criteria.length > 0 ? (
+            {criteria.length > 0 && (
               <div className="p-4 bg-gray-700/20 rounded-lg">
                 <h5 className="text-sm font-medium text-white mb-3">
                   Configured Evaluation Criteria
@@ -715,79 +678,6 @@ function SupplierCard({
                       </div>
                     );
                   })}
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 bg-gray-700/20 rounded-lg text-center space-y-3">
-                <p className="text-sm text-gray-400">No evaluation criteria configured</p>
-                <p className="text-xs text-gray-500">
-                  To see detailed scoring breakdowns, evaluation criteria need to be configured
-                  for this nomination.
-                </p>
-                <div className="p-4 bg-gray-700/30 rounded-lg text-left">
-                  <h5 className="text-xs font-medium text-gray-300 mb-2">Current Data Status:</h5>
-                  <div className="grid grid-cols-1 gap-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Cost Analysis:</span>
-                      <span
-                        className={
-                          costAnalysisData.some(
-                            (item) =>
-                              item.baseValue > 0 ||
-                              item.supplierValues.some((v: any) => v > 0)
-                          )
-                            ? 'text-green-400'
-                            : 'text-gray-500'
-                        }
-                      >
-                        {costAnalysisData.some(
-                          (item) =>
-                            item.baseValue > 0 ||
-                            item.supplierValues.some((v: any) => v > 0)
-                        )
-                          ? 'Data Available'
-                          : 'No Data'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Capability Scores:</span>
-                      <span
-                        className={
-                          capabilityData.some((item) =>
-                            Object.values(item.vendorScores || {}).some(
-                              (s: any) => s > 0
-                            )
-                          )
-                            ? 'text-green-400'
-                            : 'text-gray-500'
-                        }
-                      >
-                        {capabilityData.some((item) =>
-                          Object.values(item.vendorScores || {}).some((s: any) => s > 0)
-                        )
-                          ? 'Data Available'
-                          : 'No Data'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Vendor Ratings:</span>
-                      <span
-                        className={
-                          vendorRatingScores &&
-                            (vendorRatingScores.sectionWiseCapability > 0 ||
-                              vendorRatingScores.riskMitigation > 0)
-                            ? 'text-green-400'
-                            : 'text-gray-500'
-                        }
-                      >
-                        {vendorRatingScores &&
-                          (vendorRatingScores.sectionWiseCapability > 0 ||
-                            vendorRatingScores.riskMitigation > 0)
-                          ? 'Data Available'
-                          : 'No Data'}
-                      </span>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}

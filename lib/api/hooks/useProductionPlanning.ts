@@ -230,7 +230,7 @@ export const PRODUCTION_PLANNING_QUERY_KEYS = {
 };
 
 // React Query hooks
-export function useProductionLots(filters?: { status?: string; bomId?: string; priority?: string }) {
+export function useProductionLots(filters?: { status?: string; bomId?: string; priority?: string; projectId?: string }) {
   return useQuery({
     queryKey: [...PRODUCTION_PLANNING_QUERY_KEYS.lots(), filters],
     queryFn: () => productionPlanningApi.getProductionLots(filters),

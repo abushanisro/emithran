@@ -385,6 +385,7 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
   const [mainSections, setMainSections] = useState<MainProcessSection[]>(DEFAULT_SECTIONS as any);
   const [processDataLoading, setProcessDataLoading] = useState(true);
   const [processDataError, setProcessDataError] = useState<Error | null>(null);
+  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
 
   // Load data on component mount
   useEffect(() => {
@@ -721,7 +722,12 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
    * -------------------------------------------------------------------------- */
 
   const handleCreateSubTask = useCallback(async () => {
+    // Prevent duplicate calls
+    if (isCreatingSubtask) return;
+    
     try {
+      setIsCreatingSubtask(true);
+      
       // Basic validation
       if (!subTaskName.trim()) {
         toast.error('Sub-task name is required');
@@ -868,9 +874,10 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
 
       toast.error(errorMessage);
     } finally {
-      // Cleanup if needed
+      setIsCreatingSubtask(false);
     }
   }, [
+    isCreatingSubtask,
     subTaskName,
     subTaskOperator,
     subTaskStartDate,
@@ -1630,6 +1637,7 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
             <Button
               onClick={handleCreateSubTask}
               disabled={
+                isCreatingSubtask ||
                 processDataLoading ||
                 !subTaskName ||
                 !subTaskOperator ||
@@ -1637,7 +1645,7 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
                 !subTaskEndDate
               }
             >
-              {processDataLoading ? 'Creating...' : 'Create Sub-Task'}
+              {isCreatingSubtask ? 'Creating...' : 'Create Sub-Task'}
             </Button>
           </DialogFooter>
         </DialogContent>

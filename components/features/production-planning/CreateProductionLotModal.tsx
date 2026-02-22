@@ -554,43 +554,6 @@ export function CreateProductionLotModal({ open, onOpenChange, projectId }: Crea
                           </div>
                         ))}
                         
-                        {selectedItems.length > 0 && (
-                          <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                            <div className="text-sm font-medium text-primary mb-2">
-                              Selected Items ({selectedItems.length} of {bomItemsData.items.length})
-                            </div>
-                            
-                            {/* Display selected items */}
-                            <div className="space-y-2 max-h-32 overflow-y-auto">
-                              {selectedItems.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between p-2 bg-white/50 rounded text-xs">
-                                  <div className="flex-1">
-                                    <div className="font-medium text-gray-900">
-                                      {item.partNumber || item.name}
-                                    </div>
-                                    <div className="text-gray-600 truncate">
-                                      {item.description}
-                                    </div>
-                                  </div>
-                                  <div className="text-right text-gray-700">
-                                    <div>Qty: {item.quantity}</div>
-                                    {item.unitCost && (
-                                      <div>${item.unitCost.toFixed(2)}</div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            
-                            {selectedItems.some(item => item.unitCost) && (
-                              <div className="text-sm text-primary/80 mt-2 pt-2 border-t border-primary/20">
-                                Estimated Total Cost: ${selectedItems
-                                  .reduce((total, item) => total + (item.unitCost || 0) * item.quantity, 0)
-                                  .toFixed(2)}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                       ) : (
                         <div className="text-center py-8 text-muted-foreground">

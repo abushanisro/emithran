@@ -3,8 +3,10 @@ import { QualityControlController } from './quality-control.controller';
 import { QualityControlService } from './quality-control.service';
 import { QualityInspectionService } from './services/quality-inspection.service';
 import { QualityChecklistService } from './services/quality-checklist.service';
+import { SupabaseModule } from '@/common/supabase/supabase.module';
 
 @Module({
+  imports: [SupabaseModule],
   controllers: [QualityControlController],
   providers: [
     QualityControlService,

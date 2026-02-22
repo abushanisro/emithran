@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useProductionLots } from '@/lib/api/hooks/useProductionPlanning';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
@@ -10,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ArrowLeft, Shield, CheckCircle, AlertTriangle, Clock, FileText, BarChart3, Target, Package, Settings } from 'lucide-react';
 import Link from 'next/link';
 import CreateQCInspectionDialog from '@/components/features/quality-control/CreateQCInspectionDialog';
+import QCReportDialog from '@/components/features/quality-control/QCReportDialog';
 
 interface ProductionLot {
   id: string;
@@ -38,7 +40,13 @@ interface BOMItem {
 export default function QualityControlPage() {
   const params = useParams();
   const projectId = params.id as string;
-  const { data: productionLots = [], isLoading: loading, error: lotsError } = useProductionLots();
+  const { data: productionLots = [], isLoading: loading, error: lotsError } = useProductionLots({ projectId });
+  const [currentInspection, setCurrentInspection] = useState<any>(null);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [completedInspections, setCompletedInspections] = useState<any[]>([]);
+
+  // Debug logging
+  console.log('QC Page state:', { showReportDialog, hasInspection: !!currentInspection });
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -68,7 +76,8 @@ export default function QualityControlPage() {
             projectId={projectId}
             onInspectionCreated={(inspection) => {
               console.log('Inspection created:', inspection);
-              // Here you could refresh the inspections list or show a success message
+              setCurrentInspection(inspection);
+              setShowReportDialog(true);
             }}
           />
         </div>
@@ -140,79 +149,64 @@ export default function QualityControlPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="bom-overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="basic" disabled className="opacity-50 cursor-not-allowed">
-                  Basic Info
-                </TabsTrigger>
-                <TabsTrigger value="bom-overview">
-                  BOM Selection
-                </TabsTrigger>
-                <TabsTrigger value="standards" disabled className="opacity-50 cursor-not-allowed">
-                  Standards
-                </TabsTrigger>
-                <TabsTrigger value="checklist" disabled className="opacity-50 cursor-not-allowed">
-                  Checklist
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="bom-overview" className="mt-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <p className="text-muted-foreground">Loading production lots...</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {productionLots.length === 0 ? (
-                      <div className="text-center py-8">
-                        <p className="text-muted-foreground">No production lots found.</p>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Create a production lot in the Production Planning module to see BOM details here.
-                        </p>
-                      </div>
-                    ) : (
-                      productionLots.map((lot) => (
-                        <Card key={lot.id} className="border-l-4 border-l-blue-500">
-                          <CardHeader className="pb-4">
-                            <div className="flex items-center justify-between">
-                              <div className="space-y-1">
-                                <CardTitle className="text-base font-semibold">
-                                  Lot: {lot.lotNumber}
-                                </CardTitle>
-                                {lot.bom && (
-                                  <CardDescription>
-                                    BOM: {lot.bom.name} (v{lot.bom.version})
-                                  </CardDescription>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge 
-                                  variant={lot.status === 'completed' ? 'default' : 'secondary'}
-                                  className="text-xs"
-                                >
-                                  {lot.status}
-                                </Badge>
-                                <span className="text-sm text-muted-foreground">
-                                  Qty: {lot.productionQuantity}
-                                </span>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          
-                          <CardContent>
-                            <div className="text-center py-4">
-                              <p className="text-muted-foreground text-sm">
-                                Click "Create QC Inspection" to view BOM parts and create quality control reports for this lot.
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-muted-foreground">Loading production lots...</p>
+              </div>
+            ) : productionLots.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No production lots found.</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Create a production lot in the Production Planning module to see BOM details here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Completed Inspections */}
+                {completedInspections.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Completed Quality Inspections</h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      {completedInspections.map((inspection, index) => (
+                        <Card key={index} className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium">{inspection.name}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {inspection.bomName} • {inspection.selectedItems?.length || 0} parts inspected
                               </p>
+                              <div className="flex gap-2 mt-2">
+                                <Badge variant={inspection.overallResult === 'pass' ? 'default' : inspection.overallResult === 'fail' ? 'destructive' : 'secondary'}>
+                                  {inspection.overallResult?.toUpperCase() || 'COMPLETED'}
+                                </Badge>
+                                <Badge variant="outline">{inspection.checklist?.length || 0} checks</Badge>
+                              </div>
                             </div>
-                          </CardContent>
+                            <div className="text-sm text-muted-foreground">
+                              {new Date(inspection.submittedAt || inspection.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
                         </Card>
-                      ))
-                    )}
+                      ))}
+                    </div>
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+                
+                <div className="text-center py-8">
+                  <CreateQCInspectionDialog 
+                    projectId={projectId}
+                    onInspectionCreated={(inspection) => {
+                      console.log('Inspection created:', inspection);
+                      console.log('Setting current inspection and showing dialog...');
+                      // Open the report dialog immediately after creation
+                      setCurrentInspection(inspection);
+                      setShowReportDialog(true);
+                      console.log('Dialog state set to true');
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -333,6 +327,13 @@ export default function QualityControlPage() {
         <WorkflowNavigation 
           currentModuleId="quality-control" 
           projectId={projectId}
+        />
+
+        {/* QC Report Dialog */}
+        <QCReportDialog
+          open={showReportDialog}
+          onOpenChange={setShowReportDialog}
+          inspection={currentInspection}
         />
       </div>
     </div>

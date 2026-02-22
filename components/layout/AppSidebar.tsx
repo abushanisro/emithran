@@ -61,6 +61,24 @@ export function AppSidebar() {
     return pathname.startsWith(path);
   };
 
+  // Helper function to get display name from user data
+  const getUserDisplayName = () => {
+    const fullName = (user as any)?.user_metadata?.full_name;
+    if (fullName) return fullName;
+    
+    // Extract name from email if no full name available
+    if (user?.email) {
+      const emailPrefix = user.email.split('@')[0];
+      // Convert email prefix to readable name (e.g., "john.doe" -> "John Doe")
+      return emailPrefix
+        .split(/[._-]/) // Split on dots, underscores, or hyphens
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(' ');
+    }
+    
+    return 'User';
+  };
+
   const userInitials = (user as any)?.user_metadata?.full_name
     ?.split(' ')
     .map((n: string) => n[0])
@@ -157,7 +175,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {(user as any)?.user_metadata?.full_name || 'User'}
+                {getUserDisplayName()}
               </p>
               <p className="text-xs text-sidebar-foreground/50 truncate">
                 {user?.email}

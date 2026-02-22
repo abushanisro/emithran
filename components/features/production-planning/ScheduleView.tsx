@@ -1845,16 +1845,6 @@ return {
                 </div>
               )}
 
-              <div>
-                <label className="text-sm font-medium">Notes</label>
-                <textarea 
-                  value={taskFormData.notes || ''}
-                  onChange={(e) => setTaskFormData({...taskFormData, notes: e.target.value})}
-                  className="w-full mt-1 px-3 py-2 border border-input rounded-md"
-                  rows={2}
-                  placeholder="Enter additional notes"
-                />
-              </div>
 
             </div>
 

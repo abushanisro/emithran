@@ -39,7 +39,7 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 @ApiTags('RFQ (Request for Quotation)')
 @ApiBearerAuth()
 @UseGuards(SupabaseAuthGuard)
-@Controller('api/rfq')
+@Controller({ path: 'api/rfq', version: '1' })
 export class RfqController {
   private readonly logger = new Logger(RfqController.name);
 

@@ -115,7 +115,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
   const [selectedStandards, setSelectedStandards] = useState<string[]>([]);
   const [customChecklists, setCustomChecklists] = useState<InspectionChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const { data: productionLots = [], isLoading: loadingLots, error: lotsError } = useProductionLots();
+  const { data: productionLots = [], isLoading: loadingLots, error: lotsError } = useProductionLots({ projectId });
   
 
   // Load BOMs for the project
@@ -151,77 +151,122 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
     const checklist: InspectionChecklistItem[] = [];
     
     items.forEach((item, index) => {
-      // Dimensional checks
-      checklist.push({
-        id: `dim-${item.id}`,
-        category: 'dimensional',
-        requirement: `Dimensional Verification - ${item.partNumber}`,
-        specification: `Per Drawing/CAD Model for ${item.description}`,
-        measurementType: 'measurement',
-        criticalLevel: 'critical',
-        inspectionMethod: 'Dimensional Measurement',
-        acceptanceCriteria: 'Within drawing tolerances ±0.1mm',
-        tools: ['Caliper', 'Micrometer', 'CMM'],
-        standardReference: 'ISO 1101'
+      // Enhanced dimensional checks with specific measurements
+      const dimensionalChecks = [
+        'Overall Length', 'Overall Width', 'Overall Height', 'Diameter', 'Thickness',
+        'Hole Diameter', 'Thread Pitch', 'Surface Roughness', 'Flatness', 'Parallelism',
+        'Perpendicularity', 'Concentricity', 'Roundness', 'Profile', 'Position'
+      ];
+
+      dimensionalChecks.forEach((dimension, dimIndex) => {
+        checklist.push({
+          id: `dim-${item.id}-${dimIndex}`,
+          category: 'dimensional',
+          requirement: `${dimension} - ${item.partNumber || item.name}`,
+          specification: `${dimension} measurement per drawing specification for ${item.description || item.name}`,
+          measurementType: 'measurement',
+          criticalLevel: dimension.includes('Overall') || dimension.includes('Diameter') ? 'critical' : 'major',
+          inspectionMethod: 'Dimensional Measurement',
+          acceptanceCriteria: `Within drawing tolerances (±0.05mm for critical, ±0.1mm for major)`,
+          tools: dimension.includes('Surface') ? ['Surface Roughness Tester'] : 
+                dimension.includes('Thread') ? ['Thread Gauge', 'Pitch Gauge'] :
+                ['Caliper', 'Micrometer', 'CMM', 'Height Gauge'],
+          standardReference: 'ISO 1101, ASME Y14.5'
+        });
       });
 
-      // Visual inspection
+      // Visual inspection with detailed criteria
       checklist.push({
         id: `visual-${item.id}`,
         category: 'visual',
-        requirement: `Visual Inspection - ${item.partNumber}`,
-        specification: `Surface condition and workmanship for ${item.description}`,
+        requirement: `Visual Inspection - ${item.partNumber || item.name}`,
+        specification: `Complete visual examination of ${item.description || item.name}`,
         measurementType: 'visual',
         criticalLevel: 'major',
         inspectionMethod: 'Visual Inspection',
-        acceptanceCriteria: 'No visible defects, scratches, or damage',
-        tools: ['Magnifying Glass', 'Comparator'],
-        standardReference: 'ASME Y14.5'
+        acceptanceCriteria: 'No visible defects: scratches, dents, porosity, discoloration, burrs, sharp edges',
+        tools: ['Magnifying Glass (10x)', 'Surface Comparator', 'Borescope (if applicable)'],
+        standardReference: 'ASME Y14.5, IPC Standards'
       });
 
-      // Material verification
-      if (item.description.toLowerCase().includes('metal') || 
-          item.description.toLowerCase().includes('steel') || 
-          item.description.toLowerCase().includes('aluminum')) {
-        checklist.push({
-          id: `material-${item.id}`,
-          category: 'material',
-          requirement: `Material Certification - ${item.partNumber}`,
-          specification: `Material compliance verification for ${item.description}`,
-          measurementType: 'document',
-          criticalLevel: 'critical',
-          inspectionMethod: 'Material Verification',
-          acceptanceCriteria: 'Valid material certificate provided',
-          tools: ['Material Certificate', 'Spectrometer'],
-          standardReference: 'ASTM Standards'
-        });
-      }
+      // Surface finish verification
+      checklist.push({
+        id: `surface-${item.id}`,
+        category: 'surface',
+        requirement: `Surface Finish - ${item.partNumber || item.name}`,
+        specification: `Surface roughness and finish quality for ${item.description || item.name}`,
+        measurementType: 'measurement',
+        criticalLevel: 'major',
+        inspectionMethod: 'Surface Roughness Measurement',
+        acceptanceCriteria: 'Ra ≤ 1.6μm (or as specified on drawing)',
+        tools: ['Surface Roughness Tester', 'Profilometer'],
+        standardReference: 'ISO 4287, ISO 1302'
+      });
 
-      // Functional testing for assemblies
-      if (item.level === 0 || item.description.toLowerCase().includes('assembly')) {
+      // Material verification with enhanced checks
+      checklist.push({
+        id: `material-${item.id}`,
+        category: 'material',
+        requirement: `Material Verification - ${item.partNumber || item.name}`,
+        specification: `Material compliance and certification for ${item.materialGrade || item.material || 'specified material'}`,
+        measurementType: 'document',
+        criticalLevel: 'critical',
+        inspectionMethod: 'Material Verification & Testing',
+        acceptanceCriteria: 'Valid material certificate + hardness test (if req.) + chemical composition (if req.)',
+        tools: ['Material Certificate', 'Hardness Tester', 'Spectrometer (if available)'],
+        standardReference: 'ASTM Standards, Material Specifications'
+      });
+
+      // Functional testing for mechanical parts
+      if (item.itemType?.toLowerCase().includes('assembly') || 
+          item.description?.toLowerCase().includes('assembly') ||
+          item.level === 0) {
         checklist.push({
           id: `func-${item.id}`,
           category: 'functional',
-          requirement: `Functional Test - ${item.partNumber}`,
-          specification: `Operational verification for ${item.description}`,
+          requirement: `Functional Test - ${item.partNumber || item.name}`,
+          specification: `Operational verification and performance test for ${item.description || item.name}`,
           measurementType: 'pass_fail',
           criticalLevel: 'critical',
-          inspectionMethod: 'Functional Test',
-          acceptanceCriteria: 'Meets functional requirements as specified',
-          tools: ['Test Equipment', 'Fixtures'],
-          standardReference: 'Design Specification'
+          inspectionMethod: 'Functional Performance Test',
+          acceptanceCriteria: 'Meets all functional requirements: fit, operation, performance as specified',
+          tools: ['Test Fixtures', 'Gauges', 'Performance Test Equipment'],
+          standardReference: 'Design Specification, Performance Requirements'
         });
       }
+
+      // Marking and identification check
+      checklist.push({
+        id: `marking-${item.id}`,
+        category: 'visual',
+        requirement: `Marking & Identification - ${item.partNumber || item.name}`,
+        specification: `Part marking, serial numbers, and identification for ${item.description || item.name}`,
+        measurementType: 'visual',
+        criticalLevel: 'minor',
+        inspectionMethod: 'Visual Verification',
+        acceptanceCriteria: 'All required markings present, legible, and correctly positioned',
+        tools: ['Magnifying Glass', 'Ruler'],
+        standardReference: 'Drawing Requirements, Company Standards'
+      });
     });
 
     return checklist;
   };
 
   const handleItemSelection = (itemId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedItems([...selectedItems, itemId]);
+    const newSelectedItems = checked 
+      ? [...selectedItems, itemId] 
+      : selectedItems.filter(id => id !== itemId);
+    
+    setSelectedItems(newSelectedItems);
+    
+    // Auto-generate checklist when items are selected
+    if (newSelectedItems.length > 0) {
+      const selectedBOMItems = bomItems.filter(item => newSelectedItems.includes(item.id));
+      const generatedChecklist = generateStandardChecklist(selectedBOMItems, selectedStandards);
+      setCustomChecklists(generatedChecklist);
     } else {
-      setSelectedItems(selectedItems.filter(id => id !== itemId));
+      setCustomChecklists([]);
     }
   };
 
@@ -256,16 +301,22 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
 
     setLoading(true);
     try {
+      // Get the actual BOM items data for the selected items
+      const selectedBOMItems = bomItems.filter(item => selectedItems.includes(item.id));
+      
       const inspectionData = {
         name: inspectionName,
         description: inspectionDescription,
         type: inspectionType,
         status: 'planned',
         bomId: selectedBOM.id,
+        bomName: selectedBOM.name,
+        bomVersion: selectedBOM.version,
         projectId,
         inspector,
         plannedDate,
         selectedItems,
+        bomItems: selectedBOMItems, // Include actual BOM item data
         qualityStandards: selectedStandards,
         checklist: customChecklists,
         createdAt: new Date().toISOString(),
@@ -281,14 +332,22 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
         onInspectionCreated(inspectionData);
       }
 
-      setOpen(false);
+      toast.success('Quality inspection created successfully! Opening report dialog...');
+      
       // Reset form
       setInspectionName('');
       setInspectionDescription('');
       setSelectedBOM(null);
+      setSelectedLot('');
+      setBomItems([]);
       setSelectedItems([]);
       setCustomChecklists([]);
       setSelectedStandards([]);
+      setInspector('');
+      setPlannedDate('');
+      
+      // Close dialog
+      setOpen(false);
     } catch (error: any) {
       console.error('Failed to create inspection:', error);
       let errorMessage = 'Failed to create quality inspection. Please try again.';
@@ -413,73 +472,152 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
               </div>
 
 
-              {/* BOM Parts Selection */}
+              {/* Enhanced BOM Parts Selection */}
               {selectedLot && selectedBOM && bomItems.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <Label>Select BOM Parts for Inspection ({selectedItems.length} selected)</Label>
-                    <div className="space-x-2">
+                    <Label className="text-base font-semibold">BOM Parts for Quality Inspection ({selectedItems.length} of {bomItems.length} selected)</Label>
+                    <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setSelectedItems(bomItems.map(item => item.id))}
+                        onClick={() => {
+                          const allIds = bomItems.map(item => item.id);
+                          setSelectedItems(allIds);
+                          // Auto-generate checklist for all items
+                          const generatedChecklist = generateStandardChecklist(bomItems, selectedStandards);
+                          setCustomChecklists(generatedChecklist);
+                        }}
                       >
                         Select All
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setSelectedItems([])}
+                        onClick={() => {
+                          setSelectedItems([]);
+                          setCustomChecklists([]);
+                        }}
                       >
                         Clear All
                       </Button>
                     </div>
                   </div>
                   
-                  <div className="border rounded-lg max-h-64 overflow-y-auto">
-                    <div className="p-3 space-y-2">
-                      {bomItems.map((item) => (
-                        <div key={item.id} className="flex items-center space-x-3 p-2 border rounded hover:bg-muted/50">
+                  <div className="grid grid-cols-1 gap-3 max-h-80 overflow-y-auto">
+                    {bomItems.map((item, index) => (
+                      <Card key={item.id} className={`p-4 transition-all ${selectedItems.includes(item.id) ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/50'}`}>
+                        <div className="flex items-start space-x-3">
                           <Checkbox
                             checked={selectedItems.includes(item.id)}
                             onCheckedChange={(checked) => handleItemSelection(item.id, !!checked)}
+                            className="mt-1"
                           />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm">{item.partNumber || item.name}</span>
-                              {item.partNumber && (
-                                <Badge variant="outline" className="text-xs">
-                                  {item.partNumber}
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs font-mono">
+                                  #{index + 1}
                                 </Badge>
-                              )}
+                                <span className="font-semibold text-sm">{item.partNumber || item.name}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {item.itemType}
+                                </Badge>
+                              </div>
+                              <div className="flex gap-1">
+                                {(item.file2dPath || item.drawingFile || item.cadFile2D || item.drawing2DFile) && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                      const filePath = item.file2dPath || item.drawingFile || item.cadFile2D || item.drawing2DFile;
+                                      if (filePath) {
+                                        window.open(`${process.env.NEXT_PUBLIC_API_URL}/files/download?path=${encodeURIComponent(filePath)}`, '_blank');
+                                      }
+                                    }}
+                                    className="h-7 px-2"
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    2D Drawing
+                                  </Button>
+                                )}
+                                {(item.file3dPath || item.cadFile || item.cadFile3D || item.model3DFile || item.stepFile) && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                      const filePath = item.file3dPath || item.cadFile || item.cadFile3D || item.model3DFile || item.stepFile;
+                                      if (filePath) {
+                                        window.open(`${process.env.NEXT_PUBLIC_API_URL}/files/download?path=${encodeURIComponent(filePath)}`, '_blank');
+                                      }
+                                    }}
+                                    className="h-7 px-2"
+                                  >
+                                    <Layers className="h-3 w-3 mr-1" />
+                                    3D Model
+                                  </Button>
+                                )}
+                              </div>
                             </div>
+                            
                             {item.description && (
-                              <div className="text-xs text-muted-foreground mt-1">{item.description}</div>
+                              <div className="text-sm text-muted-foreground">{item.description}</div>
                             )}
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                              <span>Type: {item.itemType}</span>
-                              {(item.materialGrade || item.material) && <span>Material: {item.materialGrade || item.material}</span>}
-                              <span>Qty: {item.quantity} {item.unitOfMeasure || 'pcs'}</span>
+                            
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Qty:</span>
+                                <span>{item.quantity} {item.unitOfMeasure || 'pcs'}</span>
+                              </div>
+                              {(item.materialGrade || item.material) && (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">Material:</span>
+                                  <span className="truncate">{item.materialGrade || item.material}</span>
+                                </div>
+                              )}
+                              {item.unitCost && (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">Cost:</span>
+                                  <span>${item.unitCost.toFixed(2)}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Level:</span>
+                                <span>{item.level || 0}</span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex gap-1">
-                            {(item.drawingFile || item.cadFile2D || item.drawing2DFile) && (
-                              <Button variant="outline" size="sm">
-                                <Eye className="h-3 w-3" />
-                                2D
-                              </Button>
-                            )}
-                            {(item.cadFile || item.cadFile3D || item.model3DFile || item.stepFile) && (
-                              <Button variant="outline" size="sm">
-                                <Layers className="h-3 w-3" />
-                                3D
-                              </Button>
+                            
+                            {selectedItems.includes(item.id) && (
+                              <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                                <div className="font-medium text-green-800 mb-1">Quality Inspection Plan:</div>
+                                <div className="text-green-700">
+                                  • 15 Dimensional checks (Length, Width, Height, Diameters, etc.)
+                                  • Visual inspection for defects and surface quality
+                                  • Surface finish measurement (Ra ≤ 1.6μm)
+                                  • Material verification and certification
+                                  • Functional testing {item.itemType?.toLowerCase().includes('assembly') ? '(Assembly level)' : ''}
+                                  • Marking and identification verification
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      </Card>
+                    ))}
                   </div>
+                  
+                  {customChecklists.length > 0 && (
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Target className="h-4 w-4 text-blue-600" />
+                        <span className="font-medium text-blue-800">Generated Quality Inspection Checklist</span>
+                      </div>
+                      <div className="text-sm text-blue-700">
+                        {customChecklists.length} inspection points generated for {selectedItems.length} selected parts.
+                        This includes dimensional measurements, visual inspections, material verification, and functional tests.
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
