@@ -6,16 +6,20 @@ import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const outfit = Outfit({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+  weight: ['400', '500', '600'], // Reduced weight variants to minimize preloads
   variable: '--font-sans',
   display: 'swap',
+  preload: true,
+  fallback: ['system-ui', 'arial'],
 })
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  weight: ['400', '500'],
+  weight: ['400'], // Reduced to single weight to minimize preloads
   variable: '--font-mono',
-  display: 'swap',
+  display: 'optional', // Changed from 'swap' to 'optional' for non-critical font
+  preload: false,
+  fallback: ['Monaco', 'Menlo', 'monospace'],
 })
 
 export const metadata: Metadata = {
@@ -59,7 +63,7 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
-        <SpeedInsights />
+        {process.env.NODE_ENV === 'production' && <SpeedInsights debug={false} />}
       </body>
     </html>
   )

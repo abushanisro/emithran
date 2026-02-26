@@ -16,10 +16,20 @@ import { useProject } from '@/lib/api/hooks/useProjects';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import Link from 'next/link';
 
+interface ProductionLot {
+  id: string;
+  bomId: string;
+  status: string;
+  priority?: string;
+  totalEstimatedCost: number;
+  productionQuantity: number;
+  [key: string]: any;
+}
+
 export default function ProjectProductionPlanningPage() {
   const params = useParams();
   const projectId = params.id as string;
-  
+
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -39,15 +49,15 @@ export default function ProjectProductionPlanningPage() {
   });
 
   // Filter lots to only show ones for this project's BOMs
-  const lots = allLots.filter(lot => projectBOMIds.includes(lot.bomId));
+  const lots = allLots.filter((lot: ProductionLot) => projectBOMIds.includes(lot.bomId));
 
-  const { data: dashboardData } = useProductionDashboard();
+  useProductionDashboard(); // kept for potential future use / side-effects
 
   const statusCounts = {
-    planned: lots.filter(lot => lot.status === 'planned').length,
-    in_production: lots.filter(lot => lot.status === 'in_production').length,
-    completed: lots.filter(lot => lot.status === 'completed').length,
-    on_hold: lots.filter(lot => lot.status === 'on_hold').length,
+    planned: lots.filter((lot: ProductionLot) => lot.status === 'planned').length,
+    in_production: lots.filter((lot: ProductionLot) => lot.status === 'in_production').length,
+    completed: lots.filter((lot: ProductionLot) => lot.status === 'completed').length,
+    on_hold: lots.filter((lot: ProductionLot) => lot.status === 'on_hold').length,
   };
 
   return (
@@ -57,7 +67,7 @@ export default function ProjectProductionPlanningPage() {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Link 
+              <Link
                 href={`/projects/${projectId}`}
                 className="flex items-center gap-1 hover:text-foreground transition-colors"
               >
@@ -104,8 +114,8 @@ export default function ProjectProductionPlanningPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Location</p>
                   <p className="text-sm font-semibold">
-                    {project.city && project.state ? `${project.city}, ${project.state}` : 
-                     project.country || 'Not specified'}
+                    {project.city && project.state ? `${project.city}, ${project.state}` :
+                      project.country || 'Not specified'}
                   </p>
                 </div>
               </div>
@@ -161,7 +171,7 @@ export default function ProjectProductionPlanningPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ₹{lots.reduce((sum, lot) => sum + lot.totalEstimatedCost, 0).toLocaleString()}
+                ₹{lots.reduce((sum: number, lot: ProductionLot) => sum + lot.totalEstimatedCost, 0).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
                 Estimated production value
@@ -279,7 +289,7 @@ export default function ProjectProductionPlanningPage() {
                       activeLots: statusCounts.in_production,
                       completedLots: statusCounts.completed,
                       plannedLots: statusCounts.planned,
-                      overallProduction: lots.reduce((sum, lot) => sum + lot.productionQuantity, 0),
+                      overallProduction: lots.reduce((sum: number, lot: ProductionLot) => sum + lot.productionQuantity, 0),
                       averageEfficiency: 85, // Calculate from actual data
                     },
                     lots: lots.slice(0, 5)
@@ -326,8 +336,8 @@ export default function ProjectProductionPlanningPage() {
         />
 
         {/* Workflow Navigation */}
-        <WorkflowNavigation 
-          currentModuleId="production-planning" 
+        <WorkflowNavigation
+          currentModuleId="production-planning"
           projectId={projectId}
         />
       </div>

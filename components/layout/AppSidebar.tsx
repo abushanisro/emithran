@@ -166,7 +166,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 overflow-hidden">
           <Avatar className="h-9 w-9 shrink-0 border border-sidebar-border">
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
               {userInitials}

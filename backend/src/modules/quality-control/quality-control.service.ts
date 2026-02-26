@@ -38,6 +38,27 @@ export class QualityControlService {
       if (error) {
         this.logger.error(`Error fetching quality inspections for project ${projectId}: ${error.message}`);
         
+        // Handle case where tables don't exist yet
+        if (error.message?.includes('does not exist') || 
+            error.message?.includes('relation') || 
+            error.message?.includes('relationship') ||
+            error.code === 'PGRST200') {
+          this.logger.warn('Quality inspections table does not exist yet. Returning empty metrics.');
+          // Return empty metrics when tables don't exist
+          return {
+            totalInspections: 0,
+            completedInspections: 0,
+            passRate: 0,
+            nonConformances: 0,
+            avgInspectionTime: 0,
+            inspectionsThisMonth: 0,
+            failedInspections: 0,
+            completionRate: 0,
+            openNonConformances: 0,
+            lastInspectionDate: null,
+          };
+        }
+        
         if (error.message.includes('row-level security policy')) {
           throw new ForbiddenException('You do not have permission to access quality data for this project.');
         }

@@ -47,10 +47,10 @@ function addSecurityHeaders(response: NextResponse) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64').slice(0, 16)
   response.headers.set('x-nonce', nonce)
 
-  // CSP with CAD engine support (includes Railway CAD engine domain)
+  // CSP with CAD engine support and PDF viewing (includes Railway CAD engine domain)
   const csp = isProduction 
-    ? `default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vercel.live https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app; object-src 'none'; frame-src 'self' https://vercel.live https://*.vercel.live https://*.supabase.co; base-uri 'self'; form-action 'self'`
-    : `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws://localhost:* http://localhost:* http://localhost:5000 https://*.supabase.co wss://*.supabase.co https://*.railway.app; font-src 'self' https://fonts.gstatic.com; frame-src 'self' https://*.supabase.co; object-src 'none'`
+    ? `default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vercel.live https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app; object-src 'self' data: https://*.supabase.co; frame-src 'self' https://vercel.live https://*.vercel.live https://*.supabase.co; base-uri 'self'; form-action 'self'`
+    : `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws://localhost:* http://localhost:* http://localhost:5000 https://*.supabase.co wss://*.supabase.co https://*.railway.app; font-src 'self' https://fonts.gstatic.com; frame-src 'self' https://*.supabase.co; object-src 'self' data: blob: https://*.supabase.co`
   
   response.headers.set('Content-Security-Policy', csp)
 

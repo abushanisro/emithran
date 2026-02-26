@@ -143,7 +143,7 @@ export interface ProductionSummary {
 // API functions
 export const productionPlanningApi = {
   // Production Lots
-  getProductionLots: (filters?: { status?: string; bomId?: string; priority?: string }) =>
+  getProductionLots: (filters?: { status?: string; bomId?: string; priority?: string; projectId?: string }) =>
     apiClient.get('/production-planning/lots', { params: filters }),
 
   getProductionLotById: (id: string) =>

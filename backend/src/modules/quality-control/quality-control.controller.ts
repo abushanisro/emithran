@@ -26,6 +26,10 @@ import {
   QualityInspectionResponseDto,
   InspectionResultDto,
 } from './dto/quality-inspection.dto';
+import {
+  CreateDetailedInspectionReportDto,
+  DetailedInspectionReportResponseDto,
+} from './dto/detailed-inspection-report.dto';
 
 @ApiTags('Quality Control')
 @ApiBearerAuth()
@@ -357,6 +361,72 @@ export class QualityControlController {
       return createResponse(result);
     } catch (error) {
       this.logger.error(`Failed to fetch quality dashboard for project ${projectId}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // DETAILED INSPECTION REPORTS ENDPOINTS
+  // ============================================================================
+
+  @Post('inspections/:id/detailed-report')
+  @ApiOperation({ summary: 'Save or update detailed inspection report' })
+  @ApiResponse({ status: 200, description: 'Report saved successfully', type: DetailedInspectionReportResponseDto })
+  async saveDetailedInspectionReport(
+    @Param('id', ParseUUIDPipe) inspectionId: string,
+    @Body() reportDto: CreateDetailedInspectionReportDto,
+    @CurrentUser() user: User,
+  ): Promise<CustomApiResponse<DetailedInspectionReportResponseDto>> {
+    try {
+      this.logger.log(`Saving detailed inspection report for inspection ${inspectionId}`);
+      const result = await this.qualityInspectionService.saveDetailedInspectionReport(
+        inspectionId,
+        reportDto,
+        this.getUserId(user),
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to save detailed inspection report for ${inspectionId}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  @Get('inspections/:id/detailed-report')
+  @ApiOperation({ summary: 'Get detailed inspection report' })
+  @ApiResponse({ status: 200, description: 'Report retrieved successfully', type: DetailedInspectionReportResponseDto })
+  async getDetailedInspectionReport(
+    @Param('id', ParseUUIDPipe) inspectionId: string,
+    @CurrentUser() user: User,
+  ): Promise<CustomApiResponse<DetailedInspectionReportResponseDto>> {
+    try {
+      this.logger.log(`Fetching detailed inspection report for inspection ${inspectionId}`);
+      const result = await this.qualityInspectionService.getDetailedInspectionReport(
+        inspectionId,
+        this.getUserId(user),
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to fetch detailed inspection report for ${inspectionId}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  @Delete('inspections/:id/detailed-report')
+  @ApiOperation({ summary: 'Delete detailed inspection report' })
+  @ApiResponse({ status: 200, description: 'Report deleted successfully' })
+  async deleteDetailedInspectionReport(
+    @Param('id', ParseUUIDPipe) inspectionId: string,
+    @CurrentUser() user: User,
+  ): Promise<CustomApiResponse<{ deleted: boolean }>> {
+    try {
+      this.logger.log(`Deleting detailed inspection report for inspection ${inspectionId}`);
+      const result = await this.qualityInspectionService.deleteDetailedInspectionReport(
+        inspectionId,
+        this.getUserId(user),
+      );
+      return createResponse(result);
+    } catch (error) {
+      this.logger.error(`Failed to delete detailed inspection report for ${inspectionId}: ${error.message}`, error.stack);
       throw error;
     }
   }
