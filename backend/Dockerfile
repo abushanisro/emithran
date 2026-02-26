@@ -1,8 +1,22 @@
 # Simplified single-stage build for Railway
 FROM node:20-alpine
 
-# Install system dependencies
-RUN apk add --no-cache dumb-init
+# Install system dependencies for native modules
+RUN apk add --no-cache \
+    dumb-init \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    musl-dev \
+    giflib-dev \
+    pixman-dev \
+    pangomm-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    python3 \
+    make \
+    g++ \
+    vips-dev
 
 # Set working directory
 WORKDIR /app
@@ -10,14 +24,19 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --legacy-peer-deps
+# Install dependencies with error handling
+RUN npm ci --legacy-peer-deps --no-audit --no-fund || \
+    (rm -rf node_modules package-lock.json && \
+     npm install --legacy-peer-deps --no-audit --no-fund)
 
 # Copy source code
 COPY . .
 
-# Build application
-RUN npm run build
+# Build application with error handling
+RUN npm run build || (echo "Build failed - checking for common issues..." && \
+    ls -la dist/ && \
+    npm run typecheck && \
+    npm run build)
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
