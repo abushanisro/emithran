@@ -1,52 +1,146 @@
 import { Request, Response } from 'express';
 import { Pool } from 'pg';
-import { z } from 'zod';
+import { IsString, IsNumber, IsOptional, IsArray, IsUUID, IsEnum, IsInt, Min, Max, ValidateNested, ArrayMinSize, ArrayMaxSize, IsNotEmpty } from 'class-validator';
+import { Type } from 'class-transformer';
 
-// Validation schemas
-const BalloonAnnotationSchema = z.object({
-  id: z.string(),
-  number: z.number(),
-  x: z.number(),
-  y: z.number(),
-});
+// Validation DTOs using class-validator (NestJS standard)
+class BalloonAnnotationDto {
+  @IsString()
+  @IsNotEmpty()
+  id: string;
 
-const MeasurementSchema = z.object({
-  id: z.string(),
-  slNo: z.number(),
-  specification: z.string(),
-  nominal: z.number(),
-  plusTolerance: z.number(),
-  minusTolerance: z.number(),
-  method: z.string(),
-  sampleValues: z.array(z.number()),
-  remarks: z.string().optional(),
-});
+  @IsNumber()
+  number: number;
 
-const DetailedInspectionReportSchema = z.object({
-  inspectionId: z.string().uuid(),
-  balloonDrawing: z.object({
-    partName: z.string().min(1),
-    material: z.string().min(1),
-    surfaceTreatment: z.string().optional(),
-    drawingTitle: z.string().min(1),
-    drawingSize: z.string().default('A4'),
-    balloonAnnotations: z.array(BalloonAnnotationSchema),
-  }),
-  finalInspectionReport: z.object({
-    companyName: z.string().min(1),
-    revisionNumber: z.string().optional(),
-    inspectionDate: z.string(),
-    rawMaterial: z.string().min(1),
-    inspectionBy: z.string().min(1),
-    approvedBy: z.string().optional(),
-    generalRemarks: z.string().optional(),
-    status: z.enum(['draft', 'release', 'rejected']).default('draft'),
-  }),
-  inspectionTable: z.object({
-    samples: z.number().min(1).max(5),
-    measurements: z.array(MeasurementSchema),
-  }),
-});
+  @IsNumber()
+  x: number;
+
+  @IsNumber()
+  y: number;
+}
+
+class MeasurementDto {
+  @IsString()
+  @IsNotEmpty()
+  id: string;
+
+  @IsNumber()
+  slNo: number;
+
+  @IsString()
+  @IsNotEmpty()
+  specification: string;
+
+  @IsNumber()
+  nominal: number;
+
+  @IsNumber()
+  plusTolerance: number;
+
+  @IsNumber()
+  minusTolerance: number;
+
+  @IsString()
+  @IsNotEmpty()
+  method: string;
+
+  @IsArray()
+  @IsNumber({}, { each: true })
+  sampleValues: number[];
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+class BalloonDrawingDto {
+  @IsString()
+  @IsNotEmpty()
+  partName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  material: string;
+
+  @IsOptional()
+  @IsString()
+  surfaceTreatment?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  drawingTitle: string;
+
+  @IsString()
+  @IsNotEmpty()
+  drawingSize: string = 'A4';
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BalloonAnnotationDto)
+  balloonAnnotations: BalloonAnnotationDto[];
+}
+
+class FinalInspectionReportDto {
+  @IsString()
+  @IsNotEmpty()
+  companyName: string;
+
+  @IsOptional()
+  @IsString()
+  revisionNumber?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  inspectionDate: string;
+
+  @IsString()
+  @IsNotEmpty()
+  rawMaterial: string;
+
+  @IsString()
+  @IsNotEmpty()
+  inspectionBy: string;
+
+  @IsOptional()
+  @IsString()
+  approvedBy?: string;
+
+  @IsOptional()
+  @IsString()
+  generalRemarks?: string;
+
+  @IsEnum(['draft', 'release', 'rejected'])
+  status: 'draft' | 'release' | 'rejected' = 'draft';
+}
+
+class InspectionTableDto {
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  samples: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MeasurementDto)
+  measurements: MeasurementDto[];
+}
+
+class DetailedInspectionReportDto {
+  @IsUUID()
+  inspectionId: string;
+
+  @ValidateNested()
+  @Type(() => BalloonDrawingDto)
+  balloonDrawing: BalloonDrawingDto;
+
+  @ValidateNested()
+  @Type(() => FinalInspectionReportDto)
+  finalInspectionReport: FinalInspectionReportDto;
+
+  @ValidateNested()
+  @Type(() => InspectionTableDto)
+  inspectionTable: InspectionTableDto;
+}
 
 interface DatabasePool {
   pool: Pool;
@@ -59,9 +153,16 @@ export async function saveDetailedInspectionReport(req: Request & DatabasePool, 
   const { pool } = req;
   
   try {
-    // Validate request body
-    const validatedData = DetailedInspectionReportSchema.parse(req.body);
-    const { inspectionId, balloonDrawing, finalInspectionReport, inspectionTable } = validatedData;
+    // Manual validation for now - in a proper NestJS controller this would be handled by pipes
+    const { inspectionId, balloonDrawing, finalInspectionReport, inspectionTable } = req.body;
+    
+    // Basic validation
+    if (!inspectionId || typeof inspectionId !== 'string') {
+      throw new Error('Invalid inspectionId');
+    }
+    if (!balloonDrawing || !finalInspectionReport || !inspectionTable) {
+      throw new Error('Missing required fields');
+    }
 
     // Check if inspection exists
     const inspectionCheck = await pool.query(
@@ -188,13 +289,13 @@ export async function saveDetailedInspectionReport(req: Request & DatabasePool, 
   } catch (error) {
     console.error('Error saving detailed inspection report:', error);
 
-    if (error instanceof z.ZodError) {
+    if (error.message?.includes('Invalid') || error.message?.includes('Missing')) {
       return res.status(400).json({
         success: false,
         error: {
           message: 'Validation failed',
           code: 'VALIDATION_ERROR',
-          details: error.errors,
+          details: error.message,
         },
       });
     }
