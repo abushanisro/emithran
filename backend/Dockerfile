@@ -28,10 +28,11 @@ RUN npm install -g node-gyp
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with Sharp pre-configuration for Alpine
-RUN npm config set sharp_binary_host "https://github.com/lovell/sharp-libvips/releases/download" && \
-    npm config set sharp_libvips_binary_host "https://github.com/lovell/sharp-libvips/releases/download" && \
-    npm ci --legacy-peer-deps --no-audit --no-fund || \
+# Install dependencies with Sharp environment variables for Alpine
+ENV npm_config_sharp_binary_host="https://github.com/lovell/sharp-libvips/releases/download" \
+    npm_config_sharp_libvips_binary_host="https://github.com/lovell/sharp-libvips/releases/download"
+
+RUN npm ci --legacy-peer-deps --no-audit --no-fund || \
     (rm -rf node_modules package-lock.json && \
      npm install --legacy-peer-deps --no-audit --no-fund) || \
     (npm install --legacy-peer-deps --no-audit --no-fund --build-from-source)
