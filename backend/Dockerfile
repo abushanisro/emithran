@@ -16,18 +16,26 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    vips-dev
+    vips-dev \
+    pkgconfig \
+    nodejs-npm
 
 # Set working directory
 WORKDIR /app
 
+# Install node-gyp globally for native modules
+RUN npm install -g node-gyp
+
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with error handling
-RUN npm ci --legacy-peer-deps --no-audit --no-fund || \
+# Install dependencies with Sharp pre-configuration for Alpine
+RUN npm config set sharp_binary_host "https://github.com/lovell/sharp-libvips/releases/download" && \
+    npm config set sharp_libvips_binary_host "https://github.com/lovell/sharp-libvips/releases/download" && \
+    npm ci --legacy-peer-deps --no-audit --no-fund || \
     (rm -rf node_modules package-lock.json && \
-     npm install --legacy-peer-deps --no-audit --no-fund)
+     npm install --legacy-peer-deps --no-audit --no-fund) || \
+    (npm install --legacy-peer-deps --no-audit --no-fund --build-from-source)
 
 # Copy source code
 COPY . .
