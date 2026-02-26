@@ -17,8 +17,7 @@ RUN apk add --no-cache \
     make \
     g++ \
     vips-dev \
-    pkgconfig \
-    nodejs-npm
+    pkgconfig
 
 # Set working directory
 WORKDIR /app
