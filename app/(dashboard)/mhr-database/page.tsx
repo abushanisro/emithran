@@ -17,7 +17,6 @@ import {
 import { Plus, Search, FileDown, FileText, Edit, Trash2, Calculator } from 'lucide-react';
 import { useMHRRecords, useDeleteMHR } from '@/lib/api/hooks';
 import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
-import { CostByLocationAnalytics } from '@/components/features/mhr/CostByLocationAnalytics';
 import { formatCurrency } from '@/lib/utils';
 import { exportMHRToPDF } from '@/lib/utils/exportMHRToPDF';
 import { getCommodityLabel } from '@/lib/constants/commodityPresets';
@@ -204,10 +203,6 @@ export default function MHRDatabasePage() {
         </div>
       )}
 
-      {/* Cost Analytics by Location */}
-      {data && data.records.length > 0 && (
-        <CostByLocationAnalytics records={data.records} />
-      )}
 
       {/* MHR Records Table */}
       <Card>

@@ -32,7 +32,7 @@ export function proxy(request: NextRequest) {
 
 
   // Add comprehensive security headers
-  addSecurityHeaders(response)
+  addSecurityHeaders(response, request)
 
   // Add performance and monitoring headers
   addMonitoringHeaders(response, request, startTime)
@@ -40,17 +40,17 @@ export function proxy(request: NextRequest) {
   return response
 }
 
-function addSecurityHeaders(response: NextResponse) {
+function addSecurityHeaders(response: NextResponse, request: NextRequest) {
   const isProduction = process.env.NODE_ENV === 'production'
   
   // Generate nonce for CSP
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64').slice(0, 16)
   response.headers.set('x-nonce', nonce)
 
-  // CSP with CAD engine support and PDF viewing (includes Railway CAD engine domain)
+  // CSP with QC module support for PDF viewing, iframes, and file uploads
   const csp = isProduction 
-    ? `default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vercel.live https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app; object-src 'self' data: https://*.supabase.co; frame-src 'self' https://vercel.live https://*.vercel.live https://*.supabase.co; base-uri 'self'; form-action 'self'`
-    : `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws://localhost:* http://localhost:* http://localhost:5000 https://*.supabase.co wss://*.supabase.co https://*.railway.app; font-src 'self' https://fonts.gstatic.com; frame-src 'self' https://*.supabase.co; object-src 'self' data: blob: https://*.supabase.co`
+    ? `default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vercel.live https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app; object-src 'self' data: blob: https://*.supabase.co; frame-src 'self' data: blob: https://vercel.live https://*.vercel.live https://*.supabase.co https://*.railway.app; media-src 'self' data: blob: https:; child-src 'self' data: blob:; base-uri 'self'; form-action 'self'`
+    : `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws://localhost:* http://localhost:* http://localhost:4000 http://localhost:5000 https://*.supabase.co wss://*.supabase.co https://*.railway.app; font-src 'self' https://fonts.gstatic.com; frame-src 'self' data: blob: https://*.supabase.co; object-src 'self' data: blob: https://*.supabase.co; media-src 'self' data: blob: https:; child-src 'self' data: blob:`
   
   response.headers.set('Content-Security-Policy', csp)
 
@@ -58,12 +58,24 @@ function addSecurityHeaders(response: NextResponse) {
   response.headers.set('X-Content-Type-Options', 'nosniff')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   response.headers.set('X-DNS-Prefetch-Control', 'on')
-  response.headers.set('Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(), fullscreen=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()')
+  
+  // Special permissions for QC module (PDF viewing, file uploads, etc.)
+  const isQCRoute = request.nextUrl.pathname.includes('/quality-control')
+  const permissionsPolicy = isQCRoute
+    ? 'camera=(), microphone=(), geolocation=(), fullscreen=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), clipboard-read=(self), clipboard-write=(self)'
+    : 'camera=(), microphone=(), geolocation=(), fullscreen=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()'
+  
+  response.headers.set('Permissions-Policy', permissionsPolicy)
 
   // Remove server fingerprinting
   response.headers.delete('X-Powered-By')
   response.headers.set('Server', '')
+  
+  // Allow cross-origin isolation for QC module
+  if (isQCRoute) {
+    response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless')
+    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
+  }
 
   // HSTS in production only
   if (isProduction) {

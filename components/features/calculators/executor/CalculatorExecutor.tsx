@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, ArrowLeft, Play, AlertCircle } from 'lucide-react';
+import { Calculator, ArrowLeft, Play, AlertCircle, Table2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,23 @@ type CalculatorExecutorProps = {
 
 type FieldValues = Record<string, string | number | null>;
 
+// Reference table field names that trigger a lookup table display
+const REFERENCE_TABLE_FIELDS = [
+  'fromViscosity',
+  'fromCavityPressure',
+  'fromCavitiesRecommendation',
+  'fromRunnerDia',
+];
+
+type ReferenceTableData = {
+  fieldName: string;
+  fieldLabel: string;
+  tableName: string;
+  tableId: string;
+  column_definitions: Array<{ name: string; label: string; unit?: string; type: string }>;
+  rows: Array<Record<string, any>>;
+};
+
 export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
   const router = useRouter();
   const { data: calculator, isLoading, error } = useCalculator(calculatorId);
@@ -25,6 +42,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
   const [fieldValues, setFieldValues] = useState<FieldValues>({});
   const [results, setResults] = useState<Record<string, any> | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
+  const [lookupTables, setLookupTables] = useState<ReferenceTableData[]>([]);
 
   // Initialize field values when calculator loads
   useEffect(() => {
@@ -37,14 +55,144 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
         }
       });
       setFieldValues(initialValues);
+      
+      // Also fetch lookup tables immediately for display
+      fetchLookupTables();
     }
   }, [calculator]);
+
+  // Fetch reference tables for database_lookup fields after process
+  const fetchLookupTables = async () => {
+    if (!calculator?.fields) {
+      return;
+    }
+    
+    // If no associatedProcessId, try to fetch tables directly by field IDs
+    if (!calculator.associatedProcessId) {
+      const directTables: ReferenceTableData[] = [];
+      
+      for (const field of calculator.fields) {
+        if (field.fieldType === 'database_lookup' && 
+            field.dataSource === 'processes' && 
+            field.sourceField?.startsWith('from_')) {
+          const tableId = field.sourceField.replace('from_', '');
+          
+          try {
+            const { processesApi } = await import('@/lib/api/processes');
+            const table = await processesApi.getReferenceTable(tableId);
+            if (table) {
+              const processedRows = table.rows?.map((row) => {
+                // Handle different data structures
+                if (row.rowData) {
+                  return row.rowData;
+                }
+                // If no rowData property, the row might be the data itself
+                return row;
+              }) || [];
+              
+              directTables.push({
+                fieldName: field.fieldName,
+                fieldLabel: field.displayLabel || field.fieldName,
+                tableName: table.tableName,
+                tableId: table.id,
+                column_definitions: table.columnDefinitions || [],
+                rows: processedRows
+              });
+            }
+          } catch (error) {
+            console.error('Failed to fetch table directly:', error);
+          }
+        }
+      }
+      
+      if (directTables.length > 0) {
+        setLookupTables(directTables);
+        return;
+      } else {
+        return;
+      }
+    }
+
+    const refTableFields = calculator.fields.filter(
+      (f) =>
+        f.fieldType === 'database_lookup' &&
+        f.dataSource === 'processes' &&
+        f.sourceField &&
+        (REFERENCE_TABLE_FIELDS.includes(f.sourceField) || f.sourceField.startsWith('from_'))
+    );
+
+    if (refTableFields.length === 0) {
+      return;
+    }
+
+    try {
+      const { apiClient } = await import('@/lib/api/client');
+
+      // Step 1: Resolve associatedProcessId (string slug) to UUID
+      const processesResponse = await apiClient.get('/processes');
+      const processes = (processesResponse as any).processes || [];
+
+      const matchingProcess = processes.find((p: any) =>
+        p.processName?.toLowerCase().replace(/\s+/g, '-') === calculator.associatedProcessId
+      );
+
+      if (!matchingProcess) return;
+
+      // Step 2: Fetch reference tables for this process
+      const response: any = await apiClient.get(`/processes/${matchingProcess.id}/reference-tables`);
+      const allTables: any[] = response.tables || [];
+
+      // Step 3: Match each refTable field to its reference table by name or ID
+      const tableFieldNameMap: Record<string, string> = {
+        fromViscosity: 'material viscosity',
+        fromCavityPressure: 'cavity pressure',
+        fromCavitiesRecommendation: 'cavities recommendation',
+        fromRunnerDia: 'runner diameter',
+      };
+
+      const matched: ReferenceTableData[] = [];
+
+      for (const field of refTableFields) {
+        if (!field.sourceField) continue;
+        
+        let matchedTable;
+        
+        // Handle dynamic from_ fields by extracting table ID
+        if (field.sourceField.startsWith('from_')) {
+          const tableId = field.sourceField.replace('from_', '');
+          matchedTable = allTables.find((t: any) => t.id === tableId);
+        } else {
+          // Handle legacy hardcoded field names
+          const keyword = tableFieldNameMap[field.sourceField] || '';
+          matchedTable = allTables.find((t: any) =>
+            t.table_name?.toLowerCase().includes(keyword.toLowerCase())
+          );
+        }
+
+        if (matchedTable) {
+          matched.push({
+            fieldName: field.fieldName,
+            fieldLabel: field.displayLabel || field.fieldName,
+            tableName: matchedTable.table_name,
+            tableId: matchedTable.id,
+            column_definitions: matchedTable.column_definitions || [],
+            rows: matchedTable.rows || [],
+          });
+        }
+      }
+
+      setLookupTables(matched);
+    } catch (err) {
+      console.error('Failed to fetch lookup tables:', err);
+    }
+  };
 
   const handleExecute = async () => {
     if (!calculator) return;
 
-    // Clear previous errors
+    // Clear previous errors and lookup tables
     setExecutionError(null);
+    setLookupTables([]);
 
     try {
       const result = await executeCalculatorMutation.mutateAsync({
@@ -54,6 +202,9 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
 
       if (result.success) {
         setResults(result.results);
+
+        // Fetch lookup tables to display below results
+        await fetchLookupTables();
 
         // Check if any calculations failed
         const hasErrors = Object.values(result.results).some(
@@ -154,7 +305,12 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {calculator.fields
-            ?.filter((field) => field.fieldType !== 'calculated')
+            ?.filter((field) => 
+              field.fieldType !== 'calculated' && 
+              !(field.fieldType === 'database_lookup' && 
+                field.dataSource === 'processes' && 
+                field.sourceField?.startsWith('from_'))
+            )
             .map((field) => (
               <div key={field.id} className="space-y-2">
                 <Label htmlFor={field.fieldName}>
@@ -286,6 +442,87 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Lookup Tables - shown when reference table fields exist */}
+      {lookupTables.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Table2 className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Reference Lookup Tables</h2>
+          </div>
+          {lookupTables.map((table) => (
+            <Card key={table.tableId} className="border-primary/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <span>{table.tableName}</span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    (used by: {table.fieldLabel})
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {table.rows.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-muted/60">
+                          <th className="border border-border text-center text-xs font-medium py-2 px-2 text-muted-foreground w-8">
+                            #
+                          </th>
+                          {table.column_definitions.map((col) => (
+                            <th
+                              key={col.name}
+                              className="border border-border text-left text-xs font-semibold py-2 px-3 text-foreground"
+                            >
+                              {col.label}
+                              {col.unit && (
+                                <span className="text-primary/70 ml-1">({col.unit})</span>
+                              )}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {table.rows.map((row, rowIndex) => (
+                          <tr
+                            key={rowIndex}
+                            className="hover:bg-primary/5 transition-colors"
+                          >
+                            <td className="border border-border text-center text-xs py-1.5 px-2 text-muted-foreground font-mono bg-muted/20">
+                              {rowIndex + 1}
+                            </td>
+                            {table.column_definitions.map((col) => {
+                              // Handle column name mismatch (snake_case vs camelCase)
+                              const camelCaseKey = col.name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+                              const value = row[col.name] || row[camelCaseKey];
+                              
+                              return (
+                                <td
+                                  key={col.name}
+                                  className="border border-border py-1.5 px-3 text-sm"
+                                >
+                                  {value !== undefined && value !== null
+                                    ? String(value)
+                                    : '—'}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <p className="text-sm">No rows in this table.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
     </div>
   );
 }

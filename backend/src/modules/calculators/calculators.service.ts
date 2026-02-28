@@ -157,6 +157,7 @@ export class CalculatorsServiceV2 {
         is_public: dto.isPublic || false,
         template_category: dto.templateCategory,
         display_config: dto.displayConfig || {},
+        associated_process_id: dto.associatedProcessId,
         version: 1,
       })
       .select()
@@ -277,6 +278,7 @@ export class CalculatorsServiceV2 {
     if (dto.isPublic !== undefined) updateData.is_public = dto.isPublic;
     if (dto.templateCategory !== undefined) updateData.template_category = dto.templateCategory;
     if (dto.displayConfig !== undefined) updateData.display_config = dto.displayConfig;
+    if (dto.associatedProcessId !== undefined) updateData.associated_process_id = dto.associatedProcessId;
 
     // Increment version for optimistic locking
     updateData.version = (existing.version || 1) + 1;

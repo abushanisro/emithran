@@ -47,6 +47,8 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { InlineReferenceTableEditor } from '@/components/features/calculators/builder/InlineReferenceTableEditor';
+import { useAuth } from '@/lib/providers/auth';
 
 // Helper function to convert snake_case to camelCase
 const snakeToCamel = (str: string): string => {
@@ -72,6 +74,7 @@ const getRowValue = (row: any, columnName: string): any => {
 
 export default function ProcessPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [editingTableId, setEditingTableId] = useState<string | null>(null);
   const [editedTableData, setEditedTableData] = useState<Record<string, any[]>>({});
@@ -91,10 +94,14 @@ export default function ProcessPage() {
   const [filterProcessRoute, setFilterProcessRoute] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-// State for lookup table modal
+  // State for lookup table modal
   const [isLookupTableModalOpen, setIsLookupTableModalOpen] = useState(false);
   const [modalProcessId, setModalProcessId] = useState<string | null>(null);
   const [modalProcessName, setModalProcessName] = useState<string>('');
+
+  const [inlineEditorTables, setInlineEditorTables] = useState<any[]>([]);
+  const [expandedTableId, setExpandedTableId] = useState<string | null>(null);
+  const [showAddTableEditor, setShowAddTableEditor] = useState(false);
 
   // Reset process route filter when process group changes
   const handleProcessGroupChange = (value: string) => {
@@ -104,14 +111,14 @@ export default function ProcessPage() {
     }
   };
 
-// Fetch processes from database
+  // Fetch processes from database
   const { data: processesData, isLoading: processesLoading, error: processesError } = useProcesses();
 
   // Fetch reference tables for selected process (from old functionality)
   const { data: referenceTables, isLoading: loadingTables } = useReferenceTables(selectedProcessId || undefined);
 
-// Fetch reference tables for modal process (only if modalProcessId is a valid UUID)
-  const { data: modalReferenceTables, isLoading: loadingModalTables } = useReferenceTables(
+  // Fetch reference tables for modal process (only if modalProcessId is a valid UUID)
+  const { data: modalReferenceTables, isLoading: loadingModalTables, refetch: refetchModalTables } = useReferenceTables(
     modalProcessId && modalProcessId !== 'test' ? modalProcessId : undefined
   );
 
@@ -124,7 +131,8 @@ export default function ProcessPage() {
   });
   const { data: hierarchy } = useProcessHierarchy();
 
-// Bulk update mutation
+
+  // Bulk update mutation
   const bulkUpdateMutation = useBulkUpdateTableRows();
 
   // Calculator mapping mutations
@@ -132,7 +140,7 @@ export default function ProcessPage() {
   const updateMappingMutation = useUpdateProcessCalculatorMapping();
   const deleteMappingMutation = useDeleteProcessCalculatorMapping();
 
-const handleEditTable = (tableId: string) => {
+  const handleEditTable = (tableId: string) => {
     setEditingTableId(tableId);
     // Initialize edited data with current table rows
     const table = referenceTables?.find(t => t.id === tableId);
@@ -487,6 +495,24 @@ const handleEditTable = (tableId: string) => {
     );
   };
 
+  // Show loading spinner during auth initialization
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated
+  if (!user) {
+    router.push('/auth/login');
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -523,178 +549,144 @@ const handleEditTable = (tableId: string) => {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Filters */}
-            <div className="flex flex-wrap gap-4 mb-6">
-              <div className="flex-1 min-w-[200px]">
-                <Label htmlFor="filter-group" className="text-xs mb-1">Process Group</Label>
-                <Select value={filterProcessGroup} onValueChange={handleProcessGroupChange}>
-                  <SelectTrigger id="filter-group" className="h-9">
-                    <SelectValue placeholder="All Groups" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Groups</SelectItem>
-                    {hierarchy?.processGroups.map((group) => (
-                      <SelectItem key={group} value={group}>
-                        {group}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* Search bar */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="filter-search"
+                  placeholder="Search groups, routes or operations..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9"
+                />
               </div>
-              <div className="flex-1 min-w-[200px]">
-                <Label htmlFor="filter-route" className="text-xs mb-1">Process Route</Label>
-                <Select
-                  value={filterProcessRoute}
-                  onValueChange={setFilterProcessRoute}
-                  disabled={!filterProcessGroup || filterProcessGroup === 'all'}
-                >
-                  <SelectTrigger id="filter-route" className="h-9">
-                    <SelectValue placeholder="All Routes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Routes</SelectItem>
-                    {hierarchy?.processRoutes
-                      .filter((route) => {
-                        if (!filterProcessGroup || filterProcessGroup === 'all') return true;
-                        return calculatorMappings?.mappings.some(
-                          (m) => m.processGroup === filterProcessGroup && m.processRoute === route
-                        );
-                      })
-                      .map((route) => (
-                        <SelectItem key={route} value={route}>
-                          {route}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <Label htmlFor="filter-search" className="text-xs mb-1">Search</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="filter-search"
-                    placeholder="Search operations or calculators..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-9"
-                  />
-                </div>
-              </div>
-              {((filterProcessGroup && filterProcessGroup !== 'all') ||
-                (filterProcessRoute && filterProcessRoute !== 'all') ||
-                searchQuery) && (
-                  <div className="flex items-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setFilterProcessGroup('all');
-                        setFilterProcessRoute('all');
-                        setSearchQuery('');
-                      }}
-                      className="h-9"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Clear Filters
-                    </Button>
-                  </div>
-                )}
+              {searchQuery && (
+                <Button variant="ghost" size="sm" onClick={() => setSearchQuery('')} className="h-9">
+                  <X className="h-4 w-4 mr-1" /> Clear
+                </Button>
+              )}
+              {calculatorMappings && (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {calculatorMappings.mappings.length} operations ·{' '}
+                  {Object.keys(calculatorMappings.mappings.reduce((g: any, m) => { g[m.processGroup] = true; return g; }, {})).length} groups
+                </span>
+              )}
             </div>
+            {/* GROUPED TREE VIEW */}
             {loadingMappings ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Loading calculator mappings...</span>
+                <span className="ml-2 text-muted-foreground">Loading...</span>
               </div>
-            ) : (
-              <>
-                {calculatorMappings && calculatorMappings.mappings.length > 0 && (
-                  <div className="text-sm text-muted-foreground mb-4">
-                    Showing <span className="font-semibold text-foreground">{calculatorMappings.mappings.length}</span> of{' '}
-                    <span className="font-semibold text-foreground">{calculatorMappings.count}</span> mappings
-                  </div>
-                )}
-                <div className="overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Process Group</TableHead>
-                        <TableHead>Process Route</TableHead>
-                        <TableHead>Operations</TableHead>
-                        <TableHead>Process Calculator</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {calculatorMappings?.mappings.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
-                            No calculator mappings found. Add one to get started.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        calculatorMappings?.mappings.map((mapping) => {
-                          const handleProcessRouteClick = () => {
-                            // Find the process by name (processRoute)
-                            const processes = processesData?.processes || [];
-                            const process = processes.find(
-                              p => p.processName === mapping.processRoute
-                            );
-                            
-                            if (process) {
-                              setModalProcessId(process.id);
-                              setModalProcessName(process.processName);
-                              setIsLookupTableModalOpen(true);
-                            } else {
-                              // Process not found - show user-friendly message
-                              const processes = processesData?.processes || [];
-                              toast.error(`Process "${mapping.processRoute}" not found. Please update the calculator mapping to use one of: ${processes.map(p => p.processName).join(', ')}`);
-                            }
-                          };
+            ) : (() => {
+              const allMappings = calculatorMappings?.mappings ?? [];
+              const q = searchQuery.toLowerCase();
+              const filtered = q
+                ? allMappings.filter(m =>
+                  m.processGroup.toLowerCase().includes(q) ||
+                  m.processRoute.toLowerCase().includes(q) ||
+                  m.operation.toLowerCase().includes(q)
+                )
+                : allMappings;
 
-                          return (
-                            <TableRow key={mapping.id}>
-                              <TableCell className="font-medium">{mapping.processGroup}</TableCell>
-                              <TableCell 
-                                className="cursor-pointer hover:bg-muted/50 transition-colors font-medium text-primary hover:text-primary/80"
-                                onClick={handleProcessRouteClick}
-                                title="Click to view reference tables"
-                              >
-                                {mapping.processRoute}
-                              </TableCell>
-                              <TableCell>{mapping.operation}</TableCell>
-                              <TableCell>
-                                <Badge variant="secondary">{mapping.calculatorName || 'NA'}</Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex gap-2 justify-end">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleEditMapping(mapping)}
-                                    className="h-8 w-8"
+              const grouped: Record<string, Record<string, typeof allMappings>> = {};
+              for (const m of filtered) {
+                if (!grouped[m.processGroup]) grouped[m.processGroup] = {};
+                if (!grouped[m.processGroup][m.processRoute]) grouped[m.processGroup][m.processRoute] = [];
+                grouped[m.processGroup][m.processRoute].push(m);
+              }
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p className="font-medium">No mappings found</p>
+                    <p className="text-sm mt-1">Try a different search or add a new mapping</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-2">
+                  {Object.entries(grouped).map(([group, routes]) => (
+                    <div key={group} className="border border-border rounded-lg overflow-hidden">
+                      {/* Process Group header */}
+                      <div className="px-4 py-2.5 bg-secondary/50 border-b border-border flex items-center justify-between">
+                        <h3 className="font-semibold text-sm text-foreground">{group}</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {Object.values(routes).flat().length} ops · {Object.keys(routes).length} routes
+                        </Badge>
+                      </div>
+                      {/* Process Routes */}
+                      <div className="divide-y divide-border/40">
+                        {Object.entries(routes).map(([route, ops]) => (
+                          <div key={route} className="px-4 py-2 flex items-start gap-4 hover:bg-secondary/10 transition-colors">
+                            {/* Route — clickable to open reference tables modal */}
+                            <button
+                              className="text-sm font-medium text-primary hover:underline w-44 shrink-0 text-left pt-0.5"
+                              title="Click to view / edit reference tables"
+                              onClick={() => {
+                                const processes = processesData?.processes || [];
+                                let process = processes.find(p => p.processName === route);
+                                if (!process) process = processes.find(p => p.processName.toLowerCase() === route.toLowerCase());
+                                setModalProcessId(process?.id ?? null);
+                                setModalProcessName(route);
+                                setInlineEditorTables([]);
+                                setShowAddTableEditor(false);
+                                setExpandedTableId(null);
+                                setIsLookupTableModalOpen(true);
+                              }}
+                            >
+                              {route}
+                            </button>
+                            {/* Operations as pill chips */}
+                            <div className="flex flex-wrap gap-1.5 flex-1">
+                              {ops.map((op) => (
+                                <div
+                                  key={op.id}
+                                  className="flex items-center gap-1 bg-secondary/40 border border-border rounded-full px-2.5 py-0.5 group"
+                                >
+                                  <span className="text-xs text-foreground">{op.operation}</span>
+                                  <button
+                                    className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary flex items-center justify-center"
+                                    onClick={() => {
+                                      router.push(`/calculators?processGroup=${encodeURIComponent(op.processGroup)}&processRoute=${encodeURIComponent(op.processRoute)}&operation=${encodeURIComponent(op.operation)}`);
+                                    }}
+                                    title="View Calculators"
                                   >
-                                    <Edit2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDeleteMapping(mapping.id)}
-                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5">
+                                      <rect x="4" y="3" width="16" height="2" rx="1"/>
+                                      <rect x="4" y="7" width="16" height="2" rx="1"/>
+                                      <rect x="4" y="11" width="16" height="2" rx="1"/>
+                                      <rect x="4" y="15" width="16" height="2" rx="1"/>
+                                      <rect x="4" y="19" width="16" height="2" rx="1"/>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground flex items-center justify-center"
+                                    onClick={() => handleEditMapping(op)}
+                                    title="Edit"
                                   >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                    <Edit2 className="h-2.5 w-2.5" />
+                                  </button>
+                                  <button
+                                    className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive flex items-center justify-center"
+                                    onClick={() => handleDeleteMapping(op.id)}
+                                    title="Delete"
+                                  >
+                                    <X className="h-2.5 w-2.5" />
+                                  </button>
                                 </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
 
@@ -706,13 +698,13 @@ const handleEditTable = (tableId: string) => {
             </CardContent>
           </Card>
         )}
-        
+
         {processesError && (
           <Card className="border-red-200 bg-red-50">
             <CardContent className="p-4">
               <p className="text-red-800">Error loading processes: {processesError.message}</p>
               <p className="text-sm text-red-600 mt-2">
-                This page loads general manufacturing processes. If you're looking for production lot processes, 
+                This page loads general manufacturing processes. If you're looking for production lot processes,
                 navigate to a specific production lot instead.
               </p>
             </CardContent>
@@ -784,17 +776,7 @@ const handleEditTable = (tableId: string) => {
                 placeholder="e.g., Injection Molding-Cold Runner"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="calculatorName">Calculator Name</Label>
-              <Input
-                id="calculatorName"
-                value={mappingFormData.calculatorName}
-                onChange={(e) =>
-                  setMappingFormData({ ...mappingFormData, calculatorName: e.target.value })
-                }
-                placeholder="e.g., Tonnage Calculator"
-              />
-            </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddMappingDialogOpen(false)}>
@@ -821,7 +803,7 @@ const handleEditTable = (tableId: string) => {
 
       {/* LOOKUP TABLE MODAL - ENHANCED FOR CALCULATOR REFERENCE */}
       <Dialog open={isLookupTableModalOpen} onOpenChange={setIsLookupTableModalOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-[95vw] max-h-[90vh] flex flex-col">
           <DialogHeader className="pb-4 border-b">
             <DialogTitle className="flex items-center gap-3 text-xl">
               <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
@@ -836,8 +818,8 @@ const handleEditTable = (tableId: string) => {
               Lookup tables and reference data for calculator creation and process planning
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="flex-1 overflow-hidden flex flex-col">
+
+          <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
             {loadingModalTables ? (
               <div className="flex items-center justify-center py-16">
                 <div className="text-center">
@@ -846,126 +828,143 @@ const handleEditTable = (tableId: string) => {
                   <p className="text-muted-foreground">Fetching lookup tables for {modalProcessName}...</p>
                 </div>
               </div>
-            ) : modalReferenceTables && modalReferenceTables.length > 0 ? (
-              <div className="flex-1 overflow-auto">
-                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <h4 className="font-semibold text-blue-900 dark:text-blue-100">Calculator Reference Guide</h4>
-                  </div>
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    Use these lookup tables as reference data when creating calculators for {modalProcessName}. 
-                    You can copy values, formulas, and ranges to build accurate calculation logic.
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6 pb-4">
-                  {modalReferenceTables.map((table, index) => (
-                    <div key={table.id} className="border rounded-lg overflow-hidden bg-card">
-                      <div className="bg-muted/30 px-4 py-3 border-b">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-semibold text-lg">{table.tableName}</h3>
-                            {table.tableDescription && (
-                              <p className="text-sm text-muted-foreground mt-1">{table.tableDescription}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">
-                              Table {index + 1}
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                // Copy table data to clipboard for calculator use
-                                const tableData = table.rows?.map(row => {
-                                  const data = (row as any).row_data || row.rowData || row;
-                                  return data;
-                                }) || [];
-                                navigator.clipboard.writeText(JSON.stringify(tableData, null, 2));
-                                toast?.success?.('Table data copied to clipboard');
-                              }}
-                            >
-                              Copy Data
-                            </Button>
-                          </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {/* Saved tables list */}
+                {modalReferenceTables && modalReferenceTables.length > 0 ? (
+                  modalReferenceTables.map((table) => (
+                    <div key={table.id} className="border border-border rounded-lg bg-card overflow-hidden">
+                      {/* Table header card */}
+                      <div
+                        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-secondary/30 transition-colors"
+                        onClick={() => setExpandedTableId(expandedTableId === table.id ? null : table.id)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground">{table.tableName}</h3>
+                          {table.tableDescription && (
+                            <p className="text-sm text-muted-foreground mt-0.5">{table.tableDescription}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 ml-4 shrink-0">
+                          <Badge variant="outline" className="text-xs">
+                            {table.rows?.length ?? 0} rows
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => { e.stopPropagation(); setExpandedTableId(expandedTableId === table.id ? null : table.id); }}
+                          >
+                            {expandedTableId === table.id ? 'Collapse' : 'View / Edit'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            title="Delete table"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm(`Delete "${table.tableName}"? This cannot be undone.`)) return;
+                              try {
+                                const { apiClient } = await import('@/lib/api/client');
+                                await apiClient.delete(`/processes/reference-tables/${table.id}`);
+                                toast.success(`"${table.tableName}" deleted`);
+                                if (expandedTableId === table.id) setExpandedTableId(null);
+                                refetchModalTables();
+                              } catch (err) {
+                                toast.error('Failed to delete table');
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
-                      
-                      <div className="p-4">
-                        {renderEditableTable(table)}
-                      </div>
+                      {/* Expanded editable table */}
+                      {expandedTableId === table.id && (
+                        <div className="border-t border-border bg-background/50 p-4">
+                          {renderEditableTable(table)}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center max-w-md">
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-muted/50 flex items-center justify-center">
-                    <Database className="h-10 w-10 text-muted-foreground" />
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p className="font-medium">No reference tables yet</p>
+                    <p className="text-sm mt-1">Click "Add New Table" below to create one</p>
                   </div>
-                  <h3 className="text-xl font-semibold mb-3">No Reference Tables Found</h3>
-                  <p className="text-muted-foreground mb-6 leading-relaxed">
-                    No lookup tables have been configured for <span className="font-semibold">{modalProcessName}</span> yet. 
-                    Reference tables help provide standardized data for calculator creation.
-                  </p>
-                  
-                  <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg p-6 text-left">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                      <h4 className="font-semibold text-amber-900 dark:text-amber-100">What are Reference Tables?</h4>
-                    </div>
-                    <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-2">
-                      <li>• <strong>Material Properties:</strong> Density, strength, melting points</li>
-                      <li>• <strong>Process Parameters:</strong> Speeds, feeds, temperatures</li>
-                      <li>• <strong>Dimensional Standards:</strong> Tolerances, clearances</li>
-                      <li>• <strong>Cost Factors:</strong> Tool life, cycle times, setup costs</li>
-                    </ul>
-                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-4 italic">
-                      These tables can be added via the database and will appear here for calculator reference.
-                    </p>
+                )}
+
+                {/* Add new table section */}
+                {showAddTableEditor ? (
+                  <div className="border border-primary/30 rounded-lg mt-4">
+                    <InlineReferenceTableEditor
+                      processId={modalProcessId || ''}
+                      processName={modalProcessName}
+                      tables={inlineEditorTables}
+                      onTablesChange={setInlineEditorTables}
+                      onViewTables={() => setShowAddTableEditor(false)}
+                      onSave={async (tables) => {
+                        try {
+                          const { apiClient } = await import('@/lib/api/client');
+                          for (const table of tables) {
+                            const tableResponse = await apiClient.post(`/processes/${modalProcessId}/reference-tables`, {
+                              processId: modalProcessId,
+                              tableName: table.table_name,
+                              tableDescription: table.table_description,
+                              columnDefinitions: table.column_definitions,
+                              isEditable: true,
+                              displayOrder: 0
+                            });
+                            if (table.rows && table.rows.length > 0) {
+                              for (let i = 0; i < table.rows.length; i++) {
+                                await apiClient.post(`/processes/reference-tables/${tableResponse.id}/rows`, {
+                                  tableId: tableResponse.id,
+                                  rowData: table.rows[i],
+                                  rowOrder: i
+                                });
+                              }
+                            }
+                          }
+                          toast.success(`Successfully saved ${tables.length} reference tables`);
+                          if (modalProcessId) {
+                            refetchModalTables();
+                            setInlineEditorTables([]);
+                            setShowAddTableEditor(false);
+                          }
+                        } catch (error) {
+                          console.error('Failed to save reference tables:', error);
+                          toast.error('Failed to save reference tables');
+                        }
+                      }}
+                    />
                   </div>
-                </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2 border-dashed border-primary/40 text-primary hover:bg-primary/5"
+                    onClick={() => { setInlineEditorTables([]); setShowAddTableEditor(true); }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add New Table
+                  </Button>
+                )}
               </div>
             )}
           </div>
-          
+
           <DialogFooter className="border-t pt-4 flex justify-between">
             <div className="text-sm text-muted-foreground">
               {modalReferenceTables?.length ? (
-                <span>Showing {modalReferenceTables.length} reference table{modalReferenceTables.length !== 1 ? 's' : ''}</span>
+                <span>{modalReferenceTables.length} reference table{modalReferenceTables.length !== 1 ? 's' : ''}</span>
               ) : null}
             </div>
-            <div className="flex gap-2">
-              {modalReferenceTables?.length ? (
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    // Generate calculator template based on reference tables
-                    const template = {
-                      processName: modalProcessName,
-                      referenceTables: modalReferenceTables.map(table => ({
-                        name: table.tableName,
-                        description: table.tableDescription,
-                        columns: table.columnDefinitions
-                      }))
-                    };
-                    navigator.clipboard.writeText(JSON.stringify(template, null, 2));
-                    toast?.success?.('Calculator template copied to clipboard');
-                  }}
-                >
-                  Export for Calculator
-                </Button>
-              ) : null}
-              <Button onClick={() => setIsLookupTableModalOpen(false)}>
-                Close
-              </Button>
-            </div>
+            <Button onClick={() => setIsLookupTableModalOpen(false)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

@@ -274,6 +274,11 @@ export class CreateCalculatorDto {
   @IsOptional()
   displayConfig?: Record<string, any>;
 
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  associatedProcessId?: string;
+
   // ATOMIC: Fields are created WITH the calculator
   @ApiPropertyOptional({ type: [CreateFieldDto] })
   @IsArray()
@@ -336,6 +341,11 @@ export class UpdateCalculatorDto {
   @IsObject()
   @IsOptional()
   displayConfig?: Record<string, any>;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  associatedProcessId?: string;
 
   // ATOMIC: If provided, ALL fields are replaced (not merged)
   @ApiPropertyOptional({ type: [CreateFieldDto] })

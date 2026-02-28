@@ -102,6 +102,11 @@ export class ColumnDefinitionDto {
   @ApiProperty({ example: 'Flow Path Ratio' })
   @IsString()
   label: string;
+
+  @ApiPropertyOptional({ example: 'Bar' })
+  @IsOptional()
+  @IsString()
+  unit?: string;
 }
 
 export class CreateReferenceTableDto {

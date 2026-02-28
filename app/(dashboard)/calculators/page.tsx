@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Search, Trash2, Edit2, X, Check, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { useCalculators, useCreateCalculator, useDeleteCalculator, useUpdateCalc
 
 export default function CalculatorsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
@@ -21,6 +22,26 @@ export default function CalculatorsPage() {
     isTemplate: false,
     isPublic: false,
   });
+
+  // Process filtering from query parameters
+  const [processFilters, setProcessFilters] = useState({
+    processGroup: '',
+    processRoute: '',
+    operation: ''
+  });
+
+  // Read query parameters and set process filters
+  useEffect(() => {
+    const processGroup = searchParams.get('processGroup') || '';
+    const processRoute = searchParams.get('processRoute') || '';
+    const operation = searchParams.get('operation') || '';
+    
+    setProcessFilters({
+      processGroup,
+      processRoute,
+      operation
+    });
+  }, [searchParams]);
 
   const { data, isLoading } = useCalculators({
     search: searchQuery || undefined,
@@ -32,10 +53,26 @@ export default function CalculatorsPage() {
 
   const handleCreateCalculator = async () => {
     try {
+      let calculatorName = 'New Calculator';
+      let calculatorDescription = 'Enter description...';
+      
+      // If we have process filters, create a more specific calculator name
+      if (processFilters.operation) {
+        calculatorName = `${processFilters.operation} Calculator`;
+        calculatorDescription = `Calculator for ${processFilters.processGroup} - ${processFilters.processRoute} - ${processFilters.operation}`;
+      } else if (processFilters.processRoute) {
+        calculatorName = `${processFilters.processRoute} Calculator`;
+        calculatorDescription = `Calculator for ${processFilters.processGroup} - ${processFilters.processRoute}`;
+      } else if (processFilters.processGroup) {
+        calculatorName = `${processFilters.processGroup} Calculator`;
+        calculatorDescription = `Calculator for ${processFilters.processGroup}`;
+      }
+
       const newCalc = await createCalculatorMutation.mutateAsync({
-        name: 'New Calculator',
-        description: 'Enter description...',
+        name: calculatorName,
+        description: calculatorDescription,
         calculatorType: 'single',
+        calcCategory: 'process',
       });
       router.push(`/calculators/builder/${newCalc.id}`);
     } catch (error) {
@@ -76,7 +113,10 @@ export default function CalculatorsPage() {
     try {
       await updateCalculatorMutation.mutateAsync({
         id,
-        data: editForm,
+        data: {
+          ...editForm,
+          calcCategory: editForm.calcCategory || undefined,
+        },
       });
       setEditingId(null);
     } catch (error) {
@@ -84,21 +124,114 @@ export default function CalculatorsPage() {
     }
   };
 
-  const calculators = data?.calculators || [];
+  // Filter calculators based on process filters and group them
+  const allCalculators = data?.calculators || [];
+  const filteredCalculators = allCalculators.filter(calc => {
+    // If no process filters are active, show all calculators
+    if (!processFilters.processGroup && !processFilters.processRoute && !processFilters.operation) {
+      return true;
+    }
+
+    // Check if calculator name or description contains the process information
+    const nameDesc = `${calc.name} ${calc.description || ''}`.toLowerCase();
+    
+    if (processFilters.operation) {
+      return nameDesc.includes(processFilters.operation.toLowerCase());
+    }
+    if (processFilters.processRoute) {
+      return nameDesc.includes(processFilters.processRoute.toLowerCase());
+    }
+    if (processFilters.processGroup) {
+      return nameDesc.includes(processFilters.processGroup.toLowerCase());
+    }
+    
+    return true;
+  });
+
+  // Group calculators by their associated process or category
+  const groupedCalculators = filteredCalculators.reduce((groups: Record<string, typeof filteredCalculators>, calc) => {
+    let groupKey = 'General';
+    
+    // Use the calculator's category if available
+    if (calc.calcCategory) {
+      groupKey = calc.calcCategory.charAt(0).toUpperCase() + calc.calcCategory.slice(1);
+    }
+    
+    // If calculator has an associated process, use that as the group
+    if (calc.associatedProcessId) {
+      groupKey = `Process: ${calc.associatedProcessId}`;
+    }
+    
+    // If calculator description contains process information, extract it
+    if (calc.description) {
+      const desc = calc.description.toLowerCase();
+      if (desc.includes('calculator for ')) {
+        const processMatch = calc.description.match(/calculator for (.+?)(?:\s|$)/i);
+        if (processMatch) {
+          groupKey = processMatch[1];
+        }
+      }
+    }
+    
+    if (!groups[groupKey]) {
+      groups[groupKey] = [];
+    }
+    groups[groupKey].push(calc);
+    
+    return groups;
+  }, {});
+
+  const calculators = filteredCalculators;
 
   return (
     <div className="flex flex-col gap-8 p-8 max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border pb-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => {
+              // If we came from process page (have process filters), go back to process page
+              if (processFilters.processGroup || processFilters.processRoute || processFilters.operation) {
+                router.push('/process');
+              } else {
+                router.push('/');
+              }
+            }}
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold">Calculators</h1>
+            <h1 className="text-2xl font-semibold">
+              Calculators
+              {processFilters.operation && (
+                <span className="text-primary ml-2">- {processFilters.operation}</span>
+              )}
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {calculators.length} {calculators.length === 1 ? 'calculator' : 'calculators'}
+              {processFilters.processGroup && (
+                <span className="ml-2">
+                  for {processFilters.processGroup}
+                  {processFilters.processRoute && ` → ${processFilters.processRoute}`}
+                  {processFilters.operation && ` → ${processFilters.operation}`}
+                </span>
+              )}
             </p>
+            {processFilters.processGroup && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  router.push('/calculators');
+                }} 
+                className="mt-2 h-7 px-2 text-xs"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear Filter
+              </Button>
+            )}
           </div>
         </div>
         <Button
@@ -108,7 +241,7 @@ export default function CalculatorsPage() {
           size="sm"
         >
           <Plus className="h-4 w-4 mr-2" />
-          New
+          {processFilters.operation ? `New ${processFilters.operation} Calculator` : 'New'}
         </Button>
       </div>
 
@@ -125,10 +258,10 @@ export default function CalculatorsPage() {
         </div>
       </div>
 
-{/* Calculator List - Grid Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {isLoading ? (
-          Array.from({ length: 6 }).map((_, i) => (
+{/* Calculator List - Grouped by Process */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i} className="border">
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
@@ -137,26 +270,40 @@ export default function CalculatorsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
-        ) : calculators.length === 0 ? (
-          <div className="col-span-full text-center py-12">
-            <p className="text-muted-foreground">
-              {searchQuery ? 'No calculators found' : 'No calculators'}
-            </p>
-            {!searchQuery && (
-              <Button
-                onClick={handleCreateCalculator}
-                variant="outline"
-                size="sm"
-                className="mt-4"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Calculator
-              </Button>
-            )}
-          </div>
-        ) : (
-          calculators.map((calc) => {
+          ))}
+        </div>
+      ) : calculators.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">
+            {searchQuery ? 'No calculators found' : 'No calculators'}
+          </p>
+          {!searchQuery && (
+            <Button
+              onClick={handleCreateCalculator}
+              variant="outline"
+              size="sm"
+              className="mt-4"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Calculator
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {Object.entries(groupedCalculators).map(([groupName, groupCalcs]) => (
+            <div key={groupName} className="space-y-4">
+              {/* Group Header */}
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-foreground">{groupName}</h2>
+                <Badge variant="secondary" className="text-xs">
+                  {groupCalcs.length} {groupCalcs.length === 1 ? 'calculator' : 'calculators'}
+                </Badge>
+              </div>
+              
+              {/* Group Calculator Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {groupCalcs.map((calc) => {
             const isEditing = editingId === calc.id;
 
             return (
@@ -320,9 +467,12 @@ export default function CalculatorsPage() {
                 </CardContent>
               </Card>
             );
-          })
-        )}
-      </div>
+          })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

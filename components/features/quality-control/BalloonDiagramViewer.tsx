@@ -47,35 +47,23 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
     setError(null);
     
     try {
-      // First try to get a signed URL for the PDF
-      const signedUrlEndpoint = `${process.env.NEXT_PUBLIC_API_URL}/bom-items/${fileId}/file-url/2d`;
+      // First try to get a signed URL for the PDF using proper API client
+      const { apiClient } = await import('@/lib/api/client');
+      const signedUrlEndpoint = `/bom-items/${fileId}/file-url/2d`;
       console.log('Attempting signed URL from:', signedUrlEndpoint);
       
-      const response = await fetch(signedUrlEndpoint, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const data = await apiClient.get(signedUrlEndpoint);
+      console.log('Signed URL API response:', data);
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Signed URL API response:', data);
-        
-        // Try different possible response formats
-        const possibleUrl = data.url || data.downloadUrl || data.fileUrl || data.signedUrl || data.data?.url;
-        
-        if (possibleUrl) {
-          console.log('Using signed URL:', possibleUrl);
-          setPdfUrl(possibleUrl);
-        } else {
-          console.log('No URL found in response, response keys:', Object.keys(data));
-          throw new Error('No signed URL returned');
-        }
+      // Try different possible response formats
+      const possibleUrl = data.url || data.downloadUrl || data.fileUrl || data.signedUrl || data.data?.url;
+      
+      if (possibleUrl) {
+        console.log('Using signed URL:', possibleUrl);
+        setPdfUrl(possibleUrl);
       } else {
-        const errorText = await response.text();
-        console.log('Signed URL request failed:', response.status, errorText);
-        throw new Error(`Signed URL request failed: ${response.status} - ${errorText}`);
+        console.log('No URL found in response, response keys:', Object.keys(data));
+        throw new Error('No signed URL returned');
       }
     } catch (error) {
       console.error('Signed URL failed, trying blob approach:', error);

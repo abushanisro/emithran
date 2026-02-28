@@ -17,6 +17,7 @@ import {
   useDeleteField
 } from '@/lib/api/hooks';
 import type { Calculator, CalculatorField, FieldType, DataSource } from '@/lib/api/calculators';
+import { processesApi, type Process } from '@/lib/api/processes';
 import { FormulaEditor } from './FormulaEditor';
 import { DatabaseFieldExtractor } from './DatabaseFieldExtractor';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,10 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
   // This is the ONLY state - one unified object
   const [draftCalculator, setDraftCalculator] = useState<Calculator | null>(null);
 
+  // Process data
+  const [processes, setProcesses] = useState<Process[]>([]);
+  const [processesLoading, setProcessesLoading] = useState(false);
+
   // Track which field is being saved or deleted
   const [savingFieldId, setSavingFieldId] = useState<string | null>(null);
   const [deletingFieldId, setDeletingFieldId] = useState<string | null>(null);
@@ -79,6 +84,23 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
       setIsInitialLoad(false);
     }
   }, [calculator, isInitialLoad]);
+
+  // Fetch processes on component mount
+  useEffect(() => {
+    const fetchProcesses = async () => {
+      setProcessesLoading(true);
+      try {
+        const response = await processesApi.getAll();
+        setProcesses(response.processes);
+      } catch (error) {
+        console.error('Failed to fetch processes:', error);
+      } finally {
+        setProcessesLoading(false);
+      }
+    };
+
+    fetchProcesses();
+  }, []);
 
   // ============================================================================
   // HANDLERS
@@ -127,10 +149,10 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
     const field = fields?.[index];
     if (!field || !fields) return;
 
-    // Use the exact display label as field name, but trim whitespace
+    // Set field name from display label, but don't trim the displayLabel during editing
     if (updates.displayLabel !== undefined) {
       updates.fieldName = updates.displayLabel.trim();
-      updates.displayLabel = updates.displayLabel.trim();
+      // Don't trim displayLabel here - allow spaces during editing
     }
 
     const updatedFields = [...fields];
@@ -191,6 +213,96 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
       return newSet;
     });
     setDeletingFieldId(null);
+  };
+
+  const handleCreateBOMFields = (replaceIndex: number) => {
+    if (!currentData) return;
+
+    const currentFields = currentData.fields || [];
+    const fieldCount = currentFields.length;
+    
+    // Remove the original field that was changed to BOM
+    const fieldsWithoutOriginal = currentFields.filter((_, i) => i !== replaceIndex);
+    
+    // Define BOM fields to create
+    const bomFields = [
+      {
+        displayLabel: 'Height',
+        fieldType: 'number' as FieldType,
+        unit: 'mm',
+        defaultValue: '',
+        displayOrder: replaceIndex
+      },
+      {
+        displayLabel: 'Width',
+        fieldType: 'number' as FieldType,
+        unit: 'mm',
+        defaultValue: '',
+        displayOrder: replaceIndex + 1
+      },
+      {
+        displayLabel: 'Length',
+        fieldType: 'number' as FieldType,
+        unit: 'mm',
+        defaultValue: '',
+        displayOrder: replaceIndex + 2
+      },
+      {
+        displayLabel: 'Volume',
+        fieldType: 'calculated' as FieldType,
+        unit: 'mm³',
+        defaultValue: 'Height * Width * Length',
+        displayOrder: replaceIndex + 3
+      },
+      {
+        displayLabel: 'Principal Property',
+        fieldType: 'text' as FieldType,
+        unit: '',
+        defaultValue: '',
+        displayOrder: replaceIndex + 4
+      }
+    ];
+
+    // Create the new fields with temporary IDs
+    const newFields = bomFields.map((bomField, idx) => {
+      const newFieldId = `temp-bom-${Date.now()}-${idx}`;
+      return {
+        id: newFieldId,
+        fieldName: bomField.displayLabel,
+        displayLabel: bomField.displayLabel,
+        fieldType: bomField.fieldType,
+        isRequired: false,
+        displayOrder: bomField.displayOrder,
+        unit: bomField.unit,
+        defaultValue: bomField.defaultValue,
+        sourceField: '',
+        lookupConfig: {},
+        inputConfig: { decimalPlaces: 2 },
+      } as CalculatorField;
+    });
+
+    // Insert new fields at the original position
+    const updatedFields = [
+      ...fieldsWithoutOriginal.slice(0, replaceIndex),
+      ...newFields,
+      ...fieldsWithoutOriginal.slice(replaceIndex).map(field => ({
+        ...field,
+        displayOrder: field.displayOrder + newFields.length - 1
+      }))
+    ];
+
+    setDraftCalculator({
+      ...currentData,
+      fields: updatedFields,
+    });
+
+    // Mark all new BOM fields as being in edit mode
+    const newFieldIds = newFields.map(f => f.id);
+    setEditingFieldIds(prev => {
+      const newSet = new Set(prev);
+      newFieldIds.forEach(id => newSet.add(id));
+      return newSet;
+    });
   };
 
   // Formula management removed as it's now integrated into fields
@@ -293,7 +405,7 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
         data: {
           name: currentData.name,
           description: currentData.description,
-          calcCategory: currentData.calcCategory,
+          calcCategory: currentData.calcCategory || undefined,
           calculatorType: currentData.calculatorType,
           isTemplate: currentData.isTemplate,
           isPublic: currentData.isPublic,
@@ -418,7 +530,7 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Calculator Name *</Label>
                 <Input
@@ -444,6 +556,31 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
                     <SelectItem value="process">Process</SelectItem>
                     <SelectItem value="tooling">Tooling</SelectItem>
                     <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="process">Associated Process</Label>
+                <Select
+                  value={currentData.associatedProcessId || ''}
+                  onValueChange={(value) => handleMetadataChange('associatedProcessId', value)}
+                >
+                  <SelectTrigger id="process" className="bg-primary/5 border-primary/10">
+                    <SelectValue placeholder="Select process..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {processesLoading ? (
+                      <div className="text-sm text-muted-foreground px-2 py-1">Loading processes...</div>
+                    ) : processes.length === 0 ? (
+                      <div className="text-sm text-muted-foreground px-2 py-1">No processes available</div>
+                    ) : (
+                      processes.map((process) => (
+                        <SelectItem key={process.id} value={process.id}>
+                          {process.processName}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -507,16 +644,22 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
                       <div className="flex-1 space-y-3">
                         <div className="grid grid-cols-3 gap-3">
                           <Input
-                            placeholder="Display Label"
+                            placeholder="Display Label "
                             value={field.displayLabel || ''}
                             onChange={(e) => handleUpdateField(index, { displayLabel: e.target.value })}
                             disabled={isFieldSaved}
-                            className={cn(isFieldSaved ? "bg-secondary/20" : "bg-primary/5 border-primary/10")}
+                            className={cn(isFieldSaved ? "bg-secondary/20" : "bg-primary/5 border-primary/10 pr-4")}
                           />
                           <Select
                             value={field.fieldType}
                             disabled={isFieldSaved}
                             onValueChange={(value: FieldType) => {
+                              // Handle BOM selection - create multiple fields automatically
+                              if (value === 'bom') {
+                                handleCreateBOMFields(index);
+                                return;
+                              }
+                              
                               // Clear type-specific fields when switching types
                               if (value !== 'database_lookup') {
                                 handleUpdateField(index, {
@@ -543,6 +686,7 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
                               <SelectItem value="text">User Input</SelectItem>
                               <SelectItem value="database_lookup">Database</SelectItem>
                               <SelectItem value="calculated">Custom Formula</SelectItem>
+                              <SelectItem value="bom">BOM (Bill of Materials)</SelectItem>
                             </SelectContent>
                           </Select>
                           <Input
@@ -671,10 +815,16 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
                             <DatabaseFieldExtractor
                               dataSource={field.dataSource as DataSource}
                               selectedField={field.sourceField}
+                              lookupConfig={field.lookupConfig || {}}
+                              associatedProcessId={currentData.associatedProcessId}
                               onFieldSelect={(selectedField) => {
                                 handleUpdateField(index, {
-                                  sourceField: selectedField
+                                  sourceField: selectedField,
+                                  lookupConfig: {} // reset lookupConfig when field changes
                                 });
+                              }}
+                              onLookupConfigChange={(config) => {
+                                handleUpdateField(index, { lookupConfig: config });
                               }}
                               disabled={isFieldSaved}
                             />

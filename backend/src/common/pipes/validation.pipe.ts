@@ -18,8 +18,11 @@ export class CustomValidationPipe extends NestValidationPipe implements PipeTran
       forbidNonWhitelisted: true,
       stopAtFirstError: false,
       exceptionFactory: (errors: ValidationError[]) => {
+        const formattedErrors = this.formatValidationErrors(errors);
+        console.log('🚨 Validation errors:', formattedErrors);
+        console.log('🚨 Raw validation errors:', JSON.stringify(errors, null, 2));
         return new BadRequestException({
-          message: this.formatValidationErrors(errors),
+          message: formattedErrors,
           error: 'Validation Failed',
           statusCode: 400,
         });

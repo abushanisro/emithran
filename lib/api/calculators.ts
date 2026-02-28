@@ -10,7 +10,7 @@ import { apiClient } from './client';
 // ========================================
 
 export type CalculatorType = 'single' | 'multi_step' | 'dashboard';
-export type FieldType = 'number' | 'text' | 'select' | 'database_lookup' | 'calculated' | 'multi_select' | 'const';
+export type FieldType = 'number' | 'text' | 'select' | 'database_lookup' | 'calculated' | 'multi_select' | 'const' | 'bom';
 export type DataSource = 'lhr' | 'mhr' | 'raw_materials' | 'processes' | 'manual';
 export type FormulaType = 'expression' | 'multi_step' | 'conditional';
 export type DisplayFormat = 'number' | 'currency' | 'percentage';
@@ -26,6 +26,7 @@ export type Calculator = {
   isPublic: boolean;
   templateCategory?: string;
   displayConfig: Record<string, any>;
+  associatedProcessId?: string;
   createdAt: string;
   updatedAt: string;
   createdBy?: string;
