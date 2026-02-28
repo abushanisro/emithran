@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
-import { useQualityInspections, useDeleteQualityInspection } from '@/lib/api/hooks/useQualityControl';
+import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection } from '@/lib/api/hooks/useQualityControl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,9 @@ import {
   Clock,
   Trash2,
   MoreVertical,
-  ArrowLeft
+  ArrowLeft,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import CreateQCInspectionDialog from '@/components/features/quality-control/CreateQCInspectionDialog';
 
@@ -51,6 +53,8 @@ export default function QualityControlPage() {
   );
 
   const deleteInspection = useDeleteQualityInspection();
+  const approveInspection = useApproveQualityInspection();
+  const rejectInspection = useRejectQualityInspection();
 
   // Handle the API response format
   const qualityInspections = Array.isArray(qualityInspectionsResponse)
@@ -88,6 +92,27 @@ export default function QualityControlPage() {
     }
   };
 
+  const handleApproveInspection = async (inspection: any) => {
+    if (window.confirm(`Are you sure you want to approve "${inspection.name}"? This will make the items available for delivery.`)) {
+      try {
+        await approveInspection.mutateAsync(inspection.id);
+      } catch (error) {
+        console.error('Failed to approve inspection:', error);
+      }
+    }
+  };
+
+  const handleRejectInspection = async (inspection: any) => {
+    const reason = window.prompt(`Please provide a reason for rejecting "${inspection.name}":`);
+    if (reason !== null) { // null means user cancelled
+      try {
+        await rejectInspection.mutateAsync({ inspectionId: inspection.id, reason });
+      } catch (error) {
+        console.error('Failed to reject inspection:', error);
+      }
+    }
+  };
+
   const getStatusIcon = (status: string, result?: string) => {
     if (result === 'pass') return <CheckCircle className="h-4 w-4 text-green-600" />;
     if (result === 'fail') return <XCircle className="h-4 w-4 text-red-600" />;
@@ -95,6 +120,8 @@ export default function QualityControlPage() {
 
     switch (status) {
       case 'completed': return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'approved': return <ThumbsUp className="h-4 w-4 text-green-600" />;
+      case 'rejected': return <ThumbsDown className="h-4 w-4 text-red-600" />;
       case 'in_progress': return <Clock className="h-4 w-4 text-blue-600" />;
       case 'planned': return <Calendar className="h-4 w-4 text-gray-600" />;
       default: return <Clock className="h-4 w-4 text-gray-400" />;
@@ -108,6 +135,8 @@ export default function QualityControlPage() {
 
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'approved': return 'bg-green-100 text-green-800 border-green-200';
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
       case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'planned': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -255,6 +284,32 @@ export default function QualityControlPage() {
                         Open Report
                       </Button>
                       
+                      {/* Approve/Reject buttons - only show for completed inspections that aren't already approved/rejected */}
+                      {inspection.status === 'completed' && inspection.status !== 'approved' && inspection.status !== 'rejected' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleApproveInspection(inspection)}
+                            className="flex items-center gap-1 text-green-600 border-green-200 hover:bg-green-50"
+                            disabled={approveInspection.isPending}
+                          >
+                            <ThumbsUp className="h-4 w-4" />
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRejectInspection(inspection)}
+                            className="flex items-center gap-1 text-red-600 border-red-200 hover:bg-red-50"
+                            disabled={rejectInspection.isPending}
+                          >
+                            <ThumbsDown className="h-4 w-4" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" className="h-9 w-9 p-0">
@@ -306,6 +361,45 @@ export default function QualityControlPage() {
                     {inspection.checklist && inspection.checklist.length > 0 && (
                       <div className="text-sm text-muted-foreground">
                         {inspection.checklist.length} checklist item{inspection.checklist.length !== 1 ? 's' : ''}
+                      </div>
+                    )}
+
+                    {/* Rejection Reason */}
+                    {inspection.status === 'rejected' && inspection.rejection_reason && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                        <div className="flex items-start gap-2">
+                          <ThumbsDown className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-red-800 mb-1">Rejection Reason:</p>
+                            <p className="text-sm text-red-700">{inspection.rejection_reason}</p>
+                            {inspection.rejected_by && (
+                              <p className="text-xs text-red-600 mt-1">
+                                Rejected by: {inspection.rejected_by}
+                                {inspection.rejected_at && (
+                                  <span className="ml-1">on {new Date(inspection.rejected_at).toLocaleString()}</span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Approval Info */}
+                    {inspection.status === 'approved' && inspection.approved_by && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                        <div className="flex items-start gap-2">
+                          <ThumbsUp className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-green-800 mb-1">Approved</p>
+                            <p className="text-xs text-green-600">
+                              Approved by: {inspection.approved_by}
+                              {inspection.approved_at && (
+                                <span className="ml-1">on {new Date(inspection.approved_at).toLocaleString()}</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
 

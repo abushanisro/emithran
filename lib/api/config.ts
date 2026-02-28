@@ -33,7 +33,7 @@ export interface ApiConfig {
  */
 function createApiConfig(): ApiConfig {
   const baseUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:4000';
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/v1/api';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/v1';
   const cadUrl = process.env.NEXT_PUBLIC_CAD_ENGINE_URL || 'http://localhost:5000';
   
   return {

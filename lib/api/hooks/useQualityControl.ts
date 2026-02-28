@@ -19,6 +19,11 @@ export interface QualityInspection {
   checklist?: any[];
   overall_result?: 'pass' | 'fail' | 'conditional';
   notes?: string;
+  approved_by?: string;
+  approved_at?: string;
+  rejected_by?: string;
+  rejected_at?: string;
+  rejection_reason?: string;
   created_at: string;
   updated_at: string;
 }
@@ -357,6 +362,79 @@ export function useSaveDetailedInspectionReport() {
     onError: (error) => {
       console.error('Failed to save inspection report:', error);
       toast.error('Failed to save inspection report');
+    },
+  });
+}
+
+// Approve quality inspection
+export function useApproveQualityInspection() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (inspectionId: string) => {
+      const response = await apiClient.post<QualityInspection>(`/quality-control/inspections/${inspectionId}/approve`, {});
+      return response;
+    },
+    onSuccess: (updatedInspection) => {
+      toast.success('Quality inspection approved successfully');
+      
+      // Update the specific inspection in cache
+      queryClient.setQueryData(
+        QUERY_KEYS.inspection(updatedInspection.id),
+        updatedInspection
+      );
+      
+      // Invalidate inspections list
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.inspections(updatedInspection.project_id),
+      });
+      
+      // Invalidate dashboard metrics
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.dashboard(updatedInspection.project_id),
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to approve quality inspection:', error);
+      toast.error('Failed to approve quality inspection');
+    },
+  });
+}
+
+// Reject quality inspection
+export function useRejectQualityInspection() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ inspectionId, reason }: { inspectionId: string; reason?: string }) => {
+      const response = await apiClient.post<QualityInspection>(`/quality-control/inspections/${inspectionId}/reject`, { 
+        rejectionReason: reason, 
+        correctiveAction: '' 
+      });
+      return response;
+    },
+    onSuccess: (updatedInspection) => {
+      toast.success('Quality inspection rejected');
+      
+      // Update the specific inspection in cache
+      queryClient.setQueryData(
+        QUERY_KEYS.inspection(updatedInspection.id),
+        updatedInspection
+      );
+      
+      // Invalidate inspections list
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.inspections(updatedInspection.project_id),
+      });
+      
+      // Invalidate dashboard metrics
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.dashboard(updatedInspection.project_id),
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to reject quality inspection:', error);
+      toast.error('Failed to reject quality inspection');
     },
   });
 }

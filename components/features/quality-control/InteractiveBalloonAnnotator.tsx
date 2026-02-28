@@ -278,6 +278,7 @@ export default function InteractiveBalloonAnnotator({
                   src={pdfUrl}
                   className="w-full h-full border-0"
                   style={{ pointerEvents: isAnnotating ? 'none' : 'auto' }}
+                  sandbox="allow-same-origin"
                 />
               </div>
 

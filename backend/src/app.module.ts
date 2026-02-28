@@ -27,6 +27,7 @@ import { ProductionPlanningModule } from './modules/production-planning/producti
 import { ProcessPlanningModule } from './modules/process-planning/process-planning.module';
 import { QualityControlModule } from './modules/quality-control/quality-control.module';
 import { ProjectReportsModule } from './modules/project-reports/project-reports.module';
+import { DeliveryModule } from './modules/delivery/delivery.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { SupabaseService } from './common/supabase/supabase.service';
 import { SupabaseAuthGuard } from './common/guards/supabase-auth.guard';
@@ -85,6 +86,7 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     ProcessPlanningModule,
     QualityControlModule,
     ProjectReportsModule,
+    DeliveryModule,
   ],
   controllers: [AppController],
   providers: [

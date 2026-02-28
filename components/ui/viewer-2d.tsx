@@ -98,6 +98,7 @@ export function Viewer2D({ fileUrl, fileName, fileType }: Viewer2DProps) {
                             <iframe
                                 src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                                 className="w-full h-full border-0"
+                                sandbox="allow-same-origin"
                                 onLoad={handleLoad}
                                 onError={handleError}
                                 title={fileName}

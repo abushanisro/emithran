@@ -24,6 +24,8 @@ import { useQuery } from '@tanstack/react-query';
 import { 
   useSaveDetailedInspectionReport, 
   useDetailedInspectionReport,
+  useUpdateQualityInspection,
+  useQualityInspection,
   DetailedInspectionReport 
 } from '@/lib/api/hooks/useQualityControl';
 import { Button } from '@/components/ui/button';
@@ -1026,6 +1028,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                 src={`${pdfUrl}#view=FitH&scrollbar=0&toolbar=0&navpanes=0`}
                 title="2D Technical Drawing"
                 className="w-full border-0"
+                sandbox="allow-same-origin"
                 style={{ 
                   height: '100vh',
                   minHeight: '800px',
@@ -1418,8 +1421,11 @@ export default function QualityInspectionPage() {
 
   // Database hooks for saving/loading inspection reports
   const saveInspectionReport = useSaveDetailedInspectionReport();
+  const updateInspection = useUpdateQualityInspection();
   // Load existing report - now properly handles 404 errors
   const { data: existingReport, isLoading: reportLoading } = useDetailedInspectionReport(inspectionId);
+  // Load current inspection data to check status
+  const { data: currentInspection, isLoading: inspectionLoading } = useQualityInspection(inspectionId);
 
   // Edit mode states for each section
   const [balloonDrawingEditMode, setBalloonDrawingEditMode] = useState(false);
@@ -1767,8 +1773,28 @@ export default function QualityInspectionPage() {
     }
   };
 
+  // Complete the inspection
+  const handleCompleteInspection = async () => {
+    try {
+      const updateData = {
+        id: inspectionId,
+        data: {
+          status: 'completed',
+          notes: generalRemarks
+        }
+      };
+      console.log('🚀 Updating inspection with:', updateData);
+      await updateInspection.mutateAsync(updateData);
+      toast.success('Inspection report submitted and completed successfully! You can now approve or reject it.');
+      router.push(`/projects/${projectId}/quality-control`);
+    } catch (error) {
+      console.error('Failed to complete inspection:', error);
+      toast.error('Failed to complete inspection');
+    }
+  };
+
   // Save inspection report to database
-  const handleSaveReport = async (isDraft = true) => {
+  const handleSaveReport = async (isDraft = true, silent = false) => {
     // Validate required fields for final submission
     if (!isDraft && !validateRequiredFields()) {
       return;
@@ -1846,10 +1872,14 @@ export default function QualityInspectionPage() {
         }, 100);
         
         // Force a re-render by updating a state that affects UI
-        toast.success(`Inspection report ${isDraft ? 'saved as draft' : 'submitted'} successfully! Status: ${newStatus.toUpperCase()}`);
+        if (!silent) {
+          toast.success(`Inspection report ${isDraft ? 'saved as draft' : 'submitted'} successfully! Status: ${newStatus.toUpperCase()}`);
+        }
       } else {
         console.warn('⚠️ No status returned from API response');
-        toast.success(`Inspection report ${isDraft ? 'saved as draft' : 'submitted'} successfully!`);
+        if (!silent) {
+          toast.success(`Inspection report ${isDraft ? 'saved as draft' : 'submitted'} successfully!`);
+        }
       }
     } catch (error) {
       console.error('Error saving inspection report:', error);
@@ -2826,20 +2856,27 @@ export default function QualityInspectionPage() {
             <span className="hidden sm:inline">Save Draft</span>
             <span className="sm:hidden">Draft</span>
           </Button>
-          <Button 
-            size="sm" 
-            className="flex items-center gap-2 text-xs sm:text-sm"
-            onClick={() => handleSaveReport(false)}
-            disabled={saveInspectionReport.isPending || !inspectionBy}
-          >
-            {saveInspectionReport.isPending ? (
-              <div className="animate-spin h-3 w-3 sm:h-4 sm:w-4">⟳</div>
-            ) : (
-              <Send className="h-3 w-3 sm:h-4 sm:w-4" />
-            )}
-            <span className="hidden sm:inline">Submit Report</span>
-            <span className="sm:hidden">Submit</span>
-          </Button>
+          {!inspectionLoading && currentInspection?.status !== 'completed' && currentInspection?.status !== 'approved' && currentInspection?.status !== 'rejected' && (
+            <Button 
+              size="sm" 
+              className="flex items-center gap-2 text-xs sm:text-sm"
+              onClick={async () => {
+                // First save the report silently
+                await handleSaveReport(false, true);
+                // Then complete the inspection
+                await handleCompleteInspection();
+              }}
+              disabled={saveInspectionReport.isPending || updateInspection.isPending || !inspectionBy}
+            >
+              {(saveInspectionReport.isPending || updateInspection.isPending) ? (
+                <div className="animate-spin h-3 w-3 sm:h-4 sm:w-4">⟳</div>
+              ) : (
+                <Send className="h-3 w-3 sm:h-4 sm:w-4" />
+              )}
+              <span className="hidden sm:inline">Submit & Complete</span>
+              <span className="sm:hidden">Submit</span>
+            </Button>
+          )}
         </div>
       </div>
     </div>

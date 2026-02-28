@@ -317,6 +317,7 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
                             src={file2dUrl}
                             className="w-full h-full"
                             title="PDF Preview"
+                            sandbox="allow-same-origin"
                           />
                         </div>
                         <Button variant="outline" className="w-full" asChild>

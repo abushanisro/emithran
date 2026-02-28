@@ -16,6 +16,7 @@
 import { config as appConfig } from '../config';
 import { apiConfig } from './config';
 import { supabase } from '../supabase/client';
+import { authTokenManager } from '../auth/token-manager';
 
 import { CircuitBreaker, CircuitBreakerError } from './circuit-breaker';
 import { requestMetrics } from './request-metrics';
