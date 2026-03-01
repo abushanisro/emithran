@@ -217,11 +217,12 @@ export function InlineReferenceTableEditor({
   };
 
   const handleAddColumn = () => {
+    const columnNumber = newTable.column_definitions.length + 1;
     setNewTable({
       ...newTable,
       column_definitions: [
         ...newTable.column_definitions,
-        { name: '', type: 'text', label: '' }
+        { name: `column_${columnNumber}`, type: 'text', label: `Column ${columnNumber}` }
       ]
     });
   };

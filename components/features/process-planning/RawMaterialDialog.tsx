@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { useRawMaterials, useRawMaterialFilterOptions } from '@/lib/api/hooks/useRawMaterials';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
-import { Loader2, Calculator as CalculatorIcon, Play } from 'lucide-react';
+import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,7 @@ interface RawMaterialDialogProps {
   onSubmit: (data: any) => void;
   estimateId?: string;
   editData?: any;
+  bomItemData?: any;
 }
 
 export function RawMaterialDialog({
@@ -38,6 +40,7 @@ export function RawMaterialDialog({
   onOpenChange,
   onSubmit,
   editData,
+  bomItemData,
 }: RawMaterialDialogProps) {
   const [materialGroup, setMaterialGroup] = useState<string>('');
   const [location, setLocation] = useState<string>('');
@@ -56,10 +59,85 @@ export function RawMaterialDialog({
   const [calculatorInputs, setCalculatorInputs] = useState<Record<string, any>>({});
   const [calculatorResults, setCalculatorResults] = useState<Record<string, any> | null>(null);
 
+  // Lookup table state
+  const [selectedLookupField, setSelectedLookupField] = useState<any>(null);
+  const [showLookupTable, setShowLookupTable] = useState<boolean>(false);
+  const [lookupTableData, setLookupTableData] = useState<any>(null);
+
   // Fetch calculators
   const { data: calculatorsData } = useCalculators();
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
   const executeCalculator = useExecuteCalculator();
+
+  // Auto-populate calculator inputs from BOM data
+  const autoPopulateFromBOM = () => {
+    if (!bomItemData || !selectedCalculator) return;
+
+    const bomFieldMapping: Record<string, any> = {
+      // Weight mappings
+      'weight': bomItemData.weight || bomItemData.unitWeight,
+      'unitWeight': bomItemData.unitWeight || bomItemData.weight,
+      'Weight': bomItemData.weight || bomItemData.unitWeight,
+      'Weight(kg)': bomItemData.weight || bomItemData.unitWeight,
+      
+      // Dimension mappings
+      'length': bomItemData.length || bomItemData.maxLength,
+      'maxLength': bomItemData.maxLength || bomItemData.length,
+      'Length': bomItemData.length || bomItemData.maxLength,
+      'Max Length': bomItemData.maxLength || bomItemData.length,
+      'Max Length(mm)': bomItemData.maxLength || bomItemData.length,
+      
+      'width': bomItemData.width || bomItemData.maxWidth,
+      'maxWidth': bomItemData.maxWidth || bomItemData.width,
+      'Width': bomItemData.width || bomItemData.maxWidth,
+      'Max Width': bomItemData.maxWidth || bomItemData.width,
+      'Max Width(mm)': bomItemData.maxWidth || bomItemData.width,
+      
+      'height': bomItemData.height || bomItemData.maxHeight,
+      'maxHeight': bomItemData.maxHeight || bomItemData.height,
+      'Height': bomItemData.height || bomItemData.maxHeight,
+      'Max Height': bomItemData.maxHeight || bomItemData.height,
+      'Max Height(mm)': bomItemData.maxHeight || bomItemData.height,
+      
+      // Surface area mapping
+      'surfaceArea': bomItemData.surfaceArea,
+      'Surface Area': bomItemData.surfaceArea,
+      'Surface Area(mm²)': bomItemData.surfaceArea,
+    };
+
+    const newInputs: Record<string, any> = { ...calculatorInputs };
+
+    selectedCalculator.fields
+      ?.filter((field: any) => field.fieldType !== 'calculated')
+      .forEach((field: any) => {
+        const fieldName = field.fieldName;
+        const displayName = field.displayLabel || field.displayName;
+
+        // Try to match by field name or display name
+        const bomValue = bomFieldMapping[fieldName] || bomFieldMapping[displayName];
+        
+        if (bomValue !== undefined && bomValue !== null && bomValue !== '') {
+          newInputs[fieldName] = typeof bomValue === 'number' ? bomValue : parseFloat(bomValue) || 0;
+        }
+      });
+
+    setCalculatorInputs(newInputs);
+  };
+
+  // Auto-populate when calculator or BOM data changes
+  useEffect(() => {
+    if (selectedCalculator && bomItemData) {
+      autoPopulateFromBOM();
+    }
+  }, [selectedCalculator?.id, bomItemData?.id, calculatorTarget]);
+
+  // Also auto-populate when dialog opens with calculator already selected
+  useEffect(() => {
+    if (open && selectedCalculatorId && bomItemData) {
+      // Small delay to ensure calculator data is loaded
+      setTimeout(autoPopulateFromBOM, 100);
+    }
+  }, [open, selectedCalculatorId, bomItemData?.id]);
 
   // Handle calculator value selection
   const handleUseCalculatorValue = (value: number) => {
@@ -68,6 +146,7 @@ export function RawMaterialDialog({
     } else if (calculatorTarget === 'netUsage') {
       setNetUsage(value);
     }
+    // Close calculator when "Use" button is clicked
     setCalculatorOpen(false);
     setCalculatorResults(null);
     setCalculatorInputs({});
@@ -92,13 +171,115 @@ export function RawMaterialDialog({
     }
   };
 
+  // Handle viewing lookup table
+  const handleViewLookupTable = async (field: any) => {
+    console.log('Opening lookup table for field:', field.fieldName);
+    setSelectedLookupField(field);
+
+    try {
+      const { processesApi } = await import('@/lib/api/processes');
+
+      // Case 1: sourceField is set — fetch by table ID directly
+      if (field.sourceField) {
+        let tableId = field.sourceField;
+        if (field.sourceField.startsWith('from_')) {
+          tableId = field.sourceField.replace('from_', '');
+        }
+
+        const table = await processesApi.getReferenceTable(tableId);
+        if (table) {
+          const processedRows = table.rows?.map((row: any) =>
+            row.rowData ? row.rowData : row
+          ) || [];
+          const tableData = {
+            fieldName: field.fieldName,
+            fieldLabel: field.displayLabel || field.fieldName,
+            tableName: table.tableName,
+            tableId: table.id,
+            column_definitions: table.columnDefinitions || [],
+            rows: processedRows,
+          };
+          console.log('Setting lookup table data:', tableData);
+          setLookupTableData(tableData);
+          setShowLookupTable(true);
+          return;
+        }
+      }
+
+      // Case 2: Find reference table by matching field label
+      const processId: string | undefined =
+        (selectedCalculator as any)?.associatedProcessId ||
+        (selectedCalculator as any)?.processId;
+
+      if (processId) {
+        const tables = await processesApi.getReferenceTables(processId);
+        const fieldLabel = (field.displayLabel || field.fieldName || '').toLowerCase();
+        const fieldName = (field.fieldName || '').toLowerCase();
+        
+        let matched = tables.find((t: any) => {
+          const tableName = (t.tableName || '').toLowerCase();
+          
+          // Direct matches
+          if (tableName.includes(fieldLabel) || fieldLabel.includes(tableName)) return true;
+          if (tableName.includes(fieldName) || fieldName.includes(tableName)) return true;
+          
+          // Special cases for common field types
+          if (fieldName.includes('viscosity') && tableName.includes('viscosity')) return true;
+          if (fieldName.includes('gross') && tableName.includes('weight')) return true;
+          if (fieldName.includes('usage') && tableName.includes('weight')) return true;
+          if (fieldName.includes('density') && tableName.includes('density')) return true;
+          
+          return false;
+        });
+        
+        if (!matched && tables.length === 1) {
+          matched = tables[0];
+        }
+
+        if (matched) {
+          const processedRows = matched.rows?.map((row: any) =>
+            row.rowData ? row.rowData : row
+          ) || [];
+          setLookupTableData({
+            fieldName: field.fieldName,
+            fieldLabel: field.displayLabel || field.fieldName,
+            tableName: matched.tableName,
+            tableId: matched.id,
+            column_definitions: matched.columnDefinitions || [],
+            rows: processedRows,
+          });
+          setShowLookupTable(true);
+          return;
+        }
+      }
+
+      console.error('Could not resolve reference table for field:', field);
+    } catch (error) {
+      console.error('Failed to fetch table for field:', field.fieldName, error);
+    }
+  };
+
   // Reset calculator when closed
   useEffect(() => {
     if (!calculatorOpen) {
       setSelectedCalculatorId('');
       setCalculatorInputs({});
       setCalculatorResults(null);
+      // Don't auto-close lookup table - let user control it independently
     }
+  }, [calculatorOpen]);
+
+  // Control page scroll when calculator is open
+  useEffect(() => {
+    if (calculatorOpen) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+    
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
   }, [calculatorOpen]);
 
   // Fetch raw materials from API
@@ -278,8 +459,19 @@ export function RawMaterialDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog 
+      open={open} 
+      modal={false}
+      onOpenChange={(openState) => {
+        // Prevent closing if calculator is open
+        if (!openState && calculatorOpen) {
+          console.log('Preventing main dialog close because calculator is open');
+          return;
+        }
+        onOpenChange(openState);
+      }}
+    >
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-primary">
             {editData ? 'Edit Material Cost' : 'Create Material Cost'}
@@ -289,8 +481,9 @@ export function RawMaterialDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
+        <div className="max-h-[calc(90vh-120px)] overflow-y-auto">
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
             {/* Loading State */}
             {(isLoading || isLoadingOptions) && (
               <div className="flex items-center justify-center py-8">
@@ -510,9 +703,21 @@ export function RawMaterialDialog({
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.nativeEvent?.stopImmediatePropagation?.();
                       setCalculatorTarget('grossUsage');
                       setCalculatorOpen(true);
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.nativeEvent?.stopImmediatePropagation?.();
+                    }}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                     }}
                     title="Use Calculator"
                     disabled={!selectedMaterialId && !editData}
@@ -541,9 +746,21 @@ export function RawMaterialDialog({
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.nativeEvent?.stopImmediatePropagation?.();
                       setCalculatorTarget('netUsage');
                       setCalculatorOpen(true);
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.nativeEvent?.stopImmediatePropagation?.();
+                    }}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                     }}
                     title="Use Calculator"
                     disabled={!selectedMaterialId && !editData}
@@ -594,29 +811,48 @@ export function RawMaterialDialog({
                 <span className="text-lg font-bold">₹{totalCost.toFixed(2)}</span>
               </div>
             </div>
-          </div>
+            </div>
 
-          <DialogFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={
-                editData
-                  ? grossUsage <= 0
-                  : !materialGroup || !selectedMaterialId || grossUsage <= 0
-              }
-            >
-              {editData ? 'Update Material' : 'Add Material'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  editData
+                    ? grossUsage <= 0
+                    : !materialGroup || !selectedMaterialId || grossUsage <= 0
+                }
+              >
+                {editData ? 'Update Material' : 'Add Material'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </div>
       </DialogContent>
 
       {/* Calculator Side Panel */}
-      <Sheet open={calculatorOpen} onOpenChange={setCalculatorOpen}>
-        <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+      <Sheet open={calculatorOpen} onOpenChange={(open) => {
+        console.log('Calculator onOpenChange called with:', open);
+        
+        // Prevent calculator from closing if lookup table is open
+        if (!open && showLookupTable) {
+          console.log('Preventing calculator close because lookup table is open');
+          return;
+        }
+        
+        if (!open) {
+          console.log('Calculator closing - also closing lookup table');
+          // When closing calculator, also close lookup table
+          setShowLookupTable(false);
+          setSelectedLookupField(null);
+          setLookupTableData(null);
+        }
+        
+        setCalculatorOpen(open);
+      }} modal={false}>
+        <SheetContent side="right" className="w-[600px] sm:w-[700px]" style={{ overflowY: 'auto' }}>
           <SheetHeader>
             <SheetTitle>
               Calculator - {calculatorTarget === 'grossUsage' ? 'Gross Usage' : 'Net Usage'}
@@ -641,6 +877,26 @@ export function RawMaterialDialog({
               </Select>
             </div>
 
+            {/* Auto-populate from BOM button */}
+            {bomItemData && (
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant="outline" 
+                  onClick={autoPopulateFromBOM}
+                  className="w-full"
+                  disabled={!selectedCalculator}
+                >
+                  Auto-fill from BOM Data
+                </Button>
+                {!selectedCalculator && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Select a calculator above to enable auto-fill
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Calculator Inputs */}
             {selectedCalculator && (
               <>
@@ -651,27 +907,79 @@ export function RawMaterialDialog({
                   <CardContent className="space-y-4">
                     {selectedCalculator.fields
                       ?.filter((field: any) => field.fieldType !== 'calculated')
-                      .map((field: any) => (
-                        <div key={field.id} className="space-y-2">
-                          <Label htmlFor={field.fieldName}>
-                            {field.displayName || field.fieldName}
-                            {field.unit && <span className="text-muted-foreground ml-1">({field.unit})</span>}
-                          </Label>
-                          <Input
-                            id={field.fieldName}
-                            type="number"
-                            step="0.01"
-                            value={calculatorInputs[field.fieldName] || ''}
-                            onChange={(e) =>
-                              setCalculatorInputs({
-                                ...calculatorInputs,
-                                [field.fieldName]: parseFloat(e.target.value) || 0,
-                              })
-                            }
-                            placeholder={`Enter ${field.displayName || field.fieldName}`}
-                          />
-                        </div>
-                      ))}
+                      .map((field: any) => {
+                        // Only show eye button for fields that are likely to have lookup tables
+                        const labelLower = (field.displayLabel || field.fieldName || '').toLowerCase();
+                        const fieldNameLower = (field.fieldName || '').toLowerCase();
+                        
+                        const isLookupTableField = 
+                          // Only show for explicitly configured database lookup fields
+                          (field.fieldType === 'database_lookup' && field.dataSource === 'processes') ||
+                          // Only show for fields with sourceField starting with 'from_' (linked to reference tables)
+                          (field.sourceField && field.sourceField.startsWith('from_'));
+
+                        return (
+                          <div key={field.id} className="space-y-2">
+                            <Label htmlFor={field.fieldName}>
+                              {field.displayLabel || field.fieldName}
+                              {field.unit && <span className="text-muted-foreground ml-1">({field.unit})</span>}
+                            </Label>
+
+                            {isLookupTableField ? (
+                              // Input field WITH eye icon for lookup table fields
+                              <div className="flex gap-2">
+                                <Input
+                                  id={field.fieldName}
+                                  type="number"
+                                  step="0.01"
+                                  value={calculatorInputs[field.fieldName] || ''}
+                                  onChange={(e) =>
+                                    setCalculatorInputs({
+                                      ...calculatorInputs,
+                                      [field.fieldName]: parseFloat(e.target.value) || 0,
+                                    })
+                                  }
+                                  placeholder={`Enter ${field.displayLabel || field.fieldName}`}
+                                  className="flex-1"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleViewLookupTable(field);
+                                  }}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  className="px-3"
+                                  title="View reference table"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              // Regular input field only
+                              <Input
+                                id={field.fieldName}
+                                type="number"
+                                step="0.01"
+                                value={calculatorInputs[field.fieldName] || ''}
+                                onChange={(e) =>
+                                  setCalculatorInputs({
+                                    ...calculatorInputs,
+                                    [field.fieldName]: parseFloat(e.target.value) || 0,
+                                  })
+                                }
+                                placeholder={`Enter ${field.displayLabel || field.fieldName}`}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
 
                     <Button
                       onClick={handleExecuteCalculator}
@@ -732,6 +1040,173 @@ export function RawMaterialDialog({
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Lookup Table Panel */}
+      {showLookupTable && lookupTableData && (() => {
+        console.log('Rendering lookup table:', { showLookupTable, hasData: !!lookupTableData, tableName: lookupTableData?.tableName });
+        return (
+          <>
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-black/20 z-[59]" 
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                e.nativeEvent?.stopImmediatePropagation?.();
+                setShowLookupTable(false);
+                setSelectedLookupField(null);
+                setLookupTableData(null);
+              }}
+            />
+            
+            {/* Lookup Table */}
+            <div
+              className="fixed top-0 left-0 h-screen w-[500px] bg-background border-r border-border shadow-xl z-[60] flex flex-col"
+              style={{ pointerEvents: 'auto' }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-3 border-b border-border bg-background">
+                <div>
+                  <h3 className="font-semibold text-sm">Reference Table</h3>
+                  <p className="text-xs text-muted-foreground">{lookupTableData.tableName}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    e.nativeEvent?.stopImmediatePropagation?.();
+                    setShowLookupTable(false);
+                    setSelectedLookupField(null);
+                    setLookupTableData(null);
+                  }}
+                  className="h-6 w-6 p-0"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18"></path>
+                    <path d="m6 6 12 12"></path>
+                  </svg>
+                </Button>
+              </div>
+
+              {/* Hint */}
+              <div className="px-3 py-1.5 bg-primary/5 border-b border-border text-xs text-muted-foreground flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4" />
+                  <path d="M12 8h.01" />
+                </svg>
+                Click any row to use that value for <strong className="text-foreground mx-0.5">{lookupTableData.fieldLabel}</strong>. Highlighted column = selected value.
+              </div>
+
+              <div
+                className="flex-1 p-3 relative overflow-auto"
+                style={{
+                  height: 'calc(100vh - 120px)',
+                  pointerEvents: 'auto',
+                  zIndex: 61
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onScroll={(e) => e.stopPropagation()}
+              >
+                <div className="w-full">
+                  <table className="w-full border-collapse text-sm bg-background">
+                    <thead>
+                      <tr className="bg-muted/60">
+                        <th className="border border-border text-center text-xs font-medium py-1 px-1 text-muted-foreground w-6">
+                          #
+                        </th>
+                        {lookupTableData.column_definitions.map((col: any, colIdx: number) => {
+                          const isOutputCol = colIdx === lookupTableData.column_definitions.length - 1;
+                          return (
+                            <th
+                              key={col.name}
+                              className={`border border-border text-left text-xs font-semibold py-1 px-2 ${isOutputCol ? 'text-primary bg-primary/10' : 'text-foreground'}`}
+                            >
+                              {col.label}
+                              {isOutputCol && <span className="ml-1 text-primary/60">(↵ select)</span>}
+                              {col.unit && (
+                                <span className="text-primary/70 ml-1">({col.unit})</span>
+                              )}
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lookupTableData.rows.map((row: any, rowIndex: number) => {
+                        const outputCol = lookupTableData.column_definitions[lookupTableData.column_definitions.length - 1];
+                        const getVal = (col: any) => {
+                          const camel = col.name.replace(/_([a-z])/g, (_: string, l: string) => l.toUpperCase());
+                          return row[col.name] !== undefined ? row[col.name] : row[camel];
+                        };
+                        const outputValue = outputCol ? getVal(outputCol) : undefined;
+                        return (
+                          <tr
+                            key={rowIndex}
+                            className="hover:bg-primary/10 cursor-pointer transition-colors"
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                            }}
+                            onClick={(e) => {
+                              console.log('Lookup table row clicked');
+                              e.stopPropagation();
+                              e.preventDefault();
+                              e.nativeEvent?.stopImmediatePropagation?.();
+                              
+                              if (selectedLookupField && outputValue !== undefined) {
+                                console.log('Setting calculator input:', selectedLookupField.fieldName, outputValue);
+                                setCalculatorInputs((prev: Record<string, any>) => ({
+                                  ...prev,
+                                  [selectedLookupField.fieldName]: typeof outputValue === "number"
+                                    ? outputValue
+                                    : parseFloat(outputValue) || outputValue,
+                                }));
+                              }
+                              
+                              // Use setTimeout to ensure state updates don't conflict
+                              setTimeout(() => {
+                                console.log('Closing lookup table only');
+                                // Close ONLY lookup table after selection
+                                setShowLookupTable(false);
+                                setSelectedLookupField(null);
+                                setLookupTableData(null);
+                              }, 0);
+                              
+                              return false;
+                            }}
+                            title={outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`}
+                          >
+                            <td className="border border-border text-center text-xs py-1 px-1 text-muted-foreground font-mono bg-muted/20">
+                              {rowIndex + 1}
+                            </td>
+                            {lookupTableData.column_definitions.map((col: any) => {
+                              const value = getVal(col);
+                              const isOutput = col.name === outputCol?.name;
+                              return (
+                                <td
+                                  key={col.name}
+                                  className={`border border-border py-1 px-2 text-xs${isOutput ? ' font-semibold text-primary bg-primary/5' : ''}`}
+                                >
+                                  {value !== undefined && value !== null ? String(value) : '—'}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      })()}
     </Dialog>
   );
 }

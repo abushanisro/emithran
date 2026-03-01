@@ -13,11 +13,15 @@ import {
 
 interface ManufacturingProcessSectionProps {
   bomItemId?: string;
+  bomItem?: any;
 }
 
-export function ManufacturingProcessSection({ bomItemId }: ManufacturingProcessSectionProps) {
+export function ManufacturingProcessSection({ bomItemId, bomItem }: ManufacturingProcessSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editProcess, setEditProcess] = useState<any | null>(null);
+
+  // Use the bomItem prop directly instead of fetching
+  const bomItemData = bomItem;
 
   // Fetch process costs from database
   const { data, isLoading } = useProcessCosts({
@@ -260,6 +264,7 @@ export function ManufacturingProcessSection({ bomItemId }: ManufacturingProcessS
         onOpenChange={setDialogOpen}
         onSubmit={handleDialogSubmit}
         editData={editProcess}
+        bomItemData={bomItemData}
       />
     </div>
   );

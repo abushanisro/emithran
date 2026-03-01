@@ -13,9 +13,10 @@ import {
 
 interface RawMaterialsSectionProps {
   bomItemId?: string;
+  bomItem?: any;
 }
 
-export function RawMaterialsSection({ bomItemId }: RawMaterialsSectionProps) {
+export function RawMaterialsSection({ bomItemId, bomItem }: RawMaterialsSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMaterial, setEditMaterial] = useState<any | null>(null);
 
@@ -280,6 +281,7 @@ export function RawMaterialsSection({ bomItemId }: RawMaterialsSectionProps) {
         onOpenChange={setDialogOpen}
         onSubmit={handleDialogSubmit}
         editData={editMaterial}
+        bomItemData={bomItem}
       />
     </div>
   );

@@ -1,6 +1,7 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -32,6 +33,7 @@ interface ProcessCostDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: any) => void;
   editData?: any;
+  bomItemData?: any;
 }
 
 export function ProcessCostDialog({
@@ -39,6 +41,7 @@ export function ProcessCostDialog({
   onOpenChange,
   onSubmit,
   editData,
+  bomItemData,
 }: ProcessCostDialogProps) {
   const [opNbr, setOpNbr] = useState<number>(0);
   const [location, setLocation] = useState<string>('');
@@ -71,7 +74,7 @@ export function ProcessCostDialog({
   const [selectedCalculatorId, setSelectedCalculatorId] = useState<string>('');
   const [calculatorInputs, setCalculatorInputs] = useState<Record<string, any>>({});
   const [calculatorResults, setCalculatorResults] = useState<Record<string, any> | null>(null);
-  const [, setSelectedLookupField] = useState<any>(null);
+  const [selectedLookupField, setSelectedLookupField] = useState<any>(null);
   const [showLookupTable, setShowLookupTable] = useState<boolean>(false);
   const [lookupTableData, setLookupTableData] = useState<any>(null);
 
@@ -222,50 +225,163 @@ export function ProcessCostDialog({
     }
   };
 
+  // Auto-populate calculator inputs from BOM data
+  const autoPopulateFromBOM = () => {
+    if (!bomItemData || !selectedCalculator) return;
+
+    const bomFieldMapping: Record<string, any> = {
+      // Weight mappings
+      'weight': bomItemData.weight || bomItemData.unitWeight,
+      'unitWeight': bomItemData.unitWeight || bomItemData.weight,
+      'Weight': bomItemData.weight || bomItemData.unitWeight,
+      'Weight(kg)': bomItemData.weight || bomItemData.unitWeight,
+      
+      // Dimension mappings
+      'length': bomItemData.length || bomItemData.maxLength,
+      'maxLength': bomItemData.maxLength || bomItemData.length,
+      'Length': bomItemData.length || bomItemData.maxLength,
+      'Max Length': bomItemData.maxLength || bomItemData.length,
+      'Max Length(mm)': bomItemData.maxLength || bomItemData.length,
+      
+      'width': bomItemData.width || bomItemData.maxWidth,
+      'maxWidth': bomItemData.maxWidth || bomItemData.width,
+      'Width': bomItemData.width || bomItemData.maxWidth,
+      'Max Width': bomItemData.maxWidth || bomItemData.width,
+      'Max Width(mm)': bomItemData.maxWidth || bomItemData.width,
+      
+      'height': bomItemData.height || bomItemData.maxHeight,
+      'maxHeight': bomItemData.maxHeight || bomItemData.height,
+      'Height': bomItemData.height || bomItemData.maxHeight,
+      'Max Height': bomItemData.maxHeight || bomItemData.height,
+      'Max Height(mm)': bomItemData.maxHeight || bomItemData.height,
+      
+      // Surface area mapping
+      'surfaceArea': bomItemData.surfaceArea,
+      'Surface Area': bomItemData.surfaceArea,
+      'Surface Area(mm²)': bomItemData.surfaceArea,
+    };
+
+    const newInputs: Record<string, any> = { ...calculatorInputs };
+
+    selectedCalculator.fields
+      ?.filter((field: any) => field.fieldType !== 'calculated')
+      .forEach((field: any) => {
+        const fieldName = field.fieldName;
+        const displayName = field.displayLabel || field.displayName;
+
+        // Try to match by field name or display name
+        const bomValue = bomFieldMapping[fieldName] || bomFieldMapping[displayName];
+        
+        if (bomValue !== undefined && bomValue !== null && bomValue !== '') {
+          newInputs[fieldName] = typeof bomValue === 'number' ? bomValue : parseFloat(bomValue) || 0;
+        }
+      });
+
+    setCalculatorInputs(newInputs);
+  };
+
+  // Auto-populate when calculator or BOM data changes
+  useEffect(() => {
+    if (selectedCalculator && bomItemData) {
+      autoPopulateFromBOM();
+    }
+  }, [selectedCalculator?.id, bomItemData?.id, calculatorTarget]);
+
+  // Also auto-populate when dialog opens with calculator already selected
+  useEffect(() => {
+    if (open && selectedCalculatorId && bomItemData) {
+      // Small delay to ensure calculator data is loaded
+      setTimeout(autoPopulateFromBOM, 100);
+    }
+  }, [open, selectedCalculatorId, bomItemData?.id]);
+
   // Handle viewing lookup table
   const handleViewLookupTable = async (field: any) => {
     setSelectedLookupField(field);
 
-    // Only proceed if this is a proper database_lookup field with source information
-    if (field.fieldType !== 'database_lookup' || field.dataSource !== 'processes' || !field.sourceField) {
-      console.error('Field is not a valid database lookup field:', field);
-      return;
-    }
-
-    let tableId = field.sourceField;
-
-    // Handle the from_ prefix format
-    if (field.sourceField.startsWith('from_')) {
-      tableId = field.sourceField.replace('from_', '');
-    }
-
-    // Fetch table data from the processes API
     try {
       const { processesApi } = await import('@/lib/api/processes');
-      const table = await processesApi.getReferenceTable(tableId);
 
-      if (table) {
-        const processedRows = table.rows?.map((row) => {
-          if (row.rowData) {
-            return row.rowData;
-          }
-          return row;
-        }) || [];
+      // Case 1: sourceField is set — fetch by table ID directly
+      if (field.sourceField) {
+        let tableId = field.sourceField;
+        if (field.sourceField.startsWith('from_')) {
+          tableId = field.sourceField.replace('from_', '');
+        }
 
-        setLookupTableData({
-          fieldName: field.fieldName,
-          fieldLabel: field.displayLabel || field.fieldName,
-          tableName: table.tableName,
-          tableId: table.id,
-          column_definitions: table.columnDefinitions || [],
-          rows: processedRows
-        });
-        setShowLookupTable(true);
-      } else {
-        console.error('No table found for ID:', tableId);
+        const table = await processesApi.getReferenceTable(tableId);
+        if (table) {
+          const processedRows = table.rows?.map((row: any) =>
+            row.rowData ? row.rowData : row
+          ) || [];
+          setLookupTableData({
+            fieldName: field.fieldName,
+            fieldLabel: field.displayLabel || field.fieldName,
+            tableName: table.tableName,
+            tableId: table.id,
+            column_definitions: table.columnDefinitions || [],
+            rows: processedRows,
+          });
+          setShowLookupTable(true);
+          return;
+        }
       }
+
+      // Case 2: No sourceField — find reference table by matching field label against
+      // all reference tables belonging to the calculator's associated process.
+      // The already-loaded selectedCalculator object often carries associatedProcessId.
+      const processId: string | undefined =
+        (selectedCalculator as any)?.associatedProcessId ||
+        (selectedCalculator as any)?.processId;
+
+      if (processId) {
+        const tables = await processesApi.getReferenceTables(processId);
+        // Enhanced matching for various field types
+        const fieldLabel = (field.displayLabel || field.fieldName || '').toLowerCase();
+        const fieldName = (field.fieldName || '').toLowerCase();
+
+        let matched = tables.find((t: any) => {
+          const tableName = (t.tableName || '').toLowerCase();
+
+          // Direct matches
+          if (tableName.includes(fieldLabel) || fieldLabel.includes(tableName)) return true;
+          if (tableName.includes(fieldName) || fieldName.includes(tableName)) return true;
+
+          // Special cases for common field types
+          if (fieldName.includes('viscosity') && tableName.includes('viscosity')) return true;
+          if (fieldName.includes('gross') && tableName.includes('weight')) return true;
+          if (fieldName.includes('usage') && tableName.includes('weight')) return true;
+          if (fieldName.includes('density') && tableName.includes('density')) return true;
+
+          return false;
+        });
+
+        // Fallback to first table if no specific match and only one table exists
+        if (!matched && tables.length === 1) {
+          matched = tables[0];
+        }
+
+        if (matched) {
+          const processedRows = matched.rows?.map((row: any) =>
+            row.rowData ? row.rowData : row
+          ) || [];
+          setLookupTableData({
+            fieldName: field.fieldName,
+            fieldLabel: field.displayLabel || field.fieldName,
+            tableName: matched.tableName,
+            tableId: matched.id,
+            column_definitions: matched.columnDefinitions || [],
+            rows: processedRows,
+          });
+          setShowLookupTable(true);
+          return;
+        }
+      }
+
+
+      console.error('Could not resolve reference table for field:', field);
     } catch (error) {
-      console.error('Failed to fetch table for field:', field.fieldName, 'tableId:', tableId, error);
+      console.error('Failed to fetch table for field:', field.fieldName, error);
     }
   };
 
@@ -277,6 +393,19 @@ export function ProcessCostDialog({
       setCalculatorResults(null);
       setCalculatorTarget(null);
     }
+  }, [calculatorOpen]);
+
+  // Control page scroll when calculator is open
+  useEffect(() => {
+    if (calculatorOpen) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+    
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
   }, [calculatorOpen]);
 
   // Load edit data (wait for data to be loaded before populating)
@@ -390,247 +519,420 @@ export function ProcessCostDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-primary">
-            {editData ? 'Edit Process Cost' : 'Create Process Cost'}
-          </DialogTitle>
-          <DialogDescription>
-            Configure process parameters, select resources, and calculate costs
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog 
+        open={open} 
+        modal={false}
+        onOpenChange={(openState) => {
+          // Prevent closing if calculator is open
+          if (!openState && calculatorOpen) {
+            console.log('Preventing main dialog close because calculator is open');
+            return;
+          }
+          onOpenChange(openState);
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-primary">
+              {editData ? 'Edit Process Cost' : 'Create Process Cost'}
+            </DialogTitle>
+            <DialogDescription>
+              Configure process parameters, select resources, and calculate costs
+            </DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            {/* Op Nbr */}
-            <div className="space-y-2">
-              <Label>Op Nbr</Label>
-              <Input
-                type="number"
-                value={opNbr}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setOpNbr(val === '' ? 0 : parseInt(val) || 0);
-                }}
-                placeholder="Enter operation number"
-              />
-            </div>
-
-            {/* Error State */}
-            {hasErrors && (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <p className="text-destructive font-semibold mb-2">Error loading data</p>
-                <p className="text-sm text-muted-foreground">
-                  Please check your connection and try again
-                </p>
+          <div className="max-h-[calc(90vh-120px)] overflow-y-auto">
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-4">
+              {/* Op Nbr */}
+              <div className="space-y-2">
+                <Label>Op Nbr</Label>
+                <Input
+                  type="number"
+                  value={opNbr}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setOpNbr(val === '' ? 0 : parseInt(val) || 0);
+                  }}
+                  placeholder="Enter operation number"
+                />
               </div>
-            )}
 
-            {/* Loading State */}
-            {!hasErrors && (isLoadingMHR || isLoadingLSR || isLoadingHierarchy) && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Loading data...</span>
-              </div>
-            )}
+              {/* Error State */}
+              {hasErrors && (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <p className="text-destructive font-semibold mb-2">Error loading data</p>
+                  <p className="text-sm text-muted-foreground">
+                    Please check your connection and try again
+                  </p>
+                </div>
+              )}
 
-            {!hasErrors && !isLoadingMHR && !isLoadingLSR && !isLoadingHierarchy && (
-              <>
-                {/* Info Banner - Show when process groups exist but no routes */}
-                {processGroups.length > 0 && selectedGroup && processRoutes.length === 0 && !hierarchyError && (
-                  <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-                    <CardContent className="pt-4 pb-4">
-                      <div className="flex gap-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
-                        <div className="flex-1">
-                          <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                            No Process Routes Available
-                          </h4>
-                          <p className="text-xs text-blue-700 dark:text-blue-300">
-                            There are no process routes defined for the "{selectedGroup}" group yet.
-                            Please navigate to the <strong>Process Planning</strong> page to create process routes and add steps before using them here.
-                          </p>
+              {/* Loading State */}
+              {!hasErrors && (isLoadingMHR || isLoadingLSR || isLoadingHierarchy || isLoadingCalculators) && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="ml-2 text-muted-foreground">Loading data...</span>
+                </div>
+              )}
+
+              {!hasErrors && !isLoadingMHR && !isLoadingLSR && !isLoadingHierarchy && !isLoadingCalculators && (
+                <>
+                  {/* Info Banner - Show when process groups exist but no routes */}
+                  {processGroups.length > 0 && selectedGroup && processRoutes.length === 0 && !hierarchyError && (
+                    <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+                      <CardContent className="pt-4 pb-4">
+                        <div className="flex gap-3">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                          <div className="flex-1">
+                            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                              No Process Routes Available
+                            </h4>
+                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                              There are no process routes defined for the "{selectedGroup}" group yet.
+                              Please navigate to the <strong>Process Planning</strong> page to create process routes and add steps before using them here.
+                            </p>
+                          </div>
                         </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* HIERARCHICAL SECTION */}
+                  <Card className="border-primary/50 bg-primary/5">
+                    <CardHeader>
+                      <CardTitle className="text-md">Process Selection (Hierarchical)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* 1. Group Selection */}
+                      <div className="space-y-2">
+                        <Label className="font-semibold">1. Group</Label>
+                        <Select
+                          value={selectedGroup}
+                          onValueChange={(value) => {
+                            setSelectedGroup(value);
+                            setSelectedRoute('');
+                            setSelectedOperation('');
+                            setSelectedProcessCalculatorId('');
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select process group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {processGroups.length > 0 ? (
+                              processGroups.map((group) => (
+                                <SelectItem key={group} value={group}>
+                                  {group}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem key="no-groups" value="none" disabled>
+                                No groups available
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* 2. Process Route Selection */}
+                      <div className="space-y-2">
+                        <Label className="font-semibold">
+                          2. Process Route
+                          {!selectedGroup && <span className="text-muted-foreground text-xs ml-2">(Select Group first)</span>}
+                        </Label>
+                        <Select
+                          value={selectedRoute}
+                          onValueChange={(value) => {
+                            setSelectedRoute(value);
+                            setSelectedOperation('');
+                            setSelectedProcessCalculatorId('');
+                          }}
+                          disabled={!selectedGroup}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select process route" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isLoadingHierarchy ? (
+                              <SelectItem key="loading" value="loading" disabled>
+                                Loading routes...
+                              </SelectItem>
+                            ) : processRoutes.length > 0 ? (
+                              processRoutes.map((route: string) => (
+                                <SelectItem key={route} value={route}>
+                                  {route}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem key="no-routes" value="none" disabled>
+                                No process routes for {selectedGroup}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {hierarchyError && (
+                          <p className="text-xs text-red-600 dark:text-red-400">
+                            Error loading hierarchy: {(hierarchyError as Error).message || 'Unknown error'}
+                          </p>
+                        )}
+                        {selectedGroup && !isLoadingHierarchy && !hierarchyError && processRoutes.length === 0 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            No routes found for "{selectedGroup}". Create process calculator mappings first.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* 3. Operations Selection */}
+                      <div className="space-y-2">
+                        <Label className="font-semibold">
+                          3. Operations
+                          {!selectedRoute && <span className="text-muted-foreground text-xs ml-2">(Select Process Route first)</span>}
+                        </Label>
+                        <Select
+                          value={selectedOperation}
+                          onValueChange={(value) => {
+                            setSelectedOperation(value);
+                            setSelectedProcessCalculatorId('');
+                          }}
+                          disabled={!selectedRoute}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select operation" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isLoadingHierarchy ? (
+                              <SelectItem key="loading" value="loading" disabled>
+                                Loading operations...
+                              </SelectItem>
+                            ) : operations.length > 0 ? (
+                              operations.map((op: string) => (
+                                <SelectItem key={op} value={op}>
+                                  {op}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem key="no-operations" value="none" disabled>
+                                No operations available
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {hierarchyError && (
+                          <p className="text-xs text-red-600 dark:text-red-400">
+                            Error loading operations: {(hierarchyError as Error).message || 'Unknown error'}
+                          </p>
+                        )}
+                        {selectedRoute && !isLoadingHierarchy && !hierarchyError && operations.length === 0 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            No operations found for "{selectedRoute}". Create process calculator mappings first.
+                          </p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
-                )}
 
-                {/* HIERARCHICAL SECTION */}
-                <Card className="border-primary/50 bg-primary/5">
-                  <CardHeader>
-                    <CardTitle className="text-md">Process Selection (Hierarchical)</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* 1. Group Selection */}
-                    <div className="space-y-2">
-                      <Label className="font-semibold">1. Group</Label>
-                      <Select
-                        value={selectedGroup}
-                        onValueChange={(value) => {
-                          setSelectedGroup(value);
-                          setSelectedRoute('');
-                          setSelectedOperation('');
-                          setSelectedProcessCalculatorId('');
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select process group" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {processGroups.length > 0 ? (
-                            processGroups.map((group) => (
-                              <SelectItem key={group} value={group}>
-                                {group}
+                  {/* RESOURCES SECTION */}
+                  <Card className="border-secondary/50">
+                    <CardHeader>
+                      <CardTitle className="text-md">Resources & Location</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Location Filter */}
+                      <div className="space-y-2">
+                        <Label>Location <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+                        <Select value={location} onValueChange={setLocation}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="All locations" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All locations</SelectItem>
+                            {locations.map((loc) => (
+                              <SelectItem key={loc} value={loc}>
+                                {loc}
                               </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem key="no-groups" value="none" disabled>
-                              No groups available
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                    {/* 2. Process Route Selection */}
-                    <div className="space-y-2">
-                      <Label className="font-semibold">
-                        2. Process Route
-                        {!selectedGroup && <span className="text-muted-foreground text-xs ml-2">(Select Group first)</span>}
-                      </Label>
-                      <Select
-                        value={selectedRoute}
-                        onValueChange={(value) => {
-                          setSelectedRoute(value);
-                          setSelectedOperation('');
-                          setSelectedProcessCalculatorId('');
-                        }}
-                        disabled={!selectedGroup}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select process route" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {isLoadingHierarchy ? (
-                            <SelectItem key="loading" value="loading" disabled>
-                              Loading routes...
-                            </SelectItem>
-                          ) : processRoutes.length > 0 ? (
-                            processRoutes.map((route: string) => (
-                              <SelectItem key={route} value={route}>
-                                {route}
+                      {/* Machine Value */}
+                      <div className="space-y-2">
+                        <Label>Machine Value</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={machineValue}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setMachineValue(val === '' ? 0 : parseFloat(val) || 0);
+                            }}
+                            placeholder="Enter machine value"
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setCalculatorTarget('machineValue');
+                              setCalculatorOpen(true);
+                            }}
+                            title="Use Calculator"
+                          >
+                            <CalculatorIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Machine (MHR) Selection */}
+                      <div className="space-y-2">
+                        <Label>Machine</Label>
+                        <Select value={selectedMHRId} onValueChange={setSelectedMHRId} required>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select machine" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {filteredMHR.map((mhr) => (
+                              <SelectItem key={mhr.id} value={mhr.id}>
+                                {mhr.machineName} - ₹{mhr.calculations.totalMachineHourRate.toFixed(2)}/hr
+                                {mhr.location ? ` (${mhr.location})` : ''}
                               </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem key="no-routes" value="none" disabled>
-                              No process routes for {selectedGroup}
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {hierarchyError && (
-                        <p className="text-xs text-red-600 dark:text-red-400">
-                          Error loading hierarchy: {(hierarchyError as Error).message || 'Unknown error'}
-                        </p>
-                      )}
-                      {selectedGroup && !isLoadingHierarchy && !hierarchyError && processRoutes.length === 0 && (
-                        <p className="text-xs text-amber-600 dark:text-amber-500">
-                          No routes found for "{selectedGroup}". Create process calculator mappings first.
-                        </p>
-                      )}
-                    </div>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                    {/* 3. Operations Selection */}
-                    <div className="space-y-2">
-                      <Label className="font-semibold">
-                        3. Operations
-                        {!selectedRoute && <span className="text-muted-foreground text-xs ml-2">(Select Process Route first)</span>}
-                      </Label>
-                      <Select
-                        value={selectedOperation}
-                        onValueChange={(value) => {
-                          setSelectedOperation(value);
-                          setSelectedProcessCalculatorId('');
-                        }}
-                        disabled={!selectedRoute}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select operation" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {isLoadingHierarchy ? (
-                            <SelectItem key="loading" value="loading" disabled>
-                              Loading operations...
-                            </SelectItem>
-                          ) : operations.length > 0 ? (
-                            operations.map((op: string) => (
-                              <SelectItem key={op} value={op}>
-                                {op}
+                      {/* Labour (LSR) Selection */}
+                      <div className="space-y-2">
+                        <Label>Labour Type</Label>
+                        <Select
+                          value={selectedLSRId}
+                          onValueChange={setSelectedLSRId}
+                          required
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select labour type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {filteredLSR.map((lsr: any) => (
+                              <SelectItem key={lsr.id} value={String(lsr.id)}>
+                                {lsr.labourType} - ₹{lsr.lhr.toFixed(2)}/hr
+                                {lsr.location ? ` (${lsr.location})` : ''}
                               </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem key="no-operations" value="none" disabled>
-                              No operations available
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {hierarchyError && (
-                        <p className="text-xs text-red-600 dark:text-red-400">
-                          Error loading operations: {(hierarchyError as Error).message || 'Unknown error'}
-                        </p>
-                      )}
-                      {selectedRoute && !isLoadingHierarchy && !hierarchyError && operations.length === 0 && (
-                        <p className="text-xs text-amber-600 dark:text-amber-500">
-                          No operations found for "{selectedRoute}". Create process calculator mappings first.
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
 
-                {/* RESOURCES SECTION */}
-                <Card className="border-secondary/50">
-                  <CardHeader>
-                    <CardTitle className="text-md">Resources & Location</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Location Filter */}
+              {/* Rate Information */}
+              {selectedMHR && selectedLSR && (
+                <>
+                  <Card className="bg-secondary/20">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Selected Rates</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Machine Rate:</span>
+                        <span className="ml-2 font-bold">₹{selectedMHR.calculations.totalMachineHourRate.toFixed(2)}/hr</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Labour Rate:</span>
+                        <span className="ml-2 font-bold">₹{selectedLSR.lhr.toFixed(2)}/hr</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Location <span className="text-muted-foreground text-xs">(Optional)</span></Label>
-                      <Select value={location} onValueChange={setLocation}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="All locations" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All locations</SelectItem>
-                          {locations.map((loc) => (
-                            <SelectItem key={loc} value={loc}>
-                              {loc}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Setup Manning</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={setupManning}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSetupManning(val === '' ? 0 : parseFloat(val) || 0);
+                        }}
+                        placeholder="Enter setup manning"
+                      />
                     </div>
 
-                    {/* Machine Value */}
                     <div className="space-y-2">
-                      <Label>Machine Value</Label>
+                      <Label>Setup Time (mins)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={setupTime}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSetupTime(val === '' ? 0 : parseFloat(val) || 0);
+                        }}
+                        placeholder="Enter setup time"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Batch Size</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="1"
+                        value={batchSize}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setBatchSize(val === '' ? 1 : parseFloat(val) || 1);
+                        }}
+                        placeholder="Enter batch size"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Heads</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={heads}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setHeads(val === '' ? 0 : parseFloat(val) || 0);
+                        }}
+                        placeholder="Enter number of heads"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Cycle Time (secs)</Label>
                       <div className="flex gap-2">
                         <Input
                           type="number"
                           step="0.01"
-                          min="0"
-                          value={machineValue}
+                          min="1"
+                          value={cycleTime}
                           onChange={(e) => {
                             const val = e.target.value;
-                            setMachineValue(val === '' ? 0 : parseFloat(val) || 0);
+                            setCycleTime(val === '' ? 0 : parseFloat(val) || 0);
                           }}
-                          placeholder="Enter machine value"
+                          placeholder="Enter cycle time"
+                          required
                           className="flex-1"
                         />
                         <Button
@@ -638,7 +940,7 @@ export function ProcessCostDialog({
                           variant="outline"
                           size="icon"
                           onClick={() => {
-                            setCalculatorTarget('machineValue');
+                            setCalculatorTarget('cycleTime');
                             setCalculatorOpen(true);
                           }}
                           title="Use Calculator"
@@ -648,230 +950,90 @@ export function ProcessCostDialog({
                       </div>
                     </div>
 
-                    {/* Machine (MHR) Selection */}
                     <div className="space-y-2">
-                      <Label>Machine</Label>
-                      <Select value={selectedMHRId} onValueChange={setSelectedMHRId} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select machine" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredMHR.map((mhr) => (
-                            <SelectItem key={mhr.id} value={mhr.id}>
-                              {mhr.machineName} - ₹{mhr.calculations.totalMachineHourRate.toFixed(2)}/hr
-                              {mhr.location ? ` (${mhr.location})` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Labour (LSR) Selection */}
-                    <div className="space-y-2">
-                      <Label>Labour Type</Label>
-                      <Select
-                        value={selectedLSRId}
-                        onValueChange={setSelectedLSRId}
-                        required
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select labour type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredLSR.map((lsr: any) => (
-                            <SelectItem key={lsr.id} value={String(lsr.id)}>
-                              {lsr.labourType} - ₹{lsr.lhr.toFixed(2)}/hr
-                              {lsr.location ? ` (${lsr.location})` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-
-            {/* Rate Information */}
-            {selectedMHR && selectedLSR && (
-              <>
-                <Card className="bg-secondary/20">
-                  <CardHeader>
-                    <CardTitle className="text-sm">Selected Rates</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Machine Rate:</span>
-                      <span className="ml-2 font-bold">₹{selectedMHR.calculations.totalMachineHourRate.toFixed(2)}/hr</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Labour Rate:</span>
-                      <span className="ml-2 font-bold">₹{selectedLSR.lhr.toFixed(2)}/hr</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Setup Manning</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={setupManning}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSetupManning(val === '' ? 0 : parseFloat(val) || 0);
-                      }}
-                      placeholder="Enter setup manning"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Setup Time (mins)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={setupTime}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSetupTime(val === '' ? 0 : parseFloat(val) || 0);
-                      }}
-                      placeholder="Enter setup time"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Batch Size</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="1"
-                      value={batchSize}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setBatchSize(val === '' ? 1 : parseFloat(val) || 1);
-                      }}
-                      placeholder="Enter batch size"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Heads</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={heads}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setHeads(val === '' ? 0 : parseFloat(val) || 0);
-                      }}
-                      placeholder="Enter number of heads"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Cycle Time (secs)</Label>
-                    <div className="flex gap-2">
+                      <Label>Parts/Cycle</Label>
                       <Input
                         type="number"
                         step="0.01"
                         min="1"
-                        value={cycleTime}
+                        value={partsPerCycle}
                         onChange={(e) => {
                           const val = e.target.value;
-                          setCycleTime(val === '' ? 0 : parseFloat(val) || 0);
+                          setPartsPerCycle(val === '' ? 1 : parseFloat(val) || 1);
                         }}
-                        placeholder="Enter cycle time"
+                        placeholder="Enter parts per cycle"
                         required
-                        className="flex-1"
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => {
-                          setCalculatorTarget('cycleTime');
-                          setCalculatorOpen(true);
-                        }}
-                        title="Use Calculator"
-                      >
-                        <CalculatorIcon className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Parts/Cycle</Label>
+                    <Label>Scrap %</Label>
                     <Input
                       type="number"
                       step="0.01"
-                      min="1"
-                      value={partsPerCycle}
+                      min="0"
+                      max="100"
+                      value={scrap}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setPartsPerCycle(val === '' ? 1 : parseFloat(val) || 1);
+                        setScrap(val === '' ? 0 : parseFloat(val) || 0);
                       }}
-                      placeholder="Enter parts per cycle"
-                      required
+                      placeholder="Enter scrap percentage"
                     />
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label>Scrap %</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={scrap}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setScrap(val === '' ? 0 : parseFloat(val) || 0);
-                    }}
-                    placeholder="Enter scrap percentage"
-                  />
-                </div>
+                  {/* Total Cost Display */}
+                  <Card className="bg-primary/10 border border-primary/20">
+                    <CardContent className="pt-6">
+                      <Label className="block mb-2">Total Cost</Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">INR</span>
+                        <span className="text-2xl font-bold text-primary">₹{totalCost.toFixed(2)}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
 
-                {/* Total Cost Display */}
-                <Card className="bg-primary/10 border border-primary/20">
-                  <CardContent className="pt-6">
-                    <Label className="block mb-2">Total Cost</Label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">INR</span>
-                      <span className="text-2xl font-bold text-primary">₹{totalCost.toFixed(2)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            )}
+              <DialogFooter className="mt-6">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!selectedMHRId || !selectedLSRId || cycleTime <= 0 || batchSize <= 0}
+                >
+                  {editData ? 'Update Process' : 'Add Process'}
+                </Button>
+              </DialogFooter>
+            </form>
           </div>
-
-          <DialogFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={!selectedMHRId || !selectedLSRId || cycleTime <= 0 || batchSize <= 0}
-            >
-              {editData ? 'Update Process' : 'Add Process'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+        </DialogContent>
+      </Dialog>
 
       {/* Calculator Side Panel */}
-      <Sheet open={calculatorOpen} onOpenChange={setCalculatorOpen} modal={false}>
-        <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto z-[9998]">
+      <Sheet open={calculatorOpen} onOpenChange={(open) => {
+        console.log('Calculator onOpenChange called with:', open);
+        
+        // Prevent calculator from closing if lookup table is open
+        if (!open && showLookupTable) {
+          console.log('Preventing calculator close because lookup table is open');
+          return;
+        }
+        
+        if (!open) {
+          console.log('Calculator closing - also closing lookup table');
+          // When closing calculator, also close lookup table
+          setShowLookupTable(false);
+          setSelectedLookupField(null);
+          setLookupTableData(null);
+        }
+        
+        setCalculatorOpen(open);
+      }} modal={false}>
+        <SheetContent side="right" className="w-[600px] sm:w-[700px]" style={{ overflowY: 'auto' }}>
           <SheetHeader>
             <SheetTitle>Calculator - {calculatorTarget}</SheetTitle>
             <SheetDescription>
@@ -931,6 +1093,26 @@ export function ProcessCostDialog({
               )}
             </div>
 
+            {/* Auto-populate from BOM button */}
+            {bomItemData && (
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant="outline" 
+                  onClick={autoPopulateFromBOM}
+                  className="w-full"
+                  disabled={!selectedCalculator}
+                >
+                  Auto-fill from BOM Data
+                </Button>
+                {!selectedCalculator && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Select a calculator above to enable auto-fill
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Calculator Inputs */}
             {selectedCalculator && (
               <>
@@ -942,10 +1124,15 @@ export function ProcessCostDialog({
                     {selectedCalculator.fields
                       ?.filter((field: any) => field.fieldType !== 'calculated')
                       .map((field: any) => {
-                        // Only show eye icon for properly configured database_lookup fields
-                        const isLookupTableField = field.fieldType === 'database_lookup' &&
-                          field.dataSource === 'processes' &&
-                          !!field.sourceField;
+                        // Only show eye button for fields that have actual lookup tables configured
+                        const isLookupTableField = 
+                          // Only show for explicitly configured database lookup fields
+                          (field.fieldType === 'database_lookup' && field.dataSource === 'processes') ||
+                          // Only show for fields with sourceField starting with 'from_' (linked to reference tables)
+                          (field.sourceField && field.sourceField.startsWith('from_'));
+
+
+
 
 
                         return (
@@ -955,12 +1142,23 @@ export function ProcessCostDialog({
                               {field.unit && <span className="text-muted-foreground ml-1">({field.unit})</span>}
                             </Label>
 
-                            {isLookupTableField || (field.displayLabel && (field.displayLabel.includes('Cavities') || field.displayLabel.includes('Recommendation') || field.displayLabel.includes('Viscosity'))) ? (
-                              // Show eye icon for lookup table fields
+                            {isLookupTableField ? (
+                              // Input field WITH eye icon for lookup table fields
                               <div className="flex gap-2">
-                                <div className="flex-1 bg-muted/20 border border-border rounded-md px-3 py-2 text-sm text-muted-foreground">
-                                  Reference lookup table field
-                                </div>
+                                <Input
+                                  id={field.fieldName}
+                                  type="number"
+                                  step="0.01"
+                                  value={calculatorInputs[field.fieldName] || ''}
+                                  onChange={(e) =>
+                                    setCalculatorInputs({
+                                      ...calculatorInputs,
+                                      [field.fieldName]: parseFloat(e.target.value) || 0,
+                                    })
+                                  }
+                                  placeholder={`Enter ${field.displayLabel || field.fieldName}`}
+                                  className="flex-1"
+                                />
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -973,7 +1171,7 @@ export function ProcessCostDialog({
                                 </Button>
                               </div>
                             ) : (
-                              // Regular input field
+                              // Regular input field only
                               <Input
                                 id={field.fieldName}
                                 type="number"
@@ -1053,11 +1251,30 @@ export function ProcessCostDialog({
       </Sheet>
 
       {/* Lookup Table Panel */}
-      {showLookupTable && lookupTableData && (
-        <div
-          className="fixed top-0 left-0 h-screen w-[500px] bg-background border-r border-border shadow-xl z-[9999] flex flex-col"
-          style={{ pointerEvents: 'auto' }}
-        >
+      {showLookupTable && lookupTableData && (() => {
+        console.log('Rendering lookup table:', { showLookupTable, hasData: !!lookupTableData, tableName: lookupTableData?.tableName });
+        return (
+          <>
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-black/20 z-[59]" 
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                e.nativeEvent?.stopImmediatePropagation?.();
+                setShowLookupTable(false);
+                setSelectedLookupField(null);
+                setLookupTableData(null);
+              }}
+            />
+            
+            {/* Lookup Table */}
+            <div
+              className="fixed top-0 left-0 h-screen w-[500px] bg-background border-r border-border shadow-xl z-[60] flex flex-col"
+              style={{ pointerEvents: 'auto' }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
           <div className="flex items-center justify-between p-3 border-b border-border bg-background">
             <div>
               <h3 className="font-semibold text-sm">Reference Table</h3>
@@ -1067,7 +1284,14 @@ export function ProcessCostDialog({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setShowLookupTable(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                e.nativeEvent?.stopImmediatePropagation?.();
+                setShowLookupTable(false);
+                setSelectedLookupField(null);
+                setLookupTableData(null);
+              }}
               className="h-6 w-6 p-0"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1077,15 +1301,21 @@ export function ProcessCostDialog({
             </Button>
           </div>
 
+          {/* Hint */}
+          <div className="px-3 py-1.5 bg-primary/5 border-b border-border text-xs text-muted-foreground flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+            Click any row to use that value for <strong className="text-foreground mx-0.5">{lookupTableData.fieldLabel}</strong>. Highlighted column = selected value.
+          </div>
+
           <div
-            className="flex-1 p-3 relative"
+            className="flex-1 p-3 relative overflow-auto"
             style={{
-              height: 'calc(100vh - 60px)',
-              overflowY: 'scroll',
-              overflowX: 'auto',
+              height: 'calc(100vh - 120px)',
               pointerEvents: 'auto',
               zIndex: 10000
             }}
+            onClick={(e) => e.stopPropagation()}
+            onScroll={(e) => e.stopPropagation()}
           >
             <div className="w-full">
               <table className="w-full border-collapse text-sm bg-background">
@@ -1094,51 +1324,95 @@ export function ProcessCostDialog({
                     <th className="border border-border text-center text-xs font-medium py-1 px-1 text-muted-foreground w-6">
                       #
                     </th>
-                    {lookupTableData.column_definitions.map((col: any) => (
-                      <th
-                        key={col.name}
-                        className="border border-border text-left text-xs font-semibold py-1 px-2 text-foreground"
-                      >
-                        {col.label}
-                        {col.unit && (
-                          <span className="text-primary/70 ml-1">({col.unit})</span>
-                        )}
-                      </th>
-                    ))}
+                    {lookupTableData.column_definitions.map((col: any, colIdx: number) => {
+                      const isOutputCol = colIdx === lookupTableData.column_definitions.length - 1;
+                      return (
+                        <th
+                          key={col.name}
+                          className={`border border-border text-left text-xs font-semibold py-1 px-2 ${isOutputCol ? 'text-primary bg-primary/10' : 'text-foreground'
+                            }`}
+                        >
+                          {col.label}
+                          {isOutputCol && <span className="ml-1 text-primary/60">(↵ select)</span>}
+                          {col.unit && (
+                            <span className="text-primary/70 ml-1">({col.unit})</span>
+                          )}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
-                  {lookupTableData.rows.map((row: any, rowIndex: number) => (
-                    <tr
-                      key={rowIndex}
-                      className="hover:bg-primary/5 transition-colors"
-                    >
-                      <td className="border border-border text-center text-xs py-1 px-1 text-muted-foreground font-mono bg-muted/20">
-                        {rowIndex + 1}
-                      </td>
-                      {lookupTableData.column_definitions.map((col: any) => {
-                        const camelCaseKey = col.name.replace(/_([a-z])/g, (_: string, letter: string) => letter.toUpperCase());
-                        const value = row[col.name] || row[camelCaseKey];
-
-                        return (
-                          <td
-                            key={col.name}
-                            className="border border-border py-1 px-2 text-xs"
-                          >
-                            {value !== undefined && value !== null
-                              ? String(value)
-                              : '—'}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                  {lookupTableData.rows.map((row: any, rowIndex: number) => {
+                    const outputCol = lookupTableData.column_definitions[lookupTableData.column_definitions.length - 1];
+                    const getVal = (col: any) => {
+                      const camel = col.name.replace(/_([a-z])/g, (_: string, l: string) => l.toUpperCase());
+                      return row[col.name] !== undefined ? row[col.name] : row[camel];
+                    };
+                    const outputValue = outputCol ? getVal(outputCol) : undefined;
+                    return (
+                      <tr
+                        key={rowIndex}
+                        className="hover:bg-primary/10 cursor-pointer transition-colors"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                        onClick={(e) => {
+                          console.log('Lookup table row clicked');
+                          e.stopPropagation();
+                          e.preventDefault();
+                          e.nativeEvent?.stopImmediatePropagation?.();
+                          
+                          if (selectedLookupField && outputValue !== undefined) {
+                            console.log('Setting calculator input:', selectedLookupField.fieldName, outputValue);
+                            setCalculatorInputs((prev: Record<string, any>) => ({
+                              ...prev,
+                              [selectedLookupField.fieldName]: typeof outputValue === "number"
+                                ? outputValue
+                                : parseFloat(outputValue) || outputValue,
+                            }));
+                          }
+                          
+                          // Use setTimeout to ensure state updates don't conflict
+                          setTimeout(() => {
+                            console.log('Closing lookup table only');
+                            // Close ONLY lookup table after selection
+                            setShowLookupTable(false);
+                            setSelectedLookupField(null);
+                            setLookupTableData(null);
+                          }, 0);
+                          
+                          return false;
+                        }}
+                        title={outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`}
+                      >
+                        <td className="border border-border text-center text-xs py-1 px-1 text-muted-foreground font-mono bg-muted/20">
+                          {rowIndex + 1}
+                        </td>
+                        {lookupTableData.column_definitions.map((col: any) => {
+                          const value = getVal(col);
+                          const isOutput = col.name === outputCol?.name;
+                          return (
+                            <td
+                              key={col.name}
+                              className={`border border-border py-1 px-2 text-xs${isOutput ? ' font-semibold text-primary bg-primary/5' : ''}`}
+                            >
+                              {value !== undefined && value !== null ? String(value) : '—'}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-      )}
-    </Dialog>
+        </>
+        );
+      })()}
+    </>
   );
 }

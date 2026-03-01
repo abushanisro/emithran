@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, ArrowLeft, Play, AlertCircle, Table2 } from 'lucide-react';
+import { Calculator, ArrowLeft, Play, AlertCircle, Table2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +43,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
   const [results, setResults] = useState<Record<string, any> | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [lookupTables, setLookupTables] = useState<ReferenceTableData[]>([]);
+  const [viewingTableFor, setViewingTableFor] = useState<string | null>(null);
 
   // Initialize field values when calculator loads
   useEffect(() => {
@@ -56,7 +57,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
       });
       setFieldValues(initialValues);
       
-      // Also fetch lookup tables immediately for display
+      // Fetch lookup tables immediately for display
       fetchLookupTables();
     }
   }, [calculator]);
@@ -306,10 +307,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
         <CardContent className="grid gap-4 md:grid-cols-2">
           {calculator.fields
             ?.filter((field) => 
-              field.fieldType !== 'calculated' && 
-              !(field.fieldType === 'database_lookup' && 
-                field.dataSource === 'processes' && 
-                field.sourceField?.startsWith('from_'))
+              field.fieldType !== 'calculated'
             )
             .map((field) => (
               <div key={field.id} className="space-y-2">
@@ -317,19 +315,37 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                   {field.displayLabel || field.fieldName}
                   {field.isRequired && <span className="text-destructive ml-1">*</span>}
                 </Label>
-                <Input
-                  id={field.fieldName}
-                  type={field.fieldType === 'number' ? 'number' : 'text'}
-                  value={fieldValues[field.fieldName]?.toString() || ''}
-                  onChange={(e) =>
-                    setFieldValues((prev) => ({
-                      ...prev,
-                      [field.fieldName]: field.fieldType === 'number' ? parseFloat(e.target.value) : e.target.value,
-                    }))
-                  }
-                  placeholder={field.displayLabel}
-                  className="bg-primary/5 border-primary/10"
-                />
+                <div className="relative">
+                  <Input
+                    id={field.fieldName}
+                    type={field.fieldType === 'number' ? 'number' : 'text'}
+                    value={fieldValues[field.fieldName]?.toString() || ''}
+                    onChange={(e) =>
+                      setFieldValues((prev) => ({
+                        ...prev,
+                        [field.fieldName]: field.fieldType === 'number' ? parseFloat(e.target.value) : e.target.value,
+                      }))
+                    }
+                    placeholder={field.displayLabel}
+                    className="bg-primary/5 border-primary/10"
+                  />
+                  {/* Show eye button for database lookup fields */}
+                  {field.fieldType === 'database_lookup' && 
+                   field.dataSource === 'processes' && 
+                   field.sourceField?.startsWith('from_') && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                      onClick={() => setViewingTableFor(
+                        viewingTableFor === field.fieldName ? null : field.fieldName
+                      )}
+                    >
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
                 {field.unit && (
                   <p className="text-xs text-muted-foreground">Unit: {field.unit}</p>
                 )}
@@ -337,6 +353,110 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
             ))}
         </CardContent>
       </Card>
+
+      {/* Reference Table Viewer */}
+      {viewingTableFor && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Table2 className="h-5 w-5" />
+                Reference Table for {calculator.fields?.find(f => f.fieldName === viewingTableFor)?.displayLabel || viewingTableFor}
+              </CardTitle>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setViewingTableFor(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const field = calculator.fields?.find(f => f.fieldName === viewingTableFor);
+              const table = lookupTables.find(t => t.fieldName === viewingTableFor);
+              
+              if (!table) {
+                return (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Loading reference table...</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Click on a row to select the value for {field?.displayLabel || viewingTableFor}
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b">
+                        {table.column_definitions.map((col) => (
+                          <th key={col.name} className="text-left p-3 font-medium">
+                            {col.label || col.name}
+                            {col.unit && <span className="text-muted-foreground ml-1">({col.unit})</span>}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {table.rows.map((row, index) => (
+                        <tr 
+                          key={index} 
+                          className="border-b hover:bg-primary/10 cursor-pointer transition-colors"
+                          onClick={() => {
+                            const field = calculator.fields?.find(f => f.fieldName === viewingTableFor);
+                            if (field?.sourceField?.startsWith('from_')) {
+                              // Extract table ID from sourceField (e.g., "from_viscosity" -> "viscosity")
+                              const tableId = field.sourceField.replace('from_', '');
+                              
+                              // Find the appropriate column value to use
+                              // For viscosity table, use the viscosity value
+                              // For other tables, try to find a relevant numeric column
+                              let valueToSet = null;
+                              
+                              if (tableId === 'viscosity' && row.viscosity !== undefined) {
+                                valueToSet = row.viscosity;
+                              } else {
+                                // Find first numeric column that isn't 'id'
+                                const numericCol = table.column_definitions.find(
+                                  col => col.type === 'number' && col.name !== 'id'
+                                );
+                                if (numericCol) {
+                                  valueToSet = row[numericCol.name];
+                                }
+                              }
+                              
+                              if (valueToSet !== null) {
+                                setFieldValues(prev => ({
+                                  ...prev,
+                                  [viewingTableFor]: field.fieldType === 'number' ? Number(valueToSet) : valueToSet
+                                }));
+                                setViewingTableFor(null); // Close the table
+                                toast.success(`Selected value: ${valueToSet}`);
+                              }
+                            }
+                          }}
+                        >
+                          {table.column_definitions.map((col) => (
+                            <td key={col.name} className="p-3">
+                              {row[col.name] ?? '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Results - Show both calculated fields and formulas */}
       {results && (
@@ -443,85 +563,6 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
         </Card>
       )}
 
-      {/* Lookup Tables - shown when reference table fields exist */}
-      {lookupTables.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Table2 className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Reference Lookup Tables</h2>
-          </div>
-          {lookupTables.map((table) => (
-            <Card key={table.tableId} className="border-primary/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <span>{table.tableName}</span>
-                  <span className="text-sm font-normal text-muted-foreground">
-                    (used by: {table.fieldLabel})
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {table.rows.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-sm">
-                      <thead>
-                        <tr className="bg-muted/60">
-                          <th className="border border-border text-center text-xs font-medium py-2 px-2 text-muted-foreground w-8">
-                            #
-                          </th>
-                          {table.column_definitions.map((col) => (
-                            <th
-                              key={col.name}
-                              className="border border-border text-left text-xs font-semibold py-2 px-3 text-foreground"
-                            >
-                              {col.label}
-                              {col.unit && (
-                                <span className="text-primary/70 ml-1">({col.unit})</span>
-                              )}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {table.rows.map((row, rowIndex) => (
-                          <tr
-                            key={rowIndex}
-                            className="hover:bg-primary/5 transition-colors"
-                          >
-                            <td className="border border-border text-center text-xs py-1.5 px-2 text-muted-foreground font-mono bg-muted/20">
-                              {rowIndex + 1}
-                            </td>
-                            {table.column_definitions.map((col) => {
-                              // Handle column name mismatch (snake_case vs camelCase)
-                              const camelCaseKey = col.name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-                              const value = row[col.name] || row[camelCaseKey];
-                              
-                              return (
-                                <td
-                                  key={col.name}
-                                  className="border border-border py-1.5 px-3 text-sm"
-                                >
-                                  {value !== undefined && value !== null
-                                    ? String(value)
-                                    : '—'}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <p className="text-sm">No rows in this table.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
 
     </div>
   );

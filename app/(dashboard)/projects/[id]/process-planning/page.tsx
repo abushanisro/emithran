@@ -971,10 +971,10 @@ function ProcessPlanningPageContent() {
                 </div>
 
                 {/* Raw Materials Section */}
-                <RawMaterialsSection bomItemId={selectedItem.id} />
+                <RawMaterialsSection bomItemId={selectedItem.id} bomItem={selectedItem} />
 
                 {/* Manufacturing Process Section */}
-                <ManufacturingProcessSection bomItemId={selectedItem.id} />
+                <ManufacturingProcessSection bomItemId={selectedItem.id} bomItem={selectedItem} />
 
                 {/* Packaging & Logistics Section */}
                 <PackagingLogisticsSection bomItemId={selectedItem.id} />
