@@ -1,14 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Save, Trash2, Edit2, X } from 'lucide-react';
+import { Plus, Save, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 
 type ReferenceTableRow = {
   id?: string;
@@ -38,7 +37,6 @@ type InlineReferenceTableEditorProps = {
 };
 
 export function InlineReferenceTableEditor({
-  processId,
   processName,
   tables,
   onTablesChange,
@@ -46,7 +44,6 @@ export function InlineReferenceTableEditor({
   onViewTables
 }: InlineReferenceTableEditorProps) {
   const [isCreating, setIsCreating] = useState(false);
-  const [editingTableId, setEditingTableId] = useState<string | null>(null);
   const [newTable, setNewTable] = useState<ReferenceTable>({
     table_name: '',
     table_description: '',
@@ -231,13 +228,13 @@ export function InlineReferenceTableEditor({
 
   const handleUpdateColumn = (index: number, field: string, value: string) => {
     const updatedColumns = [...newTable.column_definitions];
-    updatedColumns[index] = { ...updatedColumns[index], [field]: value };
+    updatedColumns[index] = { ...updatedColumns[index], [field]: value } as ReferenceTable['column_definitions'][number];
     setNewTable({ ...newTable, column_definitions: updatedColumns });
   };
 
   const handleAddRow = (tableIndex: number) => {
     const updatedTables = [...tables];
-    const table = updatedTables[tableIndex];
+    const table = updatedTables[tableIndex]!;
     const newRow = table.column_definitions.reduce((acc, col) => {
       acc[col.name] = col.type === 'number' ? 0 : '';
       return acc;
@@ -249,7 +246,7 @@ export function InlineReferenceTableEditor({
 
   const handleUpdateRow = (tableIndex: number, rowIndex: number, field: string, value: any) => {
     const updatedTables = [...tables];
-    const table = updatedTables[tableIndex];
+    const table = updatedTables[tableIndex]!;
     if (!table.rows) table.rows = [];
 
     table.rows[rowIndex] = { ...table.rows[rowIndex], [field]: value };
@@ -504,7 +501,7 @@ export function InlineReferenceTableEditor({
                                 size="sm"
                                 onClick={() => {
                                   const updatedTables = [...tables];
-                                  updatedTables[tableIndex].rows?.splice(rowIndex, 1);
+                                  updatedTables[tableIndex]!.rows?.splice(rowIndex, 1);
                                   onTablesChange(updatedTables);
                                 }}
                                 className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive text-muted-foreground/60"

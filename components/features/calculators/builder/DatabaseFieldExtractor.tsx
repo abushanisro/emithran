@@ -15,15 +15,6 @@ import { cn } from '@/lib/utils';
 import type { DataSource } from '@/lib/api/calculators';
 import { DatabaseRecordPicker } from './DatabaseRecordPicker';
 import { processesApi, type ReferenceTable } from '@/lib/api/processes';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 type DatabaseFieldExtractorProps = {
   dataSource: DataSource;
@@ -78,53 +69,13 @@ const DATA_SOURCE_FIELDS: Record<DataSource, Array<{ field: string; label: strin
   manual: [],
 };
 
-// Helper function to get columns for reference table lookups
-const getTableColumns = (fieldType: string, columnType: 'input' | 'output') => {
-  const tableConfigs = {
-    fromViscosity: {
-      input: [
-        { value: 'material', label: 'Material' },
-      ],
-      output: [
-        { value: 'viscosity', label: 'Viscosity Grade (K)' },
-      ]
-    },
-    fromCavityPressure: {
-      input: [
-        { value: 'flow_path_ratio', label: 'Flow Path to Thickness' },
-      ],
-      output: [
-        { value: 'cavity_pressure', label: 'Cavity Pressure (Bar)' },
-      ]
-    },
-    fromCavitiesRecommendation: {
-      input: [
-        { value: 'eau', label: 'EAU Range' },
-      ],
-      output: [
-        { value: 'cavities', label: 'Recommended Cavities' },
-      ]
-    },
-    fromRunnerDia: {
-      input: [
-        { value: 'part_weight', label: 'Part Weight (gram)' },
-      ],
-      output: [
-        { value: 'diameter', label: 'Runner Diameter (mm)' },
-      ]
-    },
-  };
 
-  return tableConfigs[fieldType as keyof typeof tableConfigs]?.[columnType] || [];
-};
 
 export function DatabaseFieldExtractor({
   dataSource,
   recordId,
   selectedField,
-  lookupConfig,
   onFieldSelect,
-  onLookupConfigChange,
   disabled = false,
   associatedProcessId,
 }: DatabaseFieldExtractorProps) {
@@ -150,11 +101,11 @@ export function DatabaseFieldExtractor({
   useEffect(() => {
     const fetchReferenceTables = async () => {
       let processId = associatedProcessId || selectedRecord || recordId;
-      
+
       // If we have a selected field with table ID but no process ID, try to fetch table directly
       if (!processId && selectedField && selectedField.startsWith('from_') && dataSource === 'processes') {
         const tableId = selectedField.replace('from_', '');
-        
+
         try {
           const table = await processesApi.getReferenceTable(tableId);
           if (table) {
@@ -166,7 +117,7 @@ export function DatabaseFieldExtractor({
           console.error('❌ Failed to fetch table directly:', error);
         }
       }
-      
+
       if (!processId || dataSource !== 'processes') {
         // Only clear if we're not staying with the same process
         if (loadedProcessId && dataSource !== 'processes') {
@@ -201,7 +152,7 @@ export function DatabaseFieldExtractor({
   useEffect(() => {
     if (dataSource && dataSource !== 'manual') {
       const baseFields = DATA_SOURCE_FIELDS[dataSource] || [];
-      
+
       // When associatedProcessId is provided for processes, only show reference table fields
       if (dataSource === 'processes' && associatedProcessId) {
         // Only show dynamic reference table fields from the selected process
@@ -210,21 +161,21 @@ export function DatabaseFieldExtractor({
           label: `From ${table.tableName}`,
           description: table.tableDescription || `Lookup from ${table.tableName} table`
         }));
-        
+
         setAvailableFields(referenceFields);
       } else {
         // Filter out hardcoded reference table fields and add dynamic ones
-        const nonReferenceFields = baseFields.filter(field => 
+        const nonReferenceFields = baseFields.filter(field =>
           !['fromViscosity', 'fromCavityPressure', 'fromCavitiesRecommendation', 'fromRunnerDia'].includes(field.field)
         );
-        
+
         // Add dynamic reference table fields
         const referenceFields = referenceTables.map(table => ({
           field: `from_${table.id}`,
           label: `From ${table.tableName}`,
           description: table.tableDescription || `Lookup from ${table.tableName} table`
         }));
-        
+
         setAvailableFields([...nonReferenceFields, ...referenceFields]);
       }
     } else {
@@ -232,27 +183,14 @@ export function DatabaseFieldExtractor({
     }
   }, [dataSource, referenceTables, associatedProcessId]);
 
-  // Get current reference table columns
-  const getCurrentReferenceTable = () => {
-    if (!selectedField?.startsWith('from_')) return null;
-    const tableId = selectedField.replace('from_', '');
-    return referenceTables.find(table => table.id === tableId) || null;
-  };
-
-  const getCurrentTableColumns = () => {
-    const currentTable = getCurrentReferenceTable();
-    return currentTable?.columnDefinitions || [];
-  };
-
 
   // Show actual reference table data when processes data source is selected and we have tables
-  const processId = associatedProcessId || selectedRecord || recordId || loadedProcessId;
-  
+
   // Also show if a specific reference table field is selected (from saved state)
   const hasSelectedReferenceField = selectedField && selectedField.startsWith('from_');
-  
+
   if (dataSource === 'processes' && (referenceTables.length > 0 || tablesLoading || hasSelectedReferenceField)) {
-    
+
     if (tablesLoading) {
       return (
         <div className="space-y-3 pt-3 border-t border-primary/10">
@@ -265,7 +203,7 @@ export function DatabaseFieldExtractor({
         </div>
       );
     }
-    
+
     if (referenceTables.length === 0) {
       return (
         <div className="space-y-3 pt-3 border-t border-primary/10">
@@ -288,8 +226,8 @@ export function DatabaseFieldExtractor({
         {!disabled && (
           <div className="space-y-2">
             <Label className="text-xs font-medium">Select Reference Table</Label>
-            <Select 
-              value={selectedTableId || ''} 
+            <Select
+              value={selectedTableId || ''}
               onValueChange={(value) => {
                 setSelectedTableId(value);
                 onFieldSelect(`from_${value}`);
@@ -318,70 +256,28 @@ export function DatabaseFieldExtractor({
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {/* Display selected table */}
           {selectedTableId && referenceTables.filter(t => t.id === selectedTableId).map((table) => (
-              <div key={table.id} className="border border-border rounded-lg bg-card overflow-hidden">
-                <div className="px-4 py-3 bg-primary/5">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground">{table.tableName}</h3>
-                    <p className="text-sm text-muted-foreground mt-0.5">{table.tableDescription}</p>
-                  </div>
-                </div>
-                <div className="border-t border-border bg-background/50 p-4">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle>{table.tableName}</CardTitle>
-                          <CardDescription>{table.tableDescription}</CardDescription>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-auto max-h-[60vh]">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              {table.columnDefinitions?.map((col) => (
-                                <TableHead key={col.name} className={col.type === 'number' ? 'text-right' : ''}>
-                                  {col.label}
-                                </TableHead>
-                              ))}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {table.rows?.map((row, index) => {
-                              return (
-                                <TableRow key={index}>
-                                  {table.columnDefinitions?.map((col) => {
-                                    const camelCaseKey = col.name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-                                    const value = row.rowData?.[col.name] || row.rowData?.[camelCaseKey] || row[col.name];
-                                    
-                                    return (
-                                      <TableCell key={col.name} className={col.type === 'number' ? 'text-right' : ''}>
-                                        <span className={col.type === 'number' ? '' : 'font-medium'}>
-                                          {value !== undefined && value !== null ? value : '-'}
-                                        </span>
-                                      </TableCell>
-                                    );
-                                  })}
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
-                  </Card>
+            <div key={table.id} className="border border-border rounded-lg bg-card overflow-hidden">
+              <div className="px-4 py-3 bg-primary/5">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-foreground">{table.tableName}</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">{table.tableDescription}</p>
                 </div>
               </div>
-            ))}
-          
+              <div className="border-t border-border bg-background/50 p-4">
+                <div className="text-xs text-muted-foreground">
+                  Table preview available in calculator preview mode
+                </div>
+              </div>
+            </div>
+          ))}
+
           {!selectedTableId && !disabled && (
             <div className="text-center py-8 text-muted-foreground">
               <p>Select a reference table from the dropdown above to view its data.</p>
             </div>
           )}
         </div>
-        
+
       </div>
     );
   }

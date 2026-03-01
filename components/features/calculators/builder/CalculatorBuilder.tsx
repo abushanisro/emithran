@@ -227,37 +227,37 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
     // Define BOM fields to create
     const bomFields = [
       {
-        displayLabel: 'Height',
+        displayLabel: 'Weight',
         fieldType: 'number' as FieldType,
-        unit: 'mm',
+        unit: 'kg',
         defaultValue: '',
         displayOrder: replaceIndex
       },
       {
-        displayLabel: 'Width',
+        displayLabel: 'Surface Area',
         fieldType: 'number' as FieldType,
-        unit: 'mm',
+        unit: 'mm²',
         defaultValue: '',
         displayOrder: replaceIndex + 1
       },
       {
-        displayLabel: 'Length',
+        displayLabel: 'Max Length',
         fieldType: 'number' as FieldType,
         unit: 'mm',
         defaultValue: '',
         displayOrder: replaceIndex + 2
       },
       {
-        displayLabel: 'Volume',
-        fieldType: 'calculated' as FieldType,
-        unit: 'mm³',
-        defaultValue: 'Height * Width * Length',
+        displayLabel: 'Max Width',
+        fieldType: 'number' as FieldType,
+        unit: 'mm',
+        defaultValue: '',
         displayOrder: replaceIndex + 3
       },
       {
-        displayLabel: 'Principal Property',
-        fieldType: 'text' as FieldType,
-        unit: '',
+        displayLabel: 'Max Height',
+        fieldType: 'number' as FieldType,
+        unit: 'mm',
         defaultValue: '',
         displayOrder: replaceIndex + 4
       }

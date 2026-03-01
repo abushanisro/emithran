@@ -357,15 +357,6 @@ export default function CalculatorsPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 w-7 p-0"
-                              onClick={(e) => handleEditClick(calc, e)}
-                              title="Edit"
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
                               className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive"
                               onClick={(e) => handleDeleteCalculator(calc.id, calc.name, e)}
                               title="Delete"

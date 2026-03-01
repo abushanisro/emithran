@@ -22,10 +22,10 @@ import { useMHRRecords } from '@/lib/api/hooks/useMHR';
 import { useLSR } from '@/lib/api/hooks/useLSR';
 import { useProcessHierarchy, useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
-import { Loader2, Calculator as CalculatorIcon, Play } from 'lucide-react';
+import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 interface ProcessCostDialogProps {
   open: boolean;
@@ -71,6 +71,9 @@ export function ProcessCostDialog({
   const [selectedCalculatorId, setSelectedCalculatorId] = useState<string>('');
   const [calculatorInputs, setCalculatorInputs] = useState<Record<string, any>>({});
   const [calculatorResults, setCalculatorResults] = useState<Record<string, any> | null>(null);
+  const [, setSelectedLookupField] = useState<any>(null);
+  const [showLookupTable, setShowLookupTable] = useState<boolean>(false);
+  const [lookupTableData, setLookupTableData] = useState<any>(null);
 
   // Fetch process hierarchy (processGroups, processRoutes, operations)
   const { data: hierarchyData, isLoading: isLoadingHierarchy, error: hierarchyError } = useProcessHierarchy();
@@ -86,12 +89,12 @@ export function ProcessCostDialog({
 
   const { data: mhrData, isLoading: isLoadingMHR, error: mhrError } = useMHRRecords();
   const { data: lsrData, isLoading: isLoadingLSR, error: lsrError } = useLSR();
-  const { data: calculatorsData } = useCalculators();
+  const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators();
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
   const executeCalculator = useExecuteCalculator();
 
   // Check for errors
-  const hasErrors = mhrError || lsrError || hierarchyError;
+  const hasErrors = mhrError || lsrError || hierarchyError || calculatorsError;
 
   // Get process groups from hierarchy
   const processGroups = useMemo(() => {
@@ -131,7 +134,7 @@ export function ProcessCostDialog({
     return processCalculatorMappings.mappings;
   }, [processCalculatorMappings]);
 
-// Get unique locations from MHR and LSR data
+  // Get unique locations from MHR and LSR data
   const locations = useMemo(() => {
     const locs = new Set<string>();
     mhrData?.records?.forEach(record => {
@@ -166,7 +169,7 @@ export function ProcessCostDialog({
     return filteredLSR.find((r: any) => String(r.id) === String(selectedLSRId));
   }, [filteredLSR, selectedLSRId]);
 
-useEffect(() => {
+  useEffect(() => {
     if (hierarchyError) {
       console.error('[ProcessCostDialog] Hierarchy Error:', hierarchyError);
     }
@@ -216,6 +219,53 @@ useEffect(() => {
       }
     } catch (error) {
       console.error('Calculator execution error:', error);
+    }
+  };
+
+  // Handle viewing lookup table
+  const handleViewLookupTable = async (field: any) => {
+    setSelectedLookupField(field);
+
+    // Only proceed if this is a proper database_lookup field with source information
+    if (field.fieldType !== 'database_lookup' || field.dataSource !== 'processes' || !field.sourceField) {
+      console.error('Field is not a valid database lookup field:', field);
+      return;
+    }
+
+    let tableId = field.sourceField;
+
+    // Handle the from_ prefix format
+    if (field.sourceField.startsWith('from_')) {
+      tableId = field.sourceField.replace('from_', '');
+    }
+
+    // Fetch table data from the processes API
+    try {
+      const { processesApi } = await import('@/lib/api/processes');
+      const table = await processesApi.getReferenceTable(tableId);
+
+      if (table) {
+        const processedRows = table.rows?.map((row) => {
+          if (row.rowData) {
+            return row.rowData;
+          }
+          return row;
+        }) || [];
+
+        setLookupTableData({
+          fieldName: field.fieldName,
+          fieldLabel: field.displayLabel || field.fieldName,
+          tableName: table.tableName,
+          tableId: table.id,
+          column_definitions: table.columnDefinitions || [],
+          rows: processedRows
+        });
+        setShowLookupTable(true);
+      } else {
+        console.error('No table found for ID:', tableId);
+      }
+    } catch (error) {
+      console.error('Failed to fetch table for field:', field.fieldName, 'tableId:', tableId, error);
     }
   };
 
@@ -820,10 +870,13 @@ useEffect(() => {
       </DialogContent>
 
       {/* Calculator Side Panel */}
-      <Sheet open={calculatorOpen} onOpenChange={setCalculatorOpen}>
-        <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+      <Sheet open={calculatorOpen} onOpenChange={setCalculatorOpen} modal={false}>
+        <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto z-[9998]">
           <SheetHeader>
             <SheetTitle>Calculator - {calculatorTarget}</SheetTitle>
+            <SheetDescription>
+              Use calculator to compute values for {calculatorTarget}
+            </SheetDescription>
           </SheetHeader>
 
           <div className="mt-6 space-y-6">
@@ -835,40 +888,24 @@ useEffect(() => {
                   <SelectValue placeholder="Choose a calculator" />
                 </SelectTrigger>
                 <SelectContent>
-                  {calculatorTarget === 'processCalculator' && availableCalculators && availableCalculators.length > 0 ? (
-                    // Show mapped calculators if available
-                    <>
-                      {availableCalculators.map((mapping: any) => (
-                        <SelectItem key={mapping.calculatorId} value={mapping.calculatorId}>
-                          {mapping.calculatorName || 'Calculator'} (Mapped)
-                        </SelectItem>
-                      ))}
-                      {((calculatorsData?.calculators ?? []).length > 0) && (
-                        <>
-                          <SelectItem key="divider" value="divider" disabled>
-                            ─────────
-                          </SelectItem>
-                          {(calculatorsData?.calculators ?? []).map((calc: any) => (
-                            <SelectItem key={calc.id} value={calc.id}>
-                              {calc.name}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    // Show all calculators
-                    ((calculatorsData?.calculators ?? []).length > 0) ? (
-                      (calculatorsData?.calculators ?? []).map((calc: any) => (
-                        <SelectItem key={calc.id} value={calc.id}>
-                          {calc.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem key="no-calc" value="none" disabled>
-                        No calculators available
+                  {isLoadingCalculators ? (
+                    <SelectItem key="loading" value="" disabled>
+                      Loading calculators...
+                    </SelectItem>
+                  ) : calculatorsError ? (
+                    <SelectItem key="error" value="" disabled>
+                      Error loading calculators
+                    </SelectItem>
+                  ) : calculatorsData?.calculators && calculatorsData.calculators.length > 0 ? (
+                    calculatorsData.calculators.map((calc: any) => (
+                      <SelectItem key={calc.id} value={calc.id}>
+                        {calc.name}
                       </SelectItem>
-                    )
+                    ))
+                  ) : (
+                    <SelectItem key="no-calc" value="" disabled>
+                      No calculators available
+                    </SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -904,27 +941,56 @@ useEffect(() => {
                   <CardContent className="space-y-4">
                     {selectedCalculator.fields
                       ?.filter((field: any) => field.fieldType !== 'calculated')
-                      .map((field: any) => (
-                        <div key={field.id} className="space-y-2">
-                          <Label htmlFor={field.fieldName}>
-                            {field.displayName || field.fieldName}
-                            {field.unit && <span className="text-muted-foreground ml-1">({field.unit})</span>}
-                          </Label>
-                          <Input
-                            id={field.fieldName}
-                            type="number"
-                            step="0.01"
-                            value={calculatorInputs[field.fieldName] || ''}
-                            onChange={(e) =>
-                              setCalculatorInputs({
-                                ...calculatorInputs,
-                                [field.fieldName]: parseFloat(e.target.value) || 0,
-                              })
-                            }
-                            placeholder={`Enter ${field.displayName || field.fieldName}`}
-                          />
-                        </div>
-                      ))}
+                      .map((field: any) => {
+                        // Only show eye icon for properly configured database_lookup fields
+                        const isLookupTableField = field.fieldType === 'database_lookup' &&
+                          field.dataSource === 'processes' &&
+                          !!field.sourceField;
+
+
+                        return (
+                          <div key={field.id} className="space-y-2">
+                            <Label htmlFor={field.fieldName}>
+                              {field.displayLabel || field.fieldName}
+                              {field.unit && <span className="text-muted-foreground ml-1">({field.unit})</span>}
+                            </Label>
+
+                            {isLookupTableField || (field.displayLabel && (field.displayLabel.includes('Cavities') || field.displayLabel.includes('Recommendation') || field.displayLabel.includes('Viscosity'))) ? (
+                              // Show eye icon for lookup table fields
+                              <div className="flex gap-2">
+                                <div className="flex-1 bg-muted/20 border border-border rounded-md px-3 py-2 text-sm text-muted-foreground">
+                                  Reference lookup table field
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleViewLookupTable(field)}
+                                  className="px-3"
+                                  title="View reference table"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              // Regular input field
+                              <Input
+                                id={field.fieldName}
+                                type="number"
+                                step="0.01"
+                                value={calculatorInputs[field.fieldName] || ''}
+                                onChange={(e) =>
+                                  setCalculatorInputs({
+                                    ...calculatorInputs,
+                                    [field.fieldName]: parseFloat(e.target.value) || 0,
+                                  })
+                                }
+                                placeholder={`Enter ${field.displayLabel || field.fieldName}`}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
 
                     <Button
                       onClick={handleExecuteCalculator}
@@ -985,6 +1051,94 @@ useEffect(() => {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Lookup Table Panel */}
+      {showLookupTable && lookupTableData && (
+        <div
+          className="fixed top-0 left-0 h-screen w-[500px] bg-background border-r border-border shadow-xl z-[9999] flex flex-col"
+          style={{ pointerEvents: 'auto' }}
+        >
+          <div className="flex items-center justify-between p-3 border-b border-border bg-background">
+            <div>
+              <h3 className="font-semibold text-sm">Reference Table</h3>
+              <p className="text-xs text-muted-foreground">{lookupTableData.tableName}</p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowLookupTable(false)}
+              className="h-6 w-6 p-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6 6 18"></path>
+                <path d="m6 6 12 12"></path>
+              </svg>
+            </Button>
+          </div>
+
+          <div
+            className="flex-1 p-3 relative"
+            style={{
+              height: 'calc(100vh - 60px)',
+              overflowY: 'scroll',
+              overflowX: 'auto',
+              pointerEvents: 'auto',
+              zIndex: 10000
+            }}
+          >
+            <div className="w-full">
+              <table className="w-full border-collapse text-sm bg-background">
+                <thead>
+                  <tr className="bg-muted/60">
+                    <th className="border border-border text-center text-xs font-medium py-1 px-1 text-muted-foreground w-6">
+                      #
+                    </th>
+                    {lookupTableData.column_definitions.map((col: any) => (
+                      <th
+                        key={col.name}
+                        className="border border-border text-left text-xs font-semibold py-1 px-2 text-foreground"
+                      >
+                        {col.label}
+                        {col.unit && (
+                          <span className="text-primary/70 ml-1">({col.unit})</span>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {lookupTableData.rows.map((row: any, rowIndex: number) => (
+                    <tr
+                      key={rowIndex}
+                      className="hover:bg-primary/5 transition-colors"
+                    >
+                      <td className="border border-border text-center text-xs py-1 px-1 text-muted-foreground font-mono bg-muted/20">
+                        {rowIndex + 1}
+                      </td>
+                      {lookupTableData.column_definitions.map((col: any) => {
+                        const camelCaseKey = col.name.replace(/_([a-z])/g, (_: string, letter: string) => letter.toUpperCase());
+                        const value = row[col.name] || row[camelCaseKey];
+
+                        return (
+                          <td
+                            key={col.name}
+                            className="border border-border py-1 px-2 text-xs"
+                          >
+                            {value !== undefined && value !== null
+                              ? String(value)
+                              : '—'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 }
