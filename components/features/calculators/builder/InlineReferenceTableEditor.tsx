@@ -175,8 +175,8 @@ export function InlineReferenceTableEditor({
       table_name: '',
       table_description: '',
       column_definitions: [
-        { name: 'parameter', type: 'text', label: 'Parameter' },
-        { name: 'value', type: 'number', label: 'Value', unit: '' },
+        { name: 'column_1', type: 'text', label: '' },
+        { name: 'column_2', type: 'number', label: '', unit: '' },
       ],
       rows: []
     });
@@ -222,8 +222,17 @@ export function InlineReferenceTableEditor({
       ...newTable,
       column_definitions: [
         ...newTable.column_definitions,
-        { name: `column_${columnNumber}`, type: 'text', label: `Column ${columnNumber}` }
+        { name: `column_${columnNumber}`, type: 'text', label: '' }
       ]
+    });
+  };
+
+  const handleRemoveColumn = (index: number) => {
+    if (newTable.column_definitions.length <= 1) return; // Prevent removing last column
+    const updatedColumns = newTable.column_definitions.filter((_, i) => i !== index);
+    setNewTable({
+      ...newTable,
+      column_definitions: updatedColumns
     });
   };
 
@@ -335,7 +344,6 @@ export function InlineReferenceTableEditor({
               <div className="space-y-1.5">
                 {newTable.column_definitions.map((col, idx) => (
                   <div key={idx} className="grid grid-cols-4 gap-1.5 p-1.5 border border-border rounded bg-secondary/30">
-                    <Input className="h-6 text-xs" placeholder="Column name" value={col.name} onChange={(e) => handleUpdateColumn(idx, 'name', e.target.value)} />
                     <Input className="h-6 text-xs" placeholder="Display label" value={col.label} onChange={(e) => handleUpdateColumn(idx, 'label', e.target.value)} />
                     <select
                       value={col.type}
@@ -346,6 +354,16 @@ export function InlineReferenceTableEditor({
                       <option value="number">Number</option>
                     </select>
                     <Input className="h-6 text-xs" placeholder="Unit (optional)" value={col.unit || ''} onChange={(e) => handleUpdateColumn(idx, 'unit', e.target.value)} />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveColumn(idx)}
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      disabled={newTable.column_definitions.length <= 1}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
                   </div>
                 ))}
                 <Button variant="ghost" size="sm" onClick={handleAddColumn} className="h-6 text-xs text-muted-foreground hover:text-primary">

@@ -317,7 +317,9 @@ export function useCreateTableRow() {
       return response;
     },
     onSuccess: (_, variables) => {
+      // Invalidate both cache patterns to ensure data refresh
       queryClient.invalidateQueries({ queryKey: ['reference-tables', variables.tableId] });
+      queryClient.invalidateQueries({ queryKey: ['processes'] });
       toast.success('Row added successfully');
     },
     onError: (error: any) => {
@@ -338,9 +340,11 @@ export function useUpdateTableRow() {
       return response;
     },
     onSuccess: (_, variables) => {
+      // Invalidate both cache patterns to ensure data refresh
       if (variables.tableId) {
         queryClient.invalidateQueries({ queryKey: ['reference-tables', variables.tableId] });
       }
+      queryClient.invalidateQueries({ queryKey: ['processes'] });
       toast.success('Row updated successfully');
     },
     onError: (error: any) => {
@@ -357,7 +361,9 @@ export function useDeleteTableRow() {
       await apiClient.delete(`/processes/reference-tables/rows/${rowId}`);
     },
     onSuccess: (_, variables) => {
+      // Invalidate both cache patterns to ensure data refresh
       queryClient.invalidateQueries({ queryKey: ['reference-tables', variables.tableId] });
+      queryClient.invalidateQueries({ queryKey: ['processes'] });
       toast.success('Row deleted successfully');
     },
     onError: (error: any) => {
@@ -378,7 +384,9 @@ export function useBulkUpdateTableRows() {
       return response;
     },
     onSuccess: (_, variables) => {
+      // Invalidate both cache patterns to ensure data refresh
       queryClient.invalidateQueries({ queryKey: ['reference-tables', variables.tableId] });
+      queryClient.invalidateQueries({ queryKey: ['processes'] }); // This will catch all process-related queries
       toast.success('Table rows updated successfully');
     },
     onError: (error: any) => {

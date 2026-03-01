@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -114,6 +114,19 @@ export default function ProcessPage() {
   // Fetch processes from database
   const { data: processesData, isLoading: processesLoading, error: processesError } = useProcesses();
 
+  // Auto-select Injection Molding process when data loads
+  useEffect(() => {
+    if (processesData?.processes && !selectedProcessId) {
+      const injectionMoldingProcess = processesData.processes.find(
+        p => p.processName?.toLowerCase() === 'injection molding'
+      );
+      if (injectionMoldingProcess) {
+        console.log('Auto-selecting Injection Molding process:', injectionMoldingProcess.id);
+        setSelectedProcessId(injectionMoldingProcess.id);
+      }
+    }
+  }, [processesData, selectedProcessId]);
+
   // Fetch reference tables for selected process (from old functionality)
   const { data: referenceTables, isLoading: loadingTables } = useReferenceTables(selectedProcessId || undefined);
 
@@ -141,10 +154,13 @@ export default function ProcessPage() {
   const deleteMappingMutation = useDeleteProcessCalculatorMapping();
 
   const handleEditTable = (tableId: string) => {
+    console.log('Starting edit for table:', tableId);
     setEditingTableId(tableId);
-    // Initialize edited data with current table rows
-    const table = referenceTables?.find(t => t.id === tableId);
+    // Initialize edited data with current table rows - try both sources
+    const table = modalReferenceTables?.find(t => t.id === tableId) || referenceTables?.find(t => t.id === tableId);
+    console.log('Found table for editing:', table);
     if (table?.rows) {
+      console.log('Table rows:', table.rows);
       setEditedTableData({
         ...editedTableData,
         [tableId]: table.rows.map(row => {
@@ -183,7 +199,9 @@ export default function ProcessPage() {
 
   const handleSaveTable = async (tableId: string) => {
     const tableData = editedTableData[tableId];
-    if (!tableData) return;
+    if (!tableData) {
+      return;
+    }
 
     // Convert to the format expected by the API
     const rows = tableData.map((row, index) => ({
@@ -197,14 +215,15 @@ export default function ProcessPage() {
       await bulkUpdateMutation.mutateAsync({ tableId, rows });
       setEditingTableId(null);
       setEditedTableData({});
+      toast.success('Table saved successfully');
     } catch (error) {
-      // Failed to save table
+      toast.error('Failed to save table. Please try again.');
     }
   };
 
   // Generic handlers for any table
   const handleAddRow = (tableId: string) => {
-    const table = referenceTables?.find(t => t.id === tableId);
+    const table = modalReferenceTables?.find(t => t.id === tableId) || referenceTables?.find(t => t.id === tableId);
     if (!table) return;
 
     // Create empty row based on column definitions with both naming conventions
