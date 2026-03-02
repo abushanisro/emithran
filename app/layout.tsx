@@ -73,11 +73,21 @@ export default function RootLayout({
                 function isExtensionError(message) {
                   if (!message || typeof message !== 'string') return false;
                   
+                  // Don't suppress Supabase or application errors
+                  if (message.includes('supabase.co') || 
+                      message.includes('fetch') ||
+                      message.includes('network') ||
+                      message.includes('Failed to load') ||
+                      message.includes('refused to connect')) {
+                    return false;
+                  }
+                  
                   return message.includes('message port closed') || 
                          message.includes('Unchecked runtime.lastError') ||
                          message.includes('Extension context invalidated') ||
                          message.includes('runtime.lastError') ||
-                         /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}:\d+/.test(message);
+                         (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}:\d+/.test(message) && 
+                          (message.includes('runtime.lastError') || message.includes('message port closed')));
                 }
                 
                 console.error = function(...args) {
