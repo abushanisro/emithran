@@ -367,8 +367,8 @@ export class ProjectsService {
       await this.projectsRepository.findById(client, id);
 
       // Check if project_team_members table exists, if not return empty team
-      let teamMembers = [];
-      let error = null;
+      let teamMembers: any[] = [];
+      let error: any = null;
       
       try {
         // Try to select with email column, fallback if column doesn't exist
