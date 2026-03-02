@@ -400,8 +400,10 @@ export class ProjectsService {
         teamMembers = result.data || [];
         error = result.error;
       } catch (tableError) {
-        this.logger.error(`project_team_members table not found: ${tableError.message}`);
-        throw new InternalServerErrorException('Unable to retrieve team members. Please ensure the project team members table exists.');
+        this.logger.warn(`project_team_members table not found: ${tableError.message}`);
+        // Gracefully handle missing table in production - return empty team
+        teamMembers = [];
+        error = null;
       }
 
       if (error) {
