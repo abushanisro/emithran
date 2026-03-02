@@ -216,7 +216,6 @@ export default function DeliveryOrderWorkflow({
       setShowAddAddress(false);
       setNewAddress({ projectId, addressType: 'delivery', country: 'India' });
     } catch (error) {
-      console.error('Address creation error:', error);
       toast.error('Failed to create address. Please try again.');
     }
   };

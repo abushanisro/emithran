@@ -91,7 +91,6 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching delivery tracking data:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -113,13 +112,6 @@ export async function POST(request: NextRequest) {
     }
 
     // In production, this would update the database
-    console.log('Updating delivery tracking:', {
-      orderId,
-      location,
-      status,
-      notes,
-      timestamp: new Date().toISOString()
-    });
 
     return NextResponse.json({
       success: true,
@@ -133,7 +125,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error updating delivery tracking:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

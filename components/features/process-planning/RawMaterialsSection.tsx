@@ -92,7 +92,6 @@ export function RawMaterialsSection({ bomItemId, bomItem }: RawMaterialsSectionP
       setDialogOpen(false);
       setEditMaterial(null);
     } catch (error) {
-      console.error('Error saving material:', error);
     }
   };
 
@@ -103,7 +102,6 @@ export function RawMaterialsSection({ bomItemId, bomItem }: RawMaterialsSectionP
       try {
         await deleteMutation.mutateAsync({ id, bomItemId });
       } catch (error) {
-        console.error('Error deleting material:', error);
       }
     }
   };

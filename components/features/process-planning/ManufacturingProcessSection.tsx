@@ -112,7 +112,6 @@ export function ManufacturingProcessSection({ bomItemId, bomItem }: Manufacturin
       setDialogOpen(false);
       setEditProcess(null);
     } catch (error) {
-      console.error('Error saving process:', error);
     }
   };
 
@@ -123,7 +122,6 @@ export function ManufacturingProcessSection({ bomItemId, bomItem }: Manufacturin
       try {
         await deleteMutation.mutateAsync(id);
       } catch (error) {
-        console.error('Error deleting process:', error);
       }
     }
   };

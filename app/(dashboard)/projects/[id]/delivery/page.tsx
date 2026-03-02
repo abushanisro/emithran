@@ -19,7 +19,6 @@ export default function DeliveryPage() {
 
   const handleOrderComplete = () => {
     // Refresh tracking data or show success message
-    console.log('Order created successfully');
   };
 
   return (

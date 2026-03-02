@@ -221,7 +221,6 @@ return {
         
         processesState.setData(transformedProcesses);
       } catch (error) {
-        console.error('Failed to fetch processes:', error);
         // Set empty array on error - the UI will show the empty state
         processesState.setData([]);
       } finally {
@@ -516,7 +515,6 @@ return {
       setTaskFormData({});
       
     } catch (error) {
-      console.error('Failed to save task:', error);
       // Revert optimistic update on error
     }
   };
@@ -563,7 +561,6 @@ return {
       // await productionPlanningApi.updateBOMProgress(editingBOM.subTaskId, bomFormData);
       
     } catch (error) {
-      console.error('Failed to save BOM progress:', error);
       // Revert optimistic update on error
       // You might want to show a toast notification here
     }
@@ -641,7 +638,6 @@ return {
       processesState.setData(transformedProcesses);
       
     } catch (error) {
-      console.error('Error fetching latest data for export:', error);
     }
   };
 
@@ -683,7 +679,6 @@ return {
       }, 1000);
       
     } catch (error) {
-      console.error('Failed to export PDF:', error);
       }
   };
 

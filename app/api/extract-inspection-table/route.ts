@@ -2,18 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('📄 PDF extraction API called');
     const body = await request.json();
     const { pdfBuffer, fileName, balloonCoordinates } = body;
-    console.log('📋 Request data:', { 
-      pdfBufferLength: pdfBuffer?.length, 
-      fileName, 
-      balloonCoordinatesCount: balloonCoordinates?.length 
-    });
 
     // If balloon coordinates are provided, extract dimensions at those exact locations
     if (balloonCoordinates && Array.isArray(balloonCoordinates)) {
-      console.log('📄 Extracting dimensions at balloon coordinates:', balloonCoordinates.length);
       
       const buffer = Buffer.from(pdfBuffer);
       const dimensionData = await extractDimensionsAtCoordinates(buffer, balloonCoordinates, fileName);
@@ -29,7 +22,6 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(pdfBuffer);
-    console.log('📄 Buffer created, size:', buffer.length);
     
     if (buffer.length < 100) {
       return NextResponse.json(
@@ -47,7 +39,6 @@ export async function POST(request: NextRequest) {
       
       const parsePromise = new Promise<string>((resolve, reject) => {
         pdfParser.on('pdfParser_dataError', (errData: any) => {
-          console.error('📄 PDF2JSON Error:', errData.parserError);
           reject(new Error(errData.parserError));
         });
         
@@ -81,9 +72,7 @@ export async function POST(request: NextRequest) {
       pdfParser.parseBuffer(buffer);
       textContent = await parsePromise;
       
-      console.log('📄 PDF parsed successfully, ready for manual dimension selection');
     } catch (parseError) {
-      console.error('📄 PDF parse error:', parseError);
       throw new Error(`Failed to parse PDF: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
     }
 
@@ -98,7 +87,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error extracting inspection table:', error);
     return NextResponse.json(
       { 
         error: 'Failed to process PDF',
@@ -110,7 +98,6 @@ export async function POST(request: NextRequest) {
 }
 
 async function extractDimensionsAtCoordinates(buffer: Buffer, balloonCoordinates: any[], fileName: string) {
-  console.log('📄 Starting coordinate-based dimension extraction');
   
   let pdfData: any = null;
   
@@ -131,10 +118,8 @@ async function extractDimensionsAtCoordinates(buffer: Buffer, balloonCoordinates
     
     pdfParser.parseBuffer(buffer);
     pdfData = await parsePromise;
-    console.log('📄 PDF parsed for coordinate extraction');
     
   } catch (error) {
-    console.error('📄 PDF parsing failed:', error);
     throw new Error('Failed to parse PDF for coordinate extraction');
   }
 
@@ -143,7 +128,6 @@ async function extractDimensionsAtCoordinates(buffer: Buffer, balloonCoordinates
   // Process each balloon coordinate
   for (let i = 0; i < balloonCoordinates.length; i++) {
     const balloon = balloonCoordinates[i];
-    console.log(`📄 Processing balloon ${balloon.number} at coordinates (${balloon.x}, ${balloon.y})`);
     
     // Try multiple coordinate mapping approaches for better accuracy
     let dimensionText = '';
@@ -156,15 +140,12 @@ async function extractDimensionsAtCoordinates(buffer: Buffer, balloonCoordinates
       const scaledX = balloon.x * 0.75; // Try 75% scaling
       const scaledY = balloon.y * 0.75;
       dimensionText = findTextNearCoordinates(pdfData, scaledX, scaledY, 20);
-      console.log(`📄 Trying scaled coordinates for balloon ${balloon.number}: (${scaledX}, ${scaledY})`);
     }
     
     // Method 3: If still no text found, try larger radius with original coordinates
     if (!dimensionText) {
       dimensionText = findTextNearCoordinates(pdfData, balloon.x, balloon.y, 40);
-      console.log(`📄 Trying larger radius for balloon ${balloon.number}`);
     }
-    console.log(`📄 Found text near balloon ${balloon.number}:`, dimensionText);
     
     if (dimensionText) {
       // Extract the actual dimension from the found text
@@ -172,7 +153,6 @@ async function extractDimensionsAtCoordinates(buffer: Buffer, balloonCoordinates
       
       if (dimension) {
         inspectionRows.push(dimension);
-        console.log(`📄 Extracted dimension for balloon ${balloon.number}:`, dimension);
       } else {
         // If no dimension found, mark as failed with reason
         inspectionRows.push({
@@ -190,7 +170,6 @@ async function extractDimensionsAtCoordinates(buffer: Buffer, balloonCoordinates
           status: 'failed',
           failureReason: 'No recognizable dimension pattern found in nearby text'
         });
-        console.log(`📄 Created placeholder for balloon ${balloon.number} - manual entry required`);
       }
     } else {
       // No text found near coordinates - mark as failed
@@ -208,7 +187,6 @@ async function extractDimensionsAtCoordinates(buffer: Buffer, balloonCoordinates
         status: 'failed',
         failureReason: 'No text detected within search radius of balloon coordinates'
       });
-      console.log(`📄 No text found near balloon ${balloon.number} coordinates`);
     }
   }
 
@@ -284,11 +262,6 @@ function findTextNearCoordinates(pdfData: any, targetX: number, targetY: number,
   
   const dimensionalTexts = nearbyText.map(item => item.text);
   
-  // Log for debugging with priority info
-  console.log(`📄 Found ${nearbyText.length} dimensional text items near coordinates (${targetX}, ${targetY}):`);
-  nearbyText.forEach(item => {
-    console.log(`  - "${item.text}" (distance: ${item.distance.toFixed(2)}, priority: ${item.priority})`);
-  });
   
   return dimensionalTexts.join(' ');
 }
@@ -369,7 +342,6 @@ function isDimensionalText(text: string): boolean {
 }
 
 function extractDimensionFromText(text: string, balloonNumber: number, totalBalloons: number = 5): any | null {
-  console.log(`📄 Analyzing text for balloon ${balloonNumber}: "${text}"`);
   
   // Enhanced dimension patterns based on engineering drawing standards
   // Sorted by priority: main dimensions first, then tolerances
@@ -530,7 +502,6 @@ function extractDimensionFromText(text: string, balloonNumber: number, totalBall
       // Skip if extraction returned null (e.g., dimension too small)
       if (!extracted) continue;
       
-      console.log(`📄 Pattern matched for balloon ${balloonNumber}:`, extracted);
       
       return {
         slNo: balloonNumber.toString(),
@@ -550,34 +521,22 @@ function extractDimensionFromText(text: string, balloonNumber: number, totalBall
     }
   }
 
-  console.log(`📄 No dimension pattern found for balloon ${balloonNumber}`);
   return null;
 }
 
 function parseInspectionTable(textContent: string, fileName: string) {
-  console.log('📄 Starting comprehensive PDF analysis for:', fileName);
-  console.log('📄 Text content length:', textContent.length);
-  
-  // Debug: Show first 500 chars of extracted text
-  console.log('📄 First 500 chars of PDF text:', textContent.substring(0, 500));
-  
-  // Also show the full text for debugging (limited to 2000 chars)
-  console.log('📄 Full PDF text (first 2000 chars):', textContent.substring(0, 2000));
   
   // First, try to extract from structured inspection tables
   const tableData = extractStructuredInspectionTable(textContent, fileName);
   if (tableData.inspectionRows.length > 0) {
-    console.log('📄 Found structured inspection table with', tableData.inspectionRows.length, 'rows');
     return tableData;
   }
 
   // If no structured table, perform comprehensive dimension extraction
-  console.log('📄 No structured table found, performing comprehensive dimension extraction');
   const dimensionData = extractComprehensiveDimensionData(textContent, fileName);
   
   // If still no results, try aggressive pattern matching
   if (dimensionData.inspectionRows.length === 0) {
-    console.log('📄 No dimensions found, trying aggressive extraction');
     return extractAggressiveDimensionData(textContent, fileName);
   }
   
@@ -613,8 +572,6 @@ function extractStructuredInspectionTable(textContent: string, fileName: string)
   }
 
   if (tableStart >= 0) {
-    console.log('📄 Found structured table at line', tableStart);
-    console.log('📄 Header structure:', headerStructure);
     
     // Parse table rows
     for (let i = tableStart + 1; i < lines.length && i < tableStart + 100; i++) {
@@ -728,42 +685,24 @@ function parseTableRow(line: string, sampleCount: number) {
     };
 
   } catch (error) {
-    console.error('Error parsing table row:', line, error);
     return null;
   }
 }
 
 function extractComprehensiveDimensionData(textContent: string, fileName: string) {
-  console.log('📄 Starting comprehensive dimension extraction');
   const inspectionRows: any[] = [];
   
   // Parse the entire document structure
   const documentStructure = analyzeDocumentStructure(textContent);
-  console.log('📄 Document structure analysis complete');
   
   // Extract all dimensional elements
   const dimensions = extractAllDimensions(textContent, documentStructure);
-  console.log('📄 Found', dimensions.length, 'dimensional elements');
   
   // Process each dimension with full context
   for (const dimension of dimensions) {
-    console.log('📄 Processing dimension:', {
-      type: dimension.type,
-      value: dimension.value,
-      rawText: dimension.rawText,
-      context: dimension.context.substring(0, 100) + '...'
-    });
     
     const inspectionRow = createInspectionRowFromDimension(dimension);
     if (inspectionRow) {
-      console.log('📄 Created inspection row:', {
-        slNo: inspectionRow.slNo,
-        specification: inspectionRow.specification,
-        nominal: inspectionRow.nominal,
-        plusTol: inspectionRow.plusTol,
-        minusTol: inspectionRow.minusTol,
-        method: inspectionRow.method
-      });
       inspectionRows.push(inspectionRow);
     }
   }
@@ -776,7 +715,6 @@ function extractComprehensiveDimensionData(textContent: string, fileName: string
     row.slNo = (index + 1).toString();
   });
   
-  console.log('📄 Created', inspectionRows.length, 'inspection rows');
   
   return {
     fileName,
@@ -1155,7 +1093,6 @@ function getContextualRemarks(context: string): string {
 }
 
 function extractAggressiveDimensionData(textContent: string, fileName: string) {
-  console.log('📄 Starting aggressive dimension extraction');
   const inspectionRows: any[] = [];
   let rowIndex = 1;
   
@@ -1163,7 +1100,6 @@ function extractAggressiveDimensionData(textContent: string, fileName: string) {
   const words = textContent.split(/\s+/).filter(word => word.length > 0);
   const lines = textContent.split(/[\n\r]+/).map(line => line.trim()).filter(line => line.length > 0);
   
-  console.log('📄 Total words:', words.length, 'Total lines:', lines.length);
   
   // Comprehensive patterns to catch ALL possible dimensions
   const aggressivePatterns = [
@@ -1256,7 +1192,6 @@ function extractAggressiveDimensionData(textContent: string, fileName: string) {
         
         rowIndex++;
         
-        console.log(`📄 Extracted: ${specification} = ${value} (${plusTol}/${minusTol}) from "${match[0]}"`);
       }
     }
   }
@@ -1289,13 +1224,11 @@ function extractAggressiveDimensionData(textContent: string, fileName: string) {
           
           rowIndex++;
           
-          console.log(`📄 Table extracted: ${specification} = ${mainValue} from line "${line.substring(0, 50)}..."`);
         }
       }
     }
   }
   
-  console.log('📄 Aggressive extraction complete:', inspectionRows.length, 'dimensions found');
   
   return {
     fileName,

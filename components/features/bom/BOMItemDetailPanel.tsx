@@ -56,7 +56,6 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
           }
         }
       } catch (error: any) {
-        console.error('Failed to load file URLs:', error);
         let errorMessage = 'Failed to load technical files.';
         if (error?.message) {
           if (error.message.includes('permission')) {
@@ -156,12 +155,10 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
             }
           }
         } catch (error: any) {
-          console.error('Failed to load file URLs after upload:', error);
           // Don't show error toast for post-upload file loading as files were uploaded successfully
         }
       }, 500);
     } catch (error: any) {
-      console.error('Upload error:', error);
       
       let errorMessage = 'Failed to upload files. Please try again.';
       if (error?.message) {

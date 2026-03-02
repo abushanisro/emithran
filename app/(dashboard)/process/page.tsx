@@ -121,7 +121,6 @@ export default function ProcessPage() {
         p => p.processName?.toLowerCase() === 'injection molding'
       );
       if (injectionMoldingProcess) {
-        console.log('Auto-selecting Injection Molding process:', injectionMoldingProcess.id);
         setSelectedProcessId(injectionMoldingProcess.id);
       }
     }
@@ -154,13 +153,10 @@ export default function ProcessPage() {
   const deleteMappingMutation = useDeleteProcessCalculatorMapping();
 
   const handleEditTable = (tableId: string) => {
-    console.log('Starting edit for table:', tableId);
     setEditingTableId(tableId);
     // Initialize edited data with current table rows - try both sources
     const table = modalReferenceTables?.find(t => t.id === tableId) || referenceTables?.find(t => t.id === tableId);
-    console.log('Found table for editing:', table);
     if (table?.rows) {
-      console.log('Table rows:', table.rows);
       setEditedTableData({
         ...editedTableData,
         [tableId]: table.rows.map(row => {
@@ -952,7 +948,6 @@ export default function ProcessPage() {
                             setShowAddTableEditor(false);
                           }
                         } catch (error) {
-                          console.error('Failed to save reference tables:', error);
                           toast.error('Failed to save reference tables');
                         }
                       }}

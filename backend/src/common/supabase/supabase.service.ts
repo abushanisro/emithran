@@ -47,25 +47,136 @@ export class SupabaseService {
    * Get Supabase client authenticated with user's access token
    * This ensures RLS policies work correctly with auth.uid()
    *
-   * @param accessToken - User's Supabase access token (or dev token)
+   * @param accessToken - User's Supabase access token
    * @returns Authenticated Supabase client
    */
   getClient(accessToken?: string): SupabaseClient {
-    console.log('🔍 getClient called, adminClient exists:', !!this.adminClient);
     if (!this.adminClient) {
-      console.error('❌ Admin client not available in getClient()');
       throw new Error('Supabase admin client not initialized');
     }
-    return this.adminClient;
+
+    // If no access token provided, return admin client for server operations
+    if (!accessToken) {
+      return this.adminClient;
+    }
+
+    // Create user-authenticated client with proper token
+    const clientOptions = {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        ...(process.env.NODE_ENV === 'development' && {
+          fetch: this.createRobustFetch(),
+        }),
+      },
+    };
+
+    const userClient = createClient(this.supabaseUrl, this.supabaseAnonKey, clientOptions);
+    
+    // Set the session with the provided token
+    userClient.auth.setSession({
+      access_token: accessToken,
+      refresh_token: '', // Not needed for server-side operations
+    });
+
+    return userClient;
+  }
+
+  /**
+   * Create a fetch wrapper that retries on ECONNRESET and other network errors
+   */
+  private createRobustFetch() {
+    const originalFetch = global.fetch;
+    
+    return async (url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const maxRetries = 3;
+      let lastError: Error | null = null;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await originalFetch(url, {
+            ...init,
+            // Add timeout to prevent hanging
+            signal: AbortSignal.timeout(30000), // 30 second timeout
+          });
+          return response;
+        } catch (error: any) {
+          lastError = error;
+          const isRetryableError = 
+            error.code === 'ECONNRESET' ||
+            error.code === 'ETIMEDOUT' ||
+            error.code === 'ECONNREFUSED' ||
+            error.message?.includes('fetch failed') ||
+            error.message?.includes('network error');
+            
+          console.warn(`Supabase fetch attempt ${attempt} failed:`, {
+            error: error.message,
+            code: error.code,
+            retryable: isRetryableError
+          });
+          
+          if (!isRetryableError || attempt === maxRetries) {
+            break;
+          }
+          
+          // Wait before retrying (exponential backoff)
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+      
+      throw lastError;
+    };
   }
 
   async verifyToken(token: string): Promise<any> {
-    // MVP: Skip token verification, return admin user
-    return {
-      id: '6e7124e7-bf9e-4686-9cac-2245f016a3e4',
-      email: 'emuski@mithran.com',
-      role: 'admin'
-    };
+    if (!token) {
+      throw new UnauthorizedException('Access token is required');
+    }
+
+    try {
+      const { data: user, error } = await this.adminClient.auth.getUser(token);
+      
+      if (error || !user?.user) {
+        throw new UnauthorizedException('Invalid or expired token');
+      }
+
+      return {
+        id: user.user.id,
+        email: user.user.email,
+        role: user.user.user_metadata?.role || 'user'
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Token verification failed');
+    }
+  }
+
+  /**
+   * Get admin user ID by email for development
+   */
+  async getAdminUserId(): Promise<string | null> {
+    try {
+      const { data: users, error } = await this.adminClient.auth.admin.listUsers();
+      
+      if (error) {
+        console.warn('Failed to get admin user ID:', error.message);
+        return null;
+      }
+
+      const adminUser = users?.users?.find(user => user.email === 'emuski@mithran.com');
+      return adminUser?.id || null;
+    } catch (error) {
+      console.warn('Error getting admin user ID:', error);
+      return null;
+    }
   }
 
   getAdminClient(): SupabaseClient {

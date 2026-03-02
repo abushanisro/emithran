@@ -65,7 +65,6 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
       }
 
       // Fetch cost components from backend services
-      console.log(`[CostProvider] Fetching cost components for BOM item: ${bomItem.id}`);
       const [rawMaterialCost, processCost, packagingCost, procuredPartsCost] = await Promise.allSettled([
         fetchRawMaterialCost(bomItem.id),
         fetchProcessCost(bomItem.id),
@@ -79,9 +78,6 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
       const packaging = packagingCost.status === 'fulfilled' ? packagingCost.value : 0;
       const procuredParts = procuredPartsCost.status === 'fulfilled' ? procuredPartsCost.value : 0;
       
-      console.log(`[CostProvider] Cost components for ${bomItem.id}:`, {
-        rawMaterials, processTotal, packaging, procuredParts
-      });
 
       // Calculate using the cost engine with actual data
       const costInput = {
@@ -114,14 +110,11 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
         procuredPartsCost: procuredParts,
       };
 
-      console.log(`[CostProvider] Cost engine input for ${bomItem.id}:`, costInput);
       
       try {
         const result = costEngine.calculateItemCost(costInput);
-        console.log(`[CostProvider] Cost engine result for ${bomItem.id}:`, result);
         return result;
       } catch (engineError) {
-        console.error(`[CostProvider] Cost engine failed for ${bomItem.id}:`, engineError);
         // Return a basic cost structure with the actual values
         const totalCost = rawMaterials + processTotal + packaging + procuredParts;
         return {
@@ -152,7 +145,6 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
         };
       }
     } catch (error) {
-      console.error(`Failed to calculate cost for item ${bomItem.id}:`, error);
       // Return fallback calculation using available item data
       return costEngine.generateSampleCostData(bomItem.itemType);
     }
@@ -163,12 +155,9 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    */
   const fetchRawMaterialCost = async (bomItemId: string): Promise<number> => {
     try {
-      console.log(`[CostProvider] Fetching raw material cost for BOM item: ${bomItemId}`);
       const response = await apiClient.get(`/raw-material-costs/bom-item/${bomItemId}/total`);
-      console.log(`[CostProvider] Raw material cost response:`, response);
       return response.totalCost || response.data?.totalCost || 0;
     } catch (error) {
-      console.error(`[CostProvider] Failed to fetch raw material cost for ${bomItemId}:`, error);
       return 0; // Default if no data available
     }
   };
@@ -178,12 +167,9 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    */
   const fetchProcessCost = async (bomItemId: string): Promise<number> => {
     try {
-      console.log(`[CostProvider] Fetching process cost for BOM item: ${bomItemId}`);
       const response = await apiClient.get(`/process-costs/bom-item/${bomItemId}/total`);
-      console.log(`[CostProvider] Process cost response:`, response);
       return response.totalCost || response.data?.totalCost || 0;
     } catch (error) {
-      console.error(`[CostProvider] Failed to fetch process cost for ${bomItemId}:`, error);
       return 0; // Default if no data available
     }
   };
@@ -194,11 +180,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
   const fetchPackagingCost = async (bomItemId: string): Promise<number> => {
     try {
       const response = await apiClient.get(`/packaging-logistics-costs/bom-item/${bomItemId}/total`);
-      console.log(`[CostProvider] Packaging cost full response:`, response);
-      console.log(`[CostProvider] Packaging cost response.data:`, response.data);
-      console.log(`[CostProvider] Packaging cost response.totalCost:`, response.totalCost);
       const cost = response.totalCost || response.data?.totalCost || 0;
-      console.log(`[CostProvider] Packaging cost extracted value:`, cost);
       return cost;
     } catch (error) {
       return 0; // Default if no data available
@@ -211,11 +193,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
   const fetchProcuredPartsCost = async (bomItemId: string): Promise<number> => {
     try {
       const response = await apiClient.get(`/procured-parts-costs/bom-item/${bomItemId}/total`);
-      console.log(`[CostProvider] Procured parts cost full response:`, response);
-      console.log(`[CostProvider] Procured parts cost response.data:`, response.data);
-      console.log(`[CostProvider] Procured parts cost response.totalCost:`, response.totalCost);
       const cost = response.totalCost || response.data?.totalCost || 0;
-      console.log(`[CostProvider] Procured parts cost extracted value:`, cost);
       return cost;
     } catch (error) {
       return 0; // Default if no data available
@@ -226,23 +204,16 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    * Calculate comprehensive cost data for a BOM
    */
   const calculateBomCosts = async (bomId: string, itemCount?: number): Promise<void> => {
-    console.log(`[CostProvider] Starting cost calculation for BOM: ${bomId}`);
     setIsCalculating(true);
     
     try {
       // Fetch actual BOM items from API
-      console.log(`[CostProvider] Fetching BOM items for: ${bomId}`);
       const response = await apiClient.get(`/boms/${bomId}/items`);
-      console.log(`[CostProvider] Full API response:`, response);
-      console.log(`[CostProvider] Response data:`, response.data);
-      console.log(`[CostProvider] Response status:`, response.status);
       
       // Handle different response structures - the response IS the data
       const bomItems: BOMItem[] = response.items || response.data || [];
-      console.log(`[CostProvider] Found ${bomItems.length} BOM items:`, bomItems);
       
       if (bomItems.length === 0) {
-        console.warn(`[CostProvider] No items found for BOM ${bomId}`);
         setBomCosts(prev => new Map(prev.set(bomId, [])));
         setAggregatedData(prev => new Map(prev.set(bomId, { totalCost: 0, totalItems: 0 })));
         return;
@@ -265,12 +236,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
       setAggregatedData(prev => new Map(prev.set(bomId, aggregated)));
       
     } catch (error) {
-      console.error(`[CostProvider] Failed to calculate BOM costs for ${bomId}:`, error);
-      // Check if the error has response data
-      if (error?.response) {
-        console.error(`[CostProvider] Error response status:`, error.response.status);
-        console.error(`[CostProvider] Error response data:`, error.response.data);
-      }
+      // Cost calculation failed
     } finally {
       setIsCalculating(false);
     }

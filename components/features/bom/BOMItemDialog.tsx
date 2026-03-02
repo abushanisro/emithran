@@ -171,7 +171,6 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
           await apiClient.uploadFiles(`/bom-items/${itemId}/upload-files`, formDataUpload);
           toast.success('Files uploaded successfully');
         } catch (uploadError: any) {
-          console.error('File upload error:', uploadError);
           let uploadErrorMessage = 'Item saved but file upload failed.';
           if (uploadError?.message) {
             if (uploadError.message.includes('size')) {
@@ -195,7 +194,6 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       onSuccess?.();
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('Error saving BOM item:', error);
       }
       
       let errorMessage = 'Failed to save item. Please try again.';

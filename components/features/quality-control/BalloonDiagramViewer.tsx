@@ -50,23 +50,18 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
       // First try to get a signed URL for the PDF using proper API client
       const { apiClient } = await import('@/lib/api/client');
       const signedUrlEndpoint = `/bom-items/${fileId}/file-url/2d`;
-      console.log('Attempting signed URL from:', signedUrlEndpoint);
       
       const data = await apiClient.get(signedUrlEndpoint);
-      console.log('Signed URL API response:', data);
       
       // Try different possible response formats
       const possibleUrl = data.url || data.downloadUrl || data.fileUrl || data.signedUrl || data.data?.url;
       
       if (possibleUrl) {
-        console.log('Using signed URL:', possibleUrl);
         setPdfUrl(possibleUrl);
       } else {
-        console.log('No URL found in response, response keys:', Object.keys(data));
         throw new Error('No signed URL returned');
       }
     } catch (error) {
-      console.error('Signed URL failed, trying blob approach:', error);
       
       // Fallback: Try different URL formats
       // Extract filename from path for some endpoints
@@ -97,7 +92,6 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
       let lastError = null;
       for (const url of urlsToTry) {
         try {
-          console.log('Trying URL:', url);
           const pdfResponse = await fetch(url, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
@@ -107,24 +101,19 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
           if (pdfResponse.ok) {
             const blob = await pdfResponse.blob();
             const objectUrl = URL.createObjectURL(blob);
-            console.log('Successfully created blob URL from:', url);
             setPdfUrl(objectUrl);
             return; // Success, exit the function
           } else {
             const responseText = await pdfResponse.text().catch(() => 'Could not read response');
             lastError = `${url} failed with status: ${pdfResponse.status} - ${responseText}`;
-            console.log(lastError);
           }
         } catch (fetchError) {
           lastError = `${url} failed with error: ${fetchError.message}`;
-          console.log(lastError);
         }
       }
       
       // If we get here, all URLs failed - try direct iframe as last resort
-      console.log('All blob attempts failed, trying direct iframe URLs');
       for (const url of urlsToTry.slice(0, 3)) { // Try first 3 URLs directly in iframe
-        console.log('Trying direct iframe URL:', url);
         setPdfUrl(url);
         break; // Try the first one and let iframe handle it
       }
@@ -319,7 +308,6 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
           fileName={fileName}
           fileId={fileId}
           onSave={(balloons) => {
-            console.log('Balloons saved:', balloons);
             setShowAnnotator(false);
           }}
         />
@@ -354,24 +342,11 @@ export default function BalloonDiagramViewer({
   const drawingFiles = useMemo(() => {
     if (!bomItems || bomItems.length === 0) return [];
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log('BalloonDiagramViewer: Processing BOM items:', bomItems);
-    }
     
     const processedFiles = bomItems.map(item => {
       // Check multiple potential 2D file properties from BOM items API
       const file2D = item.file2dPath || item.file_2d_path || item.drawingFile || item.cadFile2D || item.drawing2DFile;
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`BOM Item ${item.id} (${item.partNumber || item.name}):`, {
-          file2dPath: item.file2dPath,
-          file_2d_path: item.file_2d_path,
-          drawingFile: item.drawingFile,
-          cadFile2D: item.cadFile2D,
-          drawing2DFile: item.drawing2DFile,
-          hasFile: !!file2D
-        });
-      }
 
       return {
         id: item.id,
@@ -384,9 +359,6 @@ export default function BalloonDiagramViewer({
       };
     });
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log('BalloonDiagramViewer: All processed files:', processedFiles);
-    }
     
     return processedFiles;
   }, [bomItems]);
@@ -415,7 +387,7 @@ export default function BalloonDiagramViewer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-4xl lg:max-w-7xl max-h-[95vh] overflow-y-auto">
         <DialogHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
             <DialogTitle className="flex items-center gap-2 text-xl">

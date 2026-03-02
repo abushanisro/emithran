@@ -168,7 +168,6 @@ export function useCreateQualityInspection() {
       });
     },
     onError: (error) => {
-      console.error('Failed to create quality inspection:', error);
       toast.error('Failed to create quality inspection');
     },
   });
@@ -198,7 +197,6 @@ export function useUpdateQualityInspection() {
       });
     },
     onError: (error) => {
-      console.error('Failed to update quality inspection:', error);
       toast.error('Failed to update quality inspection');
     },
   });
@@ -236,7 +234,6 @@ export function useSubmitInspectionResults() {
       }
     },
     onError: (error) => {
-      console.error('Failed to submit inspection results:', error);
       toast.error('Failed to submit inspection results');
     },
   });
@@ -259,7 +256,6 @@ export function useStartInspection() {
       });
     },
     onError: (error) => {
-      console.error('Failed to start inspection:', error);
       toast.error('Failed to start inspection');
     },
   });
@@ -294,7 +290,6 @@ export function useCompleteInspection() {
       });
     },
     onError: (error) => {
-      console.error('Failed to complete inspection:', error);
       toast.error('Failed to complete inspection');
     },
   });
@@ -360,7 +355,6 @@ export function useSaveDetailedInspectionReport() {
       });
     },
     onError: (error) => {
-      console.error('Failed to save inspection report:', error);
       toast.error('Failed to save inspection report');
     },
   });
@@ -395,7 +389,6 @@ export function useApproveQualityInspection() {
       });
     },
     onError: (error) => {
-      console.error('Failed to approve quality inspection:', error);
       toast.error('Failed to approve quality inspection');
     },
   });
@@ -433,7 +426,6 @@ export function useRejectQualityInspection() {
       });
     },
     onError: (error) => {
-      console.error('Failed to reject quality inspection:', error);
       toast.error('Failed to reject quality inspection');
     },
   });
@@ -467,7 +459,6 @@ export function useDeleteQualityInspection() {
       });
     },
     onError: (error) => {
-      console.error('Failed to delete quality inspection:', error);
       toast.error('Failed to delete quality inspection');
     },
   });
@@ -478,27 +469,21 @@ export function useDetailedInspectionReport(inspectionId: string) {
   return useQuery({
     queryKey: ['detailed-inspection-report', inspectionId],
     queryFn: async () => {
-      console.log(`🔍 Loading detailed inspection report for: ${inspectionId}`);
       
       try {
         const response = await apiClient.get<DetailedInspectionReport>(
           `/quality-control/inspections/${inspectionId}/detailed-report`
         );
-        console.log(`✅ Report loaded successfully:`, response);
         return response;
       } catch (error: any) {
-        console.log(`❌ Report loading error for ${inspectionId}:`, error);
-        console.log(`Error statusCode: ${error.statusCode}, Error status: ${error.status}, Error code: ${error.code}`);
         
         // If report doesn't exist (404), return null instead of throwing error
         // Check both statusCode (from ApiError) and status (legacy/other sources)
         if (error.statusCode === 404 || error.status === 404 || error.message?.includes('not found')) {
-          console.log(`✅ Handling 404 - returning null for non-existent report`);
           return null;
         }
         
         // Re-throw other errors
-        console.log(`❌ Re-throwing error:`, error);
         throw error;
       }
     },

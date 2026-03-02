@@ -174,7 +174,6 @@ export function ProcessCostDialog({
 
   useEffect(() => {
     if (hierarchyError) {
-      console.error('[ProcessCostDialog] Hierarchy Error:', hierarchyError);
     }
   }, [hierarchyError]);
 
@@ -221,7 +220,6 @@ export function ProcessCostDialog({
         setCalculatorResults(result.results);
       }
     } catch (error) {
-      console.error('Calculator execution error:', error);
     }
   };
 
@@ -379,9 +377,7 @@ export function ProcessCostDialog({
       }
 
 
-      console.error('Could not resolve reference table for field:', field);
     } catch (error) {
-      console.error('Failed to fetch table for field:', field.fieldName, error);
     }
   };
 
@@ -526,7 +522,6 @@ export function ProcessCostDialog({
         onOpenChange={(openState) => {
           // Prevent closing if calculator is open
           if (!openState && calculatorOpen) {
-            console.log('Preventing main dialog close because calculator is open');
             return;
           }
           onOpenChange(openState);

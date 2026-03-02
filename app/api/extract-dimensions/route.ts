@@ -17,18 +17,15 @@ export async function POST(request: NextRequest) {
     });
     
     if (!pdfResponse.ok) {
-      console.error(`Failed to fetch PDF from ${pdfUrl}: ${pdfResponse.status} ${pdfResponse.statusText}`);
       return NextResponse.json({ error: 'Failed to fetch PDF from storage' }, { status: 400 });
     }
 
     const pdfArrayBuffer = await pdfResponse.arrayBuffer();
     const pdfBuffer = Buffer.from(pdfArrayBuffer);
     
-    console.log(`Fetched PDF from Supabase: ${pdfBuffer.length} bytes`);
     
     // Validate PDF buffer
     if (!pdfBuffer || pdfBuffer.length === 0) {
-      console.error('Downloaded PDF buffer is empty');
       return NextResponse.json({ error: 'Downloaded PDF is empty' }, { status: 400 });
     }
 
@@ -48,12 +45,10 @@ export async function POST(request: NextRequest) {
 
     if (!backendResponse.ok) {
       const errorText = await backendResponse.text();
-      console.error('Backend processing failed:', errorText);
       throw new Error(`Backend processing failed: ${backendResponse.status} - ${errorText}`);
     }
 
     const result = await backendResponse.json();
-    console.log('Backend extraction result:', JSON.stringify(result, null, 2));
     
     // Handle nested response structure
     const actualData = result.data?.data || result.data || result;
@@ -79,7 +74,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(dimensions);
 
   } catch (error) {
-    console.error('Dimension extraction error:', error);
     return NextResponse.json(
       { error: 'Dimension extraction failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

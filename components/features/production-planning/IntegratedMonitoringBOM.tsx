@@ -223,36 +223,28 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
     queryKey: ['bom-items', bomId, lotId],
     queryFn: async () => {
       if (!bomId) {
-        console.log('❌ No BOM ID found, trying to get from lot data');
         return null;
       }
       try {
         // Try multiple endpoints to get BOM items
-        console.log(`🔍 Trying to fetch BOM items for BOM ID: ${bomId}`);
 
         let response: any;
         // First try: the endpoint we see in the logs that's working
         try {
           response = await apiClient.get(`/bom-items?bomId=${bomId}`);
-          console.log('✅ Got BOM items from /bom-items?bomId=:', response);
         } catch (err1) {
-          console.log('❌ Failed /bom-items?bomId=, trying production-planning endpoint');
           try {
             // Second try: the production planning specific endpoint  
             response = await apiClient.get(`/production-planning/lots/${lotId}/bom-items`);
-            console.log('✅ Got BOM items from production-planning endpoint:', response);
           } catch (err2) {
-            console.log('❌ Failed production-planning endpoint, trying direct BOM endpoint');
             // Third try: direct BOM endpoint
             response = await apiClient.get(`/boms/${bomId}/items`);
-            console.log('✅ Got BOM items from direct BOM endpoint:', response);
           }
         }
 
         // The response might be wrapped in data property
         return response?.data || response;
       } catch (error) {
-        console.error('❌ Could not fetch BOM items from any endpoint:', error);
         return null;
       }
     },
@@ -261,14 +253,6 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
   });
 
   // Debug: Log all data sources
-  console.log('🔍 DEBUG - lotData structure:', {
-    lotDataExists: !!lotData,
-    lotDataData: lotData?.data,
-    selectedBomItems: lotData?.data?.selectedBomItems,
-    directSelectedBomItems: lotData?.selectedBomItems,
-    bomItems: lotData?.data?.bom?.items,
-    lotDataKeys: lotData ? Object.keys(lotData) : null
-  });
 
   // Use selected BOM items from lot as the primary source, fallback to BOM items if none selected
   const selectedBomItems = lotData?.data?.selectedBomItems || lotData?.selectedBomItems || [];
@@ -277,32 +261,18 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
   // Handle the API response structure - bomData has items array
   const directBomItems = Array.isArray(bomData) ? bomData : (bomData?.items || bomData?.data || []);
 
-  console.log('🔍 DEBUG - Data sources:', {
-    selectedBomItemsCount: selectedBomItems.length,
-    allBomItemsCount: allBomItems.length,
-    directBomItemsCount: Array.isArray(directBomItems) ? directBomItems.length : 0,
-    selectedBomItemsSample: selectedBomItems.slice(0, 2),
-    bomDataStructure: typeof bomData,
-    directBomItemsSample: Array.isArray(directBomItems) ? directBomItems.slice(0, 2) : 'Not an array',
-  });
 
   // If no selected items but BOM has items, use all BOM items as fallback
   // Priority: selectedBomItems > allBomItems > directBomItems (only as last resort)
   let itemsToProcess = [];
   if (selectedBomItems.length > 0) {
     itemsToProcess = selectedBomItems;
-    console.log('✅ Using selectedBomItems (preferred):', selectedBomItems);
   } else if (allBomItems.length > 0) {
     itemsToProcess = allBomItems;
-    console.log('✅ Using allBomItems from lot:', allBomItems);
   } else if (Array.isArray(directBomItems) && directBomItems.length > 0) {
     // Last resort: show all BOM items with a warning
-    console.warn('⚠️ No selected BOM items found. Showing all BOM items as fallback.');
-    console.warn('This means the lot creation process did not properly save selected BOM items.');
     itemsToProcess = directBomItems;
-    console.log('Using directBomItems (fallback):', directBomItems);
   } else {
-    console.warn('❌ No BOM items found from any source. Check BOM configuration.');
     itemsToProcess = [];
   }
 
@@ -355,29 +325,10 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
 
   // Also extract BOM requirements from process subtasks to show comprehensive tracking
   const subtaskBomItems = (realProcesses || []).flatMap((process: any) => {
-    console.log(`🔍 Processing subtasks for process: ${process.process_name || process.processName}`, {
-      processId: process.id,
-      subtaskCount: (process.subtasks || []).length,
-      subtasks: (process.subtasks || []).map((st: any) => ({
-        id: st.id,
-        name: st.task_name || st.taskName,
-        bomRequirements: (st.bom_requirements || st.bomRequirements || []).length
-      }))
-    });
 
     return (process.subtasks || []).flatMap((subtask: any, subtaskIndex: number) => {
       const bomRequirements = subtask.bom_requirements || subtask.bomRequirements || [];
 
-      console.log(`🔍 Processing BOM for subtask ${subtaskIndex + 1}:`, {
-        subtaskId: subtask.id,
-        taskName: subtask.task_name || subtask.taskName,
-        bomCount: bomRequirements.length,
-        bomRequirements: bomRequirements.map((b: any) => ({
-          id: b.id,
-          partNumber: b.part_number || b.partNumber,
-          partName: b.part_name || b.partName || b.name
-        }))
-      });
 
       return bomRequirements.map((bomReq: any, bomIndex: number) => {
         const taskName = subtask.task_name || subtask.taskName || 'Unknown Task';
@@ -423,14 +374,6 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
     });
   });
 
-  console.log(`📊 Extracted ${subtaskBomItems.length} BOM items from subtasks:`, {
-    totalBomItems: subtaskBomItems.length,
-    inspectionItems: subtaskBomItems.filter((item: any) => item.sectionName === 'Inspection').length,
-    rawMaterialItems: subtaskBomItems.filter((item: any) => item.sectionName === 'Raw Material').length,
-    processItems: subtaskBomItems.filter((item: any) => item.sectionName === 'Process').length,
-    packingItems: subtaskBomItems.filter((item: any) => item.sectionName === 'Packing').length,
-    sampleItems: subtaskBomItems.slice(0, 3)
-  });
 
   // Merge lot-level BOM items with subtask BOM items, avoiding duplicates
   const allUniqueMaterialItems = [...materialItems];
@@ -448,30 +391,6 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
   materialItems = allUniqueMaterialItems;
 
   // Debug logging to understand data structure
-  console.log('📊 IntegratedMonitoringBOM Debug Data:', {
-    lotData,
-    bomId,
-    bomData,
-    bomLoading,
-    selectedBomItems,
-    allBomItems,
-    directBomItems,
-    itemsToProcess,
-    dashboardMaterials: bomItems,
-    finalMaterialItems: materialItems,
-    processProgress,
-    remarksData
-  });
-
-  // Additional debug for BOM query status
-  console.log('🔍 BOM Query Status:', {
-    bomId,
-    queryEnabled: !!bomId,
-    isLoading: bomLoading,
-    hasData: !!bomData,
-    dataType: typeof bomData,
-    dataLength: Array.isArray(bomData) ? bomData.length : 'not array'
-  });
 
   // Use real remarks data instead of mock alerts
   const integratedAlerts = (remarksData || []).map((remark: any) => ({
@@ -510,7 +429,6 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
       refreshAll();
       setAddMaterialDialogOpen(false);
     } catch (error) {
-      console.error('Failed to initialize materials:', error);
     }
   };
 
@@ -520,7 +438,6 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
       // Resolve the remark instead of mock alert
       await resolveRemarkMutation.mutateAsync(alertId);
     } catch (error) {
-      console.error('Failed to resolve remark:', error);
     }
   };
 

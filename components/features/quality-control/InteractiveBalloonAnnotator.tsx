@@ -93,6 +93,29 @@ export default function InteractiveBalloonAnnotator({
     saveToHistory(newBalloons);
   }, [isAnnotating, scale, nextBalloonNumber, balloons, saveToHistory]);
 
+  // Handle touch events for mobile devices
+  const handleContainerTouch = useCallback((event: React.TouchEvent) => {
+    event.preventDefault();
+    if (!isAnnotating || !containerRef.current || event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((touch.clientX - rect.left) / scale);
+    const y = ((touch.clientY - rect.top) / scale);
+
+    const newBalloon: Balloon = {
+      id: `balloon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      number: nextBalloonNumber,
+      x,
+      y,
+      timestamp: Date.now()
+    };
+
+    const newBalloons = [...balloons, newBalloon];
+    setBalloons(newBalloons);
+    saveToHistory(newBalloons);
+  }, [isAnnotating, scale, nextBalloonNumber, balloons, saveToHistory]);
+
   // Delete balloon
   const deleteBalloon = useCallback((balloonId: string) => {
     const newBalloons = balloons.filter(b => b.id !== balloonId);
@@ -130,7 +153,7 @@ export default function InteractiveBalloonAnnotator({
         onSave(balloons);
       }
     } catch (error) {
-      console.error('Failed to save balloons:', error);
+;
     }
   }, [balloons, saveBalloons, onSave]);
 
@@ -141,7 +164,7 @@ export default function InteractiveBalloonAnnotator({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden">
+      <DialogContent className="max-w-[95vw] sm:max-w-4xl lg:max-w-7xl max-h-[95vh] overflow-hidden">
         <DialogHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
             <DialogTitle className="flex items-center gap-2 text-xl">
@@ -263,6 +286,7 @@ export default function InteractiveBalloonAnnotator({
                 cursor: isAnnotating ? 'crosshair' : 'default'
               }}
               onClick={handleContainerClick}
+              onTouchStart={handleContainerTouch}
             >
               {/* PDF Iframe */}
               <div

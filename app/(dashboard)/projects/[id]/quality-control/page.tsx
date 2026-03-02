@@ -87,7 +87,6 @@ export default function QualityControlPage() {
       try {
         await deleteInspection.mutateAsync(inspection.id);
       } catch (error) {
-        console.error('Failed to delete inspection:', error);
       }
     }
   };
@@ -97,7 +96,6 @@ export default function QualityControlPage() {
       try {
         await approveInspection.mutateAsync(inspection.id);
       } catch (error) {
-        console.error('Failed to approve inspection:', error);
       }
     }
   };
@@ -108,7 +106,6 @@ export default function QualityControlPage() {
       try {
         await rejectInspection.mutateAsync({ inspectionId: inspection.id, reason });
       } catch (error) {
-        console.error('Failed to reject inspection:', error);
       }
     }
   };
@@ -158,8 +155,8 @@ export default function QualityControlPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-card text-card-foreground border-b border-border shadow-sm">
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
                 <Button
@@ -169,19 +166,21 @@ export default function QualityControlPage() {
                   size="sm"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  Back to Project
+                  <span className="hidden xs:inline">Back to Project</span>
+                  <span className="xs:hidden">Back</span>
                 </Button>
-                <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-                  <Shield className="h-6 w-6 text-primary" />
-                  Quality Control
+                <h1 className="text-xl sm:text-2xl font-semibold text-foreground flex items-center gap-2">
+                  <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                  <span className="hidden sm:inline">Quality Control</span>
+                  <span className="sm:hidden">QC</span>
                 </h1>
               </div>
-              <p className="text-sm text-muted-foreground ml-24">
+              <p className="text-xs sm:text-sm text-muted-foreground sm:ml-24">
                 Manage quality inspections and reports for this project
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="text-sm">
+            <div className="flex items-center gap-3 justify-end">
+              <Badge variant="outline" className="text-xs sm:text-sm">
                 {filteredInspections.length} Inspections
               </Badge>
               <CreateQCInspectionDialog
@@ -194,18 +193,18 @@ export default function QualityControlPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Search and Filters */}
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder="Search inspections by name, type, status, or inspector..."
+                  placeholder="Search inspections..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 text-sm"
                 />
               </div>
             </div>
@@ -215,12 +214,12 @@ export default function QualityControlPage() {
         {/* Inspections List */}
         {filteredInspections.length === 0 ? (
           <Card>
-            <CardContent className="p-12 text-center">
-              <Shield className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">
+            <CardContent className="p-6 sm:p-12 text-center">
+              <Shield className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">
                 {qualityInspections.length === 0 ? 'No Quality Inspections' : 'No Matching Inspections'}
               </h3>
-              <p className="text-muted-foreground mb-4">
+              <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
                 {qualityInspections.length === 0
                   ? 'Get started by creating your first quality control inspection.'
                   : 'Try adjusting your search criteria to find inspections.'
@@ -238,50 +237,52 @@ export default function QualityControlPage() {
           <div className="grid gap-4">
             {filteredInspections.map((inspection: any) => (
               <Card key={inspection.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <CardTitle className="text-lg">{inspection.name}</CardTitle>
-                        <Badge className={`text-xs border ${getStatusBadge(inspection.status, inspection.overall_result)}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <CardTitle className="text-base sm:text-lg truncate pr-2">{inspection.name}</CardTitle>
+                        <Badge className={`text-xs border w-fit ${getStatusBadge(inspection.status, inspection.overall_result)}`}>
                           <div className="flex items-center gap-1">
                             {getStatusIcon(inspection.status, inspection.overall_result)}
-                            {inspection.overall_result?.toUpperCase() || inspection.status?.toUpperCase() || 'PLANNED'}
+                            <span className="hidden xs:inline">{inspection.overall_result?.toUpperCase() || inspection.status?.toUpperCase() || 'PLANNED'}</span>
+                            <span className="xs:hidden">{(inspection.overall_result?.toUpperCase() || inspection.status?.toUpperCase() || 'PLANNED').substr(0, 4)}</span>
                           </div>
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
-                          <FileText className="h-4 w-4" />
-                          <span>{inspection.type || 'First Article'}</span>
+                          <FileText className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">{inspection.type || 'First Article'}</span>
                         </div>
                         {inspection.inspector && (
                           <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            <span>{inspection.inspector}</span>
+                            <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{inspection.inspector}</span>
                           </div>
                         )}
                         {inspection.plannedDate && (
                           <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>{new Date(inspection.plannedDate).toLocaleDateString()}</span>
+                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{new Date(inspection.plannedDate).toLocaleDateString()}</span>
                           </div>
                         )}
                         <div className="flex items-center gap-1">
-                          <Shield className="h-4 w-4" />
+                          <Shield className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                           <span>{inspection.selectedItems?.length || 0} items</span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => openReportDialog(inspection)}
-                        className="flex items-center gap-1"
+                        className="flex items-center gap-1 text-xs sm:text-sm"
                       >
-                        <FileText className="h-4 w-4" />
-                        Open Report
+                        <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="hidden xs:inline">Open Report</span>
+                        <span className="xs:hidden">Report</span>
                       </Button>
                       
                       {/* Approve/Reject buttons - only show for completed inspections that aren't already approved/rejected */}
@@ -291,29 +292,29 @@ export default function QualityControlPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleApproveInspection(inspection)}
-                            className="flex items-center gap-1 text-green-600 border-green-200 hover:bg-green-50"
+                            className="flex items-center gap-1 text-green-600 border-green-200 hover:bg-green-50 text-xs sm:text-sm"
                             disabled={approveInspection.isPending}
                           >
-                            <ThumbsUp className="h-4 w-4" />
-                            Approve
+                            <ThumbsUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Approve</span>
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleRejectInspection(inspection)}
-                            className="flex items-center gap-1 text-red-600 border-red-200 hover:bg-red-50"
+                            className="flex items-center gap-1 text-red-600 border-red-200 hover:bg-red-50 text-xs sm:text-sm"
                             disabled={rejectInspection.isPending}
                           >
-                            <ThumbsDown className="h-4 w-4" />
-                            Reject
+                            <ThumbsDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Reject</span>
                           </Button>
                         </>
                       )}
                       
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-9 w-9 p-0">
-                            <MoreVertical className="h-4 w-4" />
+                          <Button variant="outline" size="sm" className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                            <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -329,7 +330,7 @@ export default function QualityControlPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   <div className="space-y-3">
                     {inspection.description && (
                       <p className="text-sm text-muted-foreground">{inspection.description}</p>
@@ -345,8 +346,8 @@ export default function QualityControlPage() {
 
                     {/* Quality Standards */}
                     {inspection.qualityStandards && inspection.qualityStandards.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">Standards:</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span className="text-sm font-medium flex-shrink-0">Standards:</span>
                         <div className="flex gap-1 flex-wrap">
                           {inspection.qualityStandards.map((standard: string, index: number) => (
                             <Badge key={index} variant="secondary" className="text-xs">
@@ -404,7 +405,7 @@ export default function QualityControlPage() {
                     )}
 
                     {/* Timestamps */}
-                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-muted-foreground pt-2 border-t">
                       <span>Created: {new Date(inspection.createdAt).toLocaleDateString()}</span>
                       {inspection.completedAt && (
                         <span>Completed: {new Date(inspection.completedAt).toLocaleDateString()}</span>

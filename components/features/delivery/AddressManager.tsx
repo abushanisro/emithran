@@ -89,7 +89,6 @@ export default function AddressManager({
       refetch();
       toast.success('Address created successfully');
     } catch (error) {
-      console.error('Failed to create address:', error);
       toast.error('Failed to create address');
     }
   };

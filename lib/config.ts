@@ -14,13 +14,10 @@ import { envValidator } from './config/env-validator';
 if (typeof window !== 'undefined') {
   // Client-side validation
   const validation = envValidator.validate();
-  if (!validation.isValid && process.env.NODE_ENV === 'production') {
-    console.error('Environment validation failed:', validation.errors);
-  }
   if (process.env.NODE_ENV === 'development') {
     // Log results asynchronously (don't block module loading)
     envValidator.logResults().catch(err => {
-      console.error('Environment validation logging failed:', err);
+      // Environment validation logging failed
     });
   }
 }

@@ -131,7 +131,6 @@ export function AutoBalloonExtractor({
       });
       
     } catch (error) {
-      console.error('Dimension extraction failed:', error);
       setProcessingStatus('');
       toast.error(error instanceof Error ? error.message : 'Failed to extract dimensions');
     } finally {

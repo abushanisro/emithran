@@ -86,7 +86,6 @@ function CallbackContent() {
           router.push('/auth')
         }
       } catch (error: any) {
-        console.error('Auth callback error:', error)
         let errorMessage = 'An unexpected error occurred during authentication.'
         if (error?.message) {
           if (error.message.includes('network')) {

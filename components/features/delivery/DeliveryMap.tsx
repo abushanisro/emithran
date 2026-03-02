@@ -89,7 +89,7 @@ export default function DeliveryMap({
 
     loadLeaflet()
       .then(() => setMapLoaded(true))
-      .catch(error => console.error('Failed to load Leaflet:', error));
+      .catch(error => {});
   }, []);
 
   // Get user's current location
@@ -103,7 +103,6 @@ export default function DeliveryMap({
           });
         },
         (error) => {
-          console.warn('Geolocation error:', error);
           // Default to Delhi/NCR center
           setUserLocation({ lat: 28.6139, lng: 77.2090 });
         },
@@ -192,7 +191,6 @@ export default function DeliveryMap({
       });
 
     } catch (error) {
-      console.error('Error initializing map:', error);
     }
   }, [mapLoaded, userLocation, selectedDelivery, onLocationUpdate]);
 
@@ -363,7 +361,6 @@ export default function DeliveryMap({
           mapInstanceRef.current.fitBounds(routeLayerRef.current.getBounds().pad(0.1));
         }
       } catch (error) {
-        console.error('Error drawing route:', error);
       } finally {
         setIsLoadingRoute(false);
       }

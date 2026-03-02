@@ -39,32 +39,35 @@ export default function ProfessionalInspectionReport({ inspection, onBack }: Ins
   const checklistResults = inspection?.results || [];
 
   return (
-    <div className="min-h-screen bg-white p-8 font-mono text-sm">
+    <div className="min-h-screen bg-white p-4 sm:p-8 font-mono text-xs sm:text-sm">
       {/* Header Controls */}
-      <div className="flex items-center justify-between mb-8 print:hidden">
-        <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Quality Control
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8 print:hidden">
+        <Button variant="outline" onClick={onBack} className="flex items-center gap-2 text-xs sm:text-sm">
+          <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+          <span className="hidden xs:inline">Back to Quality Control</span>
+          <span className="xs:hidden">Back</span>
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print Report
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={() => window.print()} className="flex-1 sm:flex-none text-xs sm:text-sm">
+            <Printer className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+            <span className="hidden sm:inline">Print Report</span>
+            <span className="sm:hidden">Print</span>
           </Button>
-          <Button>
-            <Download className="h-4 w-4 mr-2" />
-            Download PDF
+          <Button className="flex-1 sm:flex-none text-xs sm:text-sm">
+            <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+            <span className="hidden sm:inline">Download PDF</span>
+            <span className="sm:hidden">Download</span>
           </Button>
         </div>
       </div>
 
       {/* Report Header */}
-      <div className="flex items-center justify-center mb-8">
-        <div className="flex items-center">
-          <div className="bg-slate-800 text-white px-6 py-2 font-bold text-lg">
+      <div className="flex items-center justify-center mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row items-center">
+          <div className="bg-slate-800 text-white px-3 py-2 sm:px-6 sm:py-2 font-bold text-sm sm:text-lg text-center">
             QUALITY INSPECTION REPORT
           </div>
-          <div className="bg-orange-400 text-white px-6 py-2 font-bold text-lg">
+          <div className="bg-orange-400 text-white px-3 py-2 sm:px-6 sm:py-2 font-bold text-sm sm:text-lg">
             EMUSKI
           </div>
         </div>
@@ -74,27 +77,31 @@ export default function ProfessionalInspectionReport({ inspection, onBack }: Ins
       <div className="space-y-8">
         {/* 1.5 QUALITY AUDIT CHECK SHEET */}
         <div>
-          <h2 className="text-base font-bold mb-4">1.5 QUALITY AUDIT CHECK SHEET</h2>
+          <h2 className="text-sm sm:text-base font-bold mb-4">1.5 QUALITY AUDIT CHECK SHEET</h2>
           
           <div className="border border-gray-400">
-            {/* Table Header */}
-            <div className="grid grid-cols-12 border-b border-gray-400">
-              <div className="col-span-1 border-r border-gray-400 bg-blue-200 p-2 text-center font-semibold">
+            {/* Table Header - Responsive */}
+            <div className="hidden sm:grid sm:grid-cols-12 border-b border-gray-400">
+              <div className="col-span-1 border-r border-gray-400 bg-blue-200 p-2 text-center font-semibold text-xs">
                 S.No
               </div>
-              <div className="col-span-4 border-r border-gray-400 bg-blue-200 p-2 text-center font-semibold">
+              <div className="col-span-4 border-r border-gray-400 bg-blue-200 p-2 text-center font-semibold text-xs">
                 ACTIVITY
               </div>
-              <div className="col-span-4 border-r border-gray-400 bg-blue-200 p-2 text-center font-semibold">
+              <div className="col-span-4 border-r border-gray-400 bg-blue-200 p-2 text-center font-semibold text-xs">
                 SPECIFIED
               </div>
               <div className="col-span-3 bg-blue-200 p-2">
-                <div className="text-center font-semibold mb-1">OBSERVATION</div>
+                <div className="text-center font-semibold mb-1 text-xs">OBSERVATION</div>
                 <div className="grid grid-cols-2 border-t border-gray-400">
-                  <div className="text-center font-semibold border-r border-gray-400 px-1 py-1">OK</div>
-                  <div className="text-center font-semibold px-1 py-1">Value</div>
+                  <div className="text-center font-semibold border-r border-gray-400 px-1 py-1 text-xs">OK</div>
+                  <div className="text-center font-semibold px-1 py-1 text-xs">Value</div>
                 </div>
               </div>
+            </div>
+            {/* Mobile Header */}
+            <div className="sm:hidden bg-blue-200 p-2 border-b border-gray-400">
+              <div className="text-center font-semibold text-xs">QUALITY AUDIT CHECK SHEET</div>
             </div>
 
             {/* Table Rows */}

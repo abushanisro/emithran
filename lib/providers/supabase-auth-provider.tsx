@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase/client'
+import { appReadiness } from '@/lib/core/app-readiness'
 
 import type { User } from '@supabase/supabase-js'
 
@@ -22,6 +23,22 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Check if auth is disabled in development
+    if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true') {
+      // Create a mock user for development
+      const mockUser = {
+        id: 'dev-user-123',
+        email: 'developer@mithran.dev',
+        created_at: new Date().toISOString(),
+        user_metadata: { full_name: 'Developer User' }
+      } as User;
+      
+      setUser(mockUser)
+      setLoading(false)
+      appReadiness.setAuthValidated()
+      return
+    }
+
     if (!supabase) {
       setLoading(false)
       return
@@ -33,7 +50,6 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         const { data: { session } } = await supabase.auth.getSession()
         setUser(session?.user ?? null)
       } catch (error) {
-        console.error('Error getting initial session:', error)
       } finally {
         setLoading(false)
       }
@@ -46,6 +62,13 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       async (_event, session) => {
         setUser(session?.user ?? null)
         setLoading(false)
+        
+        // Mark auth as validated when we have a session
+        if (session?.user) {
+          appReadiness.setAuthValidated()
+        } else {
+          appReadiness.resetAuth()
+        }
       }
     )
 
@@ -54,6 +77,12 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
   const signIn = useCallback(async (email: string, password: string) => {
     try {
+      // Handle disabled auth case
+      if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true') {
+        toast.success('Development mode: Authentication bypassed')
+        return { error: null }
+      }
+
       if (!supabase) {
         toast.error('Authentication is not configured.')
         return { error: new Error('Supabase not configured') }
@@ -185,6 +214,13 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
   const signOut = useCallback(async () => {
     try {
+      // Handle disabled auth case
+      if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true') {
+        setUser(null)
+        toast.success('Signed out (development mode)')
+        return
+      }
+
       if (!supabase) {
         return
       }

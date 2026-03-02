@@ -139,7 +139,6 @@ export class GeolocationService {
       try {
         return await this.geocodeWithGoogle(address);
       } catch (error) {
-        console.warn('Google geocoding failed, trying fallback');
       }
     }
 
@@ -148,7 +147,6 @@ export class GeolocationService {
       try {
         return await this.geocodeWithHere(address);
       } catch (error) {
-        console.warn('HERE geocoding failed, trying fallback');
       }
     }
 
@@ -168,7 +166,6 @@ export class GeolocationService {
       try {
         return await this.reverseGeocodeWithGoogle(coordinates);
       } catch (error) {
-        console.warn('Google reverse geocoding failed');
       }
     }
 

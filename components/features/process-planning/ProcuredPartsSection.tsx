@@ -73,7 +73,6 @@ export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
       setDialogOpen(false);
       setEditItemId(null);
     } catch (error) {
-      console.error('Failed to save procured part:', error);
     }
   };
 

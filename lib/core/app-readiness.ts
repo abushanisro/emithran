@@ -164,6 +164,11 @@ class AppReadinessManager {
       
       if (hasWindow && hasFetch && hasConsole) {
         this.setEnvironmentReady();
+        
+        // If auth is disabled, automatically mark auth as validated
+        if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true') {
+          this.setAuthValidated();
+        }
       }
     } catch (error) {
       // Environment check failed - app cannot start properly

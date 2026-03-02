@@ -133,7 +133,6 @@ export default function DeliveryTracking({
       setDeliveries(data.deliveries || []);
       setLastUpdate(new Date().toISOString());
     } catch (error) {
-      console.error('Error fetching deliveries:', error);
       toast.error('Failed to load delivery tracking data');
     } finally {
       setIsLoading(false);

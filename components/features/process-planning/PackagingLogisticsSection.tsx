@@ -81,7 +81,6 @@ export function PackagingLogisticsSection({ bomItemId }: PackagingLogisticsSecti
       setDialogOpen(false);
       setEditItemId(null);
     } catch (error) {
-      console.error('Failed to save logistics item:', error);
     }
   };
 

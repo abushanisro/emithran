@@ -213,7 +213,6 @@ export default function CreateDeliveryOrderDialog({
       resetForm();
     } catch (error) {
       // Error handling is done in the mutation
-      console.error('Failed to create delivery order:', error);
     }
   };
 

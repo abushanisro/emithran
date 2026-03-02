@@ -53,7 +53,6 @@ export default function AuthPage() {
         router.refresh()
       }
     } catch (error: any) {
-      console.error('Sign in error:', error)
       toast.error('An unexpected error occurred during sign in. Please try again.')
     } finally {
       setLoading(false)
@@ -67,7 +66,6 @@ export default function AuthPage() {
       // The user will be redirected to Google for authentication
       // After successful auth, they'll be redirected back to /auth/callback
     } catch (error: any) {
-      console.error('Google sign in error:', error)
       let errorMessage = 'Failed to sign in with Google. Please try again.'
       if (error?.message) {
         if (error.message.includes('popup')) {

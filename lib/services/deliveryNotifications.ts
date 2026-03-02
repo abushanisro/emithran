@@ -567,7 +567,6 @@ Best regards,
     }
   ): Promise<void> {
     // In production, this would use a job queue like Redis/Bull or AWS SQS
-    console.log(`Scheduled notification for ${scheduledFor}:`, notification.subject);
   }
 
   private interpolateTemplate(template: string, variables: Record<string, any>): string {

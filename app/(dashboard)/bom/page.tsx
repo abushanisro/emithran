@@ -116,7 +116,6 @@ export default function BOMManagementPage() {
       });
       refetch();
     } catch (error) {
-      console.error('Failed to create BOM:', error);
     }
   };
 

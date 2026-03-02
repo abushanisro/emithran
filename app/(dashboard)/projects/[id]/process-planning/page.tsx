@@ -221,14 +221,12 @@ function ProcessPlanningPageContent() {
       // Save manufacturing specifications to database via Process Planning API
       await apiClient.post('/process-planning/specifications/upsert', manufacturingSpecs);
       
-      console.log('Manufacturing specifications saved to database:', manufacturingSpecs);
       setIsEditingPartDetails(false);
       
       // Show success message
       alert('Manufacturing specifications saved successfully!');
       
     } catch (error) {
-      console.error('Error saving manufacturing specifications:', error);
       alert('Failed to save manufacturing specifications. Please try again.');
     }
   };

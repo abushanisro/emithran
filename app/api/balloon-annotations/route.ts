@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
       data: annotations
     });
   } catch (error) {
-    console.error('Error fetching balloon annotations:', error);
     return NextResponse.json(
       { error: 'Failed to fetch annotations' },
       { status: 500 }
@@ -64,7 +63,6 @@ export async function POST(request: NextRequest) {
     // Store the annotations
     annotationStore.set(fileId, balloons);
 
-    console.log(`Saved ${balloons.length} balloon annotations for file ${fileId}`);
 
     return NextResponse.json({
       success: true,
@@ -75,7 +73,6 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Error saving balloon annotations:', error);
     return NextResponse.json(
       { error: 'Failed to save annotations' },
       { status: 500 }
@@ -102,7 +99,6 @@ export async function DELETE(request: NextRequest) {
       message: `Annotations for file ${fileId} deleted`
     });
   } catch (error) {
-    console.error('Error deleting balloon annotations:', error);
     return NextResponse.json(
       { error: 'Failed to delete annotations' },
       { status: 500 }

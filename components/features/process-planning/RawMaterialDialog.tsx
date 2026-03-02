@@ -167,13 +167,11 @@ export function RawMaterialDialog({
         setCalculatorResults(result.results);
       }
     } catch (error) {
-      console.error('Calculator execution error:', error);
     }
   };
 
   // Handle viewing lookup table
   const handleViewLookupTable = async (field: any) => {
-    console.log('Opening lookup table for field:', field.fieldName);
     setSelectedLookupField(field);
 
     try {
@@ -199,7 +197,6 @@ export function RawMaterialDialog({
             column_definitions: table.columnDefinitions || [],
             rows: processedRows,
           };
-          console.log('Setting lookup table data:', tableData);
           setLookupTableData(tableData);
           setShowLookupTable(true);
           return;
@@ -253,9 +250,7 @@ export function RawMaterialDialog({
         }
       }
 
-      console.error('Could not resolve reference table for field:', field);
     } catch (error) {
-      console.error('Failed to fetch table for field:', field.fieldName, error);
     }
   };
 
@@ -465,7 +460,6 @@ export function RawMaterialDialog({
       onOpenChange={(openState) => {
         // Prevent closing if calculator is open
         if (!openState && calculatorOpen) {
-          console.log('Preventing main dialog close because calculator is open');
           return;
         }
         onOpenChange(openState);
@@ -834,16 +828,13 @@ export function RawMaterialDialog({
 
       {/* Calculator Side Panel */}
       <Sheet open={calculatorOpen} onOpenChange={(open) => {
-        console.log('Calculator onOpenChange called with:', open);
         
         // Prevent calculator from closing if lookup table is open
         if (!open && showLookupTable) {
-          console.log('Preventing calculator close because lookup table is open');
           return;
         }
         
         if (!open) {
-          console.log('Calculator closing - also closing lookup table');
           // When closing calculator, also close lookup table
           setShowLookupTable(false);
           setSelectedLookupField(null);
@@ -1043,7 +1034,6 @@ export function RawMaterialDialog({
 
       {/* Lookup Table Panel */}
       {showLookupTable && lookupTableData && (() => {
-        console.log('Rendering lookup table:', { showLookupTable, hasData: !!lookupTableData, tableName: lookupTableData?.tableName });
         return (
           <>
             {/* Backdrop */}
@@ -1153,13 +1143,11 @@ export function RawMaterialDialog({
                               e.preventDefault();
                             }}
                             onClick={(e) => {
-                              console.log('Lookup table row clicked');
                               e.stopPropagation();
                               e.preventDefault();
                               e.nativeEvent?.stopImmediatePropagation?.();
                               
                               if (selectedLookupField && outputValue !== undefined) {
-                                console.log('Setting calculator input:', selectedLookupField.fieldName, outputValue);
                                 setCalculatorInputs((prev: Record<string, any>) => ({
                                   ...prev,
                                   [selectedLookupField.fieldName]: typeof outputValue === "number"
@@ -1170,7 +1158,6 @@ export function RawMaterialDialog({
                               
                               // Use setTimeout to ensure state updates don't conflict
                               setTimeout(() => {
-                                console.log('Closing lookup table only');
                                 // Close ONLY lookup table after selection
                                 setShowLookupTable(false);
                                 setSelectedLookupField(null);

@@ -145,7 +145,6 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
         const response = await bomApi.getAll({ projectId });
         setBomOptions(response.boms || []);
       } catch (error: any) {
-        console.error('Failed to load BOMs:', error);
         toast.error('Failed to load available BOMs. Please refresh the page and try again.');
       }
     };
@@ -160,7 +159,6 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       setBomItems(items);
       setSelectedItems([]);
     } catch (error: any) {
-      console.error('Failed to load BOM items:', error);
       toast.error('Failed to load BOM items for the selected lot. Please try selecting a different lot.');
     }
   };
@@ -262,7 +260,6 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       };
 
       // Create quality inspection using real API
-      console.log('Creating inspection:', inspectionData);
 
       const apiPayload = {
         name: inspectionName,
@@ -287,9 +284,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
         actualChecklist: apiPayload.checklist
       });
 
-      console.log('Sending API request to create inspection...');
       const newInspection = await createInspectionMutation.mutateAsync(apiPayload);
-      console.log('API Response received:', newInspection);
 
       if (onInspectionCreated) {
         onInspectionCreated(newInspection);
@@ -312,7 +307,6 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       // Close dialog
       setOpen(false);
     } catch (error: any) {
-      console.error('Failed to create inspection:', error);
       let errorMessage = 'Failed to create quality inspection. Please try again.';
       if (error?.message) {
         if (error.message.includes('permission')) {
@@ -339,7 +333,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
           Create QC Inspection
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-4xl lg:max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <Button

@@ -98,37 +98,29 @@ interface RemarksIssuesProps {
 
 // Helper function to safely format dates
 const formatDate = (dateString: string | null | undefined, options: { time?: boolean } = {}) => {
-  console.log('formatDate called with:', dateString, 'type:', typeof dateString);
-  
   if (!dateString) return 'Unknown date';
   
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      console.warn('Invalid date string:', dateString);
       return 'Invalid date';
     }
     
     return options.time ? date.toLocaleString() : date.toLocaleDateString();
   } catch (error) {
-    console.warn('Error formatting date:', error, 'Input:', dateString);
     return 'Invalid date';
   }
 };
 
 // Helper function to show relative time (e.g., "2 hours ago", "3 days ago")
 const getTimeAgo = (dateString: string | null | undefined): string => {
-  console.log('getTimeAgo called with:', dateString, 'type:', typeof dateString);
-  
   if (!dateString) {
-    console.warn('getTimeAgo: dateString is null/undefined');
     return 'Unknown time';
   }
   
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      console.warn('getTimeAgo: Invalid date string:', dateString);
       return 'Invalid date';
     }
     
@@ -158,7 +150,6 @@ const getTimeAgo = (dateString: string | null | undefined): string => {
       return diffYears === 1 ? '1 year ago' : `${diffYears} years ago`;
     }
   } catch (error) {
-    console.warn('Error calculating time ago:', error, 'Input:', dateString);
     return 'Unknown time';
   }
 };
@@ -208,7 +199,6 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
         [remarkId]: commentsData?.length || 0
       }));
     } catch (error) {
-      console.error(`Error loading comments for remark ${remarkId}:`, error);
       setCommentCounts(prev => ({
         ...prev,
         [remarkId]: 0
@@ -222,16 +212,9 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
         setLoading(true);
         const data = await RemarksApi.getRemarksByLot(lotId);
         const remarksArray = Array.isArray(data) ? data : [];
-        console.log('Fetched remarks data:', remarksArray);
-        console.log('Sample remark:', remarksArray[0]);
-        if (remarksArray[0]) {
-          console.log('Sample remark ALL fields:', Object.keys(remarksArray[0]));
-          console.log('Sample remark reportedDate field:', remarksArray[0].reportedDate, 'type:', typeof remarksArray[0].reportedDate);
-          console.log('Sample remark createdAt field:', remarksArray[0].createdAt, 'type:', typeof remarksArray[0].createdAt);
-        }
         setRemarks(remarksArray);
       } catch (error) {
-        console.error('Error fetching remarks data:', error);
+        // Error fetching remarks data
       } finally {
         setLoading(false);
       }
@@ -264,18 +247,14 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
       try {
         const lotResponse = await productionPlanningApi.getProductionLotById(lotId);
         selectedBomItems = (lotResponse as any)?.selectedBomItems || [];
-        console.log('Selected BOM items from lot:', selectedBomItems);
       } catch (bomError) {
-        console.warn('Could not fetch selected BOM items:', bomError);
         selectedBomItems = [];
       }
       
-      console.log('Processes response:', response);
 
       const processData = (response as any)?.data || response || [];
 
       if (!Array.isArray(processData)) {
-        console.error('Expected array but got:', typeof processData, processData);
         throw new Error('Invalid response format - expected array');
       }
 
@@ -287,31 +266,15 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
           // Get all BOM requirements for this subtask
           const allBomRequirements = subtask.bom_requirements || subtask.bomRequirements || [];
           
-          console.log(`🔍 Processing BOM requirements for subtask "${subtask.name || subtask.taskName}":`, {
-            allBomReqsCount: allBomRequirements.length,
-            selectedBomItemsCount: selectedBomItems.length,
-            allBomReqs: allBomRequirements.map((req: any) => ({
-              id: req.id,
-              bom_item_id: req.bom_item_id || req.bomItemId,
-              bom_item: req.bom_item
-            })),
-            selectedBomItems: selectedBomItems.map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              partNumber: item.partNumber
-            }))
-          });
           
           let bomRequirements = [];
           
           if (selectedBomItems.length > 0) {
-            console.log('🔍 Using selectedBomItems path');
             // If we have selected BOM items, filter to only show those
             bomRequirements = allBomRequirements
               .filter((req: any) => {
                 const bomItemId = req.bom_item_id || req.bomItemId;
                 const hasMatch = selectedBomItems.some((selectedItem: any) => selectedItem.id === bomItemId);
-                console.log(`🔍 Checking BOM req ${req.id} with bomItemId ${bomItemId}: hasMatch = ${hasMatch}`);
                 return hasMatch;
               })
               .map((req: any) => {
@@ -333,21 +296,14 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                 };
               });
           } else {
-            console.log('🔍 Using fallback path (no selectedBomItems)');
             // Fallback: Show all BOM requirements if no selected items
             bomRequirements = await Promise.all(allBomRequirements.map(async (req: any) => {
               let bomItem = req.bom_item || req.bomItem || req.bom_items || {};
-              console.log(`🔍 Processing fallback BOM req ${req.id}:`, {
-                bomItem,
-                hasData: !!bomItem && Object.keys(bomItem).length > 0,
-                bomItemId: req.bom_item_id || req.bomItemId
-              });
               
               // If no BOM item data but we have an ID, try to fetch it
               if ((!bomItem || Object.keys(bomItem).length === 0) && (req.bom_item_id || req.bomItemId)) {
                 try {
                   const bomItemId = req.bom_item_id || req.bomItemId;
-                  console.log(`🔍 Fetching BOM item details for ID: ${bomItemId}`);
                   
                   // Try multiple API endpoints to find BOM item data
                   let fetchedBomItem = null;
@@ -357,11 +313,8 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                     const response1 = await fetch(`/api/bom-items/${bomItemId}`);
                     if (response1.ok) {
                       fetchedBomItem = await response1.json();
-                      console.log(`✅ Successfully fetched BOM item from /api/bom-items:`, fetchedBomItem);
-                    } else if (response1.status !== 404) {
-                      console.log(`❌ /api/bom-items returned ${response1.status}`);
                     }
-                  } catch (e) { console.log(`❌ /api/bom-items failed:`, (e as Error).message); }
+                  } catch (e) { /* API call failed */ }
                   
                   // Try 2: /api/boms/items/{id} 
                   if (!fetchedBomItem) {
@@ -369,11 +322,8 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                       const response2 = await fetch(`/api/boms/items/${bomItemId}`);
                       if (response2.ok) {
                         fetchedBomItem = await response2.json();
-                        console.log(`✅ Successfully fetched BOM item from /api/boms/items:`, fetchedBomItem);
-                      } else if (response2.status !== 404) {
-                        console.log(`❌ /api/boms/items returned ${response2.status}`);
                       }
-                    } catch (e) { console.log(`❌ /api/boms/items failed:`, (e as Error).message); }
+                    } catch (e) { /* API call failed */ }
                   }
                   
                   // Try 3: Use apiClient (from the lib)
@@ -382,17 +332,14 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                       const { apiClient } = await import('@/lib/api/client');
                       const response3 = await apiClient.get(`/bom-items/${bomItemId}`);
                       fetchedBomItem = (response3 as any).data || response3;
-                      console.log(`✅ Successfully fetched BOM item from apiClient:`, fetchedBomItem);
-                    } catch (e) { console.log(`❌ apiClient /bom-items failed:`, (e as Error).message); }
+                    } catch (e) { /* API call failed */ }
                   }
                   
                   if (fetchedBomItem) {
                     bomItem = fetchedBomItem.data || fetchedBomItem;
-                  } else {
-                    console.debug(`ℹ️ BOM item ${bomItemId} not found - this may be expected for some process configurations`);
                   }
                 } catch (fetchError) {
-                  console.warn(`❌ Error fetching BOM item ${req.bom_item_id || req.bomItemId}:`, fetchError);
+                  // Error fetching BOM item
                 }
               }
               
@@ -444,19 +391,9 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
 
       setProcesses(mappedProcesses);
 
-      console.log('Final mapped processes:', mappedProcesses);
-      console.log('Processes with subtasks:', mappedProcesses.filter(p => p.subtasks && p.subtasks.length > 0));
-      
-      if (mappedProcesses.length === 0) {
-        console.warn('No processes found for lot:', lotId);
-      }
 
     } catch (error) {
-      console.error('Error fetching processes:', error);
-      console.error('Error details:', (error as any)?.response || (error as Error)?.message || error);
-
-      // More detailed error message - logged for debugging
-      console.error('Error details:', (error as any)?.response?.data?.message || (error as Error)?.message || 'Unknown error');
+      // Error fetching processes
     } finally {
       setLoadingProcesses(false);
     }
@@ -647,7 +584,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
       setSelectedSubtask(null);
       setShowNewRemark(false);
     } catch (error) {
-      console.error('Error creating remark:', error);
+      // Error creating remark
     } finally {
       setSubmitting(false);
     }
@@ -661,13 +598,13 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
       // Remove from state immediately for better UX
       setRemarks(prev => prev.filter(r => r.id !== remarkId));
     } catch (error) {
-      console.error('Error deleting remark:', error);
+      // Error deleting remark
     }
   };
 
   const handleEditRemark = (remark: Remark) => {
     // TODO: Implement edit functionality
-    console.log('Edit remark:', remark);
+    // TODO: Implement edit functionality
   };
 
 
@@ -683,7 +620,6 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
         [remarkId]: commentsData?.length || 0
       }));
     } catch (error) {
-      console.error('Error loading comments:', error);
       setComments([]);
       setCommentCounts(prev => ({
         ...prev,
@@ -708,7 +644,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
       // Reload comments
       await loadComments(selectedRemark.id);
     } catch (error) {
-      console.error('Error posting comment:', error);
+      // Error posting comment
     } finally {
       setSubmittingComment(false);
     }
@@ -724,7 +660,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
         await loadComments(selectedRemark.id);
       }
     } catch (error) {
-      console.error('Error deleting comment:', error);
+      // Error deleting comment
     }
   };
 
@@ -1031,15 +967,6 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                                 </SelectItem>
 
                                 {selectedSubtask.bomRequirements.map(requirement => {
-                                  // Debug logging to see the actual data structure
-                                  console.log('🔍 BOM Requirement Debug:', {
-                                    requirementId: requirement.id,
-                                    bomItem: requirement.bom_item,
-                                    partNumber: requirement.bom_item?.part_number,
-                                    partName: requirement.bom_item?.name,
-                                    description: requirement.bom_item?.description,
-                                    fullRequirement: requirement
-                                  });
                                   
                                   return (
                                   <SelectItem key={requirement.id} value={requirement.id}>

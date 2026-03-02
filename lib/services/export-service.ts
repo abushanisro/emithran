@@ -51,7 +51,6 @@ export class ExportService {
         await this.exportToExcel(data);
       }
     } catch (error) {
-      console.error('Export failed:', error);
       throw new Error(`Failed to export as ${format.toUpperCase()}`);
     }
   }

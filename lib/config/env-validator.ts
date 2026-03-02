@@ -57,12 +57,6 @@ class EnvironmentValidator {
     const supabaseKey = this.getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
     const hasSupabase = !!(supabaseUrl && supabaseKey && supabaseKey.startsWith('eyJ'));
 
-    // Debug logging for production
-    if (process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
-      console.log('Environment validation - Supabase URL exists:', !!supabaseUrl);
-      console.log('Environment validation - Supabase Key exists:', !!supabaseKey);
-      console.log('Environment validation - Supabase Key format valid:', supabaseKey ? supabaseKey.startsWith('eyJ') : false);
-    }
 
     // Production-specific validations
     if (process.env.NODE_ENV === 'production') {

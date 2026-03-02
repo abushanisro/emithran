@@ -32,7 +32,6 @@ export async function POST(
       updatedBy: 'system' // In production, get from auth context
     };
 
-    console.log('Location update:', locationUpdate);
 
     // Simulate database update
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -43,7 +42,6 @@ export async function POST(
     });
 
   } catch (error) {
-    console.error('Error updating delivery location:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
