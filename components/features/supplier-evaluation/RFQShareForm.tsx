@@ -140,7 +140,7 @@ export function RFQShareForm({ projectId, bomId, onRFQSent, className }: RFQShar
         selectedParts: [],
         quoteDeadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] || '',
         selectionType: 'competitive',
-        buyerName: user?.fullName || '',
+        buyerName: user?.user_metadata?.full_name || '',
         emailBody: 'We are seeking quotations for the following parts as part of our manufacturing process. Please provide detailed quotes including lead times, minimum order quantities, and pricing tiers.',
         selectedSuppliers: [],
       });

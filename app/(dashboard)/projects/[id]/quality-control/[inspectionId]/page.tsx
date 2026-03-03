@@ -63,14 +63,14 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
   if (!supabase) {
     throw new Error('Supabase client not configured');
   }
-  
+
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-  
+
   if (!token) {
     throw new Error('No authentication token available. Please log in again.');
   }
-  
+
   headers['Authorization'] = `Bearer ${token}`;
   return headers;
 };
@@ -475,25 +475,49 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
       const { width, height } = firstPage.getSize();
 
 
-      // Get the iframe element to match its exact dimensions
+      // Get the PDF container element that holds the iframe
+      const pdfContainer = document.querySelector('[data-pdf-container]') as HTMLElement;
       const iframeElement = document.querySelector('iframe[title="2D Technical Drawing"]') as HTMLIFrameElement;
-      const iframeRect = iframeElement?.getBoundingClientRect();
+      
+      if (!pdfContainer) {
+        throw new Error('PDF container not found');
+      }
 
-
-      // Calculate scaling factors to match screen display exactly
-      const scaleX = iframeRect ? width / iframeRect.width : 1;
-      const scaleY = iframeRect ? height / iframeRect.height : 1;
-
+      // Calculate the actual PDF display dimensions considering the PDF viewer's scaling
+      const containerRect = pdfContainer.getBoundingClientRect();
+      
+      // Account for PDF viewer's internal scaling due to view=Fit&zoom=page-fit
+      // The PDF viewer scales the content to fit the container, so we need to 
+      // calculate the actual displayed PDF dimensions within the iframe
+      const containerAspectRatio = containerRect.width / containerRect.height;
+      const pdfAspectRatio = width / height;
+      
+      let displayedPDFWidth, displayedPDFHeight;
+      
+      if (containerAspectRatio > pdfAspectRatio) {
+        // Container is wider than PDF - PDF fits to height
+        displayedPDFHeight = containerRect.height;
+        displayedPDFWidth = displayedPDFHeight * pdfAspectRatio;
+      } else {
+        // Container is taller than PDF - PDF fits to width
+        displayedPDFWidth = containerRect.width;
+        displayedPDFHeight = displayedPDFWidth / pdfAspectRatio;
+      }
+      
+      // Calculate the offset if PDF is centered in container
+      const offsetX = (containerRect.width - displayedPDFWidth) / 2;
+      const offsetY = (containerRect.height - displayedPDFHeight) / 2;
 
       // Draw balloons on the PDF with exact screen alignment
       balloons.forEach(balloon => {
-        // Convert percentage coordinates to exact screen pixel coordinates first
-        const screenX = iframeRect ? (balloon.x / 100) * iframeRect.width : (balloon.x / 100) * width;
-        const screenY = iframeRect ? (balloon.y / 100) * iframeRect.height : (balloon.y / 100) * height;
-
-        // Then convert screen coordinates to PDF coordinates
-        const pdfX = screenX * scaleX;
-        const pdfY = height - (screenY * scaleY); // PDF coordinates are bottom-up, screen is top-down
+        // Convert balloon percentage coordinates to actual PDF coordinates
+        // Account for the displayed PDF size and centering offset
+        const relativeX = (balloon.x / 100) * containerRect.width - offsetX;
+        const relativeY = (balloon.y / 100) * containerRect.height - offsetY;
+        
+        // Scale to actual PDF coordinates
+        const pdfX = (relativeX / displayedPDFWidth) * width;
+        const pdfY = height - ((relativeY / displayedPDFHeight) * height); // PDF coordinates are bottom-up
 
 
         // Draw balloon circle with exact positioning
@@ -614,10 +638,14 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
         const data = await response.json();
 
         // Try different possible response formats
-        const possibleUrl = data.url || data.signedUrl || data.downloadUrl || data.fileUrl || data.data?.url;
+        const signedUrl = data.url || data.signedUrl || data.downloadUrl || data.fileUrl || data.data?.url;
 
-        if (possibleUrl) {
-          setPdfUrl(possibleUrl);
+        if (signedUrl) {
+          // ⚡ CRITICAL: Never embed the Supabase signed URL directly in an iframe.
+          // Chrome blocks cross-site iframes (sec-fetch-site: cross-site + sec-fetch-dest: iframe).
+          // Route through the same-origin proxy so the iframe src is localhost:3000.
+          const proxyUrl = `/api/file-proxy?url=${encodeURIComponent(signedUrl)}`;
+          setPdfUrl(proxyUrl);
         } else {
           throw new Error(`No URL returned from server. Response: ${JSON.stringify(data)}`);
         }
@@ -647,48 +675,48 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-muted-foreground">Drawing file: {drawingFile}</p>
-      <div className="border border-border rounded-lg bg-card shadow-sm">
+    <div className="w-full">
+      {/* PDF viewer — no padding, edge-to-edge */}
+      <div className="w-full overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center p-8">
+          <div className="flex items-center justify-center p-8 bg-muted/30 rounded-lg">
             <div className="text-center">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Loading 2D Drawing...</p>
             </div>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center p-8">
+          <div className="flex flex-col items-center justify-center p-8 bg-muted/30 rounded-lg">
             <FileText className="h-12 w-12 mb-3 text-muted-foreground" />
             <p className="text-sm text-red-500 mb-2">Failed to load PDF</p>
             <p className="text-xs text-muted-foreground mb-3">{error}</p>
-            <Button onClick={loadPDF} variant="outline" size="sm">
-              Try Again
-            </Button>
+            <Button onClick={loadPDF} variant="outline" size="sm">Try Again</Button>
           </div>
         ) : pdfUrl ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-muted">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">{bomItem.partNumber || bomItem.name} - 2D Drawing</span>
+          <div>
+            {/* Responsive toolbar — stacks vertically on small screens */}
+            <div className="flex flex-col lg:flex-row lg:items-center gap-2 px-3 py-2 bg-muted border-b">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-medium truncate">
+                  {bomItem.partNumber || bomItem.name} — 2D Drawing
+                </span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Button
                   onClick={toggleAnnotationMode}
-                  variant={isAnnotationMode ? "destructive" : "default"}
+                  variant={isAnnotationMode ? 'destructive' : 'default'}
                   size="sm"
-                  className={isAnnotationMode ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}
+                  className={isAnnotationMode ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}
                 >
-                  <Edit3 className="h-4 w-4 mr-1" />
-                  {isAnnotationMode ? 'Save Balloons' : 'Add Balloons'}
+                  <Edit3 className="h-4 w-4 lg:mr-1" />
+                  <span className="hidden lg:inline">
+                    {isAnnotationMode ? 'Save Balloons' : 'Add Balloons'}
+                  </span>
                 </Button>
                 {isAnnotationMode && balloons.length > 0 && (
                   <Button
-                    onClick={() => {
-                      setBalloons([]);
-                      setSelectedBalloon(null);
-                    }}
+                    onClick={() => { setBalloons([]); setSelectedBalloon(null); }}
                     variant="outline"
                     size="sm"
                   >
@@ -696,30 +724,34 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                   </Button>
                 )}
                 {isAnnotationMode && (
-                  <div className="flex items-center gap-1 text-sm text-red-600 font-medium">
-                    {isDragging ? 'Dragging balloon...' : 'Click to add • Drag to move • Double-click to edit number'}
-                  </div>
+                  <span className="hidden xl:inline text-xs text-red-600 font-medium">
+                    {isDragging ? 'Dragging…' : 'Click to add • Drag to move'}
+                  </span>
                 )}
                 <Button
                   onClick={() => window.open(pdfUrl, '_blank')}
                   variant="outline"
                   size="sm"
+                  title="Open Full Size"
                 >
-                  <Download className="h-4 w-4 mr-1" />
-                  Open Full Size
+                  <Download className="h-4 w-4 lg:mr-1" />
+                  <span className="hidden lg:inline">Open Full Size</span>
                 </Button>
                 <Button
                   onClick={downloadPDFWithBalloons}
                   variant="outline"
                   size="sm"
                   disabled={isGeneratingPDF}
+                  title={balloons.length > 0 ? 'Download with Balloons' : 'Download PDF'}
                 >
                   {isGeneratingPDF ? (
-                    <div className="animate-spin h-4 w-4 mr-1">⟳</div>
+                    <div className="animate-spin h-4 w-4 lg:mr-1">⟳</div>
                   ) : (
-                    <Download className="h-4 w-4 mr-1" />
+                    <Download className="h-4 w-4 lg:mr-1" />
                   )}
-                  {balloons.length > 0 ? 'Download with Balloons' : 'Download PDF'}
+                  <span className="hidden lg:inline">
+                    {balloons.length > 0 ? 'Download with Balloons' : 'Download PDF'}
+                  </span>
                 </Button>
                 <Button
                   onClick={extractInspectionTableFromPDF}
@@ -727,66 +759,65 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                   size="sm"
                   disabled={!pdfUrl || isExtractingTable}
                   className="bg-green-600 hover:bg-green-700"
+                  title="Extract Table Data"
                 >
                   {isExtractingTable ? (
-                    <div className="animate-spin h-4 w-4 mr-1">⟳</div>
+                    <div className="animate-spin h-4 w-4 lg:mr-1">⟳</div>
                   ) : (
-                    <Download className="h-4 w-4 mr-1" />
+                    <Download className="h-4 w-4 lg:mr-1" />
                   )}
-                  Extract Table Data
+                  <span className="hidden lg:inline">Extract Table Data</span>
                 </Button>
               </div>
             </div>
+
+
+            {/* PDF + balloon overlay — full width, no padding */}
             <div
-              className={`w-full relative ${isAnnotationMode ? 'cursor-crosshair' : ''}`}
-              style={{ minHeight: '800px', height: '100vh', overflow: 'hidden' }}
+              className={`w-full relative ${isAnnotationMode ? 'cursor-crosshair' : ''} h-[50vh] lg:h-[85vh]`}
               onClick={isAnnotationMode ? handleOverlayClick : undefined}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
               data-pdf-container
             >
-              {/* PDF iframe - full display without scroll */}
+              {/* PDF iframe — src is always the same-origin proxy, never a raw Supabase URL */}
               <iframe
-                src={`${pdfUrl}#view=FitH&scrollbar=0&toolbar=0&navpanes=0`}
+                src={`${pdfUrl}#view=Fit&zoom=page-fit&scrollbar=0&toolbar=0&navpanes=0&statusbar=0&messages=0&page=1`}
                 title="2D Technical Drawing"
-                className="w-full border-0"
-                sandbox="allow-same-origin"
+                className="absolute inset-0 w-full h-full border-0"
                 style={{
-                  height: '100vh',
-                  minHeight: '800px',
-                  overflow: 'hidden',
                   pointerEvents: isAnnotationMode ? 'none' :
-                    balloons.length > 0 && !isAnnotationMode ? 'none' : 'auto'
+                    balloons.length > 0 && !isAnnotationMode ? 'none' : 'auto',
+                  overflow: 'hidden',
+                  border: 'none',
+                  margin: '0',
+                  padding: '0'
                 }}
+                scrolling="no"
+                frameBorder="0"
+                marginHeight="0"
+                marginWidth="0"
               />
 
-              {/* Balloon Overlays - show when annotating OR when balloons exist */}
+              {/* Balloon Overlays */}
               {(isAnnotationMode || balloons.length > 0) && (
                 <>
-                  {/* Balloons */}
                   {balloons.map((balloon) => (
                     <div
                       key={balloon.id}
-                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all select-none ${isAnnotationMode ? (isDragging && selectedBalloon === balloon.id ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
-                        } ${selectedBalloon === balloon.id && isAnnotationMode
-                          ? 'ring-4 ring-blue-500 ring-opacity-50'
-                          : ''
+                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all select-none ${isAnnotationMode
+                        ? (isDragging && selectedBalloon === balloon.id ? 'cursor-grabbing' : 'cursor-grab')
+                        : 'cursor-default'
+                        } ${selectedBalloon === balloon.id && isAnnotationMode ? 'ring-4 ring-blue-500 ring-opacity-50' : ''
                         } ${isDragging && selectedBalloon === balloon.id ? 'z-50 scale-110' : ''
                         }`}
-                      style={{
-                        left: `${balloon.x}%`,
-                        top: `${balloon.y}%`,
-                        zIndex: 10
-                      }}
+                      style={{ left: `${balloon.x}%`, top: `${balloon.y}%`, zIndex: 10 }}
                       onMouseDown={(e) => handleMouseDown(e, balloon.id)}
                       onDoubleClick={(e) => handleDoubleClick(e, balloon.id)}
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Only allow selection in annotation mode
-                        if (isAnnotationMode && !isDragging) {
-                          setSelectedBalloon(balloon.id);
-                        }
+                        if (isAnnotationMode && !isDragging) setSelectedBalloon(balloon.id);
                       }}
                     >
                       <div className="relative">
@@ -810,21 +841,13 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                               onClick={(e) => e.stopPropagation()}
                               autoFocus
                               className="w-6 h-6 text-xs text-center bg-transparent text-white border-0 outline-0 appearance-none"
-                              min="1"
-                              max="99"
+                              min="1" max="99"
                             />
-                          ) : (
-                            balloon.number
-                          )}
+                          ) : balloon.number}
                         </div>
-
-                        {/* Delete button for selected balloon - only in annotation mode */}
                         {selectedBalloon === balloon.id && isAnnotationMode && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteBalloon(balloon.id);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); deleteBalloon(balloon.id); }}
                             className="absolute -top-1 -right-1 w-4 h-4 bg-gray-800 text-white rounded-full flex items-center justify-center text-xs hover:bg-gray-900"
                           >
                             ×
@@ -834,10 +857,9 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                     </div>
                   ))}
 
-                  {/* Instructions overlay when in annotation mode */}
                   {balloons.length === 0 && isAnnotationMode && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black bg-opacity-10 instruction-overlay" style={{ zIndex: 5 }}>
-                      <div className="bg-white bg-opacity-90 rounded-lg p-4 text-center border border-red-200 shadow-lg">
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/10" style={{ zIndex: 5 }}>
+                      <div className="bg-white/90 rounded-lg p-4 text-center border border-red-200 shadow-lg">
                         <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-2">
                           <span className="text-white font-bold text-sm">1</span>
                         </div>
@@ -848,15 +870,13 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                 </>
               )}
             </div>
-
-            {/* Dimension input and summary dialogs removed - functionality integrated into inspection table */}
-
           </div>
         ) : null}
       </div>
     </div>
   );
 }
+
 
 export default function QualityInspectionPage() {
   const params = useParams();
@@ -1743,641 +1763,644 @@ export default function QualityInspectionPage() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2 sm:py-4 space-y-3 sm:space-y-4">
-      {/* Header with breadcrumb and navigation */}
-      <div className="flex flex-col gap-2 mb-3 sm:mb-4">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-          <button
-            onClick={() => router.push(`/projects/${projectId}/quality-control`)}
-            className="hover:text-foreground transition-colors flex items-center gap-1"
-          >
-            Create Quality Report
-          </button>
-          <span>›</span>
-          <span className="truncate">{inspection?.name || 'Inspection Report'}</span>
-        </div>
+    <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0 max-w-full">
+      {/* Page Header */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 mb-3 sm:mb-4">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+            <button
+              onClick={() => router.push(`/projects/${projectId}/quality-control`)}
+              className="hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              Create Quality Report
+            </button>
+            <span>›</span>
+            <span className="truncate">{inspection?.name || 'Inspection Report'}</span>
+          </div>
 
-        {/* Main Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-          <Button
-            variant="ghost"
-            onClick={() => router.push(`/projects/${projectId}/quality-control`)}
-            className="flex items-center gap-2 self-start"
-            size="sm"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Create Quality Report</span>
-            <span className="sm:hidden">Back</span>
-          </Button>
-          <div className="flex-1 min-w-0 w-full sm:w-auto">
-            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold flex items-center gap-2">
-              <Shield className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
-              <span className="truncate">QC Inspection Report</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">
-              {inspection?.name || 'Unknown'}
-            </p>
+          {/* Main Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => router.push(`/projects/${projectId}/quality-control`)}
+              className="flex items-center gap-2 self-start"
+              size="sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Create Quality Report</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
+            <div className="flex-1 min-w-0 w-full sm:w-auto">
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold flex items-center gap-2">
+                <Shield className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                <span className="truncate">QC Inspection Report</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                {inspection?.name || 'Unknown'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 2D Drawing Display */}
-      <Card>
-        <CardHeader className="pb-2 sm:pb-3">
-          <CardTitle className="text-base sm:text-lg">2D Technical Drawings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 sm:space-y-3 p-3 sm:p-6">
-          {bomsLoading || bomItemsLoading ? (
-            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
-              <div className="animate-spin h-8 w-8 mb-3 text-muted-foreground">⟳</div>
-              <p className="text-sm text-muted-foreground">Loading BOM items...</p>
-            </div>
-          ) : bomItems?.length > 0 ? (
-            <div className="grid gap-3">
-              {bomItems.map((bomItem: any, index: number) => (
-                <div key={bomItem.id || index} className="border rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-3">
-                    <h4 className="font-medium">{bomItem.partNumber || bomItem.name || `Item ${index + 1}`}</h4>
-                    <Badge variant="secondary" className="text-xs">
-                      {bomItem.itemType || 'Component'}
-                    </Badge>
-                  </div>
-
-                  <InlinePDFViewer
-                    bomItem={bomItem}
-                    onBalloonsChanged={setBalloons}
-                    inspectionId={inspectionId}
-                    onSaveToDatabaseSilently={saveToDatabaseSilently}
-                    onTableDataExtracted={handleExtractedTableData}
-                  />
-
-                  {/* Item Details */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 bg-muted rounded-lg mt-3">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Material</p>
-                      <p className="text-sm font-mono">{bomItem.materialGrade || bomItem.material || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Quantity</p>
-                      <p className="text-sm font-mono">{bomItem.quantity || 'N/A'} {bomItem.unitOfMeasure || bomItem.unit || 'pcs'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Drawing Type</p>
-                      <p className="text-sm font-mono">2D Technical</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Description</p>
-                      <p className="text-sm font-mono">{bomItem.description || 'N/A'}</p>
-                    </div>
-                  </div>
+        {/* 2D Drawing Display */}
+        <div className="w-full min-w-0">
+          <Card>
+            <CardHeader className="pb-2 sm:pb-3">
+              <CardTitle className="text-base sm:text-lg">2D Technical Drawings</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 overflow-hidden">
+              {bomsLoading || bomItemsLoading ? (
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
+                  <div className="animate-spin h-8 w-8 mb-3 text-muted-foreground">⟳</div>
+                  <p className="text-sm text-muted-foreground">Loading BOM items...</p>
                 </div>
-              ))}
-            </div>
-          ) : bomsError || bomItemsError ? (
-            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
-              <FileText className="h-12 w-12 mb-3 text-destructive" />
-              <p className="text-sm text-destructive mb-2">Failed to load BOM data</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  bomsQuery.refetch();
-                  bomItemsQuery.refetch();
-                }}
-              >
-                Try Again
-              </Button>
-            </div>
-          ) : !projectBOM ? (
-            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
-              <FileText className="h-12 w-12 mb-3 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No BOM found for this project</p>
-              <p className="text-xs text-muted-foreground mt-1">Make sure the project has a BOM created</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
-              <FileText className="h-12 w-12 mb-3 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No BOM items found for this inspection</p>
-              <p className="text-xs text-muted-foreground mt-1">The BOM may be empty or still loading</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : bomItems?.length > 0 ? (
+                <div className="grid gap-3">
+                  {bomItems.map((bomItem: any, index: number) => (
+                    <div key={bomItem.id || index} className="border rounded-lg overflow-hidden">
+                      <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b">
+                        <h4 className="font-medium text-sm">{bomItem.partNumber || bomItem.name || `Item ${index + 1}`}</h4>
+                        <Badge variant="secondary" className="text-xs">{bomItem.itemType || 'Component'}</Badge>
+                      </div>
 
-      {/* Balloon Drawing Section */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">1.3 BALLOON DRAWING</CardTitle>
-            <div className="flex gap-2">
-              {balloonDrawingEditMode ? (
-                <>
+                      <InlinePDFViewer
+                        bomItem={bomItem}
+                        onBalloonsChanged={setBalloons}
+                        inspectionId={inspectionId}
+                        onSaveToDatabaseSilently={saveToDatabaseSilently}
+                        onTableDataExtracted={handleExtractedTableData}
+                      />
+
+                      {/* Item Details */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-muted/30 border-t">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Material</p>
+                          <p className="text-sm font-mono">{bomItem.materialGrade || bomItem.material || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Quantity</p>
+                          <p className="text-sm font-mono">{bomItem.quantity || 'N/A'} {bomItem.unitOfMeasure || bomItem.unit || 'pcs'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Drawing Type</p>
+                          <p className="text-sm font-mono">2D Technical</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Description</p>
+                          <p className="text-sm font-mono truncate">{bomItem.description || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : bomsError || bomItemsError ? (
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
+                  <FileText className="h-12 w-12 mb-3 text-destructive" />
+                  <p className="text-sm text-destructive mb-2">Failed to load BOM data</p>
                   <Button
-                    size="sm"
                     variant="outline"
+                    size="sm"
                     onClick={() => {
-                      setBalloonDrawingEditMode(false);
-                      toast.success('Changes saved');
+                      bomsQuery.refetch();
+                      bomItemsQuery.refetch();
                     }}
                   >
-                    <Check className="h-4 w-4 mr-1" />
-                    Save
+                    Try Again
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setBalloonDrawingEditMode(false)}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Cancel
-                  </Button>
-                </>
+                </div>
+              ) : !projectBOM ? (
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
+                  <FileText className="h-12 w-12 mb-3 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No BOM found for this project</p>
+                  <p className="text-xs text-muted-foreground mt-1">Make sure the project has a BOM created</p>
+                </div>
               ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBalloonDrawingEditMode(true)}
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
+                  <FileText className="h-12 w-12 mb-3 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No BOM items found for this inspection</p>
+                  <p className="text-xs text-muted-foreground mt-1">The BOM may be empty or still loading</p>
+                </div>
               )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-6">
-          <DisplayField
-            label="Part Name"
-            value={partName}
-            onChange={setPartName}
-            placeholder="e.g., Camera Holder"
-            isEditing={balloonDrawingEditMode}
-            required
-          />
-          <DisplayField
-            label="Material"
-            value={material}
-            onChange={setMaterial}
-            placeholder="e.g., Aluminium 6061-T6"
-            isEditing={balloonDrawingEditMode}
-            required
-          />
-          <DisplayField
-            label="Surface Treatment"
-            value={surfaceTreatment}
-            onChange={setSurfaceTreatment}
-            placeholder="e.g., Black Anodized"
-            isEditing={balloonDrawingEditMode}
-          />
-          <DisplayField
-            label="Drawing Title"
-            value={drawingTitle}
-            onChange={setDrawingTitle}
-            placeholder="e.g., CAMERA HOLDER"
-            isEditing={balloonDrawingEditMode}
-          />
-          <DisplayField
-            label="Drawing Size"
-            value={drawingSize}
-            onChange={setDrawingSize}
-            placeholder="e.g., A4"
-            isEditing={balloonDrawingEditMode}
-          />
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </div> {/* end 2D Drawing container */}
 
-      {/* Final Inspection Report */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">1.4 FINAL INSPECTION REPORT</CardTitle>
-            <div className="flex gap-2">
-              {finalInspectionEditMode ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setFinalInspectionEditMode(false);
-                      toast.success('Changes saved');
-                    }}
-                  >
-                    <Check className="h-4 w-4 mr-1" />
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setFinalInspectionEditMode(false)}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setFinalInspectionEditMode(true)}
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <DisplayField
-              label="Company Name"
-              value={companyName}
-              onChange={setCompanyName}
-              placeholder="EMUSKI"
-              isEditing={finalInspectionEditMode}
-            />
-            <DisplayField
-              label="Revision Number"
-              value={revisionNumber}
-              onChange={setRevisionNumber}
-              placeholder="—"
-              isEditing={finalInspectionEditMode}
-            />
-            <DisplayField
-              label="Inspection Date"
-              value={inspectionDate}
-              onChange={setInspectionDate}
-              type="date"
-              isEditing={finalInspectionEditMode}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <DisplayField
-              label="Raw Material"
-              value={rawMaterial}
-              onChange={setRawMaterial}
-              placeholder="e.g., Aluminium 6061-T6"
-              isEditing={finalInspectionEditMode}
-              required
-            />
-            <DisplayField
-              label="Inspection By"
-              value={inspectionBy}
-              onChange={setInspectionBy}
-              placeholder="Inspector name"
-              isEditing={finalInspectionEditMode}
-              required
-            />
-            <DisplayField
-              label="Approved By"
-              value={approvedBy}
-              onChange={setApprovedBy}
-              placeholder="Approver name"
-              isEditing={finalInspectionEditMode}
-            />
-          </div>
-        </CardContent>
-      </Card>
+        {/* Rest of page content */}
+        <div className="space-y-4 sm:space-y-6 w-full min-w-0 mb-8">
+          <Card className="min-w-0">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">1.3 BALLOON DRAWING</CardTitle>
+                <div className="flex gap-2">
+                  {balloonDrawingEditMode ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setBalloonDrawingEditMode(false);
+                          toast.success('Changes saved');
+                        }}
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setBalloonDrawingEditMode(false)}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setBalloonDrawingEditMode(true)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-6">
+              <DisplayField
+                label="Part Name"
+                value={partName}
+                onChange={setPartName}
+                placeholder="e.g., Camera Holder"
+                isEditing={balloonDrawingEditMode}
+                required
+              />
+              <DisplayField
+                label="Material"
+                value={material}
+                onChange={setMaterial}
+                placeholder="e.g., Aluminium 6061-T6"
+                isEditing={balloonDrawingEditMode}
+                required
+              />
+              <DisplayField
+                label="Surface Treatment"
+                value={surfaceTreatment}
+                onChange={setSurfaceTreatment}
+                placeholder="e.g., Black Anodized"
+                isEditing={balloonDrawingEditMode}
+              />
+              <DisplayField
+                label="Drawing Title"
+                value={drawingTitle}
+                onChange={setDrawingTitle}
+                placeholder="e.g., CAMERA HOLDER"
+                isEditing={balloonDrawingEditMode}
+              />
+              <DisplayField
+                label="Drawing Size"
+                value={drawingSize}
+                onChange={setDrawingSize}
+                placeholder="e.g., A4"
+                isEditing={balloonDrawingEditMode}
+              />
+            </CardContent>
+          </Card>
 
-      {/* Inspection Table */}
-      <Card>
-        <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
-            <CardTitle className="text-base sm:text-lg">Inspection Table (Summary)</CardTitle>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-2">
-                <Label className="text-xs sm:text-sm whitespace-nowrap">Samples:</Label>
-                <TableDisplayField
-                  value={sampleCount.toString()}
-                  onChange={(value) => updateSampleCount(parseInt(value) || 1)}
-                  placeholder="5"
-                  type="number"
-                  isEditing={inspectionTableEditMode}
-                  className="w-12 sm:w-16 text-xs sm:text-sm"
+          {/* Final Inspection Report */}
+          <Card className="min-w-0">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">1.4 FINAL INSPECTION REPORT</CardTitle>
+                <div className="flex gap-2">
+                  {finalInspectionEditMode ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setFinalInspectionEditMode(false);
+                          toast.success('Changes saved');
+                        }}
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setFinalInspectionEditMode(false)}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setFinalInspectionEditMode(true)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                <DisplayField
+                  label="Company Name"
+                  value={companyName}
+                  onChange={setCompanyName}
+                  placeholder="EMUSKI"
+                  isEditing={finalInspectionEditMode}
+                />
+                <DisplayField
+                  label="Revision Number"
+                  value={revisionNumber}
+                  onChange={setRevisionNumber}
+                  placeholder="—"
+                  isEditing={finalInspectionEditMode}
+                />
+                <DisplayField
+                  label="Inspection Date"
+                  value={inspectionDate}
+                  onChange={setInspectionDate}
+                  type="date"
+                  isEditing={finalInspectionEditMode}
                 />
               </div>
-              {inspectionTableEditMode ? (
-                <>
-                  <Button onClick={addInspectionRow} size="sm">
-                    Add Row
-                  </Button>
-                  <Button
-                    onClick={clearInspectionData}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Clear All
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setInspectionTableEditMode(false);
-                      toast.success('Table changes saved');
-                    }}
-                  >
-                    <Check className="h-4 w-4 mr-1" />
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setInspectionTableEditMode(false)}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setInspectionTableEditMode(true)}
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <div className="space-y-3 min-w-max">
-              {/* Table Header */}
-              <div className={`grid gap-2 text-xs font-medium bg-muted p-2 rounded`} style={{ gridTemplateColumns: `50px 120px 90px 70px 70px 80px repeat(${sampleCount}, 80px) 120px` }}>
-                <div>Sl. No</div>
-                <div>Specification</div>
-                <div>Nominal (mm)</div>
-                <div>+ Tol</div>
-                <div>- Tol</div>
-                <div>Method</div>
-                {Array.from({ length: sampleCount }, (_, i) => (
-                  <div key={i}>Sample {i + 1}</div>
-                ))}
-                <div>Remarks</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                <DisplayField
+                  label="Raw Material"
+                  value={rawMaterial}
+                  onChange={setRawMaterial}
+                  placeholder="e.g., Aluminium 6061-T6"
+                  isEditing={finalInspectionEditMode}
+                  required
+                />
+                <DisplayField
+                  label="Inspection By"
+                  value={inspectionBy}
+                  onChange={setInspectionBy}
+                  placeholder="Inspector name"
+                  isEditing={finalInspectionEditMode}
+                  required
+                />
+                <DisplayField
+                  label="Approved By"
+                  value={approvedBy}
+                  onChange={setApprovedBy}
+                  placeholder="Approver name"
+                  isEditing={finalInspectionEditMode}
+                />
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Table Rows */}
-              {inspectionRows.map((row, index) => (
-                <div key={row.id} className="grid gap-2 items-center" style={{ gridTemplateColumns: `50px 120px 90px 70px 70px 80px repeat(${sampleCount}, 80px) 120px` }}>
-                  <div className="text-sm text-center">{index + 1}</div>
-                  <TableDisplayField
-                    value={row.specification}
-                    onChange={(value) => updateInspectionRow(row.id, 'specification', value)}
-                    placeholder="Length"
-                    isEditing={inspectionTableEditMode}
-                  />
-                  <TableDisplayField
-                    value={row.nominal}
-                    onChange={(value) => updateInspectionRow(row.id, 'nominal', value)}
-                    placeholder="40"
-                    type="number"
-                    isEditing={inspectionTableEditMode}
-                  />
-                  <TableDisplayField
-                    value={row.plusTol}
-                    onChange={(value) => updateInspectionRow(row.id, 'plusTol', value)}
-                    placeholder="0.1"
-                    type="number"
-                    isEditing={inspectionTableEditMode}
-                  />
-                  <TableDisplayField
-                    value={row.minusTol}
-                    onChange={(value) => updateInspectionRow(row.id, 'minusTol', value)}
-                    placeholder="-0.1"
-                    type="number"
-                    isEditing={inspectionTableEditMode}
-                  />
-                  <TableDisplayField
-                    value={row.method}
-                    onChange={(value) => updateInspectionRow(row.id, 'method', value)}
-                    placeholder="DVC"
-                    isEditing={inspectionTableEditMode}
-                  />
-                  {row.samples.map((sample: string, index: number) => (
-                    <div key={index}>
-                      {inspectionTableEditMode ? (
-                        <Input
-                          type="number"
-                          value={sample}
-                          onChange={(e) => updateInspectionRow(row.id, 'sample', e.target.value, index)}
-                          placeholder="40.00"
-                          className="text-xs"
-                        />
-                      ) : (
-                        <div className="text-xs py-1">
-                          {sample ? (() => {
+          {/* Inspection Table */}
+          <Card className="min-w-0">
+            <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+                <CardTitle className="text-base sm:text-lg w-full truncate">Inspection Table (Summary)</CardTitle>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs sm:text-sm whitespace-nowrap">Samples:</Label>
+                    <TableDisplayField
+                      value={sampleCount.toString()}
+                      onChange={(value) => updateSampleCount(parseInt(value) || 1)}
+                      placeholder="5"
+                      type="number"
+                      isEditing={inspectionTableEditMode}
+                      className="w-12 sm:w-16 text-xs sm:text-sm"
+                    />
+                  </div>
+                  {inspectionTableEditMode ? (
+                    <>
+                      <Button onClick={addInspectionRow} size="sm">
+                        Add Row
+                      </Button>
+                      <Button
+                        onClick={clearInspectionData}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Clear All
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setInspectionTableEditMode(false);
+                          toast.success('Table changes saved');
+                        }}
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setInspectionTableEditMode(false)}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setInspectionTableEditMode(true)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="overflow-x-auto w-full pb-2">
+                <div className="space-y-3 min-w-max">
+                  {/* Table Header */}
+                  <div className={`grid gap-2 text-xs font-medium bg-muted p-2 rounded`} style={{ gridTemplateColumns: `50px 120px 90px 70px 70px 80px repeat(${sampleCount}, 80px) 120px` }}>
+                    <div>Sl. No</div>
+                    <div>Specification</div>
+                    <div>Nominal (mm)</div>
+                    <div>+ Tol</div>
+                    <div>- Tol</div>
+                    <div>Method</div>
+                    {Array.from({ length: sampleCount }, (_, i) => (
+                      <div key={i}>Sample {i + 1}</div>
+                    ))}
+                    <div>Remarks</div>
+                  </div>
+
+                  {/* Table Rows */}
+                  {inspectionRows.map((row, index) => (
+                    <div key={row.id} className="grid gap-2 items-center" style={{ gridTemplateColumns: `50px 120px 90px 70px 70px 80px repeat(${sampleCount}, 80px) 120px` }}>
+                      <div className="text-sm text-center">{index + 1}</div>
+                      <TableDisplayField
+                        value={row.specification}
+                        onChange={(value) => updateInspectionRow(row.id, 'specification', value)}
+                        placeholder="Length"
+                        isEditing={inspectionTableEditMode}
+                      />
+                      <TableDisplayField
+                        value={row.nominal}
+                        onChange={(value) => updateInspectionRow(row.id, 'nominal', value)}
+                        placeholder="40"
+                        type="number"
+                        isEditing={inspectionTableEditMode}
+                      />
+                      <TableDisplayField
+                        value={row.plusTol}
+                        onChange={(value) => updateInspectionRow(row.id, 'plusTol', value)}
+                        placeholder="0.1"
+                        type="number"
+                        isEditing={inspectionTableEditMode}
+                      />
+                      <TableDisplayField
+                        value={row.minusTol}
+                        onChange={(value) => updateInspectionRow(row.id, 'minusTol', value)}
+                        placeholder="-0.1"
+                        type="number"
+                        isEditing={inspectionTableEditMode}
+                      />
+                      <TableDisplayField
+                        value={row.method}
+                        onChange={(value) => updateInspectionRow(row.id, 'method', value)}
+                        placeholder="DVC"
+                        isEditing={inspectionTableEditMode}
+                      />
+                      {row.samples.map((sample: string, index: number) => (
+                        <div key={index}>
+                          {inspectionTableEditMode ? (
+                            <Input
+                              type="number"
+                              value={sample}
+                              onChange={(e) => updateInspectionRow(row.id, 'sample', e.target.value, index)}
+                              placeholder="40.00"
+                              className="text-xs"
+                            />
+                          ) : (
+                            <div className="text-xs py-1">
+                              {sample ? (() => {
+                                const nominal = parseFloat(row.nominal) || 0;
+                                const plusTol = parseFloat(row.plusTol) || 0;
+                                const minusTol = parseFloat(row.minusTol) || 0;
+                                const upperLimit = nominal + plusTol;
+                                const lowerLimit = nominal + minusTol;
+                                const sampleValue = parseFloat(sample);
+
+                                if (isNaN(sampleValue) || !row.nominal) {
+                                  return <span>{sample}</span>;
+                                }
+
+                                const isInTolerance = sampleValue >= lowerLimit && sampleValue <= upperLimit;
+                                const colorClass = isInTolerance
+                                  ? 'text-green-600 font-semibold'
+                                  : 'text-red-600 font-semibold';
+
+                                return <span className={colorClass}>{sample}</span>;
+                              })() : (
+                                <span className="text-muted-foreground italic">Not set</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      <div className="flex gap-1">
+                        <div className="text-xs py-1 flex items-center flex-1">
+                          {(() => {
                             const nominal = parseFloat(row.nominal) || 0;
                             const plusTol = parseFloat(row.plusTol) || 0;
                             const minusTol = parseFloat(row.minusTol) || 0;
                             const upperLimit = nominal + plusTol;
                             const lowerLimit = nominal + minusTol;
-                            const sampleValue = parseFloat(sample);
 
-                            if (isNaN(sampleValue) || !row.nominal) {
-                              return <span>{sample}</span>;
-                            }
+                            const allSamplesValid = row.samples.every((sample: string) => {
+                              const value = parseFloat(sample);
+                              return !isNaN(value) && value >= lowerLimit && value <= upperLimit;
+                            });
 
-                            const isInTolerance = sampleValue >= lowerLimit && sampleValue <= upperLimit;
-                            const colorClass = isInTolerance
-                              ? 'text-green-600 font-semibold'
-                              : 'text-red-600 font-semibold';
+                            const hasValues = row.samples.some((sample: string) => sample.trim() !== '');
 
-                            return <span className={colorClass}>{sample}</span>;
-                          })() : (
-                            <span className="text-muted-foreground italic">Not set</span>
-                          )}
+                            if (!hasValues || !row.nominal) return '';
+
+                            const result = allSamplesValid ? 'OK' : 'NG';
+                            const colorClass = result === 'OK' ? 'text-green-600 font-semibold' :
+                              result === 'NG' ? 'text-red-600 font-semibold' : '';
+
+                            return <span className={colorClass}>{result}</span>;
+                          })()}
                         </div>
-                      )}
+                        {inspectionRows.length > 1 && (
+                          <Button
+                            onClick={() => removeInspectionRow(row.id)}
+                            size="sm"
+                            variant="outline"
+                            className="px-2"
+                          >
+                            ×
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))}
-                  <div className="flex gap-1">
-                    <div className="text-xs py-1 flex items-center flex-1">
-                      {(() => {
-                        const nominal = parseFloat(row.nominal) || 0;
-                        const plusTol = parseFloat(row.plusTol) || 0;
-                        const minusTol = parseFloat(row.minusTol) || 0;
-                        const upperLimit = nominal + plusTol;
-                        const lowerLimit = nominal + minusTol;
+                </div>
+              </div>
 
-                        const allSamplesValid = row.samples.every((sample: string) => {
-                          const value = parseFloat(sample);
-                          return !isNaN(value) && value >= lowerLimit && value <= upperLimit;
-                        });
-
-                        const hasValues = row.samples.some((sample: string) => sample.trim() !== '');
-
-                        if (!hasValues || !row.nominal) return '';
-
-                        const result = allSamplesValid ? 'OK' : 'NG';
-                        const colorClass = result === 'OK' ? 'text-green-600 font-semibold' :
-                          result === 'NG' ? 'text-red-600 font-semibold' : '';
-
-                        return <span className={colorClass}>{result}</span>;
-                      })()}
-                    </div>
-                    {inspectionRows.length > 1 && (
-                      <Button
-                        onClick={() => removeInspectionRow(row.id)}
-                        size="sm"
-                        variant="outline"
-                        className="px-2"
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div></div>
+                  <div className="flex gap-2">
+                    {inspectionTableEditMode ? (
+                      <span className="text-xs text-muted-foreground">Edit mode active above</span>
+                    ) : null}
+                  </div>
+                </div>
+                <DisplayTextarea
+                  label="General Remarks"
+                  value={generalRemarks}
+                  onChange={setGeneralRemarks}
+                  placeholder="Add general remarks about the inspection..."
+                  rows={3}
+                  isEditing={inspectionTableEditMode}
+                />
+                <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                  <div key={`status-${status}`} className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      Status
+                      <Badge
+                        key={`status-badge-${status}`}
+                        variant={
+                          status === 'draft' ? 'secondary' :
+                            status === 'release' ? 'default' :
+                              'destructive'
+                        }
+                        className={`text-xs ${status === 'release' ? 'bg-primary text-primary-foreground hover:bg-primary/80' : ''}`}
                       >
-                        ×
-                      </Button>
+                        {status?.toUpperCase() || 'UNKNOWN'}
+                      </Badge>
+                    </Label>
+                    {inspectionTableEditMode ? (
+                      <Input
+                        key={`status-input-${status}`}
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        placeholder="release"
+                      />
+                    ) : (
+                      <div key={`status-display-${status}`} className="p-2 border rounded bg-primary/10 border-primary/20 text-primary font-medium">
+                        {status?.toUpperCase() || 'Not Set'}
+                      </div>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <div></div>
-              <div className="flex gap-2">
-                {inspectionTableEditMode ? (
-                  <span className="text-xs text-muted-foreground">Edit mode active above</span>
-                ) : null}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 sm:gap-4 pt-3 sm:pt-4 border-t">
+            <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={generateComprehensivePDF}
+                className="flex items-center gap-2 text-xs sm:text-sm"
+              >
+                <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Download Full Report</span>
+                <span className="sm:hidden">Download</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyFormattedOutput}
+                className="flex items-center gap-2 text-xs sm:text-sm"
+              >
+                <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Copy Output</span>
+                <span className="sm:hidden">Copy</span>
+              </Button>
             </div>
-            <DisplayTextarea
-              label="General Remarks"
-              value={generalRemarks}
-              onChange={setGeneralRemarks}
-              placeholder="Add general remarks about the inspection..."
-              rows={3}
-              isEditing={inspectionTableEditMode}
-            />
-            <div className="grid grid-cols-1 gap-3 sm:gap-4">
-              <div key={`status-${status}`} className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  Status
-                  <Badge
-                    key={`status-badge-${status}`}
-                    variant={
-                      status === 'draft' ? 'secondary' :
-                        status === 'release' ? 'default' :
-                          'destructive'
-                    }
-                    className={`text-xs ${status === 'release' ? 'bg-primary text-primary-foreground hover:bg-primary/80' : ''
-                      }`}
-                  >
-                    {status?.toUpperCase() || 'UNKNOWN'}
-                  </Badge>
-                </Label>
-                {inspectionTableEditMode ? (
-                  <Input
-                    key={`status-input-${status}`}
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    placeholder="release"
-                  />
+            <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
+              {/* Status Indicator */}
+              <div className={`flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 rounded-md border text-xs sm:text-sm ${status === 'draft' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
+                status === 'release' ? 'bg-primary/10 border-primary/20 text-primary' :
+                  status === 'rejected' ? 'bg-red-50 border-red-200 text-red-800' :
+                    'bg-gray-50 border-gray-200 text-gray-600'
+                }`}>
+                <div className={`${status === 'draft' ? 'text-yellow-600' :
+                  status === 'release' ? 'text-primary' :
+                    status === 'rejected' ? 'text-red-600' :
+                      'text-gray-400'
+                  }`}>
+                  {status === 'draft' ? <Clock className="h-3 w-3 sm:h-4 sm:w-4" /> :
+                    status === 'release' ? <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" /> :
+                      status === 'rejected' ? <XCircle className="h-3 w-3 sm:h-4 sm:w-4" /> :
+                        <Clock className="h-3 w-3 sm:h-4 sm:w-4" />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-medium">
+                    {status === 'draft' ? 'Draft Saved' :
+                      status === 'release' ? 'Report Submitted' :
+                        status === 'rejected' ? 'Report Rejected' :
+                          'Not Saved'}
+                  </span>
+                  {lastSavedTime && (
+                    <span className="text-xs opacity-70 hidden sm:block">
+                      {lastSavedTime}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                className="flex items-center gap-2 text-xs sm:text-sm"
+                onClick={() => handleSaveReport(true)}
+                disabled={saveInspectionReport.isPending}
+              >
+                {saveInspectionReport.isPending ? (
+                  <div className="animate-spin h-3 w-3 sm:h-4 sm:w-4">⟳</div>
                 ) : (
-                  <div key={`status-display-${status}`} className="p-2 border rounded bg-primary/10 border-primary/20 text-primary font-medium">
-                    {status?.toUpperCase() || 'Not Set'}
-                  </div>
+                  <Save className="h-3 w-3 sm:h-4 sm:w-4" />
                 )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Action Buttons */}
-      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 sm:gap-4 pt-3 sm:pt-4 border-t">
-        <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generateComprehensivePDF}
-            className="flex items-center gap-2 text-xs sm:text-sm"
-          >
-            <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Download Full Report</span>
-            <span className="sm:hidden">Download</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={copyFormattedOutput}
-            className="flex items-center gap-2 text-xs sm:text-sm"
-          >
-            <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Copy Output</span>
-            <span className="sm:hidden">Copy</span>
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
-          {/* Status Indicator */}
-          <div className={`flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 rounded-md border text-xs sm:text-sm ${status === 'draft' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
-            status === 'release' ? 'bg-primary/10 border-primary/20 text-primary' :
-              status === 'rejected' ? 'bg-red-50 border-red-200 text-red-800' :
-                'bg-gray-50 border-gray-200 text-gray-600'
-            }`}>
-            <div className={`${status === 'draft' ? 'text-yellow-600' :
-              status === 'release' ? 'text-primary' :
-                status === 'rejected' ? 'text-red-600' :
-                  'text-gray-400'
-              }`}>
-              {status === 'draft' ? <Clock className="h-3 w-3 sm:h-4 sm:w-4" /> :
-                status === 'release' ? <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" /> :
-                  status === 'rejected' ? <XCircle className="h-3 w-3 sm:h-4 sm:w-4" /> :
-                    <Clock className="h-3 w-3 sm:h-4 sm:w-4" />}
-            </div>
-            <div className="flex flex-col">
-              <span className="font-medium">
-                {status === 'draft' ? 'Draft Saved' :
-                  status === 'release' ? 'Report Submitted' :
-                    status === 'rejected' ? 'Report Rejected' :
-                      'Not Saved'}
-              </span>
-              {lastSavedTime && (
-                <span className="text-xs opacity-70 hidden sm:block">
-                  {lastSavedTime}
-                </span>
+                <span className="hidden sm:inline">Save Draft</span>
+                <span className="sm:hidden">Draft</span>
+              </Button>
+              {!inspectionLoading && currentInspection?.status !== 'completed' && currentInspection?.status !== 'approved' && currentInspection?.status !== 'rejected' && (
+                <Button
+                  size="sm"
+                  className="flex items-center gap-2 text-xs sm:text-sm"
+                  onClick={async () => {
+                    // First save the report silently
+                    await handleSaveReport(false, true);
+                    // Then complete the inspection
+                    await handleCompleteInspection();
+                  }}
+                  disabled={saveInspectionReport.isPending || updateInspection.isPending || !inspectionBy}
+                >
+                  {(saveInspectionReport.isPending || updateInspection.isPending) ? (
+                    <div className="animate-spin h-3 w-3 sm:h-4 sm:w-4">⟳</div>
+                  ) : (
+                    <Send className="h-3 w-3 sm:h-4 sm:w-4" />
+                  )}
+                  <span className="hidden sm:inline">Submit &amp; Complete</span>
+                  <span className="sm:hidden">Submit</span>
+                </Button>
               )}
             </div>
           </div>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            className="flex items-center gap-2 text-xs sm:text-sm"
-            onClick={() => handleSaveReport(true)}
-            disabled={saveInspectionReport.isPending}
-          >
-            {saveInspectionReport.isPending ? (
-              <div className="animate-spin h-3 w-3 sm:h-4 sm:w-4">⟳</div>
-            ) : (
-              <Save className="h-3 w-3 sm:h-4 sm:w-4" />
-            )}
-            <span className="hidden sm:inline">Save Draft</span>
-            <span className="sm:hidden">Draft</span>
-          </Button>
-          {!inspectionLoading && currentInspection?.status !== 'completed' && currentInspection?.status !== 'approved' && currentInspection?.status !== 'rejected' && (
-            <Button
-              size="sm"
-              className="flex items-center gap-2 text-xs sm:text-sm"
-              onClick={async () => {
-                // First save the report silently
-                await handleSaveReport(false, true);
-                // Then complete the inspection
-                await handleCompleteInspection();
-              }}
-              disabled={saveInspectionReport.isPending || updateInspection.isPending || !inspectionBy}
-            >
-              {(saveInspectionReport.isPending || updateInspection.isPending) ? (
-                <div className="animate-spin h-3 w-3 sm:h-4 sm:w-4">⟳</div>
-              ) : (
-                <Send className="h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-              <span className="hidden sm:inline">Submit & Complete</span>
-              <span className="sm:hidden">Submit</span>
-            </Button>
-          )}
         </div>
       </div>
     </div>

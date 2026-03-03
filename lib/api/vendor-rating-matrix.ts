@@ -91,15 +91,16 @@ export async function getVendorRatingMatrix(
     return transformed;
   } catch (error) {
     // Enhanced error handling for network failures
-    const status = error?.response?.status;
-    const statusText = error?.response?.statusText;
+    const err = error as any;
+    const status = err?.response?.status;
+    const statusText = err?.response?.statusText;
 
     apiLogger.logApiError('GET', `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix`, error, {
       status,
       statusText,
       nominationId,
       vendorId,
-      errorType: error?.constructor?.name || 'Unknown'
+      errorType: err?.constructor?.name || 'Unknown'
     });
 
     // Return empty array for 404s (no data exists yet)
@@ -154,7 +155,8 @@ export async function initializeVendorRatingMatrix(
     const fallbackData = await getVendorRatingMatrix(nominationId, vendorId);
     return fallbackData;
   } catch (error) {
-    const status = error?.response?.status;
+    const err = error as any;
+    const status = err?.response?.status;
 
     apiLogger.logApiError('POST', `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/init`, error, {
       status,
@@ -294,7 +296,7 @@ class VendorRatingDataTransformer {
       ];
 
       numericFields.forEach(({ name, min, max }) => {
-        const value = update[name];
+        const value = (update as any)[name];
         if (value !== undefined) {
           const numValue = Number(value);
           if (isNaN(numValue) || numValue < min || numValue > max) {
@@ -330,14 +332,15 @@ export async function batchUpdateVendorRatingMatrix(
     }
 
     // Get or initialize the rating matrix
-    let existingData;
+    let existingData: VendorRatingMatrix[];
     try {
       existingData = await getVendorRatingMatrix(nominationId, vendorId);
     } catch (fetchError) {
       // 404 is expected when no data exists - don't treat as error
-      if (fetchError?.response?.status !== 404) {
+      const fe = fetchError as any;
+      if (fe?.response?.status !== 404) {
         console.error('Failed to fetch existing data before update:', fetchError);
-        throw new Error(`Cannot update rating matrix: ${fetchError.message}`);
+        throw new Error(`Cannot update rating matrix: ${fe?.message ?? 'Unknown error'}`);
       }
 
       existingData = [];
@@ -430,10 +433,11 @@ export async function batchUpdateVendorRatingMatrix(
 
   } catch (error) {
     // Enhanced error logging to capture the actual problem
-    const status = error.response?.status;
-    const statusText = error.response?.statusText;
-    const message = error.response?.data?.message || error.message || "Unknown error";
-    const responseData = error.response?.data;
+    const err = error as any;
+    const status = err?.response?.status;
+    const statusText = err?.response?.statusText;
+    const message = err?.response?.data?.message || err?.message || "Unknown error";
+    const responseData = err?.response?.data;
 
     console.error('Batch update failed:', {
       status,
@@ -484,12 +488,13 @@ export async function getVendorRatingOverallScores(
     // API client returns data directly, not wrapped in .data
     const data = response;
     if (data) {
+      const d = data as any;
       return {
-        sectionWiseCapability: data.sectionWiseCapability || 0,
-        riskMitigation: data.riskMitigation || 0,
-        totalMinorNC: data.totalMinorNC || 0,
-        totalMajorNC: data.totalMajorNC || 0,
-        totalRecords: data.totalRecords || 0
+        sectionWiseCapability: d.sectionWiseCapability || 0,
+        riskMitigation: d.riskMitigation || 0,
+        totalMinorNC: d.totalMinorNC || 0,
+        totalMajorNC: d.totalMajorNC || 0,
+        totalRecords: d.totalRecords || 0
       };
     }
 
@@ -501,7 +506,8 @@ export async function getVendorRatingOverallScores(
       totalRecords: 0
     };
   } catch (error) {
-    const status = error?.response?.status;
+    const err = error as any;
+    const status = err?.response?.status;
 
     apiLogger.logApiError('GET', `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/overall-scores`, error, {
       status,

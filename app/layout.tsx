@@ -63,89 +63,136 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              // Suppress browser extension runtime errors
+              // Complete browser extension error suppression
               (function() {
+                // Store original console methods
                 const originalConsoleError = console.error;
                 const originalConsoleWarn = console.warn;
                 const originalConsoleLog = console.log;
                 
-                // Enhanced pattern matching for extension errors
+                // Comprehensive extension error detection
                 function isExtensionError(message) {
                   if (!message || typeof message !== 'string') return false;
                   
-                  // Don't suppress Supabase or application errors
-                  if (message.includes('supabase.co') || 
-                      message.includes('fetch') ||
-                      message.includes('network') ||
-                      message.includes('Failed to load') ||
-                      message.includes('refused to connect')) {
+                  // Never suppress these critical application errors
+                  const criticalPatterns = [
+                    'supabase.co', 'fetch failed', 'network error', 'Failed to load',
+                    'refused to connect', 'CORS', 'TypeError:', 'ReferenceError:',
+                    'SyntaxError:', 'RangeError:', 'URIError:'
+                  ];
+                  
+                  if (criticalPatterns.some(pattern => message.includes(pattern))) {
                     return false;
                   }
                   
-                  return message.includes('message port closed') || 
-                         message.includes('Unchecked runtime.lastError') ||
-                         message.includes('Extension context invalidated') ||
-                         message.includes('runtime.lastError') ||
-                         (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}:\d+/.test(message) && 
-                          (message.includes('runtime.lastError') || message.includes('message port closed')));
+                  // Extension error patterns to suppress
+                  const extensionPatterns = [
+                    'message port closed',
+                    'Unchecked runtime.lastError',
+                    'Extension context invalidated',
+                    'runtime.lastError',
+                    'The message port closed before a response was received',
+                    'chrome-extension://',
+                    'moz-extension://'
+                  ];
+                  
+                  // Check for extension patterns
+                  if (extensionPatterns.some(pattern => message.includes(pattern))) {
+                    return true;
+                  }
+                  
+                  // Check for UUID-prefixed extension errors
+                  if (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}:\d+/.test(message)) {
+                    return extensionPatterns.some(pattern => message.includes(pattern));
+                  }
+                  
+                  return false;
                 }
                 
+                // Override console methods with filtering
                 console.error = function(...args) {
                   const message = args.join(' ');
-                  if (isExtensionError(message)) {
-                    return;
+                  if (!isExtensionError(message)) {
+                    originalConsoleError.apply(console, args);
                   }
-                  originalConsoleError.apply(console, args);
                 };
                 
                 console.warn = function(...args) {
                   const message = args.join(' ');
-                  if (isExtensionError(message)) {
-                    return;
+                  if (!isExtensionError(message)) {
+                    originalConsoleWarn.apply(console, args);
                   }
-                  originalConsoleWarn.apply(console, args);
                 };
                 
                 console.log = function(...args) {
                   const message = args.join(' ');
-                  if (isExtensionError(message)) {
-                    return;
+                  if (!isExtensionError(message)) {
+                    originalConsoleLog.apply(console, args);
                   }
-                  originalConsoleLog.apply(console, args);
                 };
                 
-                // Handle unhandled promise rejections from extensions
+                // Suppress extension promise rejections
                 window.addEventListener('unhandledrejection', function(event) {
                   if (event.reason) {
                     const message = typeof event.reason === 'string' ? event.reason : 
-                                  (event.reason.message || String(event.reason));
+                                  (event.reason.message || event.reason.toString());
                     if (isExtensionError(message)) {
                       event.preventDefault();
-                      return;
+                      event.stopPropagation();
+                      return false;
                     }
                   }
                 });
                 
-                // Handle runtime errors from extensions
+                // Suppress extension runtime errors
                 window.addEventListener('error', function(event) {
-                  if (event.message && isExtensionError(event.message)) {
-                    event.preventDefault();
-                    return;
-                  }
+                  const message = event.message || '';
+                  const filename = event.filename || '';
                   
-                  // Also check the source/filename for extension UUIDs
-                  if (event.filename && isExtensionError(event.filename)) {
+                  if (isExtensionError(message) || isExtensionError(filename)) {
                     event.preventDefault();
-                    return;
+                    event.stopPropagation();
+                    return false;
                   }
                 });
                 
-                // Override console methods for extension scripts that might inject later
-                setTimeout(function() {
-                  window.console.error = console.error;
-                  window.console.warn = console.warn;
-                  window.console.log = console.log;
-                }, 100);
+                // Handle dynamically injected extension scripts
+                const observer = new MutationObserver(function(mutations) {
+                  mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList') {
+                      mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1 && node.tagName === 'SCRIPT') {
+                          const src = node.src || '';
+                          if (src.includes('chrome-extension://') || src.includes('moz-extension://')) {
+                            // Extension script detected - ensure our overrides persist
+                            setTimeout(function() {
+                              if (typeof window.console !== 'undefined') {
+                                window.console.error = console.error;
+                                window.console.warn = console.warn;
+                                window.console.log = console.log;
+                              }
+                            }, 50);
+                          }
+                        }
+                      });
+                    }
+                  });
+                });
+                
+                // Observe the document for extension script injection
+                observer.observe(document.documentElement, {
+                  childList: true,
+                  subtree: true
+                });
+                
+                // Ensure overrides persist
+                setInterval(function() {
+                  if (window.console.error !== console.error) {
+                    window.console.error = console.error;
+                    window.console.warn = console.warn;
+                    window.console.log = console.log;
+                  }
+                }, 1000);
               })();
             `,
           }}

@@ -26,17 +26,17 @@ export function AppLayout({ children }: AppLayoutProps) {
       if (currentUrl !== '/auth' && currentUrl !== '/') {
         sessionStorage.setItem('redirectAfterAuth', currentUrl);
       }
-      
+
       // Add a small delay to prevent flashing during normal auth resolution
       const timer = setTimeout(() => {
         setShouldRedirect(true);
         router.replace('/auth');
       }, 100);
-      
+
       return () => clearTimeout(timer);
     } else if (user) {
       setShouldRedirect(false);
-      
+
       // Check for stored redirect URL and navigate there
       const redirectUrl = sessionStorage.getItem('redirectAfterAuth');
       if (redirectUrl && window.location.pathname === '/') {
@@ -44,6 +44,8 @@ export function AppLayout({ children }: AppLayoutProps) {
         router.replace(redirectUrl);
       }
     }
+
+    return undefined;
   }, [user, loading, router]);
 
   // Show loading during auth resolution or when about to redirect
@@ -88,16 +90,16 @@ export function AppLayout({ children }: AppLayoutProps) {
               <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors">
                 <Menu className="h-5 w-5" />
               </SidebarTrigger>
-              
+
               <div className="hidden md:flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-1.5 w-64">
                 <Search className="h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search projects, vendors..." 
+                <Input
+                  placeholder="Search projects, vendors..."
                   className="border-0 bg-transparent h-7 p-0 focus-visible:ring-0 text-sm placeholder:text-muted-foreground/60"
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground relative">
                 <Bell className="h-5 w-5" />
@@ -105,7 +107,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </Button>
             </div>
           </header>
-          <main className="flex-1 p-6 overflow-auto">
+          <main className="flex-1 p-4 sm:p-6 overflow-auto overflow-x-hidden">
             {children}
           </main>
         </SidebarInset>

@@ -6,18 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useBalloonAnnotations, type Balloon } from '@/lib/hooks/useBalloonAnnotations';
-import { 
-  Plus, 
-  Minus, 
-  RotateCw, 
-  Download, 
-  Save, 
-  Undo, 
-  Redo, 
+import {
+  Plus,
+  Minus,
+  Save,
+  Undo,
+  Redo,
   Trash2,
   MousePointer,
   Circle,
-  Edit,
   X,
   Loader2
 } from 'lucide-react';
@@ -42,8 +39,6 @@ export default function InteractiveBalloonAnnotator({
   const {
     balloons,
     loading: savingLoading,
-    error: saveError,
-    loadBalloons,
     saveBalloons,
     setBalloons
   } = useBalloonAnnotations({ fileId, autoLoad: true });
@@ -54,7 +49,7 @@ export default function InteractiveBalloonAnnotator({
   const [selectedBalloon, setSelectedBalloon] = useState<string | null>(null);
   const [history, setHistory] = useState<Balloon[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -99,6 +94,7 @@ export default function InteractiveBalloonAnnotator({
     if (!isAnnotating || !containerRef.current || event.touches.length !== 1) return;
 
     const touch = event.touches[0];
+    if (!touch) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = ((touch.clientX - rect.left) / scale);
     const y = ((touch.clientY - rect.top) / scale);
@@ -128,14 +124,14 @@ export default function InteractiveBalloonAnnotator({
   const undo = useCallback(() => {
     if (historyIndex > 0) {
       setHistoryIndex(historyIndex - 1);
-      setBalloons(history[historyIndex - 1]);
+      setBalloons(history[historyIndex - 1] ?? []);
     }
   }, [history, historyIndex]);
 
   const redo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       setHistoryIndex(historyIndex + 1);
-      setBalloons(history[historyIndex + 1]);
+      setBalloons(history[historyIndex + 1] ?? []);
     }
   }, [history, historyIndex]);
 
@@ -153,7 +149,7 @@ export default function InteractiveBalloonAnnotator({
         onSave(balloons);
       }
     } catch (error) {
-;
+      ;
     }
   }, [balloons, saveBalloons, onSave]);
 
@@ -281,7 +277,7 @@ export default function InteractiveBalloonAnnotator({
             <div
               ref={containerRef}
               className="relative border border-gray-300 rounded-lg overflow-auto bg-gray-100 cursor-crosshair"
-              style={{ 
+              style={{
                 height: '600px',
                 cursor: isAnnotating ? 'crosshair' : 'default'
               }}
@@ -297,12 +293,24 @@ export default function InteractiveBalloonAnnotator({
                   height: `${100 / scale}%`
                 }}
               >
+                {/* pdfUrl is already the same-origin proxy URL (/api/file-proxy?url=...)
+                    set by PDFViewer in BalloonDiagramViewer — never a raw Supabase URL */}
                 <iframe
                   ref={iframeRef}
-                  src={pdfUrl}
+                  src={`${pdfUrl}#view=Fit&zoom=page-fit&scrollbar=0&toolbar=0&navpanes=0&statusbar=0&messages=0`}
                   className="w-full h-full border-0"
-                  style={{ pointerEvents: isAnnotating ? 'none' : 'auto' }}
-                  sandbox="allow-same-origin"
+                  style={{ 
+                    pointerEvents: isAnnotating ? 'none' : 'auto', 
+                    overflow: 'hidden', 
+                    border: 'none', 
+                    margin: '0', 
+                    padding: '0' 
+                  }}
+                  scrolling="no"
+                  frameBorder="0"
+                  marginHeight="0"
+                  marginWidth="0"
+                  title="PDF Annotator"
                 />
               </div>
 
@@ -321,6 +329,7 @@ export default function InteractiveBalloonAnnotator({
                   .map((balloon, index, sortedBalloons) => {
                     if (index === sortedBalloons.length - 1) return null;
                     const nextBalloon = sortedBalloons[index + 1];
+                    if (!nextBalloon) return null;
                     return (
                       <line
                         key={`line-${balloon.id}-${nextBalloon.id}`}
@@ -341,11 +350,10 @@ export default function InteractiveBalloonAnnotator({
               {balloons.map((balloon) => (
                 <div
                   key={balloon.id}
-                  className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all ${
-                    selectedBalloon === balloon.id 
-                      ? 'ring-4 ring-red-500 ring-opacity-50' 
-                      : ''
-                  }`}
+                  className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all ${selectedBalloon === balloon.id
+                    ? 'ring-4 ring-red-500 ring-opacity-50'
+                    : ''
+                    }`}
                   style={{
                     left: balloon.x * scale,
                     top: balloon.y * scale,
@@ -358,16 +366,15 @@ export default function InteractiveBalloonAnnotator({
                 >
                   {/* Balloon Circle */}
                   <div className="relative">
-                    <div 
-                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shadow-lg transition-all ${
-                        selectedBalloon === balloon.id
-                          ? 'bg-red-600 border-red-700 text-white scale-110'
-                          : 'bg-red-500 border-red-700 text-white hover:bg-red-600'
-                      }`}
+                    <div
+                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shadow-lg transition-all ${selectedBalloon === balloon.id
+                        ? 'bg-red-600 border-red-700 text-white scale-110'
+                        : 'bg-red-500 border-red-700 text-white hover:bg-red-600'
+                        }`}
                     >
                       {balloon.number}
                     </div>
-                    
+
                     {/* Delete button for selected balloon */}
                     {selectedBalloon === balloon.id && (
                       <button
@@ -419,11 +426,10 @@ export default function InteractiveBalloonAnnotator({
                       .map((balloon) => (
                         <div
                           key={balloon.id}
-                          className={`flex items-center justify-between p-2 rounded border cursor-pointer transition-colors ${
-                            selectedBalloon === balloon.id
-                              ? 'bg-blue-50 border-blue-200'
-                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                          }`}
+                          className={`flex items-center justify-between p-2 rounded border cursor-pointer transition-colors ${selectedBalloon === balloon.id
+                            ? 'bg-blue-50 border-blue-200'
+                            : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                            }`}
                           onClick={() => setSelectedBalloon(balloon.id)}
                         >
                           <div className="flex items-center gap-2">

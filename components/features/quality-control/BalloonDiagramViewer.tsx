@@ -7,11 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import InteractiveBalloonAnnotator from './InteractiveBalloonAnnotator';
-import { 
-  Download, 
-  Maximize2, 
-  ZoomIn, 
-  ZoomOut, 
+import {
+  Download,
+  Maximize2,
+  ZoomIn,
+  ZoomOut,
   RotateCw,
   FileImage,
   Ruler,
@@ -35,105 +35,76 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [showAnnotator, setShowAnnotator] = useState(false);
 
-  // Load PDF with authentication headers
+  // Load PDF using the same-origin file proxy to avoid cross-site iframe block
   useEffect(() => {
     if (filePath) {
-      loadPDFWithAuth();
+      loadPDF();
     }
   }, [filePath]);
 
-  const loadPDFWithAuth = async () => {
+  const loadPDF = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // First try to get a signed URL for the PDF using proper API client
+      // Get the signed URL from the NestJS backend
       const { apiClient } = await import('@/lib/api/client');
-      const signedUrlEndpoint = `/bom-items/${fileId}/file-url/2d`;
-      
-      const data = await apiClient.get(signedUrlEndpoint);
-      
-      // Try different possible response formats
-      const possibleUrl = data.url || data.downloadUrl || data.fileUrl || data.signedUrl || data.data?.url;
-      
-      if (possibleUrl) {
-        setPdfUrl(possibleUrl);
-      } else {
-        throw new Error('No signed URL returned');
+      const data = await apiClient.get<{ url: string }>(`/bom-items/${fileId}/file-url/2d`);
+
+      const signedUrl: string | undefined =
+        (data as any)?.url ??
+        (data as any)?.downloadUrl ??
+        (data as any)?.fileUrl ??
+        (data as any)?.signedUrl ??
+        (data as any)?.data?.url;
+
+      if (!signedUrl) {
+        throw new Error('No signed URL returned from backend');
       }
-    } catch (error) {
-      
-      // Fallback: Try different URL formats
-      // Extract filename from path for some endpoints
-      const filename = filePath.split('/').pop();
-      
-      const urlsToTry = [
-        // Original file download endpoint
-        `${process.env.NEXT_PUBLIC_API_URL}/files/download?path=${encodeURIComponent(filePath)}`,
-        // Try with different file download formats
-        `${process.env.NEXT_PUBLIC_API_URL}/files/download/${encodeURIComponent(filePath)}`,
-        // Direct BOM item file endpoints
-        `${process.env.NEXT_PUBLIC_API_URL}/bom-items/${fileId}/files/2d`,
-        `${process.env.NEXT_PUBLIC_API_URL}/bom-items/${fileId}/file/2d`,
-        `${process.env.NEXT_PUBLIC_API_URL}/bom-items/${fileId}/download/2d`,
-        // Try using just the filename
-        `${process.env.NEXT_PUBLIC_API_URL}/bom-items/${fileId}/files/2d/${filename}`,
-        // Alternative file serving endpoints
-        `${process.env.NEXT_PUBLIC_API_URL}/files/${fileId}/2d`,
-        `${process.env.NEXT_PUBLIC_API_URL}/files/${fileId}`,
-        // Static file serving attempts
-        `${process.env.NEXT_PUBLIC_API_URL}/static/${filePath}`,
-        `${process.env.NEXT_PUBLIC_API_URL}/uploads/${filePath}`,
-        // Direct path attempts
-        `${process.env.NEXT_PUBLIC_API_URL}/${filePath}`,
-        `${process.env.NEXT_PUBLIC_API_URL}/files/${filePath}`
-      ];
-      
-      let lastError = null;
-      for (const url of urlsToTry) {
-        try {
-          const pdfResponse = await fetch(url, {
+
+      // Route through the same-origin proxy so the iframe src is localhost:3000.
+      // This eliminates Chrome's cross-site iframe block:
+      //   sec-fetch-site: cross-site + sec-fetch-dest: iframe → blocked
+      //   sec-fetch-site: same-origin + sec-fetch-dest: iframe → allowed ✓
+      const proxyUrl = `/api/file-proxy?url=${encodeURIComponent(signedUrl)}`;
+      setPdfUrl(proxyUrl);
+    } catch (err) {
+      console.warn('[PDFViewer] Failed to get signed URL, falling back to blob fetch:', err);
+
+      // Fallback: fetch bytes and create a blob URL (also same-origin, also safe)
+      try {
+        const { apiClient } = await import('@/lib/api/client');
+        // Some deployments may not have the file-url endpoint — try direct fetch
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/bom-items/${fileId}/file-url/2d`,
+          {
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
-            }
-          });
-          
-          if (pdfResponse.ok) {
-            const blob = await pdfResponse.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            setPdfUrl(objectUrl);
-            return; // Success, exit the function
-          } else {
-            const responseText = await pdfResponse.text().catch(() => 'Could not read response');
-            lastError = `${url} failed with status: ${pdfResponse.status} - ${responseText}`;
+              Authorization: `Bearer ${(await apiClient.getAuthToken()) ?? ''}`,
+            },
+          },
+        );
+
+        if (response.ok) {
+          const json = await response.json();
+          const signedUrl = json?.data?.url ?? json?.url;
+          if (signedUrl) {
+            // Fetch the bytes via proxy instead of embedding cross-site URL
+            const proxyUrl = `/api/file-proxy?url=${encodeURIComponent(signedUrl)}`;
+            setPdfUrl(proxyUrl);
+            return;
           }
-        } catch (fetchError) {
-          lastError = `${url} failed with error: ${fetchError.message}`;
         }
+      } catch {
+        // ignore fallback error
       }
-      
-      // If we get here, all URLs failed - try direct iframe as last resort
-      for (const url of urlsToTry.slice(0, 3)) { // Try first 3 URLs directly in iframe
-        setPdfUrl(url);
-        break; // Try the first one and let iframe handle it
-      }
-      
-      if (!pdfUrl) {
-        setError(`All PDF download attempts failed. Last error: ${lastError}`);
-      }
+
+      setError(`Failed to load PDF: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Cleanup blob URL when component unmounts
-  useEffect(() => {
-    return () => {
-      if (pdfUrl && pdfUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
-  }, [pdfUrl]);
+  // No blob URL cleanup needed since we're using proxy URLs now
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -169,7 +140,7 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
           </Button>
         </div>
       </div>
-      
+
       <div className="flex-1 min-h-[600px] h-full">
         {loading ? (
           <div className="w-full h-full flex items-center justify-center">
@@ -189,7 +160,7 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
                 <p><strong>File Path:</strong> {filePath}</p>
                 <p><strong>File ID:</strong> {fileId}</p>
               </div>
-              <Button onClick={loadPDFWithAuth} size="sm" className="mt-3">
+              <Button onClick={loadPDF} size="sm" className="mt-3">
                 Try Again
               </Button>
             </div>
@@ -207,7 +178,7 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">Technical Drawing</h3>
                   <p className="text-gray-600 text-sm">{fileName}</p>
                 </div>
-                
+
                 <div className="space-y-3">
                   <Button
                     onClick={() => window.open(pdfUrl, '_blank')}
@@ -217,7 +188,7 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
                     <Eye className="h-5 w-5 mr-2" />
                     View PDF
                   </Button>
-                  
+
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -232,14 +203,14 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
                     Download PDF
                   </Button>
                 </div>
-                
+
                 <div className="mt-6 text-xs text-gray-500">
                   <p>PDF Size: Ready for viewing</p>
                   <p>Type: 2D Technical Drawing</p>
                 </div>
               </div>
             </div>
-            
+
             {/* Alternative: Try simple iframe as fallback */}
             <div className="absolute bottom-4 left-4 text-xs text-gray-500">
               <Button
@@ -258,14 +229,19 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
                   container.style.display = 'flex';
                   container.style.alignItems = 'center';
                   container.style.justifyContent = 'center';
-                  
+
                   const iframe = document.createElement('iframe');
-                  iframe.src = pdfUrl;
+                  iframe.src = `${pdfUrl}#view=Fit&zoom=page-fit&scrollbar=0&toolbar=0&navpanes=0&statusbar=0&messages=0`;
                   iframe.style.width = '90%';
                   iframe.style.height = '90%';
                   iframe.style.border = 'none';
                   iframe.style.background = 'white';
-                  
+                  iframe.style.overflow = 'hidden';
+                  iframe.scrolling = 'no';
+                  iframe.setAttribute('frameBorder', '0');
+                  iframe.setAttribute('marginHeight', '0');
+                  iframe.setAttribute('marginWidth', '0');
+
                   const closeBtn = document.createElement('button');
                   closeBtn.innerHTML = '✕';
                   closeBtn.style.position = 'absolute';
@@ -278,7 +254,7 @@ function PDFViewer({ filePath, fileId, fileName }: PDFViewerProps) {
                   closeBtn.style.padding = '10px';
                   closeBtn.style.borderRadius = '50%';
                   closeBtn.onclick = () => document.body.removeChild(container);
-                  
+
                   container.appendChild(iframe);
                   container.appendChild(closeBtn);
                   document.body.appendChild(container);
@@ -323,11 +299,11 @@ interface BalloonDiagramViewerProps {
   bomItems?: any[];
 }
 
-export default function BalloonDiagramViewer({ 
-  open, 
-  onOpenChange, 
-  inspection, 
-  bomItems = [] 
+export default function BalloonDiagramViewer({
+  open,
+  onOpenChange,
+  inspection,
+  bomItems = []
 }: BalloonDiagramViewerProps) {
   // Early return before any hooks to prevent hook order violations
   if (!inspection) return null;
@@ -336,13 +312,13 @@ export default function BalloonDiagramViewer({
   const [zoomLevel, setZoomLevel] = useState(100);
   const [selectedBalloon, setSelectedBalloon] = useState<string | null>(null);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-  const [balloonAnnotations, setBalloonAnnotations] = useState<{[key: string]: any[]}>({});
+  const [balloonAnnotations, setBalloonAnnotations] = useState<{ [key: string]: any[] }>({});
 
   // Memoize drawing files processing to prevent excessive re-renders
   const drawingFiles = useMemo(() => {
     if (!bomItems || bomItems.length === 0) return [];
-    
-    
+
+
     const processedFiles = bomItems.map(item => {
       // Check multiple potential 2D file properties from BOM items API
       const file2D = item.file2dPath || item.file_2d_path || item.drawingFile || item.cadFile2D || item.drawing2DFile;
@@ -358,8 +334,8 @@ export default function BalloonDiagramViewer({
         unitOfMeasure: item.unit || item.unitOfMeasure,
       };
     });
-    
-    
+
+
     return processedFiles;
   }, [bomItems]);
 
@@ -378,7 +354,7 @@ export default function BalloonDiagramViewer({
     tolerances: '±0.1mm (unless otherwise specified)',
     inspectionDate: new Date().toLocaleDateString('en-GB', {
       day: '2-digit',
-      month: '2-digit', 
+      month: '2-digit',
       year: 'numeric'
     }),
     companyName: 'EMUSKI',
@@ -431,17 +407,17 @@ export default function BalloonDiagramViewer({
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-2">
-                      <Button 
-                        variant="default" 
-                        size="sm" 
+                      <Button
+                        variant="default"
+                        size="sm"
                         className="bg-blue-600 hover:bg-blue-700"
                       >
                         <Circle className="h-4 w-4 mr-1" />
                         Annotate PDFs
                       </Button>
-                      
+
                       <div className="w-px h-6 bg-gray-300" />
-                      
+
                       <Button variant="outline" size="sm" onClick={handleZoomOut}>
                         <ZoomOut className="h-4 w-4 mr-1" />
                         Zoom Out
@@ -488,7 +464,7 @@ export default function BalloonDiagramViewer({
                         <div className="space-y-4">
                           {/* Drawing Viewer */}
                           <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                            <div 
+                            <div
                               className="relative overflow-auto max-h-[500px] flex items-center justify-center bg-gray-50"
                               style={{ minHeight: '400px' }}
                             >
@@ -502,9 +478,9 @@ export default function BalloonDiagramViewer({
                                     <div className="flex flex-col items-center justify-center p-8 text-gray-500">
                                       <div className="w-12 h-12 mb-3 text-gray-400">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                          <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
-                                          <circle cx="9" cy="9" r="2"/>
-                                          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                                          <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                                          <circle cx="9" cy="9" r="2" />
+                                          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
                                         </svg>
                                       </div>
                                       <p className="text-sm">Unable to load drawing</p>
@@ -515,7 +491,7 @@ export default function BalloonDiagramViewer({
                                       src={`${process.env.NEXT_PUBLIC_API_URL}/files/download?path=${encodeURIComponent(file.file2D)}`}
                                       alt={`${file.name} - 2D Drawing`}
                                       className="max-w-full h-auto"
-                                      style={{ 
+                                      style={{
                                         transform: `scale(${zoomLevel / 100})`,
                                         transformOrigin: 'center center'
                                       }}
@@ -630,8 +606,8 @@ export default function BalloonDiagramViewer({
                                     <td className="border border-gray-300 p-2">0.1</td>
                                     <td className="border border-gray-300 p-2">-0.1</td>
                                     <td className="border border-gray-300 p-2">
-                                      {check.measurementType === 'measurement' ? 'DVC' : 
-                                       check.measurementType === 'visual' ? 'ASGD' : 'Gauge'}
+                                      {check.measurementType === 'measurement' ? 'DVC' :
+                                        check.measurementType === 'visual' ? 'ASGD' : 'Gauge'}
                                     </td>
                                     <td className="border border-gray-300 p-2 bg-green-50">OK</td>
                                     <td className="border border-gray-300 p-2 bg-green-50">OK</td>
@@ -703,17 +679,17 @@ export default function BalloonDiagramViewer({
                             <div className="relative overflow-auto max-h-[500px] flex items-center justify-center bg-gray-50" style={{ minHeight: '400px' }}>
                               {(item.file2dPath || item.file_2d_path || item.drawingFile || item.cadFile2D || item.drawing2DFile) ? (
                                 (item.file2dPath || item.file_2d_path || item.drawingFile || item.cadFile2D || item.drawing2DFile).toLowerCase().endsWith('.pdf') ? (
-                                  <PDFViewer 
-                                    filePath={item.file2dPath || item.file_2d_path || item.drawingFile || item.cadFile2D || item.drawing2DFile} 
-                                    fileId={item.id} 
-                                    fileName={item.partNumber || item.name} 
+                                  <PDFViewer
+                                    filePath={item.file2dPath || item.file_2d_path || item.drawingFile || item.cadFile2D || item.drawing2DFile}
+                                    fileId={item.id}
+                                    fileName={item.partNumber || item.name}
                                   />
                                 ) : (
                                   <img
                                     src={`${process.env.NEXT_PUBLIC_API_URL}/files/download?path=${encodeURIComponent(item.file2dPath || item.file_2d_path || item.drawingFile || item.cadFile2D || item.drawing2DFile)}`}
                                     alt={`${item.partNumber || item.name} - 2D Drawing`}
                                     className="max-w-full h-auto"
-                                    style={{ 
+                                    style={{
                                       transform: `scale(${zoomLevel / 100})`,
                                       transformOrigin: 'center center'
                                     }}
@@ -819,8 +795,8 @@ export default function BalloonDiagramViewer({
                                     <td className="border border-gray-300 p-2">0.1</td>
                                     <td className="border border-gray-300 p-2">-0.1</td>
                                     <td className="border border-gray-300 p-2">
-                                      {check.measurementType === 'measurement' ? 'DVC' : 
-                                       check.measurementType === 'visual' ? 'ASGD' : 'Gauge'}
+                                      {check.measurementType === 'measurement' ? 'DVC' :
+                                        check.measurementType === 'visual' ? 'ASGD' : 'Gauge'}
                                     </td>
                                     <td className="border border-gray-300 p-2 bg-green-50">OK</td>
                                     <td className="border border-gray-300 p-2 bg-green-50">OK</td>

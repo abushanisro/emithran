@@ -159,7 +159,7 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
         }
       }, 500);
     } catch (error: any) {
-      
+
       let errorMessage = 'Failed to upload files. Please try again.';
       if (error?.message) {
         if (error.message.includes('size')) {
@@ -176,7 +176,7 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
           errorMessage = `File upload failed: ${error.message}`;
         }
       }
-      
+
       toast.error(errorMessage, { duration: 8000 });
     } finally {
       setUploading(false);
@@ -238,7 +238,7 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
         <CardContent>
           <div className="mt-6">
 
-{/* Files Section - Respects Preferred View */}
+            {/* Files Section - Respects Preferred View */}
             {(item.file2dPath || item.file3dPath) && (
               <div className="border-t pt-6">
                 {/* Show based on preferredView, or fallback logic */}
@@ -250,7 +250,7 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
                       </div>
                     )}
 
-{!loading && file3dUrl && (
+                    {!loading && file3dUrl && (
                       <ModelViewer
                         key={file3dUrl}
                         fileUrl={file3dUrl}
@@ -311,13 +311,13 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
                         </p>
                         <div className="border rounded-lg overflow-hidden" style={{ height: '800px' }}>
                           <iframe
-                            src={file2dUrl}
+                            src={`/api/file-proxy?url=${encodeURIComponent(file2dUrl)}`}
                             className="w-full h-full"
                             title="PDF Preview"
-                            sandbox="allow-same-origin"
                           />
                         </div>
                         <Button variant="outline" className="w-full" asChild>
+                          {/* Download uses the original signed URL, not the proxy */}
                           <a href={file2dUrl} download target="_blank" rel="noopener noreferrer">
                             <Download className="h-4 w-4 mr-2" />
                             Download PDF

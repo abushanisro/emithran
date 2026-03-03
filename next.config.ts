@@ -86,25 +86,70 @@ const nextConfig: NextConfig = {
 
   // Enable compression
   compress: true,
-  
+
   // Force rebuild - updated CSP for Railway backend
 
   // Disable x-powered-by header for security
   poweredByHeader: false,
 
   async headers() {
+    // Development: permissive CSP — explicitly covers worker-src because
+    // Chrome does NOT inherit default-src wildcards into worker-src.
+    // @react-three/fiber (Three.js) creates blob: workers for WebGL shader
+    // compilation, which Chrome blocks without an explicit worker-src blob:.
+    const devCSP = [
+      "default-src *",
+      "script-src * 'unsafe-inline' 'unsafe-eval'",
+      "style-src * 'unsafe-inline'",
+      "connect-src *",
+      "font-src *",
+      "img-src * data: blob:",
+      "object-src * data: blob:",
+      "frame-src * data: blob:",
+      "media-src * data: blob:",
+      // Critical: wildcard does NOT cover worker-src in Chrome — must be explicit
+      "worker-src * blob: 'self'",
+      "child-src * blob: 'self'",
+      "base-uri 'self'",
+    ].join('; ');
+
+    // Production: strict CSP — covers all Three.js/R3F/WebGL requirements
+    const prodConnectSrc = [
+      "'self'",
+      "https://*.supabase.co", "wss://*.supabase.co",
+      "https://iuvtsvjpmovfymvnmqys.supabase.co", "wss://iuvtsvjpmovfymvnmqys.supabase.co",
+      "https://vercel.live", "wss://ws-us3.pusher.app",
+      "https://*.railway.app",
+      "https://mithran-production.up.railway.app",
+      "https://mithran-production-dc9d.up.railway.app",
+    ].join(' ');
+
+    const prodCSP = [
+      "default-src 'self'",
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live`,
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      `connect-src ${prodConnectSrc}`,
+      "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
+      "img-src 'self' data: blob: https: https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co",
+      "object-src 'self' blob: data: https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co",
+      "frame-src 'self' https://vercel.live https://*.vercel.live https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co data: blob:",
+      "media-src 'self' blob: data: https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co",
+      // Three.js/R3F WebGL: shader workers are spawned as blob: URLs
+      "worker-src 'self' blob:",
+      "child-src 'self' blob: https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co",
+      "base-uri 'self'",
+    ].join('; ');
+
     return [
       {
         source: '/(.*)',
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: process.env.NODE_ENV === 'development' 
-              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' http://localhost:* https://*.supabase.co wss://*.supabase.co https://emuski.jiobase.com https://*.jiobase.com wss://emuski.jiobase.com wss://*.jiobase.com https://vercel.live wss://ws-us3.pusher.app https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app; font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai; img-src 'self' data: blob: https: http://localhost:*; object-src 'self' blob: data: https://*.supabase.co; frame-src 'self' https://vercel.live https://*.vercel.live https://*.supabase.co https://emuski.jiobase.com https://*.jiobase.com http://localhost:*; base-uri 'self';"
-              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://emuski.jiobase.com https://*.jiobase.com wss://emuski.jiobase.com wss://*.jiobase.com https://vercel.live wss://ws-us3.pusher.app https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app; font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai; img-src 'self' data: blob: https:; object-src 'self' blob: data: https://*.supabase.co; frame-src 'self' https://vercel.live https://*.vercel.live https://*.supabase.co https://emuski.jiobase.com https://*.jiobase.com; base-uri 'self';"
-          }
-        ]
-      }
+            value: process.env.NODE_ENV === 'development' ? devCSP : prodCSP,
+          },
+        ],
+      },
     ];
   },
 }

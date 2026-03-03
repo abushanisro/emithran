@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, FileText, AlertCircle, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -8,10 +8,41 @@ interface Viewer2DProps {
     fileType: 'pdf' | 'img' | 'other';
 }
 
+/**
+ * Build a same-origin proxy URL for a given Supabase signed URL.
+ *
+ * Why: Chrome blocks cross-site iframes that load Supabase signed URLs
+ * (sec-fetch-site: cross-site + sec-fetch-dest: iframe → browser blocks it).
+ *
+ * Fix: Route the PDF through /api/file-proxy so the iframe src is
+ * localhost:3000 (same-origin) and Chrome allows it unconditionally.
+ */
+function toProxyUrl(signedUrl: string): string {
+    return `/api/file-proxy?url=${encodeURIComponent(signedUrl)}`;
+}
+
 export function Viewer2D({ fileUrl, fileName, fileType }: Viewer2DProps) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [zoom, setZoom] = useState(100);
+    // For PDFs we always use the proxy; for images we can use the direct URL
+    // after a quick reachability check.
+    const [resolvedUrl, setResolvedUrl] = useState<string>('');
+
+    useEffect(() => {
+        if (!fileUrl) return;
+
+        if (fileType === 'pdf') {
+            // Always proxy PDFs — avoids cross-site iframe Chrome block
+            setResolvedUrl(toProxyUrl(fileUrl));
+            setError(false);
+        } else {
+            // For images, use the signed URL directly (images are not subject
+            // to the cross-site iframe restriction).
+            setResolvedUrl(fileUrl);
+            setError(false);
+        }
+    }, [fileUrl, fileType]);
 
     const handleLoad = () => {
         setLoading(false);
@@ -69,6 +100,7 @@ export function Viewer2D({ fileUrl, fileName, fileType }: Viewer2DProps) {
                         asChild
                         title="Open in new tab"
                     >
+                        {/* Open the original signed URL in a new tab (not the proxy) */}
                         <a href={fileUrl} target="_blank" rel="noopener noreferrer">
                             <Maximize className="h-3 w-3" />
                         </a>
@@ -77,7 +109,7 @@ export function Viewer2D({ fileUrl, fileName, fileType }: Viewer2DProps) {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 relative overflow-hidden bg-secondary/10 flex items-center justify-center">
+            <div className="flex-1 relative overflow-hidden bg-secondary/10">
                 {loading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -96,17 +128,22 @@ export function Viewer2D({ fileUrl, fileName, fileType }: Viewer2DProps) {
                     <>
                         {fileType === 'pdf' ? (
                             <iframe
-                                src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                                key={resolvedUrl}
+                                src={resolvedUrl ? `${resolvedUrl}#view=FitV&zoom=page-actual&scrollbar=0&toolbar=0&navpanes=0&statusbar=0&messages=0&page=1` : ''}
                                 className="w-full h-full border-0"
-                                sandbox="allow-same-origin"
+                                style={{ overflow: 'hidden', border: 'none', margin: '0', padding: '0' }}
                                 onLoad={handleLoad}
                                 onError={handleError}
                                 title={fileName}
+                                scrolling="no"
+                                frameBorder="0"
+                                marginHeight="0"
+                                marginWidth="0"
                             />
                         ) : fileType === 'img' ? (
                             <div className="overflow-auto w-full h-full flex items-center justify-center p-4">
                                 <img
-                                    src={fileUrl}
+                                    src={resolvedUrl || fileUrl}
                                     alt={fileName}
                                     className="max-w-none transition-transform duration-200"
                                     style={{ transform: `scale(${zoom / 100})` }}
