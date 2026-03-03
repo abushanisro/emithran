@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { evaluate } from 'mathjs';
@@ -297,14 +297,19 @@ export class CalculatorsServiceV2 {
     // STEP 2: Replace fields (if provided)
     let updatedFields = existing.fields || [];
     if (dto.fields !== undefined) {
-      // Delete all existing fields
-      await client.from('calculator_fields').delete().eq('calculator_id', id);
+      // Validate field names are unique
+      const fieldNames = dto.fields.map((f: any) => f.fieldName?.trim()).filter(Boolean);
+      const uniqueNames = new Set(fieldNames);
+      if (fieldNames.length !== uniqueNames.size) {
+        const duplicates = fieldNames.filter((name, index) => fieldNames.indexOf(name) !== index);
+        throw new BadRequestException(`Duplicate field names detected: ${duplicates.join(', ')}`);
+      }
 
-      // Insert new fields
+      // Use RPC for atomic delete+insert to prevent constraint violations
       if (dto.fields.length > 0) {
         const fieldsToInsert = dto.fields.map((field: any, index: any) => ({
           calculator_id: id,
-          field_name: field.fieldName,
+          field_name: field.fieldName?.trim(),
           display_label: field.displayLabel,
           field_type: field.fieldType,
           data_source: field.dataSource,
@@ -323,9 +328,10 @@ export class CalculatorsServiceV2 {
         }));
 
         const { data: fields, error: fieldsError } = await client
-          .from('calculator_fields')
-          .insert(fieldsToInsert)
-          .select();
+          .rpc('replace_calculator_fields', {
+            p_calculator_id: id,
+            p_fields: fieldsToInsert
+          });
 
         if (fieldsError) {
           this.logger.error(`Failed to update fields: ${fieldsError.message}`, 'CalculatorsServiceV2');
@@ -333,20 +339,21 @@ export class CalculatorsServiceV2 {
         }
 
         updatedFields = fields || [];
+      } else {
+        // Just delete all fields if empty array provided
+        await client.from('calculator_fields').delete().eq('calculator_id', id);
+        updatedFields = [];
       }
     }
 
     // STEP 3: Replace formulas (if provided)
     let updatedFormulas = existing.formulas || [];
     if (dto.formulas !== undefined) {
-      // Delete all existing formulas
-      await client.from('calculator_formulas').delete().eq('calculator_id', id);
-
-      // Insert new formulas
+      // Use RPC for atomic delete+insert to prevent constraint violations
       if (dto.formulas.length > 0) {
         const formulasToInsert = dto.formulas.map((formula: any, index: any) => ({
           calculator_id: id,
-          formula_name: formula.formulaName,
+          formula_name: formula.formulaName?.trim(),
           display_label: formula.displayLabel,
           description: formula.description,
           formula_type: formula.formulaType || 'expression',
@@ -364,9 +371,10 @@ export class CalculatorsServiceV2 {
         }));
 
         const { data: formulas, error: formulasError } = await client
-          .from('calculator_formulas')
-          .insert(formulasToInsert)
-          .select();
+          .rpc('replace_calculator_formulas', {
+            p_calculator_id: id,
+            p_formulas: formulasToInsert
+          });
 
         if (formulasError) {
           this.logger.error(`Failed to update formulas: ${formulasError.message}`, 'CalculatorsServiceV2');
@@ -374,6 +382,10 @@ export class CalculatorsServiceV2 {
         }
 
         updatedFormulas = formulas || [];
+      } else {
+        // Just delete all formulas if empty array provided
+        await client.from('calculator_formulas').delete().eq('calculator_id', id);
+        updatedFormulas = [];
       }
     }
 

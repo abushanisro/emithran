@@ -70,6 +70,7 @@ export default function CreateDeliveryOrderDialog({
   const [searchTerm, setSearchTerm] = useState('');
 
   // Form state
+  const [deliveryMode, setDeliveryMode] = useState<string>('');
   const [formData, setFormData] = useState({
     priority: 'standard' as 'low' | 'standard' | 'high' | 'urgent',
     requestedDeliveryDate: '',
@@ -95,10 +96,59 @@ export default function CreateDeliveryOrderDialog({
   const { data: addresses = [], isLoading: addressesLoading, error: addressesError } = useDeliveryAddresses(projectId);
   const { data: carriers = [], isLoading: carriersLoading, error: carriersError } = useCarriers();
 
+  // Delivery modes configuration
+  const deliveryModes = [
+    {
+      value: 'express',
+      label: 'Express Delivery',
+      description: 'Next day delivery',
+      carriers: ['fedex', 'dhl', 'ups', 'blue_dart']
+    },
+    {
+      value: 'standard',
+      label: 'Standard Delivery',
+      description: '3-5 business days',
+      carriers: ['fedex', 'dhl', 'ups', 'india_post', 'dtdc', 'blue_dart']
+    },
+    {
+      value: 'economy',
+      label: 'Economy Delivery',
+      description: '5-7 business days',
+      carriers: ['india_post', 'dtdc', 'professional_couriers']
+    },
+    {
+      value: 'freight',
+      label: 'Freight/Heavy',
+      description: 'Large shipments',
+      carriers: ['logistics_plus', 'cargo_express', 'transport_corp']
+    }
+  ];
+
+  // Filter carriers based on selected delivery mode
+  const getAvailableCarriers = () => {
+    if (!deliveryMode) return [];
+    
+    const selectedMode = deliveryModes.find(mode => mode.value === deliveryMode);
+    if (!selectedMode) return [];
+    
+    return carriers.filter(carrier => 
+      selectedMode.carriers.includes(carrier.code?.toLowerCase()) || 
+      selectedMode.carriers.includes(carrier.name.toLowerCase().replace(/\s+/g, '_'))
+    );
+  };
+
+  // Handle delivery mode change
+  const handleDeliveryModeChange = (newMode: string) => {
+    setDeliveryMode(newMode);
+    // Reset carrier when mode changes
+    setFormData({ ...formData, carrierId: '' });
+  };
+
   const resetForm = () => {
     setStep(1);
     setSelectedItems([]);
     setSearchTerm('');
+    setDeliveryMode('');
     setFormData({
       priority: 'standard',
       requestedDeliveryDate: '',
@@ -582,25 +632,84 @@ export default function CreateDeliveryOrderDialog({
               </div>
 
               <div>
-                <Label htmlFor="carrier">Preferred Carrier</Label>
-                <Select value={formData.carrierId} onValueChange={(value) => setFormData({ ...formData, carrierId: value })}>
+                <Label htmlFor="deliveryMode">Delivery Mode *</Label>
+                <Select value={deliveryMode} onValueChange={handleDeliveryModeChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder={carriersLoading ? "Loading carriers..." : "Select carrier"} />
+                    <SelectValue placeholder="Select delivery mode" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[100]">
+                    {deliveryModes.map((mode) => (
+                      <SelectItem key={mode.value} value={mode.value}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{mode.label}</span>
+                          <span className="text-xs text-muted-foreground">{mode.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Carrier & Handling Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="carrier">Preferred Carrier</Label>
+                <Select 
+                  value={formData.carrierId} 
+                  onValueChange={(value) => setFormData({ ...formData, carrierId: value })}
+                  disabled={!deliveryMode}
+                >
+                  <SelectTrigger>
+                    <SelectValue 
+                      placeholder={
+                        !deliveryMode 
+                          ? "Select delivery mode first" 
+                          : carriersLoading 
+                            ? "Loading carriers..." 
+                            : "Select carrier (optional)"
+                      } 
+                    />
                   </SelectTrigger>
                   <SelectContent className="z-[100]">
                     {carriersError ? (
                       <SelectItem value="error" disabled>Error loading carriers</SelectItem>
-                    ) : carriers.length === 0 ? (
-                      <SelectItem value="empty" disabled>No carriers available</SelectItem>
+                    ) : getAvailableCarriers().length === 0 ? (
+                      <SelectItem value="empty" disabled>
+                        {deliveryMode ? "No carriers available for this mode" : "Select delivery mode first"}
+                      </SelectItem>
                     ) : (
-                      carriers.map((carrier) => (
+                      getAvailableCarriers().map((carrier) => (
                         <SelectItem key={carrier.id} value={carrier.id}>
-                          {carrier.name}
+                          <div className="flex flex-col">
+                            <span className="font-medium">{carrier.name}</span>
+                            {carrier.code && (
+                              <span className="text-xs text-muted-foreground">Code: {carrier.code}</span>
+                            )}
+                          </div>
                         </SelectItem>
                       ))
                     )}
                   </SelectContent>
                 </Select>
+                {deliveryMode && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Available for {deliveryModes.find(m => m.value === deliveryMode)?.label}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="specialHandling">Special Handling</Label>
+                <Input 
+                  id="specialHandling" 
+                  placeholder="Fragile, temperature controlled, etc." 
+                  value={formData.specialHandlingRequirements || ''}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    specialHandlingRequirements: e.target.value 
+                  })}
+                />
               </div>
             </div>
           </div>
@@ -685,18 +794,51 @@ export default function CreateDeliveryOrderDialog({
                 </div>
 
                 <div>
-                  <Label htmlFor="carrier">Preferred Carrier</Label>
-                  <Select value={formData.carrierId} onValueChange={(value) => setFormData({ ...formData, carrierId: value })}>
+                  <Label htmlFor="deliveryMode">Delivery Mode *</Label>
+                  <Select value={deliveryMode} onValueChange={handleDeliveryModeChange}>
                     <SelectTrigger>
-                      <SelectValue placeholder={carriersLoading ? "Loading carriers..." : "Select carrier"} />
+                      <SelectValue placeholder="Select delivery mode" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[100]">
+                      {deliveryModes.map((mode) => (
+                        <SelectItem key={mode.value} value={mode.value}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{mode.label}</span>
+                            <span className="text-xs text-muted-foreground">{mode.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="carrier">Preferred Carrier</Label>
+                  <Select 
+                    value={formData.carrierId} 
+                    onValueChange={(value) => setFormData({ ...formData, carrierId: value })}
+                    disabled={!deliveryMode}
+                  >
+                    <SelectTrigger>
+                      <SelectValue 
+                        placeholder={
+                          !deliveryMode 
+                            ? "Select delivery mode first" 
+                            : carriersLoading 
+                              ? "Loading carriers..." 
+                              : "Select carrier (optional)"
+                        } 
+                      />
                     </SelectTrigger>
                     <SelectContent className="z-[100]">
                       {carriersError ? (
                         <SelectItem value="error" disabled>Error loading carriers</SelectItem>
-                      ) : carriers.length === 0 ? (
-                        <SelectItem value="empty" disabled>No carriers available</SelectItem>
+                      ) : getAvailableCarriers().length === 0 ? (
+                        <SelectItem value="empty" disabled>
+                          {deliveryMode ? "No carriers available for this mode" : "Select delivery mode first"}
+                        </SelectItem>
                       ) : (
-                        carriers.map((carrier) => (
+                        getAvailableCarriers().map((carrier) => (
                           <SelectItem key={carrier.id} value={carrier.id}>
                             {carrier.name}
                           </SelectItem>
@@ -948,11 +1090,19 @@ export default function CreateDeliveryOrderDialog({
                         'Address not found'}
                     </p>
                   </div>
+                  {deliveryMode && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Delivery Mode:</span>
+                      <p className="font-medium">
+                        {deliveryModes.find(m => m.value === deliveryMode)?.label || 'Not selected'}
+                      </p>
+                    </div>
+                  )}
                   {formData.carrierId && (
                     <div>
                       <span className="text-sm text-muted-foreground">Carrier:</span>
                       <p className="font-medium">
-                        {carriers.find(c => c.id === formData.carrierId)?.name || 'Carrier not found'}
+                        {getAvailableCarriers().find(c => c.id === formData.carrierId)?.name || 'Carrier not found'}
                       </p>
                     </div>
                   )}

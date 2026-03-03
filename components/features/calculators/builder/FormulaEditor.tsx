@@ -17,7 +17,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from '@/components/ui/command';
+import { AlertCircle, CheckCircle2, Info, Search, Plus } from 'lucide-react';
 import { validateFormula, getAutocompleteSuggestions } from '@/lib/formula/validator';
 import { FORMULA_FUNCTIONS } from '@/lib/formula/functions';
 import { cn } from '@/lib/utils';
