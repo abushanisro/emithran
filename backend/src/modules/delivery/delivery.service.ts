@@ -1,8 +1,8 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { SupabaseService } from '@/common/supabase/supabase.service';
-import { 
-  CreateDeliveryOrderDto, 
-  UpdateDeliveryOrderDto, 
+import {
+  CreateDeliveryOrderDto,
+  UpdateDeliveryOrderDto,
   DeliveryOrderQueryDto,
   DeliveryOrderResponseDto,
   CreateDeliveryAddressDto,
@@ -17,7 +17,7 @@ export class DeliveryService {
 
   constructor(
     private readonly supabase: SupabaseService
-  ) {}
+  ) { }
 
   /**
    * Get available quality-approved items for delivery by project
@@ -26,26 +26,35 @@ export class DeliveryService {
   async getAvailableItemsForDelivery(projectId: string, userId: string): Promise<QualityApprovedItemDto[]> {
     try {
       this.logger.debug(`Fetching available items for delivery - Project: ${projectId}, User: ${userId}`);
-      
-      // Query quality approved items that are not already in delivery orders
-      // First get all already used quality approved item IDs - handle missing table gracefully
+
+      // Query quality approved items that are not already in active delivery orders
+      // Only exclude items that are in non-delivered/non-cancelled orders
       let usedItemIds: string[] = [];
       try {
         const { data: usedItems, error: usedError } = await this.supabase.client
           .from('delivery_items')
-          .select('quality_approved_item_id')
-          .not('quality_approved_item_id', 'is', null);
+          .select(`
+            quality_approved_item_id,
+            delivery_orders!inner (
+              id,
+              status
+            )
+          `)
+          .not('quality_approved_item_id', 'is', null)
+          .not('delivery_orders.status', 'in', '("delivered","cancelled")');
 
         if (usedError) {
           this.logger.error(`Database error fetching used items: ${usedError.message}`, usedError);
-          throw new BadRequestException('Failed to retrieve used items');
+          // For demo purposes, continue without filtering
+          this.logger.warn('Continuing without filtering used items for demo purposes');
+          usedItemIds = [];
+        } else {
+          usedItemIds = (usedItems || []).map(item => item.quality_approved_item_id);
+          this.logger.log(`Found ${usedItemIds.length} items in active delivery orders`);
         }
-
-        usedItemIds = (usedItems || []).map(item => item.quality_approved_item_id);
-        this.logger.log(`Found ${usedItemIds.length} already used items`);
       } catch (error: any) {
-        this.logger.warn(`Could not fetch used items (delivery_items table may not exist): ${error.message}`);
-        this.logger.warn('Proceeding with empty used items list. Please run migration 205_fix_delivery_schema.sql');
+        this.logger.warn(`Could not fetch used items (table may not exist): ${error.message}`);
+        this.logger.warn('Proceeding with empty used items list - all approved items will be available');
         usedItemIds = [];
       }
 
@@ -134,7 +143,7 @@ export class DeliveryService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error fetching available items: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to retrieve available items for delivery');
     }
@@ -147,63 +156,109 @@ export class DeliveryService {
     try {
       this.logger.log(`Creating delivery order for project ${createDeliveryOrderDto.projectId} by user ${userId}`);
 
-      // Start transaction
-      const { data: orderData, error: transactionError } = await this.supabase.client.rpc('create_delivery_order_transaction', {
-        order_data: {
+      // ── Step 1: Generate a unique order number ─────────────────────────────
+      const orderNumber = `DO-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      // ── Step 2: Insert the delivery order row ──────────────────────────────
+      const { data: createdOrder, error: orderError } = await this.supabase.client
+        .from('delivery_orders')
+        .insert({
+          order_number: orderNumber,
           project_id: createDeliveryOrderDto.projectId,
-          inspection_id: createDeliveryOrderDto.inspectionId,
+          inspection_id: createDeliveryOrderDto.inspectionId || null,
           delivery_address_id: createDeliveryOrderDto.deliveryAddressId,
-          billing_address_id: createDeliveryOrderDto.billingAddressId,
-          carrier_id: createDeliveryOrderDto.carrierId,
+          billing_address_id: createDeliveryOrderDto.billingAddressId || null,
+          carrier_id: createDeliveryOrderDto.carrierId || null,
+          status: 'draft',
           priority: createDeliveryOrderDto.priority || 'standard',
-          requested_delivery_date: createDeliveryOrderDto.requestedDeliveryDate,
-          delivery_window_start: createDeliveryOrderDto.deliveryWindowStart,
-          delivery_window_end: createDeliveryOrderDto.deliveryWindowEnd,
+          requested_delivery_date: createDeliveryOrderDto.requestedDeliveryDate || null,
+          estimated_delivery_date: createDeliveryOrderDto.estimatedDeliveryDate || null,
+          delivery_window_start: createDeliveryOrderDto.deliveryWindowStart || null,
+          delivery_window_end: createDeliveryOrderDto.deliveryWindowEnd || null,
           package_count: createDeliveryOrderDto.packageCount || 1,
-          special_handling_requirements: createDeliveryOrderDto.specialHandlingRequirements,
-          delivery_instructions: createDeliveryOrderDto.deliveryInstructions,
+          special_handling_requirements: createDeliveryOrderDto.specialHandlingRequirements || null,
+          delivery_instructions: createDeliveryOrderDto.deliveryInstructions || null,
           delivery_cost_inr: createDeliveryOrderDto.deliveryCostInr || 0,
           insurance_cost_inr: createDeliveryOrderDto.insuranceCostInr || 0,
           handling_cost_inr: createDeliveryOrderDto.handlingCostInr || 0,
-          notes: createDeliveryOrderDto.notes,
-          created_by: userId
-        },
-        items_data: createDeliveryOrderDto.items.map(item => ({
-          quality_approved_item_id: item.qualityApprovedItemId,
-          bom_item_id: item.bomItemId,
-          approved_quantity: item.approvedQuantity,
-          delivery_quantity: item.deliveryQuantity,
-          unit_weight_kg: item.unitWeightKg,
-          unit_dimensions_cm: item.unitDimensionsCm,
-          packaging_type: item.packagingType,
-          packaging_instructions: item.packagingInstructions,
-          hazmat_classification: item.hazmatClassification,
-          qc_certificate_number: item.qcCertificateNumber,
-          batch_number: item.batchNumber,
-          serial_numbers: item.serialNumbers,
-          unit_value_inr: item.unitValueInr
-        }))
-      });
+          total_delivery_cost_inr: createDeliveryOrderDto.totalDeliveryCostInr || 0,
+          // Route and transport data
+          transport_mode: createDeliveryOrderDto.transportMode || null,
+          material_type: createDeliveryOrderDto.materialType || null,
+          route_type: createDeliveryOrderDto.routeType || null,
+          route_distance_km: createDeliveryOrderDto.routeDistanceKm || null,
+          route_travel_time_minutes: createDeliveryOrderDto.routeTravelTimeMinutes || null,
+          route_data: createDeliveryOrderDto.routeData || null,
+          // Cost breakdown
+          transport_cost_inr: createDeliveryOrderDto.transportCostInr || null,
+          loading_cost_inr: createDeliveryOrderDto.loadingCostInr || null,
+          fuel_toll_cost_inr: createDeliveryOrderDto.fuelTollCostInr || null,
+          cost_breakdown: createDeliveryOrderDto.costBreakdown || null,
+          // Documentation and quality
+          parts_photos: createDeliveryOrderDto.partsPhotos || null,
+          packing_photos: createDeliveryOrderDto.packingPhotos || null,
+          documents: createDeliveryOrderDto.documents || null,
+          dock_audit: createDeliveryOrderDto.dockAudit || null,
+          checked_by: createDeliveryOrderDto.checkedBy || null,
+          checked_at: createDeliveryOrderDto.checkedBy ? new Date().toISOString() : null,
+          notes: createDeliveryOrderDto.notes || null,
+          created_by: userId,
+        })
+        .select('id, order_number')
+        .single();
 
-      if (transactionError) {
-        this.logger.error(`Transaction error creating delivery order: ${transactionError.message}`, transactionError);
-        throw new BadRequestException(transactionError.message || 'Failed to create delivery order');
+      if (orderError || !createdOrder) {
+        this.logger.error(`Error inserting delivery order: ${orderError?.message}`, orderError);
+        throw new BadRequestException(orderError?.message || 'Failed to create delivery order');
       }
 
-      this.logger.log(`Delivery order created successfully: ${orderData.order_number}`);
-      
-      // Return the created order with full details
-      return await this.getDeliveryOrderById(orderData.id, userId);
+      this.logger.log(`Delivery order row created: ${createdOrder.order_number} (${createdOrder.id})`);
+
+      // ── Step 3: Insert delivery items ──────────────────────────────────────
+      const itemRows = createDeliveryOrderDto.items.map(item => ({
+        delivery_order_id: createdOrder.id,
+        quality_approved_item_id: item.qualityApprovedItemId,
+        bom_item_id: item.bomItemId,
+        approved_quantity: item.approvedQuantity,
+        delivery_quantity: item.deliveryQuantity,
+        requested_quantity: item.deliveryQuantity, // Use deliveryQuantity as the requested quantity
+        unit_weight_kg: item.unitWeightKg || null,
+        unit_dimensions_cm: item.unitDimensionsCm || null,
+        packaging_type: item.packagingType || null,
+        packaging_instructions: item.packagingInstructions || null,
+        hazmat_classification: item.hazmatClassification || null,
+        qc_certificate_number: item.qcCertificateNumber || null,
+        batch_number: item.batchNumber || null,
+        serial_numbers: item.serialNumbers || null,
+        unit_value_inr: item.unitValueInr || null,
+      }));
+
+      const { error: itemsError } = await this.supabase.client
+        .from('delivery_items')
+        .insert(itemRows);
+
+      if (itemsError) {
+        // Compensating delete – keep the DB clean if items insert fails
+        this.logger.error(`Error inserting delivery items, rolling back order: ${itemsError.message}`, itemsError);
+        await this.supabase.client.from('delivery_orders').delete().eq('id', createdOrder.id);
+        throw new BadRequestException(itemsError.message || 'Failed to create delivery items');
+      }
+
+      this.logger.log(`Delivery order created successfully: ${createdOrder.order_number}`);
+
+      // ── Step 4: Return full order details ──────────────────────────────────
+      return await this.getDeliveryOrderById(createdOrder.id, userId);
 
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error creating delivery order: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to create delivery order');
     }
   }
+
 
   /**
    * Get delivery order by ID with comprehensive details
@@ -216,7 +271,7 @@ export class DeliveryService {
         .from('delivery_orders')
         .select(`
           *,
-          delivery_addresses!fk_delivery_orders_delivery_address (
+          delivery_addresses!delivery_orders_delivery_address_id_fkey (
             id,
             company_name,
             contact_person,
@@ -259,7 +314,7 @@ export class DeliveryService {
             part_number,
             description,
             material,
-            unit_of_measure,
+            unit,
             unit_cost_inr
           ),
           quality_approved_items (
@@ -298,7 +353,7 @@ export class DeliveryService {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error fetching delivery order: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to retrieve delivery order');
     }
@@ -307,21 +362,22 @@ export class DeliveryService {
   /**
    * Get delivery orders with advanced filtering and pagination
    */
-  async getDeliveryOrders(queryDto: DeliveryOrderQueryDto, userId: string): Promise<{ 
-    data: DeliveryOrderResponseDto[], 
-    total: number, 
-    page: number, 
-    limit: number 
+  async getDeliveryOrders(queryDto: DeliveryOrderQueryDto, userId: string): Promise<{
+    data: DeliveryOrderResponseDto[],
+    total: number,
+    page: number,
+    limit: number
   }> {
     try {
       this.logger.debug(`Fetching delivery orders with filters: ${JSON.stringify(queryDto)}`);
 
-      // Build query with filters
+      // Build query with filters and related data - specify exact relationships
       let query = this.supabase.client
         .from('delivery_orders')
         .select(`
           *,
-          delivery_addresses!fk_delivery_orders_delivery_address (
+          delivery_addresses!delivery_orders_delivery_address_id_fkey (
+            id,
             company_name,
             contact_person,
             city,
@@ -335,6 +391,15 @@ export class DeliveryService {
           projects (
             id,
             name
+          ),
+          delivery_items!delivery_items_delivery_order_id_fkey (
+            id,
+            bom_item_id,
+            delivery_quantity,
+            bom_items (
+              part_number,
+              description
+            )
           )
         `, { count: 'exact' });
 
@@ -377,13 +442,23 @@ export class DeliveryService {
         query = query.or(
           `order_number.ilike.%${queryDto.search}%,` +
           `tracking_number.ilike.%${queryDto.search}%,` +
-          `delivery_addresses!fk_delivery_orders_delivery_address.company_name.ilike.%${queryDto.search}%,` +
+          `delivery_addresses!delivery_orders_delivery_address_id_fkey.company_name.ilike.%${queryDto.search}%,` +
           `notes.ilike.%${queryDto.search}%`
         );
       }
 
-      // Apply sorting
-      const sortBy = queryDto.sortBy || 'created_at';
+      // Apply sorting with column name mapping
+      const columnMapping: Record<string, string> = {
+        'createdAt': 'created_at',
+        'updatedAt': 'updated_at',
+        'orderNumber': 'order_number',
+        'requestedDeliveryDate': 'requested_delivery_date',
+        'estimatedDeliveryDate': 'estimated_delivery_date',
+        'actualDeliveryDate': 'actual_delivery_date'
+      };
+      
+      const requestedSortBy = queryDto.sortBy || 'created_at';
+      const sortBy = columnMapping[requestedSortBy] || requestedSortBy;
       const sortOrder = queryDto.sortOrder === 'asc' ? true : false;
       query = query.order(sortBy, { ascending: sortOrder });
 
@@ -391,7 +466,7 @@ export class DeliveryService {
       const page = Math.max(1, queryDto.page || 1);
       const limit = Math.min(100, Math.max(1, queryDto.limit || 20));
       const offset = (page - 1) * limit;
-      
+
       query = query.range(offset, offset + limit - 1);
 
       const { data: deliveryOrders, error, count } = await query;
@@ -402,9 +477,35 @@ export class DeliveryService {
       }
 
       const total = count || 0;
+      this.logger.debug(`Delivery orders query result: ${deliveryOrders?.length || 0} orders found, total count: ${total}`);
+      
+      // Debug: Log the first few orders if found
+      if (deliveryOrders && deliveryOrders.length > 0) {
+        this.logger.debug(`Sample delivery orders:`, deliveryOrders.slice(0, 2).map(order => ({
+          id: order.id,
+          order_number: order.order_number,
+          status: order.status,
+          project_id: order.project_id,
+          created_at: order.created_at
+        })));
+      } else {
+        // Try a simple query to see if ANY delivery orders exist
+        const { data: allOrders, error: allError } = await this.supabase.client
+          .from('delivery_orders')
+          .select('id, order_number, project_id, status, created_at')
+          .limit(5);
+        
+        if (!allError && allOrders) {
+          this.logger.debug(`Debug: Found ${allOrders.length} total delivery orders in system:`, allOrders);
+        } else {
+          this.logger.error(`Debug: Could not query delivery_orders table:`, allError);
+        }
+      }
 
       // Transform to response format (simplified for list view)
       const data = (deliveryOrders || []).map(order => this.transformToSimplifiedDeliveryOrderResponse(order)) as DeliveryOrderResponseDto[];
+      
+      this.logger.debug(`Transformed delivery orders data:`, data.slice(0, 2));
 
       return {
         data,
@@ -417,7 +518,7 @@ export class DeliveryService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error fetching delivery orders: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to retrieve delivery orders');
     }
@@ -432,7 +533,7 @@ export class DeliveryService {
 
       // First check if order exists and user has permission
       const existingOrder = await this.getDeliveryOrderById(id, userId);
-      
+
       // Prevent updates to delivered or cancelled orders unless it's status change
       if (['delivered', 'cancelled'].includes(existingOrder.status) && updateDto.status !== 'cancelled') {
         throw new ForbiddenException('Cannot update delivered or cancelled orders');
@@ -446,11 +547,11 @@ export class DeliveryService {
       };
 
       // Calculate total cost if individual costs are updated
-      if (updateDto.deliveryCostInr !== undefined || 
-          updateDto.insuranceCostInr !== undefined || 
-          updateDto.handlingCostInr !== undefined) {
-        
-        (updateData as any).total_delivery_cost_inr = 
+      if (updateDto.deliveryCostInr !== undefined ||
+        updateDto.insuranceCostInr !== undefined ||
+        updateDto.handlingCostInr !== undefined) {
+
+        (updateData as any).total_delivery_cost_inr =
           (updateDto.deliveryCostInr ?? (existingOrder.totalDeliveryCostInr || 0)) +
           (updateDto.insuranceCostInr ?? 0) +
           (updateDto.handlingCostInr ?? 0);
@@ -481,7 +582,7 @@ export class DeliveryService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error updating delivery order: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to update delivery order');
     }
@@ -528,9 +629,58 @@ export class DeliveryService {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error adding tracking event: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to add tracking event');
+    }
+  }
+
+  /**
+   * Delete a delivery order (only draft orders can be deleted)
+   */
+  async deleteDeliveryOrder(id: string, userId: string): Promise<void> {
+    try {
+      this.logger.debug(`Deleting delivery order ${id} for user ${userId}`);
+
+      // First, get the order to check its status
+      const existingOrder = await this.getDeliveryOrderById(id, userId);
+
+      // Only allow deletion of draft orders
+      if (existingOrder.status !== 'draft') {
+        throw new ForbiddenException('Only draft orders can be deleted. Cancel the order instead.');
+      }
+
+      // Delete delivery items first (foreign key constraint)
+      const { error: itemsDeleteError } = await this.supabase.client
+        .from('delivery_items')
+        .delete()
+        .eq('delivery_order_id', id);
+
+      if (itemsDeleteError) {
+        this.logger.error(`Error deleting delivery items: ${itemsDeleteError.message}`, itemsDeleteError);
+        throw new BadRequestException('Failed to delete delivery items');
+      }
+
+      // Delete the delivery order
+      const { error: orderDeleteError } = await this.supabase.client
+        .from('delivery_orders')
+        .delete()
+        .eq('id', id);
+
+      if (orderDeleteError) {
+        this.logger.error(`Error deleting delivery order: ${orderDeleteError.message}`, orderDeleteError);
+        throw new BadRequestException('Failed to delete delivery order');
+      }
+
+      this.logger.log(`Delivery order ${existingOrder.orderNumber} deleted successfully`);
+
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+        throw error;
+      }
+
+      this.logger.error(`Unexpected error deleting delivery order: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to delete delivery order');
     }
   }
 
@@ -576,18 +726,18 @@ export class DeliveryService {
       // Calculate metrics
       const totalDeliveries = deliveryData?.length || 0;
       const deliveredCount = deliveryData?.filter(d => d.status === 'delivered').length || 0;
-      const onTimeDeliveries = deliveryData?.filter(d => 
-        d.status === 'delivered' && 
-        d.actual_delivery_date && 
+      const onTimeDeliveries = deliveryData?.filter(d =>
+        d.status === 'delivered' &&
+        d.actual_delivery_date &&
         d.requested_delivery_date &&
         new Date(d.actual_delivery_date) <= new Date(d.requested_delivery_date)
       ).length || 0;
 
-      const avgDeliveryCost = deliveryData?.length > 0 
+      const avgDeliveryCost = deliveryData?.length > 0
         ? deliveryData.reduce((sum, d) => sum + (d.total_delivery_cost_inr || 0), 0) / deliveryData.length
         : 0;
 
-      const avgDelayDays = deliveryData?.filter(d => 
+      const avgDelayDays = deliveryData?.filter(d =>
         d.status === 'delivered' && d.actual_delivery_date && d.requested_delivery_date
       ).reduce((sum, d, _, arr) => {
         const delay = Math.ceil((new Date(d.actual_delivery_date).getTime() - new Date(d.requested_delivery_date).getTime()) / (1000 * 60 * 60 * 24));
@@ -610,7 +760,7 @@ export class DeliveryService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error fetching delivery metrics: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to retrieve delivery metrics');
     }
@@ -663,7 +813,7 @@ export class DeliveryService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error creating delivery address: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to create delivery address');
     }
@@ -693,9 +843,48 @@ export class DeliveryService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error fetching delivery addresses: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to retrieve delivery addresses');
+    }
+  }
+
+  /**
+   * Delete a delivery address by ID
+   */
+  async deleteDeliveryAddress(addressId: string, userId: string): Promise<void> {
+    try {
+      this.logger.log(`Deleting delivery address ${addressId} by user ${userId}`);
+
+      // First check it exists
+      const { data: existing, error: fetchError } = await this.supabase.client
+        .from('delivery_addresses')
+        .select('id')
+        .eq('id', addressId)
+        .single();
+
+      if (fetchError || !existing) {
+        throw new NotFoundException(`Delivery address ${addressId} not found`);
+      }
+
+      const { error } = await this.supabase.client
+        .from('delivery_addresses')
+        .delete()
+        .eq('id', addressId);
+
+      if (error) {
+        this.logger.error(`Error deleting delivery address: ${error.message}`, error);
+        throw new BadRequestException('Failed to delete delivery address');
+      }
+
+      this.logger.log(`Delivery address ${addressId} deleted successfully`);
+
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Unexpected error deleting delivery address: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to delete delivery address');
     }
   }
 
@@ -732,11 +921,11 @@ export class DeliveryService {
 
       // Update order status to cancelled
       const updatedOrder = await this.updateDeliveryOrder(
-        id, 
-        { 
+        id,
+        {
           status: 'cancelled' as DeliveryStatus,
           notes: `Cancelled: ${reason}`
-        }, 
+        },
         userId
       );
 
@@ -755,7 +944,7 @@ export class DeliveryService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
         throw error;
       }
-      
+
       this.logger.error(`Unexpected error cancelling delivery order: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to cancel delivery order');
     }
@@ -818,7 +1007,7 @@ export class DeliveryService {
         partNumber: item.bom_items?.part_number,
         description: item.bom_items?.description,
         material: item.bom_items?.material,
-        unitOfMeasure: item.bom_items?.unit_of_measure,
+        unitOfMeasure: item.bom_items?.unit,
         approvedQuantity: item.approved_quantity,
         deliveryQuantity: item.delivery_quantity,
         unitWeightKg: item.unit_weight_kg,
@@ -853,16 +1042,38 @@ export class DeliveryService {
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       approvedBy: order.approved_by,
-      approvedAt: order.approved_at
+      approvedAt: order.approved_at,
+      // Route and transport data
+      transportMode: order.transport_mode,
+      materialType: order.material_type,
+      routeType: order.route_type,
+      routeDistanceKm: order.route_distance_km,
+      routeTravelTimeMinutes: order.route_travel_time_minutes,
+      routeData: order.route_data,
+      // Cost breakdown
+      transportCostInr: order.transport_cost_inr,
+      loadingCostInr: order.loading_cost_inr,
+      fuelTollCostInr: order.fuel_toll_cost_inr,
+      costBreakdown: order.cost_breakdown,
+      // Documentation and quality
+      partsPhotos: order.parts_photos,
+      packingPhotos: order.packing_photos,
+      documents: order.documents,
+      dockAudit: order.dock_audit,
+      checkedBy: order.checked_by,
+      checkedAt: order.checked_at
     };
   }
 
   private transformToSimplifiedDeliveryOrderResponse(order: any): Partial<DeliveryOrderResponseDto> {
+    const itemsCount = order.delivery_items?.length || 0;
+    const totalQuantity = order.delivery_items?.reduce((sum: number, item: any) => sum + (item.delivery_quantity || 0), 0) || 0;
+    
     return {
       id: order.id,
       orderNumber: order.order_number,
       projectId: order.project_id,
-      projectName: order.projects?.name,
+      projectName: order.projects?.name || 'Unknown Project',
       status: order.status,
       priority: order.priority,
       requestedDeliveryDate: order.requested_delivery_date,
@@ -872,6 +1083,7 @@ export class DeliveryService {
       totalDeliveryCostInr: order.total_delivery_cost_inr,
       trackingNumber: order.tracking_number,
       deliveryAddress: order.delivery_addresses ? {
+        id: order.delivery_addresses.id,
         companyName: order.delivery_addresses.company_name,
         contactPerson: order.delivery_addresses.contact_person,
         city: order.delivery_addresses.city,
@@ -882,15 +1094,24 @@ export class DeliveryService {
         name: order.carriers.name,
         code: order.carriers.code
       } : null,
+      items: order.delivery_items?.map((item: any) => ({
+        id: item.id,
+        bomItemId: item.bom_item_id,
+        deliveryQuantity: item.delivery_quantity,
+        partNumber: item.bom_items?.part_number,
+        description: item.bom_items?.description
+      })) || [],
+      itemsCount: itemsCount,
+      totalQuantity: totalQuantity,
       createdAt: order.created_at,
       updatedAt: order.updated_at
     };
   }
 
   private async createTrackingEventsForUpdate(
-    orderId: string, 
-    existingOrder: DeliveryOrderResponseDto, 
-    updateDto: UpdateDeliveryOrderDto, 
+    orderId: string,
+    existingOrder: DeliveryOrderResponseDto,
+    updateDto: UpdateDeliveryOrderDto,
     userId: string
   ): Promise<void> {
     const trackingEvents = [];
@@ -935,9 +1156,9 @@ export class DeliveryService {
   }
 
   private async updateOrderStatusFromTracking(
-    orderId: string, 
-    eventType: string, 
-    eventTimestamp: string, 
+    orderId: string,
+    eventType: string,
+    eventTimestamp: string,
     userId: string
   ): Promise<void> {
     const statusMapping: Record<string, DeliveryStatus> = {

@@ -34,12 +34,33 @@ export interface DeliveryOrder {
   billingAddress?: DeliveryAddress;
   carrier?: Carrier;
   items: DeliveryItem[];
+  itemsCount?: number;
+  totalQuantity?: number;
   tracking?: TrackingEvent[];
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
   approvedBy?: string;
   approvedAt?: string;
+  // Route and transport data
+  transportMode?: string;
+  materialType?: string;
+  routeType?: string;
+  routeDistanceKm?: number;
+  routeTravelTimeMinutes?: number;
+  routeData?: any;
+  // Cost breakdown
+  transportCostInr?: number;
+  loadingCostInr?: number;
+  fuelTollCostInr?: number;
+  costBreakdown?: any;
+  // Documentation and quality
+  partsPhotos?: any[];
+  packingPhotos?: any[];
+  documents?: any[];
+  dockAudit?: any[];
+  checkedBy?: string;
+  checkedAt?: string;
 }
 
 export interface DeliveryItem {
@@ -198,7 +219,7 @@ const QUERY_KEYS = {
 // Get available QC-approved items for delivery
 export function useAvailableItemsForDelivery(projectId: string) {
   const authReady = useAuthReady();
-  
+
   return useQuery({
     queryKey: QUERY_KEYS.availableItems(projectId),
     queryFn: async (): Promise<QualityApprovedItem[]> => {
@@ -227,7 +248,7 @@ export function useDeliveryOrders(
   }
 ) {
   const authReady = useAuthReady();
-  
+
   return useQuery({
     queryKey: QUERY_KEYS.deliveryOrders(projectId, filters),
     queryFn: async () => {
@@ -257,7 +278,7 @@ export function useDeliveryOrders(
       if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
 
       const response = await apiClient.get(`/delivery/orders?${params.toString()}`);
-      return response.data;
+      return response.data.data || response.data;
     },
     enabled: authReady,
     staleTime: 1000 * 60 * 1, // 1 minute
@@ -270,7 +291,7 @@ export function useDeliveryOrder(id: string) {
     queryKey: QUERY_KEYS.deliveryOrder(id),
     queryFn: async (): Promise<DeliveryOrder> => {
       const response = await apiClient.get(`/delivery/orders/${id}`);
-      return response.data.data;
+      return response.data.data?.data || response.data.data || response.data;
     },
     enabled: !!id,
     staleTime: 1000 * 60 * 1, // 1 minute
@@ -299,6 +320,24 @@ export function useCreateDeliveryOrder() {
       insuranceCostInr?: number;
       handlingCostInr?: number;
       notes?: string;
+      // Route and transport data
+      transportMode?: string;
+      materialType?: string;
+      routeType?: string;
+      routeDistanceKm?: number;
+      routeTravelTimeMinutes?: number;
+      routeData?: any;
+      // Cost breakdown
+      transportCostInr?: number;
+      loadingCostInr?: number;
+      fuelTollCostInr?: number;
+      costBreakdown?: any;
+      // Documentation and quality
+      partsPhotos?: any[];
+      packingPhotos?: any[];
+      documents?: any[];
+      dockAudit?: any[];
+      checkedBy?: string;
       items: Array<{
         qualityApprovedItemId: string;
         bomItemId: string;
@@ -316,11 +355,11 @@ export function useCreateDeliveryOrder() {
       }>;
     }): Promise<DeliveryOrder> => {
       const response = await apiClient.post('/delivery/orders', data);
-      return response.data.data;
+      return response.data.data || response.data;
     },
     onSuccess: (newOrder, variables) => {
       toast.success(`Delivery order ${newOrder.orderNumber} created successfully`);
-      
+
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.deliveryOrders(variables.projectId),
       });
@@ -365,12 +404,12 @@ export function useUpdateDeliveryOrder() {
     },
     onSuccess: (updatedOrder) => {
       toast.success(`Delivery order ${updatedOrder.orderNumber} updated successfully`);
-      
+
       queryClient.setQueryData(
         QUERY_KEYS.deliveryOrder(updatedOrder.id),
         updatedOrder
       );
-      
+
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.deliveryOrders(updatedOrder.projectId),
       });
@@ -408,7 +447,7 @@ export function useAddTrackingEvent() {
     },
     onSuccess: (_, variables) => {
       toast.success('Tracking event added successfully');
-      
+
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.deliveryOrder(variables.deliveryOrderId),
       });
@@ -448,7 +487,7 @@ export function useCreateDeliveryAddress() {
     },
     onSuccess: (newAddress, variables) => {
       toast.success('Delivery address created successfully');
-      
+
       // Use projectId from the original request variables if not in response
       const projectId = newAddress?.projectId || newAddress?.project_id || variables.projectId;
       if (projectId) {
@@ -460,6 +499,27 @@ export function useCreateDeliveryAddress() {
     onError: (error: any) => {
       console.error('Failed to create delivery address:', error);
       toast.error(error?.response?.data?.message || 'Failed to create delivery address');
+    },
+  });
+}
+
+// Delete delivery address
+export function useDeleteDeliveryAddress() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ addressId, projectId }: { addressId: string; projectId: string }): Promise<void> => {
+      await apiClient.delete(`/delivery/addresses/${addressId}`);
+    },
+    onSuccess: (_, variables) => {
+      toast.success('Address deleted successfully');
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.deliveryAddresses(variables.projectId),
+      });
+    },
+    onError: (error: any) => {
+      console.error('Failed to delete delivery address:', error);
+      toast.error(error?.response?.data?.message || 'Failed to delete address');
     },
   });
 }
@@ -479,7 +539,7 @@ export function useCarriers() {
 // Get delivery metrics
 export function useDeliveryMetrics(projectId?: string, startDate?: string, endDate?: string) {
   const authReady = useAuthReady();
-  
+
   return useQuery({
     queryKey: QUERY_KEYS.deliveryMetrics(projectId, startDate, endDate),
     queryFn: async (): Promise<DeliveryMetrics> => {
@@ -554,12 +614,12 @@ export function useCancelDeliveryOrder() {
     },
     onSuccess: (cancelledOrder) => {
       toast.success(`Delivery order ${cancelledOrder.orderNumber} cancelled successfully`);
-      
+
       queryClient.setQueryData(
         QUERY_KEYS.deliveryOrder(cancelledOrder.id),
         cancelledOrder
       );
-      
+
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.deliveryOrders(cancelledOrder.projectId),
       });
@@ -570,6 +630,38 @@ export function useCancelDeliveryOrder() {
     onError: (error: any) => {
       console.error('Failed to cancel delivery order:', error);
       toast.error(error?.response?.data?.message || 'Failed to cancel delivery order');
+    },
+  });
+}
+
+// Delete delivery order
+export function useDeleteDeliveryOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, projectId }: { id: string; projectId: string }): Promise<void> => {
+      await apiClient.delete(`/delivery/orders/${id}`);
+    },
+    onSuccess: (_, variables) => {
+      toast.success('Delivery order deleted successfully');
+      
+      // Invalidate all delivery orders queries for this project (with any filters)
+      queryClient.invalidateQueries({
+        queryKey: ['delivery-orders', variables.projectId],
+      });
+      
+      // Also invalidate delivery orders queries without project filter
+      queryClient.invalidateQueries({
+        queryKey: ['delivery-orders'],
+      });
+      
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.deliveryMetrics(variables.projectId),
+      });
+    },
+    onError: (error: any) => {
+      console.error('Failed to delete delivery order:', error);
+      toast.error(error?.response?.data?.message || 'Failed to delete delivery order');
     },
   });
 }

@@ -1,31 +1,33 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
-  Body, 
-  Param, 
-  Query, 
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
   UseGuards,
   HttpStatus,
   Logger,
   ParseUUIDPipe,
   ValidationPipe,
-  UsePipes
+  UsePipes,
+  HttpCode
 } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
-  ApiParam, 
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
   ApiQuery,
   ApiBearerAuth,
-  ApiBody 
+  ApiBody
 } from '@nestjs/swagger';
 import { DeliveryService } from './delivery.service';
-import { 
-  CreateDeliveryOrderDto, 
-  UpdateDeliveryOrderDto, 
+import {
+  CreateDeliveryOrderDto,
+  UpdateDeliveryOrderDto,
   DeliveryOrderQueryDto,
   DeliveryOrderResponseDto,
   CreateDeliveryAddressDto,
@@ -41,16 +43,16 @@ import {
 export class DeliveryController {
   private readonly logger = new Logger(DeliveryController.name);
 
-  constructor(private readonly deliveryService: DeliveryService) {}
+  constructor(private readonly deliveryService: DeliveryService) { }
 
   @Get('available-items/:projectId')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get quality-approved items available for delivery',
     description: 'Retrieves all QC-approved BOM items that are ready for delivery for a specific project'
   })
   @ApiParam({ name: 'projectId', description: 'Project UUID' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Available items retrieved successfully',
     // type: [QualityApprovedItemDto]
   })
@@ -63,9 +65,9 @@ export class DeliveryController {
     try {
       // For production, replace with actual user ID from auth token
       const userId = 'authenticated-user'; // user?.id || user?.sub || 'system';
-      
+
       const availableItems = await this.deliveryService.getAvailableItemsForDelivery(projectId, userId);
-      
+
       return {
         success: true,
         data: availableItems,
@@ -82,13 +84,13 @@ export class DeliveryController {
   }
 
   @Post('orders')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Create a new delivery order',
     description: 'Creates a new delivery order from QC-approved items with comprehensive validation'
   })
   @ApiBody({ type: CreateDeliveryOrderDto })
-  @ApiResponse({ 
-    status: HttpStatus.CREATED, 
+  @ApiResponse({
+    status: HttpStatus.CREATED,
     description: 'Delivery order created successfully',
     type: DeliveryOrderResponseDto
   })
@@ -104,9 +106,9 @@ export class DeliveryController {
     try {
       // For production, replace with actual user ID from auth token
       const userId = 'authenticated-user'; // user?.id || user?.sub || 'system';
-      
+
       this.logger.log(`Creating delivery order for project ${createDeliveryOrderDto.projectId} by user ${userId}`);
-      
+
       const deliveryOrder = await this.deliveryService.createDeliveryOrder(
         createDeliveryOrderDto,
         userId
@@ -132,7 +134,7 @@ export class DeliveryController {
   }
 
   @Get('orders')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get delivery orders with filtering and pagination',
     description: 'Retrieves delivery orders with optional filtering, search, and pagination'
   })
@@ -147,8 +149,8 @@ export class DeliveryController {
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page (default: 20, max: 100)' })
   @ApiQuery({ name: 'sortBy', required: false, description: 'Sort field (default: createdAt)' })
   @ApiQuery({ name: 'sortOrder', required: false, description: 'Sort order: asc|desc (default: desc)' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Delivery orders retrieved successfully'
   })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Authentication required' })
@@ -160,9 +162,9 @@ export class DeliveryController {
     try {
       // For production, replace with actual user ID from auth token
       const userId = 'authenticated-user'; // user?.id || user?.sub || 'system';
-      
+
       this.logger.debug(`Fetching delivery orders with filters: ${JSON.stringify(queryDto)} for user ${userId}`);
-      
+
       const result = await this.deliveryService.getDeliveryOrders(queryDto, userId);
 
       return {
@@ -183,7 +185,7 @@ export class DeliveryController {
         metadata: {
           timestamp: new Date().toISOString(),
           filters: queryDto,
-          appliedFilters: Object.keys(queryDto).filter(key => 
+          appliedFilters: Object.keys(queryDto).filter(key =>
             (queryDto as any)[key] !== undefined && (queryDto as any)[key] !== null && (queryDto as any)[key] !== ''
           )
         }
@@ -195,13 +197,13 @@ export class DeliveryController {
   }
 
   @Get('orders/:id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get delivery order by ID',
     description: 'Retrieves a specific delivery order with full details including items and tracking'
   })
   @ApiParam({ name: 'id', description: 'Delivery order UUID' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Delivery order retrieved successfully',
     type: DeliveryOrderResponseDto
   })
@@ -226,14 +228,14 @@ export class DeliveryController {
   }
 
   @Put('orders/:id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update delivery order',
     description: 'Updates an existing delivery order (status, carrier, costs, etc.)'
   })
   @ApiParam({ name: 'id', description: 'Delivery order UUID' })
   @ApiBody({ type: UpdateDeliveryOrderDto })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Delivery order updated successfully',
     type: DeliveryOrderResponseDto
   })
@@ -248,7 +250,7 @@ export class DeliveryController {
     try {
       // For now, using a default user ID - replace with actual user from token
       const userId = 'system'; // user?.id || 'system';
-      
+
       const deliveryOrder = await this.deliveryService.updateDeliveryOrder(
         id,
         updateDeliveryOrderDto,
@@ -270,13 +272,13 @@ export class DeliveryController {
   }
 
   @Post('tracking')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Add tracking event',
     description: 'Adds a new tracking event for a delivery order'
   })
   @ApiBody({ type: CreateTrackingEventDto })
-  @ApiResponse({ 
-    status: HttpStatus.CREATED, 
+  @ApiResponse({
+    status: HttpStatus.CREATED,
     description: 'Tracking event added successfully'
   })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Delivery order not found' })
@@ -288,7 +290,7 @@ export class DeliveryController {
     try {
       // For now, using a default user ID - replace with actual user from token
       const userId = 'system'; // user?.id || 'system';
-      
+
       await this.deliveryService.addTrackingEvent(createTrackingEventDto, userId);
 
       return {
@@ -305,15 +307,15 @@ export class DeliveryController {
   }
 
   @Get('metrics')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get delivery performance metrics',
     description: 'Retrieves delivery performance metrics with optional filtering by project and date range'
   })
   @ApiQuery({ name: 'projectId', required: false, description: 'Filter by project ID' })
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date for metrics (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date for metrics (ISO format)' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Delivery metrics retrieved successfully'
   })
   async getDeliveryMetrics(
@@ -350,13 +352,13 @@ export class DeliveryController {
   }
 
   @Post('addresses')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Create delivery address',
     description: 'Creates a new delivery address for a project'
   })
   @ApiBody({ type: CreateDeliveryAddressDto })
-  @ApiResponse({ 
-    status: HttpStatus.CREATED, 
+  @ApiResponse({
+    status: HttpStatus.CREATED,
     description: 'Delivery address created successfully'
   })
   @UsePipes(new ValidationPipe({ transform: true }))
@@ -367,7 +369,7 @@ export class DeliveryController {
     try {
       // For now, using a default user ID - replace with actual user from token
       const userId = 'system'; // user?.id || 'system';
-      
+
       const address = await this.deliveryService.createDeliveryAddress(createAddressDto, userId);
 
       return {
@@ -385,13 +387,13 @@ export class DeliveryController {
   }
 
   @Get('addresses/:projectId')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get delivery addresses for project',
     description: 'Retrieves all delivery addresses for a specific project'
   })
   @ApiParam({ name: 'projectId', description: 'Project UUID' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Delivery addresses retrieved successfully'
   })
   async getDeliveryAddresses(@Param('projectId', ParseUUIDPipe) projectId: string) {
@@ -414,13 +416,44 @@ export class DeliveryController {
     }
   }
 
+  @Delete('addresses/:addressId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Delete delivery address',
+    description: 'Deletes a specific delivery address by ID'
+  })
+  @ApiParam({ name: 'addressId', description: 'Address UUID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Address deleted successfully'
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Address not found' })
+  async deleteDeliveryAddress(@Param('addressId', ParseUUIDPipe) addressId: string) {
+    try {
+      const userId = 'system';
+      await this.deliveryService.deleteDeliveryAddress(addressId, userId);
+
+      return {
+        success: true,
+        message: 'Address deleted successfully',
+        metadata: {
+          addressId,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      this.logger.error(`Failed to delete delivery address ${addressId}: ${error.message}`);
+      throw error;
+    }
+  }
+
   @Get('carriers')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get available carriers',
     description: 'Retrieves all active carriers available for delivery'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Carriers retrieved successfully'
   })
   async getCarriers() {
@@ -442,13 +475,13 @@ export class DeliveryController {
   }
 
   @Get('orders/:id/tracking')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get tracking events for delivery order',
     description: 'Retrieves all tracking events for a specific delivery order'
   })
   @ApiParam({ name: 'id', description: 'Delivery order UUID' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Tracking events retrieved successfully'
   })
   async getTrackingEvents(@Param('id', ParseUUIDPipe) id: string) {
@@ -478,13 +511,13 @@ export class DeliveryController {
   }
 
   @Post('orders/:id/cancel')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Cancel delivery order',
     description: 'Cancels a delivery order if it has not been shipped'
   })
   @ApiParam({ name: 'id', description: 'Delivery order UUID' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Delivery order cancelled successfully'
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Cannot cancel shipped orders' })
@@ -495,7 +528,7 @@ export class DeliveryController {
     try {
       // For now, using a default user ID - replace with actual user from token
       const userId = 'system'; // user?.id || 'system';
-      
+
       const cancelledOrder = await this.deliveryService.updateDeliveryOrder(
         id,
         { status: 'cancelled' as any },
@@ -516,14 +549,49 @@ export class DeliveryController {
     }
   }
 
+  @Delete('orders/:id')
+  @ApiOperation({
+    summary: 'Delete delivery order',
+    description: 'Permanently deletes a delivery order (only draft orders can be deleted)'
+  })
+  @ApiParam({ name: 'id', description: 'Delivery order UUID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Delivery order deleted successfully'
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Cannot delete non-draft orders' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Delivery order not found' })
+  async deleteDeliveryOrder(
+    @Param('id', ParseUUIDPipe) id: string,
+    // @CurrentUser() user: any
+  ) {
+    try {
+      // For now, using a default user ID - replace with actual user from token
+      const userId = 'authenticated-user'; // user?.id || 'system';
+
+      await this.deliveryService.deleteDeliveryOrder(id, userId);
+
+      return {
+        success: true,
+        message: 'Delivery order deleted successfully',
+        metadata: {
+          timestamp: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      this.logger.error(`Failed to delete delivery order ${id}: ${error.message}`);
+      throw error;
+    }
+  }
+
   @Get('batches')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get delivery batches',
     description: 'Retrieves delivery batches for a project'
   })
   @ApiQuery({ name: 'projectId', required: false, description: 'Filter by project ID' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Delivery batches retrieved successfully'
   })
   async getDeliveryBatches(
@@ -559,13 +627,13 @@ export class DeliveryController {
   }
 
   @Get('shipments')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get delivery shipments',
     description: 'Retrieves delivery shipments for a project'
   })
   @ApiQuery({ name: 'projectId', required: false, description: 'Filter by project ID' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Delivery shipments retrieved successfully'
   })
   async getDeliveryShipments(

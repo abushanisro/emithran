@@ -196,12 +196,19 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
     setLookupTables([]);
 
     try {
+      console.log('🚀 Starting calculation with input values:', fieldValues);
       const result = await executeCalculatorMutation.mutateAsync({
         calculatorId,
         inputValues: fieldValues,
       });
 
+      console.log('✅ Raw mutation result:', result);
+
       if (result.success) {
+        console.log('🎯 Calculator execution result:', result);
+        console.log('📊 Results data:', result.results);
+        console.log('🔧 Calculator fields:', calculator.fields);
+        console.log('🧮 Calculated fields:', calculator.fields?.filter(f => f.fieldType === 'calculated'));
         setResults(result.results);
 
         // Fetch lookup tables to display below results
@@ -470,7 +477,11 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
               {calculator.fields
                 ?.filter((field) => field.fieldType === 'calculated')
                 .map((field) => {
-                  const value = results[field.id] ?? results[field.fieldName];
+                  // Try multiple lookup strategies for field values
+                  const value = results[field.id] ?? 
+                               results[field.fieldName] ??
+                               results[`calculate${field.fieldName}`] ??
+                               results[`calculate${field.fieldName.charAt(0).toUpperCase() + field.fieldName.slice(1)}`];
 
                   // Handle error case
                   if (value && typeof value === 'object' && value.error) {

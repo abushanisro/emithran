@@ -307,6 +307,95 @@ export class CreateDeliveryOrderDto {
   @MaxLength(1000)
   notes?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  estimatedDeliveryDate?: Date;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  totalDeliveryCostInr?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  checkedBy?: string;
+
+  // Route and transport data
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  transportMode?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  materialType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  routeType?: string; // fastest, shortest, balanced
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  routeDistanceKm?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  routeTravelTimeMinutes?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  routeData?: any; // Complete route information
+
+  // Cost breakdown
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  transportCostInr?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  loadingCostInr?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  fuelTollCostInr?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  costBreakdown?: any; // Detailed cost breakdown
+
+  // Documentation
+  @ApiPropertyOptional()
+  @IsOptional()
+  partsPhotos?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  packingPhotos?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  documents?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  dockAudit?: any[];
+
   @ApiProperty({ type: [CreateDeliveryItemDto] })
   @IsArray()
   @ArrayNotEmpty()
@@ -616,6 +705,12 @@ export class DeliveryOrderResponseDto {
   items: any[]; // Will be populated with delivery items
 
   @ApiPropertyOptional()
+  itemsCount?: number;
+
+  @ApiPropertyOptional()
+  totalQuantity?: number;
+
+  @ApiPropertyOptional()
   tracking?: any[];
 
   @ApiPropertyOptional()
@@ -632,6 +727,57 @@ export class DeliveryOrderResponseDto {
 
   @ApiPropertyOptional()
   approvedAt?: Date;
+
+  // Route and transport data
+  @ApiPropertyOptional()
+  transportMode?: string;
+
+  @ApiPropertyOptional()
+  materialType?: string;
+
+  @ApiPropertyOptional()
+  routeType?: string;
+
+  @ApiPropertyOptional()
+  routeDistanceKm?: number;
+
+  @ApiPropertyOptional()
+  routeTravelTimeMinutes?: number;
+
+  @ApiPropertyOptional()
+  routeData?: any;
+
+  // Cost breakdown
+  @ApiPropertyOptional()
+  transportCostInr?: number;
+
+  @ApiPropertyOptional()
+  loadingCostInr?: number;
+
+  @ApiPropertyOptional()
+  fuelTollCostInr?: number;
+
+  @ApiPropertyOptional()
+  costBreakdown?: any;
+
+  // Documentation and quality
+  @ApiPropertyOptional()
+  partsPhotos?: any[];
+
+  @ApiPropertyOptional()
+  packingPhotos?: any[];
+
+  @ApiPropertyOptional()
+  documents?: any[];
+
+  @ApiPropertyOptional()
+  dockAudit?: any[];
+
+  @ApiPropertyOptional()
+  checkedBy?: string;
+
+  @ApiPropertyOptional()
+  checkedAt?: Date;
 }
 
 // Query DTOs

@@ -127,19 +127,26 @@ export function Viewer2D({ fileUrl, fileName, fileType }: Viewer2DProps) {
                 ) : (
                     <>
                         {fileType === 'pdf' ? (
-                            <iframe
-                                key={resolvedUrl}
-                                src={resolvedUrl ? `${resolvedUrl}#view=FitV&zoom=page-actual&scrollbar=0&toolbar=0&navpanes=0&statusbar=0&messages=0&page=1` : ''}
-                                className="w-full h-full border-0"
-                                style={{ overflow: 'hidden', border: 'none', margin: '0', padding: '0' }}
-                                onLoad={handleLoad}
-                                onError={handleError}
-                                title={fileName}
-                                scrolling="no"
-                                frameBorder="0"
-                                marginHeight="0"
-                                marginWidth="0"
-                            />
+                            resolvedUrl ? (
+                                <iframe
+                                    key={resolvedUrl}
+                                    src={`${resolvedUrl}#view=FitV&zoom=page-actual&scrollbar=0&toolbar=0&navpanes=0&statusbar=0&messages=0&page=1`}
+                                    className="w-full h-full border-0"
+                                    style={{ overflow: 'hidden', border: 'none', margin: '0', padding: '0' }}
+                                    onLoad={handleLoad}
+                                    onError={handleError}
+                                    title={fileName}
+                                    scrolling="no"
+                                    frameBorder="0"
+                                    marginHeight="0"
+                                    marginWidth="0"
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center p-4 text-center">
+                                    <FileText className="h-10 w-10 text-muted-foreground mb-2" />
+                                    <p className="text-sm font-medium">Loading PDF...</p>
+                                </div>
+                            )
                         ) : fileType === 'img' ? (
                             <div className="overflow-auto w-full h-full flex items-center justify-center p-4">
                                 <img

@@ -58,7 +58,7 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest) {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co wss://iuvtsvjpmovfymvnmqys.supabase.co https://emuski.jiobase.com https://*.jiobase.com wss://emuski.jiobase.com wss://*.jiobase.com https://vercel.live https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co wss://iuvtsvjpmovfymvnmqys.supabase.co https://emuski.jiobase.com https://*.jiobase.com wss://emuski.jiobase.com wss://*.jiobase.com https://vercel.live https://*.railway.app https://mithran-production.up.railway.app https://mithran-production-dc9d.up.railway.app https://router.project-osrm.org",
       // 'self' covers /api/file-proxy; blob: covers Chrome PDF plugin internals
       "object-src 'self' blob: data:",
       // frame-src: only 'self' needed — PDF iframe src is now always localhost/api/file-proxy
@@ -74,7 +74,7 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest) {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' ws://localhost:* http://localhost:* http://localhost:4000 http://localhost:5000 https://*.supabase.co wss://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co wss://iuvtsvjpmovfymvnmqys.supabase.co https://emuski.jiobase.com https://*.jiobase.com wss://emuski.jiobase.com wss://*.jiobase.com https://*.railway.app",
+      "connect-src 'self' ws://localhost:* http://localhost:* http://localhost:4000 http://localhost:5000 https://*.supabase.co wss://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co wss://iuvtsvjpmovfymvnmqys.supabase.co https://emuski.jiobase.com https://*.jiobase.com wss://emuski.jiobase.com wss://*.jiobase.com https://*.railway.app https://router.project-osrm.org",
       "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com",
       // 'self' covers /api/file-proxy; blob: covers Chrome PDF plugin internals
       "object-src 'self' blob: data:",

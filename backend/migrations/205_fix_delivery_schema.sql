@@ -218,5 +218,3 @@ COMMENT ON COLUMN delivery_orders.delivery_address_id IS 'Reference to delivery 
 COMMENT ON COLUMN delivery_orders.billing_address_id IS 'Reference to billing address (optional, can be same as delivery)';
 COMMENT ON COLUMN delivery_items.quality_approved_item_id IS 'Reference to quality approved item from QC module';
 COMMENT ON COLUMN delivery_items.bom_item_id IS 'Direct reference to BOM item for easier queries';
-
-RAISE NOTICE 'Delivery schema migration completed successfully';

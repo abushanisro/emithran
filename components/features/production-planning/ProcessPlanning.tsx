@@ -394,10 +394,13 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
         setProcessDataLoading(true);
         setProcessDataError(null);
 
+        console.log('🔍 Loading process data for lot:', lotId);
         const processData = await getProcessesByLot(lotId);
+        console.log('📦 Raw process data received:', processData);
 
         // Update sections with process data
         const dataArray = processData?.data || processData || [];
+        console.log('📋 Data array extracted:', dataArray, 'Length:', dataArray.length);
 
         if (Array.isArray(dataArray) && dataArray.length > 0) {
           // Transform and assign processes to sections
@@ -483,6 +486,8 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
 
           setMainSections(updatedSections);
         } else {
+          console.log('⚠️ No process data found - using default sections');
+          console.log('🔧 Lot ID:', lotId, 'Process data structure:', { processData, dataArray });
           setMainSections(DEFAULT_SECTIONS as any);
         }
       } catch (error) {

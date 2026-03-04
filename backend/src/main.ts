@@ -21,6 +21,11 @@ async function bootstrap() {
   // No global prefix - all controllers use explicit prefixes
   // AppController uses no prefix for root routes
   
+  // Set body parser limits
+  const express = require('express');
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',

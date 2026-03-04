@@ -3,13 +3,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Navigation, MapPin, Truck, Route, RefreshCw } from 'lucide-react';
+import { Route, RefreshCw } from 'lucide-react';
 import FallbackRouteMap from './FallbackRouteMap';
 
 interface RouteMapProps {
   fromAddress?: any;
   toAddress?: any;
+  transportMode?: string;
+  materialType?: string;
   onRouteCalculated?: (result: any) => void;
+  onTransportModeChange?: (mode: string) => void;
+  onMaterialTypeChange?: (type: string) => void;
   className?: string;
 }
 
@@ -19,7 +23,7 @@ declare global {
   }
 }
 
-export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, className = '' }: RouteMapProps) {
+export default function RouteMap({ fromAddress, toAddress, transportMode, materialType, onRouteCalculated, onTransportModeChange, onMaterialTypeChange, className = '' }: RouteMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const directionsServiceRef = useRef<any>(null);
@@ -33,7 +37,7 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
   useEffect(() => {
     const loadGoogleMaps = () => {
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-      
+
       if (!apiKey) {
         console.warn('Google Maps API key not found');
         setMapLoaded(false);
@@ -54,19 +58,19 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
       script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry&loading=async`;
       script.async = true;
       script.defer = true;
-      
+
       script.onload = () => {
         console.log('Google Maps loaded successfully');
         setMapLoaded(true);
       };
-      
+
       script.onerror = (error) => {
         console.error('Failed to load Google Maps script:', error);
         console.error('API Key:', apiKey ? 'Present' : 'Missing');
         setMapLoaded(false);
         setGoogleMapsFailed(true);
       };
-      
+
       document.head.appendChild(script);
     };
 
@@ -116,7 +120,7 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
     }
 
     setIsCalculating(true);
-    
+
     try {
       // Build address strings
       const fromAddressString = `${fromAddress.addressLine1}, ${fromAddress.city}, ${fromAddress.stateProvince}, ${fromAddress.country}`;
@@ -135,11 +139,11 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
         if (status === 'OK') {
           // Display route on map
           directionsRendererRef.current.setDirections(result);
-          
+
           // Extract route information
           const route = result.routes[0];
           const leg = route.legs[0];
-          
+
           const routeData = {
             distance: (leg.distance.value / 1000).toFixed(1), // Convert to km
             duration: Math.round(leg.duration.value / 60), // Convert to minutes
@@ -160,7 +164,7 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
           }
         } else {
           console.error('Directions request failed due to ' + status);
-          
+
           // Fallback: Show markers for start and end points
           showMarkersOnly(fromAddressString, toAddressString);
         }
@@ -175,7 +179,7 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
   // Fallback: Show only start/end markers without route
   const showMarkersOnly = async (fromAddr: string, toAddr: string) => {
     const geocoder = new window.google.maps.Geocoder();
-    
+
     try {
       // Geocode start address
       const fromResult = await new Promise((resolve, reject) => {
@@ -194,7 +198,7 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
       });
 
       // Add markers
-      const fromMarker = new window.google.maps.Marker({
+      new window.google.maps.Marker({
         position: (fromResult as any).geometry.location,
         map: mapInstanceRef.current,
         title: 'Pickup Location',
@@ -204,7 +208,7 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
         }
       });
 
-      const toMarker = new window.google.maps.Marker({
+      new window.google.maps.Marker({
         position: (toResult as any).geometry.location,
         map: mapInstanceRef.current,
         title: 'Delivery Location',
@@ -259,7 +263,11 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
       <FallbackRouteMap
         fromAddress={fromAddress}
         toAddress={toAddress}
+        transportMode={transportMode}
+        materialType={materialType}
         onRouteCalculated={onRouteCalculated}
+        onTransportModeChange={onTransportModeChange}
+        onMaterialTypeChange={onMaterialTypeChange}
         className={className}
       />
     );
@@ -300,7 +308,7 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
       {/* Map Container */}
       <div className="relative rounded-lg overflow-hidden border bg-background mb-4">
         <div ref={mapRef} className="w-full h-64"></div>
-        
+
         {/* Map Legend */}
         <div className="absolute bottom-2 left-2 bg-white/90 rounded p-2 text-xs">
           <div className="flex items-center gap-1 mb-1">
@@ -342,8 +350,8 @@ export default function RouteMap({ fromAddress, toAddress, onRouteCalculated, cl
         </div>
       ) : (
         <div className="text-center text-muted-foreground py-4">
-          {fromAddress && toAddress ? 
-            'Click "Calculate Route" to see route on map' : 
+          {fromAddress && toAddress ?
+            'Click "Calculate Route" to see route on map' :
             'Select pickup and delivery addresses to calculate route'
           }
         </div>

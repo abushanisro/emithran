@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { DeliveryOrderDetailDialog } from './DeliveryOrderDetailDialog';
 import {
   ArrowRight,
   ArrowLeft,
@@ -48,6 +49,10 @@ import {
   useDeliveryAddresses,
   useCarriers,
   useCreateDeliveryAddress,
+  useDeliveryOrders,
+  DeliveryOrder,
+  useDeleteDeliveryAddress,
+  useDeleteDeliveryOrder,
   DeliveryAddress,
 } from '@/lib/api/hooks/useDelivery';
 import { toast } from 'sonner';
@@ -66,9 +71,8 @@ interface SelectedItem extends QualityApprovedItem {
 
 interface OrderFormData {
   priority: 'low' | 'standard' | 'high' | 'urgent';
-  requestedDeliveryDate: string;
-  deliveryWindowStart: string;
-  deliveryWindowEnd: string;
+  requestedDate: string;
+  requestedTime: string;
   deliveryAddressId: string;
   fromAddressId: string;
   carrierId: string;
@@ -198,26 +202,40 @@ export default function DeliveryOrderWorkflow({
     DEFAULT_DOCK_AUDIT.map(row => ({ ...row }))
   );
   const [checkedBy, setCheckedBy] = useState('');
-  
+
   // File preview modal state
   const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [currentImageCollection, setCurrentImageCollection] = useState<UploadedFile[]>([]);
-  
+
+  // Delivery order detail dialog state
+  const [showOrderDetail, setShowOrderDetail] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
   // Route calculation state
   const [routeData, setRouteData] = useState<{
     distance?: number;
     duration?: number;
     cost?: number;
     optimizationScore?: number;
+    dataQualityScore?: number;
+    isEstimated?: boolean;
+    routeProvider?: string;
+    optimizationLevel?: string;
+    materialType?: string;
+    costBreakdown?: {
+      transportBase: number;
+      loadingUnloading: number;
+      materialSurcharge: number;
+      fuelTollSurcharge: number;
+    };
   } | null>(null);
 
   const [formData, setFormData] = useState<OrderFormData>({
     priority: 'standard',
-    requestedDeliveryDate: '',
-    deliveryWindowStart: '',
-    deliveryWindowEnd: '',
+    requestedDate: '',
+    requestedTime: '',
     deliveryAddressId: '',
     fromAddressId: '',
     carrierId: '',
@@ -241,25 +259,31 @@ export default function DeliveryOrderWorkflow({
   const { data: carriers = [], isLoading: carriersLoading } = useCarriers();
   const createOrderMutation = useCreateDeliveryOrder();
   const createAddressMutation = useCreateDeliveryAddress();
+  const deleteAddressMutation = useDeleteDeliveryAddress();
+  const deleteOrderMutation = useDeleteDeliveryOrder();
+  const { data: recentOrdersResponse, isLoading: ordersLoading, refetch: refetchOrders } = useDeliveryOrders(projectId, {
+    limit: 10,
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
+  });
+  
+  const recentOrders = recentOrdersResponse || [];
 
-  // Delete address function (mock - replace with actual API call)
+  // Delete address function
   const handleDeleteAddress = async (addressId: string) => {
     try {
-      // Mock API call - replace with actual implementation
-      console.log('Deleting address:', addressId);
-      
+      await deleteAddressMutation.mutateAsync({ addressId, projectId });
+
       // If the deleted address was selected, clear the selection
       if (formData.deliveryAddressId === addressId) {
         setFormData(prev => ({ ...prev, deliveryAddressId: '' }));
         setRouteInfo({}); // Clear route info
       }
-      
-      // Refresh the addresses list
-      await refetchAddresses();
-      toast.success('Address deleted successfully');
+      if (formData.fromAddressId === addressId) {
+        setFormData(prev => ({ ...prev, fromAddressId: '' }));
+      }
     } catch (error) {
-      console.error('Error deleting address:', error);
-      toast.error('Failed to delete address');
+      // Error is handled in the mutation's onError callback
     }
   };
 
@@ -267,7 +291,7 @@ export default function DeliveryOrderWorkflow({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!showPreviewModal) return;
-      
+
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
         event.preventDefault();
         handleNextImage();
@@ -293,38 +317,38 @@ export default function DeliveryOrderWorkflow({
   // Filter carriers based on selected transport mode and material type
   const getAvailableCarriers = () => {
     if (!formData.transportMode || !formData.materialType) return [];
-    
+
     const carrierCodes = CARRIER_CONFIG[formData.transportMode as keyof typeof CARRIER_CONFIG]?.[formData.materialType as keyof typeof CARRIER_CONFIG.road] || [];
-    
+
     return carriers.filter(carrier => {
       if (!carrier.name) return false;
-      
+
       const carrierName = carrier.name.toLowerCase();
       const carrierCode = carrier.code?.toLowerCase() || '';
-      
+
       // Check if carrier matches the configuration
-      return carrierCodes.some(configCode => 
-        carrierName.includes(configCode.replace('_', ' ')) || 
+      return carrierCodes.some(configCode =>
+        carrierName.includes(configCode.replace('_', ' ')) ||
         carrierCode.includes(configCode) ||
         carrierName.includes(configCode)
       ) ||
-      // Fallback: match based on keywords
-      (formData.transportMode === 'road' && (
-        carrierName.includes('road') || carrierName.includes('truck') || carrierName.includes('transport')
-      )) ||
-      (formData.transportMode === 'air' && (
-        carrierName.includes('air') || carrierName.includes('express') || carrierName.includes('fedex') || carrierName.includes('dhl')
-      )) ||
-      (formData.transportMode === 'ship' && (
-        carrierName.includes('ship') || carrierName.includes('sea') || carrierName.includes('ocean') || carrierName.includes('freight')
-      ));
+        // Fallback: match based on keywords
+        (formData.transportMode === 'road' && (
+          carrierName.includes('road') || carrierName.includes('truck') || carrierName.includes('transport')
+        )) ||
+        (formData.transportMode === 'air' && (
+          carrierName.includes('air') || carrierName.includes('express') || carrierName.includes('fedex') || carrierName.includes('dhl')
+        )) ||
+        (formData.transportMode === 'ship' && (
+          carrierName.includes('ship') || carrierName.includes('sea') || carrierName.includes('ocean') || carrierName.includes('freight')
+        ));
     });
   };
 
   // Handle transport mode change
   const handleTransportModeChange = (newMode: string) => {
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       transportMode: newMode,
       materialType: '', // Reset material type when transport mode changes
       carrierId: '' // Reset carrier when transport mode changes
@@ -333,8 +357,8 @@ export default function DeliveryOrderWorkflow({
 
   // Handle material type change
   const handleMaterialTypeChange = (newType: string) => {
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       materialType: newType,
       carrierId: '' // Reset carrier when material type changes
     }));
@@ -353,7 +377,7 @@ export default function DeliveryOrderWorkflow({
       const quantity = item.deliveryQuantity || 1;
       return sum + (unitCost * quantity);
     }, 0);
-    
+
     // Always update to show the calculated value as default
     setFormData(prev => ({
       ...prev,
@@ -458,17 +482,35 @@ export default function DeliveryOrderWorkflow({
       return;
     }
 
+    // Validate requested date
+    if (formData.requestedDate) {
+      const requestedDateTime = new Date(`${formData.requestedDate}T${formData.requestedTime || '00:00'}`);
+      if (requestedDateTime < new Date()) {
+        toast.error('Requested delivery date cannot be in the past');
+        return;
+      }
+    }
+
     try {
       const orderData = {
         projectId,
         deliveryAddressId: formData.deliveryAddressId,
         carrierId: formData.carrierId || undefined,
         priority: formData.priority,
-        requestedDeliveryDate: formData.requestedDeliveryDate || undefined,
-        deliveryWindowStart: formData.deliveryWindowStart || undefined,
-        deliveryWindowEnd: formData.deliveryWindowEnd || undefined,
+        requestedDeliveryDate: formData.requestedDate ? `${formData.requestedDate}T${formData.requestedTime || '00:00'}:00.000Z` : undefined,
+        deliveryWindowStart: formData.requestedTime || undefined,
+        deliveryWindowEnd: formData.requestedTime ? 
+          (() => {
+            // Add 2 hours to the start time for the end window
+            const [hours, minutes] = formData.requestedTime.split(':').map(Number);
+            const endHours = (hours + 2) % 24;
+            return `${endHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          })() : undefined,
         specialHandlingRequirements: formData.specialHandling || undefined,
         deliveryInstructions: formData.deliveryInstructions || undefined,
+        deliveryCostInr: formData.estimatedCost || 0,
+        totalDeliveryCostInr: formData.estimatedCost || 0,
+        packageCount: selectedItems.reduce((sum, item) => sum + (item.deliveryQuantity || 0), 0),
         notes: formData.notes || undefined,
         items: selectedItems.map(item => ({
           qualityApprovedItemId: item.id,
@@ -476,11 +518,31 @@ export default function DeliveryOrderWorkflow({
           approvedQuantity: item.approvedQuantity,
           deliveryQuantity: item.deliveryQuantity,
           qcCertificateNumber: item.qcCertificateNumber || undefined,
-        }))
+        })),
+        // Route and transport data
+        transportMode: formData.transportMode,
+        materialType: formData.materialType || routeData?.materialType,
+        routeType: routeData?.optimizationLevel,
+        routeDistanceKm: routeData?.distance,
+        routeTravelTimeMinutes: routeData?.duration,
+        routeData: routeData,
+        // Cost breakdown from route calculation
+        transportCostInr: routeData?.costBreakdown?.transportBase || 0,
+        loadingCostInr: routeData?.costBreakdown?.loadingUnloading || 0,
+        fuelTollCostInr: routeData?.costBreakdown?.fuelTollSurcharge || 0,
+        costBreakdown: routeData?.costBreakdown,
+        // Additional workflow data
+        partsPhotos: partsPhotos,
+        packingPhotos: packingPhotos,
+        documents: documents,
+        dockAudit: dockAudit,
+        checkedBy: checkedBy
       };
 
       await createOrderMutation.mutateAsync(orderData);
       toast.success('Delivery order created successfully!');
+      // Refresh the recent orders list
+      await refetchOrders();
       onComplete?.();
 
       // Reset form
@@ -493,9 +555,8 @@ export default function DeliveryOrderWorkflow({
       setCheckedBy('');
       setFormData({
         priority: 'standard',
-        requestedDeliveryDate: '',
-        deliveryWindowStart: '',
-        deliveryWindowEnd: '',
+        requestedDate: '',
+        requestedTime: '',
         deliveryAddressId: '',
         carrierId: '',
         transportMode: '',
@@ -552,7 +613,7 @@ export default function DeliveryOrderWorkflow({
 
   const handleOpenPreview = (file: UploadedFile, collection?: UploadedFile[]) => {
     setPreviewFile(file);
-    
+
     if (collection && file.preview) {
       // If it's an image and we have a collection, set up gallery navigation
       const imageFiles = collection.filter(f => f.preview);
@@ -563,7 +624,7 @@ export default function DeliveryOrderWorkflow({
       setCurrentImageCollection([]);
       setCurrentImageIndex(0);
     }
-    
+
     setShowPreviewModal(true);
   };
 
@@ -599,7 +660,7 @@ export default function DeliveryOrderWorkflow({
   // Route calculation callback
   const handleRouteCalculated = (result: any) => {
     setRouteData(result);
-    
+
     // Update form data for submission
     setFormData(prev => ({
       ...prev,
@@ -797,7 +858,7 @@ export default function DeliveryOrderWorkflow({
                           }, 0).toLocaleString('en-IN')}
                         </span>
                       </div>
-                      
+
                       <div className="flex justify-between items-center gap-4">
                         <Label htmlFor="estimatedCost" className="font-medium whitespace-nowrap">Total Estimated Value:</Label>
                         <div className="flex-1 max-w-xs">
@@ -1004,61 +1065,114 @@ export default function DeliveryOrderWorkflow({
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 gap-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {addresses
                           .filter(addr => addr.addressType === 'pickup' || !addr.addressType)
                           .map((address) => (
-                          <div
-                            key={`from-${address.id}`}
-                            className={`group relative p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${formData.fromAddressId === address.id
-                              ? 'border-green-500 bg-green-50/80 shadow-sm ring-1 ring-green-200'
-                              : 'border-gray-200 hover:border-green-300 hover:bg-gray-50/50'
-                              }`}
-                            onClick={() => setFormData(prev => ({ ...prev, fromAddressId: address.id! }))}
-                          >
-                            {/* Selection indicator and delete button */}
-                            <div className="absolute top-2 right-2 flex items-center gap-2">
-                              {/* Delete button */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (window.confirm('Are you sure you want to delete this pickup address?')) {
-                                    handleDeleteAddress(address.id!);
-                                  }
-                                }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded-full"
-                                title="Delete pickup address"
-                              >
-                                <Trash2 className="h-3 w-3 text-red-500 hover:text-red-600" />
-                              </button>
+                            <div
+                              key={`from-${address.id}`}
+                              className={`group relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.fromAddressId === address.id
+                                ? 'border-primary bg-primary/10 shadow-lg ring-1 ring-primary/30'
+                                : 'border-border bg-card hover:border-primary/40 hover:bg-secondary/50'
+                                }`}
+                              onClick={() => setFormData(prev => ({ ...prev, fromAddressId: address.id! }))}
+                            >
+                              {/* Selection indicator and delete button */}
+                              <div className="absolute top-3 right-3 flex items-center gap-2">
+                                {/* Delete button */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm('Are you sure you want to delete this pickup address?')) {
+                                      handleDeleteAddress(address.id!);
+                                    }
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/20 rounded-full"
+                                  title="Delete pickup address"
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </button>
 
-                              {/* Selection indicator */}
-                              <div className={`w-4 h-4 rounded-full border-2 transition-all ${formData.fromAddressId === address.id
-                                ? 'border-green-500 bg-green-500'
-                                : 'border-gray-300'
-                                }`}>
-                                {formData.fromAddressId === address.id && (
-                                  <div className="w-full h-full rounded-full bg-green-500 flex items-center justify-center">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                {/* Selection indicator */}
+                                <div className={`w-4 h-4 rounded-full border-2 transition-all ${formData.fromAddressId === address.id
+                                  ? 'border-primary bg-primary'
+                                  : 'border-muted-foreground/40'
+                                  }`}>
+                                  {formData.fromAddressId === address.id && (
+                                    <div className="w-full h-full rounded-full bg-primary flex items-center justify-center">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Company/Contact header */}
+                              <div className="pr-6 mb-3">
+                                <div className="flex items-start gap-2 mb-2">
+                                  <div className="flex-1">
+                                    <h3 className="font-semibold text-sm text-foreground leading-tight">
+                                      {address.companyName || address.contactPerson}
+                                    </h3>
+                                    {address.companyName && address.contactPerson && (
+                                      <p className="text-xs text-muted-foreground mt-1 leading-tight">
+                                        Contact: {address.contactPerson}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {address.isDefault && (
+                                    <Badge variant="default" className="text-xs bg-primary/20 text-primary border-primary/30 shrink-0">
+                                      Default
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Address */}
+                              <div className="space-y-2 mb-3">
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  <div className="break-words">{address.addressLine1}</div>
+                                  {address.addressLine2 && (
+                                    <div className="break-words mt-1">{address.addressLine2}</div>
+                                  )}
+                                </div>
+                                <div className="text-xs font-medium text-foreground/80">
+                                  {address.city}, {address.stateProvince} {address.postalCode}
+                                </div>
+                                <div className="text-xs text-muted-foreground/70 uppercase tracking-wide">
+                                  {address.country}
+                                </div>
+                              </div>
+
+                              {/* Contact info */}
+                              <div className="space-y-2 mb-3">
+                                {address.contactPhone && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="text-primary shrink-0">📞</span>
+                                    <span className="break-words">{address.contactPhone}</span>
+                                  </div>
+                                )}
+                                {address.contactEmail && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="text-primary shrink-0">✉️</span>
+                                    <span className="break-words">{address.contactEmail}</span>
                                   </div>
                                 )}
                               </div>
-                            </div>
 
-                            {/* Address content - compact version */}
-                            <div className="pr-6">
-                              <h3 className="font-semibold text-sm text-gray-900 leading-tight">
-                                {address.companyName || address.contactPerson}
-                              </h3>
-                              <p className="text-xs text-gray-600 mt-1">
-                                {address.city}, {address.stateProvince}
-                              </p>
-                              {address.contactPhone && (
-                                <p className="text-xs text-gray-500 mt-1">📞 {address.contactPhone}</p>
+                              {/* Special instructions */}
+                              {address.specialInstructions && (
+                                <div className="mt-3 p-2 bg-warning/10 border border-warning/30 rounded">
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-warning text-xs shrink-0">💡</span>
+                                    <div className="flex-1">
+                                      <p className="text-xs font-medium text-warning mb-1">Note:</p>
+                                      <p className="text-xs text-foreground/70 break-words leading-relaxed">{address.specialInstructions}</p>
+                                    </div>
+                                  </div>
+                                </div>
                               )}
                             </div>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     )}
                   </div>
@@ -1233,8 +1347,8 @@ export default function DeliveryOrderWorkflow({
                   {/* Address Selection Cards */}
                   <div>
                     {addresses.filter(addr => addr.addressType === 'delivery' || !addr.addressType).length === 0 ? (
-                      <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center">
-                        <div className="flex flex-col items-center gap-2 text-gray-500">
+                      <div className="p-6 border-2 border-dashed border-border rounded-lg text-center">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
                           <AlertCircle className="h-8 w-8" />
                           <span className="font-medium">No delivery addresses found</span>
                           <p className="text-sm">Create your first delivery address to continue</p>
@@ -1253,110 +1367,110 @@ export default function DeliveryOrderWorkflow({
                         {addresses
                           .filter(addr => addr.addressType === 'delivery' || !addr.addressType)
                           .map((address) => (
-                          <div
-                            key={address.id}
-                            className={`group relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${formData.deliveryAddressId === address.id
-                              ? 'border-blue-500 bg-blue-50/80 shadow-sm ring-1 ring-blue-200'
-                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50/50'
-                              }`}
-                            onClick={() => setFormData(prev => ({ ...prev, deliveryAddressId: address.id! }))}
-                          >
-                            {/* Selection indicator and delete button */}
-                            <div className="absolute top-3 right-3 flex items-center gap-2">
-                              {/* Delete button */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (window.confirm('Are you sure you want to delete this address?')) {
-                                    handleDeleteAddress(address.id!);
-                                  }
-                                }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded-full"
-                                title="Delete address"
-                              >
-                                <Trash2 className="h-3 w-3 text-red-500 hover:text-red-600" />
-                              </button>
+                            <div
+                              key={address.id}
+                              className={`group relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.deliveryAddressId === address.id
+                                ? 'border-primary bg-primary/10 shadow-lg ring-1 ring-primary/30'
+                                : 'border-border bg-card hover:border-primary/40 hover:bg-secondary/50'
+                                }`}
+                              onClick={() => setFormData(prev => ({ ...prev, deliveryAddressId: address.id! }))}
+                            >
+                              {/* Selection indicator and delete button */}
+                              <div className="absolute top-3 right-3 flex items-center gap-2">
+                                {/* Delete button */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm('Are you sure you want to delete this address?')) {
+                                      handleDeleteAddress(address.id!);
+                                    }
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/20 rounded-full"
+                                  title="Delete address"
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </button>
 
-                              {/* Selection indicator */}
-                              <div className={`w-4 h-4 rounded-full border-2 transition-all ${formData.deliveryAddressId === address.id
-                                ? 'border-blue-500 bg-blue-500'
-                                : 'border-gray-300'
-                                }`}>
-                                {formData.deliveryAddressId === address.id && (
-                                  <div className="w-full h-full rounded-full bg-blue-500 flex items-center justify-center">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Company/Contact header */}
-                            <div className="pr-6 mb-3">
-                              <div className="flex items-start gap-2 mb-2">
-                                <div className="flex-1">
-                                  <h3 className="font-semibold text-sm text-gray-900 leading-tight">
-                                    {address.companyName || address.contactPerson}
-                                  </h3>
-                                  {address.companyName && address.contactPerson && (
-                                    <p className="text-xs text-gray-600 mt-1 leading-tight">
-                                      Contact: {address.contactPerson}
-                                    </p>
+                                {/* Selection indicator */}
+                                <div className={`w-4 h-4 rounded-full border-2 transition-all ${formData.deliveryAddressId === address.id
+                                  ? 'border-primary bg-primary'
+                                  : 'border-muted-foreground/40'
+                                  }`}>
+                                  {formData.deliveryAddressId === address.id && (
+                                    <div className="w-full h-full rounded-full bg-primary flex items-center justify-center">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+                                    </div>
                                   )}
                                 </div>
-                                {address.isDefault && (
-                                  <Badge variant="default" className="text-xs bg-green-100 text-green-800 border-green-200 shrink-0">
-                                    Default
-                                  </Badge>
-                                )}
                               </div>
-                            </div>
 
-                            {/* Address */}
-                            <div className="space-y-2 mb-3">
-                              <div className="text-xs text-gray-700 leading-relaxed">
-                                <div className="break-words">{address.addressLine1}</div>
-                                {address.addressLine2 && (
-                                  <div className="break-words mt-1">{address.addressLine2}</div>
-                                )}
-                              </div>
-                              <div className="text-xs font-medium text-gray-800">
-                                {address.city}, {address.stateProvince} {address.postalCode}
-                              </div>
-                              <div className="text-xs text-gray-500 uppercase tracking-wide">
-                                {address.country}
-                              </div>
-                            </div>
-
-                            {/* Contact info */}
-                            <div className="space-y-2 mb-3">
-                              {address.contactPhone && (
-                                <div className="flex items-center gap-2 text-xs text-gray-600">
-                                  <span className="text-blue-500 shrink-0">📞</span>
-                                  <span className="break-words">{address.contactPhone}</span>
-                                </div>
-                              )}
-                              {address.contactEmail && (
-                                <div className="flex items-center gap-2 text-xs text-gray-600">
-                                  <span className="text-blue-500 shrink-0">✉️</span>
-                                  <span className="break-words">{address.contactEmail}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Special instructions */}
-                            {address.specialInstructions && (
-                              <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                                <div className="flex items-start gap-2">
-                                  <span className="text-yellow-600 text-xs shrink-0">💡</span>
+                              {/* Company/Contact header */}
+                              <div className="pr-6 mb-3">
+                                <div className="flex items-start gap-2 mb-2">
                                   <div className="flex-1">
-                                    <p className="text-xs font-medium text-yellow-800 mb-1">Note:</p>
-                                    <p className="text-xs text-yellow-700 break-words leading-relaxed">{address.specialInstructions}</p>
+                                    <h3 className="font-semibold text-sm text-foreground leading-tight">
+                                      {address.companyName || address.contactPerson}
+                                    </h3>
+                                    {address.companyName && address.contactPerson && (
+                                      <p className="text-xs text-muted-foreground mt-1 leading-tight">
+                                        Contact: {address.contactPerson}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {address.isDefault && (
+                                    <Badge variant="default" className="text-xs bg-primary/20 text-primary border-primary/30 shrink-0">
+                                      Default
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Address */}
+                              <div className="space-y-2 mb-3">
+                                <div className="text-xs text-muted-foreground leading-relaxed">
+                                  <div className="break-words">{address.addressLine1}</div>
+                                  {address.addressLine2 && (
+                                    <div className="break-words mt-1">{address.addressLine2}</div>
+                                  )}
+                                </div>
+                                <div className="text-xs font-medium text-foreground/80">
+                                  {address.city}, {address.stateProvince} {address.postalCode}
+                                </div>
+                                <div className="text-xs text-muted-foreground/70 uppercase tracking-wide">
+                                  {address.country}
+                                </div>
+                              </div>
+
+                              {/* Contact info */}
+                              <div className="space-y-2 mb-3">
+                                {address.contactPhone && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="text-primary shrink-0">📞</span>
+                                    <span className="break-words">{address.contactPhone}</span>
+                                  </div>
+                                )}
+                                {address.contactEmail && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="text-primary shrink-0">✉️</span>
+                                    <span className="break-words">{address.contactEmail}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Special instructions */}
+                              {address.specialInstructions && (
+                                <div className="mt-3 p-2 bg-warning/10 border border-warning/30 rounded">
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-warning text-xs shrink-0">💡</span>
+                                    <div className="flex-1">
+                                      <p className="text-xs font-medium text-warning mb-1">Note:</p>
+                                      <p className="text-xs text-foreground/70 break-words leading-relaxed">{address.specialInstructions}</p>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                              )}
+                            </div>
+                          ))}
                       </div>
                     )}
                   </div>
@@ -1381,35 +1495,25 @@ export default function DeliveryOrderWorkflow({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="requestedDate">Requested Delivery Date</Label>
+                  <Label htmlFor="requestedDate">Requested Date</Label>
                   <Input
                     id="requestedDate"
                     type="date"
-                    value={formData.requestedDeliveryDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, requestedDeliveryDate: e.target.value }))}
+                    value={formData.requestedDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, requestedDate: e.target.value }))}
                     min={new Date().toISOString().split('T')[0]}
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="windowStart">Delivery Window Start</Label>
+                  <Label htmlFor="requestedTime">Requested Time</Label>
                   <Input
-                    id="windowStart"
+                    id="requestedTime"
                     type="time"
-                    value={formData.deliveryWindowStart}
-                    onChange={(e) => setFormData(prev => ({ ...prev, deliveryWindowStart: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="windowEnd">Delivery Window End</Label>
-                  <Input
-                    id="windowEnd"
-                    type="time"
-                    value={formData.deliveryWindowEnd}
-                    onChange={(e) => setFormData(prev => ({ ...prev, deliveryWindowEnd: e.target.value }))}
+                    value={formData.requestedTime}
+                    onChange={(e) => setFormData(prev => ({ ...prev, requestedTime: e.target.value }))}
                   />
                 </div>
               </div>
@@ -1428,61 +1532,6 @@ export default function DeliveryOrderWorkflow({
               {/* Delivery & Handling */}
               <div className="mt-8">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Delivery &amp; Handling</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Transport Mode Dropdown */}
-                  <div>
-                    <Label htmlFor="transportMode">Transport Mode *</Label>
-                    <Select value={formData.transportMode} onValueChange={handleTransportModeChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select transport mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TRANSPORT_MODES.map((mode) => (
-                          <SelectItem key={mode.value} value={mode.value}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{mode.label}</span>
-                              <span className="text-xs text-muted-foreground">{mode.description}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Material Type Dropdown - Only enabled after transport mode is selected */}
-                  <div>
-                    <Label htmlFor="materialType">Material Type *</Label>
-                    <Select 
-                      value={formData.materialType} 
-                      onValueChange={handleMaterialTypeChange}
-                      disabled={!formData.transportMode}
-                    >
-                      <SelectTrigger>
-                        <SelectValue 
-                          placeholder={
-                            !formData.transportMode 
-                              ? "Select transport first" 
-                              : "Select material type"
-                          } 
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getAvailableMaterialTypes().length === 0 ? (
-                          <SelectItem value="empty" disabled>Select transport mode first</SelectItem>
-                        ) : (
-                          getAvailableMaterialTypes().map((material) => (
-                            <SelectItem key={material.value} value={material.value}>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{material.label}</span>
-                                <span className="text-xs text-muted-foreground">{material.description}</span>
-                              </div>
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
 
                 {/* Special Handling */}
                 <div className="mt-4">
@@ -1512,11 +1561,15 @@ export default function DeliveryOrderWorkflow({
               {formData.fromAddressId && formData.deliveryAddressId && (
                 <div className="mt-8">
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Route Visualization</h3>
-                  
+
                   <RouteMap
                     fromAddress={addresses.find(a => a.id === formData.fromAddressId)}
                     toAddress={addresses.find(a => a.id === formData.deliveryAddressId)}
+                    transportMode={formData.transportMode || 'car'}
+                    materialType={formData.materialType || 'general'}
                     onRouteCalculated={handleRouteCalculated}
+                    onTransportModeChange={handleTransportModeChange}
+                    onMaterialTypeChange={handleMaterialTypeChange}
                   />
                 </div>
               )}
@@ -1592,8 +1645,8 @@ export default function DeliveryOrderWorkflow({
                             )
                           }
                           className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${row.isOk
-                              ? 'bg-green-500 border-green-600 text-white'
-                              : 'border-muted-foreground/40 hover:border-green-400'
+                            ? 'bg-green-500 border-green-600 text-white'
+                            : 'border-muted-foreground/40 hover:border-green-400'
                             }`}
                           title={row.isOk ? 'Unmark OK' : 'Mark OK'}
                         >
@@ -1641,7 +1694,7 @@ export default function DeliveryOrderWorkflow({
 
               {/* File Upload Sections with Enhanced UI/UX */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 {/* Parts Photos */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
@@ -1658,7 +1711,7 @@ export default function DeliveryOrderWorkflow({
                       </Badge>
                     )}
                   </div>
-                  
+
                   <label
                     htmlFor="parts-photos-input"
                     className="relative group block w-full p-6 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary hover:bg-primary/5 transition-all duration-200"
@@ -1687,7 +1740,7 @@ export default function DeliveryOrderWorkflow({
                     <div className="grid grid-cols-2 gap-3">
                       {partsPhotos.map((f) => (
                         <div key={f.id} className="relative group">
-                          <div 
+                          <div
                             className="aspect-square rounded-lg overflow-hidden border-2 border-border bg-muted/30 cursor-pointer hover:border-primary transition-colors"
                             onClick={() => handleOpenPreview(f, partsPhotos)}
                           >
@@ -1735,7 +1788,7 @@ export default function DeliveryOrderWorkflow({
                       </Badge>
                     )}
                   </div>
-                  
+
                   <label
                     htmlFor="packing-photos-input"
                     className="relative group block w-full p-6 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50/50 transition-all duration-200"
@@ -1764,7 +1817,7 @@ export default function DeliveryOrderWorkflow({
                     <div className="grid grid-cols-2 gap-3">
                       {packingPhotos.map((f) => (
                         <div key={f.id} className="relative group">
-                          <div 
+                          <div
                             className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-50 cursor-pointer hover:border-green-400 transition-colors"
                             onClick={() => handleOpenPreview(f, packingPhotos)}
                           >
@@ -1812,7 +1865,7 @@ export default function DeliveryOrderWorkflow({
                       </Badge>
                     )}
                   </div>
-                  
+
                   <label
                     htmlFor="documents-input"
                     className="relative group block w-full p-6 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-purple-400 hover:bg-purple-50/50 transition-all duration-200"
@@ -1840,8 +1893,8 @@ export default function DeliveryOrderWorkflow({
                   {documents.length > 0 && (
                     <div className="space-y-3">
                       {documents.map((f) => (
-                        <div 
-                          key={f.id} 
+                        <div
+                          key={f.id}
                           className="group flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50/50 hover:bg-gray-50 hover:border-purple-300 transition-colors cursor-pointer"
                           onClick={() => handleOpenPreview(f)}
                         >
@@ -1880,144 +1933,600 @@ export default function DeliveryOrderWorkflow({
           )}
 
           {/* Step 4: Review & Submit */}
-          {currentStep === 4 && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Order Summary */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Order Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <h4 className="font-medium">Items ({selectedItems.length})</h4>
-                      {selectedItems.map((item) => (
-                        <div key={item.id} className="flex justify-between text-sm">
-                          <span>{item.bomItem.partNumber}</span>
-                          <span>{item.deliveryQuantity} × ₹{item.bomItem.unitCost}</span>
+          {currentStep === 4 && (() => {
+            const fromAddress = addresses.find(a => a.id === formData.fromAddressId);
+            const toAddress = addresses.find(a => a.id === formData.deliveryAddressId);
+            const auditOkCount = dockAudit.filter(r => r.isOk).length;
+            const auditTotal = dockAudit.length;
+
+            const handleExportPDF = () => {
+              const el = document.getElementById('delivery-review-print');
+              if (!el) return;
+
+              const fromAddr = addresses.find(a => a.id === formData.fromAddressId);
+              const toAddr = addresses.find(a => a.id === formData.deliveryAddressId);
+              const okCount = dockAudit.filter(r => r.isOk).length;
+              const partsTotal = selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0);
+              const grandTotal = partsTotal + (routeData?.cost ?? 0);
+
+              const addrBlock = (addr: any, label: string) => addr ? `
+                <div class="addr-card">
+                  <div class="addr-label">${label}</div>
+                  <div class="addr-name">${addr.companyName || addr.contactPerson || ''}</div>
+                  ${addr.companyName && addr.contactPerson ? `<div>${addr.contactPerson}</div>` : ''}
+                  <div>${addr.addressLine1 || ''}</div>
+                  ${addr.addressLine2 ? `<div>${addr.addressLine2}</div>` : ''}
+                  <div>${addr.city || ''}, ${addr.stateProvince || ''} – ${addr.postalCode || ''}</div>
+                  <div>${addr.country || ''}</div>
+                  ${addr.contactPhone ? `<div>📞 ${addr.contactPhone}</div>` : ''}
+                  ${addr.contactEmail ? `<div>✉ ${addr.contactEmail}</div>` : ''}
+                  ${addr.specialInstructions ? `<div class="instructions"><b>Instructions:</b> ${addr.specialInstructions}</div>` : ''}
+                </div>` : `<div class="addr-card"><i>Not selected</i></div>`;
+
+              const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Delivery Order – Dock Audit Report</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#111;background:#fff;padding:12mm}
+    h1{font-size:15pt;margin-bottom:2mm}
+    h2{font-size:12pt;border-bottom:2px solid #333;padding-bottom:2mm;margin:6mm 0 3mm}
+    h3{font-size:10pt;margin-bottom:2mm;color:#555}
+    table{width:100%;border-collapse:collapse;margin-bottom:4mm}
+    th,td{border:1px solid #bbb;padding:4px 7px;font-size:10pt;text-align:left;vertical-align:middle}
+    th{background:#f0f0f0;font-weight:bold;text-align:center}
+    td.center{text-align:center}
+    td.right{text-align:right}
+    .ok-badge{display:inline-block;width:18px;height:18px;border-radius:50%;background:#22c55e;color:#fff;text-align:center;line-height:18px;font-size:9pt;font-weight:bold}
+    .no-badge{display:inline-block;width:18px;height:18px;border-radius:50%;background:#e5e7eb;color:#888;text-align:center;line-height:18px;font-size:9pt}
+    .ok-row{background:#f0fdf4}
+    .header-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3mm}
+    .score-box{text-align:right}
+    .score-num{font-size:22pt;font-weight:bold;color:#1d4ed8}
+    .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9pt;font-weight:bold}
+    .badge-pass{background:#dcfce7;color:#166534}
+    .badge-partial{background:#fef9c3;color:#854d0e}
+    .badge-fail{background:#fee2e2;color:#991b1b}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6mm;margin-bottom:4mm}
+    .addr-card{border:1px solid #ddd;border-radius:4px;padding:4mm;font-size:10pt;line-height:1.6}
+    .addr-label{font-size:8pt;text-transform:uppercase;letter-spacing:.05em;color:#666;margin-bottom:1mm}
+    .addr-name{font-weight:bold;font-size:11pt}
+    .instructions{margin-top:2mm;background:#f5f5f5;padding:2mm 3mm;border-radius:3px;font-size:9pt}
+    .metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:4mm;margin-bottom:4mm}
+    .metric-box{border:1px solid #ddd;border-radius:4px;padding:3mm;text-align:center}
+    .metric-val{font-size:14pt;font-weight:bold;color:#1d4ed8}
+    .metric-val.green{color:#16a34a}
+    .metric-val.sky{color:#0284c7}
+    .metric-lbl{font-size:8pt;color:#666;margin-top:1mm}
+    .breakdown-header{background:#f5f5f5;padding:2mm 4mm;font-size:9pt;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#555;border:1px solid #ddd;border-bottom:none;border-radius:4px 4px 0 0}
+    .breakdown-body{border:1px solid #ddd;border-radius:0 0 4px 4px;overflow:hidden}
+    .breakdown-row{display:flex;justify-content:space-between;padding:2mm 4mm;font-size:10pt;border-bottom:1px solid #eee}
+    .breakdown-row:last-child{border-bottom:none;font-weight:bold;background:#f9f9f9}
+    .breakdown-muted{color:#555}
+    .chips{display:flex;flex-wrap:wrap;gap:2mm;margin-top:3mm}
+    .chip{display:inline-block;padding:1mm 3mm;border-radius:20px;font-size:9pt;background:#e0e7ff;color:#3730a3}
+    .chip.secondary{background:#f3f4f6;color:#374151}
+    .chip.warn{background:#fef3c7;color:#92400e}
+    .footer{margin-top:6mm;display:flex;justify-content:space-between;font-size:9pt;color:#555;border-top:1px solid #ccc;padding-top:2mm}
+    tfoot td{font-weight:bold;background:#f5f5f5}
+    tfoot tr:last-child td{background:#eff6ff;color:#1d4ed8;font-size:11pt}
+    .audit-footer{display:flex;justify-content:space-between;margin-top:3mm;padding-top:2mm;border-top:1px solid #eee;font-size:10pt}
+    @page{margin:12mm;size:A4}
+  </style>
+</head>
+<body>
+  <div class="header-row">
+    <div>
+      <h1>Delivery Order Report</h1>
+      <div style="font-size:9pt;color:#666">Generated: ${new Date().toLocaleString('en-IN')}</div>
+    </div>
+  </div>
+
+  <!-- DOCK AUDIT -->
+  <h2>6.5 Dock Audit Check Sheet</h2>
+  <div class="header-row">
+    <div></div>
+    <div class="score-box">
+      <span class="score-num">${okCount} / ${dockAudit.length}</span>
+      <div style="font-size:9pt;color:#555">Items OK</div>
+      <span class="badge ${okCount === dockAudit.length ? 'badge-pass' : okCount >= dockAudit.length * 0.7 ? 'badge-partial' : 'badge-fail'}">
+        ${okCount === dockAudit.length ? '✓ PASS' : okCount >= dockAudit.length * 0.7 ? '⚠ PARTIAL' : '✗ FAIL'}
+      </span>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th style="width:40px">S.No</th><th>Activity</th><th>Specified</th><th style="width:50px">OK</th><th style="width:70px">Value</th></tr></thead>
+    <tbody>
+      ${dockAudit.map(r => `
+        <tr class="${r.isOk ? 'ok-row' : ''}">
+          <td class="center">${r.slNo}</td>
+          <td><b>${r.activity}</b></td>
+          <td style="color:#555">${r.specified}</td>
+          <td class="center">${r.isOk ? '<span class="ok-badge">✓</span>' : '<span class="no-badge">—</span>'}</td>
+          <td class="center">${r.value || '—'}</td>
+        </tr>`).join('')}
+    </tbody>
+  </table>
+  <div class="audit-footer">
+    <span><b>Checked by:</b> ${checkedBy || '—'}</span>
+    <span><b>Date:</b> ${new Date().toLocaleDateString('en-IN')}</span>
+  </div>
+
+  <!-- ADDRESSES -->
+  <h2>Addresses</h2>
+  <div class="grid2">
+    ${addrBlock(fromAddr, '⬆ From (Pickup)')}
+    ${addrBlock(toAddr, '⬇ To (Delivery)')}
+  </div>
+
+  <!-- ROUTE -->
+  ${routeData ? `
+  <h2>Route & Shipping Cost</h2>
+  <div class="metrics-row">
+    <div class="metric-box"><div class="metric-val">${routeData.distance} km</div><div class="metric-lbl">${routeData.isEstimated ? 'Est. Distance' : 'Road Distance'}</div></div>
+    <div class="metric-box"><div class="metric-val">${(routeData.duration ?? 0) >= 60 ? `${Math.floor((routeData.duration ?? 0) / 60)}h ${(routeData.duration ?? 0) % 60}m` : `${routeData.duration ?? 0}m`}</div><div class="metric-lbl">${routeData.isEstimated ? 'Est. Time' : 'Travel Time'}</div></div>
+    <div class="metric-box"><div class="metric-val green">₹${(routeData.cost ?? 0).toLocaleString('en-IN')}</div><div class="metric-lbl">Shipping Cost</div></div>
+    <div class="metric-box"><div class="metric-val sky">${routeData.dataQualityScore ?? '—'}%</div><div class="metric-lbl">Data Quality</div></div>
+  </div>
+  ${routeData.costBreakdown ? `
+  <div class="breakdown-header">Cost Breakdown</div>
+  <div class="breakdown-body">
+    <div class="breakdown-row"><span class="breakdown-muted">Transport (${routeData.distance} km)</span><span>₹${(routeData.costBreakdown.transportBase ?? 0).toLocaleString('en-IN')}</span></div>
+    <div class="breakdown-row"><span class="breakdown-muted">Loading & Unloading</span><span>₹${(routeData.costBreakdown.loadingUnloading ?? 0).toLocaleString('en-IN')}</span></div>
+    ${(routeData.costBreakdown.materialSurcharge ?? 0) > 0 ? `<div class="breakdown-row"><span class="breakdown-muted">Material Surcharge (${formData.materialType || 'general'})</span><span>₹${routeData.costBreakdown.materialSurcharge.toLocaleString('en-IN')}</span></div>` : ''}
+    ${(routeData.costBreakdown.fuelTollSurcharge ?? 0) > 0 ? `<div class="breakdown-row"><span class="breakdown-muted">Fuel & Toll (6%)</span><span>₹${routeData.costBreakdown.fuelTollSurcharge.toLocaleString('en-IN')}</span></div>` : ''}
+    <div class="breakdown-row"><span>Total Shipping</span><span style="color:#16a34a">₹${(routeData.cost ?? 0).toLocaleString('en-IN')}</span></div>
+  </div>
+  <div class="chips">
+    ${formData.transportMode ? `<span class="chip">🚛 ${formData.transportMode}</span>` : ''}
+    ${formData.materialType ? `<span class="chip secondary">📦 ${formData.materialType}</span>` : ''}
+    ${routeData.isEstimated ? `<span class="chip warn">⚠ Estimated route</span>` : ''}
+    ${routeData.routeProvider ? `<span class="chip secondary">via ${routeData.routeProvider}</span>` : ''}
+  </div>` : ''}` : ''}
+
+  <!-- ITEMS -->
+  <h2>Items Summary (${selectedItems.length})</h2>
+  <table>
+    <thead><tr><th>Part No.</th><th>Description</th><th style="width:50px">Qty</th><th style="width:90px;text-align:right">Unit Cost</th><th style="width:90px;text-align:right">Total</th></tr></thead>
+    <tbody>
+      ${selectedItems.map(item => `
+        <tr>
+          <td><b>${item.bomItem.partNumber}</b></td>
+          <td style="color:#555">${item.bomItem.description || ''}</td>
+          <td class="center">${item.deliveryQuantity}</td>
+          <td class="right">₹${(item.bomItem.unitCost || 0).toLocaleString('en-IN')}</td>
+          <td class="right">₹${((item.bomItem.unitCost || 0) * item.deliveryQuantity).toLocaleString('en-IN')}</td>
+        </tr>`).join('')}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="4" class="right">Parts Total</td><td class="right">₹${partsTotal.toLocaleString('en-IN')}</td></tr>
+      ${routeData?.cost ? `<tr><td colspan="4" class="right">Shipping Cost</td><td class="right" style="color:#16a34a">₹${(routeData.cost).toLocaleString('en-IN')}</td></tr>` : ''}
+      <tr><td colspan="4" class="right">Grand Total</td><td class="right">₹${grandTotal.toLocaleString('en-IN')}</td></tr>
+    </tfoot>
+  </table>
+
+  <!-- META -->
+  <div class="grid2" style="margin-top:3mm">
+    <div><b>Priority:</b> ${formData.priority}</div>
+    ${formData.requestedDeliveryDate ? `<div><b>Requested Delivery:</b> ${new Date(formData.requestedDeliveryDate).toLocaleDateString('en-IN')}</div>` : ''}
+    ${formData.specialHandling ? `<div><b>Special Handling:</b> ${formData.specialHandling}</div>` : ''}
+  </div>
+
+  ${(partsPhotos.length > 0 || packingPhotos.length > 0 || documents.length > 0) ? `
+  <h3 style="margin-top:4mm">Attachments</h3>
+  <div style="font-size:10pt;line-height:1.8">
+    ${partsPhotos.length > 0 ? `
+    <div style="margin-bottom:2mm">
+      <b>📷 Parts Photos (${partsPhotos.length}):</b><br/>
+      ${partsPhotos.map(f => `<span style="display:inline-block;margin:1mm 2mm 1mm 0;padding:1mm 3mm;background:#f3f4f6;border:1px solid #ddd;border-radius:3px;font-size:9pt">${f.file.name}</span>`).join('')}
+    </div>` : ''}
+    ${packingPhotos.length > 0 ? `
+    <div style="margin-bottom:2mm">
+      <b>📦 Packing Photos (${packingPhotos.length}):</b><br/>
+      ${packingPhotos.map(f => `<span style="display:inline-block;margin:1mm 2mm 1mm 0;padding:1mm 3mm;background:#f3f4f6;border:1px solid #ddd;border-radius:3px;font-size:9pt">${f.file.name}</span>`).join('')}
+    </div>` : ''}
+    ${documents.length > 0 ? `
+    <div style="margin-bottom:2mm">
+      <b>📄 Documents (${documents.length}):</b><br/>
+      ${documents.map(f => `<span style="display:inline-block;margin:1mm 2mm 1mm 0;padding:1mm 3mm;background:#f3f4f6;border:1px solid #ddd;border-radius:3px;font-size:9pt">${f.file.name}</span>`).join('')}
+    </div>` : ''}
+  </div>` : ''}
+
+  ${formData.deliveryInstructions ? `<h3 style="margin-top:4mm">Delivery Instructions</h3><p>${formData.deliveryInstructions}</p>` : ''}
+  ${formData.notes ? `<h3 style="margin-top:4mm">Notes</h3><p>${formData.notes}</p>` : ''}
+
+  <div class="footer">
+    <span>Document 6.5 – Dock Audit Check Sheet</span>
+    <span>Printed: ${new Date().toLocaleString('en-IN')}</span>
+  </div>
+</body>
+</html>`;
+
+              const win = window.open('', '_blank', 'width=900,height=700');
+              if (!win) { alert('Please allow popups for this site to export PDF.'); return; }
+              win.document.write(html);
+              win.document.close();
+              win.focus();
+              setTimeout(() => { win.print(); }, 600);
+            };
+
+            return (
+              <div id="delivery-review-print" className="space-y-6">
+
+                {/* Export Button */}
+                <div className="flex justify-end no-print">
+                  <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    Export as PDF
+                  </Button>
+                </div>
+
+                {/* ── Section: Dock Audit Check Sheet 6.5 ─────────────────────── */}
+                <Card className="border-2 border-primary/20">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">Document 6.5</div>
+                        <CardTitle className="text-lg">Dock Audit Check Sheet</CardTitle>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-primary">{auditOkCount} / {auditTotal}</div>
+                        <div className="text-xs text-muted-foreground">Items OK</div>
+                        <div className="mt-1">
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${auditOkCount === auditTotal ? 'bg-green-100 text-green-700' :
+                            auditOkCount >= auditTotal * 0.7 ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                            {auditOkCount === auditTotal ? '✓ PASS' : auditOkCount >= auditTotal * 0.7 ? '⚠ PARTIAL' : '✗ FAIL'}
+                          </span>
                         </div>
-                      ))}
+                      </div>
                     </div>
-
-                    <Separator />
-
-                    <div className="flex justify-between font-medium">
-                      <span>Total Value:</span>
-                      <span>₹{formData.estimatedCost.toLocaleString('en-IN')}</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="bg-muted/60">
+                            <th className="border border-border px-3 py-2 text-center w-10">S.No</th>
+                            <th className="border border-border px-3 py-2 text-left">Activity</th>
+                            <th className="border border-border px-3 py-2 text-left">Specified</th>
+                            <th className="border border-border px-3 py-2 text-center w-16">OK</th>
+                            <th className="border border-border px-3 py-2 text-center w-24">Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dockAudit.map((row) => (
+                            <tr key={row.slNo} className={row.isOk ? 'bg-green-50/30' : ''}>
+                              <td className="border border-border px-3 py-2 text-center font-medium">{row.slNo}</td>
+                              <td className="border border-border px-3 py-2 font-medium">{row.activity}</td>
+                              <td className="border border-border px-3 py-2 text-muted-foreground">{row.specified}</td>
+                              <td className="border border-border px-3 py-2 text-center">
+                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${row.isOk ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                                  }`}>
+                                  {row.isOk ? '✓' : '—'}
+                                </span>
+                              </td>
+                              <td className="border border-border px-3 py-2 text-center">
+                                {row.value || '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t text-sm">
+                      <span className="text-muted-foreground">Checked by:</span>
+                      <span className="font-semibold">{checkedBy || '—'}</span>
+                      <span className="text-muted-foreground">Date:</span>
+                      <span className="font-semibold">{new Date().toLocaleDateString('en-IN')}</span>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="text-sm space-y-1">
-                      <div><strong>Priority:</strong> {formData.priority}</div>
-                      {formData.requestedDeliveryDate && (
-                        <div><strong>Requested Date:</strong> {new Date(formData.requestedDeliveryDate).toLocaleDateString()}</div>
+                {/* ── Section: Addresses ─────────────────────────────────────── */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold">F</span>
+                        From (Pickup)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-1">
+                      {fromAddress ? (
+                        <>
+                          <div className="font-semibold text-foreground">{fromAddress.companyName || fromAddress.contactPerson}</div>
+                          {fromAddress.companyName && fromAddress.contactPerson && (
+                            <div className="text-muted-foreground">{fromAddress.contactPerson}</div>
+                          )}
+                          <div>{fromAddress.addressLine1}</div>
+                          {fromAddress.addressLine2 && <div>{fromAddress.addressLine2}</div>}
+                          <div>{fromAddress.city}, {fromAddress.stateProvince} – {fromAddress.postalCode}</div>
+                          <div>{fromAddress.country}</div>
+                          {fromAddress.contactPhone && (
+                            <div className="flex items-center gap-1 text-muted-foreground pt-1">
+                              <Phone className="h-3 w-3" />{fromAddress.contactPhone}
+                            </div>
+                          )}
+                          {fromAddress.contactEmail && (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Mail className="h-3 w-3" />{fromAddress.contactEmail}
+                            </div>
+                          )}
+                        </>
+                      ) : <p className="text-muted-foreground italic">No pickup address selected</p>}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">T</span>
+                        To (Delivery)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-1">
+                      {toAddress ? (
+                        <>
+                          <div className="font-semibold text-foreground">{toAddress.companyName || toAddress.contactPerson}</div>
+                          {toAddress.companyName && toAddress.contactPerson && (
+                            <div className="text-muted-foreground">{toAddress.contactPerson}</div>
+                          )}
+                          <div>{toAddress.addressLine1}</div>
+                          {toAddress.addressLine2 && <div>{toAddress.addressLine2}</div>}
+                          <div>{toAddress.city}, {toAddress.stateProvince} – {toAddress.postalCode}</div>
+                          <div>{toAddress.country}</div>
+                          {toAddress.contactPhone && (
+                            <div className="flex items-center gap-1 text-muted-foreground pt-1">
+                              <Phone className="h-3 w-3" />{toAddress.contactPhone}
+                            </div>
+                          )}
+                          {toAddress.contactEmail && (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Mail className="h-3 w-3" />{toAddress.contactEmail}
+                            </div>
+                          )}
+                          {toAddress.specialInstructions && (
+                            <div className="mt-2 p-2 bg-muted rounded text-xs">
+                              <strong>Instructions:</strong> {toAddress.specialInstructions}
+                            </div>
+                          )}
+                        </>
+                      ) : <p className="text-muted-foreground italic">No delivery address selected</p>}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* ── Section: Route & Cost Breakdown ────────────────────────── */}
+                {routeData && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Truck className="h-4 w-4" />
+                        Route & Shipping Cost
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {/* Metrics row */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <div className="text-center p-3 bg-muted/40 rounded-lg border">
+                          <div className="text-xl font-bold text-primary">{routeData.distance} km</div>
+                          <div className="text-xs text-muted-foreground mt-1">{routeData.isEstimated ? 'Est. Distance' : 'Road Distance'}</div>
+                        </div>
+                        <div className="text-center p-3 bg-muted/40 rounded-lg border">
+                          <div className="text-xl font-bold text-primary">
+                            {(routeData.duration ?? 0) >= 60
+                              ? `${Math.floor((routeData.duration ?? 0) / 60)}h ${(routeData.duration ?? 0) % 60}m`
+                              : `${routeData.duration ?? 0}m`}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">{routeData.isEstimated ? 'Est. Time' : 'Travel Time'}</div>
+                        </div>
+                        <div className="text-center p-3 bg-muted/40 rounded-lg border">
+                          <div className="text-xl font-bold text-emerald-500">₹{(routeData.cost ?? 0).toLocaleString('en-IN')}</div>
+                          <div className="text-xs text-muted-foreground mt-1">Shipping Cost</div>
+                        </div>
+                        <div className="text-center p-3 bg-muted/40 rounded-lg border">
+                          <div className="text-xl font-bold text-sky-500">{routeData.dataQualityScore ?? '—'}%</div>
+                          <div className="text-xs text-muted-foreground mt-1">Data Quality</div>
+                        </div>
+                      </div>
+
+                      {/* Cost breakdown table */}
+                      {routeData.costBreakdown && (
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="bg-muted/40 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cost Breakdown</div>
+                          <div className="divide-y">
+                            <div className="flex justify-between px-3 py-2 text-sm">
+                              <span className="text-muted-foreground">Transport ({routeData.distance} km)</span>
+                              <span>₹{(routeData.costBreakdown.transportBase ?? 0).toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="flex justify-between px-3 py-2 text-sm">
+                              <span className="text-muted-foreground">Loading & Unloading</span>
+                              <span>₹{(routeData.costBreakdown.loadingUnloading ?? 0).toLocaleString('en-IN')}</span>
+                            </div>
+                            {(routeData.costBreakdown.materialSurcharge ?? 0) > 0 && (
+                              <div className="flex justify-between px-3 py-2 text-sm">
+                                <span className="text-muted-foreground">
+                                  Material Surcharge ({formData.materialType || 'general'})
+                                </span>
+                                <span>₹{routeData.costBreakdown.materialSurcharge.toLocaleString('en-IN')}</span>
+                              </div>
+                            )}
+                            {(routeData.costBreakdown.fuelTollSurcharge ?? 0) > 0 && (
+                              <div className="flex justify-between px-3 py-2 text-sm">
+                                <span className="text-muted-foreground">Fuel & Toll (6%)</span>
+                                <span>₹{routeData.costBreakdown.fuelTollSurcharge.toLocaleString('en-IN')}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between px-3 py-2 text-sm font-semibold bg-muted/20">
+                              <span>Total Shipping</span>
+                              <span className="text-emerald-500">₹{(routeData.cost ?? 0).toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+                        </div>
                       )}
-                      {formData.deliveryMode && (
-                        <div><strong>Delivery Mode:</strong> {DELIVERY_MODES.find(m => m.value === formData.deliveryMode)?.label}</div>
+
+                      {/* Transport info */}
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {formData.transportMode && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">
+                            🚛 {formData.transportMode}
+                          </span>
+                        )}
+                        {formData.materialType && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground font-medium">
+                            📦 {formData.materialType}
+                          </span>
+                        )}
+                        {routeData.isEstimated && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                            ⚠ Estimated route
+                          </span>
+                        )}
+                        {routeData.routeProvider && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                            via {routeData.routeProvider}
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* ── Section: Order Summary ──────────────────────────────────── */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Items Summary ({selectedItems.length})
+                      </CardTitle>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Parts Value</div>
+                        <div className="font-bold text-primary">₹{selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0).toLocaleString('en-IN')}</div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="bg-muted/60">
+                            <th className="border border-border px-3 py-2 text-left">Part No.</th>
+                            <th className="border border-border px-3 py-2 text-left">Description</th>
+                            <th className="border border-border px-3 py-2 text-center">Qty</th>
+                            <th className="border border-border px-3 py-2 text-right">Unit Cost</th>
+                            <th className="border border-border px-3 py-2 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedItems.map((item) => (
+                            <tr key={item.id}>
+                              <td className="border border-border px-3 py-2 font-mono font-medium">{item.bomItem.partNumber}</td>
+                              <td className="border border-border px-3 py-2 text-muted-foreground">{item.bomItem.description}</td>
+                              <td className="border border-border px-3 py-2 text-center">{item.deliveryQuantity}</td>
+                              <td className="border border-border px-3 py-2 text-right">₹{(item.bomItem.unitCost || 0).toLocaleString('en-IN')}</td>
+                              <td className="border border-border px-3 py-2 text-right font-medium">₹{((item.bomItem.unitCost || 0) * item.deliveryQuantity).toLocaleString('en-IN')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-muted/40 font-semibold">
+                            <td colSpan={4} className="border border-border px-3 py-2 text-right">Parts Total</td>
+                            <td className="border border-border px-3 py-2 text-right text-primary">
+                              ₹{selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                          {routeData?.cost && (
+                            <tr className="bg-muted/40 font-semibold">
+                              <td colSpan={4} className="border border-border px-3 py-2 text-right">Shipping Cost</td>
+                              <td className="border border-border px-3 py-2 text-right text-emerald-500">
+                                ₹{(routeData.cost).toLocaleString('en-IN')}
+                              </td>
+                            </tr>
+                          )}
+                          <tr className="bg-primary/5 font-bold text-base">
+                            <td colSpan={4} className="border border-border px-3 py-2 text-right">Grand Total</td>
+                            <td className="border border-border px-3 py-2 text-right text-primary">
+                              ₹{(selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0) + (routeData?.cost ?? 0)).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-sm">
+                      <div><span className="text-muted-foreground">Priority:</span> <strong className="capitalize">{formData.priority}</strong></div>
+                      {formData.requestedDeliveryDate && (
+                        <div><span className="text-muted-foreground">Delivery Date:</span> <strong>{new Date(formData.requestedDeliveryDate).toLocaleDateString('en-IN')}</strong></div>
                       )}
                       {formData.carrierId && (
-                        <div><strong>Carrier:</strong> {getAvailableCarriers().find(c => c.id === formData.carrierId)?.name}</div>
+                        <div><span className="text-muted-foreground">Carrier:</span> <strong>{getAvailableCarriers().find(c => c.id === formData.carrierId)?.name || '—'}</strong></div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-
-                {/* Delivery Information */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Delivery Information</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {formData.deliveryAddressId ? (
-                      <div className="space-y-3">
-                        {(() => {
-                          const address = addresses.find(a => a.id === formData.deliveryAddressId);
-                          return address ? (
-                            <>
-                              <div>
-                                <strong>{address.companyName || address.contactPerson}</strong>
-                                {address.companyName && address.contactPerson && (
-                                  <div className="text-sm text-muted-foreground">{address.contactPerson}</div>
-                                )}
-                              </div>
-                              <div className="text-sm">
-                                <div>{address.addressLine1}</div>
-                                {address.addressLine2 && <div>{address.addressLine2}</div>}
-                                <div>{address.city}, {address.stateProvince} {address.postalCode}</div>
-                              </div>
-                              {address.contactPhone && (
-                                <div className="text-sm flex items-center gap-1">
-                                  <Phone className="h-3 w-3" />
-                                  {address.contactPhone}
-                                </div>
-                              )}
-                              {address.specialInstructions && (
-                                <div className="text-sm bg-muted p-2 rounded">
-                                  <strong>Instructions:</strong> {address.specialInstructions}
-                                </div>
-                              )}
-                            </>
-                          ) : null;
-                        })()}
+                    {/* Attachments file list */}
+                    {(partsPhotos.length > 0 || packingPhotos.length > 0 || documents.length > 0) && (
+                      <div className="mt-3 pt-3 border-t space-y-2">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Attachments</div>
+                        {partsPhotos.length > 0 && (
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">📷 Parts Photos ({partsPhotos.length})</div>
+                            <div className="flex flex-wrap gap-1">
+                              {partsPhotos.map(f => (
+                                <span key={f.id} className="text-xs px-2 py-0.5 rounded bg-muted border truncate max-w-[200px]" title={f.file.name}>{f.file.name}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {packingPhotos.length > 0 && (
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">📦 Packing Photos ({packingPhotos.length})</div>
+                            <div className="flex flex-wrap gap-1">
+                              {packingPhotos.map(f => (
+                                <span key={f.id} className="text-xs px-2 py-0.5 rounded bg-muted border truncate max-w-[200px]" title={f.file.name}>{f.file.name}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {documents.length > 0 && (
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">📄 Documents ({documents.length})</div>
+                            <div className="flex flex-wrap gap-1">
+                              {documents.map(f => (
+                                <span key={f.id} className="text-xs px-2 py-0.5 rounded bg-muted border truncate max-w-[200px]" title={f.file.name}>{f.file.name}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-muted-foreground">No address selected</p>
                     )}
                   </CardContent>
                 </Card>
+
+                {/* ── Delivery Instructions & Notes ───────────────────────────── */}
+                {(formData.deliveryInstructions || formData.notes) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {formData.deliveryInstructions && (
+                      <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm">Delivery Instructions</CardTitle></CardHeader>
+                        <CardContent><p className="text-sm text-muted-foreground">{formData.deliveryInstructions}</p></CardContent>
+                      </Card>
+                    )}
+                    {formData.notes && (
+                      <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm">Additional Notes</CardTitle></CardHeader>
+                        <CardContent><p className="text-sm text-muted-foreground">{formData.notes}</p></CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
               </div>
-
-              {formData.deliveryInstructions && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Delivery Instructions</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm">{formData.deliveryInstructions}</p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {formData.notes && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Additional Notes</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm">{formData.notes}</p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Attachments Summary */}
-              {(partsPhotos.length > 0 || packingPhotos.length > 0 || documents.length > 0) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Attachments</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {partsPhotos.length > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Image className="h-4 w-4 text-muted-foreground" />
-                        <span><strong>{partsPhotos.length}</strong> parts photo{partsPhotos.length > 1 ? 's' : ''}</span>
-                      </div>
-                    )}
-                    {packingPhotos.length > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <span><strong>{packingPhotos.length}</strong> packing photo{packingPhotos.length > 1 ? 's' : ''}</span>
-                      </div>
-                    )}
-                    {documents.length > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Paperclip className="h-4 w-4 text-muted-foreground" />
-                        <span><strong>{documents.length}</strong> document{documents.length > 1 ? 's' : ''}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -2069,11 +2578,11 @@ export default function DeliveryOrderWorkflow({
       {showPreviewModal && previewFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
-          <div 
+          <div
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             onClick={handleClosePreview}
           />
-          
+
           {/* Modal Content */}
           <div className="relative z-10 max-w-7xl max-h-[90vh] w-full bg-background rounded-2xl shadow-2xl overflow-hidden border">
             {/* Modal Header */}
@@ -2096,7 +2605,7 @@ export default function DeliveryOrderWorkflow({
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -2118,7 +2627,7 @@ export default function DeliveryOrderWorkflow({
                   </svg>
                   Download
                 </Button>
-                
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -2147,8 +2656,8 @@ export default function DeliveryOrderWorkflow({
                   )}
 
                   {/* Main Image */}
-                  <img 
-                    src={previewFile.preview} 
+                  <img
+                    src={previewFile.preview}
                     alt={previewFile.file.name}
                     className="max-w-full max-h-[calc(90vh-200px)] object-contain rounded-lg shadow-lg"
                   />
@@ -2186,7 +2695,7 @@ export default function DeliveryOrderWorkflow({
                     <p><strong>File Size:</strong> {formatFileSize(previewFile.file.size)}</p>
                     <p><strong>Last Modified:</strong> {new Date(previewFile.file.lastModified).toLocaleString()}</p>
                   </div>
-                  
+
                   {/* PDF Preview Attempt */}
                   {previewFile.file.type === 'application/pdf' && (
                     <div className="mt-8">
@@ -2197,21 +2706,21 @@ export default function DeliveryOrderWorkflow({
                       />
                     </div>
                   )}
-                  
+
                   {/* Text file preview attempt */}
-                  {(previewFile.file.type.startsWith('text/') || 
-                    previewFile.file.name.endsWith('.txt') || 
+                  {(previewFile.file.type.startsWith('text/') ||
+                    previewFile.file.name.endsWith('.txt') ||
                     previewFile.file.name.endsWith('.csv')) && (
-                    <div className="mt-8">
-                      <div className="bg-muted/50 p-4 rounded-lg">
-                        <p className="text-sm text-muted-foreground mb-2">Text Preview:</p>
-                        <div className="bg-background p-3 rounded border max-h-40 overflow-auto text-left">
-                          <FilePreviewContent file={previewFile.file} />
+                      <div className="mt-8">
+                        <div className="bg-muted/50 p-4 rounded-lg">
+                          <p className="text-sm text-muted-foreground mb-2">Text Preview:</p>
+                          <div className="bg-background p-3 rounded border max-h-40 overflow-auto text-left">
+                            <FilePreviewContent file={previewFile.file} />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  
+                    )}
+
                   <Button
                     onClick={() => {
                       const url = URL.createObjectURL(previewFile.file);
@@ -2232,6 +2741,182 @@ export default function DeliveryOrderWorkflow({
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Recent Delivery Orders Section */}
+      <div className="mt-12">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Recent Delivery Orders
+              <Badge variant="outline" className="ml-auto">
+                {recentOrders.length} orders
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {ordersLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <span className="ml-2 text-muted-foreground">Loading delivery orders...</span>
+              </div>
+            ) : recentOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium text-muted-foreground mb-2">No delivery orders yet</h3>
+                <p className="text-sm text-muted-foreground">
+                  Create your first delivery order using the workflow above
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <h4 className="font-semibold text-lg">
+                            {order.items && order.items.length > 0 ? (
+                              order.items.length === 1 
+                                ? `${order.items[0].partNumber} - ${order.items[0].description?.slice(0, 60)}${order.items[0].description?.length > 60 ? '...' : ''}`
+                                : `${order.items.length} Parts: ${order.items.map(item => item.partNumber).join(', ')}`
+                            ) : (
+                              order.orderNumber
+                            )}
+                          </h4>
+                          <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
+                            {order.status.replace('_', ' ').toUpperCase()}
+                          </Badge>
+                          <Badge variant="outline" className={`
+                            ${order.priority === 'urgent' ? 'border-red-200 text-red-700 bg-red-50' : ''}
+                            ${order.priority === 'high' ? 'border-orange-200 text-orange-700 bg-orange-50' : ''}
+                            ${order.priority === 'standard' ? 'border-blue-200 text-blue-700 bg-blue-50' : ''}
+                            ${order.priority === 'low' ? 'border-gray-200 text-gray-700 bg-gray-50' : ''}
+                          `}>
+                            {order.priority.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          Order: {order.orderNumber}
+                        </div>
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              <span>Created: {new Date(order.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            {order.requestedDeliveryDate && (
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-4 w-4" />
+                                <span>Delivery: {new Date(order.requestedDeliveryDate).toLocaleDateString()}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <Package className="h-4 w-4" />
+                              <span>{order.itemsCount || order.items?.length || 0} items</span>
+                            </div>
+                          </div>
+                          {order.deliveryAddress && (
+                            <div className="flex items-start gap-1">
+                              <MapPin className="h-4 w-4 mt-0.5" />
+                              <span className="line-clamp-2">
+                                <span className="font-medium">{order.deliveryAddress.companyName}</span>, {order.deliveryAddress.city}, {order.deliveryAddress.country}
+                              </span>
+                            </div>
+                          )}
+                          {order.carrier && (
+                            <div className="flex items-center gap-1">
+                              <Truck className="h-4 w-4" />
+                              <span>{order.carrier.name}</span>
+                              {order.trackingNumber && (
+                                <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                                  {order.trackingNumber}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        {order.totalDeliveryCostInr && (
+                          <div className="text-right">
+                            <div className="text-sm text-muted-foreground">Total Cost</div>
+                            <div className="font-semibold">₹{order.totalDeliveryCostInr.toLocaleString()}</div>
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="shrink-0"
+                            onClick={() => {
+                              setSelectedOrderId(order.id);
+                              setShowOrderDetail(true);
+                            }}
+                          >
+                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View
+                          </Button>
+                          {order.status === 'draft' && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="shrink-0 text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                              onClick={async () => {
+                                if (window.confirm('Are you sure you want to delete this delivery order? This action cannot be undone.')) {
+                                  console.log('Attempting to delete order:', { id: order.id, projectId: order.projectId, status: order.status });
+                                  try {
+                                    await deleteOrderMutation.mutateAsync({ id: order.id, projectId: order.projectId });
+                                  } catch (error) {
+                                    console.error('Failed to delete delivery order:', error);
+                                    const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete delivery order';
+                                    toast.error(errorMessage);
+                                  }
+                                }
+                              }}
+                              disabled={deleteOrderMutation.isPending}
+                            >
+                              <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              {deleteOrderMutation.isPending ? 'Deleting...' : 'Delete'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {recentOrders.length >= 10 && (
+                  <div className="text-center pt-4">
+                    <Button variant="ghost" size="sm" className="text-muted-foreground">
+                      View all delivery orders →
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Delivery Order Detail Dialog */}
+      {selectedOrderId && (
+        <DeliveryOrderDetailDialog
+          isOpen={showOrderDetail}
+          onClose={() => {
+            setShowOrderDetail(false);
+            setSelectedOrderId(null);
+          }}
+          orderId={selectedOrderId}
+        />
       )}
     </div>
   );

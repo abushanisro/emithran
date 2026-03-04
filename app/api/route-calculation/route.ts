@@ -5,12 +5,48 @@ interface RouteRequest {
   toAddress: string;
   transportMode: string;
   optimizationLevel: string;
+  materialType?: string;
 }
+
+// ─── Industry-standard cost rates (INR per km) ────────────────────────────────
+const TRANSPORT_RATES: Record<string, {
+  baseCostPerKm: number;  // INR/km base
+  loadingCost: number;    // INR flat per shipment (loading + unloading)
+  avgSpeedKmh: number;
+  label: string;
+}> = {
+  car: { baseCostPerKm: 14, loadingCost: 200, avgSpeedKmh: 45, label: 'Car/Light Vehicle' },
+  truck: { baseCostPerKm: 22, loadingCost: 800, avgSpeedKmh: 35, label: 'Truck/Heavy Vehicle' },
+  bike: { baseCostPerKm: 7, loadingCost: 100, avgSpeedKmh: 35, label: 'Motorcycle' },
+  walking: { baseCostPerKm: 3, loadingCost: 50, avgSpeedKmh: 5, label: 'Walking/Handcart' },
+  ship: { baseCostPerKm: 2.5, loadingCost: 5000, avgSpeedKmh: 25, label: 'Ship/Maritime' },
+  flight: { baseCostPerKm: 55, loadingCost: 3000, avgSpeedKmh: 800, label: 'Air Cargo' },
+};
+
+// ─── Material type cost multipliers ───────────────────────────────────────────
+const MATERIAL_MULTIPLIERS: Record<string, { label: string; multiplier: number }> = {
+  general: { label: 'General Goods', multiplier: 1.00 },
+  wooden_box: { label: 'Wooden Box / Crate', multiplier: 1.10 },
+  metal_box: { label: 'Metal Box / Container', multiplier: 1.20 },
+  fragile: { label: 'Fragile Items', multiplier: 1.50 },
+  hazardous: { label: 'Hazardous Materials', multiplier: 2.20 },
+  perishable: { label: 'Perishable Goods', multiplier: 1.35 },
+  bulk: { label: 'Bulk Materials', multiplier: 0.85 },
+  electronics: { label: 'Electronics', multiplier: 1.45 },
+  pharmaceuticals: { label: 'Pharmaceuticals', multiplier: 1.90 },
+};
+
+// ─── Optimization adjustments ─────────────────────────────────────────────────
+const OPTIMIZATION_ADJUSTMENTS: Record<string, { costFactor: number; speedFactor: number }> = {
+  fastest: { costFactor: 1.15, speedFactor: 1.10 }, // pay more, go faster
+  balanced: { costFactor: 1.00, speedFactor: 1.00 }, // baseline
+  shortest: { costFactor: 0.92, speedFactor: 0.90 }, // save cost, longer time
+};
 
 export async function POST(request: NextRequest) {
   try {
     const body: RouteRequest = await request.json();
-    const { fromAddress, toAddress, transportMode, optimizationLevel } = body;
+    const { fromAddress, toAddress, transportMode, optimizationLevel, materialType } = body;
 
     if (!fromAddress || !toAddress) {
       return NextResponse.json(
@@ -20,287 +56,202 @@ export async function POST(request: NextRequest) {
     }
 
     const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    console.log('API Key available:', !!googleApiKey);
+    const transportConfig = (TRANSPORT_RATES[transportMode] ?? TRANSPORT_RATES.car)!;
+    const materialConfig = (materialType ? MATERIAL_MULTIPLIERS[materialType] : null) ?? MATERIAL_MULTIPLIERS.general;
+    const optimizationConfig = (OPTIMIZATION_ADJUSTMENTS[optimizationLevel] ?? OPTIMIZATION_ADJUSTMENTS.balanced)!;
 
-    // Step 1: Geocode addresses
+    // ── Step 1: Geocode both addresses ──────────────────────────────────────
     let fromCoords: { lat: number; lng: number } | null = null;
     let toCoords: { lat: number; lng: number } | null = null;
 
     try {
-      // Always try OpenStreetMap first (free and reliable)
-      console.log('Geocoding with OpenStreetMap...');
-      
-      const osmFromResponse = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fromAddress)}&limit=1&countrycodes=in`,
-        {
-          headers: {
-            'User-Agent': 'Mithran-Manufacturing-Platform/1.0 (contact@mithran.com)',
-            'Accept': 'application/json'
-          }
-        }
-      );
-      const osmFromData = await osmFromResponse.json();
-      if (osmFromData.length > 0) {
-        fromCoords = { lat: parseFloat(osmFromData[0].lat), lng: parseFloat(osmFromData[0].lon) };
-        console.log('From address geocoded:', fromCoords);
-      }
+      // Clean up addresses for better geocoding
+      const cleanAddress = (addr: string) => {
+        return addr
+          .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+          .replace(/,\s*,/g, ',') // Remove double commas
+          .trim();
+      };
 
-      const osmToResponse = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(toAddress)}&limit=1&countrycodes=in`,
-        {
-          headers: {
-            'User-Agent': 'Mithran-Manufacturing-Platform/1.0 (contact@mithran.com)',
-            'Accept': 'application/json'
-          }
-        }
-      );
-      const osmToData = await osmToResponse.json();
-      if (osmToData.length > 0) {
-        toCoords = { lat: parseFloat(osmToData[0].lat), lng: parseFloat(osmToData[0].lon) };
-        console.log('To address geocoded:', toCoords);
-      }
+      const cleanFromAddress = cleanAddress(fromAddress);
+      const cleanToAddress = cleanAddress(toAddress);
 
-      // Try Google if OSM failed and API key is available
+      // OSM Nominatim (free, primary for India)
+      const [osmFrom, osmTo] = await Promise.all([
+        fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanFromAddress)}&limit=1&countrycodes=in`,
+          { headers: { 'User-Agent': 'Mithran-Manufacturing-Platform/1.0', 'Accept': 'application/json' } }
+        ).then(r => r.json()),
+        fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanToAddress)}&limit=1&countrycodes=in`,
+          { headers: { 'User-Agent': 'Mithran-Manufacturing-Platform/1.0', 'Accept': 'application/json' } }
+        ).then(r => r.json()),
+      ]);
+
+      if (osmFrom.length > 0) fromCoords = { lat: parseFloat(osmFrom[0].lat), lng: parseFloat(osmFrom[0].lon) };
+      if (osmTo.length > 0) toCoords = { lat: parseFloat(osmTo[0].lat), lng: parseFloat(osmTo[0].lon) };
+
+      // Google fallback if key is available
       if (googleApiKey && (!fromCoords || !toCoords)) {
-        console.log('Trying Google Maps geocoding...');
-        
         if (!fromCoords) {
-          const fromGeocodeResponse = await fetch(
-            `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fromAddress)}&key=${googleApiKey}`
-          );
-          const fromGeocodeData = await fromGeocodeResponse.json();
-
-          if (fromGeocodeData.status === 'OK' && fromGeocodeData.results.length > 0) {
-            const location = fromGeocodeData.results[0].geometry.location;
-            fromCoords = { lat: location.lat, lng: location.lng };
-            console.log('Google geocoded from address:', fromCoords);
-          }
+          const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cleanFromAddress)}&key=${googleApiKey}`);
+          const data = await res.json();
+          if (data.status === 'OK') fromCoords = data.results[0].geometry.location;
         }
-
         if (!toCoords) {
-          const toGeocodeResponse = await fetch(
-            `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(toAddress)}&key=${googleApiKey}`
-          );
-          const toGeocodeData = await toGeocodeResponse.json();
-
-          if (toGeocodeData.status === 'OK' && toGeocodeData.results.length > 0) {
-            const location = toGeocodeData.results[0].geometry.location;
-            toCoords = { lat: location.lat, lng: location.lng };
-            console.log('Google geocoded to address:', toCoords);
-          }
+          const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cleanToAddress)}&key=${googleApiKey}`);
+          const data = await res.json();
+          if (data.status === 'OK') toCoords = data.results[0].geometry.location;
         }
       }
 
-      // Fallback to Indian city coordinates if geocoding failed
+      // Indian city coordinate fallback
       if (!fromCoords || !toCoords) {
-        console.log('Primary geocoding failed, trying fallback city coordinates...');
-        
-        const indianCities = {
-          'bangalore': { lat: 12.9716, lng: 77.5946 },
-          'bengaluru': { lat: 12.9716, lng: 77.5946 },
-          'mumbai': { lat: 19.0760, lng: 72.8777 },
-          'delhi': { lat: 28.7041, lng: 77.1025 },
-          'chennai': { lat: 13.0827, lng: 80.2707 },
-          'kolkata': { lat: 22.5726, lng: 88.3639 },
-          'hyderabad': { lat: 17.3850, lng: 78.4867 },
-          'pune': { lat: 18.5204, lng: 73.8567 },
-          'ahmedabad': { lat: 23.0225, lng: 72.5714 },
-          'jaipur': { lat: 26.9124, lng: 75.7873 },
-          'kochi': { lat: 9.9312, lng: 76.2673 },
-          'gurgaon': { lat: 28.4595, lng: 77.0266 },
-          'noida': { lat: 28.5355, lng: 77.3910 }
+        const indianCities: Record<string, { lat: number; lng: number }> = {
+          'bangalore': { lat: 12.9716, lng: 77.5946 }, 'bengaluru': { lat: 12.9716, lng: 77.5946 },
+          'mumbai': { lat: 19.0760, lng: 72.8777 }, 'delhi': { lat: 28.7041, lng: 77.1025 },
+          'chennai': { lat: 13.0827, lng: 80.2707 }, 'kolkata': { lat: 22.5726, lng: 88.3639 },
+          'hyderabad': { lat: 17.3850, lng: 78.4867 }, 'pune': { lat: 18.5204, lng: 73.8567 },
+          'ahmedabad': { lat: 23.0225, lng: 72.5714 }, 'jaipur': { lat: 26.9124, lng: 75.7873 },
+          'kochi': { lat: 9.9312, lng: 76.2673 }, 'surat': { lat: 21.1702, lng: 72.8311 },
+          'lucknow': { lat: 26.8467, lng: 80.9462 }, 'nagpur': { lat: 21.1458, lng: 79.0882 },
+          'vizag': { lat: 17.6868, lng: 83.2185 }, 'visakhapatnam': { lat: 17.6868, lng: 83.2185 },
+          'coimbatore': { lat: 11.0168, lng: 76.9558 }, 'bhopal': { lat: 23.2599, lng: 77.4126 },
+          'nagercoil': { lat: 8.1774, lng: 77.4349 }, 'kanyakumari': { lat: 8.0883, lng: 77.5385 },
         };
-
-        if (!fromCoords) {
-          const fromAddressLower = fromAddress.toLowerCase();
+        const tryCity = (addr: string) => {
+          const lower = addr.toLowerCase();
+          // Try exact city name matches first
           for (const [city, coords] of Object.entries(indianCities)) {
-            if (fromAddressLower.includes(city)) {
-              fromCoords = coords;
-              console.log(`Using fallback coordinates for from address (${city}):`, fromCoords);
-              break;
-            }
+            if (lower.includes(city)) return coords;
           }
-        }
-
-        if (!toCoords) {
-          const toAddressLower = toAddress.toLowerCase();
-          for (const [city, coords] of Object.entries(indianCities)) {
-            if (toAddressLower.includes(city)) {
-              toCoords = coords;
-              console.log(`Using fallback coordinates for to address (${city}):`, toCoords);
-              break;
-            }
-          }
-        }
-
-        // Final check
-        if (!fromCoords || !toCoords) {
-          console.error('All geocoding methods failed:', { fromAddress, toAddress, fromCoords, toCoords });
-          return NextResponse.json(
-            { error: 'Could not geocode one or both addresses', details: { fromCoords, toCoords } },
-            { status: 400 }
-          );
-        }
+          return null;
+        };
+        if (!fromCoords) fromCoords = tryCity(cleanFromAddress);
+        if (!toCoords) toCoords = tryCity(cleanToAddress);
       }
 
-    } catch (geocodeError) {
-      console.error('Geocoding error:', geocodeError);
-      return NextResponse.json(
-        { error: 'Geocoding failed', details: geocodeError instanceof Error ? geocodeError.message : String(geocodeError) },
-        { status: 500 }
-      );
-    }
-
-    // Step 2: Calculate route
-    let routeResult = null;
-
-    try {
-      // Try Google Directions first
-      if (googleApiKey) {
-        const travelMode = transportMode === 'bike' ? 'bicycling' : transportMode === 'walking' ? 'walking' : 'driving';
-        const directionsResponse = await fetch(
-          `https://maps.googleapis.com/maps/api/directions/json?origin=${fromCoords.lat},${fromCoords.lng}&destination=${toCoords.lat},${toCoords.lng}&mode=${travelMode}&departure_time=now&traffic_model=best_guess&key=${googleApiKey}`
+      if (!fromCoords || !toCoords) {
+        return NextResponse.json(
+          { error: 'Could not geocode one or both addresses. Please use Indian addresses.' },
+          { status: 400 }
         );
+      }
+    } catch (err) {
+      return NextResponse.json({ error: 'Geocoding failed' }, { status: 500 });
+    }
 
-        if (directionsResponse.ok) {
-          const directionsData = await directionsResponse.json();
+    // ── Step 2: Get real road distance and duration ──────────────────────────
+    let distanceKm = 0;
+    let durationMin = 0;
+    let routeProvider = 'haversine';
+    let routingQuality: 'real' | 'estimated' = 'estimated';
 
-          if (directionsData.status === 'OK' && directionsData.routes.length > 0) {
-            const route = directionsData.routes[0];
-            const leg = route.legs[0];
+    const isSpecialMode = transportMode === 'ship' || transportMode === 'flight';
 
-            routeResult = {
-              distance: Math.round(leg.distance.value / 1000 * 100) / 100, // km
-              duration: Math.round(leg.duration.value / 60), // minutes
-              durationWithTraffic: leg.duration_in_traffic ? Math.round(leg.duration_in_traffic.value / 60) : undefined,
-              optimizationScore: 85, // Google's routes are well optimized
-              provider: 'google'
-            };
+    if (!isSpecialMode) {
+      // Try OSRM for road routing
+      try {
+        const osrmProfile = transportMode === 'bike' ? 'bicycle' : transportMode === 'walking' ? 'foot' : 'driving';
+        const osrmRes = await fetch(
+          `https://router.project-osrm.org/route/v1/${osrmProfile}/${fromCoords.lng},${fromCoords.lat};${toCoords.lng},${toCoords.lat}?overview=false`,
+          { headers: { 'User-Agent': 'Mithran-Manufacturing-Platform/1.0' }, signal: AbortSignal.timeout(8000) }
+        );
+        if (osrmRes.ok) {
+          const osrmData = await osrmRes.json();
+          if (osrmData.routes?.length > 0) {
+            distanceKm = Math.round(osrmData.routes[0].distance / 1000 * 10) / 10;
+            durationMin = Math.round(osrmData.routes[0].duration / 60);
+            routeProvider = 'osrm';
+            routingQuality = 'real';
           }
         }
-      }
+      } catch { }
 
-      // Fallback to OSRM
-      if (!routeResult) {
-        console.log('Trying OSRM routing...');
-        const profile = transportMode === 'bike' ? 'bicycle' : transportMode === 'walking' ? 'foot' : 'driving';
-        
+      // Google fallback
+      if (routingQuality !== 'real' && googleApiKey) {
         try {
-          const osrmResponse = await fetch(
-            `https://router.project-osrm.org/route/v1/${profile}/${fromCoords.lng},${fromCoords.lat};${toCoords.lng},${toCoords.lat}?overview=full&geometries=geojson&steps=false`,
-            {
-              headers: {
-                'User-Agent': 'Mithran-Manufacturing-Platform/1.0'
-              }
-            }
+          const travelMode = transportMode === 'bike' ? 'bicycling' : transportMode === 'walking' ? 'walking' : 'driving';
+          const gRes = await fetch(
+            `https://maps.googleapis.com/maps/api/directions/json?origin=${fromCoords.lat},${fromCoords.lng}&destination=${toCoords.lat},${toCoords.lng}&mode=${travelMode}&key=${googleApiKey}`
           );
-
-          if (osrmResponse.ok) {
-            const osrmData = await osrmResponse.json();
-
-            if (osrmData.routes && osrmData.routes.length > 0) {
-              const route = osrmData.routes[0];
-              console.log('OSRM routing successful');
-
-              routeResult = {
-                distance: Math.round(route.distance / 1000 * 100) / 100, // km
-                duration: Math.round(route.duration / 60), // minutes
-                optimizationScore: 75, // OSRM is good but not as optimized as Google
-                provider: 'osrm'
-              };
-            } else {
-              console.warn('OSRM returned no routes');
+          if (gRes.ok) {
+            const gData = await gRes.json();
+            if (gData.status === 'OK') {
+              const leg = gData.routes[0].legs[0];
+              distanceKm = Math.round(leg.distance.value / 1000 * 10) / 10;
+              durationMin = Math.round(leg.duration.value / 60);
+              routeProvider = 'google';
+              routingQuality = 'real';
             }
-          } else {
-            console.warn(`OSRM request failed with status: ${osrmResponse.status}`);
           }
-        } catch (osrmError) {
-          console.warn('OSRM routing error:', osrmError);
-        }
+        } catch { }
       }
-
-      // Final fallback: Haversine calculation
-      if (!routeResult) {
-        const distance = calculateHaversineDistance(fromCoords, toCoords);
-        const speeds = {
-          car: 45,
-          truck: 35,
-          bike: 35,
-          walking: 5
-        };
-        const speed = speeds[transportMode as keyof typeof speeds] || 45;
-        const duration = Math.round((distance / speed) * 60);
-
-        routeResult = {
-          distance: Math.round(distance * 100) / 100,
-          duration,
-          optimizationScore: 50,
-          provider: 'haversine',
-          warnings: ['Using estimated calculation - actual route may vary']
-        };
-      }
-
-    } catch (routeError) {
-      console.error('Route calculation error:', routeError);
-      return NextResponse.json(
-        { error: 'Route calculation failed' },
-        { status: 500 }
-      );
     }
 
-    // Step 3: Apply optimization adjustments and cost calculation
-    if (optimizationLevel === 'fastest' && routeResult.durationWithTraffic) {
-      routeResult.duration = routeResult.durationWithTraffic;
-      routeResult.optimizationScore = (routeResult.optimizationScore || 70) + 10;
-    } else if (optimizationLevel === 'shortest') {
-      routeResult.duration = Math.round(routeResult.duration * 1.1);
-      routeResult.optimizationScore = (routeResult.optimizationScore || 70) + 5;
+    // Haversine fallback for all modes (or ship/flight)
+    if (routingQuality !== 'real' || isSpecialMode) {
+      const R = 6371;
+      const dLat = (toCoords.lat - fromCoords.lat) * Math.PI / 180;
+      const dLng = (toCoords.lng - fromCoords.lng) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(fromCoords.lat * Math.PI / 180) * Math.cos(toCoords.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+      const straightLine = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+      // Road factor: actual road distance is ~1.2–1.4× straight-line for India
+      const roadFactor = isSpecialMode ? 1.0 : 1.3;
+      distanceKm = Math.round(straightLine * roadFactor * 10) / 10;
+      durationMin = Math.round((distanceKm / transportConfig.avgSpeedKmh) * 60);
+      routeProvider = isSpecialMode ? (transportMode === 'ship' ? 'maritime-haversine' : 'aviation-haversine') : 'estimated';
+      routingQuality = 'estimated';
     }
 
-    // Calculate cost
-    const costPerKm = {
-      car: 8,
-      truck: 12,
-      bike: 4,
-      walking: 2
-    };
-    const baseCost = routeResult.distance * (costPerKm[transportMode as keyof typeof costPerKm] || 8);
-    const optimizationFactor = (routeResult.optimizationScore || 70) / 100;
-    const cost = Math.round(baseCost * (2 - optimizationFactor) * 100) / 100;
+    // Apply optimization speed factor
+    durationMin = Math.round(durationMin / optimizationConfig.speedFactor);
 
-    const finalResult = {
-      ...routeResult,
-      cost,
+    // ── Step 3: Accurate cost calculation ───────────────────────────────────
+    // Base transport cost = per km rate × distance + loading/unloading
+    const transportCost = (transportConfig.baseCostPerKm * distanceKm) + transportConfig.loadingCost;
+
+    // Material handling multiplier
+    const materialMultiplier = materialConfig?.multiplier ?? 1.0;
+
+    // Optimization factor (fastest = +15% cost, shortest = -8% cost)
+    const totalCost = Math.round(transportCost * materialMultiplier * optimizationConfig.costFactor);
+
+    // Fuel/toll surcharge (5–8% on road, not applicable for ship/flight)
+    const surcharge = isSpecialMode ? 0 : Math.round(totalCost * 0.06);
+
+    const finalCost = totalCost + surcharge;
+
+    // ── Step 4: Data quality score (not an optimization "mock" percentage) ──
+    const dataQualityScore = routingQuality === 'real'
+      ? (routeProvider === 'google' ? 96 : 91)
+      : 72;
+
+    return NextResponse.json({
+      distance: distanceKm,
+      duration: durationMin,
+      cost: finalCost,
+      costBreakdown: {
+        transportBase: Math.round(transportConfig.baseCostPerKm * distanceKm),
+        loadingUnloading: transportConfig.loadingCost,
+        materialSurcharge: Math.round((materialMultiplier - 1) * transportCost),
+        fuelTollSurcharge: surcharge,
+        total: finalCost,
+      },
+      dataQualityScore,
+      routeProvider,
+      isEstimated: routingQuality === 'estimated',
       fromCoords,
-      toCoords
-    };
-
-    return NextResponse.json(finalResult);
+      toCoords,
+      transportMode,
+      materialType: materialType || 'general',
+      optimizationLevel,
+    });
 
   } catch (error) {
     console.error('Route calculation API error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
-
-// Haversine distance calculation
-function calculateHaversineDistance(
-  point1: { lat: number; lng: number },
-  point2: { lat: number; lng: number }
-): number {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = (point2.lat - point1.lat) * Math.PI / 180;
-  const dLng = (point2.lng - point1.lng) * Math.PI / 180;
-  
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(point1.lat * Math.PI / 180) * 
-    Math.cos(point2.lat * Math.PI / 180) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
 }

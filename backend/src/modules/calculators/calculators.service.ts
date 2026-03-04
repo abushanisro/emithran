@@ -493,6 +493,11 @@ export class CalculatorsServiceV2 {
 
         let expression = field.default_value;
 
+        // STEP 0: Remove Excel-style = prefix if present
+        if (expression.trim().startsWith('=')) {
+          expression = expression.trim().substring(1).trim();
+        }
+
         // STEP 1: Replace {fieldName} with normalized field names
         const bracedFieldPattern = /\{([^}]+)\}/g;
         expression = expression.replace(bracedFieldPattern, (match: string, fieldName: string) => {
@@ -541,6 +546,11 @@ export class CalculatorsServiceV2 {
 
         this.logger.log(`Raw calculation result: ${result}`, 'CalculatorsServiceV2');
 
+        // Handle special validation cases
+        if (field.field_name === 'No. of passes' && result < 0) {
+          this.logger.warn(`Negative passes detected: ${result}. This may indicate incorrect input values (final diameter > initial diameter).`, 'CalculatorsServiceV2');
+        }
+
         // Store result in scope for subsequent calculations (normalized name)
         if (field.field_name) {
           const normalizedName = normalizeFieldName(field.field_name);
@@ -570,8 +580,14 @@ export class CalculatorsServiceV2 {
       try {
         if (!formula.formula_expression) continue;
 
+        // Clean formula expression (remove Excel-style = prefix)
+        let expression = formula.formula_expression.trim();
+        if (expression.startsWith('=')) {
+          expression = expression.substring(1).trim();
+        }
+
         // Evaluate formula
-        const result = evaluate(formula.formula_expression, scope);
+        const result = evaluate(expression, scope);
 
         // Store result in scope for subsequent formulas
         if (formula.formula_name) {
