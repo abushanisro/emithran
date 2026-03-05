@@ -12,6 +12,7 @@
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsNumber, IsOptional, IsBoolean, IsUUID, IsEnum, Min, IsObject } from 'class-validator';
+import { Type } from 'class-transformer';
 
 // ============================================================================
 // ENUMS
@@ -188,17 +189,20 @@ export class QueryPackagingLogisticsCostsDto {
 
   @ApiPropertyOptional({ description: 'Filter by active status', default: true })
   @IsOptional()
+  @Type(() => Boolean)
   @IsBoolean()
   isActive?: boolean;
 
   @ApiPropertyOptional({ description: 'Page number', minimum: 1, default: 1 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
   @ApiPropertyOptional({ description: 'Items per page', minimum: 1, maximum: 100, default: 10 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   limit?: number;

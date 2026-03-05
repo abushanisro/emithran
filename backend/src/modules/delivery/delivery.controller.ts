@@ -98,7 +98,6 @@ export class DeliveryController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Project, address, or items not found' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Authentication required' })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Insufficient permissions for project' })
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   async createDeliveryOrder(
     @Body() createDeliveryOrderDto: CreateDeliveryOrderDto,
     // @CurrentUser() user: any

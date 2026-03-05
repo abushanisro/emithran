@@ -354,7 +354,53 @@ export function useCreateDeliveryOrder() {
         unitValueInr?: number;
       }>;
     }): Promise<DeliveryOrder> => {
-      const response = await apiClient.post('/delivery/orders', data);
+      // Transform data to ensure File objects are converted to serializable format
+      const transformedData = {
+        ...data,
+        // Convert File objects to metadata-only for JSON serialization
+        partsPhotos: data.partsPhotos?.map(item => {
+          if (item && typeof item === 'object' && 'file' in item) {
+            return {
+              id: item.id,
+              fileName: item.file.name,
+              fileSize: item.file.size,
+              fileType: item.file.type,
+              preview: item.preview
+              // Note: File will need to be uploaded separately in the future
+            };
+          }
+          return item;
+        }),
+        packingPhotos: data.packingPhotos?.map(item => {
+          if (item && typeof item === 'object' && 'file' in item) {
+            return {
+              id: item.id,
+              fileName: item.file.name,
+              fileSize: item.file.size,
+              fileType: item.file.type,
+              preview: item.preview
+              // Note: File will need to be uploaded separately in the future
+            };
+          }
+          return item;
+        }),
+        documents: data.documents?.map(item => {
+          if (item && typeof item === 'object' && 'file' in item) {
+            return {
+              id: item.id,
+              fileName: item.file.name,
+              fileSize: item.file.size,
+              fileType: item.file.type
+              // Note: File will need to be uploaded separately in the future
+            };
+          }
+          return item;
+        }),
+        // Ensure dock audit data is preserved
+        dockAudit: data.dockAudit
+      };
+      
+      const response = await apiClient.post('/delivery/orders', transformedData);
       return response.data.data || response.data;
     },
     onSuccess: (newOrder, variables) => {
@@ -397,6 +443,12 @@ export function useUpdateDeliveryOrder() {
         insuranceCostInr?: number;
         handlingCostInr?: number;
         notes?: string;
+        // Documentation and quality fields
+        partsPhotos?: any[];
+        packingPhotos?: any[];
+        documents?: any[];
+        dockAudit?: any[];
+        checkedBy?: string;
       };
     }): Promise<DeliveryOrder> => {
       const response = await apiClient.put(`/delivery/orders/${id}`, data);

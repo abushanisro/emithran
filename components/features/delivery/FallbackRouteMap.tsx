@@ -464,7 +464,7 @@ export default function FallbackRouteMap({
           address.postalCode,
           address.country
         ].filter(part => part && part.trim() !== '').map(part => part.trim());
-        
+
         return parts.join(', ');
       };
 
@@ -896,7 +896,7 @@ export default function FallbackRouteMap({
         <div className="text-center text-muted-foreground py-6">
           <div className="text-lg">No route calculated yet</div>
           <div className="text-sm mt-1">
-            {fromAddress && toAddress 
+            {fromAddress && toAddress
               ? 'Route will be calculated automatically'
               : 'Select pickup and delivery addresses to see route'
             }

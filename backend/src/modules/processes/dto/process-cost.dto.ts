@@ -24,25 +24,26 @@ import {
   ValidatorConstraintInterface,
   Validate,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 @ValidatorConstraint({ name: 'IsUUIDOrArrayOfUUIDs', async: false })
 export class IsUUIDOrArrayOfUUIDs implements ValidatorConstraintInterface {
   validate(value: any, args: ValidationArguments) {
     if (!value) return true; // Optional field
-    
+
     // Check if it's a single UUID string
     if (typeof value === 'string') {
       return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
     }
-    
+
     // Check if it's an array of UUID strings
     if (Array.isArray(value)) {
-      return value.every(item => 
-        typeof item === 'string' && 
+      return value.every(item =>
+        typeof item === 'string' &&
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item)
       );
     }
-    
+
     return false;
   }
 
@@ -467,12 +468,14 @@ export class UpdateProcessCostDto {
 export class QueryProcessCostsDto {
   @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
   @ApiPropertyOptional({ description: 'Items per page', example: 10, default: 10 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(100)
@@ -495,6 +498,7 @@ export class QueryProcessCostsDto {
 
   @ApiPropertyOptional({ description: 'Filter by active status', example: true })
   @IsOptional()
+  @Type(() => Boolean)
   @IsBoolean()
   isActive?: boolean;
 
@@ -513,7 +517,7 @@ export class QueryProcessCostsDto {
   @Validate(IsUUIDOrArrayOfUUIDs)
   bomItemId?: string | string[];
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filter by multiple BOM item IDs',
     type: [String],
     example: ['uuid1', 'uuid2']

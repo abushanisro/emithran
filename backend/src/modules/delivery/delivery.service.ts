@@ -156,6 +156,7 @@ export class DeliveryService {
     try {
       this.logger.log(`Creating delivery order for project ${createDeliveryOrderDto.projectId} by user ${userId}`);
 
+
       // ── Step 1: Generate a unique order number ─────────────────────────────
       const orderNumber = `DO-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
@@ -199,8 +200,8 @@ export class DeliveryService {
           packing_photos: createDeliveryOrderDto.packingPhotos || null,
           documents: createDeliveryOrderDto.documents || null,
           dock_audit: createDeliveryOrderDto.dockAudit || null,
-          checked_by: createDeliveryOrderDto.checkedBy || null,
-          checked_at: createDeliveryOrderDto.checkedBy ? new Date().toISOString() : null,
+          checked_by: createDeliveryOrderDto.checkedBy ?? null,
+          checked_at: createDeliveryOrderDto.checkedBy != null ? new Date().toISOString() : null,
           notes: createDeliveryOrderDto.notes || null,
           created_by: userId,
         })
@@ -1103,6 +1104,9 @@ export class DeliveryService {
       })) || [],
       itemsCount: itemsCount,
       totalQuantity: totalQuantity,
+      dockAudit: order.dock_audit,
+      checkedBy: order.checked_by,
+      checkedAt: order.checked_at,
       createdAt: order.created_at,
       updatedAt: order.updated_at
     };

@@ -18,6 +18,7 @@ import {
   Max,
   IsUUID,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * DTO for creating a new raw material cost record
@@ -305,12 +306,14 @@ export class UpdateRawMaterialCostDto {
 export class QueryRawMaterialCostsDto {
   @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
   @ApiPropertyOptional({ description: 'Items per page', example: 10, default: 10 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(100)
@@ -328,6 +331,7 @@ export class QueryRawMaterialCostsDto {
 
   @ApiPropertyOptional({ description: 'Filter by active status', example: true })
   @IsOptional()
+  @Type(() => Boolean)
   @IsBoolean()
   isActive?: boolean;
 

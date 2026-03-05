@@ -1,4 +1,5 @@
 import { IsString, IsNumber, IsOptional, IsNotEmpty, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateMHRDto {
@@ -300,14 +301,16 @@ export class QueryMHRDto {
   commodityCode?: string;
 
   @ApiPropertyOptional({ description: 'Page number', default: 1 })
-  @IsNumber()
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   @Min(1)
   page?: number;
 
   @ApiPropertyOptional({ description: 'Items per page', default: 10 })
-  @IsNumber()
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   @Min(1)
   @Max(100)
   limit?: number;

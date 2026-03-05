@@ -392,7 +392,20 @@ export class CreateDeliveryOrderDto {
   @IsOptional()
   documents?: any[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Dock audit checklist data with completion status',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        activity: { type: 'string' },
+        specified: { type: 'string' },
+        ok: { type: 'boolean' },
+        value: { type: 'string' }
+      }
+    }
+  })
   @IsOptional()
   dockAudit?: any[];
 
@@ -473,6 +486,41 @@ export class UpdateDeliveryOrderDto {
   @IsString()
   @MaxLength(1000)
   notes?: string;
+
+  // Documentation and quality fields
+  @ApiPropertyOptional()
+  @IsOptional()
+  partsPhotos?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  packingPhotos?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  documents?: any[];
+
+  @ApiPropertyOptional({
+    description: 'Updated dock audit checklist data',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        activity: { type: 'string' },
+        specified: { type: 'string' },
+        ok: { type: 'boolean' },
+        value: { type: 'string' }
+      }
+    }
+  })
+  @IsOptional()
+  dockAudit?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  checkedBy?: string;
 }
 
 // Tracking DTOs
@@ -770,7 +818,10 @@ export class DeliveryOrderResponseDto {
   @ApiPropertyOptional()
   documents?: any[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Dock audit checklist completion data',
+    type: 'array'
+  })
   dockAudit?: any[];
 
   @ApiPropertyOptional()

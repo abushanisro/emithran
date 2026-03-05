@@ -20,6 +20,7 @@ import {
   IsBoolean,
   IsObject,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * Make/Buy enum for child parts
@@ -211,7 +212,7 @@ export class CreateChildPartCostDto {
 /**
  * DTO for updating a child part cost record
  */
-export class UpdateChildPartCostDto extends PartialType(CreateChildPartCostDto) {}
+export class UpdateChildPartCostDto extends PartialType(CreateChildPartCostDto) { }
 
 /**
  * DTO for querying child part cost records
@@ -234,17 +235,20 @@ export class QueryChildPartCostsDto {
 
   @ApiPropertyOptional({ description: 'Filter by active status' })
   @IsOptional()
+  @Type(() => Boolean)
   @IsBoolean()
   isActive?: boolean;
 
   @ApiPropertyOptional({ description: 'Page number', default: 1, minimum: 1 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
   @ApiPropertyOptional({ description: 'Items per page', default: 10, minimum: 1 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(100)

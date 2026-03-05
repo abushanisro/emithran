@@ -199,7 +199,7 @@ export default function DeliveryOrderWorkflow({
   const [packingPhotos, setPackingPhotos] = useState<UploadedFile[]>([]);
   const [documents, setDocuments] = useState<UploadedFile[]>([]);
   const [dockAudit, setDockAudit] = useState<DockAuditItem[]>(() =>
-    DEFAULT_DOCK_AUDIT.map(row => ({ ...row }))
+    DEFAULT_DOCK_AUDIT.map(item => ({ ...item }))
   );
   const [checkedBy, setCheckedBy] = useState('');
 
@@ -535,10 +535,17 @@ export default function DeliveryOrderWorkflow({
         partsPhotos: partsPhotos,
         packingPhotos: packingPhotos,
         documents: documents,
-        dockAudit: dockAudit,
+        dockAudit: dockAudit.map(item => ({
+          slNo: item.slNo,
+          activity: item.activity,
+          specified: item.specified,
+          ok: item.isOk,
+          value: item.value
+        })),
         checkedBy: checkedBy
       };
 
+      
       await createOrderMutation.mutateAsync(orderData);
       toast.success('Delivery order created successfully!');
       // Refresh the recent orders list
@@ -551,7 +558,7 @@ export default function DeliveryOrderWorkflow({
       setPartsPhotos([]);
       setPackingPhotos([]);
       setDocuments([]);
-      setDockAudit(DEFAULT_DOCK_AUDIT.map(row => ({ ...row })));
+      setDockAudit(DEFAULT_DOCK_AUDIT.map(item => ({ ...item })));
       setCheckedBy('');
       setFormData({
         priority: 'standard',
@@ -1637,12 +1644,11 @@ export default function DeliveryOrderWorkflow({
                       <div className="px-3 py-2 border-r flex items-center justify-center">
                         <button
                           type="button"
-                          onClick={() =>
-                            setDockAudit(prev =>
-                              prev.map((r, i) =>
-                                i === idx ? { ...r, isOk: !r.isOk } : r
-                              )
-                            )
+                          onClick={() => {
+                            const newDockAudit = [...dockAudit];
+                            newDockAudit[idx] = { ...newDockAudit[idx], isOk: !newDockAudit[idx].isOk };
+                            setDockAudit(newDockAudit);
+                          }
                           }
                           className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${row.isOk
                             ? 'bg-green-500 border-green-600 text-white'
@@ -1663,12 +1669,11 @@ export default function DeliveryOrderWorkflow({
                         <input
                           type="text"
                           value={row.value}
-                          onChange={(e) =>
-                            setDockAudit(prev =>
-                              prev.map((r, i) =>
-                                i === idx ? { ...r, value: e.target.value } : r
-                              )
-                            )
+                          onChange={(e) => {
+                            const newDockAudit = [...dockAudit];
+                            newDockAudit[idx] = { ...newDockAudit[idx], value: e.target.value };
+                            setDockAudit(newDockAudit);
+                          }
                           }
                           placeholder="—"
                           className="w-full text-xs bg-transparent border border-transparent rounded px-1 py-0.5 focus:border-border focus:outline-none focus:bg-muted/30 transition-colors"
@@ -2799,6 +2804,40 @@ export default function DeliveryOrderWorkflow({
                           `}>
                             {order.priority.toUpperCase()}
                           </Badge>
+                          {/* Dock Audit Status Badge */}
+                          {(() => {
+                            if (!order.dockAudit || !Array.isArray(order.dockAudit) || order.dockAudit.length === 0) {
+                              return (
+                                <Badge variant="outline" className="border-yellow-200 text-yellow-700 bg-yellow-50">
+                                  ⚠ PARTIAL
+                                </Badge>
+                              );
+                            }
+                            
+                            const completedItems = order.dockAudit.filter(item => item && (item.ok === true || item.isOk === true)).length;
+                            const totalItems = order.dockAudit.length;
+                            const completionRate = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+                            
+                            if (completionRate === 100) {
+                              return (
+                                <Badge variant="outline" className="border-green-200 text-green-700 bg-green-50">
+                                  ✓ COMPLETE
+                                </Badge>
+                              );
+                            } else if (completionRate >= 80) {
+                              return (
+                                <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50">
+                                  ⚪ MOSTLY
+                                </Badge>
+                              );
+                            } else {
+                              return (
+                                <Badge variant="outline" className="border-yellow-200 text-yellow-700 bg-yellow-50">
+                                  ⚠ PARTIAL
+                                </Badge>
+                              );
+                            }
+                          })()}
                         </div>
                         <div className="text-xs text-muted-foreground font-mono">
                           Order: {order.orderNumber}
@@ -2819,6 +2858,20 @@ export default function DeliveryOrderWorkflow({
                               <Package className="h-4 w-4" />
                               <span>{order.itemsCount || order.items?.length || 0} items</span>
                             </div>
+                            {/* Dock Audit Summary */}
+                            {(() => {
+                              if (order.dockAudit && Array.isArray(order.dockAudit) && order.dockAudit.length > 0) {
+                                const completedItems = order.dockAudit.filter(item => item && (item.ok === true || item.isOk === true)).length;
+                                const totalItems = order.dockAudit.length;
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    <CheckCircle className="h-4 w-4" />
+                                    <span>Audit: {completedItems}/{totalItems} OK</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                           {order.deliveryAddress && (
                             <div className="flex items-start gap-1">

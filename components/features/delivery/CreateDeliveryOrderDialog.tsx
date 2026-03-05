@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +27,7 @@ import {
   Upload,
   Image,
   PlayCircle,
+  X,
 } from 'lucide-react';
 import {
   QualityApprovedItem,
@@ -68,6 +69,32 @@ export default function CreateDeliveryOrderDialog({
   const [step, setStep] = useState(1);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Dock audit state
+  const [auditData, setAuditData] = useState([
+    { id: 1, activity: "Documents", specified: "PDI report with latest drawing revision number", ok: false, value: "" },
+    { id: 2, activity: "Cleaning", specified: "Free from dust stains", ok: false, value: "" },
+    { id: 3, activity: "Oiling", specified: "All surfaces are covered, no excess oil", ok: false, value: "" },
+    { id: 4, activity: "Stretch film cover packing", specified: "All surfaces are covered with Stretch film", ok: false, value: "" },
+    { id: 5, activity: "VCI bag condition", specified: "Free from damage, No oil seepage", ok: false, value: "" },
+    { id: 6, activity: "No. Of parts in each bag/packing", specified: "Verify part Qty", ok: false, value: "" },
+    { id: 7, activity: "No. Of bags/packing", specified: "Verify no of bag / pack Qty", ok: false, value: "" },
+    { id: 8, activity: "Sealing of VCI bag with adhesive tape", specified: "Free from gape", ok: false, value: "" },
+    { id: 9, activity: "Identification Tag", specified: "Verify the part no, Description, Qty", ok: false, value: "" },
+    { id: 10, activity: "Invoice", specified: "Verify the invoice as per PO", ok: false, value: "" },
+    { id: 11, activity: "Whom & When", specified: "Verified by & Date of verification", ok: false, value: "" }
+  ]);
+  const [checkedBy, setCheckedBy] = useState('');
+
+  // Debug: Monitor audit data changes
+  useEffect(() => {
+    console.log('🔍 Audit data changed:', {
+      length: auditData?.length || 0,
+      isArray: Array.isArray(auditData),
+      sample: auditData?.[0],
+      hasValidStructure: auditData?.every(item => item && typeof item === 'object' && 'id' in item && 'activity' in item)
+    });
+  }, [auditData]);
 
   // Form state
   const [deliveryMode, setDeliveryMode] = useState<string>('');
@@ -168,6 +195,20 @@ export default function CreateDeliveryOrderDialog({
       endDate: '',
       trackingEnabled: true
     });
+    setAuditData([
+      { id: 1, activity: "Documents", specified: "PDI report with latest drawing revision number", ok: false, value: "" },
+      { id: 2, activity: "Cleaning", specified: "Free from dust stains", ok: false, value: "" },
+      { id: 3, activity: "Oiling", specified: "All surfaces are covered, no excess oil", ok: false, value: "" },
+      { id: 4, activity: "Stretch film cover packing", specified: "All surfaces are covered with Stretch film", ok: false, value: "" },
+      { id: 5, activity: "VCI bag condition", specified: "Free from damage, No oil seepage", ok: false, value: "" },
+      { id: 6, activity: "No. Of parts in each bag/packing", specified: "Verify part Qty", ok: false, value: "" },
+      { id: 7, activity: "No. Of bags/packing", specified: "Verify no of bag / pack Qty", ok: false, value: "" },
+      { id: 8, activity: "Sealing of VCI bag with adhesive tape", specified: "Free from gape", ok: false, value: "" },
+      { id: 9, activity: "Identification Tag", specified: "Verify the part no, Description, Qty", ok: false, value: "" },
+      { id: 10, activity: "Invoice", specified: "Verify the invoice as per PO", ok: false, value: "" },
+      { id: 11, activity: "Whom & When", specified: "Verified by & Date of verification", ok: false, value: "" }
+    ]);
+    setCheckedBy('');
   };
 
   const filteredItems = availableItems.filter(item =>
@@ -221,6 +262,12 @@ export default function CreateDeliveryOrderDialog({
   };
 
   const handleSubmit = async () => {
+    // Ensure we're on the correct step
+    if (step !== 5) {
+      toast.error('Please complete all steps before submitting the order');
+      return;
+    }
+
     if (selectedItems.length === 0) {
       toast.error('Please select at least one item for delivery');
       return;
@@ -231,7 +278,27 @@ export default function CreateDeliveryOrderDialog({
       return;
     }
 
+    // Validate dock audit completion
+    const incompletedItems = auditData.filter(item => typeof item.ok !== 'boolean');
+    if (incompletedItems.length > 0) {
+      toast.error(`Please complete dock audit review for ${incompletedItems.length} items before submitting`);
+      return;
+    }
+
+    if (!checkedBy.trim()) {
+      toast.error('Please enter the inspector name in the dock audit section');
+      return;
+    }
+
     try {
+      // Final validation - ensure dock audit data is complete
+      if (!Array.isArray(auditData) || auditData.length === 0 || 
+          !auditData.every(item => item && typeof item === 'object' && 'id' in item && 'activity' in item && typeof item.ok === 'boolean')) {
+        console.error('🚨 Invalid dock audit data detected at submission:', auditData);
+        toast.error('Dock audit data is incomplete. Please complete all audit items.');
+        return;
+      }
+
       const orderData = {
         projectId,
         deliveryAddressId: formData.deliveryAddressId,
@@ -248,6 +315,14 @@ export default function CreateDeliveryOrderDialog({
         insuranceCostInr: formData.insuranceCostInr || undefined,
         handlingCostInr: formData.handlingCostInr || undefined,
         notes: formData.notes || undefined,
+        dockAudit: auditData.map(item => ({
+          id: item.id,
+          activity: item.activity,
+          specified: item.specified,
+          ok: item.ok,
+          value: item.value || ""
+        })),
+        checkedBy: checkedBy || undefined,
         items: selectedItems.map(item => ({
           qualityApprovedItemId: item.qualityApprovedItemId,
           bomItemId: item.bomItemId,
@@ -257,6 +332,18 @@ export default function CreateDeliveryOrderDialog({
           unitValueInr: item.unitValueInr
         }))
       };
+
+      console.log('🚀 Submitting order data:', orderData);
+      console.log('📋 Dock audit data being sent:', auditData);
+      console.log('🔍 Audit data structure check:', {
+        isArray: Array.isArray(auditData),
+        length: auditData.length,
+        firstItem: auditData[0],
+        hasValidStructure: auditData.every(item => item && typeof item === 'object' && 'id' in item && 'activity' in item),
+        allItemsHaveOkValue: auditData.map((item, i) => ({ index: i, ok: item?.ok, type: typeof item?.ok })),
+        checkedBy: checkedBy,
+        step: step
+      });
 
       await createOrderMutation.mutateAsync(orderData);
       onSuccess();
@@ -280,13 +367,14 @@ export default function CreateDeliveryOrderDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Create Delivery Order - Step {step} of 4
+            Create Delivery Order - Step {step} of 5
           </DialogTitle>
           <DialogDescription>
             {step === 1 && 'Select quality-approved BOM parts from quality control'}
             {step === 2 && 'Upload part photos and packing documentation'}
-            {step === 3 && 'Configure delivery tracking and schedule'}
-            {step === 4 && 'Review and confirm delivery order'}
+            {step === 3 && 'Complete dock audit checklist'}
+            {step === 4 && 'Configure delivery tracking and schedule'}
+            {step === 5 && 'Review and confirm delivery order'}
           </DialogDescription>
         </DialogHeader>
 
@@ -508,8 +596,125 @@ export default function CreateDeliveryOrderDialog({
           </div>
         )}
 
-        {/* Step 3: Tracking & Schedule Configuration */}
+        {/* Step 3: Dock Audit Checklist */}
         {step === 3 && (
+          <div className="space-y-6">
+            <div className="text-center mb-6">
+              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-medium">Dock Audit Check Sheet</h3>
+              <p className="text-sm text-muted-foreground">
+                Complete the quality verification checklist before proceeding to delivery
+              </p>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Quality Verification Checklist</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {auditData.filter(item => typeof item.ok === 'boolean').length} / {auditData.length} items reviewed
+                  {auditData.some(item => typeof item.ok !== 'boolean') && 
+                    <span className="text-orange-600 ml-2 font-medium">
+                      - {auditData.filter(item => typeof item.ok !== 'boolean').length} items need review
+                    </span>
+                  }
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left p-2 text-muted-foreground">S.No</th>
+                        <th className="text-left p-2 text-muted-foreground">Activity</th>
+                        <th className="text-left p-2 text-muted-foreground">Specified</th>
+                        <th className="text-left p-2 text-muted-foreground">OK</th>
+                        <th className="text-left p-2 text-muted-foreground">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-foreground">
+                      {auditData.map((item, index) => (
+                        <tr key={item.id} className={`border-b border-border/30 ${typeof item.ok !== 'boolean' ? 'bg-yellow-50' : ''}`}>
+                          <td className="p-2">{item.id}</td>
+                          <td className="p-2 font-medium">{item.activity}</td>
+                          <td className="p-2 text-muted-foreground">{item.specified}</td>
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  const updated = [...auditData];
+                                  updated[index].ok = true;
+                                  setAuditData(updated);
+                                }}
+                                className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                                  item.ok === true
+                                    ? 'bg-green-500 border-green-500 text-white'
+                                    : 'border-border hover:border-green-500'
+                                }`}
+                              >
+                                {item.ok === true && <CheckCircle className="w-3 h-3" />}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const updated = [...auditData];
+                                  updated[index].ok = false;
+                                  setAuditData(updated);
+                                }}
+                                className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                                  item.ok === false
+                                    ? 'bg-red-500 border-red-500 text-white'
+                                    : 'border-border hover:border-red-500'
+                                }`}
+                              >
+                                {item.ok === false && <X className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              value={item.value}
+                              onChange={(e) => {
+                                const updated = [...auditData];
+                                updated[index].value = e.target.value;
+                                setAuditData(updated);
+                              }}
+                              placeholder="Enter value"
+                              className="w-full text-xs"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="checkedBy">Checked by:</Label>
+                      <Input
+                        id="checkedBy"
+                        value={checkedBy}
+                        onChange={(e) => setCheckedBy(e.target.value)}
+                        placeholder="Enter inspector name"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <div className="w-full">
+                        <Label>Date:</Label>
+                        <p className="text-sm text-foreground mt-1">
+                          {new Date().toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Step 4: Tracking & Schedule Configuration */}
+        {step === 4 && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Tracking System */}
@@ -983,8 +1188,8 @@ export default function CreateDeliveryOrderDialog({
           </div>
         )}
 
-        {/* Step 3: Review & Confirm */}
-        {step === 3 && (
+        {/* Step 5: Review & Confirm */}
+        {step === 5 && (
           <div className="space-y-6">
             {/* Order Summary */}
             <Card>
@@ -1127,16 +1332,17 @@ export default function CreateDeliveryOrderDialog({
                 Cancel
               </Button>
 
-              {step < 4 ? (
+              {step < 5 ? (
                 <Button
                   onClick={() => setStep(step + 1)}
                   disabled={
                     (step === 1 && selectedItems.length === 0) ||
                     (step === 2 && !selectedItems.every(item => item.partPhotos?.length && item.packingPhotos?.length)) ||
-                    (step === 3 && (!formData.deliveryAddressId || !formData.startDate || !formData.endDate))
+                    (step === 3 && (!checkedBy.trim() || auditData.some(item => typeof item.ok !== 'boolean'))) ||
+                    (step === 4 && (!formData.deliveryAddressId || !formData.startDate || !formData.endDate))
                   }
                 >
-                  {step === 2 ? 'Photos Required' : 'Next'}
+                  {step === 2 ? 'Photos Required' : step === 3 ? 'Complete Audit' : 'Next'}
                 </Button>
               ) : (
                 <Button
