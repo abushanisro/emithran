@@ -3,12 +3,17 @@ import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateRawMaterialDto, UpdateRawMaterialDto, QueryRawMaterialsDto } from './dto/raw-materials.dto';
 import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-material-response.dto';
+import { PlasticRubberContainerService } from './containers/plastic-rubber-container.service';
+import { FerrousContainerService } from './containers/ferrous-container.service';
+import { MaterialCategory, MATERIAL_CATEGORY_LABELS } from './constants/material-categories.constants';
 
 @Injectable()
 export class RawMaterialsService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
+    private readonly plasticRubberContainer: PlasticRubberContainerService,
+    private readonly ferrousContainer: FerrousContainerService,
   ) {}
 
   async findAll(query: QueryRawMaterialsDto, userId?: string, accessToken?: string): Promise<RawMaterialListResponseDto> {
@@ -332,5 +337,116 @@ export class RawMaterialsService {
     }, {});
 
     return grouped;
+  }
+
+  async getPlasticRubberMaterials(
+    query: QueryRawMaterialsDto,
+    userId?: string,
+    accessToken?: string
+  ): Promise<RawMaterialListResponseDto> {
+    this.logger.log('Fetching plastic & rubber materials via enhanced service', 'RawMaterialsService');
+    return this.plasticRubberContainer.findAllPlasticRubberMaterials(query, userId, accessToken);
+  }
+
+  async getFerrousMaterials(
+    query: QueryRawMaterialsDto,
+    userId?: string,
+    accessToken?: string
+  ): Promise<RawMaterialListResponseDto> {
+    this.logger.log('Fetching ferrous materials via enhanced service', 'RawMaterialsService');
+    return this.ferrousContainer.findAllFerrousMaterials(query, userId, accessToken);
+  }
+
+  async getPlasticRubberMaterialById(
+    id: string,
+    userId: string,
+    accessToken: string
+  ): Promise<RawMaterialResponseDto> {
+    return this.plasticRubberContainer.getPlasticRubberMaterialById(id, userId, accessToken);
+  }
+
+  async getFerrousMaterialById(
+    id: string,
+    userId: string,
+    accessToken: string
+  ): Promise<RawMaterialResponseDto> {
+    return this.ferrousContainer.getFerrousMaterialById(id, userId, accessToken);
+  }
+
+  async createPlasticRubberMaterial(
+    createDto: CreateRawMaterialDto,
+    userId: string,
+    accessToken: string
+  ): Promise<RawMaterialResponseDto> {
+    return this.plasticRubberContainer.createPlasticRubberMaterial(createDto, userId, accessToken);
+  }
+
+  async createFerrousMaterial(
+    createDto: CreateRawMaterialDto,
+    userId: string,
+    accessToken: string
+  ): Promise<RawMaterialResponseDto> {
+    return this.ferrousContainer.createFerrousMaterial(createDto, userId, accessToken);
+  }
+
+  async updatePlasticRubberMaterial(
+    id: string,
+    updateDto: UpdateRawMaterialDto,
+    userId: string,
+    accessToken: string
+  ): Promise<RawMaterialResponseDto> {
+    return this.plasticRubberContainer.updatePlasticRubberMaterial(id, updateDto, userId, accessToken);
+  }
+
+  async updateFerrousMaterial(
+    id: string,
+    updateDto: UpdateRawMaterialDto,
+    userId: string,
+    accessToken: string
+  ): Promise<RawMaterialResponseDto> {
+    return this.ferrousContainer.updateFerrousMaterial(id, updateDto, userId, accessToken);
+  }
+
+  async getMaterialCategoryStatistics(userId: string, accessToken: string): Promise<{
+    plasticRubber: any;
+    ferrous: any;
+    summary: {
+      totalMaterials: number;
+      categoryCounts: Record<string, number>;
+    };
+  }> {
+    this.logger.log('Fetching material category statistics', 'RawMaterialsService');
+
+    const [plasticRubberStats, ferrousStats] = await Promise.all([
+      this.plasticRubberContainer.getPlasticRubberStatistics(userId, accessToken),
+      this.ferrousContainer.getFerrousStatistics(userId, accessToken),
+    ]);
+
+    return {
+      plasticRubber: plasticRubberStats,
+      ferrous: ferrousStats,
+      summary: {
+        totalMaterials: plasticRubberStats.totalMaterials + ferrousStats.totalMaterials,
+        categoryCounts: {
+          [MATERIAL_CATEGORY_LABELS.PLASTIC_RUBBER]: plasticRubberStats.totalMaterials,
+          [MATERIAL_CATEGORY_LABELS.FERROUS]: ferrousStats.totalMaterials,
+        },
+      },
+    };
+  }
+
+  async importFerrousDataFromExcel(
+    excelData: any[],
+    userId: string,
+    accessToken: string
+  ): Promise<{ imported: number; errors: string[] }> {
+    this.logger.log('Importing ferrous materials from Excel', 'RawMaterialsService');
+    return this.ferrousContainer.importFerrousDataFromExcel(excelData, userId, accessToken);
+  }
+
+  async getMaterialCategories(): Promise<{ categories: typeof MATERIAL_CATEGORY_LABELS }> {
+    return {
+      categories: MATERIAL_CATEGORY_LABELS,
+    };
   }
 }

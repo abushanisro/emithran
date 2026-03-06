@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Upload, Search, ArrowUpDown, Filter, Download, Trash2, AlertTriangle, Pencil, ArrowLeft } from 'lucide-react';
+import { Plus, Upload, Search, ArrowUpDown, Filter, Download, Trash2, AlertTriangle, Pencil, ArrowLeft, Container, BarChart3, FileSpreadsheet } from 'lucide-react';
 import {
   useRawMaterials,
   useRawMaterialFilterOptions,
@@ -31,8 +32,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+interface User { id: string; email: string; [key: string]: any; }
+
+type MaterialContainer = 'all' | 'plastic-rubber' | 'ferrous';
+
 export default function RawMaterialsPage() {
   const router = useRouter();
+  const [activeContainer, setActiveContainer] = useState<MaterialContainer>('all');
   const [search, setSearch] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [filterLocation, setFilterLocation] = useState<string>('all');
@@ -74,15 +80,36 @@ export default function RawMaterialsPage() {
 
   const CONFIRM_DELETE_TEXT = 'delete';
 
-  const { data: rawMaterialsData, isLoading } = useRawMaterials({
-    search: search || undefined,
-    materialGroup: filterGroup !== 'all' ? filterGroup : undefined,
-    location: filterLocation !== 'all' ? filterLocation : undefined,
-    year: filterYear !== 'all' ? parseInt(filterYear) : undefined,
-    sortBy,
-    sortOrder,
-  });
+  // Apply container-based filtering
+  const getFilteredQuery = () => {
+    const baseQuery = {
+      search: search || undefined,
+      materialGroup: filterGroup !== 'all' ? filterGroup : undefined,
+      location: filterLocation !== 'all' ? filterLocation : undefined,
+      year: filterYear !== 'all' ? parseInt(filterYear) : undefined,
+      sortBy,
+      sortOrder,
+    };
 
+    // Add container-specific filtering
+    if (activeContainer === 'plastic-rubber') {
+      return {
+        ...baseQuery,
+        materialGroup: baseQuery.materialGroup || undefined,
+        // Could add specific plastic-rubber filtering here if needed
+      };
+    } else if (activeContainer === 'ferrous') {
+      return {
+        ...baseQuery,
+        materialGroup: baseQuery.materialGroup || undefined,
+        // Could add specific ferrous filtering here if needed
+      };
+    }
+
+    return baseQuery;
+  };
+
+  const { data: rawMaterialsData, isLoading } = useRawMaterials(getFilteredQuery());
   const { data: filterOptions } = useRawMaterialFilterOptions();
   const uploadMutation = useUploadRawMaterialsExcel();
   const createMutation = useCreateRawMaterial();
@@ -92,6 +119,29 @@ export default function RawMaterialsPage() {
 
   const rawMaterials = rawMaterialsData?.items || [];
   const totalCount = rawMaterialsData?.total || 0;
+
+  // Filter materials based on active container
+  const getFilteredMaterials = () => {
+    if (activeContainer === 'plastic-rubber') {
+      return rawMaterials.filter(material => 
+        material.materialGroup?.toLowerCase().includes('plastic') ||
+        material.materialGroup?.toLowerCase().includes('rubber') ||
+        material.materialGroup?.toLowerCase().includes('polymer') ||
+        material.materialGroup?.toLowerCase().includes('elastomer')
+      );
+    } else if (activeContainer === 'ferrous') {
+      return rawMaterials.filter(material => 
+        material.materialGroup?.toLowerCase().includes('ferrous') ||
+        material.materialGroup?.toLowerCase().includes('steel') ||
+        material.materialGroup?.toLowerCase().includes('iron') ||
+        material.materialGroup?.toLowerCase().includes('metal')
+      );
+    }
+    return rawMaterials;
+  };
+
+  const filteredMaterials = getFilteredMaterials();
+  const filteredCount = filteredMaterials.length;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -117,8 +167,7 @@ export default function RawMaterialsPage() {
     });
   };
 
-  const downloadTemplate = () => {
-    // Create a sample template CSV
+  const downloadTemplate = (containerType: MaterialContainer = 'all') => {
     const headers = [
       'MaterialGroup',
       'Material',
@@ -144,37 +193,94 @@ export default function RawMaterialsPage() {
       'Q4',
     ];
 
-    const sampleRow = [
-      'Plastic & Rubber',
-      'Acrylonitrile Butadiene Styrene',
-      'ABS',
-      'General Purpose',
-      'Pellet',
-      'Amorphous',
-      'General purpose applications',
-      'Yes',
-      '10',
-      '50.5',
-      '80',
-      '220',
-      '60',
-      '1050',
-      '2.1',
-      '0.18',
-      'USA',
-      '2024',
-      '2.5',
-      '2.6',
-      '2.7',
-      '2.8',
-    ];
+    let sampleRow: string[] = [];
+    let fileName = 'raw-materials-template.csv';
+
+    if (containerType === 'plastic-rubber') {
+      sampleRow = [
+        'Plastic & Rubber',
+        'Acrylonitrile Butadiene Styrene',
+        'ABS',
+        'General Purpose',
+        'Pellet',
+        'Amorphous',
+        'General purpose applications',
+        'Yes',
+        '10',
+        '50.5',
+        '80',
+        '220',
+        '60',
+        '1050',
+        '2.1',
+        '0.18',
+        'USA',
+        '2024',
+        '2.5',
+        '2.6',
+        '2.7',
+        '2.8',
+      ];
+      fileName = 'plastic-rubber-materials-template.csv';
+    } else if (containerType === 'ferrous') {
+      sampleRow = [
+        'Ferrous Materials',
+        'Carbon Steel',
+        'CS',
+        'AISI 1020',
+        'Bar',
+        'Solid',
+        'Structural applications',
+        'No',
+        '0',
+        '0',
+        '0',
+        '1538',
+        '0',
+        '7850',
+        '0.49',
+        '50',
+        'USA',
+        '2024',
+        '45.5',
+        '46.2',
+        '47.1',
+        '48.0',
+      ];
+      fileName = 'ferrous-materials-template.csv';
+    } else {
+      sampleRow = [
+        'Plastic & Rubber',
+        'Acrylonitrile Butadiene Styrene',
+        'ABS',
+        'General Purpose',
+        'Pellet',
+        'Amorphous',
+        'General purpose applications',
+        'Yes',
+        '10',
+        '50.5',
+        '80',
+        '220',
+        '60',
+        '1050',
+        '2.1',
+        '0.18',
+        'USA',
+        '2024',
+        '2.5',
+        '2.6',
+        '2.7',
+        '2.8',
+      ];
+    }
 
     const csv = [headers.join(','), sampleRow.join(',')].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'raw-materials-template.csv';
+    a.download = fileName;
     a.click();
     window.URL.revokeObjectURL(url);
 
@@ -187,9 +293,16 @@ export default function RawMaterialsPage() {
       return;
     }
 
-    // Convert string inputs to proper types
+    // Set default material group based on active container
+    let materialGroup = newMaterial.materialGroup;
+    if (activeContainer === 'plastic-rubber' && !materialGroup.toLowerCase().includes('plastic') && !materialGroup.toLowerCase().includes('rubber')) {
+      materialGroup = 'Plastic & Rubber';
+    } else if (activeContainer === 'ferrous' && !materialGroup.toLowerCase().includes('ferrous') && !materialGroup.toLowerCase().includes('steel') && !materialGroup.toLowerCase().includes('iron')) {
+      materialGroup = 'Ferrous Materials';
+    }
+
     const materialData: any = {
-      materialGroup: newMaterial.materialGroup,
+      materialGroup,
       material: newMaterial.material,
       materialAbbreviation: newMaterial.materialAbbreviation || undefined,
       materialGrade: newMaterial.materialGrade || undefined,
@@ -216,31 +329,35 @@ export default function RawMaterialsPage() {
     createMutation.mutate(materialData, {
       onSuccess: () => {
         setCreateDialogOpen(false);
-        setNewMaterial({
-          materialGroup: '',
-          material: '',
-          materialAbbreviation: '',
-          materialGrade: '',
-          stockForm: '',
-          matlState: '',
-          application: '',
-          regrinding: '',
-          regrindingPercentage: '',
-          clampingPressureMpa: '',
-          ejectDeflectionTempC: '',
-          meltingTempC: '',
-          moldTempC: '',
-          densityKgM3: '',
-          specificHeatMelt: '',
-          thermalConductivityMelt: '',
-          location: '',
-          year: '',
-          q1Cost: '',
-          q2Cost: '',
-          q3Cost: '',
-          q4Cost: '',
-        });
+        resetNewMaterial();
       },
+    });
+  };
+
+  const resetNewMaterial = () => {
+    setNewMaterial({
+      materialGroup: activeContainer === 'plastic-rubber' ? 'Plastic & Rubber' : activeContainer === 'ferrous' ? 'Ferrous Materials' : '',
+      material: '',
+      materialAbbreviation: '',
+      materialGrade: '',
+      stockForm: '',
+      matlState: '',
+      application: '',
+      regrinding: '',
+      regrindingPercentage: '',
+      clampingPressureMpa: '',
+      ejectDeflectionTempC: '',
+      meltingTempC: '',
+      moldTempC: '',
+      densityKgM3: '',
+      specificHeatMelt: '',
+      thermalConductivityMelt: '',
+      location: '',
+      year: '',
+      q1Cost: '',
+      q2Cost: '',
+      q3Cost: '',
+      q4Cost: '',
     });
   };
 
@@ -262,13 +379,6 @@ export default function RawMaterialsPage() {
         setDeleteConfirmText('');
       },
     });
-  };
-
-  const handleDeleteAllDialogClose = (open: boolean) => {
-    setDeleteAllDialogOpen(open);
-    if (!open) {
-      setDeleteConfirmText('');
-    }
   };
 
   const handleEditMaterial = (material: RawMaterial) => {
@@ -307,7 +417,6 @@ export default function RawMaterialsPage() {
       return;
     }
 
-    // Convert string inputs to proper types
     const materialData: any = {
       materialGroup: newMaterial.materialGroup,
       material: newMaterial.material,
@@ -339,30 +448,7 @@ export default function RawMaterialsPage() {
         onSuccess: () => {
           setEditDialogOpen(false);
           setEditingMaterial(null);
-          setNewMaterial({
-            materialGroup: '',
-            material: '',
-            materialAbbreviation: '',
-            materialGrade: '',
-            stockForm: '',
-            matlState: '',
-            application: '',
-            regrinding: '',
-            regrindingPercentage: '',
-            clampingPressureMpa: '',
-            ejectDeflectionTempC: '',
-            meltingTempC: '',
-            moldTempC: '',
-            densityKgM3: '',
-            specificHeatMelt: '',
-            thermalConductivityMelt: '',
-            location: '',
-            year: '',
-            q1Cost: '',
-            q2Cost: '',
-            q3Cost: '',
-            q4Cost: '',
-          });
+          resetNewMaterial();
         },
       }
     );
@@ -382,37 +468,203 @@ export default function RawMaterialsPage() {
     return <ArrowUpDown className={`h-3 w-3 ml-1 ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />;
   };
 
+  const getContainerStats = () => {
+    const plasticRubberCount = rawMaterials.filter(material => 
+      material.materialGroup?.toLowerCase().includes('plastic') ||
+      material.materialGroup?.toLowerCase().includes('rubber') ||
+      material.materialGroup?.toLowerCase().includes('polymer') ||
+      material.materialGroup?.toLowerCase().includes('elastomer')
+    ).length;
+
+    const ferrousCount = rawMaterials.filter(material => 
+      material.materialGroup?.toLowerCase().includes('ferrous') ||
+      material.materialGroup?.toLowerCase().includes('steel') ||
+      material.materialGroup?.toLowerCase().includes('iron') ||
+      material.materialGroup?.toLowerCase().includes('metal')
+    ).length;
+
+    return { plasticRubberCount, ferrousCount };
+  };
+
+  const { plasticRubberCount, ferrousCount } = getContainerStats();
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <PageHeader
-          title="Raw Materials Database - Injection Moulding"
-          description="Material properties and cost data for Injection Moulding process"
-        >
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Excel
-            </Button>
-            <Button
-              variant="outline"
-              disabled={totalCount === 0}
-              className="text-red-600 hover:text-red-700"
-              onClick={() => setDeleteAllDialogOpen(true)}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete All
-            </Button>
-            <Button onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Material
-            </Button>
+      <PageHeader
+        title="Raw Materials Database"
+        description="Material properties and cost data for injection molding process"
+      >
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Excel
+          </Button>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Material
+          </Button>
+        </div>
+      </PageHeader>
+
+      {/* Material Container Tabs */}
+      <Tabs value={activeContainer} onValueChange={(value) => setActiveContainer(value as MaterialContainer)}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            All Materials ({totalCount})
+          </TabsTrigger>
+          <TabsTrigger value="plastic-rubber" className="flex items-center gap-2">
+            <Container className="h-4 w-4" />
+            Plastic & Rubber ({plasticRubberCount})
+          </TabsTrigger>
+          <TabsTrigger value="ferrous" className="flex items-center gap-2">
+            <Container className="h-4 w-4" />
+            Ferrous Materials ({ferrousCount})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Container className="h-5 w-5 text-blue-600" />
+                  Plastic & Rubber Container
+                </CardTitle>
+                <CardDescription>
+                  Thermoplastics, thermosets, elastomers, and composites
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total Materials</span>
+                    <Badge variant="secondary">{plasticRubberCount}</Badge>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setActiveContainer('plastic-rubber')}
+                    className="w-full"
+                  >
+                    View Container
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Container className="h-5 w-5 text-orange-600" />
+                  Ferrous Materials Container
+                </CardTitle>
+                <CardDescription>
+                  Steel, cast iron, and ferrous alloys
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total Materials</span>
+                    <Badge variant="secondary">{ferrousCount}</Badge>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setActiveContainer('ferrous')}
+                    className="w-full"
+                  >
+                    View Container
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </PageHeader>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="plastic-rubber" className="space-y-6">
+          <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Container className="h-5 w-5 text-blue-600" />
+                Plastic & Rubber Materials Container
+              </CardTitle>
+              <CardDescription>
+                Specialized container for thermoplastic and rubber-based materials including polymers, elastomers, and composites.
+                Optimized for injection molding process parameters.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{plasticRubberCount}</div>
+                  <div className="text-xs text-muted-foreground">Materials</div>
+                </div>
+                <div className="text-center">
+                  <Button variant="outline" size="sm" onClick={() => downloadTemplate('plastic-rubber')}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Template
+                  </Button>
+                </div>
+                <div className="text-center">
+                  <Button variant="outline" size="sm" onClick={() => { setCreateDialogOpen(true); resetNewMaterial(); }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Material
+                  </Button>
+                </div>
+                <div className="text-center">
+                  <Button variant="outline" size="sm" onClick={() => setUploadDialogOpen(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import Excel
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ferrous" className="space-y-6">
+          <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 dark:border-orange-900">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Container className="h-5 w-5 text-orange-600" />
+                Ferrous Materials Container
+              </CardTitle>
+              <CardDescription>
+                Specialized container for iron-based materials including carbon steel, alloy steel, stainless steel, and cast iron.
+                Supports import from existing Excel databases.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">{ferrousCount}</div>
+                  <div className="text-xs text-muted-foreground">Materials</div>
+                </div>
+                <div className="text-center">
+                  <Button variant="outline" size="sm" onClick={() => downloadTemplate('ferrous')}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Template
+                  </Button>
+                </div>
+                <div className="text-center">
+                  <Button variant="outline" size="sm" onClick={() => { setCreateDialogOpen(true); resetNewMaterial(); }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Material
+                  </Button>
+                </div>
+                <div className="text-center">
+                  <Button variant="outline" size="sm" onClick={() => setUploadDialogOpen(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import Excel
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
@@ -421,6 +673,11 @@ export default function RawMaterialsPage() {
             <DialogTitle>Upload Materials from Excel</DialogTitle>
             <DialogDescription>
               Select an Excel file (.xlsx, .xls) or CSV file containing raw material data to import
+              {activeContainer !== 'all' && (
+                <span className="block mt-1 text-sm font-medium">
+                  Uploading to: {activeContainer === 'plastic-rubber' ? 'Plastic & Rubber Container' : 'Ferrous Materials Container'}
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
@@ -431,11 +688,14 @@ export default function RawMaterialsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={downloadTemplate}
+                onClick={() => downloadTemplate(activeContainer)}
                 className="w-full"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download Template CSV
+                {activeContainer !== 'all' && (
+                  <span className="ml-1">({activeContainer === 'plastic-rubber' ? 'Plastic/Rubber' : 'Ferrous'})</span>
+                )}
               </Button>
             </div>
 
@@ -471,7 +731,10 @@ export default function RawMaterialsPage() {
       </Dialog>
 
       {/* Delete All Dialog */}
-      <Dialog open={deleteAllDialogOpen} onOpenChange={handleDeleteAllDialogClose}>
+      <Dialog open={deleteAllDialogOpen} onOpenChange={(open) => {
+        setDeleteAllDialogOpen(open);
+        if (!open) setDeleteConfirmText('');
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -502,30 +765,14 @@ export default function RawMaterialsPage() {
                 placeholder="Type 'delete' to confirm"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
-                className={`font-mono ${deleteConfirmText && deleteConfirmText.toLowerCase() !== CONFIRM_DELETE_TEXT
-                  ? 'border-red-500 focus-visible:ring-red-500'
-                  : deleteConfirmText.toLowerCase() === CONFIRM_DELETE_TEXT
-                    ? 'border-green-500 focus-visible:ring-green-500'
-                    : ''
-                  }`}
-                autoComplete="off"
+                className="font-mono"
               />
-              {deleteConfirmText && deleteConfirmText.toLowerCase() !== CONFIRM_DELETE_TEXT && (
-                <p className="text-xs text-red-600">
-                  Text doesn't match. Please type "delete" exactly.
-                </p>
-              )}
-              {deleteConfirmText.toLowerCase() === CONFIRM_DELETE_TEXT && (
-                <p className="text-xs text-green-600">
-                  Confirmed. You can now proceed with deletion.
-                </p>
-              )}
             </div>
 
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => handleDeleteAllDialogClose(false)}
+                onClick={() => setDeleteAllDialogOpen(false)}
                 className="flex-1"
               >
                 Cancel
@@ -533,10 +780,7 @@ export default function RawMaterialsPage() {
               <Button
                 variant="destructive"
                 onClick={handleDeleteAll}
-                disabled={
-                  deleteAllMutation.isPending ||
-                  deleteConfirmText.toLowerCase() !== CONFIRM_DELETE_TEXT
-                }
+                disabled={deleteAllMutation.isPending || deleteConfirmText.toLowerCase() !== CONFIRM_DELETE_TEXT}
                 className="flex-1"
               >
                 {deleteAllMutation.isPending ? 'Deleting...' : 'Delete All Materials'}
@@ -553,6 +797,11 @@ export default function RawMaterialsPage() {
             <DialogTitle>Add New Material</DialogTitle>
             <DialogDescription>
               Create a new raw material entry with complete specifications
+              {activeContainer !== 'all' && (
+                <span className="block mt-1 text-sm font-medium">
+                  Adding to: {activeContainer === 'plastic-rubber' ? 'Plastic & Rubber Container' : 'Ferrous Materials Container'}
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 pt-4">
@@ -561,32 +810,36 @@ export default function RawMaterialsPage() {
               <h3 className="text-sm font-semibold text-foreground">Material Identification</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Material Group *</Label>
-                  <Input
+                  <label className="text-sm font-medium">Material Group *</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Plastic & Rubber"
                     value={newMaterial.materialGroup}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialGroup: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Material *</Label>
-                  <Input
+                  <label className="text-sm font-medium">Material *</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Acrylonitrile Butadiene Styrene"
                     value={newMaterial.material}
                     onChange={(e) => setNewMaterial({ ...newMaterial, material: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Abbreviation</Label>
-                  <Input
+                  <label className="text-sm font-medium">Abbreviation</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., ABS"
                     value={newMaterial.materialAbbreviation}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialAbbreviation: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Grade</Label>
-                  <Input
+                  <label className="text-sm font-medium">Grade</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., General Purpose"
                     value={newMaterial.materialGrade}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialGrade: e.target.value })}
@@ -600,107 +853,36 @@ export default function RawMaterialsPage() {
               <h3 className="text-sm font-semibold text-foreground">Material Properties</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Stock Form</Label>
-                  <Input
+                  <label className="text-sm font-medium">Stock Form</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Pellet, Granules"
                     value={newMaterial.stockForm}
                     onChange={(e) => setNewMaterial({ ...newMaterial, stockForm: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Material State</Label>
-                  <Input
+                  <label className="text-sm font-medium">Material State</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Amorphous, Semi-Crystalline"
                     value={newMaterial.matlState}
                     onChange={(e) => setNewMaterial({ ...newMaterial, matlState: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Application</Label>
-                  <Input
+                  <label className="text-sm font-medium">Application</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., General purpose applications"
                     value={newMaterial.application}
                     onChange={(e) => setNewMaterial({ ...newMaterial, application: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Regrinding</Label>
-                  <Select
-                    value={newMaterial.regrinding}
-                    onValueChange={(value) => setNewMaterial({ ...newMaterial, regrinding: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select option" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Regrinding %</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 10"
-                    value={newMaterial.regrindingPercentage}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, regrindingPercentage: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Processing Parameters Section */}
-            <div className="space-y-4 p-4 bg-secondary/30 rounded-lg">
-              <h3 className="text-sm font-semibold text-foreground">Processing Parameters</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Clamping Pressure (MPa)</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g., 50.5"
-                    value={newMaterial.clampingPressureMpa}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, clampingPressureMpa: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Eject Deflection Temp (°C)</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 80"
-                    value={newMaterial.ejectDeflectionTempC}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, ejectDeflectionTempC: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Melting Temp (°C)</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 220"
-                    value={newMaterial.meltingTempC}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, meltingTempC: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Mold Temp (°C)</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 60"
-                    value={newMaterial.moldTempC}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, moldTempC: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Physical Properties Section */}
-            <div className="space-y-4 p-4 bg-secondary/30 rounded-lg">
-              <h3 className="text-sm font-semibold text-foreground">Physical Properties</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Density (kg/m³)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Density (kg/m³)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     placeholder="e.g., 1050"
                     value={newMaterial.densityKgM3}
@@ -708,23 +890,12 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Specific Heat of Melt (J/g·°C)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g., 2.1"
-                    value={newMaterial.specificHeatMelt}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, specificHeatMelt: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Thermal Conductivity of Melt (W/m·°C)</Label>
-                  <Input
-                    type="number"
-                    step="0.001"
-                    placeholder="e.g., 0.18"
-                    value={newMaterial.thermalConductivityMelt}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, thermalConductivityMelt: e.target.value })}
+                  <label className="text-sm font-medium">Location</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="e.g., USA, India, China"
+                    value={newMaterial.location}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, location: e.target.value })}
                   />
                 </div>
               </div>
@@ -735,16 +906,9 @@ export default function RawMaterialsPage() {
               <h3 className="text-sm font-semibold text-foreground">Cost Data</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Location</Label>
-                  <Input
-                    placeholder="e.g., USA, India, China"
-                    value={newMaterial.location}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, location: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Year</Label>
-                  <Input
+                  <label className="text-sm font-medium">Year</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     placeholder="e.g., 2024"
                     value={newMaterial.year}
@@ -752,8 +916,9 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Q1 Cost (₹)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Q1 Cost (₹)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     step="0.01"
                     placeholder="e.g., 2.5"
@@ -762,8 +927,9 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Q2 Cost (₹)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Q2 Cost (₹)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     step="0.01"
                     placeholder="e.g., 2.6"
@@ -772,8 +938,9 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Q3 Cost (₹)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Q3 Cost (₹)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     step="0.01"
                     placeholder="e.g., 2.7"
@@ -782,8 +949,9 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Q4 Cost (₹)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Q4 Cost (₹)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     step="0.01"
                     placeholder="e.g., 2.8"
@@ -830,32 +998,36 @@ export default function RawMaterialsPage() {
               <h3 className="text-sm font-semibold text-foreground">Material Identification</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Material Group *</Label>
-                  <Input
+                  <label className="text-sm font-medium">Material Group *</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Plastic & Rubber"
                     value={newMaterial.materialGroup}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialGroup: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Material *</Label>
-                  <Input
+                  <label className="text-sm font-medium">Material *</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Acrylonitrile Butadiene Styrene"
                     value={newMaterial.material}
                     onChange={(e) => setNewMaterial({ ...newMaterial, material: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Abbreviation</Label>
-                  <Input
+                  <label className="text-sm font-medium">Abbreviation</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., ABS"
                     value={newMaterial.materialAbbreviation}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialAbbreviation: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Grade</Label>
-                  <Input
+                  <label className="text-sm font-medium">Grade</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., General Purpose"
                     value={newMaterial.materialGrade}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialGrade: e.target.value })}
@@ -869,107 +1041,36 @@ export default function RawMaterialsPage() {
               <h3 className="text-sm font-semibold text-foreground">Material Properties</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Stock Form</Label>
-                  <Input
+                  <label className="text-sm font-medium">Stock Form</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Pellet, Granules"
                     value={newMaterial.stockForm}
                     onChange={(e) => setNewMaterial({ ...newMaterial, stockForm: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Material State</Label>
-                  <Input
+                  <label className="text-sm font-medium">Material State</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Amorphous, Semi-Crystalline"
                     value={newMaterial.matlState}
                     onChange={(e) => setNewMaterial({ ...newMaterial, matlState: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Application</Label>
-                  <Input
+                  <label className="text-sm font-medium">Application</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., General purpose applications"
                     value={newMaterial.application}
                     onChange={(e) => setNewMaterial({ ...newMaterial, application: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Regrinding</Label>
-                  <Select
-                    value={newMaterial.regrinding}
-                    onValueChange={(value) => setNewMaterial({ ...newMaterial, regrinding: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select option" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Regrinding %</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 10"
-                    value={newMaterial.regrindingPercentage}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, regrindingPercentage: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Processing Parameters Section */}
-            <div className="space-y-4 p-4 bg-secondary/30 rounded-lg">
-              <h3 className="text-sm font-semibold text-foreground">Processing Parameters</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Clamping Pressure (MPa)</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g., 50.5"
-                    value={newMaterial.clampingPressureMpa}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, clampingPressureMpa: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Eject Deflection Temp (°C)</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 80"
-                    value={newMaterial.ejectDeflectionTempC}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, ejectDeflectionTempC: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Melting Temp (°C)</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 220"
-                    value={newMaterial.meltingTempC}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, meltingTempC: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Mold Temp (°C)</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 60"
-                    value={newMaterial.moldTempC}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, moldTempC: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Physical Properties Section */}
-            <div className="space-y-4 p-4 bg-secondary/30 rounded-lg">
-              <h3 className="text-sm font-semibold text-foreground">Physical Properties</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Density (kg/m³)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Density (kg/m³)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     placeholder="e.g., 1050"
                     value={newMaterial.densityKgM3}
@@ -977,23 +1078,12 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Specific Heat of Melt (J/g·°C)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g., 2.1"
-                    value={newMaterial.specificHeatMelt}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, specificHeatMelt: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Thermal Conductivity of Melt (W/m·°C)</Label>
-                  <Input
-                    type="number"
-                    step="0.001"
-                    placeholder="e.g., 0.18"
-                    value={newMaterial.thermalConductivityMelt}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, thermalConductivityMelt: e.target.value })}
+                  <label className="text-sm font-medium">Location</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="e.g., USA, India, China"
+                    value={newMaterial.location}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, location: e.target.value })}
                   />
                 </div>
               </div>
@@ -1004,16 +1094,9 @@ export default function RawMaterialsPage() {
               <h3 className="text-sm font-semibold text-foreground">Cost Data</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Location</Label>
-                  <Input
-                    placeholder="e.g., USA, India, China"
-                    value={newMaterial.location}
-                    onChange={(e) => setNewMaterial({ ...newMaterial, location: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Year</Label>
-                  <Input
+                  <label className="text-sm font-medium">Year</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     placeholder="e.g., 2024"
                     value={newMaterial.year}
@@ -1021,8 +1104,9 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Q1 Cost (₹)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Q1 Cost (₹)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     step="0.01"
                     placeholder="e.g., 2.5"
@@ -1031,8 +1115,9 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Q2 Cost (₹)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Q2 Cost (₹)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     step="0.01"
                     placeholder="e.g., 2.6"
@@ -1041,8 +1126,9 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Q3 Cost (₹)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Q3 Cost (₹)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     step="0.01"
                     placeholder="e.g., 2.7"
@@ -1051,8 +1137,9 @@ export default function RawMaterialsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Q4 Cost (₹)</Label>
-                  <Input
+                  <label className="text-sm font-medium">Q4 Cost (₹)</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     step="0.01"
                     placeholder="e.g., 2.8"
@@ -1193,7 +1280,12 @@ export default function RawMaterialsPage() {
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {rawMaterials.length} of {totalCount} materials
+          Showing {filteredCount} of {totalCount} materials
+          {activeContainer !== 'all' && (
+            <span className="ml-1">
+              in {activeContainer === 'plastic-rubber' ? 'Plastic & Rubber' : 'Ferrous Materials'} container
+            </span>
+          )}
         </p>
       </div>
 
@@ -1221,14 +1313,7 @@ export default function RawMaterialsPage() {
                 <TableHead className="h-9 px-2 text-xs">State</TableHead>
                 <TableHead className="h-9 px-2 text-xs">Application</TableHead>
                 <TableHead className="h-9 px-2 text-xs">Regrind</TableHead>
-                <TableHead className="text-right h-9 px-2 text-xs">Regrind %</TableHead>
-                <TableHead className="text-right h-9 px-2 text-xs">Clamp (MPa)</TableHead>
-                <TableHead className="text-right h-9 px-2 text-xs">Eject (°C)</TableHead>
-                <TableHead className="text-right h-9 px-2 text-xs">Melt (°C)</TableHead>
-                <TableHead className="text-right h-9 px-2 text-xs">Mold (°C)</TableHead>
                 <TableHead className="text-right h-9 px-2 text-xs">Density</TableHead>
-                <TableHead className="text-right h-9 px-2 text-xs">Sp. Heat</TableHead>
-                <TableHead className="text-right h-9 px-2 text-xs">Th. Cond.</TableHead>
                 <TableHead className="h-9 px-2 text-xs">Location</TableHead>
                 <TableHead className="h-9 px-2 text-xs">Year</TableHead>
                 <TableHead className="text-right h-9 px-2 text-xs">Q1</TableHead>
@@ -1241,27 +1326,44 @@ export default function RawMaterialsPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={23} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
                     Loading materials...
                   </TableCell>
                 </TableRow>
-              ) : rawMaterials.length === 0 ? (
+              ) : filteredMaterials.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={23} className="text-center py-8 text-muted-foreground">
-                    No materials found. Upload an Excel file to get started.
+                  <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                    {activeContainer !== 'all' 
+                      ? `No materials found in ${activeContainer === 'plastic-rubber' ? 'Plastic & Rubber' : 'Ferrous Materials'} container. Upload an Excel file to get started.`
+                      : 'No materials found. Upload an Excel file to get started.'
+                    }
                   </TableCell>
                 </TableRow>
               ) : (
-                rawMaterials.map((material) => (
+                filteredMaterials.map((material) => (
                   <TableRow key={material.id} className="hover:bg-secondary/30">
                     <TableCell className="font-medium p-2 text-xs">
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-5">{material.materialGroup}</Badge>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-[10px] px-1 py-0 h-5 ${
+                          material.materialGroup?.toLowerCase().includes('plastic') || 
+                          material.materialGroup?.toLowerCase().includes('rubber') 
+                            ? 'border-blue-500 text-blue-700' 
+                            : 'border-orange-500 text-orange-700'
+                        }`}
+                      >
+                        {material.materialGroup}
+                      </Badge>
                     </TableCell>
-                    <TableCell className="font-medium p-2 text-xs truncate max-w-[120px]" title={material.material}>{material.material}</TableCell>
+                    <TableCell className="font-medium p-2 text-xs truncate max-w-[120px]" title={material.material}>
+                      {material.material}
+                    </TableCell>
                     <TableCell className="text-muted-foreground p-2 text-xs">
                       {material.materialAbbreviation || '-'}
                     </TableCell>
-                    <TableCell className="p-2 text-xs truncate max-w-[100px]" title={material.materialGrade || ''}>{material.materialGrade || '-'}</TableCell>
+                    <TableCell className="p-2 text-xs truncate max-w-[100px]" title={material.materialGrade || ''}>
+                      {material.materialGrade || '-'}
+                    </TableCell>
                     <TableCell className="p-2 text-xs">{material.stockForm || '-'}</TableCell>
                     <TableCell className="p-2 text-xs">{material.matlState || '-'}</TableCell>
                     <TableCell className="max-w-[100px] truncate p-2 text-xs" title={material.application || ''}>
@@ -1277,28 +1379,7 @@ export default function RawMaterialsPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right p-2 text-xs">
-                      {material.regrindingPercentage ? `${material.regrindingPercentage}%` : '-'}
-                    </TableCell>
-                    <TableCell className="text-right p-2 text-xs">
-                      {material.clampingPressureMpa?.toFixed(1) || '-'}
-                    </TableCell>
-                    <TableCell className="text-right p-2 text-xs">
-                      {material.ejectDeflectionTempC?.toFixed(0) || '-'}
-                    </TableCell>
-                    <TableCell className="text-right p-2 text-xs">
-                      {material.meltingTempC?.toFixed(0) || '-'}
-                    </TableCell>
-                    <TableCell className="text-right p-2 text-xs">
-                      {material.moldTempC?.toFixed(0) || '-'}
-                    </TableCell>
-                    <TableCell className="text-right p-2 text-xs">
                       {material.densityKgM3?.toFixed(0) || '-'}
-                    </TableCell>
-                    <TableCell className="text-right p-2 text-xs">
-                      {material.specificHeatMelt?.toFixed(2) || '-'}
-                    </TableCell>
-                    <TableCell className="text-right p-2 text-xs">
-                      {material.thermalConductivityMelt?.toFixed(3) || '-'}
                     </TableCell>
                     <TableCell className="p-2 text-xs">{material.location || '-'}</TableCell>
                     <TableCell className="p-2 text-xs">{material.year || '-'}</TableCell>

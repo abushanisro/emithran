@@ -45,6 +45,95 @@ export class RawMaterialsController {
     return this.rawMaterialsService.getFilterOptions(user.id, token);
   }
 
+  @Get('categories')
+  @ApiOperation({ summary: 'Get available material categories' })
+  @ApiResponse({ status: 200, description: 'Material categories retrieved successfully' })
+  async getMaterialCategories() {
+    return this.rawMaterialsService.getMaterialCategories();
+  }
+
+  @Get('statistics')
+  @ApiOperation({ summary: 'Get material category statistics' })
+  @ApiResponse({ status: 200, description: 'Category statistics retrieved successfully' })
+  async getCategoryStatistics(@CurrentUser() user: User, @AccessToken() token: string) {
+    return this.rawMaterialsService.getMaterialCategoryStatistics(user.id, token);
+  }
+
+  @Get('plastic-rubber')
+  @ApiOperation({ summary: 'Get plastic and rubber materials' })
+  @ApiResponse({ status: 200, description: 'Plastic & rubber materials retrieved successfully', type: RawMaterialListResponseDto })
+  async getPlasticRubberMaterials(@Query() query: QueryRawMaterialsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialListResponseDto> {
+    return this.rawMaterialsService.getPlasticRubberMaterials(query, user.id, token);
+  }
+
+  @Get('ferrous')
+  @ApiOperation({ summary: 'Get ferrous materials' })
+  @ApiResponse({ status: 200, description: 'Ferrous materials retrieved successfully', type: RawMaterialListResponseDto })
+  async getFerrousMaterials(@Query() query: QueryRawMaterialsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialListResponseDto> {
+    return this.rawMaterialsService.getFerrousMaterials(query, user.id, token);
+  }
+
+  @Post('plastic-rubber')
+  @ApiOperation({ summary: 'Create a new plastic or rubber material' })
+  @ApiResponse({ status: 201, description: 'Plastic/rubber material created successfully', type: RawMaterialResponseDto })
+  async createPlasticRubberMaterial(@Body() createDto: CreateRawMaterialDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
+    return this.rawMaterialsService.createPlasticRubberMaterial(createDto, user.id, token);
+  }
+
+  @Post('ferrous')
+  @ApiOperation({ summary: 'Create a new ferrous material' })
+  @ApiResponse({ status: 201, description: 'Ferrous material created successfully', type: RawMaterialResponseDto })
+  async createFerrousMaterial(@Body() createDto: CreateRawMaterialDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
+    return this.rawMaterialsService.createFerrousMaterial(createDto, user.id, token);
+  }
+
+  @Post('ferrous/import')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Import ferrous materials from Excel file' })
+  @ApiResponse({ status: 201, description: 'Ferrous materials imported successfully' })
+  async importFerrousFromExcel(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: User,
+    @AccessToken() token: string
+  ) {
+    if (!file) {
+      throw new BadRequestException('Excel file is required');
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.buffer as any);
+    const worksheet = workbook.getWorksheet(1);
+
+    if (!worksheet) {
+      throw new BadRequestException('No worksheet found in Excel file');
+    }
+
+    const data: any[] = [];
+    const headers: string[] = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) {
+        row.eachCell((cell) => {
+          headers.push(cell.text);
+        });
+      } else {
+        const rowData: any = {};
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber - 1];
+          if (header) {
+            rowData[header] = cell.value;
+          }
+        });
+        if (Object.keys(rowData).length > 0) {
+          data.push(rowData);
+        }
+      }
+    });
+
+    return this.rawMaterialsService.importFerrousDataFromExcel(data, user.id, token);
+  }
+
   @Get('grouped')
   @ApiOperation({ summary: 'Get raw materials grouped by material group' })
   @ApiResponse({ status: 200, description: 'Grouped materials retrieved successfully' })
@@ -227,13 +316,28 @@ export class RawMaterialsController {
 
           // Map Excel columns to DTO properties with comprehensive column name matching
           const materialGroup = getColumnValue(rowData, 'MaterialGroup', 'Material Group', 'material_group', 'MATERIALGROUP');
-          const material = getColumnValue(rowData, 'Material', 'material', 'MATERIAL');
+          const material = getColumnValue(
+            rowData, 
+            'Material', 
+            'MaterialDescription', 
+            'Material Description', 
+            'material', 
+            'material_description',
+            'MATERIAL',
+            'MATERIALDESCRIPTION'
+          );
 
           // Validate required fields first
           if (!materialGroup || !material) {
             const availableColumns = Object.keys(rowData).join(', ');
+            const foundMaterialGroup = !!materialGroup;
+            const foundMaterial = !!material;
+            
             throw new Error(
-              `Missing required fields. Expected 'MaterialGroup' and 'Material' but got columns: ${availableColumns}`
+              `Missing required fields. ` +
+              `MaterialGroup: ${foundMaterialGroup ? '✓ Found' : '✗ Missing'}, ` +
+              `Material: ${foundMaterial ? '✓ Found' : '✗ Missing (looking for MaterialDescription too)'}. ` +
+              `Available columns: ${availableColumns}`
             );
           }
 
@@ -278,7 +382,17 @@ export class RawMaterialsController {
             materialGroup,
             material,
             materialAbbreviation: getColumnValue(rowData, 'MaterialAbbreviation', 'Material Abbreviation', 'material_abbreviation', 'Abbr', 'Abbreviation'),
-            materialGrade: getColumnValue(rowData, 'MaterialGrade', 'Material Grade', 'material_grade', 'Grade'),
+            materialGrade: getColumnValue(
+              rowData, 
+              'MaterialGrade', 
+              'Material Grade', 
+              'MaterialType',
+              'Material Type',
+              'material_grade', 
+              'material_type',
+              'Grade',
+              'Type'
+            ),
             stockForm: getColumnValue(rowData, 'StockForm', 'Stock Form', 'stock_form', 'Form'),
             matlState: getColumnValue(rowData, 'MatlState', 'Matl State', 'matl_state', 'State', 'Material State'),
             application: getColumnValue(rowData, 'Application', 'application', 'APPLICATION'),
@@ -288,7 +402,16 @@ export class RawMaterialsController {
             ejectDeflectionTempC: parseNumeric(getColumnValue(rowData, 'Eject Deflection Temp (Â°C)', 'Eject Deflection Temp (°C)', 'Eject Temp (Â°C)', 'Eject Temp (°C)', 'EjectDeflectionTempC', 'eject_deflection_temp_c', 'Eject Temp')),
             meltingTempC: parseNumeric(getColumnValue(rowData, 'Melting Temp (Â°C)', 'Melting Temp (°C)', 'Melt Temp (Â°C)', 'Melt Temp (°C)', 'MeltingTempC', 'melting_temp_c', 'Melting Temperature', 'Melt Temp')),
             moldTempC: parseNumeric(getColumnValue(rowData, 'Mold Temp (Â°C)', 'Mold Temp (°C)', 'MoldTempC', 'mold_temp_c', 'Mold Temperature')),
-            densityKgM3: parseNumeric(getColumnValue(rowData, 'Density (kg / m^3)', 'Density (kg/m³)', 'Density (kg/mÂ³)', 'DensityKgM3', 'density_kg_m3', 'Density')),
+            densityKgM3: parseNumeric(getColumnValue(
+              rowData, 
+              'Density (kg / m^3)', 
+              'Density (kg/m³)', 
+              'Density (kg/mÂ³)', 
+              'DensityKgM3', 
+              'density_kg_m3', 
+              'Density',
+              'DENSITY'
+            )),
             specificHeatMelt: parseNumeric(specificHeatRaw),
             thermalConductivityMelt: parseNumeric(thermalCondRaw),
             location: getColumnValue(rowData, 'Location', 'location', 'LOCATION'),
