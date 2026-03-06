@@ -334,27 +334,90 @@ export function ManufacturingPerformanceChart({ modules }: { modules: any[] }) {
 }
 
 export function CostSavingsChart({ projects }: { projects: any[] }) {
-  if (!projects || projects.length === 0) {
+  // Always show chart with available data, even if incomplete
+  const savingsData = projects
+    .map(p => {
+      const targetPrice = Number(p.targetPrice) || 0;
+      const shouldCost = Number(p.shouldCost) || 0;
+      const savings = targetPrice - shouldCost;
+      const savingsPercent = targetPrice > 0 ? ((savings / targetPrice) * 100) : 0;
+      
+      return {
+        name: p.name?.substring(0, 12) || `Project ${p.id?.slice(-4) || Math.random().toString(36).slice(-4)}`,
+        targetPrice,
+        shouldCost,
+        savings,
+        savingsPercent,
+        hasData: targetPrice > 0 || shouldCost > 0,
+        fillColor: savings >= 0 ? 'hsl(var(--chart-3))' : 'hsl(var(--destructive))'
+      };
+    })
+    .filter(p => p.hasData)
+    .slice(0, 6);
+
+  // Debug logging for cost savings chart
+  if (process.env.NODE_ENV === 'development') {
+    console.log('CostSavingsChart - Projects received:', projects?.length || 0);
+    console.log('CostSavingsChart - Savings data:', savingsData);
+    console.log('CostSavingsChart - Projects sample:', projects?.slice(0, 2));
+  }
+
+  // If no projects with cost data, show projects with placeholder data
+  if (savingsData.length === 0 && projects.length > 0) {
+    const placeholderData = projects.slice(0, 6).map((p, index) => ({
+      name: p.name?.substring(0, 12) || `Project ${index + 1}`,
+      targetPrice: 0,
+      shouldCost: 0,
+      savings: 0,
+      savingsPercent: 0,
+      hasData: false,
+      fillColor: 'hsl(var(--muted))'
+    }));
+
     return (
-      <div className="h-64 flex items-center justify-center text-muted-foreground">
-        <div className="text-center">
-          <div className="text-3xl mb-2">💰</div>
-          <p className="text-sm">No cost savings data available</p>
+      <div className="h-64 relative">
+        <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/80 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-950/20 flex items-center justify-center mx-auto mb-3">
+              <div className="text-xl font-bold text-green-600">₹</div>
+            </div>
+            <p className="text-sm font-medium">Add cost data to see savings analysis</p>
+            <p className="text-xs text-muted-foreground mt-1">Enter target price and should cost in projects</p>
+          </div>
         </div>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={placeholderData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis 
+              dataKey="name" 
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+              axisLine={{ stroke: 'hsl(var(--border))' }}
+            />
+            <YAxis 
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+              tickFormatter={() => '₹0'}
+              axisLine={{ stroke: 'hsl(var(--border))' }}
+            />
+            <Bar dataKey="savings" fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     );
   }
 
-  const savingsData = projects
-    .filter(p => Number(p.targetPrice) > 0 && Number(p.shouldCost) > 0)
-    .map(p => ({
-      name: p.name?.substring(0, 12) || 'Project',
-      targetPrice: Number(p.targetPrice) || 0,
-      shouldCost: Number(p.shouldCost) || 0,
-      savings: (Number(p.targetPrice) || 0) - (Number(p.shouldCost) || 0),
-      savingsPercent: ((Number(p.targetPrice) - Number(p.shouldCost)) / Number(p.targetPrice)) * 100
-    }))
-    .slice(0, 6);
+  if (!projects || projects.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center text-muted-foreground">
+        <div className="text-center">
+          <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-950/20 flex items-center justify-center mx-auto mb-3">
+            <div className="text-xl font-bold text-green-600">₹</div>
+          </div>
+          <p className="text-sm">No projects available</p>
+          <p className="text-xs text-muted-foreground mt-1">Create projects to see cost savings analysis</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-64">
@@ -371,7 +434,12 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
           />
           <YAxis 
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`}
+            tickFormatter={(v) => {
+              const absV = Math.abs(v);
+              if (absV >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
+              if (absV >= 1000) return `₹${(v / 1000).toFixed(1)}K`;
+              return `₹${v.toFixed(0)}`;
+            }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
           />
           <Tooltip
@@ -382,11 +450,25 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
               boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             }}
             formatter={(value: any, name: string) => {
-              if (name === 'Savings %') return [`${Number(value).toFixed(1)}%`, name];
+              if (name === 'Cost Savings') {
+                const numValue = Number(value);
+                const sign = numValue >= 0 ? 'Savings' : 'Overspend';
+                return [`₹${Math.abs(numValue).toLocaleString('en-IN')} (${sign})`, name];
+              }
               return [`₹${Number(value).toLocaleString('en-IN')}`, name];
             }}
+            labelFormatter={(label) => `Project: ${label}`}
           />
-          <Bar dataKey="savings" name="Cost Savings" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} />
+          <Bar 
+            dataKey="savings" 
+            name="Cost Savings" 
+            fill="hsl(var(--chart-3))"
+            radius={[4, 4, 0, 0]}
+          >
+            {savingsData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.fillColor} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
