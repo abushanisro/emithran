@@ -62,6 +62,7 @@ import RouteMap from './RouteMap';
 interface DeliveryOrderWorkflowProps {
   projectId: string;
   onComplete?: () => void;
+  onTrackOrder?: (orderId: string) => void;
 }
 
 interface SelectedItem extends QualityApprovedItem {
@@ -189,7 +190,8 @@ const CARRIER_CONFIG = {
 
 export default function DeliveryOrderWorkflow({
   projectId,
-  onComplete
+  onComplete,
+  onTrackOrder
 }: DeliveryOrderWorkflowProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
@@ -2917,6 +2919,18 @@ export default function DeliveryOrderWorkflow({
                             </svg>
                             View
                           </Button>
+                          {/* Show Track button for all orders that have tracking capability */}
+                          {onTrackOrder && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="shrink-0"
+                              onClick={() => onTrackOrder(order.id)}
+                            >
+                              <MapPin className="h-4 w-4 mr-1" />
+                              Track
+                            </Button>
+                          )}
                           {order.status === 'draft' && (
                             <Button 
                               variant="outline" 

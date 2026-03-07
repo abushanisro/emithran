@@ -8,6 +8,7 @@ export interface BomItemCost {
   userId: string;
   rawMaterialCost: number;
   processCost: number;
+  toolingCost: number;
   packagingLogisticsCost: number;
   procuredPartsCost: number;
   directChildrenCost: number;
@@ -32,6 +33,7 @@ export interface BomItemCostSummary {
   totalCost: number;
   rawMaterialCost: number;
   processCost: number;
+  toolingCost: number;
   packagingLogisticsCost: number;
   procuredPartsCost: number;
   directChildrenCost: number;
@@ -43,6 +45,7 @@ export interface BomItemCostSummary {
 export interface UpdateBomItemCostDto {
   rawMaterialCost?: number;
   processCost?: number;
+  toolingCost?: number;
   sgaPercentage?: number;
   profitPercentage?: number;
 }
@@ -52,6 +55,7 @@ export interface CostByType {
   count: number;
   rawMaterialCost: number;
   processCost: number;
+  toolingCost: number;
   packagingLogisticsCost: number;
   procuredPartsCost: number;
   ownCost: number;
@@ -61,6 +65,7 @@ export interface CostByType {
 export interface CostBreakdown {
   totalRawMaterialCost: number;
   totalProcessCost: number;
+  totalToolingCost: number;
   totalPackagingLogisticsCost: number;
   totalProcuredPartsCost: number;
   totalDirectChildrenCost: number;

@@ -22,6 +22,10 @@ export class BomItemCostDto {
   @IsNumber()
   processCost: number;
 
+  @ApiProperty({ description: 'Tooling and fixture cost', example: 15.50 })
+  @IsNumber()
+  toolingCost: number;
+
   @ApiProperty({ description: 'Packaging and logistics cost', example: 25.00 })
   @IsNumber()
   @IsOptional()
@@ -96,6 +100,11 @@ export class UpdateBomItemCostDto {
   @IsOptional()
   processCost?: number;
 
+  @ApiProperty({ description: 'Tooling cost', required: false })
+  @IsNumber()
+  @IsOptional()
+  toolingCost?: number;
+
   @ApiProperty({ description: 'Packaging and logistics cost', required: false })
   @IsNumber()
   @IsOptional()
@@ -135,6 +144,9 @@ export class BomItemCostSummaryDto {
 
   @ApiProperty({ description: 'Process cost' })
   processCost: number;
+
+  @ApiProperty({ description: 'Tooling cost' })
+  toolingCost: number;
 
   @ApiProperty({ description: 'Packaging and logistics cost' })
   packagingLogisticsCost: number;

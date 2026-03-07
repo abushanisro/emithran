@@ -13,7 +13,10 @@ export class CostByTypeDto {
   @ApiProperty({ description: 'Total process cost' })
   processCost: number;
 
-  @ApiProperty({ description: 'Total own cost (material + process)' })
+  @ApiProperty({ description: 'Total tooling cost' })
+  toolingCost: number;
+
+  @ApiProperty({ description: 'Total own cost (material + process + tooling)' })
   ownCost: number;
 
   @ApiProperty({ description: 'Total cost including children' })
@@ -26,6 +29,9 @@ export class CostBreakdownDto {
 
   @ApiProperty({ description: 'Total process costs (summed from all items)' })
   totalProcessCost: number;
+
+  @ApiProperty({ description: 'Total tooling costs (summed from all items)' })
+  totalToolingCost: number;
 
   @ApiProperty({ description: 'Total packaging and logistics costs (summed from all items)' })
   totalPackagingLogisticsCost: number;

@@ -86,7 +86,7 @@ export const BomCostReport: React.FC<BomCostReportProps> = ({ bomId }) => {
 
       <div className="bg-card p-6 space-y-6">
         {/* Summary Cards Row - HackerRank Style */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
           {/* Raw Materials */}
           <div className="bg-background p-3 rounded border border-border">
             <div className="mb-1">
@@ -104,6 +104,16 @@ export const BomCostReport: React.FC<BomCostReportProps> = ({ bomId }) => {
             </div>
             <div className="text-lg font-mono font-semibold">
               {formatCurrency(breakdown.totalProcessCost)}
+            </div>
+          </div>
+
+          {/* Tooling Costs */}
+          <div className="bg-background p-3 rounded border border-border">
+            <div className="mb-1">
+              <span className="text-xs font-medium text-muted-foreground">Tooling Costs</span>
+            </div>
+            <div className="text-lg font-mono font-semibold">
+              {formatCurrency(breakdown.totalToolingCost)}
             </div>
           </div>
 
@@ -161,6 +171,7 @@ export const BomCostReport: React.FC<BomCostReportProps> = ({ bomId }) => {
                   <th className="p-2 text-right text-xs font-semibold border-r border-border">Count</th>
                   <th className="p-2 text-right text-xs font-semibold border-r border-border">Raw Materials</th>
                   <th className="p-2 text-right text-xs font-semibold border-r border-border">Process</th>
+                  <th className="p-2 text-right text-xs font-semibold border-r border-border">Tooling</th>
                   <th className="p-2 text-right text-xs font-semibold border-r border-border">Packaging & Logistics</th>
                   <th className="p-2 text-right text-xs font-semibold border-r border-border">Procured Parts</th>
                   <th className="p-2 text-right text-xs font-semibold border-r border-border">Own Cost</th>
@@ -184,6 +195,9 @@ export const BomCostReport: React.FC<BomCostReportProps> = ({ bomId }) => {
                         {formatCurrency(type.processCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
+                        {formatCurrency(type.toolingCost)}
+                      </td>
+                      <td className="p-2 text-sm text-right font-mono border-r border-border">
                         {formatCurrency(type.packagingLogisticsCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
@@ -199,7 +213,7 @@ export const BomCostReport: React.FC<BomCostReportProps> = ({ bomId }) => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={9} className="p-8 text-center text-muted-foreground">
                       No cost data available
                     </td>
                   </tr>
@@ -218,6 +232,9 @@ export const BomCostReport: React.FC<BomCostReportProps> = ({ bomId }) => {
                       {formatCurrency(breakdown.totalProcessCost)}
                     </td>
                     <td className="p-2 text-sm text-right font-mono border-r border-border">
+                      {formatCurrency(breakdown.totalToolingCost)}
+                    </td>
+                    <td className="p-2 text-sm text-right font-mono border-r border-border">
                       {formatCurrency(breakdown.totalPackagingLogisticsCost)}
                     </td>
                     <td className="p-2 text-sm text-right font-mono border-r border-border">
@@ -227,6 +244,7 @@ export const BomCostReport: React.FC<BomCostReportProps> = ({ bomId }) => {
                       {formatCurrency(
                         breakdown.totalRawMaterialCost +
                         breakdown.totalProcessCost +
+                        breakdown.totalToolingCost +
                         breakdown.totalPackagingLogisticsCost +
                         breakdown.totalProcuredPartsCost
                       )}

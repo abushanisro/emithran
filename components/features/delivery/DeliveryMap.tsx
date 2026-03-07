@@ -92,39 +92,72 @@ export default function DeliveryMap({
       .catch(error => {});
   }, []);
 
-  // Get user's current location
+  // Get user's precise current location - accurate data only
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          // Default to Delhi/NCR center
-          setUserLocation({ lat: 28.6139, lng: 77.2090 });
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-      );
-    } else {
-      setUserLocation({ lat: 28.6139, lng: 77.2090 });
-    }
+    const getUserLocation = async () => {
+      try {
+        // Require geolocation support
+        if (!('geolocation' in navigator)) {
+          console.warn('Geolocation not supported - map will center on delivery locations');
+          setUserLocation(null);
+          return;
+        }
+
+        // Check permissions - require explicit grant
+        if ('permissions' in navigator) {
+          const permission = await navigator.permissions.query({ name: 'geolocation' });
+          
+          if (permission.state === 'denied') {
+            console.info('Geolocation permission denied - map will center on delivery locations');
+            setUserLocation(null);
+            return;
+          }
+        }
+
+        // Get precise current position - high accuracy required
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setUserLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            });
+            console.info('High-accuracy location obtained');
+          },
+          (error) => {
+            console.info('Geolocation unavailable - map will center on delivery locations:', error.message);
+            setUserLocation(null); // No fallback - accurate data only
+          },
+          { 
+            enableHighAccuracy: true, // Require high accuracy
+            timeout: 15000, // Longer timeout for accuracy
+            maximumAge: 0 // No cache - fresh data only
+          }
+        );
+      } catch (error) {
+        console.info('Location services unavailable - map will center on delivery locations');
+        setUserLocation(null); // No fallback
+      }
+    };
+
+    getUserLocation();
   }, []);
 
   // Initialize map
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current || !window.L || !userLocation || mapInstanceRef.current) {
+    if (!mapLoaded || !mapRef.current || !window.L || mapInstanceRef.current) {
       return;
     }
+
+    // Default center: If user location available, use it; otherwise center on deliveries
+    let defaultCenter = userLocation || { lat: 28.6139, lng: 77.2090 }; // Delhi as final fallback
+    let defaultZoom = userLocation ? 10 : 6;
 
     try {
       // Initialize map
       const map = window.L.map(mapRef.current, {
         zoomControl: true,
         attributionControl: true,
-      }).setView([userLocation.lat, userLocation.lng], 10);
+      }).setView([defaultCenter.lat, defaultCenter.lng], defaultZoom);
 
       // Add OpenStreetMap tiles (free, no API key required)
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -191,8 +224,9 @@ export default function DeliveryMap({
       });
 
     } catch (error) {
+      console.error('Map initialization failed:', error);
     }
-  }, [mapLoaded, userLocation, selectedDelivery, onLocationUpdate]);
+  }, [mapLoaded, selectedDelivery, onLocationUpdate]);
 
   // Update markers when deliveries change
   useEffect(() => {
@@ -206,51 +240,55 @@ export default function DeliveryMap({
     deliveries.forEach(delivery => {
       const markers: any[] = [];
 
-      // Origin marker
-      const originMarker = window.L.marker(
-        [delivery.origin.lat, delivery.origin.lng],
-        { icon: createCustomIcon(delivery.status, 'origin') }
-      )
-        .addTo(mapInstanceRef.current)
-        .bindPopup(`
-          <div style="min-width: 200px;">
-            <h3 style="margin: 0 0 8px 0; font-weight: bold;">Origin</h3>
-            <p style="margin: 0 0 4px 0;"><strong>Order:</strong> ${delivery.orderNumber}</p>
-            <p style="margin: 0 0 4px 0;"><strong>Address:</strong> ${delivery.origin.address}</p>
-            <p style="margin: 0;"><strong>Carrier:</strong> ${delivery.carrier.name}</p>
-          </div>
-        `);
-      
-      markers.push(originMarker);
+      // Origin marker - only if coordinates are available
+      if (delivery.origin?.lat && delivery.origin?.lng) {
+        const originMarker = window.L.marker(
+          [delivery.origin.lat, delivery.origin.lng],
+          { icon: createCustomIcon(delivery.status, 'origin') }
+        )
+          .addTo(mapInstanceRef.current)
+          .bindPopup(`
+            <div style="min-width: 200px;">
+              <h3 style="margin: 0 0 8px 0; font-weight: bold;">Origin</h3>
+              <p style="margin: 0 0 4px 0;"><strong>Order:</strong> ${delivery.orderNumber}</p>
+              <p style="margin: 0 0 4px 0;"><strong>Address:</strong> ${delivery.origin.address}</p>
+              <p style="margin: 0;"><strong>Carrier:</strong> ${delivery.carrier.name}</p>
+            </div>
+          `);
+        
+        markers.push(originMarker);
+      }
 
-      // Destination marker
-      const destinationMarker = window.L.marker(
-        [delivery.destination.lat, delivery.destination.lng],
-        { icon: createCustomIcon(delivery.status, 'destination') }
-      )
-        .addTo(mapInstanceRef.current)
-        .bindPopup(`
-          <div style="min-width: 200px;">
-            <h3 style="margin: 0 0 8px 0; font-weight: bold;">Destination</h3>
-            <p style="margin: 0 0 4px 0;"><strong>Customer:</strong> ${delivery.customer.name}</p>
-            <p style="margin: 0 0 4px 0;"><strong>Phone:</strong> ${delivery.customer.phone}</p>
-            <p style="margin: 0 0 8px 0;"><strong>Address:</strong> ${delivery.customer.address}</p>
-            <button onclick="window.open('tel:${delivery.customer.phone}')" style="
-              background: #3b82f6;
-              color: white;
-              border: none;
-              padding: 4px 8px;
-              border-radius: 4px;
-              cursor: pointer;
-              font-size: 12px;
-            ">Call Customer</button>
-          </div>
-        `);
-      
-      markers.push(destinationMarker);
+      // Destination marker - only if coordinates are available
+      if (delivery.destination?.lat && delivery.destination?.lng) {
+        const destinationMarker = window.L.marker(
+          [delivery.destination.lat, delivery.destination.lng],
+          { icon: createCustomIcon(delivery.status, 'destination') }
+        )
+          .addTo(mapInstanceRef.current)
+          .bindPopup(`
+            <div style="min-width: 200px;">
+              <h3 style="margin: 0 0 8px 0; font-weight: bold;">Destination</h3>
+              <p style="margin: 0 0 4px 0;"><strong>Customer:</strong> ${delivery.customer.name}</p>
+              <p style="margin: 0 0 4px 0;"><strong>Phone:</strong> ${delivery.customer.phone}</p>
+              <p style="margin: 0 0 8px 0;"><strong>Address:</strong> ${delivery.customer.address}</p>
+              <button onclick="window.open('tel:${delivery.customer.phone}')" style="
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 4px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+              ">Call Customer</button>
+            </div>
+          `);
+        
+        markers.push(destinationMarker);
+      }
 
       // Current location marker (if available)
-      if (delivery.currentLocation) {
+      if (delivery.currentLocation?.lat && delivery.currentLocation?.lng) {
         const currentMarker = window.L.marker(
           [delivery.currentLocation.lat, delivery.currentLocation.lng],
           { icon: createCustomIcon(delivery.status) }
@@ -292,10 +330,14 @@ export default function DeliveryMap({
       markersRef.current.push(...markers);
     });
 
-    // Fit map to show all markers if there are deliveries
+    // Fit map to show all markers if there are deliveries with valid coordinates
     if (deliveries.length > 0 && markersRef.current.length > 0) {
-      const group = new window.L.featureGroup(markersRef.current);
-      mapInstanceRef.current.fitBounds(group.getBounds().pad(0.1));
+      try {
+        const group = new window.L.featureGroup(markersRef.current);
+        mapInstanceRef.current.fitBounds(group.getBounds().pad(0.1));
+      } catch (error) {
+        console.info('Unable to fit map bounds - no valid coordinates available');
+      }
     }
 
   }, [deliveries, onDeliverySelect]);
@@ -316,21 +358,21 @@ export default function DeliveryMap({
         const start = selectedDelivery.currentLocation || selectedDelivery.origin;
         const end = selectedDelivery.destination;
 
-        // Use OSRM (Open Source Routing Machine) for route calculation
-        // This is free and doesn't require API keys
-        const response = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch route');
+        // Check if we have valid coordinates for both start and end
+        if (!start?.lat || !start?.lng || !end?.lat || !end?.lng) {
+          console.info('Route calculation requires valid coordinates for both origin and destination');
+          return;
         }
 
-        const data = await response.json();
+        // Use route optimization service for production-ready routing
+        const { routeOptimizationService } = await import('@/lib/services/route-optimization');
+        const routeResult = await routeOptimizationService.calculateRoute(
+          { lat: start.lat, lng: start.lng },
+          { lat: end.lat, lng: end.lng }
+        );
 
-        if (data.routes && data.routes.length > 0) {
-          const route = data.routes[0];
-          const coordinates = route.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]]);
+        if (routeResult.geometry && routeResult.geometry.length > 0) {
+          const coordinates = routeResult.geometry.map(coord => [coord.lat, coord.lng]);
 
           // Draw route line
           routeLayerRef.current = window.L.polyline(coordinates, {
@@ -343,8 +385,8 @@ export default function DeliveryMap({
 
           // Add route info popup
           const midpoint = coordinates[Math.floor(coordinates.length / 2)];
-          const duration = Math.round(route.duration / 60); // minutes
-          const distance = (route.distance / 1000).toFixed(1); // km
+          const duration = Math.round(routeResult.duration / 60); // minutes
+          const distance = (routeResult.distance / 1000).toFixed(1); // km
 
           window.L.popup()
             .setLatLng(midpoint)
@@ -414,13 +456,19 @@ export default function DeliveryMap({
   const centerOnUser = () => {
     if (mapInstanceRef.current && userLocation) {
       mapInstanceRef.current.setView([userLocation.lat, userLocation.lng], 15);
+    } else {
+      console.info('User location not available - accurate GPS required');
     }
   };
 
   const centerOnDelivery = () => {
     if (mapInstanceRef.current && selectedDelivery) {
       const location = selectedDelivery.currentLocation || selectedDelivery.destination;
-      mapInstanceRef.current.setView([location.lat, location.lng], 15);
+      if (location?.lat && location?.lng) {
+        mapInstanceRef.current.setView([location.lat, location.lng], 15);
+      } else {
+        console.info('Delivery coordinates not available - geocoding required');
+      }
     }
   };
 
@@ -441,15 +489,17 @@ export default function DeliveryMap({
       
       {/* Map Controls */}
       <div className="absolute top-4 right-4 space-y-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={centerOnUser}
-          className="shadow-md"
-          title="Center on your location"
-        >
-          <Crosshair className="h-4 w-4" />
-        </Button>
+        {userLocation && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={centerOnUser}
+            className="shadow-md"
+            title="Center on your precise location"
+          >
+            <Crosshair className="h-4 w-4" />
+          </Button>
+        )}
         
         {selectedDelivery && (
           <Button
@@ -490,6 +540,20 @@ export default function DeliveryMap({
             <span className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">🚚</span>
             <span>Current Vehicle Location</span>
           </div>
+          {!userLocation && (
+            <div className="mt-2 pt-2 border-t">
+              <p className="text-xs text-amber-600">
+                📍 Enable GPS for precise location
+              </p>
+            </div>
+          )}
+          {deliveries.length > 0 && markersRef.current.length === 0 && (
+            <div className="mt-2 pt-2 border-t">
+              <p className="text-xs text-orange-600">
+                ⚠️ Addresses need geocoding for map view
+              </p>
+            </div>
+          )}
           {selectedDelivery && (
             <div className="mt-2 pt-2 border-t">
               <p className="text-xs text-muted-foreground">

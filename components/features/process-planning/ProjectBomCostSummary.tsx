@@ -21,7 +21,7 @@ const BomCostRow: React.FC<{ bomId: string; bomName: string }> = ({ bomId, bomNa
     return (
       <tr className="hover:bg-accent/30 transition-colors">
         <td className="p-4 text-sm border-r border-border">{bomName}</td>
-        <td colSpan={7} className="p-4 text-sm text-center text-muted-foreground border-r border-border">
+        <td colSpan={8} className="p-4 text-sm text-center text-muted-foreground border-r border-border">
           Loading...
         </td>
       </tr>
@@ -32,7 +32,7 @@ const BomCostRow: React.FC<{ bomId: string; bomName: string }> = ({ bomId, bomNa
     return (
       <tr className="hover:bg-accent/30 transition-colors">
         <td className="p-4 text-sm border-r border-border">{bomName}</td>
-        <td colSpan={7} className="p-4 text-sm text-center text-destructive border-r border-border">
+        <td colSpan={8} className="p-4 text-sm text-center text-destructive border-r border-border">
           <div className="flex items-center justify-center gap-2">
             <AlertCircle className="w-4 h-4" />
             Failed to load
@@ -61,6 +61,9 @@ const BomCostRow: React.FC<{ bomId: string; bomName: string }> = ({ bomId, bomNa
       <td className="p-4 text-sm text-right font-mono text-purple-600 border-r border-border">
         {formatCurrency(report.breakdown.totalProcessCost)}
       </td>
+      <td className="p-4 text-sm text-right font-mono text-orange-600 border-r border-border">
+        {formatCurrency(report.breakdown.totalToolingCost)}
+      </td>
       <td className="p-4 text-sm text-right font-mono font-semibold border-r border-border">
         {formatCurrency(report.breakdown.overallTotalCost)}
       </td>
@@ -84,7 +87,7 @@ export const ProjectBomCostSummary: React.FC<ProjectBomCostSummaryProps> = ({ pr
   const handleExport = () => {
     try {
       // Create CSV content
-      const headers = ['BOM Name', 'Items Costed', 'Raw Materials', 'Process Costs', 'Total Cost', 'Selling Price', 'Margin', 'Margin %'];
+      const headers = ['BOM Name', 'Items Costed', 'Raw Materials', 'Process Costs', 'Tooling Costs', 'Total Cost', 'Selling Price', 'Margin', 'Margin %'];
       const csvContent = [
         headers.join(','),
         // Add data rows here when implementing full export
@@ -185,6 +188,7 @@ export const ProjectBomCostSummary: React.FC<ProjectBomCostSummaryProps> = ({ pr
                 <th className="p-3 text-right text-xs font-semibold border-r border-border">Items Costed</th>
                 <th className="p-3 text-right text-xs font-semibold border-r border-border">Raw Materials</th>
                 <th className="p-3 text-right text-xs font-semibold border-r border-border">Process Costs</th>
+                <th className="p-3 text-right text-xs font-semibold border-r border-border">Tooling Costs</th>
                 <th className="p-3 text-right text-xs font-semibold border-r border-border">Total Cost</th>
                 <th className="p-3 text-right text-xs font-semibold border-r border-border">Selling Price</th>
                 <th className="p-3 text-right text-xs font-semibold border-r border-border">Margin ($)</th>

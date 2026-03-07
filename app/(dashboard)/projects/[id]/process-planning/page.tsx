@@ -26,6 +26,7 @@ if (typeof window !== 'undefined') {
 }
 import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
 import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
+import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
 import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
 import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
 import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
@@ -970,6 +971,9 @@ function ProcessPlanningPageContent() {
 
                 {/* Raw Materials Section */}
                 <RawMaterialsSection bomItemId={selectedItem.id} bomItem={selectedItem} />
+
+                {/* Tooling & Fixtures Section */}
+                <ToolingSection bomItemId={selectedItem.id} bomItem={selectedItem} />
 
                 {/* Manufacturing Process Section */}
                 <ManufacturingProcessSection bomItemId={selectedItem.id} bomItem={selectedItem} />

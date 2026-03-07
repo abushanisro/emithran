@@ -220,10 +220,22 @@ export class BomItemCostService {
     const procuredPartsCost = procuredCosts?.reduce((sum, record) =>
       sum + (parseFloat(record.total_cost_per_part) || 0), 0) || 0;
 
+    // Fetch tooling costs for this item
+    const { data: toolingCosts } = await this.supabaseService
+      .getClient(accessToken)
+      .from('tooling_cost_records')
+      .select('total_cost')
+      .eq('bom_item_id', bomItemId)
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    const toolingCost = toolingCosts?.reduce((sum, record) =>
+      sum + (parseFloat(record.total_cost) || 0), 0) || 0;
+
     // Calculate own cost (all direct costs for this item)
     const rawMaterialCost = parseFloat(costRecord.rawMaterialCost as any) || 0;
     const processCost = parseFloat(costRecord.processCost as any) || 0;
-    const ownCost = rawMaterialCost + processCost + packagingLogisticsCost + procuredPartsCost;
+    const ownCost = rawMaterialCost + processCost + toolingCost + packagingLogisticsCost + procuredPartsCost;
     const totalCost = ownCost + childrenCost;
     const unitCost = totalCost;
     const extendedCost = totalCost * (parseFloat(item.quantity) || 1);
@@ -238,6 +250,7 @@ export class BomItemCostService {
       .getClient(accessToken)
       .from('bom_item_costs')
       .update({
+        tooling_cost: toolingCost,
         packaging_logistics_cost: packagingLogisticsCost,
         procured_parts_cost: procuredPartsCost,
         direct_children_cost: childrenCost,
@@ -376,7 +389,7 @@ export class BomItemCostService {
     const { data: cost, error: costError } = await this.supabaseService
       .getClient(accessToken)
       .from('bom_item_costs')
-      .select('total_cost, raw_material_cost, process_cost, packaging_logistics_cost, procured_parts_cost, direct_children_cost, is_stale')
+      .select('total_cost, raw_material_cost, process_cost, tooling_cost, packaging_logistics_cost, procured_parts_cost, direct_children_cost, is_stale')
       .eq('bom_item_id', bomItemId)
       .eq('user_id', userId)
       .single();
@@ -395,6 +408,7 @@ export class BomItemCostService {
       totalCost: parseFloat(cost?.total_cost || '0'),
       rawMaterialCost: parseFloat(cost?.raw_material_cost || '0'),
       processCost: parseFloat(cost?.process_cost || '0'),
+      toolingCost: parseFloat(cost?.tooling_cost || '0'),
       packagingLogisticsCost: parseFloat(cost?.packaging_logistics_cost || '0'),
       procuredPartsCost: parseFloat(cost?.procured_parts_cost || '0'),
       directChildrenCost: parseFloat(cost?.direct_children_cost || '0'),
@@ -447,6 +461,7 @@ export class BomItemCostService {
         total_cost,
         raw_material_cost,
         process_cost,
+        tooling_cost,
         packaging_logistics_cost,
         procured_parts_cost,
         direct_children_cost,
@@ -479,6 +494,7 @@ export class BomItemCostService {
         totalCost: parseFloat(record.total_cost || '0'),
         rawMaterialCost: parseFloat(record.raw_material_cost || '0'),
         processCost: parseFloat(record.process_cost || '0'),
+        toolingCost: parseFloat(record.tooling_cost || '0'),
         packagingLogisticsCost: parseFloat(record.packaging_logistics_cost || '0'),
         procuredPartsCost: parseFloat(record.procured_parts_cost || '0'),
         directChildrenCost: parseFloat(record.direct_children_cost || '0'),
@@ -503,6 +519,7 @@ export class BomItemCostService {
         total_cost,
         raw_material_cost,
         process_cost,
+        tooling_cost,
         packaging_logistics_cost,
         procured_parts_cost,
         direct_children_cost,
@@ -537,6 +554,7 @@ export class BomItemCostService {
         totalCost: parseFloat(record.total_cost || '0'),
         rawMaterialCost: parseFloat(record.raw_material_cost || '0'),
         processCost: parseFloat(record.process_cost || '0'),
+        toolingCost: parseFloat(record.tooling_cost || '0'),
         packagingLogisticsCost: parseFloat(record.packaging_logistics_cost || '0'),
         procuredPartsCost: parseFloat(record.procured_parts_cost || '0'),
         directChildrenCost: parseFloat(record.direct_children_cost || '0'),
@@ -613,6 +631,7 @@ export class BomItemCostService {
           count: 0,
           rawMaterialCost: 0,
           processCost: 0,
+          toolingCost: 0,
           packagingLogisticsCost: 0,
           procuredPartsCost: 0,
           ownCost: 0,
@@ -626,6 +645,7 @@ export class BomItemCostService {
       if (cost) {
         typeData.rawMaterialCost += parseFloat(cost.raw_material_cost || '0');
         typeData.processCost += parseFloat(cost.process_cost || '0');
+        typeData.toolingCost += parseFloat(cost.tooling_cost || '0');
         typeData.packagingLogisticsCost += parseFloat(cost.packaging_logistics_cost || '0');
         typeData.procuredPartsCost += parseFloat(cost.procured_parts_cost || '0');
         typeData.ownCost += parseFloat(cost.own_cost || '0');
@@ -637,6 +657,7 @@ export class BomItemCostService {
     // But calculate total_cost from ROOT items only (to avoid double counting)
     let totalRawMaterialCost = 0;
     let totalProcessCost = 0;
+    let totalToolingCost = 0;
     let totalPackagingLogisticsCost = 0;
     let totalProcuredPartsCost = 0;
 
@@ -644,6 +665,7 @@ export class BomItemCostService {
     for (const cost of costs || []) {
       totalRawMaterialCost += parseFloat(cost.raw_material_cost || '0');
       totalProcessCost += parseFloat(cost.process_cost || '0');
+      totalToolingCost += parseFloat(cost.tooling_cost || '0');
       totalPackagingLogisticsCost += parseFloat(cost.packaging_logistics_cost || '0');
       totalProcuredPartsCost += parseFloat(cost.procured_parts_cost || '0');
     }
@@ -710,6 +732,7 @@ export class BomItemCostService {
       breakdown: {
         totalRawMaterialCost,
         totalProcessCost,
+        totalToolingCost,
         totalPackagingLogisticsCost,
         totalProcuredPartsCost,
         overallTotalCost: rootTotalCost, // Use root total cost to avoid double counting
@@ -736,6 +759,7 @@ export class BomItemCostService {
       breakdown: {
         totalRawMaterialCost: 0,
         totalProcessCost: 0,
+        totalToolingCost: 0,
         totalPackagingLogisticsCost: 0,
         totalProcuredPartsCost: 0,
         totalDirectChildrenCost: 0,

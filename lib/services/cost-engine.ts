@@ -41,6 +41,7 @@ export interface CostCalculationResult {
   breakdown: {
     rawMaterialCost: number;
     processCost: number;
+    toolingCost: number;
     packagingLogisticsCost: number;
     procuredPartsCost: number;
     overheadCost: number;
@@ -275,6 +276,7 @@ export class CostEngine {
       (acc, item) => ({
         totalRawMaterials: acc.totalRawMaterials + item.breakdown.rawMaterialCost,
         totalProcessCosts: acc.totalProcessCosts + item.breakdown.processCost,
+        totalToolingCosts: acc.totalToolingCosts + item.breakdown.toolingCost,
         totalPackagingLogistics: acc.totalPackagingLogistics + item.breakdown.packagingLogisticsCost,
         totalProcuredParts: acc.totalProcuredParts + item.breakdown.procuredPartsCost,
         totalCost: acc.totalCost + item.breakdown.totalCost,
@@ -285,6 +287,7 @@ export class CostEngine {
       {
         totalRawMaterials: 0,
         totalProcessCosts: 0,
+        totalToolingCosts: 0,
         totalPackagingLogistics: 0,
         totalProcuredParts: 0,
         totalCost: 0,

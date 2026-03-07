@@ -11,6 +11,7 @@ import { BOMItemsModule } from './modules/bom-items/bom-items.module';
 import { ProcessesModule } from './modules/processes/processes.module';
 import { ProcessRoutesModule } from './modules/process-routes/process-routes.module';
 import { RawMaterialsModule } from './modules/raw-materials/raw-materials.module';
+import { ToolingCostsModule } from './modules/tooling-costs/tooling-costs.module';
 import { ChildPartsModule } from './modules/child-parts/child-parts.module';
 import { PackagingLogisticsModule } from './modules/packaging-logistics/packaging-logistics.module';
 import { ProcuredPartsModule } from './modules/procured-parts/procured-parts.module';
@@ -70,6 +71,7 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     ProcessesModule,
     ProcessRoutesModule,
     RawMaterialsModule,
+    ToolingCostsModule,
     ChildPartsModule,
     PackagingLogisticsModule,
     ProcuredPartsModule,

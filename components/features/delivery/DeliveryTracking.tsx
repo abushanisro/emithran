@@ -30,8 +30,10 @@ import {
   Bell,
   Download,
   Filter,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { carrierTrackingService } from '@/lib/services/carrier-tracking';
 
 // Dynamic import for Map component to avoid SSR issues
 const DeliveryMap = dynamic(() => import('./DeliveryMap'), {
@@ -103,11 +105,13 @@ interface DeliveryTrackingProps {
     from: string;
     to: string;
   };
+  defaultOrderId?: string;
 }
 
 export default function DeliveryTracking({ 
   projectId, 
-  dateRange 
+  dateRange,
+  defaultOrderId 
 }: DeliveryTrackingProps) {
   const [deliveries, setDeliveries] = useState<DeliveryTracking[]>([]);
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryTracking | null>(null);
@@ -130,7 +134,7 @@ export default function DeliveryTracking({
       }
       
       const data = await response.json();
-      setDeliveries(data.deliveries || []);
+      setDeliveries(data.data?.deliveries || []);
       setLastUpdate(new Date().toISOString());
     } catch (error) {
       toast.error('Failed to load delivery tracking data');
@@ -144,6 +148,26 @@ export default function DeliveryTracking({
     fetchDeliveries();
   }, [fetchDeliveries]);
 
+  // Handle defaultOrderId selection
+  useEffect(() => {
+    if (defaultOrderId && deliveries.length > 0) {
+      const orderToSelect = deliveries.find(delivery => delivery.orderId === defaultOrderId);
+      if (orderToSelect) {
+        setSelectedDelivery(orderToSelect);
+        // Optionally scroll to the order in the list
+        setTimeout(() => {
+          const orderElement = document.querySelector(`[data-order-id="${defaultOrderId}"]`);
+          if (orderElement) {
+            orderElement.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+          }
+        }, 100);
+      }
+    }
+  }, [defaultOrderId, deliveries]);
+
   // Real-time updates
   useEffect(() => {
     if (!isLiveTracking) return;
@@ -154,6 +178,54 @@ export default function DeliveryTracking({
 
     return () => clearInterval(interval);
   }, [isLiveTracking, fetchDeliveries]);
+
+  // Individual order location updates when selected
+  useEffect(() => {
+    if (!selectedDelivery || !isLiveTracking) return;
+
+    const fetchLatestLocation = async () => {
+      try {
+        const response = await fetch(`/api/delivery/tracking/${selectedDelivery.orderId}/location`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data.currentLocation) {
+            // Update the selected delivery with latest location
+            setSelectedDelivery(prev => prev ? {
+              ...prev,
+              currentLocation: {
+                lat: data.data.currentLocation.latitude,
+                lng: data.data.currentLocation.longitude,
+                timestamp: data.data.currentLocation.timestamp
+              },
+              trackingHistory: data.data.trackingHistory || prev.trackingHistory
+            } : null);
+            
+            // Update the delivery in the main list too
+            setDeliveries(prev => prev.map(d => 
+              d.orderId === selectedDelivery.orderId 
+                ? {
+                    ...d,
+                    currentLocation: {
+                      lat: data.data.currentLocation.latitude,
+                      lng: data.data.currentLocation.longitude,
+                      timestamp: data.data.currentLocation.timestamp
+                    },
+                    trackingHistory: data.data.trackingHistory || d.trackingHistory
+                  }
+                : d
+            ));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch latest location:', error);
+      }
+    };
+
+    const locationInterval = setInterval(fetchLatestLocation, 10000); // Update every 10 seconds for selected delivery
+    fetchLatestLocation(); // Fetch immediately
+
+    return () => clearInterval(locationInterval);
+  }, [selectedDelivery?.orderId, isLiveTracking]);
 
   // Filter deliveries
   const filteredDeliveries = deliveries.filter(delivery => {
@@ -256,6 +328,28 @@ export default function DeliveryTracking({
       toast.success('Location updated successfully');
     } catch (error) {
       toast.error('Failed to update delivery location');
+    }
+  };
+
+  const getExternalTrackingUrl = (delivery: DeliveryTracking) => {
+    if (!delivery.carrier.trackingNumber) return null;
+    
+    // Try to detect carrier from tracking number or use the carrier name
+    const detectedCarrier = carrierTrackingService.detectCarrierFromTrackingNumber?.(delivery.carrier.trackingNumber) || 'unknown';
+    const carrierCode = detectedCarrier || 
+                       delivery.carrier.name.toLowerCase().replace(/\s+/g, '') ||
+                       'delhivery';
+    
+    return carrierTrackingService.getCarrierTrackingUrl(carrierCode, delivery.carrier.trackingNumber);
+  };
+
+  const openExternalTracking = (delivery: DeliveryTracking) => {
+    const url = getExternalTrackingUrl(delivery);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      toast.success(`Opening ${delivery.carrier.name} tracking page`);
+    } else {
+      toast.error('External tracking not available for this carrier');
     }
   };
 
@@ -385,8 +479,13 @@ export default function DeliveryTracking({
                   filteredDeliveries.map((delivery) => (
                     <div
                       key={delivery.orderId}
+                      data-order-id={delivery.orderId}
                       className={`p-4 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-                        selectedDelivery?.orderId === delivery.orderId ? 'bg-muted' : ''
+                        selectedDelivery?.orderId === delivery.orderId 
+                          ? delivery.orderId === defaultOrderId 
+                            ? 'bg-primary/10 border-primary/50' 
+                            : 'bg-muted' 
+                          : ''
                       }`}
                       onClick={() => setSelectedDelivery(delivery)}
                     >
@@ -469,6 +568,16 @@ export default function DeliveryTracking({
                         </a>
                       </Button>
                     )}
+                    {getExternalTrackingUrl(selectedDelivery) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openExternalTracking(selectedDelivery)}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Track on {selectedDelivery.carrier.name}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -505,11 +614,23 @@ export default function DeliveryTracking({
                             <span className="text-muted-foreground">Carrier:</span>
                             <span>{selectedDelivery.carrier.name}</span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className="flex justify-between items-center">
                             <span className="text-muted-foreground">Tracking #:</span>
-                            <span className="font-mono text-xs">
-                              {selectedDelivery.carrier.trackingNumber}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs">
+                                {selectedDelivery.carrier.trackingNumber}
+                              </span>
+                              {getExternalTrackingUrl(selectedDelivery) && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => openExternalTracking(selectedDelivery)}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                           {selectedDelivery.carrier.driverName && (
                             <div className="flex justify-between">

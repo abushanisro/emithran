@@ -10,6 +10,8 @@ import DeliveryTracking from '@/components/features/delivery/DeliveryTracking';
 export default function DeliveryPage() {
   const params = useParams();
   const projectId = params.id as string;
+  const [activeTab, setActiveTab] = useState('create-order');
+  const [trackingOrderId, setTrackingOrderId] = useState<string | undefined>();
   
   // Date range for tracking (default to last 30 days)
   const [dateRange] = useState({
@@ -21,10 +23,15 @@ export default function DeliveryPage() {
     // Refresh tracking data or show success message
   };
 
+  const handleTrackOrder = (orderId: string) => {
+    setTrackingOrderId(orderId);
+    setActiveTab('tracking');
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <Tabs defaultValue="create-order" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="create-order">Create Delivery Order</TabsTrigger>
             <TabsTrigger value="tracking">Track Deliveries</TabsTrigger>
@@ -34,6 +41,7 @@ export default function DeliveryPage() {
             <DeliveryOrderWorkflow 
               projectId={projectId} 
               onComplete={handleOrderComplete}
+              onTrackOrder={handleTrackOrder}
             />
           </TabsContent>
           
@@ -41,6 +49,7 @@ export default function DeliveryPage() {
             <DeliveryTracking 
               projectId={projectId}
               dateRange={dateRange}
+              defaultOrderId={trackingOrderId}
             />
           </TabsContent>
         </Tabs>

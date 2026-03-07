@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
 import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
+import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
 import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
 import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
 import { ChildPartsSection } from '@/components/features/process-planning/ChildPartsSection';
@@ -177,7 +178,10 @@ export default function ProcessPlanningPage() {
             </div>
 
             {/* Raw Materials Section */}
-            <RawMaterialsSection />
+            <RawMaterialsSection bomItemId={selectedPart.id} bomItem={selectedPart} />
+
+            {/* Tooling & Fixtures Section */}
+            <ToolingSection bomItemId={selectedPart.id} bomItem={selectedPart} />
 
             {/* Manufacturing Process Section */}
             <ManufacturingProcessSection />

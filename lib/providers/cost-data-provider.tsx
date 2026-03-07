@@ -36,7 +36,8 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
         const totalCost = bomItem.unitCost * bomItem.quantity;
         const breakdown = {
           rawMaterialCost: totalCost * 0.4, // Assume 40% raw materials
-          processCost: totalCost * 0.35, // Assume 35% processing
+          processCost: totalCost * 0.3, // Assume 30% processing
+          toolingCost: totalCost * 0.05, // Assume 5% tooling
           packagingLogisticsCost: totalCost * 0.1, // Assume 10% packaging/logistics
           procuredPartsCost: totalCost * 0.15, // Assume 15% procured parts
           overheadCost: totalCost * 0.15, // 15% overhead
@@ -65,9 +66,10 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
       }
 
       // Fetch cost components from backend services
-      const [rawMaterialCost, processCost, packagingCost, procuredPartsCost] = await Promise.allSettled([
+      const [rawMaterialCost, processCost, toolingCost, packagingCost, procuredPartsCost] = await Promise.allSettled([
         fetchRawMaterialCost(bomItem.id),
         fetchProcessCost(bomItem.id),
+        fetchToolingCost(bomItem.id),
         fetchPackagingCost(bomItem.id),
         fetchProcuredPartsCost(bomItem.id),
       ]);
@@ -75,6 +77,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
       // Extract values or default to 0
       const rawMaterials = rawMaterialCost.status === 'fulfilled' ? rawMaterialCost.value : 0;
       const processTotal = processCost.status === 'fulfilled' ? processCost.value : 0;
+      const toolingTotal = toolingCost.status === 'fulfilled' ? toolingCost.value : 0;
       const packaging = packagingCost.status === 'fulfilled' ? packagingCost.value : 0;
       const procuredParts = procuredPartsCost.status === 'fulfilled' ? procuredPartsCost.value : 0;
       
@@ -116,12 +119,13 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
         return result;
       } catch (engineError) {
         // Return a basic cost structure with the actual values
-        const totalCost = rawMaterials + processTotal + packaging + procuredParts;
+        const totalCost = rawMaterials + processTotal + toolingTotal + packaging + procuredParts;
         return {
           itemId: bomItem.id,
           breakdown: {
             rawMaterialCost: rawMaterials,
             processCost: processTotal,
+            toolingCost: toolingTotal,
             packagingLogisticsCost: packaging,
             procuredPartsCost: procuredParts,
             overheadCost: totalCost * 0.15,
@@ -168,6 +172,18 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
   const fetchProcessCost = async (bomItemId: string): Promise<number> => {
     try {
       const response = await apiClient.get(`/process-costs/bom-item/${bomItemId}/total`);
+      return response.totalCost || response.data?.totalCost || 0;
+    } catch (error) {
+      return 0; // Default if no data available
+    }
+  };
+
+  /**
+   * Fetch tooling cost from backend
+   */
+  const fetchToolingCost = async (bomItemId: string): Promise<number> => {
+    try {
+      const response = await apiClient.get(`/tooling-costs/bom-item/${bomItemId}/total`);
       return response.totalCost || response.data?.totalCost || 0;
     } catch (error) {
       return 0; // Default if no data available

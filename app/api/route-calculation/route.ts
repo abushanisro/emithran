@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
 
     const finalCost = totalCost + surcharge;
 
-    // ── Step 4: Data quality score (not an optimization "mock" percentage) ──
+    // ── Step 4: Data quality score for route accuracy ──
     const dataQualityScore = routingQuality === 'real'
       ? (routeProvider === 'google' ? 96 : 91)
       : 72;
