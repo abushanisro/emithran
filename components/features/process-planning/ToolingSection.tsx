@@ -188,6 +188,26 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
                               {item.specifications && (
                                 <p className="text-xs text-muted-foreground">{item.specifications}</p>
                               )}
+                              {/* Custom tooling additional details */}
+                              {item.isCustom && (item.supplier || item.leadTime || item.notes) && (
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {item.supplier && (
+                                    <div>
+                                      <span className="font-medium">Supplier:</span> {item.supplier}
+                                    </div>
+                                  )}
+                                  {item.leadTime && (
+                                    <div>
+                                      <span className="font-medium">Lead Time:</span> {item.leadTime} days
+                                    </div>
+                                  )}
+                                  {item.notes && (
+                                    <div>
+                                      <span className="font-medium">Notes:</span> {item.notes}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right">

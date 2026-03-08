@@ -464,51 +464,6 @@ export default function ProcessPage() {
     }
   };
 
-  const renderProcessTables = () => {
-    if (!selectedProcessId) return null;
-
-    const processes = processesData?.processes || [];
-    const process = processes.find(p => p.id === selectedProcessId);
-    if (!process) return null;
-
-    return (
-      <Card className="mt-6 border-2 border-primary">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-2xl">{process.processName} - Reference Tables</CardTitle>
-              <CardDescription>Click Edit to modify tables, add or remove rows</CardDescription>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSelectedProcessId(null)}
-              className="h-8 w-8"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loadingTables ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-2 text-muted-foreground">Loading reference tables...</span>
-            </div>
-          ) : referenceTables && referenceTables.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {referenceTables.map((table) => renderEditableTable(table))}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>No reference tables found for this process.</p>
-              <p className="text-sm mt-2">Reference tables can be added via the database migration.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
 
   // Show loading spinner during auth initialization
   if (authLoading) {
@@ -726,26 +681,7 @@ export default function ProcessPage() {
           </Card>
         )}
 
-        {!processesLoading && !processesError && (
-          <Card className="border-amber-200 bg-amber-50">
-            <CardContent className="p-4">
-              <p className="text-amber-800">
-                <strong>Note:</strong> This page shows general manufacturing process templates and calculator mappings.
-              </p>
-              <p className="text-sm text-amber-600 mt-1">
-                For production lot-specific processes, navigate to Production Planning → select a lot.
-              </p>
-              {processesData?.processes && processesData.processes.length > 0 && (
-                <p className="text-sm text-green-600 mt-2">
-                  Found {processesData.processes.length} process templates
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
-        {/* PROCESS-SPECIFIC TABLES */}
-        {renderProcessTables()}
       </div>
 
       {/* ADD/EDIT CALCULATOR MAPPING DIALOG */}

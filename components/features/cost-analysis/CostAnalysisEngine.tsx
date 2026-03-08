@@ -13,7 +13,8 @@ import {
   Calculator,
   FileDown,
   RefreshCw,
-  Zap
+  Zap,
+  Wrench
 } from 'lucide-react';
 import { useCostData } from '@/lib/providers/cost-data-provider';
 import { exportService } from '@/lib/services/export-service';
@@ -25,13 +26,26 @@ interface CostAnalysisEngineProps {
 }
 
 const CustomPieChart = ({ data, colors }: { data: any[], colors: string[] }) => {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+  // Filter out invalid data and ensure values are numbers
+  const validData = data.filter(item => item && typeof item.value === 'number' && !isNaN(item.value) && item.value > 0);
+  const total = validData.reduce((sum, item) => sum + item.value, 0);
   let currentAngle = 0;
+  
+  // Don't render if no valid data
+  if (validData.length === 0 || total === 0) {
+    return (
+      <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
+        <div className="text-center text-muted-foreground">
+          <p className="text-sm">No data to display</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="relative w-48 h-48 mx-auto">
       <svg width="192" height="192" className="transform -rotate-90">
-        {data.map((item, index) => {
+        {validData.map((item, index) => {
           const percentage = item.value / total;
           const angle = percentage * 360;
           const startAngle = currentAngle;
@@ -74,11 +88,21 @@ const CustomPieChart = ({ data, colors }: { data: any[], colors: string[] }) => 
 };
 
 const CustomBarChart = ({ data, colors }: { data: any[], colors: string[] }) => {
-  const maxValue = Math.max(...data.map(item => item.value));
+  // Filter out invalid data and ensure values are numbers
+  const validData = data.filter(item => item && typeof item.value === 'number' && !isNaN(item.value) && item.value >= 0);
+  const maxValue = validData.length > 0 ? Math.max(...validData.map(item => item.value)) : 1;
+  
+  if (validData.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-8 text-muted-foreground">
+        <p className="text-sm">No data to display</p>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-3">
-      {data.map((item, index) => (
+      {validData.map((item, index) => (
         <div key={index} className="flex items-center gap-3">
           <div className="w-24 text-xs font-medium truncate">{item.name}</div>
           <div className="flex-1 relative">
@@ -194,10 +218,11 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
   }
 
   const chartData = [
-    { name: 'Raw Materials', value: aggregated.totalRawMaterials },
-    { name: 'Process Costs', value: aggregated.totalProcessCosts },
-    { name: 'Packaging & Logistics', value: aggregated.totalPackagingLogistics },
-    { name: 'Procured Parts', value: aggregated.totalProcuredParts }
+    { name: 'Raw Materials', value: aggregated.totalRawMaterials || 0 },
+    { name: 'Process Costs', value: aggregated.totalProcessCosts || 0 },
+    { name: 'Tooling Costs', value: aggregated.totalToolingCosts || 0 },
+    { name: 'Packaging & Logistics', value: aggregated.totalPackagingLogistics || 0 },
+    { name: 'Procured Parts', value: aggregated.totalProcuredParts || 0 }
   ];
 
   return (
@@ -276,6 +301,21 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
           </CardContent>
         </Card>
 
+        <Card className="border-l-4 border-l-amber-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Tooling Costs</p>
+                <p className="text-sm font-semibold">{formatCurrency(aggregated.totalToolingCosts || 0)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatPercentage(((aggregated.totalToolingCosts || 0) / (aggregated.totalCost || 1)) * 100)}
+                </p>
+              </div>
+              <Wrench className="w-6 h-6 text-amber-500 opacity-60" />
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="border-l-4 border-l-purple-500">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -317,7 +357,7 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
             <CardContent>
               <CustomPieChart 
                 data={chartData}
-                colors={['#f97316', '#3b82f6', '#eab308', '#ef4444']}
+                colors={['#f97316', '#3b82f6', '#f59e0b', '#eab308', '#ef4444']}
               />
               <div className="grid grid-cols-2 gap-3 mt-4">
                 {chartData.map((item, index) => (
@@ -343,7 +383,7 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
             <CardContent>
               <CustomBarChart
                 data={chartData}
-                colors={['#f97316', '#3b82f6', '#eab308', '#ef4444']}
+                colors={['#f97316', '#3b82f6', '#f59e0b', '#eab308', '#ef4444']}
               />
             </CardContent>
           </Card>

@@ -40,7 +40,7 @@ import {
 
 @ApiTags('Tooling Costs')
 @ApiBearerAuth()
-@Controller('api/tooling-costs')
+@Controller({ path: 'api/tooling-costs', version: '1' })
 @UseGuards(SupabaseAuthGuard)
 export class ToolingCostController {
   constructor(

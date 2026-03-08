@@ -318,6 +318,7 @@ export function ToolingCostDialog({
             />
           </div>
 
+
           {/* Cost Calculation Summary */}
           {formData.unitCost && formData.amortizationParts && (
             <div className="bg-muted/30 p-4 rounded-lg border">

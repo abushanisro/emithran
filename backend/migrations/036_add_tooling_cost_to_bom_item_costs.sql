@@ -43,7 +43,7 @@ BEGIN
             COALESCE(NEW.total_cost, 0),
             COALESCE(NEW.total_cost, 0)
         )
-        ON CONFLICT (bom_item_id) DO UPDATE SET
+        ON CONFLICT (bom_item_id, user_id) DO UPDATE SET
             tooling_cost = (
                 SELECT COALESCE(SUM(total_cost), 0)
                 FROM tooling_cost_records 

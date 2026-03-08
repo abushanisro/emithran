@@ -344,6 +344,9 @@ export class ToolingCostService {
       }
 
       const totalCost = data?.reduce((sum, record) => sum + (parseFloat(record.total_cost) || 0), 0) || 0;
+      
+      this.logger.log(`Total tooling cost for BOM item ${bomItemId}: ${totalCost} (from ${data?.length || 0} records)`);
+      
       return totalCost;
     } catch (error) {
       this.logger.error('Error in getTotalCostForBomItem:', error);

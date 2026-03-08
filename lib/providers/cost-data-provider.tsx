@@ -184,8 +184,12 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
   const fetchToolingCost = async (bomItemId: string): Promise<number> => {
     try {
       const response = await apiClient.get(`/tooling-costs/bom-item/${bomItemId}/total`);
-      return response.totalCost || response.data?.totalCost || 0;
+      console.log(`Tooling cost response for ${bomItemId}:`, response);
+      const cost = response.totalCost || response.data?.totalCost || 0;
+      console.log(`Extracted tooling cost for ${bomItemId}: ${cost}`);
+      return cost;
     } catch (error) {
+      console.error(`Error fetching tooling cost for BOM item ${bomItemId}:`, error);
       return 0; // Default if no data available
     }
   };
