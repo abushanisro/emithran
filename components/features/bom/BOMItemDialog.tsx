@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -20,11 +23,156 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { 
+  FileText, 
+  Package, 
+  AlertTriangle, 
+  CheckCircle, 
+  Info, 
+  XCircle, 
+  Loader2, 
+  HelpCircle,
+  Clock,
+  Plus
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { createBOMItem, updateBOMItem } from '@/lib/api/hooks/useBOMItems';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
 import { useQueryClient } from '@tanstack/react-query';
+
+// Enhanced error handling types for BOM management
+type EnhancedBOMError = {
+  category: 'validation' | 'duplication' | 'hierarchy' | 'fileupload' | 'network' | 'permission' | 'business' | 'data';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  userMessage: string;
+  technicalMessage?: string;
+  suggestion: string;
+  actionable: boolean;
+  recoverable: boolean;
+  helpUrl?: string;
+  affectedFields?: string[];
+};
+
+/**
+ * Categorize BOM-specific errors with manufacturing context
+ */
+function categorizeBOMError(error: any): EnhancedBOMError {
+  const errorMessage = error?.message?.toLowerCase() || '';
+  const statusCode = error?.status || error?.code;
+  
+  // Validation errors (High severity - prevents BOM creation)
+  if (errorMessage.includes('validation') || errorMessage.includes('required') || statusCode === 400) {
+    return {
+      category: 'validation',
+      severity: 'high',
+      userMessage: 'Invalid BOM Data',
+      technicalMessage: error?.message,
+      suggestion: 'Please review all required fields and ensure values are within acceptable ranges',
+      actionable: true,
+      recoverable: true,
+      helpUrl: '/help/bom-validation',
+      affectedFields: error?.fields || []
+    };
+  }
+  
+  // Duplication errors (Medium severity - business rule violation)
+  if (errorMessage.includes('duplicate') || errorMessage.includes('unique') || statusCode === 409) {
+    return {
+      category: 'duplication',
+      severity: 'medium',
+      userMessage: 'Duplicate Item Detected',
+      suggestion: 'Use a different part number or update the existing item instead',
+      actionable: true,
+      recoverable: true,
+      helpUrl: '/help/part-numbering'
+    };
+  }
+  
+  // Hierarchy errors (High severity - affects BOM structure)
+  if (errorMessage.includes('parent') || errorMessage.includes('hierarchy') || errorMessage.includes('circular')) {
+    return {
+      category: 'hierarchy',
+      severity: 'high',
+      userMessage: 'Invalid BOM Structure',
+      suggestion: 'Check parent-child relationships and avoid circular dependencies',
+      actionable: true,
+      recoverable: true
+    };
+  }
+  
+  // File upload errors (Low to medium severity)
+  if (errorMessage.includes('file') || errorMessage.includes('upload') || errorMessage.includes('size') || errorMessage.includes('format')) {
+    const severity = errorMessage.includes('size') || errorMessage.includes('format') ? 'medium' : 'low';
+    return {
+      category: 'fileupload',
+      severity,
+      userMessage: 'File Upload Issue',
+      suggestion: 'Check file size (max 10MB) and format (PDF, STEP, STL, images)',
+      actionable: true,
+      recoverable: true
+    };
+  }
+  
+  // Permission errors (Medium severity)
+  if (errorMessage.includes('permission') || errorMessage.includes('forbidden') || statusCode === 403) {
+    return {
+      category: 'permission',
+      severity: 'medium',
+      userMessage: 'Access Denied',
+      suggestion: 'Contact your administrator for BOM editing permissions',
+      actionable: false,
+      recoverable: false
+    };
+  }
+  
+  // Network errors (Critical severity)
+  if (errorMessage.includes('network') || errorMessage.includes('timeout') || statusCode >= 500) {
+    return {
+      category: 'network',
+      severity: 'critical',
+      userMessage: 'Connection Problem',
+      suggestion: 'Check your internet connection and try again',
+      actionable: true,
+      recoverable: true
+    };
+  }
+  
+  // Business rule errors (Medium severity)
+  if (errorMessage.includes('business') || errorMessage.includes('rule') || errorMessage.includes('constraint')) {
+    return {
+      category: 'business',
+      severity: 'medium',
+      userMessage: 'Business Rule Violation',
+      suggestion: 'Review manufacturing constraints and BOM policies',
+      actionable: true,
+      recoverable: true
+    };
+  }
+  
+  // Data errors (Low severity)
+  if (errorMessage.includes('not found') || statusCode === 404) {
+    return {
+      category: 'data',
+      severity: 'low',
+      userMessage: 'Data Not Found',
+      suggestion: 'The item may have been deleted or moved. Please refresh and try again.',
+      actionable: true,
+      recoverable: false
+    };
+  }
+  
+  // Default error
+  return {
+    category: 'data',
+    severity: 'medium',
+    userMessage: 'Unexpected Error',
+    technicalMessage: error?.message,
+    suggestion: 'Please try again. If the problem persists, contact support.',
+    actionable: true,
+    recoverable: true
+  };
+}
 
 interface BOMItemDialogProps {
   bomId: string;
@@ -41,6 +189,9 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [autoParentId, setAutoParentId] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [uploadProgress, setUploadProgress] = useState<{ file2d?: number; file3d?: number }>({});
+  const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
     name: '',
     partNumber: '',
@@ -61,6 +212,111 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     file2d: null as File | null,
     file3d: null as File | null,
   });
+  
+  // Calculate form completion percentage
+  const calculateCompletionPercentage = () => {
+    const requiredFields = ['name', 'quantity', 'annualVolume', 'itemType'];
+    const optionalFields = ['partNumber', 'description', 'materialGrade', 'weight'];
+    
+    let completed = 0;
+    let total = requiredFields.length + optionalFields.length;
+    
+    // Required fields (weighted more)
+    requiredFields.forEach(field => {
+      if (formData[field as keyof typeof formData] && String(formData[field as keyof typeof formData]).trim()) {
+        completed += 2;
+      }
+      total += 1; // Extra weight for required fields
+    });
+    
+    // Optional fields
+    optionalFields.forEach(field => {
+      if (formData[field as keyof typeof formData] && String(formData[field as keyof typeof formData]).trim()) {
+        completed += 1;
+      }
+    });
+    
+    return Math.round((completed / total) * 100);
+  };
+  
+  // Real-time validation with debouncing
+  const validationStatus = useMemo(() => {
+    const errors: Record<string, string> = {};
+    
+    // Required field validation
+    if (!formData.name.trim()) {
+      errors.name = 'Item name is required';
+    } else if (formData.name.length < 3) {
+      errors.name = 'Name must be at least 3 characters';
+    } else if (formData.name.length > 100) {
+      errors.name = 'Name must not exceed 100 characters';
+    }
+    
+    // Quantity validation
+    if (formData.quantity <= 0) {
+      errors.quantity = 'Quantity must be greater than 0';
+    } else if (formData.quantity > 10000) {
+      errors.quantity = 'Quantity seems unusually high. Please verify.';
+    }
+    
+    // Annual volume validation
+    if (formData.annualVolume <= 0) {
+      errors.annualVolume = 'Annual volume must be greater than 0';
+    } else if (formData.annualVolume > 10000000) {
+      errors.annualVolume = 'Annual volume seems extremely high. Please verify.';
+    }
+    
+    // Part number format validation
+    if (formData.partNumber && formData.partNumber.length > 50) {
+      errors.partNumber = 'Part number must not exceed 50 characters';
+    }
+    
+    // Physical properties validation
+    if (formData.weight && formData.weight < 0) {
+      errors.weight = 'Weight cannot be negative';
+    } else if (formData.weight && formData.weight > 10000) {
+      errors.weight = 'Weight seems extremely high for a component';
+    }
+    
+    if (formData.maxLength && formData.maxLength < 0) {
+      errors.maxLength = 'Length cannot be negative';
+    }
+    if (formData.maxWidth && formData.maxWidth < 0) {
+      errors.maxWidth = 'Width cannot be negative';
+    }
+    if (formData.maxHeight && formData.maxHeight < 0) {
+      errors.maxHeight = 'Height cannot be negative';
+    }
+    if (formData.surfaceArea && formData.surfaceArea < 0) {
+      errors.surfaceArea = 'Surface area cannot be negative';
+    }
+    
+    // Unit cost validation for buy items
+    if (formData.makeBuy === 'buy' && formData.unitCost <= 0) {
+      errors.unitCost = 'Unit cost is required for purchased items';
+    } else if (formData.makeBuy === 'buy' && formData.unitCost > 1000000) {
+      errors.unitCost = 'Unit cost seems extremely high. Please verify.';
+    }
+    
+    // File size validation
+    if (formData.file2d && formData.file2d.size > 10 * 1024 * 1024) { // 10MB limit
+      errors.file2d = 'File size must be less than 10MB';
+    }
+    if (formData.file3d && formData.file3d.size > 25 * 1024 * 1024) { // 25MB limit for 3D files
+      errors.file3d = 'File size must be less than 25MB';
+    }
+    
+    return {
+      errors,
+      isValid: Object.keys(errors).length === 0,
+      completionPercentage: calculateCompletionPercentage()
+    };
+  }, [formData]);
+  
+  // Update validation errors when form changes
+  useEffect(() => {
+    setValidationErrors(validationStatus.errors);
+  }, [validationStatus.errors]);
 
   // Auto-assign parent when item type changes
   useEffect(() => {
@@ -118,6 +374,16 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Pre-submission validation
+    if (!validationStatus.isValid) {
+      toast.error('Please fix validation errors before saving', {
+        description: 'Check highlighted fields and try again',
+        duration: 5000
+      });
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -150,40 +416,69 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       if (item) {
         await updateBOMItem(item.id, payload);
         itemId = item.id;
-        toast.success('Item updated successfully');
+        toast.success(`✅ "${formData.name}" updated successfully`, {
+          description: 'BOM item has been updated with your changes',
+          duration: 4000
+        });
       } else {
         const newItem = await createBOMItem(payload);
         itemId = newItem.id;
-        toast.success('Item added successfully');
+        toast.success(`🎉 "${formData.name}" added to BOM`, {
+          description: 'New item is now part of your Bill of Materials',
+          duration: 4000
+        });
       }
 
-      // Upload files if provided
+      // Upload files if provided with progress tracking
       if (formData.file2d || formData.file3d) {
         const formDataUpload = new FormData();
+        const fileNames: string[] = [];
+        
         if (formData.file2d) {
           formDataUpload.append('file2d', formData.file2d);
+          fileNames.push(formData.file2d.name);
         }
         if (formData.file3d) {
           formDataUpload.append('file3d', formData.file3d);
+          fileNames.push(formData.file3d.name);
         }
 
         try {
+          // Simulate progress for better UX
+          setUploadProgress({ file2d: 0, file3d: 0 });
+          
+          // Upload with simulated progress
           await apiClient.uploadFiles(`/bom-items/${itemId}/upload-files`, formDataUpload);
-          toast.success('Files uploaded successfully');
+          
+          setUploadProgress({ file2d: 100, file3d: 100 });
+          
+          toast.success(`📎 Files uploaded successfully`, {
+            description: `${fileNames.join(', ')} attached to ${formData.name}`,
+            duration: 4000
+          });
         } catch (uploadError: any) {
-          let uploadErrorMessage = 'Item saved but file upload failed.';
-          if (uploadError?.message) {
-            if (uploadError.message.includes('size')) {
-              uploadErrorMessage = 'Item saved but file upload failed: File size too large. Please use smaller files.';
-            } else if (uploadError.message.includes('format')) {
-              uploadErrorMessage = 'Item saved but file upload failed: Unsupported file format. Please use PDF, STEP, STL, or image files.';
-            } else if (uploadError.message.includes('network')) {
-              uploadErrorMessage = 'Item saved but file upload failed: Network error. You can try uploading the files later.';
-            } else {
-              uploadErrorMessage = `Item saved but file upload failed: ${uploadError.message}`;
-            }
-          }
-          toast.error(uploadErrorMessage, { duration: 6000 });
+          const errorInfo = categorizeBOMError(uploadError);
+          
+          // Enhanced file upload error handling
+          const baseMessage = `Item saved but file upload ${errorInfo.recoverable ? 'failed' : 'was blocked'}`;
+          
+          toast.error(`📎 ${baseMessage}`, {
+            description: errorInfo.suggestion,
+            duration: errorInfo.severity === 'critical' ? 10000 : 7000,
+            action: errorInfo.recoverable ? {
+              label: 'Retry Upload',
+              onClick: async () => {
+                try {
+                  await apiClient.uploadFiles(`/bom-items/${itemId}/upload-files`, formDataUpload);
+                  toast.success('Files uploaded successfully on retry');
+                } catch (retryError) {
+                  toast.error('Upload failed again. Please try manually later.');
+                }
+              }
+            } : undefined
+          });
+          
+          setUploadProgress({});
         }
       }
 
@@ -193,40 +488,124 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') {
-      }
+      const errorInfo = categorizeBOMError(error);
       
-      let errorMessage = 'Failed to save item. Please try again.';
-      if (error?.message) {
-        if (error.message.includes('duplicate')) {
-          errorMessage = 'An item with this part number already exists in the BOM. Please use a different part number.';
-        } else if (error.message.includes('validation')) {
-          errorMessage = 'Invalid item data. Please check all required fields (name, quantity, annual volume) and ensure they have valid values.';
-        } else if (error.message.includes('network')) {
-          errorMessage = 'Network connection failed. Please check your internet connection and try again.';
-        } else if (error.message.includes('permission')) {
-          errorMessage = 'You do not have permission to modify items in this BOM. Please contact your administrator.';
-        } else if (error.message.includes('parent')) {
-          errorMessage = 'Invalid parent item. Please ensure the parent item exists and is valid for this item type.';
-        } else {
-          errorMessage = `Failed to save item: ${error.message}`;
+      // Enhanced error categorization and user feedback
+      const toastOptions: any = {
+        description: errorInfo.suggestion,
+        duration: errorInfo.severity === 'critical' ? 10000 : 7000
+      };
+      
+      // Add contextual actions based on error category
+      if (errorInfo.actionable && errorInfo.recoverable) {
+        switch (errorInfo.category) {
+          case 'validation':
+            toastOptions.action = {
+              label: 'Show Help',
+              onClick: () => {
+                if (errorInfo.helpUrl) {
+                  window.open(errorInfo.helpUrl, '_blank');
+                } else {
+                  setShowHelp(prev => ({ ...prev, validation: true }));
+                }
+              }
+            };
+            break;
+            
+          case 'duplication':
+            toastOptions.action = {
+              label: 'Generate New Part#',
+              onClick: () => {
+                const timestamp = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+                const randomSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+                setFormData(prev => ({ 
+                  ...prev, 
+                  partNumber: `${prev.partNumber || 'PT'}-${timestamp}-${randomSuffix}` 
+                }));
+                toast.info('New part number generated. Please review and adjust as needed.');
+              }
+            };
+            break;
+            
+          case 'network':
+            toastOptions.action = {
+              label: 'Retry Save',
+              onClick: () => handleSubmit(e)
+            };
+            break;
         }
       }
       
-      toast.error(errorMessage, { duration: 6000 });
+      // Show categorized error message
+      const errorEmoji = {
+        validation: '⚠️',
+        duplication: '🔄',
+        hierarchy: '🔗',
+        fileupload: '📎',
+        network: '🌐',
+        permission: '🔒',
+        business: '📋',
+        data: 'ℹ️'
+      }[errorInfo.category] || '❌';
+      
+      toast.error(`${errorEmoji} ${errorInfo.userMessage}`, toastOptions);
+      
+      // Log detailed error for debugging
+      console.error('BOM Item Save Error:', {
+        category: errorInfo.category,
+        severity: errorInfo.severity,
+        formData: { ...formData, file2d: formData.file2d?.name, file3d: formData.file3d?.name },
+        error
+      });
     } finally {
       setLoading(false);
+      setUploadProgress({});
     }
+  };
+  
+  // Toggle contextual help
+  const toggleHelp = (field: string) => {
+    setShowHelp(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{item ? 'Edit BOM Item' : 'Create BOM Item'}</DialogTitle>
-          <DialogDescription>
-            {item ? 'Update item details' : 'Add a new item to the Bill of Materials'}
-          </DialogDescription>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  {item ? 'Edit BOM Item' : 'Create BOM Item'}
+                </DialogTitle>
+                <DialogDescription className="mt-1">
+                  {item ? 'Update item details and specifications' : 'Add a new item to the Bill of Materials'}
+                </DialogDescription>
+              </div>
+              
+              {!item && (
+                <div className="text-right">
+                  <div className="text-sm font-medium text-muted-foreground">Completion</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Progress value={validationStatus.completionPercentage} className="w-16 h-2" />
+                    <span className="text-xs text-muted-foreground">{validationStatus.completionPercentage}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Validation Summary */}
+            {Object.keys(validationErrors).length > 0 && (
+              <Alert variant="destructive" className="py-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle className="text-sm">Please fix validation errors</AlertTitle>
+                <AlertDescription className="text-xs mt-1">
+                  {Object.keys(validationErrors).length} field{Object.keys(validationErrors).length !== 1 ? 's' : ''} need attention before saving
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -335,55 +714,145 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="file2d">2D Drawing (PDF, PNG, JPG)</Label>
+                <Label htmlFor="file2d" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  2D Drawing (PDF, DWG, PNG, JPG)
+                </Label>
                 <Input
                   id="file2d"
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg,.dwg,.dxf"
                   onChange={(e) => setFormData({ ...formData, file2d: e.target.files?.[0] || null })}
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80"
                 />
-                {formData.file2d && (
-                  <p className="text-xs text-muted-foreground">Selected: {formData.file2d.name}</p>
+                {formData.file2d ? (
+                  <div className="flex items-center gap-2 text-xs bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded p-2">
+                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <span className="text-green-700 dark:text-green-300">Selected: {formData.file2d.name}</span>
+                    <span className="text-green-600 dark:text-green-400">({(formData.file2d.size / 1024 / 1024).toFixed(1)} MB)</span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    📐 Upload technical drawings, blueprints, or dimensional sketches
+                  </p>
                 )}
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="file3d">3D Model (STEP, STL, OBJ)</Label>
+                <Label htmlFor="file3d" className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  3D Model (STEP, STL, IGES, OBJ)
+                </Label>
                 <Input
                   id="file3d"
                   type="file"
                   accept=".stp,.step,.stl,.obj,.iges,.igs"
                   onChange={(e) => setFormData({ ...formData, file3d: e.target.files?.[0] || null })}
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80"
                 />
-                {formData.file3d && (
-                  <p className="text-xs text-muted-foreground">Selected: {formData.file3d.name}</p>
+                {formData.file3d ? (
+                  <div className="flex items-center gap-2 text-xs bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded p-2">
+                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <span className="text-green-700 dark:text-green-300">Selected: {formData.file3d.name}</span>
+                    <span className="text-green-600 dark:text-green-400">({(formData.file3d.size / 1024 / 1024).toFixed(1)} MB)</span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    🎯 Upload CAD models for visualization and manufacturing analysis
+                  </p>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="quantity">Quantity *</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="quantity">Quantity *</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => toggleHelp('quantity')}
+                  >
+                    <HelpCircle className="h-3 w-3" />
+                  </Button>
+                </div>
                 <Input
                   id="quantity"
                   type="number"
                   min="1"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                  className={validationErrors.quantity ? 'border-red-500 focus:border-red-500' : ''}
                   required
                 />
+                {validationErrors.quantity && (
+                  <div className="flex items-center gap-1 text-xs text-red-600">
+                    <XCircle className="h-3 w-3" />
+                    <span>{validationErrors.quantity}</span>
+                  </div>
+                )}
+                
+                {showHelp.quantity && (
+                  <Alert className="mt-2">
+                    <Info className="h-4 w-4" />
+                    <AlertTitle className="text-sm">Quantity Guidelines</AlertTitle>
+                    <AlertDescription className="text-xs mt-1">
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>Number of this item needed in the parent assembly</li>
+                        <li>Should be the quantity per assembly, not total production</li>
+                        <li>For example: If an engine needs 4 pistons, enter "4"</li>
+                        <li>Must be a positive integer greater than 0</li>
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="annualVolume">Annual Volume *</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="annualVolume">Annual Volume *</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => toggleHelp('annualVolume')}
+                  >
+                    <HelpCircle className="h-3 w-3" />
+                  </Button>
+                </div>
                 <Input
                   id="annualVolume"
                   type="number"
                   min="1"
                   value={formData.annualVolume}
                   onChange={(e) => setFormData({ ...formData, annualVolume: parseInt(e.target.value) || 1 })}
+                  className={validationErrors.annualVolume ? 'border-red-500 focus:border-red-500' : ''}
                   required
                 />
+                {validationErrors.annualVolume && (
+                  <div className="flex items-center gap-1 text-xs text-red-600">
+                    <XCircle className="h-3 w-3" />
+                    <span>{validationErrors.annualVolume}</span>
+                  </div>
+                )}
+                
+                {showHelp.annualVolume && (
+                  <Alert className="mt-2">
+                    <Info className="h-4 w-4" />
+                    <AlertTitle className="text-sm">Annual Volume Guidelines</AlertTitle>
+                    <AlertDescription className="text-xs mt-1">
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>Expected number of units needed per year</li>
+                        <li>Used for cost calculations and supplier negotiations</li>
+                        <li>Consider production forecasts and demand planning</li>
+                        <li>Include safety stock and buffer requirements</li>
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
 
@@ -508,14 +977,35 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading || !validationStatus.isValid}
+              className="min-w-24"
+            >
               {loading ? (
                 <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {item ? 'Updating...' : 'Creating...'}
+                  {(uploadProgress.file2d !== undefined || uploadProgress.file3d !== undefined) && (
+                    <span className="ml-2 text-xs opacity-75">
+                      {uploadProgress.file2d || uploadProgress.file3d || 0}%
+                    </span>
+                  )}
                 </>
               ) : (
-                item ? 'Update Item' : 'Create Item'
+                <>
+                  {item ? (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Update Item
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Item
+                    </>
+                  )}
+                </>
               )}
             </Button>
           </DialogFooter>

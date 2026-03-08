@@ -10,6 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { useCalculator, useExecuteCalculator } from '@/lib/api/hooks';
 
 type CalculatorExecutorProps = {
@@ -25,7 +28,21 @@ type FieldError = {
   suggestion?: string;
 };
 
-type ErrorCategory = 'validation' | 'calculation' | 'network' | 'data' | 'permission' | 'timeout';
+type ErrorCategory = 'validation' | 'calculation' | 'network' | 'data' | 'permission' | 'timeout' | 'server' | 'client' | 'configuration';
+
+type ErrorSeverityLevel = 'low' | 'medium' | 'high' | 'critical';
+
+type EnhancedError = {
+  category: ErrorCategory;
+  severity: ErrorSeverityLevel;
+  userMessage: string;
+  technicalMessage?: string;
+  suggestion: string;
+  actionable: boolean;
+  recoverable: boolean;
+  helpUrl?: string;
+  errorCode?: string;
+};
 
 // Reference table field names that trigger a lookup table display
 const REFERENCE_TABLE_FIELDS = [
@@ -351,59 +368,180 @@ function getErrorSeverity(type: FieldError['type']): 'error' | 'warning' | 'info
   }
 }
 
-function categorizeError(error: any): { category: ErrorCategory; userMessage: string; suggestion: string } {
+/**
+ * Get appropriate icon and styling for error severity levels
+ * Following accessibility and visual hierarchy best practices
+ */
+function getSeverityDisplay(severity: ErrorSeverityLevel): { 
+  icon: any; 
+  bgColor: string; 
+  textColor: string; 
+  borderColor: string;
+  badgeVariant: 'default' | 'destructive' | 'outline' | 'secondary';
+} {
+  switch (severity) {
+    case 'critical':
+      return {
+        icon: XCircle,
+        bgColor: 'bg-red-50 dark:bg-red-950/20',
+        textColor: 'text-red-800 dark:text-red-200',
+        borderColor: 'border-red-200 dark:border-red-800',
+        badgeVariant: 'destructive'
+      };
+    case 'high':
+      return {
+        icon: AlertTriangle,
+        bgColor: 'bg-orange-50 dark:bg-orange-950/20',
+        textColor: 'text-orange-800 dark:text-orange-200',
+        borderColor: 'border-orange-200 dark:border-orange-800',
+        badgeVariant: 'destructive'
+      };
+    case 'medium':
+      return {
+        icon: AlertCircle,
+        bgColor: 'bg-yellow-50 dark:bg-yellow-950/20',
+        textColor: 'text-yellow-800 dark:text-yellow-200',
+        borderColor: 'border-yellow-200 dark:border-yellow-800',
+        badgeVariant: 'outline'
+      };
+    case 'low':
+      return {
+        icon: Info,
+        bgColor: 'bg-blue-50 dark:bg-blue-950/20',
+        textColor: 'text-blue-800 dark:text-blue-200',
+        borderColor: 'border-blue-200 dark:border-blue-800',
+        badgeVariant: 'secondary'
+      };
+    default:
+      return {
+        icon: AlertCircle,
+        bgColor: 'bg-gray-50 dark:bg-gray-950/20',
+        textColor: 'text-gray-800 dark:text-gray-200',
+        borderColor: 'border-gray-200 dark:border-gray-800',
+        badgeVariant: 'outline'
+      };
+  }
+}
+
+/**
+ * Enhanced error categorization following industry UX best practices:
+ * - Clear, non-technical language for users
+ * - Actionable suggestions with specific steps
+ * - Appropriate severity levels
+ * - Recovery guidance
+ * - Help resources when applicable
+ */
+function categorizeError(error: any): EnhancedError {
   const errorMessage = error?.message?.toLowerCase() || '';
+  const statusCode = error?.status || error?.code;
   
-  // Network errors
-  if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('connection')) {
+  // Network connectivity errors (Critical)
+  if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('connection') || statusCode === 'NETWORK_ERROR') {
     return {
       category: 'network',
-      userMessage: 'Connection problem occurred',
-      suggestion: 'Check your internet connection and try again'
+      severity: 'critical',
+      userMessage: 'Connection Lost',
+      technicalMessage: error?.message,
+      suggestion: 'Check your internet connection and try again in a moment',
+      actionable: true,
+      recoverable: true,
+      helpUrl: '/help/network-issues'
     };
   }
   
-  // Timeout errors
-  if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
+  // Timeout errors (High)
+  if (errorMessage.includes('timeout') || errorMessage.includes('aborted') || statusCode === 408) {
     return {
       category: 'timeout',
-      userMessage: 'Calculation took too long',
-      suggestion: 'Try simplifying your inputs or try again'
+      severity: 'high',
+      userMessage: 'Request Timed Out',
+      technicalMessage: error?.message,
+      suggestion: 'The calculation is taking longer than expected. Try with simpler values or check your connection',
+      actionable: true,
+      recoverable: true
     };
   }
   
-  // Permission errors
-  if (errorMessage.includes('unauthorized') || errorMessage.includes('forbidden') || errorMessage.includes('permission')) {
+  // Server errors (High)
+  if (statusCode >= 500 || errorMessage.includes('server error') || errorMessage.includes('internal error')) {
+    return {
+      category: 'server',
+      severity: 'high',
+      userMessage: 'Server Issue',
+      technicalMessage: error?.message,
+      suggestion: 'Our servers are experiencing issues. Please try again in a few moments',
+      actionable: true,
+      recoverable: true,
+      errorCode: `SRV-${statusCode || '500'}`
+    };
+  }
+  
+  // Permission/Authentication errors (Medium)
+  if (errorMessage.includes('unauthorized') || errorMessage.includes('forbidden') || statusCode === 401 || statusCode === 403) {
     return {
       category: 'permission',
-      userMessage: 'Access denied',
-      suggestion: 'You may not have permission to use this calculator'
+      severity: 'medium',
+      userMessage: 'Access Denied',
+      technicalMessage: error?.message,
+      suggestion: statusCode === 401 ? 'Please log in again to continue' : 'You don\'t have permission to perform this action',
+      actionable: true,
+      recoverable: statusCode === 401,
+      helpUrl: '/help/access-issues'
     };
   }
   
-  // Data/validation errors
-  if (errorMessage.includes('validation') || errorMessage.includes('invalid') || errorMessage.includes('required')) {
+  // Client/Input validation errors (Medium)
+  if (errorMessage.includes('validation') || errorMessage.includes('invalid') || errorMessage.includes('required') || statusCode === 400) {
     return {
       category: 'validation',
-      userMessage: 'Input validation failed',
-      suggestion: 'Please check your input values and try again'
+      severity: 'medium',
+      userMessage: 'Invalid Input',
+      technicalMessage: error?.message,
+      suggestion: 'Please review your input values and ensure all required fields are filled correctly',
+      actionable: true,
+      recoverable: true,
+      helpUrl: '/help/input-validation'
     };
   }
   
-  // Calculation errors
-  if (errorMessage.includes('calculation') || errorMessage.includes('formula') || errorMessage.includes('math')) {
+  // Calculation/Formula errors (Medium)
+  if (errorMessage.includes('calculation') || errorMessage.includes('formula') || errorMessage.includes('math') || errorMessage.includes('division by zero')) {
     return {
       category: 'calculation',
-      userMessage: 'Calculation error occurred',
-      suggestion: 'Check your input values and formulas'
+      severity: 'medium',
+      userMessage: 'Calculation Error',
+      technicalMessage: error?.message,
+      suggestion: 'Check your input values for errors like zero values in denominators or out-of-range numbers',
+      actionable: true,
+      recoverable: true,
+      helpUrl: '/help/calculation-errors'
     };
   }
   
-  // Default to data error
+  // Configuration errors (Low)
+  if (errorMessage.includes('config') || errorMessage.includes('setup') || errorMessage.includes('missing')) {
+    return {
+      category: 'configuration',
+      severity: 'low',
+      userMessage: 'Setup Issue',
+      technicalMessage: error?.message,
+      suggestion: 'There may be a configuration issue. Please contact support if this persists',
+      actionable: false,
+      recoverable: false,
+      helpUrl: '/help/contact-support'
+    };
+  }
+  
+  // Default to data error (Medium)
   return {
     category: 'data',
-    userMessage: 'An unexpected error occurred',
-    suggestion: 'Please try again or contact support if the problem persists'
+    severity: 'medium',
+    userMessage: 'Something Went Wrong',
+    technicalMessage: error?.message,
+    suggestion: 'An unexpected error occurred. Please try again, and contact support if the problem persists',
+    actionable: true,
+    recoverable: true,
+    helpUrl: '/help/general-issues'
   };
 }
 
@@ -463,7 +601,6 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
   const [viewingTableFor, setViewingTableFor] = useState<string | null>(null);
   const [expandedFormulas, setExpandedFormulas] = useState<Set<string>>(new Set());
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
-  const [isValidating, setIsValidating] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   // Initialize field values when calculator loads
@@ -483,15 +620,13 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
     }
   }, [calculator]);
 
-  // Real-time validation effect
+  // Silent background validation with longer debounce to reduce unnecessary calls
   useEffect(() => {
     if (calculator && Object.keys(fieldValues).length > 0) {
-      setIsValidating(true);
       const timer = setTimeout(() => {
         const errors = validateAllFields(calculator, fieldValues);
         setFieldErrors(errors);
-        setIsValidating(false);
-      }, 300); // Debounce validation
+      }, 500); // Increased debounce time for better UX
 
       return () => clearTimeout(timer);
     }
@@ -841,7 +976,6 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
           onClick={handleExecute} 
           disabled={
             executeCalculatorMutation.isPending || 
-            isValidating ||
             fieldErrors.some(e => getErrorSeverity(e.type) === 'error')
           }
           className={fieldErrors.some(e => getErrorSeverity(e.type) === 'error') ? 'opacity-50' : ''}
@@ -850,11 +984,6 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
             <>
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
               Calculating...
-            </>
-          ) : isValidating ? (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              Validating...
             </>
           ) : fieldErrors.some(e => getErrorSeverity(e.type) === 'error') ? (
             <>
@@ -868,7 +997,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
             </>
           ) : (
             <>
-              <CheckCircle className="h-4 w-4 mr-2" />
+              <Play className="h-4 w-4 mr-2" />
               Calculate
             </>
           )}
@@ -936,29 +1065,16 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Input Values</span>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {isValidating && (
-                <div className="flex items-center gap-1">
-                  <RefreshCw className="h-3 w-3 animate-spin" />
-                  <span>Validating...</span>
-                </div>
-              )}
-              {fieldErrors.length === 0 && !isValidating && (
-                <div className="flex items-center gap-1 text-green-600">
-                  <CheckCircle className="h-3 w-3" />
-                  <span>All inputs valid</span>
-                </div>
-              )}
-              {fieldErrors.length > 0 && (
-                <div className="flex items-center gap-1">
-                  {fieldErrors.some(e => getErrorSeverity(e.type) === 'error') ? (
-                    <><XCircle className="h-3 w-3 text-destructive" /><span className="text-destructive">{fieldErrors.filter(e => getErrorSeverity(e.type) === 'error').length} error(s)</span></>
-                  ) : (
-                    <><AlertTriangle className="h-3 w-3 text-yellow-500" /><span className="text-yellow-600">{fieldErrors.length} warning(s)</span></>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* Only show status when there are errors or all is valid after user interaction */}
+            {fieldErrors.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                {fieldErrors.some(e => getErrorSeverity(e.type) === 'error') ? (
+                  <><XCircle className="h-4 w-4 text-destructive" /><span className="text-destructive">{fieldErrors.filter(e => getErrorSeverity(e.type) === 'error').length} error(s)</span></>
+                ) : (
+                  <><AlertTriangle className="h-4 w-4 text-yellow-500" /><span className="text-yellow-600">{fieldErrors.length} warning(s)</span></>
+                )}
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
@@ -976,7 +1092,6 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                   <Label htmlFor={field.fieldName} className={fieldError && errorSeverity === 'error' ? 'text-destructive' : ''}>
                     {field.displayLabel || field.fieldName}
                     {field.isRequired && <span className="text-destructive ml-1">*</span>}
-                    {isValidating && <RefreshCw className="inline h-3 w-3 ml-2 animate-spin text-muted-foreground" />}
                   </Label>
                   <div className="relative">
                     <Input

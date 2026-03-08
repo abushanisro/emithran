@@ -1,8 +1,12 @@
-import { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Plus, Edit2, Trash2, ZoomIn, ZoomOut, Maximize2, AlertTriangle, Info, CheckCircle, XCircle, FileText, Network } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { toast } from 'sonner';
 import { BOMItemType } from '@/lib/types/bom.types';
 
 export interface BOMItem {
@@ -23,6 +27,34 @@ interface BOMTreeViewProps {
   onAddItem: (parentId: string | null, type: BOMItemType) => void;
   onEditItem: (item: BOMItem) => void;
   onDeleteItem: (id: string) => void;
+}
+
+// BOM Tree validation types
+type ValidationIssueType = 'circular' | 'orphaned' | 'missing_quantity' | 'invalid_hierarchy' | 'duplicate_parts' | 'missing_data';
+type ValidationSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+interface ValidationIssue {
+  type: ValidationIssueType;
+  severity: ValidationSeverity;
+  title: string;
+  description: string;
+  itemId?: string;
+  suggestion: string;
+  affectedItems?: string[];
+}
+
+interface BOMValidationResult {
+  isValid: boolean;
+  issues: ValidationIssue[];
+  summary: {
+    totalItems: number;
+    assemblies: number;
+    subAssemblies: number;
+    childParts: number;
+    orphanedItems: number;
+    maxDepth: number;
+    estimatedComplexity: 'low' | 'medium' | 'high';
+  };
 }
 
 interface NodePosition {
@@ -47,6 +79,180 @@ function generateCurvedPath(
   // Create a smooth horizontal curve
   const midX = (x1 + x2) / 2;
   return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+}
+
+// BOM Tree Validation Functions
+function validateBOMStructure(items: BOMItem[]): BOMValidationResult {
+  const issues: ValidationIssue[] = [];
+  const itemMap = new Map<string, BOMItem>();
+  const visited = new Set<string>();
+  const childToParent = new Map<string, string>();
+  
+  // Build maps for validation
+  const buildMaps = (itemList: BOMItem[], parentId?: string) => {
+    itemList.forEach(item => {
+      itemMap.set(item.id, item);
+      if (parentId) {
+        childToParent.set(item.id, parentId);
+      }
+      if (item.children) {
+        buildMaps(item.children, item.id);
+      }
+    });
+  };
+  buildMaps(items);
+  
+  // Check for circular dependencies
+  const detectCircularDependencies = (itemId: string, path: Set<string>): void => {
+    if (path.has(itemId)) {
+      issues.push({
+        type: 'circular',
+        severity: 'critical',
+        title: 'Circular Dependency Detected',
+        description: `Item creates a circular reference in the BOM structure`,
+        itemId: itemId,
+        suggestion: 'Remove the circular reference by restructuring the hierarchy',
+        affectedItems: Array.from(path)
+      });
+      return;
+    }
+    
+    if (visited.has(itemId)) return;
+    
+    visited.add(itemId);
+    path.add(itemId);
+    
+    const item = itemMap.get(itemId);
+    if (item?.children) {
+      item.children.forEach(child => detectCircularDependencies(child.id, new Set(path)));
+    }
+    
+    path.delete(itemId);
+  };
+  
+  // Check each top-level item
+  items.forEach(item => detectCircularDependencies(item.id, new Set()));
+  
+  // Check for orphaned items (items that should have parents but don't)
+  const orphanedItems: string[] = [];
+  const findOrphanedItems = (itemList: BOMItem[], isTopLevel = true) => {
+    itemList.forEach(item => {
+      // Sub-assemblies and child parts should have parents, but assemblies at top level are OK
+      if (!isTopLevel && (item.itemType === 'sub_assembly' || item.itemType === 'child_part')) {
+        if (!childToParent.has(item.id)) {
+          orphanedItems.push(item.id);
+        }
+      }
+      if (item.children) {
+        findOrphanedItems(item.children, false);
+      }
+    });
+  };
+  findOrphanedItems(items);
+  
+  if (orphanedItems.length > 0) {
+    issues.push({
+      type: 'orphaned',
+      severity: 'high',
+      title: 'Orphaned BOM Items',
+      description: `${orphanedItems.length} items are not properly connected to the BOM hierarchy`,
+      suggestion: 'Review the structure and ensure all sub-assemblies and parts have proper parent assemblies',
+      affectedItems: orphanedItems
+    });
+  }
+  
+  // Check for missing quantities or invalid data
+  const missingDataItems: string[] = [];
+  const duplicatePartNumbers = new Map<string, string[]>();
+  
+  const validateItemData = (itemList: BOMItem[]) => {
+    itemList.forEach(item => {
+      // Check for missing or invalid quantities
+      if (!item.quantity || item.quantity <= 0) {
+        missingDataItems.push(item.id);
+      }
+      
+      // Check for duplicate part numbers
+      if (item.partNumber) {
+        if (!duplicatePartNumbers.has(item.partNumber)) {
+          duplicatePartNumbers.set(item.partNumber, []);
+        }
+        duplicatePartNumbers.get(item.partNumber)!.push(item.id);
+      }
+      
+      if (item.children) {
+        validateItemData(item.children);
+      }
+    });
+  };
+  validateItemData(items);
+  
+  if (missingDataItems.length > 0) {
+    issues.push({
+      type: 'missing_quantity',
+      severity: 'medium',
+      title: 'Missing or Invalid Quantities',
+      description: `${missingDataItems.length} items have missing or invalid quantity values`,
+      suggestion: 'Update all items to have valid quantities greater than 0',
+      affectedItems: missingDataItems
+    });
+  }
+  
+  // Check for duplicate part numbers
+  const duplicates = Array.from(duplicatePartNumbers.entries()).filter(([_, ids]) => ids.length > 1);
+  if (duplicates.length > 0) {
+    duplicates.forEach(([partNumber, ids]) => {
+      issues.push({
+        type: 'duplicate_parts',
+        severity: 'medium',
+        title: 'Duplicate Part Numbers',
+        description: `Part number "${partNumber}" is used by multiple items`,
+        suggestion: 'Ensure each part has a unique part number or use revision numbers',
+        affectedItems: ids
+      });
+    });
+  }
+  
+  // Calculate summary statistics
+  const calculateStats = (itemList: BOMItem[], depth = 0): { counts: Record<string, number>, maxDepth: number } => {
+    let assemblies = 0, subAssemblies = 0, childParts = 0, maxDepth = depth;
+    
+    itemList.forEach(item => {
+      switch (item.itemType) {
+        case 'assembly': assemblies++; break;
+        case 'sub_assembly': subAssemblies++; break;
+        case 'child_part': childParts++; break;
+      }
+      
+      if (item.children && item.children.length > 0) {
+        const childStats = calculateStats(item.children, depth + 1);
+        assemblies += childStats.counts.assemblies;
+        subAssemblies += childStats.counts.subAssemblies;
+        childParts += childStats.counts.childParts;
+        maxDepth = Math.max(maxDepth, childStats.maxDepth);
+      }
+    });
+    
+    return { counts: { assemblies, subAssemblies, childParts }, maxDepth };
+  };
+  
+  const stats = calculateStats(items);
+  const totalItems = stats.counts.assemblies + stats.counts.subAssemblies + stats.counts.childParts;
+  const complexity = totalItems > 50 ? 'high' : totalItems > 20 ? 'medium' : 'low';
+  
+  return {
+    isValid: issues.length === 0,
+    issues,
+    summary: {
+      totalItems,
+      assemblies: stats.counts.assemblies,
+      subAssemblies: stats.counts.subAssemblies,
+      childParts: stats.counts.childParts,
+      orphanedItems: orphanedItems.length,
+      maxDepth: stats.maxDepth,
+      estimatedComplexity: complexity
+    }
+  };
 }
 
 // Count total descendants for spacing calculation
@@ -352,6 +558,36 @@ export function BOMTreeView({ items, projectName, projectId, onAddItem, onEditIt
   });
   const [zoom, setZoom] = useState(0.8);
   const [isRootHovered, setIsRootHovered] = useState(false);
+  const [showValidation, setShowValidation] = useState(true);
+  const [validationResult, setValidationResult] = useState<BOMValidationResult | null>(null);
+  
+  // Validate BOM structure whenever items change
+  useEffect(() => {
+    if (items.length > 0) {
+      try {
+        const result = validateBOMStructure(items);
+        setValidationResult(result);
+        
+        // Auto-toast critical issues
+        const criticalIssues = result.issues.filter(issue => issue.severity === 'critical');
+        if (criticalIssues.length > 0) {
+          toast.error(`🔍 BOM Structure Issues`, {
+            description: `${criticalIssues.length} critical issues detected in BOM structure`,
+            duration: 8000,
+            action: {
+              label: 'View Details',
+              onClick: () => setShowValidation(true)
+            }
+          });
+        }
+      } catch (error) {
+        console.error('BOM validation error:', error);
+        toast.error('Failed to validate BOM structure');
+      }
+    } else {
+      setValidationResult(null);
+    }
+  }, [items]);
 
   const toggleNode = (id: string) => {
     setExpandedNodes((prev) => {
@@ -395,9 +631,159 @@ export function BOMTreeView({ items, projectName, projectId, onAddItem, onEditIt
   }, [items, expandedNodes]);
 
   const hasItems = items.length > 0;
+  const criticalIssues = validationResult?.issues.filter(issue => issue.severity === 'critical') || [];
+  const highIssues = validationResult?.issues.filter(issue => issue.severity === 'high') || [];
 
   return (
-    <div className="relative w-full h-[500px] md:h-[600px] lg:h-[700px] bg-background rounded-lg overflow-hidden border border-border">
+    <div className="space-y-4">
+      {/* BOM Summary and Validation Panel */}
+      {validationResult && showValidation && (
+        <div className="bg-card border rounded-lg p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FileText className="h-5 w-5 text-primary" />
+              <div>
+                <h3 className="font-semibold text-lg">BOM Structure Analysis</h3>
+                <p className="text-sm text-muted-foreground">Structure validation and integrity checks</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowValidation(false)}
+            >
+              <XCircle className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Summary Statistics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="text-2xl font-bold text-emerald-600">{validationResult.summary.assemblies}</div>
+              <div className="text-xs text-muted-foreground">Assemblies</div>
+            </div>
+            <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">{validationResult.summary.subAssemblies}</div>
+              <div className="text-xs text-muted-foreground">Sub-Assemblies</div>
+            </div>
+            <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="text-2xl font-bold text-amber-600">{validationResult.summary.childParts}</div>
+              <div className="text-xs text-muted-foreground">Child Parts</div>
+            </div>
+            <div className="text-center p-3 bg-muted/30 rounded-lg">
+              <div className="text-2xl font-bold text-muted-foreground">{validationResult.summary.maxDepth}</div>
+              <div className="text-xs text-muted-foreground">Max Depth</div>
+            </div>
+          </div>
+          
+          {/* Validation Status */}
+          <div className="flex items-center gap-3">
+            {validationResult.isValid ? (
+              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                <CheckCircle className="h-5 w-5" />
+                <span className="font-medium">BOM Structure Valid</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                <XCircle className="h-5 w-5" />
+                <span className="font-medium">{validationResult.issues.length} Issues Found</span>
+              </div>
+            )}
+            
+            <Badge variant={validationResult.summary.estimatedComplexity === 'high' ? 'destructive' : 
+                          validationResult.summary.estimatedComplexity === 'medium' ? 'default' : 'secondary'}>
+              {validationResult.summary.estimatedComplexity.toUpperCase()} Complexity
+            </Badge>
+          </div>
+          
+          {/* Validation Issues */}
+          {validationResult.issues.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Validation Issues
+              </h4>
+              
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {validationResult.issues.map((issue, index) => (
+                  <Alert 
+                    key={index} 
+                    variant={issue.severity === 'critical' || issue.severity === 'high' ? 'destructive' : 'default'}
+                    className="py-2"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                    <div className="space-y-1">
+                      <AlertTitle className="text-sm flex items-center gap-2">
+                        {issue.title}
+                        <Badge variant="outline" className="text-xs">
+                          {issue.severity.toUpperCase()}
+                        </Badge>
+                      </AlertTitle>
+                      <AlertDescription className="text-xs">
+                        {issue.description}
+                      </AlertDescription>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        💡 {issue.suggestion}
+                      </div>
+                      {issue.affectedItems && issue.affectedItems.length > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          Affected items: {issue.affectedItems.length}
+                        </div>
+                      )}
+                    </div>
+                  </Alert>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Validation Summary Bar (when panel is hidden) */}
+      {validationResult && !showValidation && (
+        <div className="flex items-center justify-between bg-muted/30 border rounded p-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {validationResult.isValid ? (
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              )}
+              <span className="text-sm font-medium">
+                {validationResult.summary.totalItems} items • 
+                {validationResult.isValid ? 'Valid Structure' : `${validationResult.issues.length} issues`}
+              </span>
+            </div>
+            
+            {(criticalIssues.length > 0 || highIssues.length > 0) && (
+              <div className="flex items-center gap-1">
+                {criticalIssues.length > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {criticalIssues.length} Critical
+                  </Badge>
+                )}
+                {highIssues.length > 0 && (
+                  <Badge variant="default" className="text-xs">
+                    {highIssues.length} High
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowValidation(true)}
+            className="text-xs"
+          >
+            View Details
+          </Button>
+        </div>
+      )}
+      
+      {/* BOM Tree Visualization */}
+      <div className="relative w-full h-[500px] md:h-[600px] lg:h-[700px] bg-background rounded-lg overflow-hidden border border-border">
       {/* Controls */}
       <div className="absolute top-3 right-3 z-10 flex gap-1">
         <Button
@@ -534,6 +920,7 @@ export function BOMTreeView({ items, projectName, projectId, onAddItem, onEditIt
           </AnimatePresence>
         </svg>
       </div>
+    </div>
     </div>
   );
 }
