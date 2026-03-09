@@ -1,0 +1,9 @@
+MaterialGroup,Material,MaterialType,MaterialDescription,Shape,Country,Currency,Density,UltimateTensileStrength,YeildTensileStrength,ShearingStrength,ASTM Standard,DIN Standard,EN Standard,JIS Standard,Unit Cost ($),Year
+Ferrous & Non-Ferrous,Carbon Steel,Carbon Steel,Low carbon steel for structural applications,BARS,INDIA,INR,7.85,520,350,315,ASTM A36,DIN St37,EN S235JR,JIS SS400,45.50,2024
+Ferrous & Non-Ferrous,Stainless Steel,Stainless Steel,304 grade stainless steel for food industry,SHEETS,US,USD,7.93,621,241,207,ASTM A240,DIN 1.4301,EN 10088-2,JIS SUS304,8.75,2024
+Ferrous & Non-Ferrous,Aluminum Alloy,Aluminum Alloy,6061-T6 aluminum for aerospace,PLATES,WESTERN_EUROPE,EUR,2.70,310,276,207,ASTM B221,DIN 3.3211,EN AW-6061,JIS A6061,12.25,2024
+Ferrous & Non-Ferrous,Cast Iron,Cast Iron,Gray cast iron for engine blocks,INGOTS,CHINA,CNY,7.20,250,150,180,ASTM A48,DIN GG25,EN GJL-250,JIS FC250,18.90,2024
+Ferrous & Non-Ferrous,Tool Steel,Tool Steel,H13 hot work tool steel for dies,RODS,INDIA,INR,7.80,1570,1380,950,ASTM A681,DIN 1.2344,EN X40CrMoV5-1,JIS SKD61,125.75,2024
+Ferrous & Non-Ferrous,Copper Alloy,Copper Alloy,Brass C36000 for fittings,TUBES,NORTHERN_EUROPE,EUR,8.50,483,172,310,ASTM B16,DIN CuZn36,EN CW508L,JIS C3604,15.85,2024
+Ferrous & Non-Ferrous,Titanium Alloy,Titanium Alloy,Grade 5 titanium for medical implants,WIRE,US,USD,4.43,950,880,550,ASTM B348,DIN 3.7165,EN Ti6Al4V,JIS TAB-64,285.50,2024
+Ferrous & Non-Ferrous,Alloy Steel,Alloy Steel,4140 chrome-moly steel for gears,COILS,INDIA,INR,7.85,1020,655,620,ASTM A29,DIN 1.7225,EN 42CrMo4,JIS SCM440,78.25,2024

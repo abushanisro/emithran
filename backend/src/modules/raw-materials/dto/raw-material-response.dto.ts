@@ -11,19 +11,58 @@ export class RawMaterialResponseDto {
   material: string;
 
   @ApiProperty({ required: false })
-  materialAbbreviation?: string;
-
-  @ApiProperty({ required: false })
   materialGrade?: string;
 
   @ApiProperty({ required: false })
-  stockForm?: string;
+  materialType?: string;
 
   @ApiProperty({ required: false })
-  matlState?: string;
+  materialDescription?: string;
 
   @ApiProperty({ required: false })
-  application?: string;
+  densityKgM3?: number;
+
+  @ApiProperty({ required: false })
+  cost?: number;
+
+  @ApiProperty({ required: false })
+  unitCost?: number;
+
+  @ApiProperty({ required: false })
+  currency?: string;
+
+  // Material properties
+  @ApiProperty({ required: false, description: 'Material density in g/cm³' })
+  density?: number;
+
+  @ApiProperty({ required: false, description: 'Ultimate Tensile Strength in MPa' })
+  ultimateTensileStrength?: number;
+
+  @ApiProperty({ required: false, description: 'Yield Tensile Strength in MPa' })
+  yieldTensileStrength?: number;
+
+  @ApiProperty({ required: false, description: 'Shearing Strength in MPa' })
+  shearingStrength?: number;
+
+  @ApiProperty({ required: false })
+  astmStandard?: string;
+
+  @ApiProperty({ required: false })
+  dinStandard?: string;
+
+  @ApiProperty({ required: false })
+  enStandard?: string;
+
+  @ApiProperty({ required: false })
+  jisStandard?: string;
+
+  @ApiProperty({ required: false })
+  shape?: string;
+
+  @ApiProperty({ required: false })
+  country?: string;
+
+  // Plastic-specific properties
 
   @ApiProperty({ required: false })
   regrinding?: string;
@@ -44,31 +83,10 @@ export class RawMaterialResponseDto {
   moldTempC?: number;
 
   @ApiProperty({ required: false })
-  densityKgM3?: number;
-
-  @ApiProperty({ required: false })
   specificHeatMelt?: number;
 
   @ApiProperty({ required: false })
   thermalConductivityMelt?: number;
-
-  @ApiProperty({ required: false })
-  location?: string;
-
-  @ApiProperty({ required: false })
-  year?: number;
-
-  @ApiProperty({ required: false })
-  q1Cost?: number;
-
-  @ApiProperty({ required: false })
-  q2Cost?: number;
-
-  @ApiProperty({ required: false })
-  q3Cost?: number;
-
-  @ApiProperty({ required: false })
-  q4Cost?: number;
 
   @ApiProperty()
   userId: string;
@@ -80,30 +98,39 @@ export class RawMaterialResponseDto {
   updatedAt: Date;
 
   static fromDatabase(row: any): RawMaterialResponseDto {
+    const costValue = row.cost ? parseFloat(row.cost) : undefined;
+    
     return {
       id: row.id,
       materialGroup: row.material_group,
       material: row.material,
-      materialAbbreviation: row.material_abbreviation,
       materialGrade: row.material_grade,
-      stockForm: row.stock_form,
-      matlState: row.matl_state,
-      application: row.application,
+      materialType: row.material_type,
+      materialDescription: row.material_description,
+      densityKgM3: row.density_kg_m3 ? parseFloat(row.density_kg_m3) : undefined,
+      cost: costValue,
+      unitCost: costValue, // Map cost to unitCost for frontend compatibility
+      currency: row.currency || 'INR', // Default to INR if not specified
+      // Material properties
+      density: row.density ? parseFloat(row.density) : undefined,
+      ultimateTensileStrength: row.ultimate_tensile_strength ? parseFloat(row.ultimate_tensile_strength) : undefined,
+      yieldTensileStrength: row.yield_tensile_strength ? parseFloat(row.yield_tensile_strength) : undefined,
+      shearingStrength: row.shearing_strength ? parseFloat(row.shearing_strength) : undefined,
+      astmStandard: row.astm_standard,
+      dinStandard: row.din_standard,
+      enStandard: row.en_standard,
+      jisStandard: row.jis_standard,
+      shape: row.shape,
+      country: row.country,
+      // Plastic-specific properties
       regrinding: row.regrinding,
       regrindingPercentage: row.regrinding_percentage ? parseFloat(row.regrinding_percentage) : undefined,
       clampingPressureMpa: row.clamping_pressure_mpa ? parseFloat(row.clamping_pressure_mpa) : undefined,
       ejectDeflectionTempC: row.eject_deflection_temp_c ? parseFloat(row.eject_deflection_temp_c) : undefined,
       meltingTempC: row.melting_temp_c ? parseFloat(row.melting_temp_c) : undefined,
       moldTempC: row.mold_temp_c ? parseFloat(row.mold_temp_c) : undefined,
-      densityKgM3: row.density_kg_m3 ? parseFloat(row.density_kg_m3) : undefined,
       specificHeatMelt: row.specific_heat_melt ? parseFloat(row.specific_heat_melt) : undefined,
       thermalConductivityMelt: row.thermal_conductivity_melt ? parseFloat(row.thermal_conductivity_melt) : undefined,
-      location: row.location,
-      year: row.year,
-      q1Cost: row.q1_cost ? parseFloat(row.q1_cost) : undefined,
-      q2Cost: row.q2_cost ? parseFloat(row.q2_cost) : undefined,
-      q3Cost: row.q3_cost ? parseFloat(row.q3_cost) : undefined,
-      q4Cost: row.q4_cost ? parseFloat(row.q4_cost) : undefined,
       userId: row.user_id,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

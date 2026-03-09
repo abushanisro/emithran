@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:\\Users\\abush\\OneDrive\\Desktop\\mithran\\backend\")",
+      "Bash(npm run migration:run)"
+    ],
+    "deny": []
+  }
+}

@@ -2,6 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { toast } from 'sonner';
 
+import {
+  Currency,
+  Country,
+  MaterialShape,
+  MaterialCategory
+} from '@/lib/constants/materials';
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -10,29 +17,45 @@ export interface RawMaterial {
   id: string;
   materialGroup: string;
   material: string;
-  materialAbbreviation?: string;
   materialGrade?: string;
-  stockForm?: string;
-  matlState?: string;
-  application?: string;
+  materialType?: string;
+  materialDescription?: string;
+  densityKgM3?: number;
+  cost?: number;
+  unitCost?: number;
+  currency?: Currency;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  
+  // Material properties
+  density?: number;
+  ultimate_tensile_strength?: number;
+  ultimateTensileStrength?: number;
+  yield_tensile_strength?: number;
+  yieldTensileStrength?: number;
+  shearing_strength?: number;
+  shearingStrength?: number;
+  astm_standard?: string;
+  astmStandard?: string;
+  din_standard?: string;
+  dinStandard?: string;
+  en_standard?: string;
+  enStandard?: string;
+  jis_standard?: string;
+  jisStandard?: string;
+  shape?: MaterialShape;
+  country?: Country;
+  
+  // Plastic-specific properties
   regrinding?: string;
   regrindingPercentage?: number;
   clampingPressureMpa?: number;
   ejectDeflectionTempC?: number;
   meltingTempC?: number;
   moldTempC?: number;
-  densityKgM3?: number;
   specificHeatMelt?: number;
   thermalConductivityMelt?: number;
-  location?: string;
-  year?: number;
-  q1Cost?: number;
-  q2Cost?: number;
-  q3Cost?: number;
-  q4Cost?: number;
-  userId: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface RawMaterialListResponse {
@@ -43,11 +66,23 @@ export interface RawMaterialListResponse {
 export interface QueryRawMaterialsParams {
   search?: string;
   materialGroup?: string;
+  materialCategory?: MaterialCategory;
   material?: string;
   location?: string;
+  country?: Country;
+  currency?: Currency;
+  shape?: MaterialShape;
+  minCost?: number;
+  maxCost?: number;
+  minDensity?: number;
+  maxDensity?: number;
+  minMeltingTemp?: number;
+  maxMeltingTemp?: number;
   year?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
 }
 
 export interface CreateRawMaterialData {
@@ -55,6 +90,8 @@ export interface CreateRawMaterialData {
   material: string;
   materialAbbreviation?: string;
   materialGrade?: string;
+  materialType?: string;
+  materialDescription?: string;
   stockForm?: string;
   matlState?: string;
   application?: string;
@@ -69,10 +106,19 @@ export interface CreateRawMaterialData {
   thermalConductivityMelt?: number;
   location?: string;
   year?: number;
-  q1Cost?: number;
-  q2Cost?: number;
-  q3Cost?: number;
-  q4Cost?: number;
+  unitCost?: number;
+  currency?: Currency;
+  country?: Country;
+  shape?: MaterialShape;
+  // Material properties
+  density?: number;
+  ultimate_tensile_strength?: number;
+  yield_tensile_strength?: number;
+  shearing_strength?: number;
+  astm_standard?: string;
+  din_standard?: string;
+  en_standard?: string;
+  jis_standard?: string;
 }
 
 export interface UpdateRawMaterialData extends Partial<CreateRawMaterialData> {}
@@ -122,10 +168,17 @@ export function useRawMaterialFilterOptions() {
     queryFn: async () => {
       const response = await apiClient.get<{
         materialGroups: string[];
+        materialCategories: MaterialCategory[];
         materialTypes: string[];
         locations: string[];
+        countries: Country[];
+        currencies: Currency[];
+        shapes: MaterialShape[];
         grades: string[];
         years: number[];
+        costRange: { min: number; max: number };
+        densityRange: { min: number; max: number };
+        temperatureRange: { min: number; max: number };
       }>('/raw-materials/filter-options');
 
       return response;
@@ -164,9 +217,11 @@ export function useUpdateRawMaterial() {
       const response = await apiClient.put<RawMaterial>(`/raw-materials/${id}`, data);
       return response;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (updatedMaterial, variables) => {
+      // Force immediate cache invalidation to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['raw-materials'] });
-      queryClient.invalidateQueries({ queryKey: ['raw-materials', 'detail', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['raw-materials', 'filter-options'] });
+      
       toast.success('Raw material updated successfully');
     },
     onError: (error: any) => {

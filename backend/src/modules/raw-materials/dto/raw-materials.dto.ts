@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, Min, Max, IsEnum } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { Currency, MaterialShape } from '../constants/material-categories.constants';
 
 export class CreateRawMaterialDto {
   @ApiProperty({ example: 'Plastic & Rubber' })
@@ -10,30 +12,22 @@ export class CreateRawMaterialDto {
   @IsString()
   material: string;
 
-  @ApiPropertyOptional({ example: 'ABS' })
-  @IsOptional()
-  @IsString()
-  materialAbbreviation?: string;
 
   @ApiPropertyOptional({ example: 'ABS' })
   @IsOptional()
   @IsString()
   materialGrade?: string;
 
-  @ApiPropertyOptional({ example: 'Granules' })
+  @ApiPropertyOptional({ example: 'Stainless Steel' })
   @IsOptional()
   @IsString()
-  stockForm?: string;
+  materialType?: string;
 
-  @ApiPropertyOptional({ example: 'Base Polymer' })
+  @ApiPropertyOptional({ example: 'High-grade stainless steel for industrial applications' })
   @IsOptional()
   @IsString()
-  matlState?: string;
+  materialDescription?: string;
 
-  @ApiPropertyOptional({ example: 'Ext & Int Parts-Automotive, Electronics, Appliances' })
-  @IsOptional()
-  @IsString()
-  application?: string;
 
   @ApiPropertyOptional({ example: 'Yes' })
   @IsOptional()
@@ -89,41 +83,81 @@ export class CreateRawMaterialDto {
   @Min(0)
   thermalConductivityMelt?: number;
 
-  @ApiPropertyOptional({ example: 'Bangalore' })
+
+
+  @ApiPropertyOptional({ example: 135.00 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  cost?: number;
+
+  @ApiPropertyOptional({ example: 135.00 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitCost?: number;
+
+  @ApiPropertyOptional({ enum: Currency, example: Currency.INR })
+  @IsOptional()
+  @IsEnum(Currency)
+  currency?: Currency;
+
+
+  @ApiPropertyOptional({ enum: MaterialShape, example: MaterialShape.GRANULES })
+  @IsOptional()
+  @IsEnum(MaterialShape)
+  shape?: MaterialShape;
+
+  // Material Properties
+  @ApiPropertyOptional({ example: 7.85, description: 'Density in g/cm³' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  density?: number;
+
+  @ApiPropertyOptional({ example: 520, description: 'Ultimate Tensile Strength in MPa' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  ultimate_tensile_strength?: number;
+
+  @ApiPropertyOptional({ example: 350, description: 'Yield Tensile Strength in MPa' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  yield_tensile_strength?: number;
+
+  @ApiPropertyOptional({ example: 315, description: 'Shearing Strength in MPa' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  shearing_strength?: number;
+
+  // Material Standards
+  @ApiPropertyOptional({ example: 'ASTM A240' })
   @IsOptional()
   @IsString()
-  location?: string;
+  astm_standard?: string;
 
-  @ApiPropertyOptional({ example: 2025 })
+  @ApiPropertyOptional({ example: 'DIN 1.4301' })
   @IsOptional()
-  @IsInt()
-  @Min(1900)
-  @Max(2100)
-  year?: number;
+  @IsString()
+  din_standard?: string;
 
-  @ApiPropertyOptional({ example: 125.00 })
+  @ApiPropertyOptional({ example: 'EN 10088-2' })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  q1Cost?: number;
+  @IsString()
+  en_standard?: string;
 
-  @ApiPropertyOptional({ example: 130.00 })
+  @ApiPropertyOptional({ example: 'JIS SUS304' })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  q2Cost?: number;
+  @IsString()
+  jis_standard?: string;
 
-  @ApiPropertyOptional({ example: 140.00 })
+  @ApiPropertyOptional({ example: 'India' })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  q3Cost?: number;
-
-  @ApiPropertyOptional({ example: 150.00 })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  q4Cost?: number;
+  @IsString()
+  country?: string;
 }
 
 export class UpdateRawMaterialDto extends PartialType(CreateRawMaterialDto) {}
@@ -147,12 +181,31 @@ export class QueryRawMaterialsDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  location?: string;
+  country?: string;
+
+
+  @ApiPropertyOptional({ enum: Currency })
+  @IsOptional()
+  @IsEnum(Currency)
+  currency?: Currency;
+
+
+  @ApiPropertyOptional({ enum: MaterialShape })
+  @IsOptional()
+  @IsEnum(MaterialShape)
+  shape?: MaterialShape;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsInt()
-  year?: number;
+  @IsNumber()
+  @Min(0)
+  minCost?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  maxCost?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

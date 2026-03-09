@@ -305,6 +305,33 @@ export class RawMaterialsController {
         return isNaN(num) ? undefined : num;
       };
 
+      // Helper function to map shape values from Excel to MaterialShape enum
+      const mapShapeValue = (value: any): string | undefined => {
+        if (!value) return undefined;
+        const shapeStr = String(value).toLowerCase().trim();
+        
+        // Map common Excel shape values to our enum values
+        const shapeMapping: Record<string, string> = {
+          'granules': 'GRANULES',
+          'pellets': 'PELLETS', 
+          'powder': 'POWDER',
+          'flakes': 'FLAKES',
+          'sheets': 'SHEETS',
+          'rods': 'RODS',
+          'tubes': 'TUBES',
+          'profiles': 'PROFILES',
+          'ingots': 'INGOTS',
+          'bars': 'BARS',
+          'plates': 'PLATES',
+          'coils': 'COILS',
+          'wire': 'WIRE',
+          'foam': 'FOAM',
+          'liquid': 'LIQUID',
+        };
+        
+        return shapeMapping[shapeStr] || value;
+      };
+
       // Collect valid materials for batch insert
       const validMaterials: CreateRawMaterialDto[] = [];
       const errors: any[] = [];
@@ -315,16 +342,25 @@ export class RawMaterialsController {
           const rowData: any = row;
 
           // Map Excel columns to DTO properties with comprehensive column name matching
-          const materialGroup = getColumnValue(rowData, 'MaterialGroup', 'Material Group', 'material_group', 'MATERIALGROUP');
+          const rawMaterialGroup = getColumnValue(rowData, 'MaterialGroup', 'Material Group', 'material_group', 'MATERIALGROUP');
+          
+          // Map Excel material group values to system values
+          const materialGroup = this.mapMaterialGroupFromExcel(rawMaterialGroup);
+          
+          // For plastic materials, MaterialGrade often contains the actual material name (like ABS)
           const material = getColumnValue(
             rowData, 
             'Material', 
             'MaterialDescription', 
             'Material Description', 
+            'MaterialGrade',  // Add MaterialGrade as a potential material field
+            'Material Grade',
             'material', 
             'material_description',
+            'material_grade',
             'MATERIAL',
-            'MATERIALDESCRIPTION'
+            'MATERIALDESCRIPTION',
+            'MATERIALGRADE'
           );
 
           // Validate required fields first
@@ -381,22 +417,17 @@ export class RawMaterialsController {
           const createDto: CreateRawMaterialDto = {
             materialGroup,
             material,
-            materialAbbreviation: getColumnValue(rowData, 'MaterialAbbreviation', 'Material Abbreviation', 'material_abbreviation', 'Abbr', 'Abbreviation'),
             materialGrade: getColumnValue(
               rowData, 
-              'MaterialGrade', 
-              'Material Grade', 
+              'Grade',
+              'Type',
               'MaterialType',
               'Material Type',
-              'material_grade', 
               'material_type',
-              'Grade',
-              'Type'
+              'Subtype',
+              'Category'
             ),
-            stockForm: getColumnValue(rowData, 'StockForm', 'Stock Form', 'stock_form', 'Form'),
-            matlState: getColumnValue(rowData, 'MatlState', 'Matl State', 'matl_state', 'State', 'Material State'),
-            application: getColumnValue(rowData, 'Application', 'application', 'APPLICATION'),
-            regrinding: getColumnValue(rowData, 'Regrinding', 'regrinding', 'REGRINDING'),
+            regrinding: this.convertBooleanToYesNo(getColumnValue(rowData, 'Regrinding', 'regrinding', 'REGRINDING')),
             regrindingPercentage: parseNumeric(getColumnValue(rowData, 'Regrinding%', 'Regrinding Percentage', 'regrinding_percentage', 'RegrindingPercentage')),
             clampingPressureMpa: parseNumeric(getColumnValue(rowData, 'Clamping Pressure (MPa)', 'ClampingPressureMpa', 'clamping_pressure_mpa', 'Clamping Pressure', 'Clamp Pressure (MPa)', 'Clamp Pressure')),
             ejectDeflectionTempC: parseNumeric(getColumnValue(rowData, 'Eject Deflection Temp (Â°C)', 'Eject Deflection Temp (°C)', 'Eject Temp (Â°C)', 'Eject Temp (°C)', 'EjectDeflectionTempC', 'eject_deflection_temp_c', 'Eject Temp')),
@@ -414,12 +445,18 @@ export class RawMaterialsController {
             )),
             specificHeatMelt: parseNumeric(specificHeatRaw),
             thermalConductivityMelt: parseNumeric(thermalCondRaw),
-            location: getColumnValue(rowData, 'Location', 'location', 'LOCATION'),
-            year: parseNumeric(getColumnValue(rowData, 'Year', 'year', 'YEAR')),
-            q1Cost: parseNumeric(getColumnValue(rowData, 'Q1', 'q1', 'Q1 Cost', 'q1_cost')),
-            q2Cost: parseNumeric(getColumnValue(rowData, 'Q2', 'q2', 'Q2 Cost', 'q2_cost')),
-            q3Cost: parseNumeric(getColumnValue(rowData, 'Q3', 'q3', 'Q3 Cost', 'q3_cost')),
-            q4Cost: parseNumeric(getColumnValue(rowData, 'Q4', 'q4', 'Q4 Cost', 'q4_cost')),
+            cost: parseNumeric(getColumnValue(rowData, 'Unit Cost ($)', 'Unit Cost', 'Cost', 'cost', 'COST', 'unit_cost', 'UnitCost')),
+            
+            // New material properties mapping with extensive column name matching
+            density: parseNumeric(getColumnValue(rowData, 'Density', 'density', 'DENSITY', 'Density (g/cm³)', 'Density g/cm³')),
+            ultimate_tensile_strength: parseNumeric(getColumnValue(rowData, 'UltimateTensileStrength', 'Ultimate Tensile Strength', 'UTS', 'UTS MPa', 'ultimate_tensile_strength', 'UTS_MPa')),
+            yield_tensile_strength: parseNumeric(getColumnValue(rowData, 'YeildTensileStrength', 'Yield Tensile Strength', 'YTS', 'YTS MPa', 'yield_tensile_strength', 'YTS_MPa')),
+            shearing_strength: parseNumeric(getColumnValue(rowData, 'ShearingStrength', 'Shearing Strength', 'Shear', 'Shear MPa', 'shearing_strength', 'Shear_MPa')),
+            astm_standard: getColumnValue(rowData, 'ASTM Standard', 'ASTM_Standard', 'astm_standard', 'ASTM', 'ASTMStandard'),
+            din_standard: getColumnValue(rowData, 'DIN Standard', 'DIN_Standard', 'din_standard', 'DIN', 'DINStandard'),
+            en_standard: getColumnValue(rowData, 'EN Standard', 'EN_Standard', 'en_standard', 'EN', 'ENStandard'),
+            jis_standard: getColumnValue(rowData, 'JIS Standard', 'JIS_Standard', 'jis_standard', 'JIS', 'JISStandard'),
+            shape: mapShapeValue(getColumnValue(rowData, 'Shape', 'shape', 'SHAPE')),
           };
 
           // Add to valid materials array for batch insert
@@ -485,5 +522,82 @@ export class RawMaterialsController {
     } catch (error) {
       throw new BadRequestException(`Failed to process Excel file: ${error.message}`);
     }
+  }
+
+  /**
+   * Converts boolean values from Excel to Yes/No strings for database constraints
+   */
+  private convertBooleanToYesNo(value: any): string | undefined {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+    
+    const str = String(value).toLowerCase().trim();
+    
+    // Handle boolean true/false values
+    if (value === true || str === 'true' || str === '1' || str === 'yes') {
+      return 'Yes';
+    }
+    
+    if (value === false || str === 'false' || str === '0' || str === 'no') {
+      return 'No';
+    }
+    
+    // Return original string if it's already in correct format
+    if (str === 'yes' || str === 'no') {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+    
+    // Default to undefined for invalid values
+    return undefined;
+  }
+
+  /**
+   * Maps Excel material group values to system material group values
+   */
+  private mapMaterialGroupFromExcel(excelMaterialGroup: string): string {
+    if (!excelMaterialGroup) {
+      return '';
+    }
+
+    const lowerGroup = excelMaterialGroup.toLowerCase().trim();
+
+    // Map Excel values to PLASTIC & RUBBER materials
+    if (lowerGroup.includes('plastic') || 
+        lowerGroup.includes('rubber') || 
+        lowerGroup.includes('polymer') || 
+        lowerGroup.includes('elastomer') ||
+        lowerGroup === 'plastics' ||
+        lowerGroup === 'plastic' ||
+        lowerGroup.includes('thermoplastic') ||
+        lowerGroup.includes('abs') ||
+        lowerGroup.includes('pvc') ||
+        lowerGroup.includes('pe') ||
+        lowerGroup.includes('pp')) {
+      return 'Plastic & Rubber';
+    }
+
+    // Map Excel values to FERROUS & NON-FERROUS materials  
+    if (lowerGroup.includes('ferrous') || 
+        lowerGroup.includes('steel') || 
+        lowerGroup.includes('iron') || 
+        lowerGroup.includes('metal') ||
+        lowerGroup.includes('aluminum') ||
+        lowerGroup.includes('copper') ||
+        lowerGroup.includes('titanium') ||
+        lowerGroup.includes('zinc') ||
+        lowerGroup.includes('brass') ||
+        lowerGroup.includes('bronze') ||
+        lowerGroup === 'ferrous' ||
+        lowerGroup === 'metals' ||
+        lowerGroup === 'alloy' ||
+        lowerGroup.includes('stainless')) {
+      return 'Ferrous & Non-Ferrous';
+    }
+
+    // If no mapping found, return the original value with proper case formatting
+    return excelMaterialGroup.split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   }
 }

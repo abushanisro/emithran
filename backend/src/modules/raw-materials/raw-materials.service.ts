@@ -33,18 +33,15 @@ export class RawMaterialsService {
       queryBuilder = queryBuilder.eq('material', query.material);
     }
 
-    if (query.location) {
-      queryBuilder = queryBuilder.eq('location', query.location);
+    if (query.country) {
+      queryBuilder = queryBuilder.eq('country', query.country);
     }
 
-    if (query.year) {
-      queryBuilder = queryBuilder.eq('year', query.year);
-    }
 
     // Search across multiple fields
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_abbreviation.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
+        `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
       );
     }
 
@@ -68,16 +65,15 @@ export class RawMaterialsService {
   async getFilterOptions(userId?: string, accessToken?: string): Promise<{
     materialGroups: string[];
     materialTypes: string[];
-    locations: string[];
+    countries: string[];
     grades: string[];
-    years: number[];
   }> {
     this.logger.log('Fetching filter options', 'RawMaterialsService');
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material_group, material, location, material_grade, year');
+      .select('material_group, material, material_grade, country, shape');
 
     if (error) {
       this.logger.error(`Error fetching filter options: ${error.message}`, 'RawMaterialsService');
@@ -87,16 +83,14 @@ export class RawMaterialsService {
     // Extract unique values
     const materialGroups = [...new Set(data.map(m => m.material_group).filter(Boolean))].sort();
     const materialTypes = [...new Set(data.map(m => m.material).filter(Boolean))].sort();
-    const locations = [...new Set(data.map(m => m.location).filter(Boolean))].sort();
+    const countries = [...new Set(data.map(m => m.country).filter(Boolean))].sort();
     const grades = [...new Set(data.map(m => m.material_grade).filter(Boolean))].sort();
-    const years = [...new Set(data.map(m => m.year).filter(Boolean))].sort((a, b) => b - a);
 
     return {
       materialGroups,
       materialTypes,
-      locations,
+      countries,
       grades,
-      years,
     };
   }
 
@@ -127,8 +121,9 @@ export class RawMaterialsService {
       .insert({
         material_group: createRawMaterialDto.materialGroup,
         material: createRawMaterialDto.material,
-        material_abbreviation: createRawMaterialDto.materialAbbreviation,
         material_grade: createRawMaterialDto.materialGrade,
+        material_type: createRawMaterialDto.materialType,
+        material_description: createRawMaterialDto.materialDescription,
         stock_form: createRawMaterialDto.stockForm,
         matl_state: createRawMaterialDto.matlState,
         application: createRawMaterialDto.application,
@@ -142,11 +137,19 @@ export class RawMaterialsService {
         specific_heat_melt: createRawMaterialDto.specificHeatMelt,
         thermal_conductivity_melt: createRawMaterialDto.thermalConductivityMelt,
         location: createRawMaterialDto.location,
-        year: createRawMaterialDto.year,
-        q1_cost: createRawMaterialDto.q1Cost,
-        q2_cost: createRawMaterialDto.q2Cost,
-        q3_cost: createRawMaterialDto.q3Cost,
-        q4_cost: createRawMaterialDto.q4Cost,
+        cost: createRawMaterialDto.cost || createRawMaterialDto.unitCost,
+        currency: createRawMaterialDto.currency,
+        // Additional properties
+        density: createRawMaterialDto.density,
+        ultimate_tensile_strength: createRawMaterialDto.ultimate_tensile_strength,
+        yield_tensile_strength: createRawMaterialDto.yield_tensile_strength,
+        shearing_strength: createRawMaterialDto.shearing_strength,
+        astm_standard: createRawMaterialDto.astm_standard,
+        din_standard: createRawMaterialDto.din_standard,
+        en_standard: createRawMaterialDto.en_standard,
+        jis_standard: createRawMaterialDto.jis_standard,
+        country: createRawMaterialDto.country,
+        shape: createRawMaterialDto.shape,
         user_id: userId,
       })
       .select()
@@ -175,8 +178,9 @@ export class RawMaterialsService {
     const records = materials.map(dto => ({
       material_group: dto.materialGroup,
       material: dto.material,
-      material_abbreviation: dto.materialAbbreviation,
       material_grade: dto.materialGrade,
+      material_type: dto.materialType,
+      material_description: dto.materialDescription,
       stock_form: dto.stockForm,
       matl_state: dto.matlState,
       application: dto.application,
@@ -190,11 +194,19 @@ export class RawMaterialsService {
       specific_heat_melt: dto.specificHeatMelt,
       thermal_conductivity_melt: dto.thermalConductivityMelt,
       location: dto.location,
-      year: dto.year,
-      q1_cost: dto.q1Cost,
-      q2_cost: dto.q2Cost,
-      q3_cost: dto.q3Cost,
-      q4_cost: dto.q4Cost,
+      cost: dto.cost || dto.unitCost,
+      currency: dto.currency,
+      // Additional properties
+      density: dto.density,
+      ultimate_tensile_strength: dto.ultimate_tensile_strength,
+      yield_tensile_strength: dto.yield_tensile_strength,
+      shearing_strength: dto.shearing_strength,
+      astm_standard: dto.astm_standard,
+      din_standard: dto.din_standard,
+      en_standard: dto.en_standard,
+      jis_standard: dto.jis_standard,
+      country: dto.country,
+      shape: dto.shape,
       user_id: userId,
     }));
 
@@ -220,28 +232,56 @@ export class RawMaterialsService {
     await this.findOne(id, userId, accessToken);
 
     const updateData: any = {};
-    if (updateRawMaterialDto.materialGroup !== undefined) updateData.material_group = updateRawMaterialDto.materialGroup;
-    if (updateRawMaterialDto.material !== undefined) updateData.material = updateRawMaterialDto.material;
-    if (updateRawMaterialDto.materialAbbreviation !== undefined) updateData.material_abbreviation = updateRawMaterialDto.materialAbbreviation;
-    if (updateRawMaterialDto.materialGrade !== undefined) updateData.material_grade = updateRawMaterialDto.materialGrade;
-    if (updateRawMaterialDto.stockForm !== undefined) updateData.stock_form = updateRawMaterialDto.stockForm;
-    if (updateRawMaterialDto.matlState !== undefined) updateData.matl_state = updateRawMaterialDto.matlState;
-    if (updateRawMaterialDto.application !== undefined) updateData.application = updateRawMaterialDto.application;
-    if (updateRawMaterialDto.regrinding !== undefined) updateData.regrinding = updateRawMaterialDto.regrinding;
-    if (updateRawMaterialDto.regrindingPercentage !== undefined) updateData.regrinding_percentage = updateRawMaterialDto.regrindingPercentage;
-    if (updateRawMaterialDto.clampingPressureMpa !== undefined) updateData.clamping_pressure_mpa = updateRawMaterialDto.clampingPressureMpa;
-    if (updateRawMaterialDto.ejectDeflectionTempC !== undefined) updateData.eject_deflection_temp_c = updateRawMaterialDto.ejectDeflectionTempC;
-    if (updateRawMaterialDto.meltingTempC !== undefined) updateData.melting_temp_c = updateRawMaterialDto.meltingTempC;
-    if (updateRawMaterialDto.moldTempC !== undefined) updateData.mold_temp_c = updateRawMaterialDto.moldTempC;
-    if (updateRawMaterialDto.densityKgM3 !== undefined) updateData.density_kg_m3 = updateRawMaterialDto.densityKgM3;
-    if (updateRawMaterialDto.specificHeatMelt !== undefined) updateData.specific_heat_melt = updateRawMaterialDto.specificHeatMelt;
-    if (updateRawMaterialDto.thermalConductivityMelt !== undefined) updateData.thermal_conductivity_melt = updateRawMaterialDto.thermalConductivityMelt;
-    if (updateRawMaterialDto.location !== undefined) updateData.location = updateRawMaterialDto.location;
-    if (updateRawMaterialDto.year !== undefined) updateData.year = updateRawMaterialDto.year;
-    if (updateRawMaterialDto.q1Cost !== undefined) updateData.q1_cost = updateRawMaterialDto.q1Cost;
-    if (updateRawMaterialDto.q2Cost !== undefined) updateData.q2_cost = updateRawMaterialDto.q2Cost;
-    if (updateRawMaterialDto.q3Cost !== undefined) updateData.q3_cost = updateRawMaterialDto.q3Cost;
-    if (updateRawMaterialDto.q4Cost !== undefined) updateData.q4_cost = updateRawMaterialDto.q4Cost;
+    
+    // Helper function to handle string fields - convert empty strings to null
+    const handleStringField = (value: string | undefined): string | null | undefined => {
+      if (value === undefined) return undefined;
+      if (value === '') return null;
+      return value;
+    };
+    
+    // Helper function to handle number fields - convert empty strings/undefined to null
+    const handleNumberField = (value: number | undefined): number | null | undefined => {
+      if (value === undefined) return undefined;
+      if (value === null) return null;
+      return value;
+    };
+    
+    if (updateRawMaterialDto.materialGroup !== undefined) updateData.material_group = handleStringField(updateRawMaterialDto.materialGroup);
+    if (updateRawMaterialDto.material !== undefined) updateData.material = handleStringField(updateRawMaterialDto.material);
+    if (updateRawMaterialDto.materialGrade !== undefined) updateData.material_grade = handleStringField(updateRawMaterialDto.materialGrade);
+    if (updateRawMaterialDto.materialType !== undefined) updateData.material_type = handleStringField(updateRawMaterialDto.materialType);
+    if (updateRawMaterialDto.materialDescription !== undefined) updateData.material_description = handleStringField(updateRawMaterialDto.materialDescription);
+    if (updateRawMaterialDto.stockForm !== undefined) updateData.stock_form = handleStringField(updateRawMaterialDto.stockForm);
+    if (updateRawMaterialDto.matlState !== undefined) updateData.matl_state = handleStringField(updateRawMaterialDto.matlState);
+    if (updateRawMaterialDto.application !== undefined) updateData.application = handleStringField(updateRawMaterialDto.application);
+    if (updateRawMaterialDto.regrinding !== undefined) updateData.regrinding = handleStringField(updateRawMaterialDto.regrinding);
+    if (updateRawMaterialDto.regrindingPercentage !== undefined) updateData.regrinding_percentage = handleNumberField(updateRawMaterialDto.regrindingPercentage);
+    if (updateRawMaterialDto.clampingPressureMpa !== undefined) updateData.clamping_pressure_mpa = handleNumberField(updateRawMaterialDto.clampingPressureMpa);
+    if (updateRawMaterialDto.ejectDeflectionTempC !== undefined) updateData.eject_deflection_temp_c = handleNumberField(updateRawMaterialDto.ejectDeflectionTempC);
+    if (updateRawMaterialDto.meltingTempC !== undefined) updateData.melting_temp_c = handleNumberField(updateRawMaterialDto.meltingTempC);
+    if (updateRawMaterialDto.moldTempC !== undefined) updateData.mold_temp_c = handleNumberField(updateRawMaterialDto.moldTempC);
+    if (updateRawMaterialDto.densityKgM3 !== undefined) updateData.density_kg_m3 = handleNumberField(updateRawMaterialDto.densityKgM3);
+    if (updateRawMaterialDto.specificHeatMelt !== undefined) updateData.specific_heat_melt = handleNumberField(updateRawMaterialDto.specificHeatMelt);
+    if (updateRawMaterialDto.thermalConductivityMelt !== undefined) updateData.thermal_conductivity_melt = handleNumberField(updateRawMaterialDto.thermalConductivityMelt);
+    if (updateRawMaterialDto.location !== undefined) updateData.location = handleStringField(updateRawMaterialDto.location);
+    if (updateRawMaterialDto.cost !== undefined) updateData.cost = handleNumberField(updateRawMaterialDto.cost);
+    if (updateRawMaterialDto.unitCost !== undefined) updateData.cost = handleNumberField(updateRawMaterialDto.unitCost);
+    if (updateRawMaterialDto.currency !== undefined) updateData.currency = updateRawMaterialDto.currency;
+    
+    // Update additional properties
+    if (updateRawMaterialDto.density !== undefined) updateData.density = handleNumberField(updateRawMaterialDto.density);
+    if (updateRawMaterialDto.ultimate_tensile_strength !== undefined) updateData.ultimate_tensile_strength = handleNumberField(updateRawMaterialDto.ultimate_tensile_strength);
+    if (updateRawMaterialDto.yield_tensile_strength !== undefined) updateData.yield_tensile_strength = handleNumberField(updateRawMaterialDto.yield_tensile_strength);
+    if (updateRawMaterialDto.shearing_strength !== undefined) updateData.shearing_strength = handleNumberField(updateRawMaterialDto.shearing_strength);
+    if (updateRawMaterialDto.astm_standard !== undefined) updateData.astm_standard = handleStringField(updateRawMaterialDto.astm_standard);
+    if (updateRawMaterialDto.din_standard !== undefined) updateData.din_standard = handleStringField(updateRawMaterialDto.din_standard);
+    if (updateRawMaterialDto.en_standard !== undefined) updateData.en_standard = handleStringField(updateRawMaterialDto.en_standard);
+    if (updateRawMaterialDto.jis_standard !== undefined) updateData.jis_standard = handleStringField(updateRawMaterialDto.jis_standard);
+    if (updateRawMaterialDto.country !== undefined) updateData.country = handleStringField(updateRawMaterialDto.country);
+    if (updateRawMaterialDto.shape !== undefined) updateData.shape = handleStringField(updateRawMaterialDto.shape);
+
+    this.logger.debug(`Update data to be sent to database: ${JSON.stringify(updateData, null, 2)}`, 'RawMaterialsService');
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
@@ -429,7 +469,7 @@ export class RawMaterialsService {
         totalMaterials: plasticRubberStats.totalMaterials + ferrousStats.totalMaterials,
         categoryCounts: {
           [MATERIAL_CATEGORY_LABELS.PLASTIC_RUBBER]: plasticRubberStats.totalMaterials,
-          [MATERIAL_CATEGORY_LABELS.FERROUS]: ferrousStats.totalMaterials,
+          [MATERIAL_CATEGORY_LABELS.FERROUS_NON_FERROUS]: ferrousStats.totalMaterials,
         },
       },
     };

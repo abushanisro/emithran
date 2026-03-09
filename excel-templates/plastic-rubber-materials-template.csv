@@ -1,0 +1,9 @@
+MaterialGroup,Material,MaterialType,MaterialDescription,Shape,Country,Currency,Regrinding,Regrinding%,Clamping Pressure (MPa),Eject Deflection Temp (°C),Melting Temp (°C),Mold Temp (°C),Density (kg/m³),Specific Heat of Melt (J / g * °C),Thermal Conductivity of Melt (Watts / m * °C),Unit Cost ($),Year
+Plastic & Rubber,Acrylonitrile Butadiene Styrene,Thermoplastic,High-impact ABS plastic for automotive applications,GRANULES,INDIA,INR,Yes,10,49.4,85,240,70,1040,1.8,0.127,135.50,2024
+Plastic & Rubber,Polypropylene,Thermoplastic,General purpose PP for packaging,PELLETS,INDIA,INR,No,0,35.2,78,180,45,905,2.1,0.145,95.75,2024
+Plastic & Rubber,Polyethylene,Thermoplastic,HDPE for containers and pipes,GRANULES,US,USD,Yes,15,28.5,65,130,35,965,2.3,0.155,1.25,2024
+Plastic & Rubber,Polystyrene,Thermoplastic,Crystal clear PS for disposables,PELLETS,CHINA,CNY,No,0,42.1,88,220,55,1050,1.6,0.115,8.45,2024
+Plastic & Rubber,PVC,Thermoplastic,Rigid PVC for pipes and fittings,POWDER,WESTERN_EUROPE,EUR,Yes,5,55.8,92,200,65,1380,1.4,0.095,2.15,2024
+Plastic & Rubber,Nylon 6,Engineering Plastic,PA6 for gears and bearings,PELLETS,INDIA,INR,Yes,20,85.4,105,270,85,1140,1.9,0.135,245.30,2024
+Plastic & Rubber,Polyurethane,Elastomer,Flexible PU foam for cushioning,FOAM,US,USD,No,0,15.2,45,180,25,1200,1.7,0.105,3.85,2024
+Plastic & Rubber,Silicone Rubber,Elastomer,High temp silicone for seals,LIQUID,NORTHERN_EUROPE,EUR,No,0,8.5,35,150,45,1100,1.5,0.088,12.50,2024

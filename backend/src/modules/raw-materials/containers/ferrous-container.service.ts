@@ -7,7 +7,7 @@ import { RawMaterialResponseDto } from '../dto/raw-material-response.dto';
 
 @Injectable()
 export class FerrousContainerService {
-  private readonly category = MaterialCategory.FERROUS;
+  private readonly category = MaterialCategory.FERROUS_NON_FERROUS;
 
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -76,7 +76,6 @@ export class FerrousContainerService {
     const materialData = {
       material_group: this.ensureFerrousCategory(createDto.materialGroup),
       material: createDto.material,
-      material_abbreviation: createDto.materialAbbreviation,
       material_grade: createDto.materialGrade,
       stock_form: createDto.stockForm,
       matl_state: createDto.matlState,
@@ -86,11 +85,7 @@ export class FerrousContainerService {
       thermal_conductivity_melt: createDto.thermalConductivityMelt,
       melting_temp_c: createDto.meltingTempC,
       location: createDto.location,
-      year: createDto.year,
-      q1_cost: createDto.q1Cost,
-      q2_cost: createDto.q2Cost,
-      q3_cost: createDto.q3Cost,
-      q4_cost: createDto.q4Cost,
+      cost: createDto.cost,
       user_id: userId,
     };
 
@@ -144,7 +139,7 @@ export class FerrousContainerService {
   async getFerrousStatistics(userId: string, accessToken: string): Promise<{
     totalMaterials: number;
     byGrade: Record<string, number>;
-    averageCosts: { q1: number; q2: number; q3: number; q4: number };
+    averageCost: number;
     locations: string[];
     compositionData: { material: string; grade: string; density: number }[];
   }> {
@@ -153,7 +148,7 @@ export class FerrousContainerService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material, material_grade, location, density_kg_m3, q1_cost, q2_cost, q3_cost, q4_cost')
+      .select('material, material_grade, location, density_kg_m3, cost')
       .or('material_group.ilike.%ferrous%,material_group.ilike.%steel%,material_group.ilike.%iron%,material_group.ilike.%metal%');
 
     if (error) {
@@ -162,17 +157,14 @@ export class FerrousContainerService {
 
     const materials = data || [];
     const byGrade: Record<string, number> = {};
-    let totalQ1 = 0, totalQ2 = 0, totalQ3 = 0, totalQ4 = 0;
+    let totalCost = 0;
     let costCount = 0;
 
     materials.forEach(material => {
       const grade = material.material_grade || 'Unknown';
       byGrade[grade] = (byGrade[grade] || 0) + 1;
 
-      if (material.q1_cost) { totalQ1 += parseFloat(material.q1_cost); costCount++; }
-      if (material.q2_cost) totalQ2 += parseFloat(material.q2_cost);
-      if (material.q3_cost) totalQ3 += parseFloat(material.q3_cost);
-      if (material.q4_cost) totalQ4 += parseFloat(material.q4_cost);
+      if (material.cost) { totalCost += parseFloat(material.cost); costCount++; }
     });
 
     const locations = [...new Set(materials.map(m => m.location).filter(Boolean))];
@@ -188,12 +180,7 @@ export class FerrousContainerService {
     return {
       totalMaterials: materials.length,
       byGrade,
-      averageCosts: {
-        q1: costCount > 0 ? totalQ1 / costCount : 0,
-        q2: costCount > 0 ? totalQ2 / costCount : 0,
-        q3: costCount > 0 ? totalQ3 / costCount : 0,
-        q4: costCount > 0 ? totalQ4 / costCount : 0,
-      },
+      averageCost: costCount > 0 ? totalCost / costCount : 0,
       locations,
       compositionData,
     };
@@ -243,7 +230,6 @@ export class FerrousContainerService {
     return {
       materialGroup: 'Ferrous Materials',
       material: row.Material || row.material || '',
-      materialAbbreviation: row.Abbreviation || row.abbreviation || '',
       materialGrade: row.Grade || row.grade || '',
       stockForm: row.StockForm || row.stock_form || '',
       matlState: row.State || row.state || '',
@@ -253,11 +239,7 @@ export class FerrousContainerService {
       thermalConductivityMelt: this.parseNumber(row.ThermalConductivity || row.thermal_conductivity),
       meltingTempC: this.parseNumber(row.MeltingPoint || row.melting_point),
       location: row.Location || row.location || '',
-      year: this.parseNumber(row.Year || row.year) || new Date().getFullYear(),
-      q1Cost: this.parseNumber(row.Q1Cost || row.q1_cost),
-      q2Cost: this.parseNumber(row.Q2Cost || row.q2_cost),
-      q3Cost: this.parseNumber(row.Q3Cost || row.q3_cost),
-      q4Cost: this.parseNumber(row.Q4Cost || row.q4_cost),
+      cost: this.parseNumber(row.Cost || row.cost || row.unit_cost),
     };
   }
 
@@ -271,15 +253,12 @@ export class FerrousContainerService {
     if (query.material) {
       queryBuilder = queryBuilder.eq('material', query.material);
     }
-    if (query.location) {
-      queryBuilder = queryBuilder.eq('location', query.location);
-    }
-    if (query.year) {
-      queryBuilder = queryBuilder.eq('year', query.year);
+    if (query.country) {
+      queryBuilder = queryBuilder.eq('country', query.country);
     }
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `material.ilike.%${query.search}%,material_abbreviation.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
+        `material.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
       );
     }
     return queryBuilder;

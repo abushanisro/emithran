@@ -76,7 +76,6 @@ export class PlasticRubberContainerService {
     const materialData = {
       material_group: this.ensurePlasticRubberCategory(createDto.materialGroup),
       material: createDto.material,
-      material_abbreviation: createDto.materialAbbreviation,
       material_grade: createDto.materialGrade,
       stock_form: createDto.stockForm,
       matl_state: createDto.matlState,
@@ -91,11 +90,7 @@ export class PlasticRubberContainerService {
       specific_heat_melt: createDto.specificHeatMelt,
       thermal_conductivity_melt: createDto.thermalConductivityMelt,
       location: createDto.location,
-      year: createDto.year,
-      q1_cost: createDto.q1Cost,
-      q2_cost: createDto.q2Cost,
-      q3_cost: createDto.q3Cost,
-      q4_cost: createDto.q4Cost,
+      cost: createDto.cost,
       user_id: userId,
     };
 
@@ -149,7 +144,7 @@ export class PlasticRubberContainerService {
   async getPlasticRubberStatistics(userId: string, accessToken: string): Promise<{
     totalMaterials: number;
     bySubtype: Record<string, number>;
-    averageCosts: { q1: number; q2: number; q3: number; q4: number };
+    averageCost: number;
     locations: string[];
   }> {
     this.logger.log('Fetching plastic & rubber statistics', 'PlasticRubberContainerService');
@@ -157,7 +152,7 @@ export class PlasticRubberContainerService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material_grade, location, q1_cost, q2_cost, q3_cost, q4_cost')
+      .select('material_grade, location, cost')
       .or('material_group.ilike.%plastic%,material_group.ilike.%rubber%,material_group.ilike.%polymer%,material_group.ilike.%elastomer%');
 
     if (error) {
@@ -166,17 +161,14 @@ export class PlasticRubberContainerService {
 
     const materials = data || [];
     const bySubtype: Record<string, number> = {};
-    let totalQ1 = 0, totalQ2 = 0, totalQ3 = 0, totalQ4 = 0;
+    let totalCost = 0;
     let costCount = 0;
 
     materials.forEach(material => {
       const subtype = material.material_grade || 'Unknown';
       bySubtype[subtype] = (bySubtype[subtype] || 0) + 1;
 
-      if (material.q1_cost) { totalQ1 += parseFloat(material.q1_cost); costCount++; }
-      if (material.q2_cost) totalQ2 += parseFloat(material.q2_cost);
-      if (material.q3_cost) totalQ3 += parseFloat(material.q3_cost);
-      if (material.q4_cost) totalQ4 += parseFloat(material.q4_cost);
+      if (material.cost) { totalCost += parseFloat(material.cost); costCount++; }
     });
 
     const locations = [...new Set(materials.map(m => m.location).filter(Boolean))];
@@ -184,12 +176,7 @@ export class PlasticRubberContainerService {
     return {
       totalMaterials: materials.length,
       bySubtype,
-      averageCosts: {
-        q1: costCount > 0 ? totalQ1 / costCount : 0,
-        q2: costCount > 0 ? totalQ2 / costCount : 0,
-        q3: costCount > 0 ? totalQ3 / costCount : 0,
-        q4: costCount > 0 ? totalQ4 / costCount : 0,
-      },
+      averageCost: costCount > 0 ? totalCost / costCount : 0,
       locations,
     };
   }
@@ -215,11 +202,8 @@ export class PlasticRubberContainerService {
     if (query.material) {
       queryBuilder = queryBuilder.eq('material', query.material);
     }
-    if (query.location) {
-      queryBuilder = queryBuilder.eq('location', query.location);
-    }
-    if (query.year) {
-      queryBuilder = queryBuilder.eq('year', query.year);
+    if (query.country) {
+      queryBuilder = queryBuilder.eq('country', query.country);
     }
     if (query.search) {
       queryBuilder = queryBuilder.or(
