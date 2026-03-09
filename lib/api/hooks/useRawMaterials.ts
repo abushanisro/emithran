@@ -68,7 +68,6 @@ export interface QueryRawMaterialsParams {
   materialGroup?: string;
   materialCategory?: MaterialCategory;
   material?: string;
-  location?: string;
   country?: Country;
   currency?: Currency;
   shape?: MaterialShape;
@@ -88,13 +87,8 @@ export interface QueryRawMaterialsParams {
 export interface CreateRawMaterialData {
   materialGroup: string;
   material: string;
-  materialAbbreviation?: string;
-  materialGrade?: string;
   materialType?: string;
   materialDescription?: string;
-  stockForm?: string;
-  matlState?: string;
-  application?: string;
   regrinding?: string;
   regrindingPercentage?: number;
   clampingPressureMpa?: number;
@@ -104,7 +98,6 @@ export interface CreateRawMaterialData {
   densityKgM3?: number;
   specificHeatMelt?: number;
   thermalConductivityMelt?: number;
-  location?: string;
   year?: number;
   unitCost?: number;
   currency?: Currency;
@@ -170,11 +163,9 @@ export function useRawMaterialFilterOptions() {
         materialGroups: string[];
         materialCategories: MaterialCategory[];
         materialTypes: string[];
-        locations: string[];
         countries: Country[];
         currencies: Currency[];
         shapes: MaterialShape[];
-        grades: string[];
         years: number[];
         costRange: { min: number; max: number };
         densityRange: { min: number; max: number };
