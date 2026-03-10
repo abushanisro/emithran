@@ -168,8 +168,8 @@ export class RawMaterialCostService {
       material_category: createDto.materialCategory || '',
       material_type: createDto.materialType || '',
       material_group: createDto.materialGroup || '',
-      material_grade: createDto.materialGrade || '',
-      location: createDto.location || '',
+      material_description: createDto.materialDescription || '',
+      country: createDto.country || '',
       quarter: createDto.quarter || 'q1',
 
       // Cost Information
@@ -285,8 +285,8 @@ export class RawMaterialCostService {
     if (updateDto.materialCategory !== undefined) updateData.material_category = updateDto.materialCategory;
     if (updateDto.materialType !== undefined) updateData.material_type = updateDto.materialType;
     if (updateDto.materialGroup !== undefined) updateData.material_group = updateDto.materialGroup;
-    if (updateDto.materialGrade !== undefined) updateData.material_grade = updateDto.materialGrade;
-    if (updateDto.location !== undefined) updateData.location = updateDto.location;
+    if (updateDto.materialDescription !== undefined) updateData.material_description = updateDto.materialDescription;
+    if (updateDto.country !== undefined) updateData.country = updateDto.country;
     if (updateDto.quarter !== undefined) updateData.quarter = updateDto.quarter;
     if (updateDto.materialCostId !== undefined) updateData.material_cost_id = updateDto.materialCostId;
     if (updateDto.costName !== undefined) updateData.cost_name = updateDto.costName;

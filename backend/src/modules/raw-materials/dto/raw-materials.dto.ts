@@ -158,6 +158,26 @@ export class CreateRawMaterialDto {
   @IsOptional()
   @IsString()
   country?: string;
+
+  @ApiPropertyOptional({ example: 'Sheet' })
+  @IsOptional()
+  @IsString()
+  stockForm?: string;
+
+  @ApiPropertyOptional({ example: 'Solid' })
+  @IsOptional()
+  @IsString()
+  matlState?: string;
+
+  @ApiPropertyOptional({ example: 'Industrial' })
+  @IsOptional()
+  @IsString()
+  application?: string;
+
+  @ApiPropertyOptional({ example: 'Warehouse A' })
+  @IsOptional()
+  @IsString()
+  location?: string;
 }
 
 export class UpdateRawMaterialDto extends PartialType(CreateRawMaterialDto) {}

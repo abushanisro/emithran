@@ -61,15 +61,15 @@ export class CreateRawMaterialCostDto {
   @IsString()
   materialGroup?: string;
 
-  @ApiPropertyOptional({ description: 'Material grade', example: 'PP-H' })
+  @ApiPropertyOptional({ description: 'Material description', example: 'High-impact ABS plastic for automotive applications' })
   @IsOptional()
   @IsString()
-  materialGrade?: string;
+  materialDescription?: string;
 
-  @ApiPropertyOptional({ description: 'Location', example: 'India' })
+  @ApiPropertyOptional({ description: 'Country', example: 'INDIA' })
   @IsOptional()
   @IsString()
-  location?: string;
+  country?: string;
 
   @ApiPropertyOptional({ description: 'Quarter', example: 'q1' })
   @IsOptional()
@@ -198,15 +198,15 @@ export class UpdateRawMaterialCostDto {
   @IsString()
   materialGroup?: string;
 
-  @ApiPropertyOptional({ description: 'Material grade' })
+  @ApiPropertyOptional({ description: 'Material description' })
   @IsOptional()
   @IsString()
-  materialGrade?: string;
+  materialDescription?: string;
 
-  @ApiPropertyOptional({ description: 'Location' })
+  @ApiPropertyOptional({ description: 'Country' })
   @IsOptional()
   @IsString()
-  location?: string;
+  country?: string;
 
   @ApiPropertyOptional({ description: 'Quarter' })
   @IsOptional()
@@ -372,14 +372,14 @@ export class RawMaterialCostResponseDto {
   @ApiProperty({ description: 'Material group' })
   materialGroup: string;
 
-  @ApiProperty({ description: 'Material grade' })
-  materialGrade: string;
+  @ApiProperty({ description: 'Material description' })
+  materialDescription: string;
 
   @ApiProperty({ description: 'Material ID' })
   materialId: string;
 
-  @ApiProperty({ description: 'Location' })
-  location: string;
+  @ApiProperty({ description: 'Country' })
+  country: string;
 
   @ApiProperty({ description: 'Quarter' })
   quarter: string;
@@ -472,9 +472,9 @@ export class RawMaterialCostResponseDto {
       materialCategory: row.material_category || '',
       materialType: row.material_type || '',
       materialGroup: row.material_group || '',
-      materialGrade: row.material_grade || '',
+      materialDescription: row.material_description || '',
       materialId: row.material_id || '',
-      location: row.location || '',
+      country: row.country || '',
       quarter: row.quarter || 'q1',
       costName: row.cost_name || '',
       unitCost: parseFloat(row.unit_cost) || 0,

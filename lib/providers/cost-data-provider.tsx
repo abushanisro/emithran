@@ -25,6 +25,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
   const [bomCosts, setBomCosts] = useState<Map<string, CostCalculationResult[]>>(new Map());
   const [aggregatedData, setAggregatedData] = useState<Map<string, any>>(new Map());
   const [isCalculating, setIsCalculating] = useState(false);
+  const [calculatingBoms, setCalculatingBoms] = useState<Set<string>>(new Set());
 
   /**
    * Calculate real cost data for a BOM item using backend services
@@ -34,10 +35,11 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
       // If item has user-provided cost data, use it
       if (bomItem.unitCost && bomItem.unitCost > 0) {
         const totalCost = bomItem.unitCost * bomItem.quantity;
+        const toolingCostAmount = totalCost * 0.05; // 5% tooling
         const breakdown = {
           rawMaterialCost: totalCost * 0.4, // Assume 40% raw materials
           processCost: totalCost * 0.3, // Assume 30% processing
-          toolingCost: totalCost * 0.05, // Assume 5% tooling
+          toolingCost: toolingCostAmount, // 5% tooling
           packagingLogisticsCost: totalCost * 0.1, // Assume 10% packaging/logistics
           procuredPartsCost: totalCost * 0.15, // Assume 15% procured parts
           overheadCost: totalCost * 0.15, // 15% overhead
@@ -104,7 +106,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
             machineRate: 8.5,
             laborRate: 4.2,
             setupCost: processTotal * 0.1,
-            toolingCost: processTotal * 0.1,
+            toolingCost: toolingTotal, // Use actual fetched tooling cost
             totalCost: processTotal,
           }
         ],
@@ -224,6 +226,12 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    * Calculate comprehensive cost data for a BOM
    */
   const calculateBomCosts = async (bomId: string, itemCount?: number): Promise<void> => {
+    // Prevent multiple simultaneous calculations for the same BOM
+    if (calculatingBoms.has(bomId) || isCalculating) {
+      return;
+    }
+
+    setCalculatingBoms(prev => new Set(prev).add(bomId));
     setIsCalculating(true);
     
     try {
@@ -257,7 +265,13 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
       
     } catch (error) {
       // Cost calculation failed
+      console.error('Cost calculation failed:', error);
     } finally {
+      setCalculatingBoms(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(bomId);
+        return newSet;
+      });
       setIsCalculating(false);
     }
   };

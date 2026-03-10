@@ -23,6 +23,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { FileStorageService } from './services/file-storage.service';
 import { StepConverterService } from './services/step-converter.service';
+import { CADAnalysisService } from './services/cad-analysis.service';
 import axios from 'axios';
 
 @ApiTags('BOM Items')
@@ -35,6 +36,7 @@ export class BOMItemsController {
     private readonly bomItemsService: BOMItemsService,
     private readonly fileStorageService: FileStorageService,
     private readonly stepConverterService: StepConverterService,
+    private readonly cadAnalysisService: CADAnalysisService,
   ) {}
 
   @Get()
@@ -332,6 +334,241 @@ export class BOMItemsController {
     return this.bomItemsService.update(id, updateData, user.id, token);
   }
 
+  // ============================================================================
+  // CAD ANALYSIS ENDPOINTS
+  // ============================================================================
 
+  @Post(':id/analyze-cad')
+  @ApiOperation({ summary: 'Perform advanced CAD analysis on BOM item' })
+  @ApiResponse({ status: 200, description: 'CAD analysis completed successfully' })
+  @ApiResponse({ status: 400, description: 'No 3D file found or invalid request' })
+  @ApiResponse({ status: 500, description: 'CAD analysis failed' })
+  async analyzeBOMItemCAD(
+    @Param('id') id: string,
+    @Body() body: { 
+      strategy?: 'aggressive' | 'balanced' | 'conservative';
+      forceReanalysis?: boolean;
+    },
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    try {
+      // Get BOM item to check for 3D file
+      const bomItem = await this.bomItemsService.findOne(id, user.id, token);
+      
+      if (!bomItem.file3dPath) {
+        throw new BadRequestException('No 3D file found for this BOM item. Please upload a STEP/IGES file first.');
+      }
+
+      // Perform CAD analysis
+      const analysisResult = await this.cadAnalysisService.analyzeBOMItem({
+        bomItemId: id,
+        filePath: bomItem.file3dPath,
+        strategy: body.strategy || 'balanced',
+        forceReanalysis: body.forceReanalysis || false,
+        userId: user.id,
+        accessToken: token
+      });
+
+      this.logger.log(`CAD analysis completed for BOM item: ${bomItem.partNumber || id}`);
+
+      return {
+        success: true,
+        message: `CAD analysis completed for ${bomItem.partNumber || 'BOM item'}`,
+        analysis: analysisResult
+      };
+
+    } catch (error) {
+      this.logger.error(`CAD analysis failed for BOM item ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  @Get(':id/cad-analysis')
+  @ApiOperation({ summary: 'Get CAD analysis results for BOM item' })
+  @ApiResponse({ status: 200, description: 'CAD analysis results retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'BOM item or analysis not found' })
+  async getBOMItemCADAnalysis(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    try {
+      const analysis = await this.cadAnalysisService.getBOMItemAnalysis(id, token);
+      
+      if (!analysis) {
+        throw new BadRequestException('No CAD analysis found for this BOM item. Please run analysis first.');
+      }
+
+      return {
+        success: true,
+        analysis: {
+          id: analysis.id,
+          partNumber: analysis.part_number,
+          analysisTimestamp: analysis.analysis_timestamp,
+          analysisVersion: analysis.analysis_version,
+          optimizationStrategy: analysis.optimization_strategy,
+          
+          // Geometry features
+          geometryFeatures: {
+            volumeMm3: analysis.volume_mm3,
+            surfaceAreaMm2: analysis.surface_area_mm2,
+            complexityScore: analysis.complexity_score,
+            fullAnalysis: analysis.geometry_analysis
+          },
+          
+          // DFM analysis
+          dfmAnalysis: {
+            manufacturabilityScore: analysis.manufacturability_score,
+            difficultyLevel: analysis.difficulty_level,
+            recommendedProcesses: analysis.recommended_processes,
+            warnings: analysis.warnings_details,
+            fullAnalysis: analysis.dfm_analysis
+          },
+          
+          // Memory optimization
+          memoryOptimization: {
+            memoryReductionPercent: analysis.memory_reduction_percent,
+            processingTimeMs: analysis.processing_time_ms,
+            lodLevelsAvailable: analysis.lod_levels_available,
+            fullMetrics: analysis.memory_optimization_metrics
+          },
+          
+          // Analysis freshness
+          analysisFreshness: analysis.analysis_freshness,
+          manufacturingReadiness: analysis.manufacturing_readiness
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get CAD analysis for BOM item ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  @Get(':id/cad-analysis/history')
+  @ApiOperation({ summary: 'Get CAD analysis history for BOM item' })
+  @ApiResponse({ status: 200, description: 'Analysis history retrieved successfully' })
+  async getBOMItemAnalysisHistory(
+    @Param('id') id: string,
+    @Query('limit') limit: number = 10,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    try {
+      const history = await this.cadAnalysisService.getAnalysisHistory(id, token, limit);
+      
+      return {
+        success: true,
+        history: history.map(entry => ({
+          id: entry.id,
+          analysisVersion: entry.analysis_version,
+          optimizationStrategy: entry.optimization_strategy,
+          processingTimeMs: entry.processing_time_ms,
+          memoryReductionPercent: entry.memory_reduction_percent,
+          cacheHit: entry.cache_hit,
+          manufacturabilityScore: entry.manufacturability_score,
+          difficultyLevel: entry.difficulty_level,
+          warningsCount: entry.warnings_count,
+          recommendationsCount: entry.recommendations_count,
+          createdAt: entry.created_at
+        }))
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get analysis history for BOM item ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  @Post('batch-analyze-cad')
+  @ApiOperation({ summary: 'Perform batch CAD analysis on multiple BOM items' })
+  @ApiResponse({ status: 200, description: 'Batch CAD analysis completed' })
+  async batchAnalyzeCAD(
+    @Body() body: {
+      bomItemIds: string[];
+      strategy?: 'aggressive' | 'balanced' | 'conservative';
+      forceReanalysis?: boolean;
+    },
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    try {
+      if (!body.bomItemIds || body.bomItemIds.length === 0) {
+        throw new BadRequestException('No BOM item IDs provided for batch analysis');
+      }
+
+      if (body.bomItemIds.length > 50) {
+        throw new BadRequestException('Maximum 50 BOM items allowed for batch analysis');
+      }
+
+      this.logger.log(`Starting batch CAD analysis for ${body.bomItemIds.length} BOM items`);
+
+      // Get all BOM items with 3D files
+      const bomItems = await Promise.all(
+        body.bomItemIds.map(async (id) => {
+          try {
+            const item = await this.bomItemsService.findOne(id, user.id, token);
+            return item.file3dPath ? { 
+              bomItemId: id, 
+              filePath: item.file3dPath,
+              partNumber: item.partNumber 
+            } : null;
+          } catch (error) {
+            this.logger.warn(`BOM item ${id} not found or inaccessible`);
+            return null;
+          }
+        })
+      );
+
+      const validItems = bomItems.filter(item => item !== null);
+      
+      if (validItems.length === 0) {
+        throw new BadRequestException('No valid BOM items with 3D files found for analysis');
+      }
+
+      // Prepare batch analysis requests
+      const batchRequests = validItems.map(item => ({
+        bomItemId: item.bomItemId,
+        filePath: item.filePath,
+        strategy: body.strategy || 'balanced',
+        forceReanalysis: body.forceReanalysis || false
+      }));
+
+      // Execute batch analysis
+      const results = await this.cadAnalysisService.batchAnalyzeBOMItems(
+        batchRequests,
+        user.id,
+        token
+      );
+
+      this.logger.log(`Batch CAD analysis completed. ${results.length}/${validItems.length} items analyzed successfully`);
+
+      return {
+        success: true,
+        message: `Batch analysis completed for ${results.length}/${validItems.length} BOM items`,
+        results: {
+          totalRequested: body.bomItemIds.length,
+          validItemsFound: validItems.length,
+          successfulAnalyses: results.length,
+          failedAnalyses: validItems.length - results.length
+        },
+        analyses: results.map(result => ({
+          bomItemId: validItems.find(item => 
+            result.analysisId.includes(item.bomItemId.substring(0, 8))
+          )?.bomItemId || 'unknown',
+          analysisId: result.analysisId,
+          processingTimeMs: result.processingTimeMs,
+          manufacturabilityScore: result.dfmAnalysis.manufacturability_score,
+          difficultyLevel: result.dfmAnalysis.difficulty_level,
+          memoryReductionPercent: result.memoryOptimization.memory_reduction_percent
+        }))
+      };
+
+    } catch (error) {
+      this.logger.error(`Batch CAD analysis failed: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
 }
 

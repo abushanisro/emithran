@@ -5,13 +5,14 @@ import { BOMItemsService } from './bom-items.service';
 import { FileStorageService } from './services/file-storage.service';
 import { StepConverterService } from './services/step-converter.service';
 import { BomItemCostService } from './services/bom-item-cost.service';
+import { CADAnalysisService } from './services/cad-analysis.service';
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
   imports: [SupabaseModule, LoggerModule, ConfigModule],
   controllers: [BOMItemsController],
-  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService],
-  exports: [BOMItemsService, BomItemCostService],
+  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService],
+  exports: [BOMItemsService, BomItemCostService, CADAnalysisService],
 })
 export class BOMItemsModule {}

@@ -108,6 +108,10 @@ export class CostEngine {
   public calculateItemCost(input: CostCalculationInput): CostCalculationResult {
     const materialCost = this.calculateMaterialCost(input.materials);
     const processCost = this.calculateProcessCost(input.processes);
+    
+    // Calculate separate tooling cost from processes
+    const toolingCost = input.processes.reduce((total, process) => total + (process.toolingCost || 0), 0);
+    
     const packagingLogisticsCost = (input.packagingCost || 0) + (input.logisticsCost || 0);
     const procuredPartsCost = input.procuredPartsCost || 0;
     
@@ -123,6 +127,7 @@ export class CostEngine {
     const breakdown = {
       rawMaterialCost: materialCost,
       processCost: processCost,
+      toolingCost: toolingCost, // Add separate tooling cost field
       packagingLogisticsCost: packagingLogisticsCost,
       procuredPartsCost: procuredPartsCost,
       overheadCost: overheadCost,

@@ -125,8 +125,21 @@ export function useCreateBOMItem() {
     mutationFn: (dto: CreateBOMItemDto) => {
       return apiClient.post<BOMItem>('/bom-items', dto);
     },
-    onSuccess: (_, variables) => {
+    onSuccess: async (data, variables) => {
+      // Invalidate BOM item queries
       queryClient.invalidateQueries({ queryKey: bomItemKeys.list(variables.bomId) });
+      
+      // Trigger automatic cost calculation for the BOM
+      try {
+        await apiClient.post(`/bom/${variables.bomId}/recalculate-all-costs`);
+        // Invalidate cost-related queries
+        queryClient.invalidateQueries({ queryKey: ['bom-item-cost'] });
+        queryClient.invalidateQueries({ queryKey: ['bom-cost-summary'] });
+        queryClient.invalidateQueries({ queryKey: ['bom-cost-report'] });
+      } catch (error) {
+        // Cost recalculation failed but item was created successfully
+        console.warn('Auto cost recalculation failed for new BOM item:', error);
+      }
     },
     onError: (error: any) => {
       const status = error?.status || error?.response?.status;
@@ -155,10 +168,23 @@ export function useUpdateBOMItem() {
     mutationFn: ({ id, data }: { id: string; data: UpdateBOMItemDto }) => {
       return apiClient.put<BOMItem>(`/bom-items/${id}`, data);
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data) {
+        // Invalidate BOM item queries
         queryClient.invalidateQueries({ queryKey: bomItemKeys.list(data.bomId) });
         queryClient.invalidateQueries({ queryKey: bomItemKeys.detail(data.id) });
+        
+        // Trigger automatic cost calculation for the BOM if cost-affecting fields were updated
+        try {
+          await apiClient.post(`/bom/${data.bomId}/recalculate-all-costs`);
+          // Invalidate cost-related queries
+          queryClient.invalidateQueries({ queryKey: ['bom-item-cost'] });
+          queryClient.invalidateQueries({ queryKey: ['bom-cost-summary'] });
+          queryClient.invalidateQueries({ queryKey: ['bom-cost-report'] });
+        } catch (error) {
+          // Cost recalculation failed but item was updated successfully
+          console.warn('Auto cost recalculation failed for updated BOM item:', error);
+        }
       }
     },
     onError: (error: any) => {

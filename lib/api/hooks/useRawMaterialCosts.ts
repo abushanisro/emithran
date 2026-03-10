@@ -25,8 +25,8 @@ export interface RawMaterialCostInput {
   scrap: number;
   overhead: number;
   materialGroup?: string;
-  materialGrade?: string;
-  location?: string;
+  materialDescription?: string;
+  country?: string;
   quarter?: string;
   notes?: string;
   isActive?: boolean;
@@ -69,8 +69,8 @@ export interface RawMaterialCostRecord {
   scrapRate: number;
   calculationBreakdown?: any;
   materialGroup?: string;
-  materialGrade?: string;
-  location?: string;
+  materialDescription?: string;
+  country?: string;
   quarter?: string;
   notes?: string;
   isActive: boolean;

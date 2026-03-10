@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ToolingCostDialog } from './ToolingCostDialog';
 import {
   useToolingCosts,
@@ -17,9 +18,49 @@ interface ToolingSectionProps {
   bomItem?: any;
 }
 
+// Manufacturing Process Hierarchy (simplified version)
+const MANUFACTURING_PROCESSES = {
+  machining: {
+    label: 'Machining',
+    subProcesses: ['turning', 'milling', 'drilling', 'grinding', 'boring', 'threading']
+  },
+  injection_molding: {
+    label: 'Injection Molding',
+    subProcesses: ['mold_making', 'injection', 'cooling', 'ejection']
+  },
+  sheet_metal: {
+    label: 'Sheet Metal',
+    subProcesses: ['cutting', 'bending', 'punching', 'stamping', 'welding', 'forming']
+  },
+  casting: {
+    label: 'Casting',
+    subProcesses: ['sand_casting', 'investment_casting', 'die_casting', 'permanent_mold', 'pattern_making']
+  },
+  forging: {
+    label: 'Forging',
+    subProcesses: ['hot_forging', 'cold_forging', 'upset_forging', 'drop_forging', 'press_forging']
+  },
+  assembly: {
+    label: 'Assembly',
+    subProcesses: ['mechanical_assembly', 'welded_assembly', 'fastened_assembly', 'bonded_assembly']
+  },
+  finishing: {
+    label: 'Finishing',
+    subProcesses: ['surface_treatment', 'painting', 'plating', 'heat_treatment']
+  },
+  inspection: {
+    label: 'Quality Control & Inspection',
+    subProcesses: ['dimensional_inspection', 'functional_testing', 'visual_inspection', 'material_testing']
+  }
+};
+
 export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTooling, setEditTooling] = useState<any | null>(null);
+  const [selectedProcess, setSelectedProcess] = useState<string | null>(null);
+  const [selectedSubProcess, setSelectedSubProcess] = useState<string | null>(null);
+  const [openProcesses, setOpenProcesses] = useState<Set<string>>(new Set(['machining'])); // Default to machining open
+  const [viewMode, setViewMode] = useState<'process' | 'table'>('process');
 
   if (!bomItemId) {
     return (
@@ -47,13 +88,27 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
 
   const tooling = data?.records || [];
 
-  const handleAddTooling = () => {
+  const toggleProcess = (processKey: string) => {
+    const newOpenProcesses = new Set(openProcesses);
+    if (newOpenProcesses.has(processKey)) {
+      newOpenProcesses.delete(processKey);
+    } else {
+      newOpenProcesses.add(processKey);
+    }
+    setOpenProcesses(newOpenProcesses);
+  };
+
+  const handleAddTooling = (processKey?: string, subProcessKey?: string) => {
     setEditTooling(null);
+    setSelectedProcess(processKey || null);
+    setSelectedSubProcess(subProcessKey || null);
     setDialogOpen(true);
   };
 
   const handleEditTooling = (toolingItem: any) => {
     setEditTooling(toolingItem);
+    setSelectedProcess(null);
+    setSelectedSubProcess(null);
     setDialogOpen(true);
   };
 
@@ -61,41 +116,36 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
     if (!bomItemId) return;
 
     try {
+      const submitData = {
+        manufacturingProcess: data.manufacturingProcess,
+        subProcess: data.subProcess,
+        toolingType: data.toolingType,
+        description: data.description,
+        specifications: data.specifications,
+        unitCost: data.unitCost,
+        quantity: data.quantity,
+        amortizationParts: data.amortizationParts,
+        usagePercentage: data.usagePercentage,
+        isCustom: data.isCustom,
+        supplier: data.supplier,
+        leadTime: data.leadTime,
+        notes: data.notes,
+        totalCost: data.totalCost,
+        totalToolingInvestment: data.totalToolingInvestment,
+        isActive: true,
+      };
+
       if (editTooling?.id) {
         // Update existing tooling
         await updateMutation.mutateAsync({
           id: editTooling.id,
-          data: {
-            toolingType: data.toolingType,
-            description: data.description,
-            specifications: data.specifications,
-            unitCost: data.unitCost,
-            quantity: data.quantity,
-            amortizationParts: data.amortizationParts,
-            usagePercentage: data.usagePercentage,
-            isCustom: data.isCustom,
-            supplier: data.supplier,
-            leadTime: data.leadTime,
-            notes: data.notes,
-            isActive: true,
-          },
+          data: submitData,
         });
       } else {
         // Create new tooling
         await createMutation.mutateAsync({
           bomItemId,
-          toolingType: data.toolingType,
-          description: data.description,
-          specifications: data.specifications,
-          unitCost: data.unitCost,
-          quantity: data.quantity,
-          amortizationParts: data.amortizationParts,
-          usagePercentage: data.usagePercentage,
-          isCustom: data.isCustom,
-          supplier: data.supplier,
-          leadTime: data.leadTime,
-          notes: data.notes,
-          isActive: true,
+          ...submitData,
         });
       }
       setDialogOpen(false);
@@ -116,14 +166,67 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
     }
   };
 
+  // Group tooling by process and sub-process
+  const groupedTooling = tooling.reduce((groups: any, item: any) => {
+    const process = item.manufacturingProcess || 'unassigned';
+    const subProcess = item.subProcess || 'unassigned';
+    
+    if (!groups[process]) {
+      groups[process] = {};
+    }
+    if (!groups[process][subProcess]) {
+      groups[process][subProcess] = [];
+    }
+    groups[process][subProcess].push(item);
+    
+    return groups;
+  }, {});
+
   const calculateTotal = () => {
-    return tooling.reduce((sum, item) => sum + (item.totalCost || 0), 0).toFixed(2);
+    return tooling.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+  };
+
+  const calculateProcessTotal = (processKey: string) => {
+    const processTooling = groupedTooling[processKey] || {};
+    return Object.values(processTooling).flat().reduce((sum: number, item: any) => sum + (item.totalCost || 0), 0);
+  };
+
+  const calculateSubProcessTotal = (processKey: string, subProcessKey: string) => {
+    const subProcessTooling = groupedTooling[processKey]?.[subProcessKey] || [];
+    return subProcessTooling.reduce((sum: number, item: any) => sum + (item.totalCost || 0), 0);
   };
 
   return (
     <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
       <div className="bg-primary py-3 px-4">
-        <h6 className="m-0 font-semibold text-primary-foreground">Tooling & Fixtures</h6>
+        <div className="flex items-center justify-between">
+          <h6 className="m-0 font-semibold text-primary-foreground">
+            Tooling & Fixtures - {viewMode === 'process' ? 'Process View' : 'Table View'}
+          </h6>
+          <div className="flex items-center gap-3">
+            <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground">
+              Total: ₹{calculateTotal().toFixed(2)}
+            </Badge>
+            <div className="flex bg-primary-foreground/20 rounded">
+              <Button
+                variant={viewMode === 'process' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setViewMode('process')}
+              >
+                Process View
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setViewMode('table')}
+              >
+                Table View
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
       <div className="bg-card p-4">
         {isLoading ? (
@@ -136,101 +239,220 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
             <p className="text-sm">Error loading tooling data. Please try again.</p>
           </div>
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-primary text-primary-foreground">
-                    <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 min-w-[150px]">
-                      Tooling
-                    </th>
-                    <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
-                      Unit Cost (₹)
-                    </th>
-                    <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
-                      Quantity
-                    </th>
-                    <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
-                      Amortization
-                    </th>
-                    <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-24">
-                      Usage %
-                    </th>
-                    <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
-                      Total Cost (₹)
-                    </th>
-                    <th className="p-3 text-center text-xs font-semibold w-24">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {tooling.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                        <p className="text-sm">No tooling items added yet</p>
-                        <p className="text-xs mt-1">Click "Add Tooling Item" to get started</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    <>
-                      {tooling.map((item: any) => (
-                        <tr key={item.id} className="hover:bg-secondary/50">
-                          <td className="p-3 border-r border-border text-xs font-medium">
-                            <div>
+          <div className="space-y-4">
+            {viewMode === 'process' ? (
+              <>
+                {/* Manufacturing Processes */}
+                {Object.entries(MANUFACTURING_PROCESSES).map(([processKey, process]) => (
+                  <Collapsible 
+                    key={processKey} 
+                    open={openProcesses.has(processKey)}
+                    onOpenChange={() => toggleProcess(processKey)}
+                  >
+                    <div className="border border-border rounded-lg overflow-hidden">
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between p-3 bg-secondary/50 hover:bg-secondary/70 cursor-pointer transition-colors">
+                          <div className="flex items-center gap-3">
+                            {openProcesses.has(processKey) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                            <h3 className="font-semibold text-sm">{process.label}</h3>
+                            <Badge variant="outline" className="text-xs">
+                              {Object.keys(groupedTooling[processKey] || {}).length} sub-processes
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              ₹{calculateProcessTotal(processKey).toFixed(2)}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddTooling(processKey);
+                              }}
+                              title={`Add tooling for ${process.label}`}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      
+                      <CollapsibleContent>
+                        <div className="p-4 space-y-3">
+                          {/* Sub-processes */}
+                          {process.subProcesses.map((subProcessKey) => {
+                            const subProcessTooling = groupedTooling[processKey]?.[subProcessKey] || [];
+                            const subProcessTotal = calculateSubProcessTotal(processKey, subProcessKey);
+                            const subProcessLabel = subProcessKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            
+                            return (
+                              <div key={subProcessKey} className="border border-border/50 rounded-md">
+                                <div className="flex items-center justify-between p-3 bg-muted/30">
+                                  <div className="flex items-center gap-3">
+                                    <h4 className="font-medium text-sm">{subProcessLabel}</h4>
+                                    <Badge variant="outline" className="text-xs">
+                                      {subProcessTooling.length} tools
+                                    </Badge>
+                                    {subProcessTotal > 0 && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        ₹{subProcessTotal.toFixed(2)}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0"
+                                    onClick={() => handleAddTooling(processKey, subProcessKey)}
+                                    title={`Add tooling for ${subProcessLabel}`}
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                
+                                {/* Tooling items for this sub-process */}
+                                {subProcessTooling.length > 0 && (
+                                  <div className="p-3">
+                                    <div className="space-y-2">
+                                      {subProcessTooling.map((item: any) => (
+                                        <div key={item.id} className="flex items-center justify-between p-2 bg-background rounded border border-border/30">
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-medium text-sm">
+                                                {item.toolingType?.replace('_', ' ') || 'Tooling'}
+                                              </span>
+                                              {item.isCustom && (
+                                                <Badge variant="secondary" className="text-xs">Custom</Badge>
+                                              )}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">{item.description}</p>
+                                            <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                                              <span>Qty: {item.quantity}</span>
+                                              <span>Cost: ₹{item.unitCost.toFixed(2)}</span>
+                                              <span>Usage: {item.usagePercentage}%</span>
+                                              <span className="font-medium">Total: ₹{item.totalCost.toFixed(2)}</span>
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 w-6 p-0"
+                                              onClick={() => handleEditTooling(item)}
+                                              title="Edit"
+                                            >
+                                              <Edit className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                              onClick={() => handleDeleteTooling(item.id)}
+                                              title="Delete"
+                                              disabled={deleteMutation.isPending}
+                                            >
+                                              {deleteMutation.isPending ? (
+                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                              ) : (
+                                                <Trash2 className="h-3 w-3" />
+                                              )}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          
+                          {/* Unassigned tools in this process */}
+                          {groupedTooling[processKey]?.unassigned && (
+                            <div className="border border-border/50 rounded-md">
+                              <div className="p-3 bg-muted/20">
+                                <h4 className="font-medium text-sm text-muted-foreground">Unassigned to Sub-process</h4>
+                                <div className="mt-2 space-y-2">
+                                  {groupedTooling[processKey].unassigned.map((item: any) => (
+                                    <div key={item.id} className="flex items-center justify-between p-2 bg-background rounded border border-border/30">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-sm">
+                                            {item.toolingType?.replace('_', ' ') || 'Tooling'}
+                                          </span>
+                                          {item.isCustom && (
+                                            <Badge variant="secondary" className="text-xs">Custom</Badge>
+                                          )}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0"
+                                          onClick={() => handleEditTooling(item)}
+                                          title="Edit"
+                                        >
+                                          <Edit className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                          onClick={() => handleDeleteTooling(item.id)}
+                                          title="Delete"
+                                          disabled={deleteMutation.isPending}
+                                        >
+                                          {deleteMutation.isPending ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-3 w-3" />
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+                ))}
+                
+                {/* Unassigned tools (no process specified) */}
+                {groupedTooling.unassigned && (
+                  <div className="border border-border rounded-lg">
+                    <div className="p-3 bg-muted/20">
+                      <h3 className="font-semibold text-sm text-muted-foreground">Unassigned Tools</h3>
+                      <div className="mt-2 space-y-2">
+                        {Object.values(groupedTooling.unassigned).flat().map((item: any) => (
+                          <div key={item.id} className="flex items-center justify-between p-2 bg-background rounded border border-border/30">
+                            <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium">{item.toolingType?.replace('_', ' ') || 'Tooling'}</span>
+                                <span className="font-medium text-sm">
+                                  {item.toolingType?.replace('_', ' ') || 'Tooling'}
+                                </span>
                                 {item.isCustom && (
                                   <Badge variant="secondary" className="text-xs">Custom</Badge>
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground">{item.description}</p>
-                              {item.specifications && (
-                                <p className="text-xs text-muted-foreground">{item.specifications}</p>
-                              )}
-                              {/* Custom tooling additional details */}
-                              {item.isCustom && (item.supplier || item.leadTime || item.notes) && (
-                                <div className="mt-1 text-xs text-muted-foreground">
-                                  {item.supplier && (
-                                    <div>
-                                      <span className="font-medium">Supplier:</span> {item.supplier}
-                                    </div>
-                                  )}
-                                  {item.leadTime && (
-                                    <div>
-                                      <span className="font-medium">Lead Time:</span> {item.leadTime} days
-                                    </div>
-                                  )}
-                                  {item.notes && (
-                                    <div>
-                                      <span className="font-medium">Notes:</span> {item.notes}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
                             </div>
-                          </td>
-                          <td className="p-3 border-r border-border text-xs text-right">
-                            ₹{item.unitCost.toFixed(2)}
-                          </td>
-                          <td className="p-3 border-r border-border text-xs text-right">
-                            {item.quantity.toFixed(2)}
-                          </td>
-                          <td className="p-3 border-r border-border text-xs text-right">
-                            {item.amortizationParts ? `${item.amortizationParts.toLocaleString()} pcs` : '—'}
-                          </td>
-                          <td className="p-3 border-r border-border text-xs text-right">
-                            {item.usagePercentage}%
-                          </td>
-                          <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                            ₹{item.totalCost.toFixed(2)}
-                          </td>
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-2">
+                            <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 w-7 p-0"
+                                className="h-6 w-6 p-0"
                                 onClick={() => handleEditTooling(item)}
                                 title="Edit"
                               >
@@ -239,7 +461,7 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
                                 onClick={() => handleDeleteTooling(item.id)}
                                 title="Delete"
                                 disabled={deleteMutation.isPending}
@@ -251,46 +473,207 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
                                 )}
                               </Button>
                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick Add Section */}
+                <div className="border-t border-border pt-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() => handleAddTooling()}
+                      variant="outline"
+                      size="sm"
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                    >
+                      {createMutation.isPending || updateMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add General Tooling
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Table View - Original Implementation */
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-primary text-primary-foreground">
+                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 min-w-[150px]">
+                          Tooling
+                        </th>
+                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
+                          Process
+                        </th>
+                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
+                          Unit Cost (₹)
+                        </th>
+                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
+                          Quantity
+                        </th>
+                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
+                          Amortization
+                        </th>
+                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-24">
+                          Usage %
+                        </th>
+                        <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
+                          Total Cost (₹)
+                        </th>
+                        <th className="p-3 text-center text-xs font-semibold w-24">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {tooling.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                            <p className="text-sm">No tooling items added yet</p>
+                            <p className="text-xs mt-1">Click "Add Tooling Item" to get started</p>
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        <>
+                          {tooling.map((item: any) => {
+                            const processData = item.manufacturingProcess ? MANUFACTURING_PROCESSES[item.manufacturingProcess as keyof typeof MANUFACTURING_PROCESSES] : null;
+                            const subProcessLabel = item.subProcess ? item.subProcess.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : '';
+                            
+                            // Check if this tool is recommended for the sub-process
+                            const isRecommended = processData?.subProcesses?.some((sp: string) => sp === item.subProcess) && 
+                              processData?.subProcesses?.includes(item.subProcess);
+                            
+                            return (
+                              <tr key={item.id} className="hover:bg-secondary/50">
+                                <td className="p-3 border-r border-border text-xs font-medium">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium">{item.toolingType?.replace('_', ' ') || 'Tooling'}</span>
+                                      {item.isCustom && (
+                                        <Badge variant="secondary" className="text-xs">Custom</Badge>
+                                      )}
+                                      {isRecommended && (
+                                        <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                                          Recommended
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                                    {item.specifications && (
+                                      <p className="text-xs text-muted-foreground">{item.specifications}</p>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-3 border-r border-border text-xs">
+                                  <div>
+                                    {processData ? (
+                                      <div>
+                                        <div className="font-medium text-xs">{processData.label}</div>
+                                        {subProcessLabel && (
+                                          <div className="text-xs text-muted-foreground">{subProcessLabel}</div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">Unassigned</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-3 border-r border-border text-xs text-right">
+                                  ₹{item.unitCost.toFixed(2)}
+                                </td>
+                                <td className="p-3 border-r border-border text-xs text-right">
+                                  {item.quantity.toFixed(2)}
+                                </td>
+                                <td className="p-3 border-r border-border text-xs text-right">
+                                  {item.amortizationParts ? `${item.amortizationParts.toLocaleString()} pcs` : '—'}
+                                </td>
+                                <td className="p-3 border-r border-border text-xs text-right">
+                                  {item.usagePercentage}%
+                                </td>
+                                <td className="p-3 border-r border-border text-xs text-right font-semibold">
+                                  ₹{item.totalCost.toFixed(2)}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => handleEditTooling(item)}
+                                      title="Edit"
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                      onClick={() => handleDeleteTooling(item.id)}
+                                      title="Delete"
+                                      disabled={deleteMutation.isPending}
+                                    >
+                                      {deleteMutation.isPending ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-3 w-3" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
 
-                      <tr className="bg-secondary/30 font-semibold">
-                        <td colSpan={5} className="p-3 text-right border-r border-border text-xs">
-                          Total:
-                        </td>
-                        <td className="p-3 border-r border-border text-xs text-right">
-                          ₹{calculateTotal()}
-                        </td>
-                        <td className="p-3"></td>
-                      </tr>
-                    </>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          <tr className="bg-secondary/30 font-semibold">
+                            <td colSpan={6} className="p-3 text-right border-r border-border text-xs">
+                              Total:
+                            </td>
+                            <td className="p-3 border-r border-border text-xs text-right">
+                              ₹{calculateTotal().toFixed(2)}
+                            </td>
+                            <td className="p-3"></td>
+                          </tr>
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
 
-            <div className="mt-4">
-              <Button
-                onClick={handleAddTooling}
-                variant="outline"
-                size="sm"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
-                {createMutation.isPending || updateMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Tooling Item
-                  </>
-                )}
-              </Button>
-            </div>
-          </>
+                <div className="mt-4">
+                  <Button
+                    onClick={() => handleAddTooling()}
+                    variant="outline"
+                    size="sm"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                  >
+                    {createMutation.isPending || updateMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add Tooling Item
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -301,6 +684,8 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
         onSubmit={handleDialogSubmit}
         initialData={editTooling}
         bomItem={bomItem}
+        selectedProcess={selectedProcess}
+        selectedSubProcess={selectedSubProcess}
       />
     </div>
   );

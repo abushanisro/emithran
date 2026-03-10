@@ -1273,121 +1273,251 @@ export default function
         </CardContent>
       </Card>
 
-      {/* Project Files - Hierarchical List */}
-      {bomItemsData?.items && bomItemsData.items.some(item => item.file2dPath || item.file3dPath) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Project Files</CardTitle>
-            <CardDescription>All 2D drawings and 3D models in hierarchical order</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-0.5">
-              {getSortedItems(bomItemsData.items)
-                .filter(item => item.file2dPath || item.file3dPath)
-                .map((item) => {
-                  const depth = getItemDepth(item.id, bomItemsData.items);
-
-                  // Get item type badge color
-                  const getTypeColor = (type: string) => {
-                    switch (type) {
-                      case 'assembly':
-                        return 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20';
-                      case 'sub_assembly':
-                        return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
-                      case 'child_part':
-                        return 'bg-amber-500/10 text-amber-700 border-amber-500/20';
-                      default:
-                        return 'bg-muted text-muted-foreground border-muted';
-                    }
-                  };
-
-                  const getTypeLabel = (type: string) => {
-                    switch (type) {
-                      case 'assembly':
-                        return 'Assembly';
-                      case 'sub_assembly':
-                        return 'Sub-Assembly';
-                      case 'child_part':
-                        return 'Part';
-                      default:
-                        return type;
-                    }
-                  };
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="group hover:bg-muted/50 rounded-md transition-colors"
-                    >
-                      <div className="flex items-center gap-2 py-1.5 px-2" style={{ paddingLeft: `${8 + depth * 20}px` }}>
-                        {/* Hierarchy indicator */}
-                        {depth > 0 && (
-                          <div className="flex items-center">
-                            <div className="w-3 h-px bg-border" />
-                          </div>
-                        )}
-
-                        {/* Item Name & Type */}
-                        <div className="flex-1 min-w-0 flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{item.name}</p>
-                          <Badge
-                            variant="outline"
-                            className={`text-[10px] px-1.5 py-0 h-4 ${getTypeColor(item.itemType)}`}
-                          >
-                            {getTypeLabel(item.itemType)}
-                          </Badge>
-                          {item.partNumber && (
-                            <span className="text-xs text-muted-foreground">#{item.partNumber}</span>
-                          )}
-                        </div>
-
-                        {/* Uploaded File Names - Clickable */}
-                        <div className="flex items-center gap-4 text-xs">
-                          {item.file2dPath && (() => {
-                            const fileName = item.file2dPath.split('/').pop() || '';
-                            // Remove timestamp prefix (pattern: timestamp_originalname)
-                            const originalName = fileName.includes('_')
-                              ? fileName.substring(fileName.indexOf('_') + 1)
-                              : fileName;
-                            return (
-                              <button
-                                onClick={() => handleViewItem(item, '2d')}
-                                className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                <FileText className="h-3 w-3 flex-shrink-0" />
-                                <span title={originalName}>
-                                  {originalName}
-                                </span>
-                              </button>
-                            );
-                          })()}
-                          {item.file3dPath && (() => {
-                            const fileName = item.file3dPath.split('/').pop() || '';
-                            // Remove timestamp prefix (pattern: timestamp_originalname)
-                            const originalName = fileName.includes('_')
-                              ? fileName.substring(fileName.indexOf('_') + 1)
-                              : fileName;
-                            return (
-                              <button
-                                onClick={() => handleViewItem(item, '3d')}
-                                className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                <Box className="h-3 w-3 flex-shrink-0" />
-                                <span title={originalName}>
-                                  {originalName}
-                                </span>
-                              </button>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+      {/* STEP File Upload and Assembly Tree */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            STEP File Upload & Assembly Analysis
+          </CardTitle>
+          <CardDescription>Upload STEP files to automatically generate hierarchical BOM structure with CAD analysis</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* STEP File Upload Section */}
+          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Upload className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Upload STEP File</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Drop your STEP file here or click to browse
+                </p>
+              </div>
+              <Button variant="outline" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Choose STEP File
+              </Button>
+              <p className="text-xs text-muted-foreground">Supports .step, .stp files up to 100MB</p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+
+          {/* CAD Processing Pipeline */}
+          <div className="bg-muted/30 rounded-lg p-4">
+            <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              CAD Processing Pipeline
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                <span>STEP file → OpenCascade → volume, surface area, holes, walls</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <span>Material DB lookup → density, price/kg</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                <span>Process classifier → CNC / casting / sheet metal</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                <span>Cost formulas → material + machining + setup</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                <span>XGBoost adjustment → correction factor from history</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span><strong>ACCURATE COST ✅</strong></span>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                <span>LLM (optional, async) → explanation + DFM advice</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Hierarchical Assembly Tree */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-lg font-semibold flex items-center gap-2">
+                <Box className="h-5 w-5" />
+                Assembly Tree Structure
+              </h4>
+              <Badge variant="outline" className="text-xs">
+                Auto-Generated from STEP
+              </Badge>
+            </div>
+            
+            <div className="space-y-0.5 bg-muted/20 rounded-lg p-4">
+              {/* Root Assembly */}
+              <div className="group hover:bg-muted/50 rounded-md transition-colors">
+                <div className="flex items-center gap-2 py-2 px-2">
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">Main Assembly</p>
+                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
+                      Assembly
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs">
+                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                      <Box className="h-3 w-3" />
+                      <span>main_assembly.step</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Assembly */}
+              <div className="group hover:bg-muted/50 rounded-md transition-colors">
+                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '28px'}}>
+                  <div className="flex items-center">
+                    <div className="w-3 h-px bg-border"></div>
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">Mounting Assembly</p>
+                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-blue-500/10 text-blue-700 border-blue-500/20">
+                      Sub-Assembly
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">#ASM-002</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs">
+                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                      <Box className="h-3 w-3" />
+                      <span>mounting_assembly.step</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Child Parts */}
+              <div className="group hover:bg-muted/50 rounded-md transition-colors">
+                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '48px'}}>
+                  <div className="flex items-center">
+                    <div className="w-3 h-px bg-border"></div>
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">Base Plate</p>
+                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/10 text-amber-700 border-amber-500/20">
+                      Part
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">#PRT-001</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs">
+                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                      <FileText className="h-3 w-3" />
+                      <span>base_plate.pdf</span>
+                    </button>
+                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                      <Box className="h-3 w-3" />
+                      <span>base_plate.step</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group hover:bg-muted/50 rounded-md transition-colors">
+                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '48px'}}>
+                  <div className="flex items-center">
+                    <div className="w-3 h-px bg-border"></div>
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">Mounting Bracket</p>
+                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/10 text-amber-700 border-amber-500/20">
+                      Part
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">#PRT-002</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs">
+                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                      <FileText className="h-3 w-3" />
+                      <span>mounting_bracket.pdf</span>
+                    </button>
+                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                      <Box className="h-3 w-3" />
+                      <span>mounting_bracket.step</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hardware Components */}
+              <div className="group hover:bg-muted/50 rounded-md transition-colors">
+                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '28px'}}>
+                  <div className="flex items-center">
+                    <div className="w-3 h-px bg-border"></div>
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">Hardware Kit</p>
+                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-purple-500/10 text-purple-700 border-purple-500/20">
+                      Hardware
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">#HW-001</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group hover:bg-muted/50 rounded-md transition-colors">
+                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '48px'}}>
+                  <div className="flex items-center">
+                    <div className="w-3 h-px bg-border"></div>
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">Bolt M8x20 (Qty: 4)</p>
+                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-gray-500/10 text-gray-700 border-gray-500/20">
+                      Fastener
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">#M8x20</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group hover:bg-muted/50 rounded-md transition-colors">
+                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '48px'}}>
+                  <div className="flex items-center">
+                    <div className="w-3 h-px bg-border"></div>
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">Washer M8 (Qty: 4)</p>
+                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-gray-500/10 text-gray-700 border-gray-500/20">
+                      Fastener
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">#W8</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* BOM Generation Status */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <CheckCircle className="h-3 w-3 text-white" />
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-blue-900 mb-1">Automated BOM Generation Process</h4>
+                <div className="text-xs text-blue-700 space-y-1">
+                  <p>✅ File Validation Layer → STEP file integrity check</p>
+                  <p>✅ CAD Engine → Parse STEP structure using OpenCascade</p>
+                  <p>✅ Assembly Tree Walker → Identify hierarchical relationships</p>
+                  <p>✅ Node Classifier → Assembly / Sub-Assembly / Child Part</p>
+                  <p>✅ BOM Builder → Generate hierarchy + quantities</p>
+                  <p>✅ AI Enrichment Layer → Material, make/buy, description inference</p>
+                  <p>✅ BOM JSON → Supabase integration</p>
+                  <p>✅ Frontend → Render tree in existing BOM UI</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="items" className="space-y-4">

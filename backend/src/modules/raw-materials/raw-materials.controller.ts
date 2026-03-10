@@ -17,6 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { RawMaterialsService } from './raw-materials.service';
 import { CreateRawMaterialDto, UpdateRawMaterialDto, QueryRawMaterialsDto } from './dto/raw-materials.dto';
+import { MaterialShape } from './constants/material-categories.constants';
 import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-material-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -306,30 +307,30 @@ export class RawMaterialsController {
       };
 
       // Helper function to map shape values from Excel to MaterialShape enum
-      const mapShapeValue = (value: any): string | undefined => {
+      const mapShapeValue = (value: any): MaterialShape | undefined => {
         if (!value) return undefined;
         const shapeStr = String(value).toLowerCase().trim();
         
         // Map common Excel shape values to our enum values
-        const shapeMapping: Record<string, string> = {
-          'granules': 'GRANULES',
-          'pellets': 'PELLETS', 
-          'powder': 'POWDER',
-          'flakes': 'FLAKES',
-          'sheets': 'SHEETS',
-          'rods': 'RODS',
-          'tubes': 'TUBES',
-          'profiles': 'PROFILES',
-          'ingots': 'INGOTS',
-          'bars': 'BARS',
-          'plates': 'PLATES',
-          'coils': 'COILS',
-          'wire': 'WIRE',
-          'foam': 'FOAM',
-          'liquid': 'LIQUID',
+        const shapeMapping: Record<string, MaterialShape> = {
+          'granules': MaterialShape.GRANULES,
+          'pellets': MaterialShape.PELLETS, 
+          'powder': MaterialShape.POWDER,
+          'flakes': MaterialShape.FLAKES,
+          'sheets': MaterialShape.SHEETS,
+          'rods': MaterialShape.RODS,
+          'tubes': MaterialShape.TUBES,
+          'profiles': MaterialShape.PROFILES,
+          'ingots': MaterialShape.INGOTS,
+          'bars': MaterialShape.BARS,
+          'plates': MaterialShape.PLATES,
+          'coils': MaterialShape.COILS,
+          'wire': MaterialShape.WIRE,
+          'foam': MaterialShape.FOAM,
+          'liquid': MaterialShape.LIQUID,
         };
         
-        return shapeMapping[shapeStr] || value;
+        return shapeMapping[shapeStr] || undefined;
       };
 
       // Collect valid materials for batch insert

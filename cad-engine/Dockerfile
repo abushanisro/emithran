@@ -31,7 +31,7 @@ RUN conda install -n cad-env -c conda-forge \
     conda clean -afy
 
 # Copy application code
-COPY main.py config.py services.py validators.py exceptions.py .
+COPY main.py config.py services.py validators.py exceptions.py memory_optimizer.py .
 
 # Create temp directory for CAD conversions
 RUN mkdir -p /tmp/cad-files

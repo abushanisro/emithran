@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-import { X, Download, FileText, Maximize2, Upload, Loader2, Box } from 'lucide-react';
+import { X, Download, FileText, Maximize2, Upload, Loader2, Box, Cpu } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { apiClient } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
+import { CADAnalysisPanel } from './CADAnalysisPanel';
 
 interface BOMItemDetailPanelProps {
   item: BOMItem | null;
@@ -28,6 +29,7 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
   const [imageView, setImageView] = useState<'fit' | 'full'>('fit');
   const [selectedFile2d, setSelectedFile2d] = useState<File | null>(null);
   const [selectedFile3d, setSelectedFile3d] = useState<File | null>(null);
+  const [activeTab, setActiveTab] = useState<'files' | 'analysis'>('files');
   const file2dInputRef = useRef<HTMLInputElement>(null);
   const file3dInputRef = useRef<HTMLInputElement>(null);
 
@@ -236,10 +238,39 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
         </CardHeader>
 
         <CardContent>
+          {/* Tab Navigation */}
+          <div className="flex gap-2 mb-6 border-b">
+            <button
+              onClick={() => setActiveTab('files')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === 'files' 
+                  ? 'border-primary text-primary bg-primary/5' 
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <FileText className="h-4 w-4 inline mr-2" />
+              Technical Files
+            </button>
+            <button
+              onClick={() => setActiveTab('analysis')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === 'analysis' 
+                  ? 'border-primary text-primary bg-primary/5' 
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Cpu className="h-4 w-4 inline mr-2" />
+              CAD Analysis
+            </button>
+          </div>
+
           <div className="mt-6">
 
-            {/* Files Section - Respects Preferred View */}
-            {(item.file2dPath || item.file3dPath) && (
+            {/* Files Tab Content */}
+            {activeTab === 'files' && (
+              <>
+                {/* Files Section - Respects Preferred View */}
+                {(item.file2dPath || item.file3dPath) && (
               <div className="border-t pt-6">
                 {/* Show based on preferredView, or fallback logic */}
                 {(preferredView === '3d' && item.file3dPath) || (!item.file2dPath && item.file3dPath) ? (
@@ -421,8 +452,8 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
               </div>
             )}
 
-            {!item.file2dPath && !item.file3dPath && (
-              <div className="border rounded-lg p-6">
+                {!item.file2dPath && !item.file3dPath && (
+                  <div className="border rounded-lg p-6">
                 <div className="text-center mb-6">
                   <Upload className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
                   <p className="text-sm text-muted-foreground mb-1">No technical files attached</p>
@@ -491,8 +522,18 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
                       </>
                     )}
                   </Button>
+                  </div>
                 </div>
-              </div>
+                )}
+              </>
+            )}
+
+            {/* CAD Analysis Tab Content */}
+            {activeTab === 'analysis' && (
+              <CADAnalysisPanel
+                item={item}
+                onUpdate={onUpdate}
+              />
             )}
           </div>
         </CardContent>

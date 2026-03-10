@@ -43,7 +43,7 @@ export function RawMaterialDialog({
   bomItemData,
 }: RawMaterialDialogProps) {
   const [materialGroup, setMaterialGroup] = useState<string>('');
-  const [location, setLocation] = useState<string>('');
+  const [country, setCountry] = useState<string>('');
   const [selectedQuarter, setSelectedQuarter] = useState<string>('q1');
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
   const [grossUsage, setGrossUsage] = useState<number>(0);
@@ -51,6 +51,7 @@ export function RawMaterialDialog({
   const [scrap, setScrap] = useState<number>(0);
   const [overhead, setOverhead] = useState<number>(0);
   const [totalCost, setTotalCost] = useState<number>(0);
+  const [manualUnitCost, setManualUnitCost] = useState<number>(0);
 
   // Calculator state
   const [calculatorOpen, setCalculatorOpen] = useState<boolean>(false);
@@ -288,23 +289,23 @@ export function RawMaterialDialog({
     return filterOptions?.materialGroups || [];
   }, [filterOptions]);
 
-  // Get unique locations
-  const locations = useMemo(() => {
-    return filterOptions?.locations || [];
+  // Get unique countries  
+  const countries = useMemo(() => {
+    return filterOptions?.countries || [];
   }, [filterOptions]);
 
-  // Get materials filtered by selected group and location
+  // Get materials filtered by selected group and country
   const materials = useMemo(() => {
     if (!rawMaterialsData?.items || !materialGroup) return [];
     let filtered = rawMaterialsData.items.filter(m => m.materialGroup === materialGroup);
 
-    // Apply location filter if selected
-    if (location) {
-      filtered = filtered.filter(m => m.location === location);
+    // Apply country filter if selected
+    if (country) {
+      filtered = filtered.filter(m => m.country === country);
     }
 
     return filtered;
-  }, [rawMaterialsData, materialGroup, location]);
+  }, [rawMaterialsData, materialGroup, country]);
 
   // Get selected material details
   const selectedMaterial = useMemo(() => {
@@ -312,22 +313,48 @@ export function RawMaterialDialog({
     return materials.find(m => m.id === selectedMaterialId);
   }, [selectedMaterialId, materials]);
 
+
   // Load edit data first (wait for data to be loaded AND options to be available)
   useEffect(() => {
     if (editData && open && !isLoading && !isLoadingOptions && materialGroups.length > 0) {
-      setMaterialGroup(editData.materialGroup || '');
-      setLocation(editData.location || '');
-      setSelectedQuarter(editData.quarter || 'q1');
-      setSelectedMaterialId(editData.materialId || '');
+      // Always set the usage data first
       setGrossUsage(editData.grossUsage || 0);
       setNetUsage(editData.netUsage || 0);
       setScrap(editData.scrap ?? 0);
       setOverhead(editData.overhead ?? 0);
       setTotalCost(editData.totalCost || 0);
+      setManualUnitCost(editData.unitCost || 0);
+      
+      // Find the material in all materials (not filtered) to get correct group
+      const allMaterials = rawMaterialsData?.items || [];
+      
+      // First try to find by materialName (more reliable than ID)
+      let materialToUse = allMaterials.find(m => 
+        m.material === editData.materialName || 
+        m.materialName === editData.materialName
+      );
+      
+      // If not found by name, try by ID as fallback
+      if (!materialToUse) {
+        materialToUse = allMaterials.find(m => m.id === editData.materialId);
+      }
+      
+      if (materialToUse) {
+        // Set the correct material group and country from the found material
+        setMaterialGroup(materialToUse.materialGroup || '');
+        setCountry(materialToUse.country || '');
+      } else {
+        // Fallback to edit data values if no material found
+        setMaterialGroup(editData.materialGroup || '');
+        setCountry(editData.country || '');
+        setSelectedMaterialId('');
+      }
+      
+      setSelectedQuarter(editData.quarter || 'q1');
     } else if (!editData && open) {
       // Reset for new entry
       setMaterialGroup('');
-      setLocation('');
+      setCountry('');
       setSelectedQuarter('q1');
       setSelectedMaterialId('');
       setGrossUsage(0);
@@ -335,32 +362,96 @@ export function RawMaterialDialog({
       setScrap(0);
       setOverhead(0);
       setTotalCost(0);
+      setManualUnitCost(0);
     }
-  }, [editData, open, isLoading, isLoadingOptions, materialGroups]);
+  }, [editData, open, isLoading, isLoadingOptions, materialGroups, rawMaterialsData]);
+
+  // Set selected material ID after filters are applied (separate effect for edit mode)
+  useEffect(() => {
+    if (editData && open && !isLoading && !isLoadingOptions && materials.length > 0 && materialGroup) {
+      // First try to find by materialName (more reliable than ID)
+      let materialToUse = materials.find(m => 
+        m.material === editData.materialName || 
+        m.materialName === editData.materialName
+      );
+      
+      // If not found by name, try by ID as fallback
+      if (!materialToUse) {
+        materialToUse = materials.find(m => m.id === editData.materialId);
+      }
+      
+      console.log('Setting material selection:', { 
+        editDataMaterialName: editData.materialName,
+        editDataMaterialId: editData.materialId,
+        foundByName: !!materials.find(m => m.material === editData.materialName || m.materialName === editData.materialName),
+        foundById: !!materials.find(m => m.id === editData.materialId),
+        materialToUseId: materialToUse?.id,
+        materialToUseName: materialToUse?.material,
+        materialGroupSet: !!materialGroup,
+        materialsCount: materials.length 
+      });
+      
+      if (materialToUse) {
+        setSelectedMaterialId(materialToUse.id);
+      } else {
+        setSelectedMaterialId('');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, materials, materialGroup]);
 
   // Reset material selection when filters change (but not during initial load with editData)
   useEffect(() => {
     if (!editData) {
       setSelectedMaterialId('');
     }
-  }, [materialGroup, location, editData]);
+  }, [materialGroup, country, editData]);
 
-  // Calculate total cost based on selected quarter
+  // Calculate total cost based on unit cost
   useEffect(() => {
-    if (selectedMaterial && grossUsage > 0) {
-      // Get unit cost from selected quarter
-      const unitCost =
-        selectedQuarter === 'q1' ? selectedMaterial.q1Cost :
-        selectedQuarter === 'q2' ? selectedMaterial.q2Cost :
-        selectedQuarter === 'q3' ? selectedMaterial.q3Cost :
-        selectedQuarter === 'q4' ? selectedMaterial.q4Cost : 0;
+    if ((selectedMaterial || editData) && grossUsage > 0) {
+      // Get unit cost from material - check all possible cost fields, or use manual input
+      let unitCost = 0;
+      
+      if (selectedMaterial) {
+        unitCost = selectedMaterial.unitCost || 
+                   selectedMaterial.cost || 
+                   selectedMaterial.costPerUnit ||
+                   selectedMaterial.price ||
+                   0;
+      }
+      
+      // If no cost from material, use manual input
+      const finalUnitCost = unitCost || manualUnitCost || 0;
 
-      if (!unitCost) {
+      // Debug logging
+      console.log('Cost Calculation Debug:', {
+        selectedMaterial: selectedMaterial ? {
+          id: selectedMaterial.id,
+          material: selectedMaterial.material,
+          unitCost: selectedMaterial.unitCost,
+          cost: selectedMaterial.cost,
+          costPerUnit: selectedMaterial.costPerUnit,
+          price: selectedMaterial.price
+        } : null,
+        manualUnitCost,
+        finalUnitCost,
+        grossUsage,
+        scrap,
+        overhead,
+        calculations: {
+          materialCost: grossUsage * finalUnitCost,
+          scrapCost: (grossUsage * finalUnitCost * scrap) / 100,
+          overheadCost: (grossUsage * finalUnitCost * overhead) / 100
+        }
+      });
+
+      if (!finalUnitCost) {
         setTotalCost(0);
         return;
       }
 
-      const materialCost = grossUsage * unitCost;
+      const materialCost = grossUsage * finalUnitCost;
       const scrapCost = (materialCost * scrap) / 100;
       const overheadCost = (materialCost * overhead) / 100;
       const total = materialCost + scrapCost + overheadCost;
@@ -368,7 +459,7 @@ export function RawMaterialDialog({
     } else {
       setTotalCost(0);
     }
-  }, [selectedMaterial, selectedQuarter, grossUsage, netUsage, scrap, overhead]);
+  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, editData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -380,24 +471,23 @@ export function RawMaterialDialog({
         id: editData.materialId,
         material: editData.material,
         materialGroup: editData.materialGroup,
-        materialGrade: editData.materialGrade || '',
-        location: editData.location || '',
-        q1Cost: 0,
-        q2Cost: 0,
-        q3Cost: 0,
-        q4Cost: 0,
+        materialType: editData.materialType || '',
+        materialDescription: editData.materialDescription || '',
+        country: editData.country || '',
+        unitCost: editData.unitCost || 0,
       };
 
       onSubmit({
         id: editData.id,
-        materialId: editData.materialId || selectedMaterialId,
+        materialId: selectedMaterialId || editData.materialId,
         materialName: materialInfo.material,
         materialGroup: materialInfo.materialGroup,
         material: materialInfo.material,
-        materialGrade: materialInfo.materialGrade || '',
-        location: materialInfo.location || '',
+        materialType: materialInfo.materialType || '',
+        materialDescription: materialInfo.materialDescription || '',
+        country: materialInfo.country || '',
         quarter: selectedQuarter,
-        unitCost: editData.unitCost, // Use the stored unit cost from editData
+        unitCost: editData.unitCost || manualUnitCost || (selectedMaterial?.unitCost || selectedMaterial?.cost || 0), // Use the best available cost
         grossUsage,
         netUsage,
         scrap,
@@ -415,23 +505,43 @@ export function RawMaterialDialog({
       if (grossUsage <= 0) {
         return;
       }
-
-      // Get unit cost from selected quarter
-      const unitCost =
-        selectedQuarter === 'q1' ? selectedMaterial.q1Cost :
-        selectedQuarter === 'q2' ? selectedMaterial.q2Cost :
-        selectedQuarter === 'q3' ? selectedMaterial.q3Cost :
-        selectedQuarter === 'q4' ? selectedMaterial.q4Cost : 0;
+      
+      // Get unit cost from material - check all possible cost fields, or use manual input
+      const materialUnitCost = selectedMaterial.unitCost || 
+                               selectedMaterial.cost || 
+                               selectedMaterial.costPerUnit ||
+                               selectedMaterial.price ||
+                               0;
+      
+      if (!materialUnitCost && !manualUnitCost) {
+        alert('Please enter a unit cost. The selected material has no cost data available.');
+        return;
+      }
+      
+      // Additional validation for total cost
+      if (totalCost <= 0) {
+        console.error('Total cost validation failed:', {
+          totalCost,
+          finalUnitCost: materialUnitCost || manualUnitCost,
+          grossUsage,
+          scrap,
+          overhead
+        });
+        alert('Total cost calculation failed. Please check your inputs and try again.');
+        return;
+      }
+      const finalUnitCost = materialUnitCost || manualUnitCost || 0;
 
       onSubmit({
         materialId: selectedMaterialId,
         materialName: selectedMaterial.material,
         materialGroup: selectedMaterial.materialGroup,
         material: selectedMaterial.material,
-        materialGrade: selectedMaterial.materialGrade || '',
-        location: selectedMaterial.location || '',
+        materialType: selectedMaterial.materialType || '',
+        materialDescription: selectedMaterial.materialDescription || '',
+        country: selectedMaterial.country || '',
         quarter: selectedQuarter,
-        unitCost,
+        unitCost: finalUnitCost,
         grossUsage,
         netUsage,
         scrap,
@@ -442,7 +552,7 @@ export function RawMaterialDialog({
 
     // Reset form
     setMaterialGroup('');
-    setLocation('');
+    setCountry('');
     setSelectedQuarter('q1');
     setSelectedMaterialId('');
     setGrossUsage(0);
@@ -450,6 +560,7 @@ export function RawMaterialDialog({
     setScrap(0);
     setOverhead(0);
     setTotalCost(0);
+    setManualUnitCost(0);
     onOpenChange(false);
   };
 
@@ -534,36 +645,36 @@ export function RawMaterialDialog({
                     </Select>
                   </div>
 
-                  {/* Location Filter */}
+                  {/* Country Filter */}
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">
-                      Location <span className="text-muted-foreground text-xs">(Optional)</span>
+                      Country <span className="text-muted-foreground text-xs">(Optional)</span>
                     </label>
                     <div className="flex gap-2">
-                      <Select value={location} onValueChange={setLocation}>
+                      <Select value={country} onValueChange={setCountry}>
                         <SelectTrigger>
-                          <SelectValue placeholder="All locations" />
+                          <SelectValue placeholder="All countries" />
                         </SelectTrigger>
                         <SelectContent>
-                          {locations.length > 0 ? (
-                            locations.map((loc) => (
-                              <SelectItem key={loc} value={loc}>
-                                {loc}
+                          {countries.length > 0 ? (
+                            countries.map((countryItem) => (
+                              <SelectItem key={countryItem} value={countryItem}>
+                                {countryItem}
                               </SelectItem>
                             ))
                           ) : (
-                            <SelectItem key="no-locations" value="none" disabled>
-                              No locations available
+                            <SelectItem key="no-countries" value="none" disabled>
+                              No countries available
                             </SelectItem>
                           )}
                         </SelectContent>
                       </Select>
-                      {location && (
+                      {country && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setLocation('')}
+                          onClick={() => setCountry('')}
                           className="px-3"
                         >
                           Clear
@@ -595,8 +706,8 @@ export function RawMaterialDialog({
                       {materials.length > 0 ? (
                         materials.map((material) => (
                           <SelectItem key={material.id} value={material.id}>
-                            {material.material} {material.materialGrade ? `(${material.materialGrade})` : ''}
-                            {material.location ? ` - ${material.location}` : ''}
+                            {material.material} {material.materialType ? `(${material.materialType})` : ''}
+                            {material.country ? ` - ${material.country}` : ''}
                           </SelectItem>
                         ))
                       ) : (
@@ -619,16 +730,22 @@ export function RawMaterialDialog({
                     <span className="text-muted-foreground">Material:</span>
                     <span className="ml-2 font-medium">{selectedMaterial.material}</span>
                   </div>
-                  {selectedMaterial.materialGrade && (
+                  {selectedMaterial.materialType && (
                     <div>
-                      <span className="text-muted-foreground">Grade:</span>
-                      <span className="ml-2 font-medium">{selectedMaterial.materialGrade}</span>
+                      <span className="text-muted-foreground">Type:</span>
+                      <span className="ml-2 font-medium">{selectedMaterial.materialType}</span>
                     </div>
                   )}
-                  {selectedMaterial.location && (
+                  {selectedMaterial.materialDescription && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Description:</span>
+                      <span className="ml-2 font-medium">{selectedMaterial.materialDescription}</span>
+                    </div>
+                  )}
+                  {selectedMaterial.country && (
                     <div>
-                      <span className="text-muted-foreground">Location:</span>
-                      <span className="ml-2 font-medium">{selectedMaterial.location}</span>
+                      <span className="text-muted-foreground">Country:</span>
+                      <span className="ml-2 font-medium">{selectedMaterial.country}</span>
                     </div>
                   )}
                   {selectedMaterial.densityKgM3 && (
@@ -641,35 +758,59 @@ export function RawMaterialDialog({
               </div>
             )}
 
-            {/* Quarter Selection with Cost Preview */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold">Select Quarter & Cost</label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { value: 'q1', label: 'Q1', cost: selectedMaterial?.q1Cost },
-                  { value: 'q2', label: 'Q2', cost: selectedMaterial?.q2Cost },
-                  { value: 'q3', label: 'Q3', cost: selectedMaterial?.q3Cost },
-                  { value: 'q4', label: 'Q4', cost: selectedMaterial?.q4Cost },
-                ].map(({ value, label, cost }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setSelectedQuarter(value)}
-                    disabled={!selectedMaterialId && !editData}
-                    className={`p-3 border-2 rounded-lg text-left transition-all ${
-                      selectedQuarter === value
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/50'
-                    } ${!selectedMaterialId && !editData ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className="text-sm font-semibold">{label}</div>
-                    <div className="text-lg font-bold text-primary">
-                      {cost ? `₹${cost.toFixed(2)}` : 'N/A'}
+            {/* Current Cost Display */}
+            {selectedMaterial && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Unit Cost</label>
+                <div className="p-4 border-2 border-primary/20 bg-primary/5 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Current Price:</span>
+                    <span className="text-lg font-bold text-primary">
+                      {selectedMaterial.currency && selectedMaterial.currency === 'USD' ? '$' : 
+                       selectedMaterial.currency === 'EUR' ? '€' : 
+                       selectedMaterial.currency === 'GBP' ? '£' : 
+                       '₹'}
+                      {(selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  {selectedMaterial.currency && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Currency: {selectedMaterial.currency}
                     </div>
-                  </button>
-                ))}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Manual Unit Cost Input (when material has no cost) */}
+            {(selectedMaterialId || editData) && (!selectedMaterial || 
+              (!selectedMaterial.unitCost && !selectedMaterial.cost && !selectedMaterial.costPerUnit && !selectedMaterial.price)) && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-orange-600">
+                  Manual Unit Cost <span className="text-xs text-muted-foreground">(Material has no cost data)</span>
+                </label>
+                <div className="p-4 border-2 border-orange-200 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm">₹</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={manualUnitCost === 0 ? '' : manualUnitCost}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setManualUnitCost(val === '' ? 0 : parseFloat(val) || 0);
+                      }}
+                      placeholder="Enter unit cost"
+                      className="flex-1"
+                    />
+                    <span className="text-xs text-muted-foreground">per unit</span>
+                  </div>
+                  <div className="text-xs text-orange-600 mt-2">
+                    This cost will be used for calculations since the selected material has no cost data.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Usage and Cost Fields */}
             {!selectedMaterialId && !editData && (

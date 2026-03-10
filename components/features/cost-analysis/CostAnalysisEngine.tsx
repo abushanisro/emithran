@@ -135,17 +135,16 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
   itemCount = 2 
 }) => {
   const { calculateBomCosts, getCostData, getAggregatedData, isCalculating } = useCostData();
-  const [isInitialized, setIsInitialized] = useState(false);
   
   const costData = getCostData(bomId);
   const aggregated = getAggregatedData(bomId);
 
+  // Trigger calculation only once when BOM is first loaded and no data exists
   useEffect(() => {
-    if (bomId && !costData && !isInitialized) {
+    if (bomId && !costData && !isCalculating) {
       calculateBomCosts(bomId, itemCount);
-      setIsInitialized(true);
     }
-  }, [bomId, costData, isInitialized, calculateBomCosts, itemCount]);
+  }, [bomId, costData, isCalculating, calculateBomCosts, itemCount]);
 
   const handleRecalculate = () => {
     calculateBomCosts(bomId, itemCount);

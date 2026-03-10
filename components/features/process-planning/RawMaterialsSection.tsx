@@ -58,8 +58,9 @@ export function RawMaterialsSection({ bomItemId, bomItem }: RawMaterialsSectionP
             materialId: data.materialId,
             materialName: data.materialName,
             materialGroup: data.materialGroup,
-            materialGrade: data.materialGrade,
-            location: data.location,
+            materialType: data.materialType,
+            materialDescription: data.materialDescription,
+            country: data.country,
             quarter: data.quarter,
             unitCost: data.unitCost,
             grossUsage: data.grossUsage,
@@ -76,8 +77,9 @@ export function RawMaterialsSection({ bomItemId, bomItem }: RawMaterialsSectionP
           materialId: data.materialId,
           materialName: data.materialName,
           materialGroup: data.materialGroup,
-          materialGrade: data.materialGrade,
-          location: data.location,
+          materialType: data.materialType,
+          materialDescription: data.materialDescription,
+          country: data.country,
           quarter: data.quarter,
           unitCost: data.unitCost,
           grossUsage: data.grossUsage,
@@ -188,22 +190,22 @@ export function RawMaterialsSection({ bomItemId, bomItem }: RawMaterialsSectionP
                             {material.materialName}
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right">
-                            ₹{material.unitCost.toFixed(2)}
+                            ₹{(material.unitCost || 0).toFixed(2)}
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right">
-                            {material.grossUsage.toFixed(2)}
+                            {(material.grossUsage || 0).toFixed(2)}
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right">
-                            {material.netUsage.toFixed(2)}
+                            {(material.netUsage || 0).toFixed(2)}
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right">
-                            {material.scrap}%
+                            {material.scrap || 0}%
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right">
-                            {material.overhead}%
+                            {material.overhead || 0}%
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                            ₹{material.totalCost.toFixed(2)}
+                            ₹{(material.totalCost || 0).toFixed(2)}
                           </td>
                           <td className="p-3 text-center">
                             <div className="flex items-center justify-center gap-2">
