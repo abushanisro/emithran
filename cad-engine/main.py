@@ -11,8 +11,9 @@ Standards: ISO 10303 (STEP), STL Binary Format
 import os
 import logging
 import tempfile
+import hashlib
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request
@@ -167,7 +168,7 @@ def cleanup_files(*file_paths):
 # ============================================================================
 
 @app.get("/")
-async def root() -> Dict:
+async def root() -> Dict[str, Any]:
     """Root endpoint - service information"""
     return {
         "service": "mithran CAD Engine",
@@ -179,7 +180,7 @@ async def root() -> Dict:
 
 
 @app.get("/health")
-async def health() -> Dict:
+async def health() -> Dict[str, Any]:
     """Detailed health check endpoint with advanced capabilities"""
     return {
         "status": "healthy",
@@ -258,12 +259,12 @@ async def convert_step_to_stl(
     try:
         # Create temporary file for uploaded content
         file_ext = Path(file.filename).suffix.lower()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir) as temp_step:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
             
             # Write uploaded file to temp location
             content = await file.read()
-            temp_step.write(content)
+            temp_step.write(content)  # type: ignore
             temp_step.flush()
         
         # Validate file (size, extension, magic number)
@@ -323,7 +324,7 @@ async def convert_step_to_stl(
 async def convert_step_to_stl_base64(
     request: Request,
     file: UploadFile = File(...)
-) -> Dict:
+) -> Dict[str, Any]:
     """
     Convert STEP file to STL and return as base64
     
@@ -352,10 +353,10 @@ async def convert_step_to_stl_base64(
     try:
         # Create temporary file
         file_ext = Path(file.filename).suffix.lower()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir) as temp_step:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
             content = await file.read()
-            temp_step.write(content)
+            temp_step.write(content)  # type: ignore
             temp_step.flush()
         
         # Validate file
@@ -395,6 +396,8 @@ async def convert_step_to_stl_base64(
     finally:
         # Always cleanup
         cleanup_files(step_path, stl_path)
+        
+    raise RuntimeError("Unreachable")
 
 
 # ============================================================================
@@ -407,53 +410,52 @@ async def analyze_geometry_advanced(
     request: Request,
     file: UploadFile = File(...),
     strategy: str = "balanced",
-    force_reanalysis: bool = False
-) -> Dict:
+    force_reanalysis: bool = False,
+    user_processes: str = ""   # JSON string: array of process objects from user's process API
+) -> Dict[str, Any]:
     """
-    Advanced geometry analysis with DFM insights and memory optimization
-    
-    Capabilities exceeding Apriori:
-    - Real-time geometry feature extraction
-    - Advanced DFM analysis with AI insights  
-    - Intelligent memory optimization (50-80% reduction)
-    - Manufacturing process recommendations
-    - Cost impact analysis
-    
-    Args:
-        request: FastAPI request
-        file: STEP/IGES file to analyze
-        strategy: Optimization strategy (aggressive/balanced/conservative)  
-        force_reanalysis: Force re-analysis even if cached
-        
-    Returns:
-        Comprehensive analysis including geometry features, DFM analysis, and optimization metrics
+    Advanced geometry analysis with DFM insights and memory optimization.
+
+    Accepts optional `user_processes` as a JSON string — array of process objects
+    from the calling application's process database. When provided, the AI DFM
+    analysis will evaluate each process against the actual part geometry and rank
+    them by suitability. Format: [{"processName":"CNC Milling","processCategory":"Machining",
+    "machineType":"VMC","cycleTimeMinutes":45,"setupTimeMinutes":30}, ...]
     """
+    import json as _json
+
     memory_optimizer: AdvancedCADMemoryOptimizer = request.app.state.memory_optimizer
-    conversion_service: ConversionService = request.app.state.conversion_service
     file_validator: FileValidator = request.app.state.file_validator
-    
+
     logger.info(f"Received advanced analysis request: {file.filename} with strategy: {strategy}")
-    
+
+    # Parse user_processes JSON if provided
+    parsed_processes = []
+    if user_processes:
+        try:
+            parsed_processes = _json.loads(user_processes)
+            logger.info(f"Received {len(parsed_processes)} user processes for AI matching")
+        except Exception as e:
+            logger.warning(f"Failed to parse user_processes JSON: {e}")
+
     step_path = None
-    
+
     try:
-        # Create temporary file
         file_ext = Path(file.filename).suffix.lower()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir) as temp_step:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
             content = await file.read()
+            file_hash = hashlib.sha256(content).hexdigest()
             temp_step.write(content)
             temp_step.flush()
-        
-        # Validate file
+
         try:
             validated_ext, file_size = file_validator.validate_file(step_path, file.filename)
             logger.info(f"File validated for analysis: {file.filename} ({file_size} bytes)")
         except FileValidationError as e:
             cleanup_files(step_path)
             raise HTTPException(status_code=400, detail=str(e))
-        
-        # Read STEP file to get shape
+
         try:
             step_reader = StepReader()
             shape = step_reader.read(step_path)
@@ -461,19 +463,21 @@ async def analyze_geometry_advanced(
         except Exception as e:
             cleanup_files(step_path)
             raise HTTPException(status_code=422, detail=f"Failed to read STEP file: {str(e)}")
-        
-        # Perform advanced analysis and optimization
+
         try:
             optimization_result = memory_optimizer.analyze_and_optimize(
                 shape=shape,
                 file_path=step_path,
                 strategy=strategy,
-                force_reanalysis=force_reanalysis
+                force_reanalysis=force_reanalysis,
+                user_processes=parsed_processes,
+                file_hash=file_hash
             )
-            
+
             logger.info(f"Advanced analysis completed for {file.filename}")
-            
-            # Convert optimization result to response format
+
+            ai_enhanced_result = getattr(optimization_result.dfm_analysis, '_ai_enhanced_result', None)
+
             response = {
                 "success": True,
                 "analysis_id": optimization_result.geometry_hash[:16],
@@ -481,16 +485,17 @@ async def analyze_geometry_advanced(
                 "optimization_strategy": optimization_result.optimization_strategy,
                 "model_version": optimization_result.model_version,
                 "timestamp": optimization_result.timestamp.isoformat(),
-                
+
                 "geometry_features": {
                     "volume_mm3": optimization_result.geometry_features.volume,
                     "surface_area_mm2": optimization_result.geometry_features.surface_area,
                     "bounding_box": optimization_result.geometry_features.bounding_box,
                     "complexity_score": optimization_result.geometry_features.complexity_score,
                     "feature_count": optimization_result.geometry_features.feature_count,
-                    "manufacturing_features": optimization_result.geometry_features.manufacturing_features
+                    "manufacturing_features": optimization_result.geometry_features.manufacturing_features,
+                    "mass_properties": optimization_result.geometry_features.mass_properties
                 },
-                
+
                 "memory_optimization": {
                     "original_size_kb": optimization_result.memory_metrics.original_size_kb,
                     "optimized_size_kb": optimization_result.memory_metrics.optimized_size_kb,
@@ -499,35 +504,54 @@ async def analyze_geometry_advanced(
                     "processing_time_ms": optimization_result.memory_metrics.processing_time_ms,
                     "cache_efficiency": optimization_result.memory_metrics.cache_efficiency
                 },
-                
+
                 "dfm_analysis": {
                     "manufacturability_score": optimization_result.dfm_analysis.manufacturability_score,
                     "difficulty_level": optimization_result.dfm_analysis.difficulty_level,
                     "recommended_processes": optimization_result.dfm_analysis.recommended_processes,
                     "warnings": optimization_result.dfm_analysis.warnings,
-                    "confidence": optimization_result.dfm_analysis.confidence
+                    "confidence": optimization_result.dfm_analysis.confidence,
+                    "ai_enhanced": ai_enhanced_result is not None,
+                    "ai_insights": {
+                        "manufacturing_complexity": ai_enhanced_result.ai_insights.manufacturing_complexity if ai_enhanced_result and ai_enhanced_result.ai_insights else None,
+                        "process_recommendations": ai_enhanced_result.ai_insights.process_recommendations if ai_enhanced_result and ai_enhanced_result.ai_insights else [],
+                        "cost_optimization_suggestions": ai_enhanced_result.ai_insights.cost_optimization_suggestions if ai_enhanced_result and ai_enhanced_result.ai_insights else [],
+                        "quality_considerations": ai_enhanced_result.ai_insights.quality_considerations if ai_enhanced_result and ai_enhanced_result.ai_insights else [],
+                        "material_recommendations": ai_enhanced_result.ai_insights.material_recommendations if ai_enhanced_result and ai_enhanced_result.ai_insights else [],
+                        "tooling_requirements": ai_enhanced_result.ai_insights.tooling_requirements if ai_enhanced_result and ai_enhanced_result.ai_insights else {},
+                        "lead_time_estimate_days": ai_enhanced_result.ai_insights.lead_time_estimate_days if ai_enhanced_result and ai_enhanced_result.ai_insights else None,
+                        "risk_assessment": ai_enhanced_result.ai_insights.risk_assessment if ai_enhanced_result and ai_enhanced_result.ai_insights else {},
+                        "ai_confidence": ai_enhanced_result.ai_insights.ai_confidence if ai_enhanced_result and ai_enhanced_result.ai_insights else 0.0,
+                        "generation_time_ms": ai_enhanced_result.ai_insights.generation_time_ms if ai_enhanced_result and ai_enhanced_result.ai_insights else None,
+                        # New fields from enhanced prompt
+                        "dfm_warnings": getattr(ai_enhanced_result.ai_insights, 'dfm_warnings', []) if ai_enhanced_result and ai_enhanced_result.ai_insights else []
+                    },
+                    "detailed_recommendations": ai_enhanced_result.detailed_recommendations if ai_enhanced_result else [],
+                    "competitive_analysis": ai_enhanced_result.competitive_analysis if ai_enhanced_result else {},
+                    "sustainability_metrics": ai_enhanced_result.sustainability_metrics if ai_enhanced_result else {}
                 },
-                
+
                 "performance_metrics": {
                     "lod_levels_generated": optimization_result.lod_levels_generated,
                     "recommendations": optimization_result.recommendations
                 }
             }
-            
+
             return response
-            
+
         except Exception as e:
             cleanup_files(step_path)
             logger.error(f"Advanced analysis failed: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
-    
+
     finally:
-        # Cleanup temp file
         cleanup_files(step_path)
+        
+    raise RuntimeError("Unreachable")
 
 
 @app.get("/memory/usage-report")
-async def get_memory_usage_report(request: Request) -> Dict:
+async def get_memory_usage_report(request: Request) -> Dict[str, Any]:
     """
     Get comprehensive memory usage and performance report
     
@@ -568,7 +592,7 @@ async def optimize_memory_only(
     request: Request,
     file: UploadFile = File(...),
     strategy: str = "balanced"
-) -> Dict:
+) -> Dict[str, Any]:
     """
     Memory-focused optimization without full DFM analysis
     
@@ -594,9 +618,10 @@ async def optimize_memory_only(
     try:
         # Process file similar to analysis endpoint but focus on memory optimization
         file_ext = Path(file.filename).suffix.lower()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir) as temp_step:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
             content = await file.read()
+            file_hash = hashlib.sha256(content).hexdigest()
             temp_step.write(content)
             temp_step.flush()
         
@@ -607,12 +632,12 @@ async def optimize_memory_only(
         step_reader = StepReader()
         shape = step_reader.read(step_path)
         
-        # Perform memory-focused optimization
         optimization_result = memory_optimizer.analyze_and_optimize(
             shape=shape,
             file_path=step_path,
             strategy=strategy,
-            force_reanalysis=False
+            force_reanalysis=False,
+            file_hash=file_hash
         )
         
         return {
@@ -642,6 +667,8 @@ async def optimize_memory_only(
         raise HTTPException(status_code=500, detail=f"Memory optimization failed: {str(e)}")
     finally:
         cleanup_files(step_path)
+        
+    raise RuntimeError("Unreachable")
 
 
 # ============================================================================

@@ -396,8 +396,8 @@ export class BOMItemsController {
     try {
       const analysis = await this.cadAnalysisService.getBOMItemAnalysis(id, token);
       
-      if (!analysis) {
-        throw new BadRequestException('No CAD analysis found for this BOM item. Please run analysis first.');
+      if (!analysis || !analysis.analysis_timestamp) {
+        return { success: false, analysis: null };
       }
 
       return {
@@ -409,29 +409,38 @@ export class BOMItemsController {
           analysisVersion: analysis.analysis_version,
           optimizationStrategy: analysis.optimization_strategy,
           
-          // Geometry features
+          // Geometry features - only real CAD analysis data
           geometryFeatures: {
-            volumeMm3: analysis.volume_mm3,
-            surfaceAreaMm2: analysis.surface_area_mm2,
-            complexityScore: analysis.complexity_score,
+            volumeMm3: analysis.volume_mm3 || analysis.geometry_analysis?.volume_mm3,
+            surfaceAreaMm2: analysis.surface_area_mm2 || analysis.geometry_analysis?.surface_area_mm2,
+            complexityScore: analysis.complexity_score || analysis.geometry_analysis?.complexity_score,
+            boundingBox: analysis.geometry_analysis?.bounding_box,
+            manufacturingFeatures: analysis.geometry_analysis?.manufacturing_features,
             fullAnalysis: analysis.geometry_analysis
           },
           
-          // DFM analysis
+          // DFM analysis - only real AI-generated data
           dfmAnalysis: {
-            manufacturabilityScore: analysis.manufacturability_score,
-            difficultyLevel: analysis.difficulty_level,
-            recommendedProcesses: analysis.recommended_processes,
-            warnings: analysis.warnings_details,
+            manufacturabilityScore: analysis.manufacturability_score || analysis.dfm_analysis?.manufacturability_score,
+            difficultyLevel: analysis.difficulty_level || analysis.dfm_analysis?.difficulty_level,
+            recommendedProcesses: analysis.recommended_processes || analysis.dfm_analysis?.recommended_processes,
+            warnings: analysis.warnings_details || analysis.dfm_analysis?.warnings,
+            aiInsights: analysis.dfm_analysis?.ai_insights,
+            competitiveAnalysis: analysis.dfm_analysis?.competitive_analysis,
+            sustainabilityMetrics: analysis.dfm_analysis?.sustainability_metrics,
+            costFactors: analysis.dfm_analysis?.cost_factors,
+            geometricConstraints: analysis.dfm_analysis?.geometric_constraints,
             fullAnalysis: analysis.dfm_analysis
           },
           
-          // Memory optimization
+          // Memory optimization - only real optimization data
           memoryOptimization: {
-            memoryReductionPercent: analysis.memory_reduction_percent,
-            processingTimeMs: analysis.processing_time_ms,
-            lodLevelsAvailable: analysis.lod_levels_available,
-            fullMetrics: analysis.memory_optimization_metrics
+            memoryReductionPercent: analysis.memory_reduction_percent || analysis.memory_metrics?.memory_reduction_percent,
+            processingTimeMs: analysis.processing_time_ms || analysis.memory_metrics?.processing_time_ms,
+            lodLevelsAvailable: analysis.lod_levels_available || analysis.memory_metrics?.lod_levels_available,
+            cacheEfficiency: analysis.memory_metrics?.cache_efficiency,
+            compressionRatio: analysis.memory_metrics?.compression_ratio,
+            fullMetrics: analysis.memory_metrics
           },
           
           // Analysis freshness

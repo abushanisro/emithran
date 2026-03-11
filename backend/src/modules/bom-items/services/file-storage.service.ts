@@ -53,6 +53,8 @@ export class FileStorageService {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
     const supabaseKey = this.configService.get<string>('SUPABASE_SERVICE_KEY');
 
+    console.log(`Initializing Supabase client with URL: ${supabaseUrl ? 'SET' : 'MISSING'}, Key: ${supabaseKey ? 'SET' : 'MISSING'}`);
+
     if (!supabaseUrl || !supabaseKey) {
       throw new InternalServerErrorException(
         'Missing required Supabase environment variables: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set'
@@ -60,6 +62,7 @@ export class FileStorageService {
     }
 
     this.supabase = createClient(supabaseUrl, supabaseKey);
+    console.log(`Supabase client initialized successfully for bucket: ${this.BUCKET_NAME}`);
   }
 
   /**
@@ -205,21 +208,131 @@ export class FileStorageService {
     expiresIn: number = 3600, // 1 hour in seconds
   ): Promise<string> {
     try {
+      console.log(`Attempting to generate signed URL for path: ${storagePath} in bucket: ${this.BUCKET_NAME}`);
+      
       const { data, error } = await this.supabase.storage
         .from(this.BUCKET_NAME)
         .createSignedUrl(storagePath, expiresIn);
 
-      if (error || !data) {
+      if (error) {
+        console.error(`Supabase storage error:`, error);
         throw new InternalServerErrorException(
-          'Failed to generate signed URL',
+          `Failed to generate signed URL - Supabase error: ${error.message}`,
         );
       }
 
+      if (!data || !data.signedUrl) {
+        console.error(`No data returned from Supabase storage for path: ${storagePath}`);
+        throw new InternalServerErrorException(
+          `Failed to generate signed URL - No data returned for path: ${storagePath}`,
+        );
+      }
+
+      console.log(`Successfully generated signed URL for path: ${storagePath}`);
       return data.signedUrl;
     } catch (error) {
+      console.error(`Exception in getSignedUrl for path ${storagePath}:`, error);
       throw new InternalServerErrorException(
         `Failed to generate signed URL: ${error.message}`,
       );
+    }
+  }
+
+  /**
+   * Test Supabase storage connection
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      console.log(`Testing connection to bucket: ${this.BUCKET_NAME}`);
+      const { data, error } = await this.supabase.storage.listBuckets();
+      
+      if (error) {
+        console.error('Failed to list buckets:', error);
+        return false;
+      }
+      
+      console.log('Available buckets:', data?.map(b => b.name));
+      return data?.some(bucket => bucket.name === this.BUCKET_NAME) || false;
+    } catch (error) {
+      console.error('Exception testing connection:', error);
+      return false;
+    }
+  }
+
+  /**
+   * List files in a directory path for debugging
+   */
+  async listFiles(directoryPath: string): Promise<string[]> {
+    try {
+      console.log(`Listing files in directory: ${directoryPath}`);
+      
+      const { data, error } = await this.supabase.storage
+        .from(this.BUCKET_NAME)
+        .list(directoryPath, { limit: 100 });
+      
+      if (error) {
+        console.error(`Error listing files in ${directoryPath}:`, error);
+        return [];
+      }
+      
+      const fileNames = data?.map(item => item.name) || [];
+      console.log(`Found ${fileNames.length} files in ${directoryPath}:`, fileNames);
+      return fileNames;
+    } catch (error) {
+      console.error(`Exception listing files in ${directoryPath}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Check file in both buckets for debugging
+   */
+  async findFileInBuckets(filePath: string): Promise<{bucket: string, exists: boolean}[]> {
+    const buckets = ['bom-files', 'Bom'];
+    const results: {bucket: string, exists: boolean}[] = [];
+    
+    for (const bucketName of buckets) {
+      try {
+        const { data, error } = await this.supabase.storage
+          .from(bucketName)
+          .list(filePath.substring(0, filePath.lastIndexOf('/')), {
+            limit: 1,
+            search: filePath.substring(filePath.lastIndexOf('/') + 1)
+          });
+        
+        const exists = !!(data && data.length > 0);
+        results.push({ bucket: bucketName, exists });
+        console.log(`File ${filePath} in bucket '${bucketName}': ${exists ? 'EXISTS' : 'NOT FOUND'}`);
+      } catch (error) {
+        console.error(`Error checking ${filePath} in bucket ${bucketName}:`, error);
+        results.push({ bucket: bucketName, exists: false });
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Check if file exists in storage
+   */
+  async fileExists(storagePath: string): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase.storage
+        .from(this.BUCKET_NAME)
+        .list(storagePath.substring(0, storagePath.lastIndexOf('/')), {
+          limit: 1,
+          search: storagePath.substring(storagePath.lastIndexOf('/') + 1)
+        });
+      
+      if (error) {
+        console.error(`Error checking file existence:`, error);
+        return false;
+      }
+      
+      return data && data.length > 0;
+    } catch (error) {
+      console.error(`Exception checking file existence:`, error);
+      return false;
     }
   }
 

@@ -541,16 +541,39 @@ class ApiClient {
         const responseTime = Date.now() - startTime;
         clearTimeout(timeoutId);
 
+
         let data: ApiResponse<T>;
         const contentType = response.headers.get('content-type');
 
+        // Get response text first for better error handling
+        let responseText: string;
         try {
-          if (contentType && contentType.includes('application/json')) {
-            data = await response.json();
-          } else {
+          responseText = await response.text();
+        } catch (textError) {
+          throw new Error(`Failed to read response: ${textError instanceof Error ? textError.message : 'Unknown error'}`);
+        }
+        
+        try {
+          // Handle 201 Created responses which might have empty bodies
+          if (response.status === 201 && (!responseText || responseText.trim().length === 0)) {
+            data = {
+              success: true,
+              data: { message: 'Operation completed successfully' } as any,
+              metadata: { timestamp: new Date().toISOString() },
+            };
+          } else if (contentType && contentType.includes('application/json') && responseText.trim()) {
+            data = JSON.parse(responseText);
+          } else if (responseText.trim()) {
             data = {
               success: response.ok,
-              data: (await response.text()) as any,
+              data: responseText as any,
+              metadata: { timestamp: new Date().toISOString() },
+            };
+          } else {
+            // Empty response - treat as success if status is OK
+            data = {
+              success: response.ok,
+              data: response.ok ? { message: 'Operation completed successfully' } : null as any,
               metadata: { timestamp: new Date().toISOString() },
             };
           }
@@ -560,7 +583,13 @@ class ApiClient {
             success: false,
             error: {
               code: 'PARSE_ERROR',
-              message: `Failed to parse response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
+              message: `Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
+              details: {
+                contentType,
+                status: response.status,
+                statusText: response.statusText,
+                responsePreview: responseText.substring(0, 200)
+              }
             },
             metadata: { timestamp: new Date().toISOString() },
           };
@@ -904,18 +933,21 @@ class ApiClient {
         }
 
         // Unexpected error
+
         tracker.recordError(500, 'UNEXPECTED_ERROR');
 
         if (traceSpan) {
           traceManager.addSpanAttributes(traceSpan.spanId, {
             'error.type': 'unexpected_error',
             'error.message': error instanceof Error ? error.message : String(error),
+            'error.stack': error instanceof Error ? error.stack : undefined,
           });
           traceManager.endSpan(traceSpan.spanId, 'error', 'Unexpected error');
         }
 
         throw new ApiError('An unexpected error occurred', 500, 'UNEXPECTED_ERROR', {
           originalError: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
         });
       }
     };

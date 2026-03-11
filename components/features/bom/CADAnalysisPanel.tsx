@@ -165,7 +165,8 @@ export function CADAnalysisPanel({ item, onUpdate }: CADAnalysisPanelProps) {
     }
   };
 
-  const getDifficultyColor = (level: string) => {
+  const getDifficultyColor = (level: string | null | undefined) => {
+    if (!level) return 'text-gray-600';
     switch (level.toLowerCase()) {
       case 'easy': return 'text-green-600';
       case 'medium': return 'text-yellow-600';
@@ -302,11 +303,11 @@ export function CADAnalysisPanel({ item, onUpdate }: CADAnalysisPanelProps) {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Memory Optimization</span>
                     <span className="text-sm font-medium text-blue-600">
-                      {analysisData.memoryOptimization.memoryReductionPercent.toFixed(1)}%
+                      {analysisData.memoryOptimization.memoryReductionPercent?.toFixed(1) || '0.0'}%
                     </span>
                   </div>
                   <Progress 
-                    value={Math.min(100, analysisData.memoryOptimization.memoryReductionPercent)} 
+                    value={Math.min(100, analysisData.memoryOptimization.memoryReductionPercent || 0)} 
                     className="h-2"
                   />
                 </div>
@@ -328,7 +329,7 @@ export function CADAnalysisPanel({ item, onUpdate }: CADAnalysisPanelProps) {
                     <Factory className={`h-5 w-5 ${getDifficultyColor(analysisData.dfmAnalysis.difficultyLevel)}`} />
                   </div>
                   <div className={`text-lg font-semibold capitalize ${getDifficultyColor(analysisData.dfmAnalysis.difficultyLevel)}`}>
-                    {analysisData.dfmAnalysis.difficultyLevel.replace('_', ' ')}
+                    {analysisData.dfmAnalysis.difficultyLevel?.replace('_', ' ') || 'Unknown'}
                   </div>
                   <div className="text-xs text-muted-foreground">Difficulty</div>
                 </div>
@@ -337,18 +338,18 @@ export function CADAnalysisPanel({ item, onUpdate }: CADAnalysisPanelProps) {
                     <Clock className="h-5 w-5 text-green-600" />
                   </div>
                   <div className="text-lg font-semibold">
-                    {(analysisData.memoryOptimization.processingTimeMs / 1000).toFixed(1)}s
+                    {analysisData.memoryOptimization.processingTimeMs != null ? (analysisData.memoryOptimization.processingTimeMs / 1000).toFixed(1) : '0.0'}s
                   </div>
                   <div className="text-xs text-muted-foreground">Analysis Time</div>
                 </div>
               </div>
 
               {/* Recommended Processes */}
-              {analysisData.dfmAnalysis.recommendedProcesses.length > 0 && (
+              {(analysisData.dfmAnalysis.recommendedProcesses?.length ?? 0) > 0 && (
                 <div>
                   <h4 className="text-sm font-medium mb-2">Recommended Processes</h4>
                   <div className="flex flex-wrap gap-2">
-                    {analysisData.dfmAnalysis.recommendedProcesses.map((process, index) => (
+                    {(analysisData.dfmAnalysis.recommendedProcesses || []).map((process, index) => (
                       <Badge key={index} variant="secondary">
                         {process}
                       </Badge>
@@ -358,11 +359,11 @@ export function CADAnalysisPanel({ item, onUpdate }: CADAnalysisPanelProps) {
               )}
 
               {/* DFM Warnings */}
-              {analysisData.dfmAnalysis.warnings.length > 0 && (
+              {(analysisData.dfmAnalysis.warnings?.length ?? 0) > 0 && (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    {analysisData.dfmAnalysis.warnings.length} manufacturing issue{analysisData.dfmAnalysis.warnings.length !== 1 ? 's' : ''} detected. 
+                    {(analysisData.dfmAnalysis.warnings?.length ?? 0)} manufacturing issue{(analysisData.dfmAnalysis.warnings?.length ?? 0) !== 1 ? 's' : ''} detected. 
                     Check DFM Analysis tab for details.
                   </AlertDescription>
                 </Alert>
@@ -443,10 +444,10 @@ export function CADAnalysisPanel({ item, onUpdate }: CADAnalysisPanelProps) {
               </div>
 
               {/* Manufacturing Warnings */}
-              {analysisData.dfmAnalysis.warnings.length > 0 ? (
+              {(analysisData.dfmAnalysis.warnings?.length ?? 0) > 0 ? (
                 <div className="space-y-3">
                   <h4 className="text-sm font-medium">Manufacturing Issues</h4>
-                  {analysisData.dfmAnalysis.warnings.map((warning, index) => (
+                  {(analysisData.dfmAnalysis.warnings ?? []).map((warning, index) => (
                     <Alert key={index} variant={warning.type === 'critical' ? 'destructive' : 'default'}>
                       <AlertTriangle className="h-4 w-4" />
                       <AlertDescription>
@@ -489,7 +490,7 @@ export function CADAnalysisPanel({ item, onUpdate }: CADAnalysisPanelProps) {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Memory Reduction:</span>
                       <span className="font-medium text-green-600">
-                        {analysisData.memoryOptimization.memoryReductionPercent.toFixed(1)}%
+                        {analysisData.memoryOptimization.memoryReductionPercent?.toFixed(1) ?? '0.0'}%
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -503,7 +504,7 @@ export function CADAnalysisPanel({ item, onUpdate }: CADAnalysisPanelProps) {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Processing Time:</span>
                       <span className="font-medium">
-                        {(analysisData.memoryOptimization.processingTimeMs / 1000).toFixed(1)}s
+                        {analysisData.memoryOptimization.processingTimeMs != null ? (analysisData.memoryOptimization.processingTimeMs / 1000).toFixed(1) : '0.0'}s
                       </span>
                     </div>
                     <div className="flex justify-between">

@@ -5,14 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-import { X, Download, FileText, Maximize2, Upload, Loader2, Box, Cpu } from 'lucide-react';
+import { X, Download, FileText, Maximize2, Upload, Loader2, Box, Factory } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { apiClient } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
-import { CADAnalysisPanel } from './CADAnalysisPanel';
+import ManufacturingAnalysisPanel from './ManufacturingAnalysisPanel';
 
 interface BOMItemDetailPanelProps {
   item: BOMItem | null;
@@ -30,8 +30,25 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
   const [selectedFile2d, setSelectedFile2d] = useState<File | null>(null);
   const [selectedFile3d, setSelectedFile3d] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState<'files' | 'analysis'>('files');
+  const [manufacturingFeatures, setManufacturingFeatures] = useState<ManufacturingFeature[]>([]);
+  const [selectedFeature, setSelectedFeature] = useState<ManufacturingFeature | null>(null);
+  const [showFeatures, setShowFeatures] = useState(false);
   const file2dInputRef = useRef<HTMLInputElement>(null);
   const file3dInputRef = useRef<HTMLInputElement>(null);
+
+// Manufacturing Feature Interface
+interface ManufacturingFeature {
+  id: string;
+  type: 'hole' | 'pocket' | 'slot' | 'boss' | 'rib' | 'thin_wall' | 'overhang' | 'undercut';
+  position: { x: number; y: number; z: number };
+  dimensions: { length?: number; width?: number; diameter?: number; depth?: number };
+  manufacturingProcess: string;
+  costImpact: number;
+  cycleTime: number;
+  tooling: string[];
+  warnings: string[];
+  aiRecommendations: string[];
+}
 
   useEffect(() => {
     if (!item) {
@@ -259,8 +276,8 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Cpu className="h-4 w-4 inline mr-2" />
-              CAD Analysis
+              <Factory className="h-4 w-4 inline mr-2" />
+              DFM Analysis
             </button>
           </div>
 
@@ -288,6 +305,10 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
                         fileName={item.file3dPath?.split('/').pop() || 'model'}
                         fileType={item.file3dPath?.split('.').pop() || 'stl'}
                         bomItemId={item.id}
+                        manufacturingFeatures={manufacturingFeatures}
+                        selectedFeature={selectedFeature}
+                        onFeatureSelect={setSelectedFeature}
+                        showFeatures={showFeatures}
                       />
                     )}
 
@@ -528,11 +549,22 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
               </>
             )}
 
-            {/* CAD Analysis Tab Content */}
+            {/* Manufacturing Analysis Tab Content */}
             {activeTab === 'analysis' && (
-              <CADAnalysisPanel
-                item={item}
-                onUpdate={onUpdate}
+              <ManufacturingAnalysisPanel
+                bomItemId={item.id}
+                onFeatureSelect={(feature) => {
+                  setSelectedFeature(feature);
+                  setShowFeatures(true);
+                  // Switch to files tab to show 3D model with highlighted feature
+                  if (feature && item.file3dPath) {
+                    setActiveTab('files');
+                  }
+                }}
+                onFeaturesUpdate={(features) => {
+                  setManufacturingFeatures(features);
+                  setShowFeatures(features.length > 0);
+                }}
               />
             )}
           </div>

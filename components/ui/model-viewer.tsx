@@ -65,6 +65,20 @@ const EDrawingsViewer = dynamic(
   }
 );
 
+// Manufacturing Feature Interface
+interface ManufacturingFeature {
+  id: string;
+  type: 'hole' | 'pocket' | 'slot' | 'boss' | 'rib' | 'thin_wall' | 'overhang' | 'undercut';
+  position: { x: number; y: number; z: number };
+  dimensions: { length?: number; width?: number; diameter?: number; depth?: number };
+  manufacturingProcess: string;
+  costImpact: number;
+  cycleTime: number;
+  tooling: string[];
+  warnings: string[];
+  aiRecommendations: string[];
+}
+
 interface ModelViewerProps {
   fileUrl: string;
   fileName: string;
@@ -75,9 +89,23 @@ interface ModelViewerProps {
     dimensions: { x: number; y: number; z: number };
     surfaceArea: number;
   }) => void;
+  manufacturingFeatures?: ManufacturingFeature[];
+  selectedFeature?: ManufacturingFeature | null;
+  onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
+  showFeatures?: boolean;
 }
 
-export function ModelViewer({ fileUrl, fileName, fileType, bomItemId, onMeasurements }: ModelViewerProps) {
+export function ModelViewer({ 
+  fileUrl, 
+  fileName, 
+  fileType, 
+  bomItemId, 
+  onMeasurements,
+  manufacturingFeatures,
+  selectedFeature,
+  onFeatureSelect,
+  showFeatures
+}: ModelViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [viewerKey, setViewerKey] = useState(0);
@@ -112,8 +140,17 @@ export function ModelViewer({ fileUrl, fileName, fileType, bomItemId, onMeasurem
       }, 1000);
     } catch (error) {
       console.error('Conversion error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to convert STEP file. Make sure CAD engine is running.';
-      toast.error(message);
+      let message = 'Failed to convert STEP file.';
+      if (error instanceof Error) {
+        if (error.message.includes('CAD Engine not available') || error.message.includes('localhost:5000')) {
+          message = 'CAD Engine is offline. Start the Python CAD service (cad-engine/) to enable STEP conversion.';
+        } else if (error.message.includes('unexpected error') || error.message.includes('unexpected')) {
+          message = 'CAD Engine is offline or returned an error. Make sure the cad-engine service is running on port 5000.';
+        } else {
+          message = error.message;
+        }
+      }
+      toast.error(message, { duration: 6000 });
     } finally {
       setIsConverting(false);
     }
@@ -142,6 +179,10 @@ export function ModelViewer({ fileUrl, fileName, fileType, bomItemId, onMeasurem
               fileUrl={fileUrl}
               fileName={fileName}
               onMeasurements={onMeasurements}
+              manufacturingFeatures={manufacturingFeatures}
+              selectedFeature={selectedFeature}
+              onFeatureSelect={onFeatureSelect}
+              showFeatures={showFeatures}
             />
           </ErrorBoundary>
         </Suspense>
@@ -252,6 +293,11 @@ export function ModelViewer({ fileUrl, fileName, fileType, bomItemId, onMeasurem
               key={viewerKey}
               fileUrl={fileUrl}
               fileName={fileName}
+              onMeasurements={onMeasurements}
+              manufacturingFeatures={manufacturingFeatures}
+              selectedFeature={selectedFeature}
+              onFeatureSelect={onFeatureSelect}
+              showFeatures={showFeatures}
             />
           </ErrorBoundary>
         </Suspense>

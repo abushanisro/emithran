@@ -58,6 +58,11 @@ export interface CreateBOMItemDto {
   unitCost?: number;
   parentItemId?: string;
   sortOrder?: number;
+  weight?: number;
+  maxLength?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  surfaceArea?: number;
 }
 
 export interface UpdateBOMItemDto {
@@ -74,6 +79,11 @@ export interface UpdateBOMItemDto {
   unitCost?: number;
   parentItemId?: string;
   sortOrder?: number;
+  weight?: number;
+  maxLength?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  surfaceArea?: number;
 }
 
 const bomItemKeys = {
@@ -125,7 +135,7 @@ export function useCreateBOMItem() {
     mutationFn: (dto: CreateBOMItemDto) => {
       return apiClient.post<BOMItem>('/bom-items', dto);
     },
-    onSuccess: async (data, variables) => {
+    onSuccess: async (_data, variables) => {
       // Invalidate BOM item queries
       queryClient.invalidateQueries({ queryKey: bomItemKeys.list(variables.bomId) });
       

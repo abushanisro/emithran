@@ -554,8 +554,10 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       console.error('BOM Item Save Error:', {
         category: errorInfo.category,
         severity: errorInfo.severity,
+        message: (error as any)?.message ?? String(error),
+        status: (error as any)?.status ?? (error as any)?.statusCode,
+        stack: (error as any)?.stack,
         formData: { ...formData, file2d: formData.file2d?.name, file3d: formData.file3d?.name },
-        error
       });
     } finally {
       setLoading(false);

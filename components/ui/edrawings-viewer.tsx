@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useState, useRef, useEffect, useCallback } from 'react';
-import { Canvas, useLoader, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Grid, Center } from '@react-three/drei';
+import { Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-three/drei';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,26 @@ import {
   Square,
   PanelRightClose,
   PanelRightOpen,
+  Target,
+  DollarSign,
+  Clock,
+  AlertTriangle,
+  Crosshair,
 } from 'lucide-react';
+
+// Manufacturing Feature Interface
+interface ManufacturingFeature {
+  id: string;
+  type: 'hole' | 'pocket' | 'slot' | 'boss' | 'rib' | 'thin_wall' | 'overhang' | 'undercut';
+  position: { x: number; y: number; z: number };
+  dimensions: { length?: number; width?: number; diameter?: number; depth?: number };
+  manufacturingProcess: string;
+  costImpact: number;
+  cycleTime: number;
+  tooling: string[];
+  warnings: string[];
+  aiRecommendations: string[];
+}
 
 /**
  * Professional CAD Viewer - eDrawings Style
@@ -47,6 +66,10 @@ interface EDrawingsViewerProps {
     dimensions: { x: number; y: number; z: number };
     surfaceArea: number;
   }) => void;
+  manufacturingFeatures?: ManufacturingFeature[];
+  selectedFeature?: ManufacturingFeature | null;
+  onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
+  showFeatures?: boolean;
 }
 
 // Standard CAD views configuration
@@ -160,6 +183,735 @@ function calculateVolume(geometry: THREE.BufferGeometry): number {
   return Math.abs(volume);
 }
 
+
+// ─── DFM Color Constants ─────────────────────────────────────────────────────
+const DFM_COLORS = {
+  hole:      { hex: '#FF4757', rgb: [1.0, 0.278, 0.341] as [number,number,number], label: 'Holes' },
+  pocket:    { hex: '#1E90FF', rgb: [0.118, 0.565, 1.0]  as [number,number,number], label: 'Pockets' },
+  thin_wall: { hex: '#FFA502', rgb: [1.0, 0.647, 0.008] as [number,number,number], label: 'Thin Walls' },
+  undercut:  { hex: '#9B59B6', rgb: [0.608, 0.349, 0.714] as [number,number,number], label: 'Undercuts' },
+  slot:      { hex: '#2ED573', rgb: [0.180, 0.835, 0.451] as [number,number,number], label: 'Slots' },
+  overhang:  { hex: '#FF6B81', rgb: [1.0, 0.42, 0.506]  as [number,number,number], label: 'Overhangs' },
+} as const;
+
+type DFMType = keyof typeof DFM_COLORS;
+
+// ─── DFM Legend ───────────────────────────────────────────────────────────────
+function DFMLegend({ activeTypes }: { activeTypes: DFMType[] }) {
+  if (activeTypes.length === 0) return null;
+  return (
+    <Html
+      position={[-999, -999, 0]}
+      style={{ position: 'fixed', bottom: 72, left: 16, pointerEvents: 'none', userSelect: 'none' }}
+    >
+      <div style={{
+        background: 'rgba(20,20,30,0.85)',
+        backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 10,
+        padding: '8px 12px',
+        minWidth: 140,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+      }}>
+        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: 600, letterSpacing: 1, marginBottom: 6 }}>
+          DFM LEGEND
+        </div>
+        {activeTypes.map(type => (
+          <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+            <div style={{
+              width: 12, height: 12, borderRadius: '50%',
+              background: DFM_COLORS[type].hex,
+              boxShadow: `0 0 6px ${DFM_COLORS[type].hex}99`,
+              flexShrink: 0,
+            }} />
+            <span style={{ color: '#fff', fontSize: 11, fontWeight: 500 }}>{DFM_COLORS[type].label}</span>
+          </div>
+        ))}
+      </div>
+    </Html>
+  );
+}
+
+// ─── DFM Analysis Dialog (3D Overlay) ──────────────────────────────────────────
+function DFMAnalysisDialog({ 
+  feature, 
+  screenPosition, 
+  visible,
+  onClose
+}: { 
+  feature: ManufacturingFeature | null;
+  screenPosition: { x: number; y: number } | null;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  if (!visible || !feature || !screenPosition) return null;
+
+  const featureColor = DFM_COLORS[feature.type as DFMType] || DFM_COLORS.hole;
+
+  return (
+    <Html
+      position={[-999, -999, 0]}
+      style={{ 
+        position: 'fixed', 
+        left: Math.min(screenPosition.x - 200, window.innerWidth - 420), 
+        top: Math.max(screenPosition.y - 150, 20),
+        pointerEvents: 'auto', 
+        userSelect: 'none',
+        zIndex: 1000
+      }}
+    >
+      <div style={{
+        background: 'rgba(10,10,15,0.98)',
+        backdropFilter: 'blur(20px)',
+        border: `2px solid ${featureColor.hex}60`,
+        borderLeft: `6px solid ${featureColor.hex}`,
+        borderRadius: 16,
+        padding: 0,
+        width: 400,
+        maxHeight: '80vh',
+        boxShadow: `0 20px 60px rgba(0,0,0,0.8), 0 0 40px ${featureColor.hex}20`,
+        overflow: 'hidden',
+        animation: 'slideUp 0.3s ease-out'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: `linear-gradient(135deg, ${featureColor.hex}20, ${featureColor.hex}10)`,
+          padding: '16px 20px',
+          borderBottom: `1px solid ${featureColor.hex}30`
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 16, height: 16, borderRadius: '50%',
+                background: featureColor.hex,
+                boxShadow: `0 0 16px ${featureColor.hex}80`,
+                flexShrink: 0,
+              }} />
+              <div>
+                <div style={{ 
+                  color: '#fff', 
+                  fontSize: 18, 
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  marginBottom: 2
+                }}>
+                  {feature.type.replace('_', ' ')} ANALYSIS
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+                  {feature.manufacturingProcess}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                color: 'rgba(255,255,255,0.7)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 16
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ 
+          padding: '20px', 
+          maxHeight: 'calc(80vh - 100px)', 
+          overflowY: 'auto',
+          fontSize: 14,
+          lineHeight: 1.5
+        }}>
+          {/* Quick Stats */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr', 
+            gap: 16,
+            marginBottom: 20,
+            padding: '16px',
+            background: 'rgba(255,255,255,0.03)',
+            borderRadius: 12
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#22c55e', fontSize: 24, fontWeight: 700 }}>
+                ₹{feature.costImpact.toLocaleString()}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Cost Impact</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#3b82f6', fontSize: 24, fontWeight: 700 }}>
+                {feature.cycleTime}min
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Cycle Time</div>
+            </div>
+          </div>
+
+          {/* Dimensions */}
+          {Object.keys(feature.dimensions).length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ 
+                color: 'rgba(255,255,255,0.9)', 
+                fontSize: 13, 
+                fontWeight: 600, 
+                marginBottom: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                📏 SPECIFICATIONS
+              </div>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(2, 1fr)', 
+                gap: 8,
+                padding: '12px',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: 8
+              }}>
+                {feature.dimensions.diameter && (
+                  <div style={{ color: '#fff' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>Diameter:</span> ⌀{feature.dimensions.diameter}mm
+                  </div>
+                )}
+                {feature.dimensions.depth && (
+                  <div style={{ color: '#fff' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>Depth:</span> {feature.dimensions.depth}mm
+                  </div>
+                )}
+                {feature.dimensions.width && (
+                  <div style={{ color: '#fff' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>Width:</span> {feature.dimensions.width}mm
+                  </div>
+                )}
+                {feature.dimensions.length && (
+                  <div style={{ color: '#fff' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>Length:</span> {feature.dimensions.length}mm
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* AI Insights */}
+          {feature.aiRecommendations.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ 
+                color: featureColor.hex, 
+                fontSize: 13, 
+                fontWeight: 600,
+                marginBottom: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                🤖 AI INSIGHTS & RECOMMENDATIONS
+              </div>
+              <div style={{
+                background: `${featureColor.hex}10`,
+                border: `1px solid ${featureColor.hex}30`,
+                borderRadius: 12,
+                padding: '16px'
+              }}>
+                {feature.aiRecommendations.map((rec, i) => (
+                  <div key={i} style={{ 
+                    color: 'rgba(255,255,255,0.9)', 
+                    marginBottom: i < feature.aiRecommendations.length - 1 ? 12 : 0,
+                    paddingLeft: 16,
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 6,
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: featureColor.hex
+                    }} />
+                    {rec}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Warnings */}
+          {feature.warnings.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ 
+                color: '#fb923c', 
+                fontSize: 13, 
+                fontWeight: 600,
+                marginBottom: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                ⚠️ MANUFACTURING WARNINGS
+              </div>
+              <div style={{
+                background: 'rgba(251,146,60,0.1)',
+                border: '1px solid rgba(251,146,60,0.3)',
+                borderRadius: 12,
+                padding: '16px'
+              }}>
+                {feature.warnings.map((warning, i) => (
+                  <div key={i} style={{ 
+                    color: 'rgba(255,255,255,0.9)', 
+                    marginBottom: i < feature.warnings.length - 1 ? 12 : 0,
+                    paddingLeft: 16,
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 6,
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: '#fb923c'
+                    }} />
+                    {warning}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tooling Requirements */}
+          {feature.tooling.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ 
+                color: 'rgba(255,255,255,0.9)', 
+                fontSize: 13, 
+                fontWeight: 600,
+                marginBottom: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                🔧 REQUIRED TOOLING
+              </div>
+              <div style={{
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: 12,
+                padding: '16px'
+              }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gap: 8 
+                }}>
+                  {feature.tooling.map((tool, i) => (
+                    <div key={i} style={{ 
+                      color: 'rgba(255,255,255,0.9)',
+                      padding: '8px 12px',
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                      • {tool}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{ 
+            display: 'flex', 
+            gap: 12,
+            marginTop: 24,
+            paddingTop: 16,
+            borderTop: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            <button style={{
+              flex: 1,
+              padding: '12px 16px',
+              background: `${featureColor.hex}20`,
+              border: `1px solid ${featureColor.hex}40`,
+              borderRadius: 8,
+              color: featureColor.hex,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}>
+              📊 VIEW FULL REPORT
+            </button>
+            <button style={{
+              flex: 1,
+              padding: '12px 16px',
+              background: 'rgba(59,130,246,0.2)',
+              border: '1px solid rgba(59,130,246,0.4)',
+              borderRadius: 8,
+              color: '#3b82f6',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}>
+              💡 GET SUGGESTIONS
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
+    </Html>
+  );
+}
+
+// ─── DFM Color Mesh ──────────────────────────────────────────────────────────
+/**
+ * Classifies each STL triangle by face-normal analysis and paints
+ * it directly with a DFM category color. No coordinate guessing needed —
+ * the colors are always pixel-perfect on the actual geometry.
+ */
+function DFMColorMesh({
+  geometry,
+  features,
+  selectedFeatureType,
+  onFaceClick,
+}: {
+  geometry: THREE.BufferGeometry;
+  features: ManufacturingFeature[];
+  selectedFeatureType: string | null;
+  onFaceClick: (type: string, worldPosition?: THREE.Vector3) => void;
+}) {
+  const coloredGeo = useMemo(() => {
+    try {
+      // Validation checks
+      if (!geometry || !features || features.length === 0) return null;
+
+      const geo = geometry.clone();
+      const posAttr = geo.attributes.position;
+      if (!posAttr || posAttr.count === 0) return null;
+
+      // Ensure geometry is valid
+      if (posAttr.count % 3 !== 0) {
+        console.warn('DFM: Invalid geometry - vertex count not divisible by 3');
+        return null;
+      }
+
+      // Compute bounding box on centered geometry
+      geo.computeBoundingBox();
+      const bbox = geo.boundingBox;
+      if (!bbox) return null;
+      
+      const size = new THREE.Vector3();
+      bbox.getSize(size);
+      const center = new THREE.Vector3();
+      bbox.getCenter(center);
+
+      // Validate bounding box
+      if (size.x === 0 || size.y === 0 || size.z === 0) {
+        console.warn('DFM: Invalid bounding box - zero dimension detected');
+        return null;
+      }
+
+    const halfX = size.x / 2 || 1;
+    const halfZ = size.z / 2 || 1;
+
+    // Detect which feature types are active
+    const hasHoles     = features.some(f => f.type === 'hole');
+    const hasPockets   = features.some(f => f.type === 'pocket');
+    const hasUndercuts = features.some(f => f.type === 'undercut');
+    const hasThinWalls = features.some(f => f.type === 'thin_wall');
+    const hasSlots     = features.some(f => f.type === 'slot');
+    const hasOverhangs = features.some(f => f.type === 'overhang');
+
+    // Estimate thin-wall threshold: 15% of the smallest bounding dimension
+    const minDim = Math.min(size.x, size.y, size.z);
+    const thinThreshold = minDim * 0.18;
+
+    const count = posAttr.count; // total vertex count (3 per triangle)
+    const triangleCount = count / 3;
+    
+    // Optimize for large meshes
+    if (triangleCount > 50000) {
+      console.log(`DFM: Processing large mesh with ${triangleCount.toLocaleString()} triangles`);
+    }
+    
+    const colors = new Float32Array(count * 3);
+
+    // Base color (steel blue-grey)
+    const BASE = [0.65, 0.72, 0.82] as [number,number,number];
+
+    // Pre-fill with base color for performance
+    for (let i = 0; i < count; i++) {
+      colors[i * 3]     = BASE[0];
+      colors[i * 3 + 1] = BASE[1]; 
+      colors[i * 3 + 2] = BASE[2];
+    }
+
+    const v: [THREE.Vector3, THREE.Vector3, THREE.Vector3] = [
+      new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()
+    ];
+    const edge1 = new THREE.Vector3();
+    const edge2 = new THREE.Vector3();
+    const normal = new THREE.Vector3();
+    const centroid = new THREE.Vector3();
+
+    for (let i = 0; i < count; i += 3) {
+      try {
+        // Read three vertices of this triangle - with bounds checking
+        if (i + 2 >= count) break;
+        
+        v[0].set(posAttr.getX(i),   posAttr.getY(i),   posAttr.getZ(i));
+        v[1].set(posAttr.getX(i+1), posAttr.getY(i+1), posAttr.getZ(i+1));
+        v[2].set(posAttr.getX(i+2), posAttr.getY(i+2), posAttr.getZ(i+2));
+
+        // Validate vertices are finite
+        if (!isFinite(v[0].x) || !isFinite(v[1].x) || !isFinite(v[2].x)) {
+          // Use base color for invalid triangles
+          for (let j = 0; j < 3; j++) {
+            colors[(i + j) * 3]     = BASE[0];
+            colors[(i + j) * 3 + 1] = BASE[1];
+            colors[(i + j) * 3 + 2] = BASE[2];
+          }
+          continue;
+        }
+
+        edge1.subVectors(v[1], v[0]);
+        edge2.subVectors(v[2], v[0]);
+        normal.crossVectors(edge1, edge2);
+        
+        // Check for degenerate triangles
+        if (normal.length() < 1e-6) {
+          // Use base color for degenerate triangles
+          for (let j = 0; j < 3; j++) {
+            colors[(i + j) * 3]     = BASE[0];
+            colors[(i + j) * 3 + 1] = BASE[1];
+            colors[(i + j) * 3 + 2] = BASE[2];
+          }
+          continue;
+        }
+        
+        normal.normalize();
+        centroid.addVectors(v[0], v[1]).add(v[2]).divideScalar(3);
+
+        // Normalize centroid to [-1,+1]
+        const nx = centroid.x / halfX;
+        const nz = centroid.z / halfZ;
+
+        // Face is on outer perimeter of the XZ bounding rectangle
+        const onOuterPerimXZ =
+          Math.abs(centroid.x - bbox.min.x) < size.x * 0.08 ||
+          Math.abs(centroid.x - bbox.max.x) < size.x * 0.08 ||
+          Math.abs(centroid.z - bbox.min.z) < size.z * 0.08 ||
+          Math.abs(centroid.z - bbox.max.z) < size.z * 0.08;
+
+        // Distance from Y-axis (for cylindrical interior detection)
+        const rXZ = Math.sqrt(centroid.x * centroid.x + centroid.z * centroid.z);
+        const normalHorizontal = Math.abs(normal.y) < 0.28; // mostly horizontal normal
+        const normalUp   = normal.y > 0.65;
+        const normalDown = normal.y < -0.45;
+
+        let color: [number,number,number] = BASE;
+
+        // Detect feature type first
+        let detectedFeature: string | null = null;
+
+        // ── UNDERCUT: faces pointing downward (not bottom face) ──────────
+        if (hasUndercuts && normalDown && centroid.y > bbox.min.y + size.y * 0.05) {
+          detectedFeature = 'undercut';
+        }
+        // ── POCKET: upward-facing recessed faces (NOT the top surface) ──
+        else if (hasPockets && normalUp && centroid.y < bbox.max.y - size.y * 0.06 && centroid.y > bbox.min.y + size.y * 0.1) {
+          detectedFeature = 'pocket';
+        }
+        // ── HOLE: cylindrical interior faces (comprehensive detection) ────
+        else if (hasHoles) {
+          // Multiple criteria for hole detection
+          const isVerticalFace = Math.abs(normal.y) < 0.6; // Vertical or angled faces
+          const isHorizontalFace = Math.abs(normal.y) > 0.4; // Horizontal or angled faces
+          
+          // Interior detection - faces that are away from the outer edges
+          const distanceFromEdgeX = Math.min(
+            Math.abs(centroid.x - bbox.min.x),
+            Math.abs(centroid.x - bbox.max.x)
+          );
+          const distanceFromEdgeZ = Math.min(
+            Math.abs(centroid.z - bbox.min.z),
+            Math.abs(centroid.z - bbox.max.z)
+          );
+          const minEdgeDistance = Math.min(distanceFromEdgeX, distanceFromEdgeZ);
+          const isInterior = minEdgeDistance > size.x * 0.05; // 5% inward from edges
+          
+          // Size constraints
+          const maxRadius = Math.min(halfX, halfZ) * 0.95;
+          const minRadius = Math.min(size.x, size.z) * 0.01; // Minimum hole size
+          const isReasonableSize = rXZ >= minRadius && rXZ <= maxRadius;
+          
+          if ((isVerticalFace || isHorizontalFace) && isInterior && isReasonableSize) {
+            detectedFeature = 'hole';
+          }
+        }
+        // ── SLOT (long narrow cut): horizontal interior faces ──────────
+        else if (hasSlots && normalHorizontal && !onOuterPerimXZ) {
+          detectedFeature = 'slot';
+        }
+        // ── THIN WALL: nearly-vertical faces near the edges ────────────
+        else if (hasThinWalls && normalHorizontal && onOuterPerimXZ) {
+          // Detect if it's a particularly thin outer wall
+          const edgeLen = Math.max(edge1.length(), edge2.length());
+          if (edgeLen < thinThreshold * 2) {
+            detectedFeature = 'thin_wall';
+          }
+        }
+        // ── OVERHANG: upward faces at extremes of X or Z ───────────────
+        else if (hasOverhangs && normalUp && (Math.abs(nx) > 0.7 || Math.abs(nz) > 0.7)) {
+          detectedFeature = 'overhang';
+        }
+
+        // Apply color based on selection logic
+        if (detectedFeature) {
+          // If no feature is selected, show all features
+          if (selectedFeatureType === null) {
+            color = DFM_COLORS[detectedFeature as DFMType].rgb;
+          }
+          // If a specific feature is selected, only show that feature
+          else if (selectedFeatureType === detectedFeature) {
+            color = DFM_COLORS[detectedFeature as DFMType].rgb;
+          }
+          // Otherwise keep base color (no highlighting for non-selected features)
+        }
+
+        // Write color for all 3 vertices of this triangle
+        for (let j = 0; j < 3; j++) {
+          colors[(i + j) * 3]     = color[0];
+          colors[(i + j) * 3 + 1] = color[1];
+          colors[(i + j) * 3 + 2] = color[2];
+        }
+      } catch (triangleError) {
+        // If triangle processing fails, use base color
+        for (let j = 0; j < 3; j++) {
+          colors[(i + j) * 3]     = BASE[0];
+          colors[(i + j) * 3 + 1] = BASE[1];
+          colors[(i + j) * 3 + 2] = BASE[2];
+        }
+      }
+    }
+
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      return geo;
+    } catch (error) {
+      console.error('DFM color mesh generation failed:', error);
+      return null;
+    }
+  }, [geometry, features, selectedFeatureType]);
+
+  if (!coloredGeo) return null;
+
+  const handleMeshClick = (event: any) => {
+    try {
+      event.stopPropagation();
+      
+      // Get the clicked intersection
+      const intersection = event.intersections?.[0];
+      if (!intersection || !intersection.face || !intersection.point) return;
+      
+      const face = intersection.face;
+      const worldPoint = intersection.point; // 3D world position
+      
+      // Get vertex colors for this triangle
+      const colors = coloredGeo.attributes.color;
+      if (!colors || !face) return;
+      
+      // Sample all three vertex colors for better accuracy
+      const colorSamples = [
+        { r: colors.getX(face.a * 3), g: colors.getY(face.a * 3), b: colors.getZ(face.a * 3) },
+        { r: colors.getX(face.b * 3), g: colors.getY(face.b * 3), b: colors.getZ(face.b * 3) },
+        { r: colors.getX(face.c * 3), g: colors.getY(face.c * 3), b: colors.getZ(face.c * 3) }
+      ];
+      
+      // Find the most common color among the three vertices
+      let bestMatch: string | null = null;
+      let bestScore = Infinity;
+      
+      const testColors = [
+        { type: 'hole', ...DFM_COLORS.hole },
+        { type: 'pocket', ...DFM_COLORS.pocket },
+        { type: 'thin_wall', ...DFM_COLORS.thin_wall },
+        { type: 'undercut', ...DFM_COLORS.undercut },
+        { type: 'slot', ...DFM_COLORS.slot },
+        { type: 'overhang', ...DFM_COLORS.overhang },
+      ];
+      
+      for (const testColor of testColors) {
+        for (const sample of colorSamples) {
+          const distance = Math.sqrt(
+            Math.pow(sample.r - testColor.rgb[0], 2) +
+            Math.pow(sample.g - testColor.rgb[1], 2) +
+            Math.pow(sample.b - testColor.rgb[2], 2)
+          );
+          
+          if (distance < bestScore && distance < 0.15) {
+            bestScore = distance;
+            bestMatch = testColor.type;
+          }
+        }
+      }
+      
+      if (bestMatch) {
+        onFaceClick(bestMatch, worldPoint);
+      }
+    } catch (error) {
+      console.warn('DFM click detection error:', error);
+    }
+  };
+
+  return (
+    <group>
+      {/* Main DFM colored mesh */}
+      <mesh
+        geometry={coloredGeo}
+        onClick={handleMeshClick}
+        onPointerOver={(e) => { 
+          e.stopPropagation(); 
+          document.body.style.cursor = 'pointer'; 
+        }}
+        onPointerOut={() => { 
+          document.body.style.cursor = 'auto'; 
+        }}
+      >
+        <meshStandardMaterial
+          vertexColors
+          transparent
+          opacity={0.92}
+          metalness={0.15}
+          roughness={0.45}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+    </group>
+  );
+}
+
+// ─── Feature Insight Tooltip (HTML overlay shown in sidebar, not 3D) ─────────
+// (See ManufacturingAnalysisPanel for sidebar rendering)
+
 // STL Model with section plane and measurements
 function STLModel({
   url,
@@ -168,7 +920,11 @@ function STLModel({
   isTransparent,
   isWireframe,
   onLoad,
-  onMeasurements
+  onMeasurements,
+  manufacturingFeatures,
+  selectedFeature,
+  onFeatureSelect,
+  showFeatures
 }: {
   url: string;
   color: string;
@@ -181,9 +937,31 @@ function STLModel({
     dimensions: { x: number; y: number; z: number };
     surfaceArea: number;
   }) => void;
+  manufacturingFeatures?: ManufacturingFeature[];
+  selectedFeature?: ManufacturingFeature | null;
+  onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
+  showFeatures?: boolean;
 }) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const meshRef = useRef<THREE.Mesh>(null);
+  const [tooltipFeature, setTooltipFeature] = useState<ManufacturingFeature | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
+  const { camera, gl } = useThree();
+
+  // Clear tooltip when clicking elsewhere
+  useEffect(() => {
+    const handleCanvasClick = (event: MouseEvent) => {
+      // Only clear if we're not clicking on a DFM feature
+      const target = event.target as Element;
+      if (!target.closest('[data-dfm-feature]')) {
+        setTooltipFeature(null);
+        setTooltipPosition(null);
+      }
+    };
+
+    gl.domElement.addEventListener('click', handleCanvasClick);
+    return () => gl.domElement.removeEventListener('click', handleCanvasClick);
+  }, [gl]);
 
   useEffect(() => {
     const loader = new STLLoader();
@@ -219,26 +997,12 @@ function STLModel({
 
       let surfaceArea = 0;
       for (let i = 0; i < position.count; i += 3) {
-        const v1 = new THREE.Vector3(
-          position.getX(i),
-          position.getY(i),
-          position.getZ(i)
-        );
-        const v2 = new THREE.Vector3(
-          position.getX(i + 1),
-          position.getY(i + 1),
-          position.getZ(i + 1)
-        );
-        const v3 = new THREE.Vector3(
-          position.getX(i + 2),
-          position.getY(i + 2),
-          position.getZ(i + 2)
-        );
-
+        const v1 = new THREE.Vector3(position.getX(i),   position.getY(i),   position.getZ(i));
+        const v2 = new THREE.Vector3(position.getX(i+1), position.getY(i+1), position.getZ(i+1));
+        const v3 = new THREE.Vector3(position.getX(i+2), position.getY(i+2), position.getZ(i+2));
         const edge1 = new THREE.Vector3().subVectors(v2, v1);
         const edge2 = new THREE.Vector3().subVectors(v3, v1);
-        const cross = new THREE.Vector3().crossVectors(edge1, edge2);
-        surfaceArea += cross.length() / 2;
+        surfaceArea += new THREE.Vector3().crossVectors(edge1, edge2).length() / 2;
       }
 
       onMeasurements?.({ volume, dimensions, surfaceArea });
@@ -249,51 +1013,102 @@ function STLModel({
   useEffect(() => {
     if (meshRef.current) {
       const material = meshRef.current.material as THREE.Material;
-
       if (sectionPlane > 0) {
-        // Create clipping plane
         const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), sectionPlane - 0.5);
         (meshRef.current.material as any).clippingPlanes = [plane];
         (meshRef.current.material as any).clipShadows = true;
       } else {
         (meshRef.current.material as any).clippingPlanes = [];
       }
-
       material.needsUpdate = true;
     }
   }, [sectionPlane]);
 
-  // Cleanup geometry and materials on unmount
   useEffect(() => {
     return () => {
       if (meshRef.current) {
         const material = meshRef.current.material as THREE.Material;
-        if (material) {
-          material.dispose();
-        }
+        if (material) material.dispose();
       }
-      // Note: geometry is handled by useLoader and will be disposed automatically
     };
   }, []);
 
-  if (!geometry) {
-    return null; // Loading state handled by Suspense wrapper
-  }
+  if (!geometry) return null;
+
+  // Detect active DFM types for the legend
+  const activeTypes = (manufacturingFeatures || [])
+    .map(f => f.type)
+    .filter((t, i, arr) => arr.indexOf(t) === i)
+    .filter(t => t in DFM_COLORS) as DFMType[];
 
   return (
-    <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial
-        color={color}
-        metalness={0.2}
-        roughness={0.4}
-        side={THREE.DoubleSide}
-        transparent={isTransparent}
-        opacity={isTransparent ? 0.5 : 1}
-        wireframe={isWireframe}
+    <group>
+      {/* Base model — semi-transparent when DFM overlay is active */}
+      <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
+        <meshStandardMaterial
+          color={showFeatures ? '#8899aa' : color}
+          metalness={0.2}
+          roughness={0.45}
+          side={THREE.DoubleSide}
+          transparent={isTransparent || !!showFeatures}
+          opacity={isTransparent ? 0.3 : showFeatures ? 0.22 : 1}
+          wireframe={isWireframe}
+        />
+      </mesh>
+
+      {/* DFM face-color highlight overlay */}
+      {showFeatures && manufacturingFeatures && manufacturingFeatures.length > 0 && (
+        <DFMColorMesh
+          geometry={geometry}
+          features={manufacturingFeatures}
+          selectedFeatureType={selectedFeature?.type ?? null}
+          onFaceClick={(type, worldPosition) => {
+            const f = manufacturingFeatures.find(mf => mf.type === type);
+            const isNewSelection = !selectedFeature || f?.id !== selectedFeature.id;
+            
+            if (isNewSelection && f && worldPosition) {
+              // Convert world position to screen position for tooltip
+              const vector = worldPosition.clone();
+              vector.project(camera);
+              
+              const canvas = gl.domElement;
+              const rect = canvas.getBoundingClientRect();
+              const x = (vector.x * 0.5 + 0.5) * rect.width + rect.left;
+              const y = (vector.y * -0.5 + 0.5) * rect.height + rect.top;
+              
+              setTooltipFeature(f);
+              setTooltipPosition({ x, y });
+              onFeatureSelect?.(f);
+            } else {
+              // Deselect if clicking same feature
+              setTooltipFeature(null);
+              setTooltipPosition(null);
+              onFeatureSelect?.(null);
+            }
+          }}
+        />
+      )}
+
+      {/* 3D DFM Analysis Dialog */}
+      <DFMAnalysisDialog
+        feature={tooltipFeature}
+        screenPosition={tooltipPosition}
+        visible={!!tooltipFeature && !!tooltipPosition}
+        onClose={() => {
+          setTooltipFeature(null);
+          setTooltipPosition(null);
+          onFeatureSelect?.(null);
+        }}
       />
-    </mesh>
+
+      {/* DFM Legend — anchored as HTML overlay */}
+      {showFeatures && activeTypes.length > 0 && (
+        <DFMLegend activeTypes={activeTypes} />
+      )}
+    </group>
   );
 }
+
 
 // Camera Controller
 function CameraController({
@@ -330,7 +1145,11 @@ function Scene({
   isTransparent,
   isWireframe,
   onMeasurements,
-  onOrientationChange
+  onOrientationChange,
+  manufacturingFeatures,
+  selectedFeature,
+  onFeatureSelect,
+  showFeatures
 }: {
   fileUrl: string;
   modelColor: string;
@@ -349,6 +1168,10 @@ function Scene({
     surfaceArea: number;
   }) => void;
   onOrientationChange: (matrix: THREE.Matrix4) => void;
+  manufacturingFeatures?: ManufacturingFeature[];
+  selectedFeature?: ManufacturingFeature | null;
+  onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
+  showFeatures?: boolean;
 }) {
   return (
     <>
@@ -407,6 +1230,10 @@ function Scene({
             isWireframe={isWireframe}
             onLoad={onModelLoad}
             onMeasurements={onMeasurements}
+            manufacturingFeatures={manufacturingFeatures}
+            selectedFeature={selectedFeature}
+            onFeatureSelect={onFeatureSelect}
+            showFeatures={showFeatures}
           />
         </Center>
       </Suspense>
@@ -424,7 +1251,15 @@ function Scene({
   );
 }
 
-export function EDrawingsViewer({ fileUrl, fileName, onMeasurements }: EDrawingsViewerProps) {
+export function EDrawingsViewer({ 
+  fileUrl, 
+  fileName, 
+  onMeasurements,
+  manufacturingFeatures,
+  selectedFeature,
+  onFeatureSelect,
+  showFeatures
+}: EDrawingsViewerProps) {
   const [loading, setLoading] = useState(true);
   const [modelColor, setModelColor] = useState('#3b82f6');
   const [showGrid, setShowGrid] = useState(true);
@@ -444,6 +1279,18 @@ export function EDrawingsViewer({ fileUrl, fileName, onMeasurements }: EDrawings
     dimensions: { x: number; y: number; z: number };
     surfaceArea: number;
   } | null>(null);
+
+  // Internal feature state with defaults
+  const [internalShowFeatures, setInternalShowFeatures] = useState(showFeatures ?? false);
+  const features = manufacturingFeatures ?? [];
+  const currentSelectedFeature = selectedFeature ?? null;
+
+  // Sync internal state with props
+  useEffect(() => {
+    if (showFeatures !== undefined) {
+      setInternalShowFeatures(showFeatures);
+    }
+  }, [showFeatures]);
 
   // Reusable Vector3 instances to avoid GC pressure from frame callbacks
   const tempVectors = useRef({
@@ -532,7 +1379,7 @@ export function EDrawingsViewer({ fileUrl, fileName, onMeasurements }: EDrawings
   const toggleWireframe = () => {
     setIsWireframe(!isWireframe);
   };
-
+  
   const toggleCrossSection = () => {
     const newValue = !showCrossSection;
     setShowCrossSection(newValue);
@@ -589,6 +1436,25 @@ export function EDrawingsViewer({ fileUrl, fileName, onMeasurements }: EDrawings
               <Slice className="h-3.5 w-3.5" />
               Cross Section
             </Button>
+
+            {/* DFM Features Toggle */}
+            {features.length > 0 && (
+              <>
+                <Separator orientation="vertical" className="h-6 bg-[#555555]" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInternalShowFeatures(!internalShowFeatures)}
+                  className={`gap-1.5 font-medium text-xs ${internalShowFeatures
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-700'
+                    : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'
+                    }`}
+                >
+                  <Target className="h-3.5 w-3.5" />
+                  DFM Features ({features.length})
+                </Button>
+              </>
+            )}
 
             <Separator orientation="vertical" className="h-6 bg-[#555555]" />
 
@@ -702,7 +1568,6 @@ export function EDrawingsViewer({ fileUrl, fileName, onMeasurements }: EDrawings
             }}
             onCreated={(state) => {
               // Handle context loss
-              const gl = state.gl.getContext();
               const canvas = state.gl.domElement;
               
               const handleContextLost = (event: Event) => {
@@ -745,6 +1610,10 @@ export function EDrawingsViewer({ fileUrl, fileName, onMeasurements }: EDrawings
               isWireframe={isWireframe}
               onMeasurements={handleMeasurements}
               onOrientationChange={handleOrientationChange}
+              manufacturingFeatures={features}
+              selectedFeature={currentSelectedFeature}
+              onFeatureSelect={onFeatureSelect}
+              showFeatures={internalShowFeatures}
             />
           </Canvas>
 
@@ -861,7 +1730,7 @@ export function EDrawingsViewer({ fileUrl, fileName, onMeasurements }: EDrawings
             <p className="text-[9px] text-gray-400">Model controls and information</p>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-1.5 space-y-1.5 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 scroll-smooth">
             {/* Part Details - Dimensions & Volume */}
             {measurements && (
               <Card className="bg-[#505050] border-[#666666]">
@@ -975,6 +1844,88 @@ export function EDrawingsViewer({ fileUrl, fileName, onMeasurements }: EDrawings
               </div>
             </Card>
 
+            {/* DFM Feature List in sidebar */}
+            {features.length > 0 && (
+              <Card className="bg-[#505050] border-[#666666]">
+                <div className="p-1.5">
+                  <h4 className="text-[10px] font-semibold text-white flex items-center gap-1 mb-1">
+                    <Target className="h-2.5 w-2.5" />
+                    DFM Features
+                    <span className="ml-auto text-[8px] text-gray-400 font-normal">click to highlight</span>
+                  </h4>
+
+                  {/* Color legend */}
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    {(['hole','pocket','thin_wall','undercut'] as const).map(t => (
+                      <span key={t} className="flex items-center gap-0.5 text-[7px] text-gray-300">
+                        <span className="inline-block w-2 h-2 rounded-full" style={{
+                          background: t === 'hole' ? '#FF6B6B' : t === 'pocket' ? '#4ECDC4' : t === 'thin_wall' ? '#FFA07A' : '#D63031'
+                        }} />
+                        {t.replace('_',' ')}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="space-y-1 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-700 pr-1">
+                    {features.map((feature) => {
+                      const featureColor =
+                        feature.type === 'hole' ? '#FF6B6B' :
+                        feature.type === 'pocket' ? '#4ECDC4' :
+                        feature.type === 'thin_wall' ? '#FFA07A' :
+                        feature.type === 'undercut' ? '#D63031' : '#74B9FF';
+                      const isSelected = currentSelectedFeature?.id === feature.id;
+                      return (
+                        <button
+                          key={feature.id}
+                          onClick={() => onFeatureSelect?.(
+                            isSelected ? null : feature
+                          )}
+                          className={`w-full text-left p-1.5 rounded border transition-all ${
+                            isSelected
+                              ? 'border-blue-400 bg-blue-900/30'
+                              : 'border-[#666666] bg-[#3f3f3f] hover:bg-[#484848]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <Crosshair
+                              className="h-2.5 w-2.5 flex-shrink-0"
+                              style={{ color: featureColor }}
+                            />
+                            <span
+                              className="text-[9px] font-semibold truncate"
+                              style={{ color: featureColor }}
+                            >
+                              {feature.type.replace('_', ' ').toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="text-[8px] text-gray-300 truncate mb-0.5">
+                            {feature.manufacturingProcess}
+                          </div>
+                          <div className="flex items-center gap-2 text-[7px] text-gray-400">
+                            <span className="flex items-center gap-0.5">
+                              <Clock className="h-1.5 w-1.5" />
+                              {feature.cycleTime}min
+                            </span>
+                            <span className="flex items-center gap-0.5">
+                              <DollarSign className="h-1.5 w-1.5" />
+                              ₹{feature.costImpact.toLocaleString()}
+                            </span>
+                          </div>
+                          {feature.warnings.length > 0 && (
+                            <div className="flex items-start gap-0.5 mt-0.5">
+                              <AlertTriangle className="h-2 w-2 text-amber-400 flex-shrink-0 mt-px" />
+                              <span className="text-[7px] text-amber-400 leading-tight">
+                                {feature.warnings[0]}
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         </div>
       </div>
