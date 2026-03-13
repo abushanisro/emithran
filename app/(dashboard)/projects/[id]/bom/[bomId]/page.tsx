@@ -1530,10 +1530,6 @@ export default function
                   <CardTitle>BOM Items</CardTitle>
                   <CardDescription>Manage parts, materials, and components</CardDescription>
                 </div>
-                <Button onClick={handleAddItem} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add BOM
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -1543,6 +1539,14 @@ export default function
                 onViewItem={handleViewItem}
                 onAddChildItem={handleAddTreeItem}
               />
+              
+              {/* Add BOM Button - Moved to bottom */}
+              <div className="flex justify-center mt-6">
+                <Button onClick={handleAddItem} className="gap-2" size="lg">
+                  <Plus className="h-4 w-4" />
+                  Add BOM Item
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

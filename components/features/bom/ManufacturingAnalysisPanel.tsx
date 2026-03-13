@@ -969,8 +969,64 @@ export default function ManufacturingAnalysisPanel({
     mfg: any,
     geo: any,
   ) => {
-    // Return empty array - no mock process recommendations
-    return [];
+    const processes: ManufacturingAnalysisData['recommendedProcesses'] = [];
+
+    // Priority 1: Use AI-generated process recommendations from your process API
+    if (aiProcs && aiProcs.length > 0) {
+      aiProcs.forEach((proc: any) => {
+        if (typeof proc === 'string') {
+          // Simple string process name - map to UI expected format
+          processes.push({
+            process: proc,
+            suitability: 75,
+            leadTime: 14,
+            quality: 'Good',
+            reasoning: 'AI recommended process based on part geometry and requirements',
+            category: 'AI Recommended'
+          });
+        } else if (proc && proc.name) {
+          // Structured process recommendation from API
+          processes.push({
+            process: proc.name,
+            suitability: Math.round((proc.suitability_score || 0.75) * 100),
+            leadTime: proc.lead_time || proc.leadTime || 14,
+            quality: proc.quality || 'Good',
+            reasoning: proc.reasoning || `Recommended for current part geometry and manufacturing requirements`,
+            category: proc.category || 'AI Analysis'
+          });
+        }
+      });
+    }
+
+    // Priority 2: Use fallback process recommendations from your API
+    if (processes.length === 0 && fallback && fallback.length > 0) {
+      fallback.forEach((proc: any) => {
+        if (typeof proc === 'string') {
+          processes.push({
+            process: proc,
+            suitability: 70,
+            leadTime: 21,
+            quality: 'Standard',
+            reasoning: 'Recommended based on manufacturing analysis',
+            category: 'Standard Process'
+          });
+        } else if (proc && (proc.name || proc.process)) {
+          // Handle structured fallback data
+          processes.push({
+            process: proc.name || proc.process,
+            suitability: proc.suitability || proc.suitability_score || 70,
+            leadTime: proc.leadTime || proc.lead_time || 21,
+            quality: proc.quality || 'Standard',
+            reasoning: proc.reasoning || 'Recommended based on manufacturing analysis',
+            category: proc.category || 'Manufacturing'
+          });
+        }
+      });
+    }
+
+    // Priority 3: If no process data available, return empty array to let your process API handle it
+    // Remove mock data generation - let the process API provide real recommendations
+    return processes;
   };
 
   /* ─────────────────────────────────────────────────────────────────
