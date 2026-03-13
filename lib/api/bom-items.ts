@@ -54,18 +54,40 @@ export interface AnalyzeCADRequest {
 
 export const bomItemsApi = {
   /**
-   * Analyze CAD for a BOM item
+   * Analyze CAD for a BOM item with optional process-specific context
    */
-  analyzeCAD: async (bomItemId: string, forceReanalysis = false): Promise<CADAnalysisResult> => {
+  analyzeCAD: async (
+    bomItemId: string, 
+    forceReanalysis = false,
+    processContext?: {
+      selectedProcess?: string;
+      annualVolume?: number;
+      material?: string;
+      materialGrade?: string;
+    }
+  ): Promise<CADAnalysisResult> => {
     try {
+      const requestBody = {
+        strategy: 'balanced',
+        forceReanalysis,
+        ...(processContext && {
+          processContext: {
+            selectedProcess: processContext.selectedProcess,
+            annualVolume: processContext.annualVolume,
+            material: processContext.material,
+            materialGrade: processContext.materialGrade
+          }
+        })
+      };
+
+      console.log('CAD Analysis Request:', { bomItemId, requestBody });
+
       const response = await apiClient.post<CADAnalysisResult>(
         `/bom-items/${bomItemId}/analyze-cad`,
+        requestBody,
         {
-          strategy: 'balanced',
-          forceReanalysis
-        },
-        {
-          timeout: 60000 // 60 seconds timeout for CAD analysis
+          timeout: 120000, // Extended to 120 seconds for process-specific analysis
+          priority: 'high' // High priority for interactive DFM analysis
         }
       );
       

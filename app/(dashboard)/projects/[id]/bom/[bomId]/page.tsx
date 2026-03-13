@@ -128,27 +128,7 @@ export default function
     return 1 + getItemDepth(item.parentItemId, items, visited);
   };
 
-  // Sort items to maintain hierarchy (parents before children)
-  const getSortedItems = (items: any[]) => {
-    const itemMap = new Map(items.map(item => [item.id, item]));
-    const sorted: any[] = [];
-    const added = new Set<string>();
 
-    const addItem = (item: any) => {
-      if (added.has(item.id)) return;
-
-      // Add parent first if it exists
-      if (item.parentItemId && itemMap.has(item.parentItemId)) {
-        addItem(itemMap.get(item.parentItemId));
-      }
-
-      sorted.push(item);
-      added.add(item.id);
-    };
-
-    items.forEach(item => addItem(item));
-    return sorted;
-  };
 
   // Auto-assign parent based on item type hierarchy
   const getAutoParentForType = (type: BOMItemType): string | null => {
@@ -490,13 +470,14 @@ export default function
       throw new Error('Invalid CSV file - no data rows found');
     }
 
-    const headers = lines[0].split(',').map((h: string) => h.trim().replace(/"/g, ''));
+    const headers = lines[0]!.split(',').map((h: string) => h.trim().replace(/"/g, ''));
     const items = [];
 
     for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
+      const line = lines[i];
+      if (!line || !line.trim()) continue;
 
-      const values = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+      const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
       const cleanedValues = values.map((v: string) => v.trim().replace(/^"|"$/g, ''));
 
       const item = parseRowData(headers, cleanedValues, i);
@@ -520,7 +501,13 @@ export default function
           
           // Use first worksheet
           const worksheetName = workbook.SheetNames[0];
+          if (!worksheetName) {
+            throw new Error('Invalid Excel file - no worksheets found');
+          }
           const worksheet = workbook.Sheets[worksheetName];
+          if (!worksheet) {
+            throw new Error(`Invalid Excel file - worksheet "${worksheetName}" not found`);
+          }
           
           // Convert to JSON with headers
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
@@ -710,6 +697,7 @@ export default function
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
+      if (!batch) continue;
       
       setImportProgress(40 + ((batchIndex / batches.length) * 50));
       setImportStatus(`Processing batch ${batchIndex + 1} of ${batches.length} (${processedCount}/${totalItems} items completed)`);
@@ -838,7 +826,7 @@ export default function
       // Method 2: Hierarchy Level-Based Parent Assignment (Fallback)
       if (!parentItemId && item.hierarchyLevel > 1) {
         // Clean parent stack - remove items at same or deeper level
-        while (parentStack.length > 0 && parentStack[parentStack.length - 1].level >= item.hierarchyLevel) {
+        while (parentStack.length > 0 && parentStack[parentStack.length - 1]!.level >= item.hierarchyLevel) {
           const removed = parentStack.pop();
           console.log(`🔄 Removed from stack (level ${removed?.level}): ${removed?.partNumber}`);
         }
@@ -846,8 +834,10 @@ export default function
         // Assign parent from stack
         if (parentStack.length > 0) {
           const stackParent = parentStack[parentStack.length - 1];
-          parentItemId = stackParent.id;
-          console.log(`📚 Stack-based parent assignment: ${item.name} (level ${item.hierarchyLevel}) → ${stackParent.partNumber} (level ${stackParent.level})`);
+          if (stackParent) {
+            parentItemId = stackParent.id;
+            console.log(`📚 Stack-based parent assignment: ${item.name} (level ${item.hierarchyLevel}) → ${stackParent.partNumber} (level ${stackParent.level})`);
+          }
         } else {
           console.warn(`⚠️ No valid parent found in stack for ${item.name} (level ${item.hierarchyLevel})`);
         }
@@ -867,8 +857,11 @@ export default function
           .slice(-3); // Last 3 potential parents
         
         if (recentParents.length > 0) {
-          parentItemId = recentParents[recentParents.length - 1].id;
-          console.log(`🎯 Smart parent detection: ${item.name} (level ${item.hierarchyLevel}) → level ${targetLevel} parent`);
+          const recentParent = recentParents[recentParents.length - 1];
+          if (recentParent) {
+            parentItemId = recentParent.id;
+            console.log(`🎯 Smart parent detection: ${item.name} (level ${item.hierarchyLevel}) → level ${targetLevel} parent`);
+          }
         }
       }
 
@@ -956,7 +949,7 @@ export default function
       // ENHANCED PARENT STACK MANAGEMENT
       if (item.hierarchyLevel >= 1) {
         // Clean the stack - remove items at same or deeper level
-        while (parentStack.length > 0 && parentStack[parentStack.length - 1].level >= item.hierarchyLevel) {
+        while (parentStack.length > 0 && parentStack[parentStack.length - 1]!.level >= item.hierarchyLevel) {
           const removed = parentStack.pop();
           console.log(`🗑️ Removed from parent stack: ${removed?.partNumber} (level ${removed?.level})`);
         }
@@ -1706,7 +1699,7 @@ export default function
               <h4 className="font-medium text-sm">Items to be deleted:</h4>
               <div className="bg-muted/50 rounded-lg p-3 max-h-32 overflow-y-auto">
                 <div className="space-y-1 text-xs">
-                  {bomItemsData?.items?.slice(0, 10).map((item, index) => (
+                  {bomItemsData?.items?.slice(0, 10).map((item) => (
                     <div key={item.id} className="flex items-center justify-between">
                       <span className="truncate">{item.name}</span>
                       <Badge 

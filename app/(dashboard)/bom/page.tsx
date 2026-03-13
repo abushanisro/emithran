@@ -220,10 +220,6 @@ export default function BOMManagementPage() {
               <Download className="h-4 w-4" />
               Export
             </Button>
-            <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create BOM
-            </Button>
           </div>
         </PageHeader>
       </div>
@@ -273,6 +269,14 @@ export default function BOMManagementPage() {
             <p className="text-xs text-muted-foreground">Combined cost estimate</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Create BOM Action */}
+      <div className="flex justify-center">
+        <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2" size="lg">
+          <Plus className="h-4 w-4" />
+          Create New BOM
+        </Button>
       </div>
 
       {/* BOM List */}

@@ -123,7 +123,7 @@ function ProcessPlanningPageContent() {
   const selectedItem = bomItems.find((item) => item.partNumber === selectedPartNumber);
 
   // Load process planning specifications for the selected BOM item
-  const { data: processSpecs, isLoading: specsLoading } = useProcessPlanningSpecsByBomItem(selectedItem?.id);
+  const { data: processSpecs } = useProcessPlanningSpecsByBomItem(selectedItem?.id);
 
   // Initialize editable data with BOM item data and process planning specifications
   useEffect(() => {

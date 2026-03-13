@@ -29,10 +29,11 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
   const [imageView, setImageView] = useState<'fit' | 'full'>('fit');
   const [selectedFile2d, setSelectedFile2d] = useState<File | null>(null);
   const [selectedFile3d, setSelectedFile3d] = useState<File | null>(null);
-  const [activeTab, setActiveTab] = useState<'files' | 'analysis'>('files');
+  const [activeTab, setActiveTab] = useState<'3d' | '2d' | 'analysis'>('3d');
   const [manufacturingFeatures, setManufacturingFeatures] = useState<ManufacturingFeature[]>([]);
   const [selectedFeature, setSelectedFeature] = useState<ManufacturingFeature | null>(null);
   const [showFeatures, setShowFeatures] = useState(false);
+  const [selectedProcessForHighlight, setSelectedProcessForHighlight] = useState<string | null>(null);
   const file2dInputRef = useRef<HTMLInputElement>(null);
   const file3dInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,7 +44,6 @@ interface ManufacturingFeature {
   position: { x: number; y: number; z: number };
   dimensions: { length?: number; width?: number; diameter?: number; depth?: number };
   manufacturingProcess: string;
-  costImpact: number;
   cycleTime: number;
   tooling: string[];
   warnings: string[];
@@ -57,6 +57,15 @@ interface ManufacturingFeature {
       setSelectedFile2d(null);
       setSelectedFile3d(null);
       return;
+    }
+
+    // Set default active tab based on available files
+    if (item.file3dPath) {
+      setActiveTab('3d');
+    } else if (item.file2dPath) {
+      setActiveTab('2d');
+    } else {
+      setActiveTab('analysis');
     }
 
     const loadFileUrls = async () => {
@@ -75,16 +84,6 @@ interface ManufacturingFeature {
           }
         }
       } catch (error: any) {
-        let errorMessage = 'Failed to load technical files.';
-        if (error?.message) {
-          if (error.message.includes('permission')) {
-            errorMessage = 'Unable to access files: Permission denied.';
-          } else if (error.message.includes('network')) {
-            errorMessage = 'Unable to load files: Network connection failed.';
-          } else if (error.message.includes('not found')) {
-            errorMessage = 'Files not found on server.';
-          }
-        }
         // Don't show toast for file loading errors in detail panel as it's not critical
         // Files will just show as unavailable
       } finally {
@@ -139,14 +138,14 @@ interface ManufacturingFeature {
 
       const updatedItem = await apiClient.uploadFiles<BOMItem>(`/bom-items/${item.id}/upload-files`, formData);
 
+      // Capture which files were uploaded before clearing state
+      const uploaded2d = selectedFile2d;
+      const uploaded3d = selectedFile3d;
+
       const uploadedFiles = [];
       if (uploaded2d) uploadedFiles.push('2D drawing');
       if (uploaded3d) uploadedFiles.push('3D model');
       toast.success(`${uploadedFiles.join(' and ')} uploaded successfully for ${item.name}. Files are now available for viewing and download.`);
-
-      // Capture which files were uploaded before clearing state
-      const uploaded2d = selectedFile2d;
-      const uploaded3d = selectedFile3d;
 
       setSelectedFile2d(null);
       setSelectedFile3d(null);
@@ -200,6 +199,57 @@ interface ManufacturingFeature {
     } finally {
       setUploading(false);
     }
+  };
+
+  // Process highlighting handler for BOM analysis
+  const handleProcessHighlight = (process: any) => {
+    const processName = process.processGroup || process.operation || 'Selected Process';
+    setSelectedProcessForHighlight(processName);
+    
+    // Simulate feature highlighting based on process type
+    const simulatedFeatures = generateProcessFeatures(processName);
+    setManufacturingFeatures(simulatedFeatures);
+    
+    // Set the first feature as selected to show highlighting
+    if (simulatedFeatures.length > 0) {
+      setSelectedFeature(simulatedFeatures[0] || null);
+      setShowFeatures(true);
+    }
+  };
+
+  // Generate simulated features based on process type for demonstration
+  const generateProcessFeatures = (processName: string): ManufacturingFeature[] => {
+    const features: ManufacturingFeature[] = [];
+    
+    if (processName.toLowerCase().includes('drill') || processName.toLowerCase().includes('hole')) {
+      features.push({
+        id: 'hole-1',
+        type: 'hole',
+        position: { x: 50, y: 50, z: 0 },
+        dimensions: { diameter: 2.2, depth: 10 },
+        manufacturingProcess: processName,
+        cycleTime: 0.5,
+        tooling: ['Carbide drill', 'Center drill'],
+        warnings: ['Small diameter drilling requires specialized tooling'],
+        aiRecommendations: ['Use carbide micro drills with reduced feed rate']
+      });
+    }
+    
+    if (processName.toLowerCase().includes('mill') || processName.toLowerCase().includes('pocket')) {
+      features.push({
+        id: 'pocket-1',
+        type: 'pocket',
+        position: { x: 30, y: 30, z: 0 },
+        dimensions: { length: 20, width: 10, depth: 5 },
+        manufacturingProcess: processName,
+        cycleTime: 2.5,
+        tooling: ['End mill', 'Roughing mill'],
+        warnings: ['Deep pocket may require multiple passes'],
+        aiRecommendations: ['Use trochoidal milling for better tool life']
+      });
+    }
+
+    return features;
   };
 
   if (!item) return null;
@@ -257,17 +307,32 @@ interface ManufacturingFeature {
         <CardContent>
           {/* Tab Navigation */}
           <div className="flex gap-2 mb-6 border-b">
-            <button
-              onClick={() => setActiveTab('files')}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === 'files' 
-                  ? 'border-primary text-primary bg-primary/5' 
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <FileText className="h-4 w-4 inline mr-2" />
-              Technical Files
-            </button>
+            {item.file3dPath && (
+              <button
+                onClick={() => setActiveTab('3d')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  activeTab === '3d' 
+                    ? 'border-primary text-primary bg-primary/5' 
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Box className="h-4 w-4 inline mr-2" />
+                3D Model
+              </button>
+            )}
+            {item.file2dPath && (
+              <button
+                onClick={() => setActiveTab('2d')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  activeTab === '2d' 
+                    ? 'border-primary text-primary bg-primary/5' 
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <FileText className="h-4 w-4 inline mr-2" />
+                2D Drawing
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('analysis')}
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -283,191 +348,115 @@ interface ManufacturingFeature {
 
           <div className="mt-6">
 
-            {/* Files Tab Content */}
-            {activeTab === 'files' && (
-              <>
-                {/* Files Section - Respects Preferred View */}
-                {(item.file2dPath || item.file3dPath) && (
-              <div className="border-t pt-6">
-                {/* Show based on preferredView, or fallback logic */}
-                {(preferredView === '3d' && item.file3dPath) || (!item.file2dPath && item.file3dPath) ? (
-                  <div className="space-y-4">
-                    {loading && (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      </div>
-                    )}
-
-                    {!loading && file3dUrl && (
-                      <ModelViewer
-                        key={file3dUrl}
-                        fileUrl={file3dUrl}
-                        fileName={item.file3dPath?.split('/').pop() || 'model'}
-                        fileType={item.file3dPath?.split('.').pop() || 'stl'}
-                        bomItemId={item.id}
-                        manufacturingFeatures={manufacturingFeatures}
-                        selectedFeature={selectedFeature}
-                        onFeatureSelect={setSelectedFeature}
-                        showFeatures={showFeatures}
-                      />
-                    )}
-
-                    {!loading && !file3dUrl && (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <p className="text-sm">No 3D model available</p>
-                      </div>
-                    )}
+            {/* 3D Model Tab Content */}
+            {activeTab === '3d' && (
+              <div className="space-y-4">
+                {loading && (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                ) : item.file2dPath ? (
-                  <div className="space-y-4">
-                    {loading && (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      </div>
-                    )}
+                )}
 
-                    {!loading && file2dUrl && isImage2d && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-muted-foreground">
-                            {item.file2dPath?.split('/').pop()}
-                          </p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setImageView(imageView === 'fit' ? 'full' : 'fit')}
-                          >
-                            <Maximize2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className={`border rounded-lg overflow-hidden bg-muted/30 ${imageView === 'fit' ? 'max-h-[400px]' : ''}`}>
-                          <img
-                            src={file2dUrl}
-                            alt={item.name}
-                            className={`w-full ${imageView === 'fit' ? 'object-contain max-h-[400px]' : 'object-cover'}`}
-                          />
-                        </div>
-                        <Button variant="outline" className="w-full" asChild>
-                          <a href={file2dUrl} download target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download Image
-                          </a>
-                        </Button>
-                      </div>
-                    )}
+                {!loading && file3dUrl && (
+                  <ModelViewer
+                    key={file3dUrl}
+                    fileUrl={file3dUrl}
+                    fileName={item.file3dPath?.split('/').pop() || 'model'}
+                    fileType={item.file3dPath?.split('.').pop() || 'stl'}
+                    bomItemId={item.id}
+                    manufacturingFeatures={manufacturingFeatures}
+                    selectedFeature={selectedFeature}
+                    onFeatureSelect={setSelectedFeature}
+                    showFeatures={showFeatures}
+                  />
+                )}
 
-                    {!loading && file2dUrl && isPdf2d && (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          {item.file2dPath?.split('/').pop()}
-                        </p>
-                        <div className="border rounded-lg overflow-hidden" style={{ height: '800px' }}>
-                          <iframe
-                            src={`/api/file-proxy?url=${encodeURIComponent(file2dUrl)}`}
-                            className="w-full h-full"
-                            title="PDF Preview"
-                          />
-                        </div>
-                        <Button variant="outline" className="w-full" asChild>
-                          {/* Download uses the original signed URL, not the proxy */}
-                          <a href={file2dUrl} download target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download PDF
-                          </a>
-                        </Button>
-                      </div>
-                    )}
-
-                    {!loading && file2dUrl && !isImage2d && !isPdf2d && (
-                      <div className="text-center py-8">
-                        <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground mb-4">
-                          {item.file2dPath?.split('/').pop()}
-                        </p>
-                        <Button variant="outline" asChild>
-                          <a href={file2dUrl} download target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download File
-                          </a>
-                        </Button>
-                      </div>
-                    )}
-
-                    {!loading && !file2dUrl && (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <p className="text-sm">No 2D drawing available</p>
-                      </div>
-                    )}
+                {!loading && !file3dUrl && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p className="text-sm">3D model could not be loaded</p>
                   </div>
-                ) : null}
+                )}
+              </div>
+            )}
 
-                {/* Add Missing Files */}
-                {(!item.file2dPath || !item.file3dPath) && (
-                  <div className="mt-6 border rounded-lg p-4 bg-muted/30">
-                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                      <Upload className="h-4 w-4" />
-                      Add {!item.file2dPath && !item.file3dPath ? 'Files' : !item.file2dPath ? '2D Drawing' : '3D Model'}
-                    </h4>
-                    <div className="space-y-3">
-                      {!item.file2dPath && (
-                        <div className="space-y-2">
-                          <Label htmlFor="add-2d" className="text-xs">
-                            2D Drawing (PDF, PNG, JPG)
-                          </Label>
-                          <Input
-                            id="add-2d"
-                            type="file"
-                            accept=".pdf,.png,.jpg,.jpeg,.dwg,.dxf"
-                            onChange={(e) => setSelectedFile2d(e.target.files?.[0] || null)}
-                            disabled={uploading}
-                            className="text-sm"
-                          />
-                          {selectedFile2d && (
-                            <p className="text-xs text-muted-foreground">
-                              {selectedFile2d.name} ({(selectedFile2d.size / 1024).toFixed(1)} KB)
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      {!item.file3dPath && (
-                        <div className="space-y-2">
-                          <Label htmlFor="add-3d" className="text-xs">
-                            3D Model (STEP, STL, OBJ)
-                          </Label>
-                          <Input
-                            id="add-3d"
-                            type="file"
-                            accept=".stp,.step,.stl,.obj,.iges,.igs"
-                            onChange={(e) => setSelectedFile3d(e.target.files?.[0] || null)}
-                            disabled={uploading}
-                            className="text-sm"
-                          />
-                          {selectedFile3d && (
-                            <p className="text-xs text-muted-foreground">
-                              {selectedFile3d.name} ({(selectedFile3d.size / 1024).toFixed(1)} KB)
-                            </p>
-                          )}
-                        </div>
-                      )}
+            {/* 2D Drawing Tab Content */}
+            {activeTab === '2d' && (
+              <div className="space-y-4">
+                {loading && (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                )}
+
+                {!loading && file2dUrl && isImage2d && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        {item.file2dPath?.split('/').pop()}
+                      </p>
                       <Button
-                        onClick={handleFileUpload}
-                        disabled={uploading || (!selectedFile2d && !selectedFile3d)}
+                        variant="ghost"
                         size="sm"
-                        className="w-full"
+                        onClick={() => setImageView(imageView === 'fit' ? 'full' : 'fit')}
                       >
-                        {uploading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload
-                          </>
-                        )}
+                        <Maximize2 className="h-4 w-4" />
                       </Button>
                     </div>
+                    <div className={`border rounded-lg overflow-hidden bg-muted/30 ${imageView === 'fit' ? 'max-h-[400px]' : ''}`}>
+                      <img
+                        src={file2dUrl}
+                        alt={item.name}
+                        className={`w-full ${imageView === 'fit' ? 'object-contain max-h-[400px]' : 'object-cover'}`}
+                      />
+                    </div>
+                    <Button variant="outline" className="w-full" asChild>
+                      <a href={file2dUrl} download target="_blank" rel="noopener noreferrer">
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Image
+                      </a>
+                    </Button>
+                  </div>
+                )}
+
+                {!loading && file2dUrl && isPdf2d && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {item.file2dPath?.split('/').pop()}
+                    </p>
+                    <div className="border rounded-lg overflow-hidden" style={{ height: '800px' }}>
+                      <iframe
+                        src={`/api/file-proxy?url=${encodeURIComponent(file2dUrl)}`}
+                        className="w-full h-full"
+                        title="PDF Preview"
+                      />
+                    </div>
+                    <Button variant="outline" className="w-full" asChild>
+                      <a href={file2dUrl} download target="_blank" rel="noopener noreferrer">
+                        <Download className="h-4 w-4 mr-2" />
+                        Download PDF
+                      </a>
+                    </Button>
+                  </div>
+                )}
+
+                {!loading && file2dUrl && !isImage2d && !isPdf2d && (
+                  <div className="text-center py-8">
+                    <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {item.file2dPath?.split('/').pop()}
+                    </p>
+                    <Button variant="outline" asChild>
+                      <a href={file2dUrl} download target="_blank" rel="noopener noreferrer">
+                        <Download className="h-4 w-4 mr-2" />
+                        Download File
+                      </a>
+                    </Button>
+                  </div>
+                )}
+
+                {!loading && !file2dUrl && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p className="text-sm">2D drawing could not be loaded</p>
                   </div>
                 )}
               </div>
@@ -546,25 +535,32 @@ interface ManufacturingFeature {
                   </div>
                 </div>
                 )}
-              </>
-            )}
 
             {/* Manufacturing Analysis Tab Content */}
             {activeTab === 'analysis' && (
               <ManufacturingAnalysisPanel
                 bomItemId={item.id}
+                bomItem={{
+                  annualVolume: item.annualVolume,
+                  material: item.material,
+                  materialGrade: item.materialGrade
+                }}
+                selectedProcess={selectedProcessForHighlight}
                 onFeatureSelect={(feature) => {
                   setSelectedFeature(feature);
                   setShowFeatures(true);
-                  // Switch to files tab to show 3D model with highlighted feature
+                  // Switch to 3D tab to show 3D model with highlighted feature
                   if (feature && item.file3dPath) {
-                    setActiveTab('files');
+                    setActiveTab('3d');
                   }
                 }}
                 onFeaturesUpdate={(features) => {
                   setManufacturingFeatures(features);
                   setShowFeatures(features.length > 0);
                 }}
+                onProcessHighlight={handleProcessHighlight}
+                selectedFeature={selectedFeature}
+                manufacturingFeatures={manufacturingFeatures}
               />
             )}
           </div>

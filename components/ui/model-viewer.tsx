@@ -72,7 +72,6 @@ interface ManufacturingFeature {
   position: { x: number; y: number; z: number };
   dimensions: { length?: number; width?: number; diameter?: number; depth?: number };
   manufacturingProcess: string;
-  costImpact: number;
   cycleTime: number;
   tooling: string[];
   warnings: string[];

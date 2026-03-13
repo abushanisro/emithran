@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { 
   FileText, 
   Package, 
@@ -33,13 +46,17 @@ import {
   Loader2, 
   HelpCircle,
   Clock,
-  Plus
+  Plus,
+  ChevronDown,
+  Check,
+  ChevronsUpDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createBOMItem, updateBOMItem } from '@/lib/api/hooks/useBOMItems';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
 
 // Enhanced error handling types for BOM management
 type EnhancedBOMError = {
@@ -187,6 +204,43 @@ interface BOMItemDialogProps {
 
 export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, parentItemId, defaultItemType, getAutoParent }: BOMItemDialogProps) {
   const queryClient = useQueryClient();
+  
+  // State for material grade combobox
+  const [materialGradeOpen, setMaterialGradeOpen] = useState(false);
+  const [materialGradeSearch, setMaterialGradeSearch] = useState('');
+  
+  // Get raw materials for material grade dropdown (only ferrous and non-ferrous)
+  const { data: rawMaterialsData, isLoading: isLoadingMaterials } = useRawMaterials({
+    search: materialGradeSearch,
+    limit: 100 // Limit for better performance with search
+  });
+  
+  // Extract unique material grades (only ferrous and non-ferrous materials)
+  const materialOptions = React.useMemo(() => {
+    if (!rawMaterialsData?.items) return [];
+    
+    // Filter for only ferrous and non-ferrous materials
+    const filteredMaterials = rawMaterialsData.items.filter(material => {
+      const materialGroup = material.materialGroup?.toLowerCase() || '';
+      const materialName = material.material?.toLowerCase() || '';
+      
+      // Exclude plastic and rubber materials
+      const isPlastic = materialGroup.includes('plastic') || materialName.includes('plastic') || 
+                       materialGroup.includes('polymer') || materialName.includes('polymer');
+      const isRubber = materialGroup.includes('rubber') || materialName.includes('rubber') ||
+                      materialGroup.includes('elastomer') || materialName.includes('elastomer');
+      
+      return !isPlastic && !isRubber && material.materialGrade && material.materialGrade.trim();
+    });
+    
+    // Extract unique material grades
+    const grades = filteredMaterials
+      .map(material => material.materialGrade!.trim())
+      .filter((grade, index, array) => array.indexOf(grade) === index)
+      .sort();
+      
+    return grades;
+  }, [rawMaterialsData]);
   const [loading, setLoading] = useState(false);
   const [autoParentId, setAutoParentId] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -203,7 +257,8 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     material: '',
     materialGrade: '',
     makeBuy: 'make' as 'make' | 'buy',
-    unitCost: 0,
+    unitCost: '',
+    bomLevel: 'L0',
     weight: 0,
     maxLength: 0,
     maxWidth: 0,
@@ -215,8 +270,8 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
   
   // Calculate form completion percentage
   const calculateCompletionPercentage = () => {
-    const requiredFields = ['name', 'quantity', 'annualVolume', 'itemType'];
-    const optionalFields = ['partNumber', 'description', 'materialGrade', 'weight'];
+    const requiredFields = ['name', 'partNumber', 'quantity', 'annualVolume', 'itemType'];
+    const optionalFields = ['description', 'materialGrade', 'weight'];
     
     let completed = 0;
     let total = requiredFields.length + optionalFields.length;
@@ -243,13 +298,22 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
   const validationStatus = useMemo(() => {
     const errors: Record<string, string> = {};
     
-    // Required field validation
+    // Required field validation - Name is required
     if (!formData.name.trim()) {
       errors.name = 'Item name is required';
     } else if (formData.name.length < 3) {
       errors.name = 'Name must be at least 3 characters';
     } else if (formData.name.length > 100) {
       errors.name = 'Name must not exceed 100 characters';
+    }
+    
+    // Required field validation - Part Number is required
+    if (!formData.partNumber.trim()) {
+      errors.partNumber = 'Part number is required';
+    } else if (formData.partNumber.length < 2) {
+      errors.partNumber = 'Part number must be at least 2 characters';
+    } else if (formData.partNumber.length > 50) {
+      errors.partNumber = 'Part number must not exceed 50 characters';
     }
     
     // Quantity validation
@@ -266,10 +330,6 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       errors.annualVolume = 'Annual volume seems extremely high. Please verify.';
     }
     
-    // Part number format validation
-    if (formData.partNumber && formData.partNumber.length > 50) {
-      errors.partNumber = 'Part number must not exceed 50 characters';
-    }
     
     // Physical properties validation
     if (formData.weight && formData.weight < 0) {
@@ -292,9 +352,10 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     }
     
     // Unit cost validation for buy items
-    if (formData.makeBuy === 'buy' && formData.unitCost <= 0) {
+    const unitCostNum = parseFloat(formData.unitCost) || 0;
+    if (formData.makeBuy === 'buy' && (!formData.unitCost || unitCostNum <= 0)) {
       errors.unitCost = 'Unit cost is required for purchased items';
-    } else if (formData.makeBuy === 'buy' && formData.unitCost > 1000000) {
+    } else if (formData.makeBuy === 'buy' && unitCostNum > 1000000) {
       errors.unitCost = 'Unit cost seems extremely high. Please verify.';
     }
     
@@ -318,13 +379,34 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     setValidationErrors(validationStatus.errors);
   }, [validationStatus.errors]);
 
-  // Auto-assign parent when item type changes
+  // Auto-assign parent and BOM level when item type changes
   useEffect(() => {
     if (!item && getAutoParent) {
       const autoParent = getAutoParent(formData.itemType);
       setAutoParentId(autoParent);
     }
-  }, [formData.itemType, getAutoParent, item]);
+    
+    // Auto-assign BOM level based on item type
+    let bomLevel = 'L0';
+    switch (formData.itemType) {
+      case BOMItemType.ASSEMBLY:
+        bomLevel = 'L0';
+        break;
+      case BOMItemType.SUB_ASSEMBLY:
+        bomLevel = 'L1';
+        break;
+      case BOMItemType.CHILD_PART:
+        bomLevel = 'L2';
+        break;
+      default:
+        bomLevel = 'L0';
+    }
+    
+    // Update bomLevel only if it's different to avoid infinite loops
+    if (formData.bomLevel !== bomLevel) {
+      setFormData(prev => ({ ...prev, bomLevel }));
+    }
+  }, [formData.itemType, getAutoParent, item, formData.bomLevel]);
 
   useEffect(() => {
     if (item) {
@@ -339,7 +421,8 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         material: item.material || '',
         materialGrade: item.materialGrade || '',
         makeBuy: item.makeBuy || 'make',
-        unitCost: item.unitCost || 0,
+        unitCost: item.unitCost ? item.unitCost.toString() : '',
+        bomLevel: item.bomLevel || 'L0',
         weight: item.weight || 0,
         maxLength: item.maxLength || 0,
         maxWidth: item.maxWidth || 0,
@@ -360,7 +443,8 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         material: '',
         materialGrade: '',
         makeBuy: 'make',
-        unitCost: 0,
+        unitCost: '',
+        bomLevel: 'L0',
         weight: 0,
         maxLength: 0,
         maxWidth: 0,
@@ -393,7 +477,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       const payload = {
         bomId,
         name: formData.name,
-        partNumber: formData.partNumber || undefined,
+        partNumber: formData.partNumber,
         description: formData.description || undefined,
         itemType: formData.itemType,
         parentItemId: finalParentId || undefined,
@@ -402,8 +486,9 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         unit: formData.unit,
         material: formData.material || undefined,
         materialGrade: formData.materialGrade || undefined,
+        bomLevel: formData.bomLevel,
         makeBuy: formData.makeBuy,
-        unitCost: formData.makeBuy === 'buy' ? formData.unitCost : undefined,
+        unitCost: formData.makeBuy === 'buy' ? parseFloat(formData.unitCost) || 0 : undefined,
         weight: formData.weight || undefined,
         maxLength: formData.maxLength || undefined,
         maxWidth: formData.maxWidth || undefined,
@@ -619,18 +704,33 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                 placeholder="e.g., Cylinder Head Assembly"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className={validationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
                 required
               />
+              {validationErrors.name && (
+                <div className="flex items-center gap-1 text-xs text-red-600">
+                  <XCircle className="h-3 w-3" />
+                  <span>{validationErrors.name}</span>
+                </div>
+              )}
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="partNumber">Part Number</Label>
+              <Label htmlFor="partNumber">Part Number *</Label>
               <Input
                 id="partNumber"
                 placeholder="e.g., CH-2024-001"
                 value={formData.partNumber}
                 onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
+                className={validationErrors.partNumber ? 'border-red-500 focus:border-red-500' : ''}
+                required
               />
+              {validationErrors.partNumber && (
+                <div className="flex items-center gap-1 text-xs text-red-600">
+                  <XCircle className="h-3 w-3" />
+                  <span>{validationErrors.partNumber}</span>
+                </div>
+              )}
             </div>
 
             <div className="grid gap-2">
@@ -646,13 +746,109 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
 
             <div className="grid gap-2">
               <Label htmlFor="materialGrade">Material Grade</Label>
-              <Input
-                id="materialGrade"
-                placeholder="e.g., EN-GJL-250, AlSi10Mg"
-                value={formData.materialGrade}
-                onChange={(e) => setFormData({ ...formData, materialGrade: e.target.value })}
-              />
+              <div className="relative">
+                <Input
+                  id="materialGrade"
+                  value={formData.materialGrade || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData({ ...formData, materialGrade: value });
+                    setMaterialGradeSearch(value);
+                    if (!materialGradeOpen) {
+                      setMaterialGradeOpen(true);
+                    }
+                  }}
+                  onFocus={() => {
+                    setMaterialGradeOpen(true);
+                    setMaterialGradeSearch(formData.materialGrade || '');
+                  }}
+                  onClick={() => {
+                    setMaterialGradeOpen(true);
+                  }}
+                  placeholder="Type or select material grade..."
+                  className="pr-10"
+                  disabled={isLoadingMaterials}
+                />
+                <Popover open={materialGradeOpen} onOpenChange={setMaterialGradeOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                      type="button"
+                    >
+                      <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    className="w-full p-0" 
+                    align="start"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    onCloseAutoFocus={(e) => e.preventDefault()}
+                  >
+                    <Command shouldFilter={false} className="max-h-[300px]">
+                      <CommandList className="max-h-[300px] overflow-y-auto">
+                        <CommandGroup>
+                          {materialOptions.map((grade) => (
+                            <div
+                              key={grade}
+                              onClick={() => {
+                                setFormData({ 
+                                  ...formData, 
+                                  materialGrade: grade === formData.materialGrade ? '' : grade 
+                                });
+                                setMaterialGradeOpen(false);
+                              }}
+                              className={`
+                                flex cursor-pointer items-center px-3 py-2 text-sm
+                                ${formData.materialGrade === grade 
+                                  ? 'bg-blue-500 text-white font-medium' 
+                                  : 'text-black dark:text-white bg-white dark:bg-gray-800'
+                                }
+                              `}
+                              style={{
+                                opacity: 1,
+                                color: formData.materialGrade === grade ? 'white' : 'inherit'
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  formData.materialGrade === grade ? "opacity-100" : "opacity-0"
+                                }`}
+                                style={{ opacity: formData.materialGrade === grade ? 1 : 0 }}
+                              />
+                              <span 
+                                className="font-medium"
+                                style={{ opacity: 1, color: 'inherit' }}
+                              >
+                                {grade}
+                              </span>
+                            </div>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {isLoadingMaterials && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading material grades from database...
+                </p>
+              )}
+              {!isLoadingMaterials && materialOptions.length === 0 && materialGradeSearch && (
+                <p className="text-xs text-muted-foreground">
+                  No material grades found matching "{materialGradeSearch}". You can still use this custom value.
+                </p>
+              )}
+              {!isLoadingMaterials && materialOptions.length === 0 && !materialGradeSearch && (
+                <p className="text-xs text-muted-foreground">
+                  No material grades available. Add materials to the raw materials database first.
+                </p>
+              )}
             </div>
+
 
             {/* Make or Buy Decision */}
             <div className="grid gap-3 border-t pt-4">
@@ -696,15 +892,13 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                   </Label>
                   <Input
                     id="unitCost"
-                    type="text"
+                    type="number"
+                    step="0.01"
+                    min="0"
                     placeholder="Enter supplier quoted price"
-                    value={formData.unitCost || ''}
+                    value={formData.unitCost}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      const numValue = parseFloat(value);
-                      if (value === '' || !isNaN(numValue)) {
-                        setFormData({ ...formData, unitCost: value === '' ? 0 : numValue });
-                      }
+                      setFormData({ ...formData, unitCost: e.target.value });
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -941,7 +1135,12 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="itemType">Type *</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="itemType">Type *</Label>
+                  <Badge variant="secondary" className="text-xs">
+                    BOM Level: {formData.bomLevel}
+                  </Badge>
+                </div>
                 <Select
                   value={formData.itemType}
                   onValueChange={(value) => setFormData({ ...formData, itemType: value as BOMItemType })}
@@ -957,14 +1156,19 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                     ))}
                   </SelectContent>
                 </Select>
-                {!item && autoParentId && formData.itemType !== BOMItemType.ASSEMBLY && (
+                <div className="space-y-1">
+                  {!item && autoParentId && formData.itemType !== BOMItemType.ASSEMBLY && (
+                    <p className="text-xs text-muted-foreground">
+                      Will be added under: {
+                        formData.itemType === BOMItemType.SUB_ASSEMBLY ? 'Latest Assembly' :
+                          formData.itemType === BOMItemType.CHILD_PART ? 'Latest Sub-Assembly' : ''
+                      }
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
-                    Will be added under: {
-                      formData.itemType === BOMItemType.SUB_ASSEMBLY ? 'Latest Assembly' :
-                        formData.itemType === BOMItemType.CHILD_PART ? 'Latest Sub-Assembly' : ''
-                    }
+                    BOM Level is automatically assigned based on item type
                   </p>
-                )}
+                </div>
               </div>
             </div>
 

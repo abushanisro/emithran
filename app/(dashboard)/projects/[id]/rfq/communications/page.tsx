@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Mail, Clock, Users, CheckCircle, AlertCircle, Send, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Mail, Clock, CheckCircle, AlertCircle, Send, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 

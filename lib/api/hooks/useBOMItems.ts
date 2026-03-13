@@ -15,6 +15,7 @@ export interface BOMItem {
   unit?: string;
   material?: string;
   materialGrade?: string;
+  bomLevel?: string;
   materialId?: string;
   makeBuy?: 'make' | 'buy';
   unitCost?: number;
@@ -46,7 +47,7 @@ export interface BOMItem {
 export interface CreateBOMItemDto {
   bomId: string;
   name: string;
-  partNumber?: string;
+  partNumber: string;
   description?: string;
   itemType: 'assembly' | 'sub_assembly' | 'child_part';
   quantity: number;
@@ -75,6 +76,7 @@ export interface UpdateBOMItemDto {
   unit?: string;
   material?: string;
   materialGrade?: string;
+  bomLevel?: string;
   makeBuy?: 'make' | 'buy';
   unitCost?: number;
   parentItemId?: string;

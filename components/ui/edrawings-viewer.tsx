@@ -25,7 +25,6 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Target,
-  DollarSign,
   Clock,
   AlertTriangle,
   Crosshair,
@@ -38,7 +37,6 @@ interface ManufacturingFeature {
   position: { x: number; y: number; z: number };
   dimensions: { length?: number; width?: number; diameter?: number; depth?: number };
   manufacturingProcess: string;
-  costImpact: number;
   cycleTime: number;
   tooling: string[];
   warnings: string[];
@@ -232,354 +230,6 @@ function DFMLegend({ activeTypes }: { activeTypes: DFMType[] }) {
   );
 }
 
-// ─── DFM Analysis Dialog (3D Overlay) ──────────────────────────────────────────
-function DFMAnalysisDialog({ 
-  feature, 
-  screenPosition, 
-  visible,
-  onClose
-}: { 
-  feature: ManufacturingFeature | null;
-  screenPosition: { x: number; y: number } | null;
-  visible: boolean;
-  onClose: () => void;
-}) {
-  if (!visible || !feature || !screenPosition) return null;
-
-  const featureColor = DFM_COLORS[feature.type as DFMType] || DFM_COLORS.hole;
-
-  return (
-    <Html
-      position={[-999, -999, 0]}
-      style={{ 
-        position: 'fixed', 
-        left: Math.min(screenPosition.x - 200, window.innerWidth - 420), 
-        top: Math.max(screenPosition.y - 150, 20),
-        pointerEvents: 'auto', 
-        userSelect: 'none',
-        zIndex: 1000
-      }}
-    >
-      <div style={{
-        background: 'rgba(10,10,15,0.98)',
-        backdropFilter: 'blur(20px)',
-        border: `2px solid ${featureColor.hex}60`,
-        borderLeft: `6px solid ${featureColor.hex}`,
-        borderRadius: 16,
-        padding: 0,
-        width: 400,
-        maxHeight: '80vh',
-        boxShadow: `0 20px 60px rgba(0,0,0,0.8), 0 0 40px ${featureColor.hex}20`,
-        overflow: 'hidden',
-        animation: 'slideUp 0.3s ease-out'
-      }}>
-        {/* Header */}
-        <div style={{
-          background: `linear-gradient(135deg, ${featureColor.hex}20, ${featureColor.hex}10)`,
-          padding: '16px 20px',
-          borderBottom: `1px solid ${featureColor.hex}30`
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{
-                width: 16, height: 16, borderRadius: '50%',
-                background: featureColor.hex,
-                boxShadow: `0 0 16px ${featureColor.hex}80`,
-                flexShrink: 0,
-              }} />
-              <div>
-                <div style={{ 
-                  color: '#fff', 
-                  fontSize: 18, 
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                  marginBottom: 2
-                }}>
-                  {feature.type.replace('_', ' ')} ANALYSIS
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
-                  {feature.manufacturingProcess}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                border: 'none',
-                borderRadius: '50%',
-                width: 32,
-                height: 32,
-                color: 'rgba(255,255,255,0.7)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 16
-              }}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div style={{ 
-          padding: '20px', 
-          maxHeight: 'calc(80vh - 100px)', 
-          overflowY: 'auto',
-          fontSize: 14,
-          lineHeight: 1.5
-        }}>
-          {/* Quick Stats */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '1fr 1fr', 
-            gap: 16,
-            marginBottom: 20,
-            padding: '16px',
-            background: 'rgba(255,255,255,0.03)',
-            borderRadius: 12
-          }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: '#22c55e', fontSize: 24, fontWeight: 700 }}>
-                ₹{feature.costImpact.toLocaleString()}
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Cost Impact</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: '#3b82f6', fontSize: 24, fontWeight: 700 }}>
-                {feature.cycleTime}min
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Cycle Time</div>
-            </div>
-          </div>
-
-          {/* Dimensions */}
-          {Object.keys(feature.dimensions).length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ 
-                color: 'rgba(255,255,255,0.9)', 
-                fontSize: 13, 
-                fontWeight: 600, 
-                marginBottom: 8,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}>
-                📏 SPECIFICATIONS
-              </div>
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, 1fr)', 
-                gap: 8,
-                padding: '12px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: 8
-              }}>
-                {feature.dimensions.diameter && (
-                  <div style={{ color: '#fff' }}>
-                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>Diameter:</span> ⌀{feature.dimensions.diameter}mm
-                  </div>
-                )}
-                {feature.dimensions.depth && (
-                  <div style={{ color: '#fff' }}>
-                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>Depth:</span> {feature.dimensions.depth}mm
-                  </div>
-                )}
-                {feature.dimensions.width && (
-                  <div style={{ color: '#fff' }}>
-                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>Width:</span> {feature.dimensions.width}mm
-                  </div>
-                )}
-                {feature.dimensions.length && (
-                  <div style={{ color: '#fff' }}>
-                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>Length:</span> {feature.dimensions.length}mm
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* AI Insights */}
-          {feature.aiRecommendations.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ 
-                color: featureColor.hex, 
-                fontSize: 13, 
-                fontWeight: 600,
-                marginBottom: 8,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}>
-                🤖 AI INSIGHTS & RECOMMENDATIONS
-              </div>
-              <div style={{
-                background: `${featureColor.hex}10`,
-                border: `1px solid ${featureColor.hex}30`,
-                borderRadius: 12,
-                padding: '16px'
-              }}>
-                {feature.aiRecommendations.map((rec, i) => (
-                  <div key={i} style={{ 
-                    color: 'rgba(255,255,255,0.9)', 
-                    marginBottom: i < feature.aiRecommendations.length - 1 ? 12 : 0,
-                    paddingLeft: 16,
-                    position: 'relative'
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: 6,
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: featureColor.hex
-                    }} />
-                    {rec}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Warnings */}
-          {feature.warnings.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ 
-                color: '#fb923c', 
-                fontSize: 13, 
-                fontWeight: 600,
-                marginBottom: 8,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}>
-                ⚠️ MANUFACTURING WARNINGS
-              </div>
-              <div style={{
-                background: 'rgba(251,146,60,0.1)',
-                border: '1px solid rgba(251,146,60,0.3)',
-                borderRadius: 12,
-                padding: '16px'
-              }}>
-                {feature.warnings.map((warning, i) => (
-                  <div key={i} style={{ 
-                    color: 'rgba(255,255,255,0.9)', 
-                    marginBottom: i < feature.warnings.length - 1 ? 12 : 0,
-                    paddingLeft: 16,
-                    position: 'relative'
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: 6,
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: '#fb923c'
-                    }} />
-                    {warning}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Tooling Requirements */}
-          {feature.tooling.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ 
-                color: 'rgba(255,255,255,0.9)', 
-                fontSize: 13, 
-                fontWeight: 600,
-                marginBottom: 8,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}>
-                🔧 REQUIRED TOOLING
-              </div>
-              <div style={{
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: 12,
-                padding: '16px'
-              }}>
-                <div style={{ 
-                  display: 'grid', 
-                  gap: 8 
-                }}>
-                  {feature.tooling.map((tool, i) => (
-                    <div key={i} style={{ 
-                      color: 'rgba(255,255,255,0.9)',
-                      padding: '8px 12px',
-                      background: 'rgba(255,255,255,0.05)',
-                      borderRadius: 8,
-                      border: '1px solid rgba(255,255,255,0.1)'
-                    }}>
-                      • {tool}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div style={{ 
-            display: 'flex', 
-            gap: 12,
-            marginTop: 24,
-            paddingTop: 16,
-            borderTop: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            <button style={{
-              flex: 1,
-              padding: '12px 16px',
-              background: `${featureColor.hex}20`,
-              border: `1px solid ${featureColor.hex}40`,
-              borderRadius: 8,
-              color: featureColor.hex,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}>
-              📊 VIEW FULL REPORT
-            </button>
-            <button style={{
-              flex: 1,
-              padding: '12px 16px',
-              background: 'rgba(59,130,246,0.2)',
-              border: '1px solid rgba(59,130,246,0.4)',
-              borderRadius: 8,
-              color: '#3b82f6',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}>
-              💡 GET SUGGESTIONS
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-      `}</style>
-    </Html>
-  );
-}
 
 // ─── DFM Color Mesh ──────────────────────────────────────────────────────────
 /**
@@ -825,11 +475,16 @@ function DFMColorMesh({
 
   const handleMeshClick = (event: any) => {
     try {
+      console.log('DFMColorMesh clicked:', event);
       event.stopPropagation();
       
       // Get the clicked intersection
       const intersection = event.intersections?.[0];
-      if (!intersection || !intersection.face || !intersection.point) return;
+      console.log('Intersection:', intersection);
+      if (!intersection || !intersection.face || !intersection.point) {
+        console.log('No valid intersection found');
+        return;
+      }
       
       const face = intersection.face;
       const worldPoint = intersection.point; // 3D world position
@@ -881,6 +536,8 @@ function DFMColorMesh({
     }
   };
 
+  console.log('DFMColorMesh rendering with geometry:', !!coloredGeo, 'features:', features?.length);
+  
   return (
     <group>
       {/* Main DFM colored mesh */}
@@ -944,24 +601,7 @@ function STLModel({
 }) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const meshRef = useRef<THREE.Mesh>(null);
-  const [tooltipFeature, setTooltipFeature] = useState<ManufacturingFeature | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
-  const { camera, gl } = useThree();
 
-  // Clear tooltip when clicking elsewhere
-  useEffect(() => {
-    const handleCanvasClick = (event: MouseEvent) => {
-      // Only clear if we're not clicking on a DFM feature
-      const target = event.target as Element;
-      if (!target.closest('[data-dfm-feature]')) {
-        setTooltipFeature(null);
-        setTooltipPosition(null);
-      }
-    };
-
-    gl.domElement.addEventListener('click', handleCanvasClick);
-    return () => gl.domElement.removeEventListener('click', handleCanvasClick);
-  }, [gl]);
 
   useEffect(() => {
     const loader = new STLLoader();
@@ -1044,7 +684,16 @@ function STLModel({
   return (
     <group>
       {/* Base model — semi-transparent when DFM overlay is active */}
-      <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
+      <mesh 
+        ref={meshRef} 
+        geometry={geometry} 
+        castShadow 
+        receiveShadow
+        onClick={(event) => {
+          console.log('Base mesh clicked:', event);
+          // Don't stop propagation here to allow DFM mesh to handle it
+        }}
+      >
         <meshStandardMaterial
           color={showFeatures ? '#8899aa' : color}
           metalness={0.2}
@@ -1066,40 +715,20 @@ function STLModel({
             const f = manufacturingFeatures.find(mf => mf.type === type);
             const isNewSelection = !selectedFeature || f?.id !== selectedFeature.id;
             
-            if (isNewSelection && f && worldPosition) {
-              // Convert world position to screen position for tooltip
-              const vector = worldPosition.clone();
-              vector.project(camera);
-              
-              const canvas = gl.domElement;
-              const rect = canvas.getBoundingClientRect();
-              const x = (vector.x * 0.5 + 0.5) * rect.width + rect.left;
-              const y = (vector.y * -0.5 + 0.5) * rect.height + rect.top;
-              
-              setTooltipFeature(f);
-              setTooltipPosition({ x, y });
+            console.log('Face clicked:', type, f, worldPosition);
+            
+            if (isNewSelection && f) {
               onFeatureSelect?.(f);
             } else {
               // Deselect if clicking same feature
-              setTooltipFeature(null);
-              setTooltipPosition(null);
+              console.log('Deselecting feature');
               onFeatureSelect?.(null);
             }
           }}
         />
       )}
 
-      {/* 3D DFM Analysis Dialog */}
-      <DFMAnalysisDialog
-        feature={tooltipFeature}
-        screenPosition={tooltipPosition}
-        visible={!!tooltipFeature && !!tooltipPosition}
-        onClose={() => {
-          setTooltipFeature(null);
-          setTooltipPosition(null);
-          onFeatureSelect?.(null);
-        }}
-      />
+
 
       {/* DFM Legend — anchored as HTML overlay */}
       {showFeatures && activeTypes.length > 0 && (
@@ -1764,36 +1393,6 @@ export function EDrawingsViewer({
               </Card>
             )}
 
-            {/* Section View Control */}
-            <Card className="bg-[#505050] border-[#666666]">
-              <div className="p-1.5">
-                <h4 className="text-[10px] font-semibold text-white flex items-center gap-1 mb-1">
-                  <Slice className="h-2.5 w-2.5" />
-                  Section View
-                </h4>
-                <div className="space-y-0.5">
-                  <div className="flex items-center justify-between text-[9px]">
-                    <span className="text-gray-300">Position</span>
-                    <span className="text-white font-medium">{Math.round(sectionPlane * 100)}%</span>
-                  </div>
-                  <Slider
-                    value={[sectionPlane]}
-                    onValueChange={(v) => {
-                      const newValue = v[0] ?? 0;
-                      setSectionPlane(newValue);
-                      setShowCrossSection(newValue > 0);
-                    }}
-                    max={1}
-                    step={0.01}
-                    className="w-full"
-                    disabled={!showCrossSection}
-                  />
-                  <p className="text-[8px] text-gray-400 leading-tight">
-                    {!showCrossSection ? 'Enable to use' : sectionPlane === 0 ? 'Slide to cut' : 'Active'}
-                  </p>
-                </div>
-              </div>
-            </Card>
 
             {/* Display Settings */}
             <Card className="bg-[#505050] border-[#666666]">
@@ -1906,10 +1505,6 @@ export function EDrawingsViewer({
                               <Clock className="h-1.5 w-1.5" />
                               {feature.cycleTime}min
                             </span>
-                            <span className="flex items-center gap-0.5">
-                              <DollarSign className="h-1.5 w-1.5" />
-                              ₹{feature.costImpact.toLocaleString()}
-                            </span>
                           </div>
                           {feature.warnings.length > 0 && (
                             <div className="flex items-start gap-0.5 mt-0.5">
@@ -1922,6 +1517,99 @@ export function EDrawingsViewer({
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* DFM Insights Panel - Shows detailed analysis for selected feature */}
+            {currentSelectedFeature && (
+              <Card className="bg-[#505050] border-[#666666]">
+                <div className="p-1.5">
+                  <h4 className="text-[10px] font-semibold text-white flex items-center gap-1 mb-1">
+                    <Box className="h-2.5 w-2.5" />
+                    DFM Analysis
+                    <span className="ml-auto text-[8px] text-gray-400 font-normal">
+                      {currentSelectedFeature.type.replace('_', ' ')}
+                    </span>
+                  </h4>
+
+                  <div className="space-y-2 text-[9px]">
+                    {/* Feature type and process */}
+                    <div>
+                      <span className="text-gray-400 font-medium">Process:</span>
+                      <div className="text-white mt-0.5">
+                        {currentSelectedFeature.manufacturingProcess}
+                      </div>
+                    </div>
+
+                    {/* Dimensions if available */}
+                    {Object.keys(currentSelectedFeature.dimensions).length > 0 && (
+                      <div>
+                        <span className="text-gray-400 font-medium">Dimensions:</span>
+                        <div className="text-white mt-0.5 space-y-0.5">
+                          {Object.entries(currentSelectedFeature.dimensions)
+                            .filter(([_, value]) => value)
+                            .map(([key, value]) => (
+                              <div key={key} className="flex justify-between">
+                                <span className="text-gray-400 capitalize">{key}:</span>
+                                <span>{value}mm</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Cycle time */}
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Cycle Time:</span>
+                      <span className="text-white">{currentSelectedFeature.cycleTime}min</span>
+                    </div>
+
+                    {/* Warnings */}
+                    {currentSelectedFeature.warnings.length > 0 && (
+                      <div>
+                        <span className="text-amber-400 font-medium flex items-center gap-1">
+                          <AlertTriangle className="h-2 w-2" />
+                          Warnings:
+                        </span>
+                        <div className="mt-1 space-y-1">
+                          {currentSelectedFeature.warnings.map((warning, index) => (
+                            <div key={index} className="text-amber-400 text-[8px] leading-tight">
+                              • {warning}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI Recommendations */}
+                    {currentSelectedFeature.aiRecommendations.length > 0 && (
+                      <div>
+                        <span className="text-green-400 font-medium">Recommendations:</span>
+                        <div className="mt-1 space-y-1">
+                          {currentSelectedFeature.aiRecommendations.map((rec, index) => (
+                            <div key={index} className="text-green-400 text-[8px] leading-tight">
+                              • {rec}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Required tooling */}
+                    {currentSelectedFeature.tooling.length > 0 && (
+                      <div>
+                        <span className="text-purple-400 font-medium">Required Tools:</span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {currentSelectedFeature.tooling.map((tool, index) => (
+                            <span key={index} className="bg-purple-900/30 text-purple-300 px-1 py-0.5 rounded text-[7px]">
+                              {tool}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>

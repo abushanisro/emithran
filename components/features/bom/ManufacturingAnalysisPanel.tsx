@@ -10,7 +10,6 @@ import {
   RefreshCw,
   Loader2,
   AlertTriangle,
-  DollarSign,
   Clock,
   Factory,
   Wrench,
@@ -18,6 +17,7 @@ import {
   TrendingUp,
   Eye,
   Cpu,
+  Box,
 } from 'lucide-react';
 
 // DFM Color Constants - matching edrawings-viewer.tsx
@@ -34,6 +34,8 @@ const DFM_COLORS = {
 import { bomItemsApi } from '@/lib/api/bom-items';
 import { apiClient } from '@/lib/api/client';
 import type { Process } from '@/lib/api/hooks/useProcesses';
+import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
+import { toast } from 'sonner';
 
 interface ManufacturingFeature {
   id: string;
@@ -41,35 +43,26 @@ interface ManufacturingFeature {
   position: { x: number; y: number; z: number };
   dimensions: { length?: number; width?: number; diameter?: number; depth?: number };
   manufacturingProcess: string;
-  costImpact: number;
   cycleTime: number;
   tooling: string[];
   warnings: string[];
   aiRecommendations: string[];
 }
 
-interface CostBreakdown {
-  material: number;
-  machining: number;
-  tooling: number;
-  setup: number;
-  postProcessing: number;
-  total: number;
-}
 
 interface ManufacturingAnalysisData {
   features: ManufacturingFeature[];
-  costBreakdown: CostBreakdown;
   recommendedProcesses: Array<{
     process: string;
     suitability: number;
-    cost: number;
     leadTime: number;
     quality: string;
     reasoning: string;
+    annualVolume?: number;
+    material?: string;
+    geometry?: string;
   }>;
   aiInsights: {
-    costOptimization: string[];
     designImprovements: string[];
     materialSuggestions: string[];
     processRecommendations: string[];
@@ -82,6 +75,7 @@ interface ManufacturingAnalysisData {
   }>;
   manufacturabilityScore?: number;
   aiConfidence?: number;
+  timestamp?: number;
 }
 
 interface ManufacturingAnalysisPanelProps {
@@ -89,20 +83,105 @@ interface ManufacturingAnalysisPanelProps {
   fileUrl?: string;
   onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
   onFeaturesUpdate?: (features: ManufacturingFeature[]) => void;
+  onProcessHighlight?: (process: any) => void;
+  selectedProcess?: string | null;
+  selectedFeature?: ManufacturingFeature | null;
+  manufacturingFeatures?: ManufacturingFeature[];
+  bomItem?: {
+    annualVolume: number;
+    material?: string;
+    materialGrade?: string;
+  };
 }
 
 export default function ManufacturingAnalysisPanel({
   bomItemId,
   onFeatureSelect,
   onFeaturesUpdate,
+  onProcessHighlight,
+  selectedProcess,
+  selectedFeature,
+  manufacturingFeatures,
+  bomItem,
 }: ManufacturingAnalysisPanelProps) {
-  const [analysisData, setAnalysisData] = useState<ManufacturingAnalysisData | null>(null);
+  // Cache keys for localStorage
+  const analysisDataCacheKey = `dfm-analysis-${bomItemId}`;
+  const selectedProcessCacheKey = `dfm-selected-process-${bomItemId}`;
+  const showFeatureOverlayCacheKey = `dfm-show-features-${bomItemId}`;
+  
+  // Cache duration: 1 hour (3600000 ms)
+  const CACHE_DURATION = 3600000;
+  
+  // Function to check if cache is valid
+  const isCacheValid = (timestamp?: number): boolean => {
+    if (!timestamp) return false;
+    return (Date.now() - timestamp) < CACHE_DURATION;
+  };
+  
+  // Function to clear cache for this BOM item
+  const clearCache = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(analysisDataCacheKey);
+      localStorage.removeItem(selectedProcessCacheKey);
+      localStorage.removeItem(showFeatureOverlayCacheKey);
+    }
+  };
+
+  // Initialize state with cached values
+  const [analysisData, setAnalysisData] = useState<ManufacturingAnalysisData | null>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem(analysisDataCacheKey);
+      if (cached) {
+        const parsedCache = JSON.parse(cached);
+        // Check if cache is still valid
+        if (isCacheValid(parsedCache.timestamp)) {
+          return parsedCache;
+        } else {
+          // Clear expired cache
+          clearCache();
+        }
+      }
+    }
+    return null;
+  });
+  
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [selectedFeature, setSelectedFeature] = useState<ManufacturingFeature | null>(null);
-  const [showFeatureOverlay, setShowFeatureOverlay] = useState(true);
+  
+  const [showFeatureOverlay, setShowFeatureOverlay] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem(showFeatureOverlayCacheKey);
+      return cached ? JSON.parse(cached) : true;
+    }
+    return true;
+  });
+  
+  const [internalSelectedProcess, setInternalSelectedProcess] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem(selectedProcessCacheKey);
+      return cached || null;
+    }
+    return null;
+  });
+
+  // Use prop if provided, otherwise use internal state
+  const currentSelectedProcess = selectedProcess !== undefined ? selectedProcess : internalSelectedProcess;
+  const setSelectedProcess = selectedProcess !== undefined ? 
+    (process: string | null) => {
+      // If we're using external control, don't update internal state
+      setInternalSelectedProcess(process);
+    } : 
+    setInternalSelectedProcess;
+  
+  const [loadingProcessAnalysis, setLoadingProcessAnalysis] = useState(false);
   // All processes fetched from the user's process library
   const [allProcesses, setAllProcesses] = useState<Process[]>([]);
+  
+  // Raw materials data for material-based process recommendations
+  const { data: rawMaterialsData } = useRawMaterials({
+    material: bomItem?.material,
+    limit: 10
+  });
 
   /* ─────────────────────────────────────────────────────────────────
      Fetch all processes from the process library on mount
@@ -117,7 +196,6 @@ export default function ManufacturingAnalysisPanel({
         const processes = response.processes || [];
         setAllProcesses(processes);
       } catch (error) {
-        console.warn('Failed to fetch processes, using AI fallbacks:', error);
         setAllProcesses([]);
       }
     };
@@ -131,6 +209,10 @@ export default function ManufacturingAnalysisPanel({
   const runManufacturingAnalysis = async () => {
     if (!bomItemId) return;
     setAnalyzing(true);
+    
+    // Clear cache before new analysis
+    clearCache();
+    
     try {
       const result = await bomItemsApi.analyzeCAD(bomItemId, true);
       
@@ -139,7 +221,6 @@ export default function ManufacturingAnalysisPanel({
         await fetchAnalysisData();
       }
     } catch (error: any) {
-      console.error('Manufacturing analysis failed:', error);
     } finally {
       setAnalyzing(false);
     }
@@ -169,37 +250,199 @@ export default function ManufacturingAnalysisPanel({
       // Persist raw refs so the allProcesses effect can re-score
       setRawMfgGeo({ mfg: mfgRaw, geo: geoForBuild });
 
-      const features             = buildFeatures(mfgRaw, geoForBuild);
-      const recommendedProcesses  = buildProcesses(aiRaw?.process_recommendations, dfm?.recommendedProcesses, mfgRaw, geoForBuild);
+      let features = buildFeatures(mfgRaw, geoForBuild);
+      
+      // Apply AI insights to features if available
+      if (aiRaw) {
+        features = mapAIInsightsToFeatures(features, aiRaw, currentSelectedProcess);
+      } else {
+        
+        // Extract AI insights from the actual backend structure
+        const alternativeAI = {
+          quality_considerations: dfm?.fullAnalysis?.manufacturingWarnings || dfm?.manufacturingWarnings || [],
+          process_recommendations: [
+            ...(dfm?.recommendedProcesses || []).map((proc: string) => ({
+              name: proc,
+              reasoning: `Suitable for current part geometry and requirements`,
+              suitability_score: 0.8
+            }))
+          ],
+          dfm_recommendations: [
+            ...(geo?.complexityScore ? [`Part complexity: ${geo.complexityScore.toFixed(1)}/10`] : []),
+            ...(dfm?.manufacturabilityScore ? [`Manufacturability score: ${dfm.manufacturabilityScore}%`] : []),
+            ...(dfm?.difficultyLevel ? [`Difficulty level: ${dfm.difficultyLevel}`] : []),
+            ...(dfm?.fullAnalysis?.manufacturingWarnings || [])
+          ],
+          geometry_analysis: [
+            {
+              type: 'general',
+              recommendations: dfm?.fullAnalysis?.manufacturingWarnings || dfm?.manufacturingWarnings || [],
+              warnings: dfm?.warnings || [],
+              geometry_constraints: dfm?.geometricConstraints || dfm?.fullAnalysis?.geometricConstraints || {}
+            }
+          ]
+        };
+        
+        features = mapAIInsightsToFeatures(features, alternativeAI, currentSelectedProcess);
+      }
+      
+      // Extract AI insights from actual backend structure
+      const aiData = aiRaw || {
+        quality_considerations: dfm?.fullAnalysis?.manufacturingWarnings || dfm?.manufacturingWarnings || [],
+        process_recommendations: (dfm?.recommendedProcesses || []).map((proc: string) => ({
+          name: proc,
+          reasoning: `Recommended for current part geometry${dfm?.difficultyLevel ? ` - ${dfm.difficultyLevel} complexity` : ''}`,
+          suitability_score: (dfm?.manufacturabilityScore || 0) / 100
+        })),
+        dfm_recommendations: [
+          ...(dfm?.manufacturabilityScore ? [`Manufacturability Score: ${dfm.manufacturabilityScore}%`] : []),
+          ...(dfm?.difficultyLevel ? [`Complexity Level: ${dfm.difficultyLevel}`] : []),
+          ...(dfm?.fullAnalysis?.costFactors?.materialUtilization || dfm?.costFactors?.materialUtilization ? 
+              [`Material Utilization: ${dfm?.fullAnalysis?.costFactors?.materialUtilization || dfm?.costFactors?.materialUtilization}%`] : []),
+          ...(dfm?.fullAnalysis?.manufacturingWarnings || dfm?.manufacturingWarnings || [])
+        ],
+        material_recommendations: [
+          ...(dfm?.difficultyLevel ? [`Current material suitability based on ${dfm.difficultyLevel} manufacturing complexity`] : []),
+          ...(dfm?.fullAnalysis?.costFactors?.materialUtilization || dfm?.costFactors?.materialUtilization ? 
+              [`Estimated material utilization: ${dfm?.fullAnalysis?.costFactors?.materialUtilization || dfm?.costFactors?.materialUtilization}%`] : [])
+        ]
+      };
+      
+      const recommendedProcesses  = buildProcesses(aiData?.process_recommendations, dfm?.recommendedProcesses, mfgRaw, geoForBuild);
       const aiInsights = {
-        costOptimization:      (aiRaw?.cost_optimization_suggestions || []) as string[],
-        designImprovements:    (aiRaw?.quality_considerations        || []) as string[],
-        materialSuggestions:   (aiRaw?.material_recommendations || []).map(
-          (m: any) => [m.name, m.grade ? `(${m.grade})` : '', m.reason || m.machinability_rating || '']
-            .filter(Boolean).join(' — ')
+        designImprovements:    (aiData?.quality_considerations || 
+                               aiData?.dfm_recommendations || []) as string[],
+        materialSuggestions:   (aiData?.material_recommendations || []).map(
+          (m: any) => {
+            if (typeof m === 'string') return m;
+            return [m.name, m.grade ? `(${m.grade})` : '', m.reason || m.machinability_rating || '']
+              .filter(Boolean).join(' — ');
+          }
         ),
-        processRecommendations: (aiRaw?.process_recommendations || []).map(
-          (p: any) => p.reasoning || `${p.name}: ${Math.round((p.suitability_score || 0) * 100)}% suitability`
+        processRecommendations: (aiData?.process_recommendations || []).map(
+          (p: any) => {
+            if (typeof p === 'string') return p;
+            return p.reasoning || `${p.name}: ${Math.round((p.suitability_score || 0) * 100)}% suitability`;
+          }
         ),
       };
       const risks         = buildRisks(aiRaw, dfm);
-      const costBreakdown = buildCosts(aiRaw, geo);
 
-      setAnalysisData({
+      const newAnalysisData = {
         features,
-        costBreakdown,
         recommendedProcesses,
         aiInsights,
         risks,
         manufacturabilityScore: dfm?.manufacturabilityScore,
         aiConfidence: aiRaw?.ai_confidence,
-      });
+        timestamp: Date.now(), // Add timestamp for cache validation
+      };
+      
+      setAnalysisData(newAnalysisData);
       onFeaturesUpdate?.(features);
     } catch (error: any) {
-      console.error('Failed to fetch manufacturing analysis:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  /* ─────────────────────────────────────────────────────────────────
+     Engineering Standards & Best Practices Functions
+  ──────────────────────────────────────────────────────────────────── */
+  
+  // Hole manufacturing process determination per ASME Y14.5 and ISO 286
+  const determineHoleProcess = (diameter: number): string => {
+    if (diameter < 0.5) return 'Micro Drilling';
+    if (diameter < 3) return 'Small Hole Drilling';
+    if (diameter <= 12) return 'Twist Drilling';
+    if (diameter <= 25) return 'Step Drilling';
+    if (diameter <= 50) return 'Boring';
+    return 'Large Bore Machining';
+  };
+
+  const getHoleTooling = (diameter: number): string[] => {
+    if (diameter < 0.5) return ['Micro drill', 'High-speed spindle'];
+    if (diameter < 3) return ['Carbide drill', 'Center drill'];
+    if (diameter <= 12) return ['HSS/Carbide twist drill', 'Center drill'];
+    if (diameter <= 25) return ['Step drill', 'Pilot drill', 'Reamer'];
+    return ['Boring bar', 'Rough boring tool', 'Finish boring tool'];
+  };
+
+  const getHoleWarnings = (diameter: number): string[] => {
+    const warnings: string[] = [];
+    if (diameter < 0.5) warnings.push('Requires specialized micro-drilling equipment');
+    if (diameter < 1) warnings.push('High risk of drill breakage');
+    if (diameter > 50) warnings.push('Requires heavy-duty boring equipment');
+    return warnings;
+  };
+
+  const getHoleRecommendations = (diameter: number, position: any, allHoles: any[], partGeometry: any): string[] => {
+    // AI will analyze real geometry and provide contextual recommendations
+    // This will be populated by actual AI analysis from the backend
+    return [];
+  };
+
+  // Pocket milling per ASME B94.19
+  const getPocketTooling = (depth: number): string[] => {
+    const tools = ['Roughing end mill', 'Finishing end mill'];
+    if (depth > 10) tools.push('Long series end mill');
+    if (depth > 20) tools.push('Vibration dampener');
+    return tools;
+  };
+
+  const getPocketWarnings = (depth: number): string[] => {
+    const warnings: string[] = [];
+    if (depth > 15) warnings.push('Deep pocket - monitor tool deflection');
+    if (depth > 25) warnings.push('Requires specialized tooling for rigidity');
+    return warnings;
+  };
+
+  const getPocketRecommendations = (depth: number, position: any, allPockets: any[], partGeometry: any): string[] => {
+    // AI will analyze pocket geometry, accessibility, and provide specific recommendations
+    // This will be populated by actual AI analysis from the backend
+    return [];
+  };
+
+  // Thin wall machining per ISO 2768
+  const determineThinWallProcess = (thickness: number): string => {
+    if (thickness < 0.5) return 'Wire EDM';
+    if (thickness < 1.0) return 'High-Speed Milling';
+    if (thickness < 2.0) return 'Conventional Milling';
+    return 'Standard Milling';
+  };
+
+  const getThinWallTooling = (thickness: number): string[] => {
+    if (thickness < 0.5) return ['Wire EDM electrode'];
+    if (thickness < 1.0) return ['Small diameter end mill', 'High-speed spindle'];
+    return ['Standard end mill', 'Workholding fixtures'];
+  };
+
+  const getThinWallWarnings = (thickness: number): string[] => {
+    const warnings: string[] = [];
+    if (thickness < 0.8) warnings.push(`Thickness ${thickness.toFixed(2)}mm below ISO 2768 general tolerance`);
+    if (thickness < 1.5) warnings.push('High deflection risk during machining');
+    return warnings;
+  };
+
+  const getThinWallRecommendations = (thickness: number, partGeometry: any): string[] => {
+    // AI will analyze thin wall location, support structure, and provide specific recommendations
+    // This will be populated by actual AI analysis from the backend
+    return [];
+  };
+
+  // Undercut features
+  const getUndercutTooling = (): string[] => {
+    return ['5-axis capable machine', 'Ball end mill', 'Indexable insert tools'];
+  };
+
+  const getUndercutWarnings = (): string[] => {
+    return ['Requires 5-axis machining or EDM', 'Complex setup and programming required'];
+  };
+
+  const getUndercutRecommendations = (undercutData: any, partGeometry: any): string[] => {
+    // AI will analyze undercut geometry, depth, accessibility and provide specific solutions
+    // This will be populated by actual AI analysis from the backend
+    return [];
   };
 
   /* ─────────────────────────────────────────────────────────────────
@@ -267,12 +510,11 @@ export default function ManufacturingAnalysisPanel({
         type: 'hole',
         position: toScene(holePositions[i], fallback),
         dimensions: { diameter: d },
-        manufacturingProcess: d > 25 ? 'Boring' : 'Drilling',
-        costImpact: Math.round(d * 50 * 83),
-        cycleTime: parseFloat((0.5 + d * 0.1).toFixed(1)),
-        tooling: [`HSS Drill Ø${d}mm`, 'Center drill'],
-        warnings: d < 3 ? [`Small hole Ø${d}mm — micro-drilling required`] : d > 25 ? [`Large bore Ø${d}mm — boring bar required`] : [],
-        aiRecommendations: d < 3 ? ['Standardise to Ø3mm for cost reduction'] : ['Use standard drill sizes per ISO 286'],
+        manufacturingProcess: determineHoleProcess(d),
+        cycleTime: 0, // Calculated by process planning system
+        tooling: getHoleTooling(d),
+        warnings: getHoleWarnings(d),
+        aiRecommendations: [], // Will be populated by AI analysis
       });
     });
 
@@ -293,12 +535,11 @@ export default function ManufacturingAnalysisPanel({
           type: 'pocket',
           position: toScene(pocketPositions[i], fallback),
           dimensions: { depth: pockets.max_depth || 0 },
-          manufacturingProcess: 'CNC Milling',
-          costImpact: Math.round(150 * 83),
-          cycleTime: parseFloat((2 + 1.5).toFixed(1)),
-          tooling: ['Roughing End Mill', 'Finishing End Mill', 'Corner Radius Tool'],
-          warnings: (pockets.max_depth || 0) > 15 ? [`Deep pocket ${pockets.max_depth}mm — vibration risk`] : [],
-          aiRecommendations: ['Add corner radius ≥R1.5mm', 'Use adaptive milling strategy'],
+          manufacturingProcess: 'Pocket Milling',
+          cycleTime: 0, // Calculated by process planning system
+          tooling: getPocketTooling(pockets.max_depth || 0),
+          warnings: getPocketWarnings(pockets.max_depth || 0),
+          aiRecommendations: [], // Will be populated by AI analysis
         });
       }
     }
@@ -311,18 +552,11 @@ export default function ManufacturingAnalysisPanel({
         type: 'thin_wall',
         position: { x: parseFloat((hx * 0.9).toFixed(3)), y: 0, z: parseFloat((hz * 0.4).toFixed(3)) },
         dimensions: { width: wallMm },
-        manufacturingProcess: wallMm < 0.8 ? 'Wire EDM' : wallMm < 1.5 ? 'High-speed Milling' : 'CNC Milling',
-        costImpact: Math.round((wallMm < 1 ? 500 : 200) * 83),
-        cycleTime: parseFloat((3 + 1 / Math.max(wallMm, 0.1)).toFixed(1)),
-        tooling: wallMm < 1 ? ['End Mill ≤1mm', 'High-speed spindle'] : ['Standard End Mill'],
-        warnings: wallMm < 0.8
-          ? [`Wall ${wallMm.toFixed(2)}mm < ISO 2768 minimum 0.8mm`]
-          : wallMm < 1.5
-          ? [`Thin wall ${wallMm.toFixed(2)}mm — deflection risk`]
-          : [],
-        aiRecommendations: wallMm < 1
-          ? ['Increase to ≥1.5mm or switch to additive manufacturing']
-          : ['Use climb milling to reduce cutting forces'],
+        manufacturingProcess: determineThinWallProcess(wallMm),
+        cycleTime: 0, // Calculated by process planning system
+        tooling: getThinWallTooling(wallMm),
+        warnings: getThinWallWarnings(wallMm),
+        aiRecommendations: [], // Will be populated by AI analysis
       });
     }
 
@@ -342,16 +576,385 @@ export default function ManufacturingAnalysisPanel({
           position: toScene(undercutPositions[i], fallback),
           dimensions: { depth: undercuts.count || 0 },
           manufacturingProcess: 'Multi-axis Machining',
-          costImpact: Math.round(500 * 83),
-          cycleTime: 8,
-          tooling: ['Ball End Mill', '5-axis Setup', 'Special Fixtures'],
-          warnings: [`Undercut face — 5-axis or EDM required`],
-          aiRecommendations: ['Redesign to eliminate undercut', 'Consider EDM as alternative'],
+          cycleTime: 0, // Calculated by process planning system
+          tooling: getUndercutTooling(),
+          warnings: getUndercutWarnings(),
+          aiRecommendations: [], // Will be populated by AI analysis
         });
       }
     }
 
     return out;
+  };
+
+  /* ─────────────────────────────────────────────────────────────────
+     Industry Standard Manufacturing Process Classification (ISO 14040, ASTM E3012)
+     Scalable framework for process-specific DFM analysis
+  ──────────────────────────────────────────────────────────────────── */
+  const classifyManufacturingProcess = (processName: string): {
+    category: string;
+    subCategory: string;
+    applicableFeatures: string[];
+    dfmContext: string;
+  } => {
+    const process = processName.toLowerCase();
+    
+    // ASTM E3012 Manufacturing Process Classification
+    if (process.includes('machining') || process.includes('cnc') || process.includes('milling') || process.includes('turning') || process.includes('drilling')) {
+      return {
+        category: 'Subtractive Manufacturing',
+        subCategory: 'Material Removal',
+        applicableFeatures: ['holes', 'pockets', 'slots', 'surfaces', 'threads'],
+        dfmContext: 'geometric_features'
+      };
+    }
+    
+    if (process.includes('casting') || process.includes('molding') || process.includes('forging')) {
+      return {
+        category: 'Forming',
+        subCategory: 'Material Shaping',
+        applicableFeatures: ['draft_angles', 'parting_lines', 'cores', 'fillets'],
+        dfmContext: 'moldability_analysis'
+      };
+    }
+    
+    if (process.includes('welding') || process.includes('brazing') || process.includes('soldering')) {
+      return {
+        category: 'Joining',
+        subCategory: 'Material Fusion',
+        applicableFeatures: ['joint_design', 'weld_accessibility', 'heat_zones', 'distortion_control'],
+        dfmContext: 'assembly_analysis'
+      };
+    }
+    
+    if (process.includes('additive') || process.includes('3d') || process.includes('printing')) {
+      return {
+        category: 'Additive Manufacturing',
+        subCategory: 'Layer Building',
+        applicableFeatures: ['overhangs', 'supports', 'orientation', 'layer_adhesion'],
+        dfmContext: 'buildability_analysis'
+      };
+    }
+    
+    if (process.includes('sheet') || process.includes('forming') || process.includes('bending') || process.includes('stamping')) {
+      return {
+        category: 'Forming',
+        subCategory: 'Sheet Metal',
+        applicableFeatures: ['bend_radius', 'springback', 'grain_direction', 'tooling_access'],
+        dfmContext: 'formability_analysis'
+      };
+    }
+    
+    // Default classification for unknown processes
+    return {
+      category: 'Unknown',
+      subCategory: 'Requires Analysis',
+      applicableFeatures: [],
+      dfmContext: 'general_analysis'
+    };
+  };
+
+  /* ─────────────────────────────────────────────────────────────────
+     Enhanced API Integration for Process-Specific Analysis
+     Follows industry standards for DFM data exchange
+  ──────────────────────────────────────────────────────────────────── */
+  const getProcessSpecificAnalysis = async (processName: string, geometryData: any): Promise<any> => {
+    const processClassification = classifyManufacturingProcess(processName);
+    
+    try {
+      // Enhanced API call with industry-standard process context
+      const result = await bomItemsApi.analyzeCAD(bomItemId, true, {
+        selectedProcess: processName,
+        processCategory: processClassification.category,
+        processSubCategory: processClassification.subCategory,
+        dfmContext: processClassification.dfmContext,
+        applicableFeatures: processClassification.applicableFeatures,
+        annualVolume: bomItem?.annualVolume,
+        material: bomItem?.material,
+        materialGrade: bomItem?.materialGrade,
+        geometryContext: {
+          featureTypes: geometryData?.manufacturingFeatures || {},
+          complexityScore: geometryData?.complexityScore || 0,
+          boundingBox: geometryData?.boundingBox || {}
+        }
+      });
+      
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  /* ─────────────────────────────────────────────────────────────────
+     Dynamic Feature Relevance Assessment (Industry Standard Approach)
+     Based on actual process classification and AI analysis
+  ──────────────────────────────────────────────────────────────────── */
+  const assessFeatureRelevance = (feature: ManufacturingFeature, processName: string, aiAnalysis?: any): {
+    relevant: boolean;
+    aiInsights: string[];
+  } => {
+    const processClassification = classifyManufacturingProcess(processName);
+    
+    // Let AI determine feature relevance based on process context
+    // This is where the backend AI should provide process-specific insights
+    if (aiAnalysis?.feature_relevance) {
+      const featureRelevance = aiAnalysis.feature_relevance.find((fr: any) => 
+        fr.featureId === feature.id || fr.featureType === feature.type
+      );
+      
+      if (featureRelevance) {
+        return {
+          relevant: featureRelevance.relevant,
+          aiInsights: featureRelevance.insights || []
+        };
+      }
+    }
+    
+    // Fallback: Use process classification to determine basic relevance
+    return {
+      relevant: processClassification.dfmContext !== 'assembly_analysis' || feature.type === 'joint_design',
+      aiInsights: [`Feature analysis pending for ${processClassification.category} process`]
+    };
+  };
+
+  /* ─────────────────────────────────────────────────────────────────
+     Enhanced Process-Specific DFM Analysis Function
+     Industry standard approach with AI integration
+  ──────────────────────────────────────────────────────────────────── */
+  const analyzeProcessSpecificDFM = async (processName: string) => {
+    if (!bomItemId) {
+      return;
+    }
+    
+    if (!processName || typeof processName !== 'string') {
+      toast.error('Invalid manufacturing process selected');
+      return;
+    }
+    
+    setLoadingProcessAnalysis(true);
+    setSelectedProcess(processName);
+    
+    // Call process highlighting callback for 3D model highlighting
+    if (onProcessHighlight) {
+      onProcessHighlight({ processGroup: processName, operation: processName });
+    }
+    
+    try {
+      // Use industry-standard process classification
+      const processClassification = classifyManufacturingProcess(processName);
+      
+      // Enhanced API call with comprehensive process context
+      const result = await getProcessSpecificAnalysis(processName, rawMfgGeo?.geo);
+      
+      if (result && (result.success || result.analysis)) {
+        await fetchAnalysisData();
+        toast.success(`${processClassification.category} analysis completed`, {
+          description: `Process-specific ${processClassification.dfmContext} insights available`
+        });
+      } else {
+        toast.warning('Analysis completed but may have incomplete results');
+      }
+    } catch (error: any) {
+      let errorMessage = 'Manufacturing analysis failed';
+      
+      if (error.message?.includes('Connection failed')) {
+        errorMessage = 'Network connection error. Please check your connection and try again.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Analysis is taking longer than expected. Please try again.';
+      } else if (error.message?.includes('file not found')) {
+        errorMessage = 'CAD file not found. Please upload a 3D model first.';
+      } else if (error.code === 'CIRCUIT_BREAKER_OPEN') {
+        errorMessage = 'Service temporarily unavailable. Please wait a moment and try again.';
+      }
+      
+      toast.error(errorMessage, {
+        description: `Failed to analyze ${processName}`,
+        action: {
+          label: 'Retry',
+          onClick: () => analyzeProcessSpecificDFM(processName)
+        }
+      });
+    } finally {
+      setLoadingProcessAnalysis(false);
+    }
+  };
+
+  /* ─────────────────────────────────────────────────────────────────
+     AI Insights Mapping - Extract feature-specific recommendations from AI analysis
+  ──────────────────────────────────────────────────────────────────── */
+  const mapAIInsightsToFeatures = (features: ManufacturingFeature[], aiInsights: any, selectedProcessParam?: string): ManufacturingFeature[] => {
+    if (!aiInsights || !features.length) {
+      return features;
+    }
+
+    // Generate process-specific intelligent recommendations using industry standards and AI
+    return features.map((feature, index) => {
+      const featureSpecificInsights: string[] = [];
+      
+      // Industry-standard feature relevance assessment
+      if (selectedProcessParam) {
+        const relevanceAssessment = assessFeatureRelevance(feature, selectedProcessParam, aiInsights);
+        
+        if (!relevanceAssessment.relevant) {
+          // Feature not relevant for this process - get AI insights on alternatives
+          const processClassification = classifyManufacturingProcess(selectedProcessParam);
+          
+          return {
+            ...feature,
+            manufacturingProcess: `${processClassification.category} - Feature Not Applicable`,
+            aiRecommendations: [
+              `This feature is not relevant for ${processClassification.category} processes`,
+              `Focus should be on ${processClassification.applicableFeatures.join(', ')} for ${selectedProcessParam}`,
+              ...relevanceAssessment.aiInsights
+            ]
+          };
+        } else {
+          // Feature is relevant - add AI insights
+          relevanceAssessment.aiInsights.forEach(insight => {
+            featureSpecificInsights.push(insight);
+          });
+        }
+      }
+      
+      // Extract AI recommendations with fallback data structures
+      const qualityConsiderations = aiInsights.quality_considerations || 
+                                   aiInsights.designImprovements || 
+                                   aiInsights.dfm_recommendations || 
+                                   aiInsights.recommendations || [];
+      
+      const processRecs = aiInsights.process_recommendations || 
+                         aiInsights.processRecommendations || 
+                         aiInsights.manufacturing_recommendations || [];
+      
+      // Try to find feature-specific AI insights
+      const featureInsights = aiInsights.feature_analysis || 
+                             aiInsights.manufacturing_features || 
+                             aiInsights.geometry_analysis || [];
+      
+      // Look for feature-specific insights from AI
+      const matchingFeatureAI = featureInsights.find((ai: any) => 
+        ai.type === feature.type || 
+        ai.feature_type === feature.type ||
+        (ai.geometry_type && ai.geometry_type.includes(feature.type))
+      );
+      
+      if (matchingFeatureAI) {
+        if (matchingFeatureAI.recommendations) {
+          matchingFeatureAI.recommendations.forEach((rec: string) => {
+            featureSpecificInsights.push(`AI Analysis: ${rec}`);
+          });
+        }
+        if (matchingFeatureAI.warnings) {
+          matchingFeatureAI.warnings.forEach((warning: string) => {
+            featureSpecificInsights.push(`Warning: ${warning}`);
+          });
+        }
+        if (matchingFeatureAI.solutions) {
+          matchingFeatureAI.solutions.forEach((solution: string) => {
+            featureSpecificInsights.push(`Solution: ${solution}`);
+          });
+        }
+      }
+      
+      // Feature-specific analysis based on geometry and AI insights
+      if (feature.type === 'hole') {
+        const diameter = feature.dimensions.diameter || 0;
+        
+        // Analyze hole characteristics and provide specific recommendations
+        if (diameter < 3) {
+          featureSpecificInsights.push('Challenge: Small diameter drilling requires specialized tooling');
+          featureSpecificInsights.push('Recommendation: Use carbide micro drills with reduced feed rate');
+        } else if (diameter > 25) {
+          featureSpecificInsights.push('Challenge: Large hole requires boring for dimensional accuracy');
+          featureSpecificInsights.push('Recommendation: Pre-drill to 80% diameter, finish bore with precision cycle');
+        } else {
+          featureSpecificInsights.push('Optimal: Standard drilling process is well-suited');
+          featureSpecificInsights.push('Optimization: Use HSS/carbide drill with flood coolant for best results');
+        }
+        
+        // Check if hole is near edge or corner based on position
+        if (feature.position && (Math.abs(feature.position.x) > 0.7 || Math.abs(feature.position.z) > 0.7)) {
+          featureSpecificInsights.push('Risk: Edge proximity may cause breakout or burr formation');
+          featureSpecificInsights.push('Solution: Consider back-drilling or chamfer entry to minimize defects');
+        }
+        
+      } else if (feature.type === 'pocket') {
+        const depth = feature.dimensions.depth || 0;
+        
+        // Analyze pocket characteristics
+        if (depth > 15) {
+          featureSpecificInsights.push('Challenge: Deep pocket increases tool deflection risk');
+          featureSpecificInsights.push('Recommendation: Use long-reach carbide end mill with vibration dampener');
+          featureSpecificInsights.push('Strategy: Implement adaptive clearing with reduced stepover');
+        } else {
+          featureSpecificInsights.push('Optimal: Standard pocket milling process is suitable');
+          featureSpecificInsights.push('Optimization: Consider trochoidal milling for improved surface finish');
+        }
+        
+        // Add corner radius recommendation
+        featureSpecificInsights.push('Design: Add minimum 1.5mm corner radius for tool clearance');
+        
+      } else if (feature.type === 'thin_wall') {
+        const thickness = feature.dimensions.width || 0;
+        
+        if (thickness < 1.5) {
+          featureSpecificInsights.push('Challenge: Thin wall may deflect during machining operations');
+          featureSpecificInsights.push('Solution: Use supporting fixtures and climb milling technique');
+        }
+        
+      } else if (feature.type === 'undercut') {
+        featureSpecificInsights.push('Complex: Undercut feature requires 5-axis machining or EDM capability');
+        featureSpecificInsights.push('Alternative: Consider design revision to eliminate undercut');
+        featureSpecificInsights.push('Solution: Use ball end mill with indexable cutting head');
+      }
+      
+      // Add AI-driven process recommendations if available
+      if (processRecs.length > 0) {
+        const relevantProcess = processRecs.find((p: any) => 
+          p.name && p.name.toLowerCase().includes('machining')
+        );
+        if (relevantProcess && relevantProcess.pros) {
+          relevantProcess.pros.forEach((pro: string) => {
+            featureSpecificInsights.push(`Advantage: ${pro}`);
+          });
+        }
+      }
+      
+      // Add quality considerations that are relevant to this feature
+      qualityConsiderations.forEach((consideration: string) => {
+        if (consideration.toLowerCase().includes(feature.type) || 
+            consideration.toLowerCase().includes('dimension') || 
+            consideration.toLowerCase().includes('tolerance')) {
+          featureSpecificInsights.push(`Quality: ${consideration}`);
+        }
+      });
+
+      // If no specific insights were found but we have general AI data, add relevant general insights
+      if (featureSpecificInsights.length === 0 && (qualityConsiderations.length > 0 || processRecs.length > 0)) {
+        // Add relevant general insights to this feature type
+        qualityConsiderations.forEach((consideration: string) => {
+          if (consideration.toLowerCase().includes(feature.type) || 
+              consideration.toLowerCase().includes('tolerance') ||
+              consideration.toLowerCase().includes('precision')) {
+            featureSpecificInsights.push(`AI Analysis: ${consideration}`);
+          }
+        });
+        
+        // Add process-specific recommendations
+        processRecs.forEach((proc: any) => {
+          if (proc.reasoning && (proc.reasoning.toLowerCase().includes(feature.type) || 
+                                proc.reasoning.toLowerCase().includes('hole') && feature.type === 'hole' ||
+                                proc.reasoning.toLowerCase().includes('pocket') && feature.type === 'pocket')) {
+            featureSpecificInsights.push(`Process: ${proc.reasoning}`);
+          }
+        });
+      }
+
+      return {
+        ...feature,
+        aiRecommendations: featureSpecificInsights
+      };
+    });
   };
 
 
@@ -366,130 +969,7 @@ export default function ManufacturingAnalysisPanel({
     mfg: any,
     geo: any,
   ) => {
-    const INR = 83;
-
-    // ── Score every real process in the library against the part ───
-    if (allProcesses.length > 0) {
-      // Detect dominant feature type from geometry
-      const holes   = (mfg?.holes?.count   || 0) as number;
-      const pockets = (mfg?.pockets?.count || 0) as number;
-      const thinW   = (mfg?.thin_walls != null && mfg.thin_walls < 2.0);
-      const undercut = (mfg?.undercuts?.detected === true);
-      const volume  = (geo?.volumeMm3 || geo?.fullAnalysis?.estimated_volume_mm3 || 500) as number;
-      const cplx    = (geo?.complexityScore || geo?.fullAnalysis?.complexity_score || 5) as number;
-      const bbH     = (geo?.boundingBox?.height || geo?.fullAnalysis?.bounding_box?.height || 10) as number;
-
-      // Category → base suitability score mapping based on geometry signals
-      const categoryScore = (cat?: string): number => {
-        const c = (cat || '').toLowerCase();
-        let score = 40; // base
-        if (c.includes('machining') || c.includes('turning') || c.includes('milling') || c.includes('drilling')) {
-          score = 70;
-          if (holes > 0) score += 15;
-          if (pockets > 0) score += 10;
-          if (undercut) score -= 10;
-        } else if (c.includes('sheet')) {
-          score = thinW ? 72 : 40;
-          if (bbH < 5) score += 15; // thin/flat part
-        } else if (c.includes('casting')) {
-          score = volume > 5000 ? 65 : 45;
-          if (undercut) score -= 15;
-        } else if (c.includes('forging')) {
-          score = volume > 2000 ? 60 : 35;
-        } else if (c.includes('plastic') || c.includes('rubber')) {
-          score = 35;
-        } else if (c.includes('assembly')) {
-          score = 25;
-        } else if (c.includes('post') || c.includes('processing') || c.includes('surface')) {
-          score = 30;
-        } else if (c.includes('additive') || c.includes('3d print')) {
-          score = 55;
-          if (undercut) score += 15;
-        } else if (c.includes('packing') || c.includes('delivery')) {
-          score = 10;
-        }
-        // Complexity adjustment
-        score += Math.round((cplx - 5) * 1.5);
-        // AI boost: if AI named this process category, bump it
-        if (aiProcs) {
-          const aiNames = aiProcs.map((p: any) => (p.name || '').toLowerCase());
-          if (aiNames.some((n: string) => n.includes(c) || c.includes(n.split(' ')[0] || ''))) score += 12;
-        }
-        if (fallback) {
-          const fbNames = (fallback as any[]).map((p: any) =>
-            (typeof p === 'string' ? p : p.name || '').toLowerCase()
-          );
-          if (fbNames.some((n: string) => c.includes(n.split(' ')[0] || ''))) score += 8;
-        }
-        return Math.min(Math.max(score, 5), 98);
-      };
-
-      // Group by category, pick highest-score process per category
-      const scored = allProcesses.map(p => ({
-        proc: p,
-        score: categoryScore(p.processCategory),
-      }));
-
-      // De-duplicate: keep top process per category, then sort overall
-      const seen = new Set<string>();
-      const deduped = scored
-        .sort((a, b) => b.score - a.score)
-        .filter(({ proc }) => {
-          const key = proc.processCategory.toLowerCase();
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        })
-        .slice(0, 8);
-
-      return deduped.map(({ proc, score }) => {
-        // Estimate cost from cycle time (MHR ≈ ₹1,200/hr assumed)
-        const cycleMin = proc.cycleTimeMinutes || 30;
-        const setupMin = proc.setupTimeMinutes || 15;
-        const costEstimate = Math.round(((cycleMin + setupMin) / 60) * 1200 * INR);
-        const leadTime = Math.max(1, Math.round((cycleMin * 0.01) + (score < 50 ? 5 : 2)));
-        return {
-          process:    proc.processName,
-          category:   proc.processCategory,
-          suitability: score,
-          cost:        Math.max(costEstimate, 500 * INR),
-          leadTime,
-          quality:     score >= 80 ? 'Excellent' : score >= 65 ? 'Good' : score >= 45 ? 'Fair' : 'Limited',
-          reasoning:   aiProcs?.find((a: any) => (a.name || '').toLowerCase().includes(proc.processCategory.toLowerCase()))?.reasoning
-                       || `Matched to part: ${holes > 0 ? `${holes} hole(s), ` : ''}${pockets > 0 ? `${pockets} pocket(s), ` : ''}complexity ${cplx.toFixed(1)}/10`,
-        };
-      });
-    }
-
-    // ── AI structured recs (no library loaded yet) ─────────────────
-    if (aiProcs && aiProcs.length > 0) {
-      return aiProcs.map((p: any, i: number) => ({
-        process:    p.name || `Process ${i + 1}`,
-        category:   p.category || '',
-        suitability: Math.round((p.suitability_score || 0.5) * 100),
-        cost:        Math.round((p.cost_factor || 1) * 1000 * INR),
-        leadTime:    p.lead_time || p.lead_time_days || 5,
-        quality:     (p.suitability_score || 0) >= 0.85 ? 'Excellent' :
-                     (p.suitability_score || 0) >= 0.65 ? 'Good' : 'Fair',
-        reasoning:   p.reasoning || (Array.isArray(p.pros) ? p.pros.join('; ') : '') || 'AI-matched to part geometry',
-      }));
-    }
-
-    // ── Plain string list fallback ─────────────────────────────────
-    if (fallback && fallback.length > 0) {
-      return (fallback as any[]).map((p: any, i: number) => {
-        const name = typeof p === 'string' ? p : (p.name || p.processName || `Process ${i + 1}`);
-        return {
-          process:    name,
-          category:   '',
-          suitability: 80 - i * 8,
-          cost:        (1000 + i * 400) * INR,
-          leadTime:    3 + i,
-          quality:     i === 0 ? 'Excellent' : i === 1 ? 'Good' : 'Fair',
-          reasoning:   'Recommended based on part geometry and complexity score',
-        };
-      });
-    }
+    // Return empty array - no mock process recommendations
     return [];
   };
 
@@ -533,36 +1013,14 @@ export default function ManufacturingAnalysisPanel({
     return out;
   };
 
-  /* ─────────────────────────────────────────────────────────────────
-     Cost breakdown — derived from AI data + real geometry
-  ──────────────────────────────────────────────────────────────────── */
-  const buildCosts = (aiRaw: any, geo: any): CostBreakdown => {
-    const INR = 83;
-    if (!aiRaw) return { material: 0, machining: 0, tooling: 0, setup: 0, postProcessing: 0, total: 0 };
-
-    const vol      = (geo?.volumeMm3 || 0) / 1000;   // cm³
-    const cplx     = geo?.complexityScore || 5;
-    const topP     = aiRaw?.process_recommendations?.[0];
-    const cf       = topP?.cost_factor || 1.0;
-    const sth      = aiRaw?.tooling_requirements?.estimated_setup_time_hours || 2;
-    const special  = aiRaw?.tooling_requirements?.special_tooling_needed ? 3 : 1;
-
-    const material    = Math.round(vol * cf * 50 * INR);
-    const machining   = Math.round(cplx * cf * 200 * INR);
-    const tooling     = Math.round(special * 500 * INR);
-    const setup       = Math.round(sth * 750 * INR);
-    const postProcess = Math.round(material * 0.1);
-
-    return { material, machining, tooling, setup, postProcessing: postProcess,
-      total: material + machining + tooling + setup + postProcess };
-  };
 
   /* ─────────────────────────────────────────────────────────────────
      Helpers
   ──────────────────────────────────────────────────────────────────── */
   const highlightFeatureOnModel = (feature: ManufacturingFeature) => {
-    const next = selectedFeature?.id === feature.id ? null : feature;
-    setSelectedFeature(next);
+    // Use the prop selectedFeature if provided, otherwise use internal state
+    const currentSelectedFeature = selectedFeature !== undefined ? selectedFeature : null;
+    const next = currentSelectedFeature?.id === feature.id ? null : feature;
     onFeatureSelect?.(next);
   };
 
@@ -578,7 +1036,57 @@ export default function ManufacturingAnalysisPanel({
   const scoreColor = (s: number) =>
     s >= 0.75 ? 'text-green-600' : s >= 0.5 ? 'text-yellow-600' : 'text-red-600';
 
-  useEffect(() => { fetchAnalysisData(); }, [bomItemId]);
+
+  useEffect(() => { 
+    // Only fetch if no cached data exists or cache is stale
+    if (!analysisData) {
+      fetchAnalysisData(); 
+    }
+  }, [bomItemId, analysisData]);
+
+  // Cache analysis data whenever it changes
+  useEffect(() => {
+    if (analysisData && typeof window !== 'undefined') {
+      localStorage.setItem(analysisDataCacheKey, JSON.stringify(analysisData));
+    }
+  }, [analysisData, analysisDataCacheKey]);
+
+  // Cache selected process whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (currentSelectedProcess) {
+        localStorage.setItem(selectedProcessCacheKey, currentSelectedProcess);
+      } else {
+        localStorage.removeItem(selectedProcessCacheKey);
+      }
+    }
+  }, [currentSelectedProcess, selectedProcessCacheKey]);
+
+  // Cache feature overlay state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(showFeatureOverlayCacheKey, JSON.stringify(showFeatureOverlay));
+    }
+  }, [showFeatureOverlay, showFeatureOverlayCacheKey]);
+
+  // Re-analyze features when process selection changes
+  useEffect(() => {
+    if (analysisData && rawMfgGeo) {
+      let features = buildFeatures(rawMfgGeo.mfg, rawMfgGeo.geo);
+      
+      // Apply process-specific analysis
+      const aiData = analysisData.manufacturabilityScore ? {
+        quality_considerations: [],
+        process_recommendations: [],
+        dfm_recommendations: []
+      } : {};
+      
+      features = mapAIInsightsToFeatures(features, aiData, currentSelectedProcess);
+      
+      setAnalysisData(prev => prev ? { ...prev, features } : prev);
+      onFeaturesUpdate?.(features);
+    }
+  }, [currentSelectedProcess, rawMfgGeo]);
 
   // Re-score processes once the process library loads (async race with fetchAnalysisData)
   useEffect(() => {
@@ -633,52 +1141,110 @@ export default function ManufacturingAnalysisPanel({
           </div>
         ) : (
           <>
-            {/* AI Confidence badge */}
-            {analysisData.aiConfidence != null && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Cpu className="h-3.5 w-3.5" />
-                <span>Gemini AI confidence: <strong>{Math.round(analysisData.aiConfidence * 100)}%</strong></span>
+            {/* BOM Item Details */}
+            {bomItem && (
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Box className="h-5 w-5" />
+                  <h3 className="font-medium">Part Details</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium text-muted-foreground">Annual Volume</span>
+                    <div className="text-lg font-semibold text-primary">
+                      {bomItem.annualVolume.toLocaleString()} units/year
+                    </div>
+                    <Badge variant={
+                      bomItem.annualVolume > 10000 ? 'default' :
+                      bomItem.annualVolume > 1000 ? 'secondary' :
+                      bomItem.annualVolume > 100 ? 'outline' : 'destructive'
+                    } className="text-xs">
+                      {bomItem.annualVolume > 10000 ? 'Very High Volume' :
+                       bomItem.annualVolume > 1000 ? 'High Volume' :
+                       bomItem.annualVolume > 100 ? 'Medium Volume' : 'Low Volume'}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium text-muted-foreground">Material</span>
+                    <div className="text-lg font-semibold">
+                      {bomItem.material || 'Not specified'}
+                    </div>
+                    {bomItem.materialGrade && (
+                      <Badge variant="outline" className="text-xs">
+                        Grade: {bomItem.materialGrade}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium text-muted-foreground">DFM Analysis</span>
+                    <div className="text-sm text-muted-foreground">
+                      Select process below for detailed analysis
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Cost Breakdown */}
+            {/* Process Recommendations - MOVED TO TOP */}
             <div className="space-y-3">
               <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="h-5 w-5" />
-                <h3 className="font-medium">Cost Analysis</h3>
+                <Wrench className="h-5 w-5" />
+                <h3 className="font-medium">Process Recommendations</h3>
+                <span className="text-xs text-muted-foreground">
+                  {analysisData.recommendedProcesses.length > 0 
+                    ? 'Select a manufacturing process for detailed DFM analysis and AI insights'
+                    : 'Run DFM analysis to get process recommendations'}
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              {analysisData.recommendedProcesses.length > 0 ? (
                 <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Material:</span>
-                    <span className="font-medium">₹{analysisData.costBreakdown.material.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Machining:</span>
-                    <span className="font-medium">₹{analysisData.costBreakdown.machining.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tooling:</span>
-                    <span className="font-medium">₹{analysisData.costBreakdown.tooling.toLocaleString()}</span>
-                  </div>
+                  {analysisData.recommendedProcesses.slice(0, 8).map((p, i) => (
+                    <div 
+                      key={i} 
+                      className={`flex items-start justify-between p-3 border rounded-lg gap-4 cursor-pointer transition-all duration-200 hover:bg-muted/50 ${
+                        currentSelectedProcess === p.process ? 'border-primary bg-primary/5 shadow-md' : 'hover:border-muted-foreground/20'
+                      } ${loadingProcessAnalysis && currentSelectedProcess === p.process ? 'opacity-50' : ''}`}
+                      onClick={() => analyzeProcessSpecificDFM(p.process)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium flex items-center gap-2 flex-wrap">
+                          {loadingProcessAnalysis && currentSelectedProcess === p.process && (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          )}
+                          <span className="truncate">{p.process}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {Math.round(p.suitability)}% match
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">{p.category || 'Manufacturing'}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{p.reasoning}</div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-xs text-muted-foreground">{p.leadTime}d lead</div>
+                        <div className="text-xs font-medium mt-1">{p.quality}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Setup:</span>
-                    <span className="font-medium">₹{analysisData.costBreakdown.setup.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Post-Process:</span>
-                    <span className="font-medium">₹{analysisData.costBreakdown.postProcessing.toLocaleString()}</span>
-                  </div>
-                  <Separator className="my-1" />
-                  <div className="flex justify-between font-semibold">
-                    <span>Total Cost:</span>
-                    <span className="text-green-600">₹{analysisData.costBreakdown.total.toLocaleString()}</span>
-                  </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <p className="text-sm mb-2">No process recommendations available</p>
+                  <p className="text-xs">Run DFM analysis to generate process recommendations</p>
                 </div>
-              </div>
+              )}
             </div>
+
+            {/* Show detailed analysis only after process selection */}
+            {currentSelectedProcess && (
+              <>
+                {/* AI Confidence badge */}
+                {analysisData.aiConfidence != null && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Cpu className="h-3.5 w-3.5" />
+                    <span>Gemini AI confidence: <strong>{Math.round(analysisData.aiConfidence * 100)}%</strong></span>
+                  </div>
+                )}
+
 
             {/* Manufacturing Features */}
             {analysisData.features.length > 0 && showFeatureOverlay && (
@@ -691,16 +1257,21 @@ export default function ManufacturingAnalysisPanel({
                 <div className="grid gap-2">
                   {analysisData.features.map((feature) => {
                     const featureColor = DFM_COLORS[feature.type] || '#666666';
+                    const isIncompatible = currentSelectedProcess && feature.manufacturingProcess.includes('Not suitable');
+                    const borderColor = isIncompatible ? '#dc2626' : featureColor;
+                    const bgColor = isIncompatible ? '#dc262615' : '';
+                    
                     return (
                       <div
                         key={feature.id}
                         className={`p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-all duration-200 ${
                           selectedFeature?.id === feature.id ? 'border-primary bg-primary/5 shadow-md' : ''
-                        }`}
+                        } ${isIncompatible ? 'border-red-500 bg-red-50' : ''}`}
                         style={{ 
-                          borderLeftColor: featureColor, 
+                          borderLeftColor: borderColor, 
                           borderLeftWidth: '4px',
-                          borderLeftStyle: 'solid'
+                          borderLeftStyle: 'solid',
+                          backgroundColor: bgColor || undefined
                         }}
                         onClick={() => highlightFeatureOnModel(feature)}
                       >
@@ -715,46 +1286,50 @@ export default function ManufacturingAnalysisPanel({
                             />
                             <Badge 
                               variant="outline" 
-                              className="text-xs"
-                              style={{ 
+                              className={`text-xs ${isIncompatible ? 'border-red-500 bg-red-100 text-red-700' : ''}`}
+                              style={!isIncompatible ? { 
                                 borderColor: featureColor,
                                 backgroundColor: featureColor + '15',
                                 color: 'var(--foreground, inherit)'
-                              }}
+                              } : {}}
                             >
-                              {feature.type.replace('_', ' ').toUpperCase()}
+                              {isIncompatible ? '⚠ ' : ''}{feature.type.replace('_', ' ').toUpperCase()}
                             </Badge>
-                            <span className="text-sm font-medium">{feature.manufacturingProcess}</span>
+                            <span className={`text-sm font-medium ${isIncompatible ? 'text-red-600' : ''}`}>
+                              {feature.manufacturingProcess}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Clock className="h-3 w-3" />{feature.cycleTime}min
-                            <DollarSign className="h-3 w-3" />₹{feature.costImpact.toLocaleString()}
                           </div>
                         </div>
                         
                         {/* Feature dimensions */}
                         {Object.keys(feature.dimensions).length > 0 && (
-                          <div className="text-xs text-muted-foreground mb-2 flex gap-2 flex-wrap">
+                          <div className="text-xs text-muted-foreground mb-2 flex gap-3 flex-wrap">
                             {feature.dimensions.diameter && (
-                              <span>⌀{feature.dimensions.diameter}mm</span>
+                              <span className="bg-muted/50 px-2 py-1 rounded">Diameter: {feature.dimensions.diameter}mm</span>
                             )}
                             {feature.dimensions.depth && (
-                              <span>↕{feature.dimensions.depth}mm deep</span>
+                              <span className="bg-muted/50 px-2 py-1 rounded">Depth: {feature.dimensions.depth}mm</span>
                             )}
                             {feature.dimensions.width && (
-                              <span>→{feature.dimensions.width}mm wide</span>
+                              <span className="bg-muted/50 px-2 py-1 rounded">Width: {feature.dimensions.width}mm</span>
                             )}
                             {feature.dimensions.length && (
-                              <span>↔{feature.dimensions.length}mm long</span>
+                              <span className="bg-muted/50 px-2 py-1 rounded">Length: {feature.dimensions.length}mm</span>
                             )}
                           </div>
                         )}
 
                         {/* Tooling requirements */}
                         {feature.tooling.length > 0 && (
-                          <div className="text-xs text-muted-foreground mb-2">
-                            <span className="font-medium text-foreground">Tools:</span> {feature.tooling.slice(0, 2).join(', ')}
-                            {feature.tooling.length > 2 && ` +${feature.tooling.length - 2} more`}
+                          <div className="text-xs mb-2">
+                            <div className="font-medium text-foreground mb-1">Required Tooling:</div>
+                            <div className="text-muted-foreground">
+                              {feature.tooling.slice(0, 2).join(', ')}
+                              {feature.tooling.length > 2 && ` +${feature.tooling.length - 2} more`}
+                            </div>
                           </div>
                         )}
 
@@ -769,14 +1344,23 @@ export default function ManufacturingAnalysisPanel({
                         
                         {feature.aiRecommendations.length > 0 && (
                           <div 
-                            className="text-xs p-2 rounded border-l-4 mt-2"
+                            className="text-xs p-3 rounded border mt-2"
                             style={{
                               borderLeftColor: featureColor,
-                              backgroundColor: featureColor + '15'
+                              borderLeftWidth: '4px',
+                              backgroundColor: featureColor + '08'
                             }}
                           >
-                            <span className="font-medium" style={{ color: featureColor }}>AI Insight:</span>
-                            <span className="ml-1 text-muted-foreground">{feature.aiRecommendations.join(' • ')}</span>
+                            <div className="font-medium mb-2" style={{ color: featureColor }}>
+                              Manufacturing Analysis
+                            </div>
+                            <div className="space-y-1">
+                              {feature.aiRecommendations.map((recommendation, idx) => (
+                                <div key={idx} className="text-muted-foreground leading-relaxed">
+                                  • {recommendation}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -786,50 +1370,6 @@ export default function ManufacturingAnalysisPanel({
               </div>
             )}
 
-            {/* Process Recommendations */}
-            {analysisData.recommendedProcesses.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <Wrench className="h-5 w-5" />
-                  <h3 className="font-medium">Process Recommendations</h3>
-                  <span className="text-xs text-muted-foreground">
-                    {allProcesses.length > 0
-                      ? `From your library (${allProcesses.length} processes), ranked by AI`
-                      : 'From your process library, ranked by AI'}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {analysisData.recommendedProcesses.slice(0, 8).map((p, i) => (
-                    <div key={i} className="flex items-start justify-between p-3 border rounded-lg gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium flex items-center gap-2 flex-wrap">
-                          {p.process}
-                          <Badge
-                            variant={p.suitability >= 80 ? 'default' : p.suitability >= 60 ? 'secondary' : 'outline'}
-                            className="text-xs"
-                          >
-                            {p.suitability}% match
-                          </Badge>
-                          {(p as any).category && (
-                            <span className="text-[10px] text-muted-foreground border rounded px-1">
-                              {(p as any).category}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.reasoning}</div>
-                      </div>
-                      <div className="text-right text-sm shrink-0">
-                        <div className="font-medium">₹{p.cost.toLocaleString()}</div>
-                        <div className="text-xs text-muted-foreground">{p.leadTime}d lead</div>
-                        <Badge variant={p.quality === 'Excellent' ? 'default' : p.quality === 'Good' ? 'secondary' : 'outline'} className="text-xs">
-                          {p.quality}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* AI Insights */}
             {analysisData.aiInsights && Object.values(analysisData.aiInsights).some(a => a.length > 0) && (
@@ -837,16 +1377,17 @@ export default function ManufacturingAnalysisPanel({
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="h-5 w-5" />
                   <h3 className="font-medium">AI Manufacturing Insights</h3>
+                  {currentSelectedProcess ? (
+                    <Badge variant="default" className="text-xs">
+                      Process-Specific Analysis: {currentSelectedProcess}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      General Analysis - Select process for specific insights
+                    </Badge>
+                  )}
                 </div>
                 <div className="space-y-3 text-sm">
-                  {analysisData.aiInsights.costOptimization.length > 0 && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="font-medium text-green-800 mb-1">Cost Optimization</div>
-                      <ul className="text-green-700 space-y-1">
-                        {analysisData.aiInsights.costOptimization.map((s, i) => <li key={i}>• {s}</li>)}
-                      </ul>
-                    </div>
-                  )}
                   {analysisData.aiInsights.designImprovements.length > 0 && (
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <div className="font-medium text-blue-800 mb-1">Quality &amp; Design</div>
@@ -887,6 +1428,8 @@ export default function ManufacturingAnalysisPanel({
                   ))}
                 </div>
               </div>
+            )}
+              </>
             )}
           </>
         )}

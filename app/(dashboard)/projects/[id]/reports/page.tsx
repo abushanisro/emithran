@@ -23,13 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+
 import { 
   FileText, 
   Download, 
   Plus, 
   Edit, 
-  Eye, 
   Printer,
   Settings,
   Loader2,
@@ -71,7 +70,7 @@ function CreateBalloonDiagramDialog({
     cadFilePath: '',
   });
 
-  const { data: boms } = useBOMs(projectId);
+  const { data: bomsData } = useBOMs({ projectId });
   const createBalloonDiagram = useCreateBalloonDiagram();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -131,7 +130,7 @@ function CreateBalloonDiagramDialog({
                 <SelectValue placeholder="Select BOM" />
               </SelectTrigger>
               <SelectContent>
-                {boms?.map((bom) => (
+                {bomsData?.boms?.map((bom: any) => (
                   <SelectItem key={bom.id} value={bom.id}>
                     {bom.name} - {bom.items?.length || 0} items
                   </SelectItem>
@@ -230,7 +229,7 @@ export default function ProjectReportPage() {
   const [selectedDiagramId, setSelectedDiagramId] = useState<string | null>(null);
   const [isEditingDiagram, setIsEditingDiagram] = useState(false);
 
-  const { data: project } = useProjects();
+  const { data: projectData } = useProjects();
   const { data: balloonDiagrams, refetch: refetchDiagrams } = useBalloonDiagrams(projectId);
   const { data: inspectionReport, isLoading: isLoadingReport } = useInspectionReport(projectId);
   const { data: completeReport, isLoading: isLoadingComplete } = useCompleteReport(projectId);
@@ -239,12 +238,14 @@ export default function ProjectReportPage() {
   const updateAnnotation = useUpdateAnnotation();
   const deleteAnnotation = useDeleteAnnotation();
 
-  const currentProject = project?.find(p => p.id === projectId);
-  const selectedDiagram = balloonDiagrams?.find(d => d.id === selectedDiagramId) || balloonDiagrams?.[0];
+  const currentProject = Array.isArray(projectData) 
+    ? projectData.find((p: any) => p.id === projectId) 
+    : (projectData as any)?.projects?.find((p: any) => p.id === projectId);
+  const selectedDiagram = balloonDiagrams?.find((d: any) => d.id === selectedDiagramId) || balloonDiagrams?.[0];
 
   useEffect(() => {
-    if (balloonDiagrams?.length > 0 && !selectedDiagramId) {
-      setSelectedDiagramId(balloonDiagrams[0].id);
+    if (balloonDiagrams && balloonDiagrams.length > 0 && !selectedDiagramId) {
+      setSelectedDiagramId(balloonDiagrams[0]!.id);
     }
   }, [balloonDiagrams, selectedDiagramId]);
 

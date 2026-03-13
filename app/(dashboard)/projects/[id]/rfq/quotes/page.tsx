@@ -15,7 +15,7 @@ export default function QuoteComparisonPage() {
   
   // Fetch real data
   const { data: trackingRecords, isLoading: trackingLoading } = useRfqTrackingRecords(projectId);
-  const { data: vendors, isLoading: vendorsLoading } = useVendors();
+  const { isLoading: vendorsLoading } = useVendors();
 
   // Process quotes data
   const quotesData = trackingRecords?.flatMap(record => 

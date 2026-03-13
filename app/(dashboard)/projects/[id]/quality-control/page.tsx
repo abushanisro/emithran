@@ -73,10 +73,6 @@ export default function QualityControlPage() {
     refetchInspections();
   };
 
-  const handleInspectionCompleted = (_completedInspection: any) => {
-    refetchInspections();
-  };
-
   const openReportDialog = (inspection: any) => {
     // Navigate to the dedicated inspection page instead of opening dialog
     router.push(`/projects/${projectId}/quality-control/${inspection.id}`);

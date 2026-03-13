@@ -348,6 +348,29 @@ class ApiClient {
   }
 
   /**
+   * Enhanced error message mapping for better user experience
+   */
+  private getEnhancedErrorMessage(errorCode: string | null, originalMessage: string): string {
+    const errorMap: Record<string, string> = {
+      'NETWORK_ERROR': 'Network connection failed. Please check your internet connection and try again.',
+      'BACKEND_UNREACHABLE': 'Service temporarily unavailable. Please try again in a moment.',
+      'CIRCUIT_BREAKER_OPEN': 'Service experiencing high load. Please wait a moment before trying again.',
+      'AUTH_FAILED': 'Authentication failed. Please sign in again.',
+      'AUTH_INITIALIZING': 'Authentication in progress. Please wait a moment.',
+      'TIMEOUT_ERROR': 'Request timed out. The operation is taking longer than expected.',
+      'RATE_LIMITED': 'Too many requests. Please wait before trying again.',
+      'FORBIDDEN': 'Access denied. You do not have permission to perform this action.',
+      'NOT_FOUND': 'Requested resource not found.',
+      'VALIDATION_ERROR': 'Invalid request data. Please check your input.',
+      'SERVER_ERROR': 'Internal server error. Please try again later.',
+      'SERVICE_UNAVAILABLE': 'Service temporarily unavailable. Please try again later.'
+    };
+
+    // Return enhanced message if available, fallback to original
+    return errorMap[errorCode || ''] || originalMessage || 'An unexpected error occurred';
+  }
+
+  /**
    * Get circuit breaker metrics for monitoring
    */
   getCircuitBreakerMetrics() {
@@ -924,7 +947,10 @@ class ApiClient {
           }
 
           if (silent) return null;
-          throw new ApiError(String(errorMessage || 'Unknown error'), 0, String(errorCode || 'UNKNOWN_ERROR'));
+          
+          // Provide more specific error messages for common failure scenarios
+          const enhancedErrorMessage = this.getEnhancedErrorMessage(errorCode, errorMessage);
+          throw new ApiError(enhancedErrorMessage, 0, String(errorCode || 'UNKNOWN_ERROR'));
         }
 
         // Silent mode: return null for all other error types
