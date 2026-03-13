@@ -57,6 +57,7 @@ import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
+import { bomItemsApi } from '@/lib/api/bom-items';
 
 // Enhanced error handling types for BOM management
 type EnhancedBOMError = {
@@ -246,6 +247,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState<{ file2d?: number; file3d?: number }>({});
   const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
+  const [isAnalyzing3D, setIsAnalyzing3D] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     partNumber: '',
@@ -373,6 +375,132 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       completionPercentage: calculateCompletionPercentage()
     };
   }, [formData]);
+
+  // Function to analyze 3D file and extract physical properties
+  const analyze3DFile = async (file: File) => {
+    if (!file) return;
+    
+    setIsAnalyzing3D(true);
+    
+    try {
+      // First, create a temporary BOM item to upload and analyze the file
+      toast.info('Analyzing 3D model...', {
+        description: 'Extracting physical properties from your CAD file',
+        duration: 3000
+      });
+
+      // Create FormData to upload the 3D file temporarily
+      const formDataUpload = new FormData();
+      formDataUpload.append('file3d', file);
+      
+      // Create a temporary item ID for analysis (we'll use the current bomId or create temp)
+      const tempItemId = item?.id || `temp-${Date.now()}`;
+      
+      // If this is an existing item, we can analyze it directly
+      // If it's new, we need to handle it differently
+      let analysisResult;
+      
+      if (item?.id) {
+        // For existing items, upload file and analyze
+        try {
+          await apiClient.uploadFiles(`/bom-items/${item.id}/upload-files`, formDataUpload);
+          analysisResult = await bomItemsApi.analyzeCAD(item.id, true);
+        } catch (error) {
+          console.warn('Could not upload and analyze file:', error);
+          return;
+        }
+      } else {
+        // For new items, we can't analyze until the item is created
+        // Show a different message
+        toast.info('3D file selected', {
+          description: 'Physical properties will be extracted after creating the item',
+          duration: 2000
+        });
+        return;
+      }
+      
+      if (analysisResult?.success && analysisResult.analysis?.geometryFeatures) {
+        const geo = analysisResult.analysis.geometryFeatures;
+        
+        // Extract physical properties from the analysis
+        const extractedProperties: Partial<typeof formData> = {};
+        
+        // Surface area (convert from mm² to match form units)
+        if (geo.surfaceAreaMm2 && geo.surfaceAreaMm2 > 0) {
+          extractedProperties.surfaceArea = Math.round(geo.surfaceAreaMm2 * 100) / 100; // Round to 2 decimal places
+        }
+        
+        // Bounding box dimensions
+        if (geo.boundingBox) {
+          if (geo.boundingBox.length && geo.boundingBox.length > 0) {
+            extractedProperties.maxLength = Math.round(geo.boundingBox.length * 100) / 100;
+          }
+          if (geo.boundingBox.width && geo.boundingBox.width > 0) {
+            extractedProperties.maxWidth = Math.round(geo.boundingBox.width * 100) / 100;
+          }
+          if (geo.boundingBox.height && geo.boundingBox.height > 0) {
+            extractedProperties.maxHeight = Math.round(geo.boundingBox.height * 100) / 100;
+          }
+        }
+        
+        // Calculate weight if we have volume and material density
+        if (geo.volumeMm3 && geo.volumeMm3 > 0 && formData.materialGrade) {
+          // Basic material density estimates (kg/mm³)
+          const materialDensities: Record<string, number> = {
+            'aluminum': 2.7e-6, // 2.7 g/cm³
+            'steel': 7.85e-6,   // 7.85 g/cm³
+            'stainless': 8.0e-6, // 8.0 g/cm³
+            'brass': 8.5e-6,    // 8.5 g/cm³
+            'copper': 8.96e-6,  // 8.96 g/cm³
+            'titanium': 4.5e-6  // 4.5 g/cm³
+          };
+          
+          const materialKey = formData.materialGrade.toLowerCase();
+          const density = Object.keys(materialDensities).find(key => 
+            materialKey.includes(key)) ? materialDensities[Object.keys(materialDensities).find(key => 
+            materialKey.includes(key))!] : 2.7e-6; // Default to aluminum
+          
+          const estimatedWeight = geo.volumeMm3 * density; // kg
+          if (estimatedWeight > 0 && estimatedWeight < 1000) { // Sanity check
+            extractedProperties.weight = Math.round(estimatedWeight * 1000) / 1000; // Round to 3 decimal places
+          }
+        }
+        
+        // Update form data with extracted properties
+        if (Object.keys(extractedProperties).length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            ...extractedProperties
+          }));
+          
+          const extractedCount = Object.keys(extractedProperties).length;
+          toast.success(`Extracted ${extractedCount} properties`, {
+            description: `Automatically populated: ${Object.keys(extractedProperties).join(', ')}`,
+            duration: 4000
+          });
+        } else {
+          toast.warning('Limited analysis results', {
+            description: 'Could not extract physical properties from this file',
+            duration: 3000
+          });
+        }
+      } else {
+        toast.warning('Analysis incomplete', {
+          description: 'Could not analyze the 3D file. Please check the file format.',
+          duration: 3000
+        });
+      }
+      
+    } catch (error: any) {
+      console.error('3D Analysis Error:', error);
+      toast.error('Analysis failed', {
+        description: 'Could not analyze the 3D file. Please try again later.',
+        duration: 4000
+      });
+    } finally {
+      setIsAnalyzing3D(false);
+    }
+  };
   
   // Update validation errors when form changes
   useEffect(() => {
@@ -501,7 +629,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       if (item) {
         await updateBOMItem(item.id, payload);
         itemId = item.id;
-        toast.success(`✅ "${formData.name}" updated successfully`, {
+        toast.success(`"${formData.name}" updated successfully`, {
           description: 'BOM item has been updated with your changes',
           duration: 4000
         });
@@ -537,7 +665,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
           
           setUploadProgress({ file2d: 100, file3d: 100 });
           
-          toast.success(`📎 Files uploaded successfully`, {
+          toast.success(`Files uploaded successfully`, {
             description: `${fileNames.join(', ')} attached to ${formData.name}`,
             duration: 4000
           });
@@ -547,7 +675,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
           // Enhanced file upload error handling
           const baseMessage = `Item saved but file upload ${errorInfo.recoverable ? 'failed' : 'was blocked'}`;
           
-          toast.error(`📎 ${baseMessage}`, {
+          toast.error(`${baseMessage}`, {
             description: errorInfo.suggestion,
             duration: errorInfo.severity === 'critical' ? 10000 : 7000,
             action: errorInfo.recoverable ? {
@@ -622,18 +750,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       }
       
       // Show categorized error message
-      const errorEmoji = {
-        validation: '⚠️',
-        duplication: '🔄',
-        hierarchy: '🔗',
-        fileupload: '📎',
-        network: '🌐',
-        permission: '🔒',
-        business: '📋',
-        data: 'ℹ️'
-      }[errorInfo.category] || '❌';
-      
-      toast.error(`${errorEmoji} ${errorInfo.userMessage}`, toastOptions);
+      toast.error(errorInfo.userMessage, toastOptions);
       
       // Log detailed error for debugging
       console.error('BOM Item Save Error:', {
@@ -929,7 +1046,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    📐 Upload technical drawings, blueprints, or dimensional sketches
+                    Upload technical drawings, blueprints, or dimensional sketches
                   </p>
                 )}
               </div>
@@ -943,18 +1060,34 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                   id="file3d"
                   type="file"
                   accept=".stp,.step,.stl,.obj,.iges,.igs"
-                  onChange={(e) => setFormData({ ...formData, file3d: e.target.files?.[0] || null })}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setFormData({ ...formData, file3d: file });
+                    // Trigger automatic analysis if file is selected
+                    if (file) {
+                      analyze3DFile(file);
+                    }
+                  }}
                   className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80"
                 />
                 {formData.file3d ? (
                   <div className="flex items-center gap-2 text-xs bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded p-2">
-                    <CheckCircle className="h-3 w-3 text-green-600" />
-                    <span className="text-green-700 dark:text-green-300">Selected: {formData.file3d.name}</span>
+                    {isAnalyzing3D ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
+                    ) : (
+                      <CheckCircle className="h-3 w-3 text-green-600" />
+                    )}
+                    <span className="text-green-700 dark:text-green-300">
+                      {isAnalyzing3D ? 'Analyzing: ' : 'Selected: '}{formData.file3d.name}
+                    </span>
                     <span className="text-green-600 dark:text-green-400">({(formData.file3d.size / 1024 / 1024).toFixed(1)} MB)</span>
+                    {isAnalyzing3D && (
+                      <span className="text-blue-600 dark:text-blue-400 font-medium">Extracting properties...</span>
+                    )}
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    🎯 Upload CAD models for visualization and manufacturing analysis
+                    Upload CAD models for automatic property extraction and manufacturing analysis
                   </p>
                 )}
               </div>
@@ -1054,7 +1187,14 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
 
             {/* Physical Properties */}
             <div className="border-t pt-4">
-              <h4 className="text-sm font-medium mb-3">Physical Properties (Optional)</h4>
+              <div className="flex items-center gap-2 mb-3">
+                <h4 className="text-sm font-medium">Physical Properties (Optional)</h4>
+                {(formData.weight > 0 || formData.surfaceArea > 0 || formData.maxLength > 0) && (
+                  <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/20 px-2 py-1 rounded">
+                    Auto-extracted
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="weight">Weight (kg)</Label>

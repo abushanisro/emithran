@@ -667,30 +667,22 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                     ) : null;
                   })()}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1.5 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-2 gap-y-1 text-xs">
                   <div>
                     <span className="text-muted-foreground">Part No: </span>
                     <span className="font-medium">{item.partNumber || '—'}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Quantity: </span>
+                    <span className="text-muted-foreground">Qty: </span>
                     <span className="font-medium">{item.quantity}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Description: </span>
-                    <span className="font-medium truncate block" title={item.description || ''}>{item.description || '—'}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">UOM: </span>
                     <span className="font-medium">{item.unit}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Material Grade: </span>
-                    <span className="font-medium">{item.materialGrade || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">BOM Level: </span>
-                    <Badge variant="outline" className="h-5 text-[10px] font-medium">
+                    <span className="text-muted-foreground">Level: </span>
+                    <Badge variant="outline" className="h-4 text-[10px] font-medium px-1">
                       {item.bomLevel || (() => {
                         switch (item.itemType) {
                           case 'assembly': return 'L0';
@@ -702,49 +694,44 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                     </Badge>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Annual Volume: </span>
+                    <span className="text-muted-foreground">Volume: </span>
                     <span className="font-medium">{item.annualVolume.toLocaleString()}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Make/Buy: </span>
+                    <span className="text-muted-foreground">Type: </span>
                     <span className="font-medium">
-                      {item.makeBuy === 'buy' ? 'Purchasing (Buy)' : 'Manufacturing (Make)'}
+                      {item.makeBuy === 'buy' ? 'Buy' : 'Make'}
                     </span>
                   </div>
-                  {item.makeBuy === 'buy' && item.unitCost && (
-                    <div>
-                      <span className="text-muted-foreground">Unit Cost: </span>
-                      <span className="font-medium">₹{item.unitCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-muted-foreground">Files: </span>
-                    <div className="flex items-center gap-1">
-                      {item.file2dPath && (
-                        <button
-                          onClick={() => onViewItem?.(item, '2d')}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
-                          title={`2D: ${item.file2dPath.split('/').pop()?.replace(/^\d+_/, '') || 'drawing'}`}
-                        >
-                          <FileText className="h-3 w-3" />
-                          <span className="text-[10px] font-medium">2D</span>
-                        </button>
-                      )}
-                      {item.file3dPath && (
-                        <button
-                          onClick={() => onViewItem?.(item, '3d')}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 transition-colors"
-                          title={`3D: ${item.file3dPath.split('/').pop()?.replace(/^\d+_/, '') || 'model'}`}
-                        >
-                          <Box className="h-3 w-3" />
-                          <span className="text-[10px] font-medium">3D</span>
-                        </button>
-                      )}
-                      {!item.file2dPath && !item.file3dPath && (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </div>
+                  
+                  <div className="col-span-2 sm:col-span-3 lg:col-span-2">
+                    <span className="text-muted-foreground">Description: </span>
+                    <span className="font-medium" title={item.description || ''}>{item.description || '—'}</span>
                   </div>
+                  <div>
+                    <span className="text-muted-foreground">Material: </span>
+                    <span className="font-medium">{item.materialGrade || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Weight: </span>
+                    <span className="font-medium">{item.weight && item.weight > 0 ? `${item.weight.toFixed(3)} kg` : '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Dimensions: </span>
+                    <span className="font-medium">
+                      {(item.maxLength && item.maxLength > 0) || (item.maxWidth && item.maxWidth > 0) || (item.maxHeight && item.maxHeight > 0) 
+                        ? `${item.maxLength || 0}×${item.maxWidth || 0}×${item.maxHeight || 0} mm`
+                        : '—'
+                      }
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Surface: </span>
+                    <span className="font-medium">
+                      {item.surfaceArea && item.surfaceArea > 0 ? `${(item.surfaceArea / 1000).toFixed(1)}k mm²` : '—'}
+                    </span>
+                  </div>
+                  
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end mt-4 md:mt-0">
