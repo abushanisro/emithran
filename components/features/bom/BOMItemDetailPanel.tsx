@@ -206,51 +206,13 @@ interface ManufacturingFeature {
     const processName = process.processGroup || process.operation || 'Selected Process';
     setSelectedProcessForHighlight(processName);
     
-    // Simulate feature highlighting based on process type
-    const simulatedFeatures = generateProcessFeatures(processName);
-    setManufacturingFeatures(simulatedFeatures);
-    
-    // Set the first feature as selected to show highlighting
-    if (simulatedFeatures.length > 0) {
-      setSelectedFeature(simulatedFeatures[0] || null);
-      setShowFeatures(true);
-    }
+    // Real CAD analysis features would be loaded from the backend
+    // No simulation or mock features - only use real CAD analysis data
+    setManufacturingFeatures([]);
+    setSelectedFeature(null);
+    setShowFeatures(false);
   };
 
-  // Generate simulated features based on process type for demonstration
-  const generateProcessFeatures = (processName: string): ManufacturingFeature[] => {
-    const features: ManufacturingFeature[] = [];
-    
-    if (processName.toLowerCase().includes('drill') || processName.toLowerCase().includes('hole')) {
-      features.push({
-        id: 'hole-1',
-        type: 'hole',
-        position: { x: 50, y: 50, z: 0 },
-        dimensions: { diameter: 2.2, depth: 10 },
-        manufacturingProcess: processName,
-        cycleTime: 0.5,
-        tooling: ['Carbide drill', 'Center drill'],
-        warnings: ['Small diameter drilling requires specialized tooling'],
-        aiRecommendations: ['Use carbide micro drills with reduced feed rate']
-      });
-    }
-    
-    if (processName.toLowerCase().includes('mill') || processName.toLowerCase().includes('pocket')) {
-      features.push({
-        id: 'pocket-1',
-        type: 'pocket',
-        position: { x: 30, y: 30, z: 0 },
-        dimensions: { length: 20, width: 10, depth: 5 },
-        manufacturingProcess: processName,
-        cycleTime: 2.5,
-        tooling: ['End mill', 'Roughing mill'],
-        warnings: ['Deep pocket may require multiple passes'],
-        aiRecommendations: ['Use trochoidal milling for better tool life']
-      });
-    }
-
-    return features;
-  };
 
   if (!item) return null;
 

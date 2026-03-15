@@ -306,10 +306,15 @@ export class BOMItemsService {
       }
 
       if (error) {
-        // Handle constraint violations from the database function itself
-        if (error.message && error.message.includes('production_lot_materials_bom_item_id_fkey')) {
+        // Handle any foreign key constraint violations by falling back to manual cascade delete
+        if (error.message && (
+          error.message.includes('production_lot_materials_bom_item_id_fkey') || 
+          error.message.includes('delivery_items_bom_item_id_fkey') ||
+          error.message.includes('foreign key constraint') ||
+          error.message.includes('violates foreign key')
+        )) {
           // Fallback to manual cascade delete if the function fails
-          this.logger.warn('Database function cascade failed, trying manual cascade', 'BOMItemsService');
+          this.logger.warn(`Database function cascade failed due to foreign key constraint, trying manual cascade: ${error.message}`, 'BOMItemsService');
           return await this.manualCascadeDelete(id, userId, accessToken);
         }
         
@@ -538,7 +543,20 @@ export class BOMItemsService {
         this.logger.log(`Removed ${routesCount} process routes`, 'BOMItemsService');
       }
 
-      // 4. Update child items to remove parent reference
+      // 4. Remove from delivery items
+      const { error: deliveryError, count: deliveryCount } = await client
+        .from('delivery_items')
+        .delete()
+        .eq('bom_item_id', id);
+
+      if (deliveryError) {
+        this.logger.warn(`Could not clean up delivery items: ${deliveryError.message}`, 'BOMItemsService');
+      } else if (deliveryCount) {
+        cleanupCount += deliveryCount;
+        this.logger.log(`Removed ${deliveryCount} delivery item references`, 'BOMItemsService');
+      }
+
+      // 5. Update child items to remove parent reference
       const { error: childError, count: childCount } = await client
         .from('bom_items')
         .update({ parent_item_id: null })
@@ -551,7 +569,7 @@ export class BOMItemsService {
         this.logger.log(`Orphaned ${childCount} child items`, 'BOMItemsService');
       }
 
-      // 5. Finally delete the BOM item
+      // 6. Finally delete the BOM item
       this.logger.log(`Attempting to delete BOM item after cleaning up ${cleanupCount} references`, 'BOMItemsService');
       
       // Double-check that production materials are really gone
@@ -574,10 +592,16 @@ export class BOMItemsService {
       if (deleteError) {
         this.logger.error(`Failed to delete BOM item after cleanup: ${deleteError.message}`, 'BOMItemsService');
         
-        // If it's still the same constraint error, the cleanup didn't work
+        // If it's still a constraint error, the cleanup didn't work
         if (deleteError.message.includes('production_lot_materials_bom_item_id_fkey')) {
           throw new InternalServerErrorException(
             `Unable to remove all production planning references for BOM item "${itemName}". ` +
+            `This may be due to database permissions or concurrent modifications. ` +
+            `Please try again or contact an administrator.`
+          );
+        } else if (deleteError.message.includes('delivery_items_bom_item_id_fkey')) {
+          throw new InternalServerErrorException(
+            `Unable to remove all delivery references for BOM item "${itemName}". ` +
             `This may be due to database permissions or concurrent modifications. ` +
             `Please try again or contact an administrator.`
           );

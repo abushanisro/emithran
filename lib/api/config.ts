@@ -40,7 +40,7 @@ function createApiConfig(): ApiConfig {
     endpoints: {
       base: baseUrl,
       gateway: baseUrl,
-      health: `${baseUrl}/api/health`,
+      health: `${baseUrl}/health`,
       api: {
         v1: apiUrl,
       },

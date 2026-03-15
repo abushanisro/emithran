@@ -16,11 +16,14 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
+import { apiClient } from '@/lib/api/client';
+import { bomItemsApi } from '@/lib/api/bom-items';
+import { toast } from 'sonner';
 
 interface AssemblyNode {
   id: string;
   name: string;
-  type: 'assembly' | 'sub-assembly' | 'part' | 'hardware' | 'fastener';
+  type: 'assembly' | 'sub-assembly' | 'child-part' | 'part' | 'hardware' | 'fastener';
   partNumber?: string;
   quantity?: number;
   children?: AssemblyNode[];
@@ -30,89 +33,35 @@ interface AssemblyNode {
   };
   level: number;
   expanded?: boolean;
+  bomItemId?: string; // Link to actual BOM item in database
 }
 
 interface AssemblyTreeGeneratorProps {
-  onAssemblyGenerated?: (tree: AssemblyNode[]) => void;
+  onAssemblyGenerated?: (tree: AssemblyNode[], assemblyData?: {
+    modelUrl: string;
+    fileName: string;
+    volume: number;
+    material: string;
+    bomItemId: string;
+  }) => void;
   className?: string;
+  bomId?: string;
+  projectId?: string;
 }
 
-export function AssemblyTreeGenerator({ onAssemblyGenerated, className }: AssemblyTreeGeneratorProps) {
+export function AssemblyTreeGenerator({ onAssemblyGenerated, className, bomId, projectId }: AssemblyTreeGeneratorProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [assemblyTree, setAssemblyTree] = useState<AssemblyNode[]>([]);
   const [processingSteps, setProcessingSteps] = useState<string[]>([]);
 
-  // Mock assembly tree data for demonstration
-  const mockAssemblyTree: AssemblyNode[] = [
-    {
-      id: 'main-assembly',
-      name: 'Main Assembly',
-      type: 'assembly',
-      level: 0,
-      expanded: true,
-      files: { step: 'main_assembly.step' },
-      children: [
-        {
-          id: 'mounting-assembly',
-          name: 'Mounting Assembly',
-          type: 'sub-assembly',
-          partNumber: 'ASM-002',
-          level: 1,
-          expanded: true,
-          files: { step: 'mounting_assembly.step' },
-          children: [
-            {
-              id: 'base-plate',
-              name: 'Base Plate',
-              type: 'part',
-              partNumber: 'PRT-001',
-              level: 2,
-              files: { step: 'base_plate.step', pdf: 'base_plate.pdf' }
-            },
-            {
-              id: 'mounting-bracket',
-              name: 'Mounting Bracket',
-              type: 'part',
-              partNumber: 'PRT-002',
-              level: 2,
-              files: { step: 'mounting_bracket.step', pdf: 'mounting_bracket.pdf' }
-            }
-          ]
-        },
-        {
-          id: 'hardware-kit',
-          name: 'Hardware Kit',
-          type: 'hardware',
-          partNumber: 'HW-001',
-          level: 1,
-          children: [
-            {
-              id: 'bolt-m8x20',
-              name: 'Bolt M8x20',
-              type: 'fastener',
-              partNumber: 'M8x20',
-              quantity: 4,
-              level: 2
-            },
-            {
-              id: 'washer-m8',
-              name: 'Washer M8',
-              type: 'fastener',
-              partNumber: 'W8',
-              quantity: 4,
-              level: 2
-            }
-          ]
-        }
-      ]
-    }
-  ];
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
+      console.log('📁 File uploaded:', file.name, 'size:', file.size);
       setUploadedFile(file);
+      console.log('✅ File state updated, Generate Assembly Tree button should now be visible');
     }
   }, []);
 
@@ -126,7 +75,14 @@ export function AssemblyTreeGenerator({ onAssemblyGenerated, className }: Assemb
   });
 
   const processStepFile = async () => {
-    if (!uploadedFile) return;
+    if (!uploadedFile) {
+      console.log('❌ No uploaded file found');
+      return;
+    }
+
+    console.log('🚀 Starting STEP file processing with file:', uploadedFile.name);
+    console.log('📋 bomId:', bomId, 'projectId:', projectId);
+    console.log('🔧 onAssemblyGenerated callback available?', !!onAssemblyGenerated);
 
     setIsProcessing(true);
     setProcessingSteps([]);
@@ -142,15 +98,266 @@ export function AssemblyTreeGenerator({ onAssemblyGenerated, className }: Assemb
       'Frontend → Render tree in existing BOM UI'
     ];
 
-    for (let i = 0; i < steps.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setProcessingSteps(prev => [...prev, steps[i]]);
-    }
+    try {
+      // File validation
+      setProcessingSteps(prev => [...prev, steps[0]]);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (!uploadedFile.name.toLowerCase().includes('.step') && !uploadedFile.name.toLowerCase().includes('.stp') && !uploadedFile.name.toLowerCase().includes('.iges') && !uploadedFile.name.toLowerCase().includes('.igs')) {
+        throw new Error('Invalid file format. Please upload a STEP (.step, .stp) or IGES (.iges, .igs) file.');
+      }
+      if (uploadedFile.size > 100 * 1024 * 1024) {
+        throw new Error('File too large. Please upload files smaller than 100MB.');
+      }
 
-    // Simulate successful processing
-    setAssemblyTree(mockAssemblyTree);
-    onAssemblyGenerated?.(mockAssemblyTree);
-    setIsProcessing(false);
+      // Check if we have a BOM ID to process against
+      if (!bomId) {
+        throw new Error('BOM ID is required for STEP file processing. Please ensure you are working within a valid BOM context.');
+      }
+
+      // Call the backend STEP processing API
+      setProcessingSteps(prev => [...prev, steps[1]]);
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const formData = new FormData();
+      formData.append('stepFile', uploadedFile);
+      formData.append('bomId', bomId);
+      if (projectId) {
+        formData.append('projectId', projectId);
+      }
+
+      try {
+        // Call the backend endpoint using uploadFiles method for proper FormData handling
+        const response = await apiClient.uploadFiles<any>('/bom-items/process-step-file', formData, {
+          timeout: 120000 // 2 minute timeout for STEP processing
+        });
+
+        // Add remaining steps
+        for (let i = 2; i < steps.length; i++) {
+          setProcessingSteps(prev => [...prev, steps[i]]);
+          await new Promise(resolve => setTimeout(resolve, 400));
+        }
+
+        if (response.success) {
+          // Real STEP processing was successful
+          setProcessingSteps(prev => [...prev, '✅ STEP file processed successfully']);
+          
+          console.log('✅ STEP processing response:', response);
+          console.log('🔍 Response has bomItemId?', response.bomItemId);
+          console.log('🔍 Full response structure:', JSON.stringify(response, null, 2));
+          
+          // Try to create assembly data directly from response first (if BOM item ID is available)
+          const tryDirectAssemblyData = () => {
+            if (response.bomItemId) {
+              console.log('🎯 Found BOM item ID in response, creating assembly data directly:', response.bomItemId);
+              
+              // Create assembly data directly using response data
+              const materialRecommendation = response.cadAnalysis?.dfmAnalysis?.aiInsights?.materialRecommendations?.[0] || response.cadAnalysis?.dfm_analysis?.ai_insights?.material_recommendations?.[0];
+              const materialString = typeof materialRecommendation === 'object' ? materialRecommendation.name || 'Aluminum 6061' : materialRecommendation || 'Aluminum 6061';
+              
+              const directAssemblyData = {
+                modelUrl: '', // Will try to fetch this separately
+                fileName: uploadedFile.name,
+                volume: response.cadAnalysis?.geometryFeatures?.volumeMm3 || response.cadAnalysis?.geometry_features?.volume_mm3 || 0,
+                material: materialString,
+                bomItemId: response.bomItemId
+              };
+              
+              console.log('📞 Calling bomItemsApi.getFileUrl with bomItemId:', response.bomItemId);
+              
+              // Try to get the 3D file URL directly using the proper API
+              bomItemsApi.getFileUrl(response.bomItemId, '3d')
+              .then(urlData => {
+                console.log('✅ Got direct 3D file URL response:', urlData);
+                if (urlData && urlData.url) {
+                  directAssemblyData.modelUrl = urlData.url;
+                  console.log('🚀 Calling onAssemblyGenerated with assembly data:', directAssemblyData);
+                  console.log('🔧 onAssemblyGenerated function exists?', !!onAssemblyGenerated);
+                  
+                  if (onAssemblyGenerated) {
+                    console.log('🎯 About to call onAssemblyGenerated...');
+                    setAssemblyTree(response.assemblyTree || []);
+                    onAssemblyGenerated(response.assemblyTree || [], directAssemblyData);
+                    console.log('✅ onAssemblyGenerated called successfully');
+                  } else {
+                    console.error('❌ onAssemblyGenerated callback is undefined!');
+                  }
+                } else {
+                  console.warn('⚠️ No URL in response, creating assembly data without model URL');
+                  if (onAssemblyGenerated) {
+                    setAssemblyTree(response.assemblyTree || []);
+                    onAssemblyGenerated(response.assemblyTree || [], directAssemblyData);
+                  }
+                }
+              })
+              .catch(error => {
+                console.error('❌ Failed to get direct 3D URL:', error);
+                console.log('📝 Error details:', error.message, error.stack);
+                console.log('🔄 Falling back to BOM fetch approach...');
+                // Fall back to the BOM items fetch approach
+                setTimeout(() => fetchAssemblyWithRetries(), 2000);
+              });
+              
+              return true; // Indicate we tried the direct approach
+            }
+            console.log('❌ No bomItemId found in response, cannot use direct approach');
+            return false; // Indicate we need to fall back
+          };
+          
+          // Try direct approach first, then fall back to BOM items fetch if needed
+          const useDirectApproach = tryDirectAssemblyData();
+          
+          // Only use the BOM fetch approach if direct approach failed
+          if (!useDirectApproach) {
+            console.log('🔄 No direct BOM item ID, falling back to BOM items fetch...');
+          }
+          
+          // Wait for file processing to complete, then fetch the main BOM item with retries
+          const fetchAssemblyWithRetries = async (attempt = 1, maxAttempts = 5) => {
+            try {
+              console.log(`🔍 Attempt ${attempt}/${maxAttempts}: Fetching BOM items to find main assembly...`);
+              
+              // Get the newly created BOM items to find the main assembly using proper API client
+              const bomItemsData = await apiClient.get<{ items: any[] }>(`/bom-items?bomId=${bomId}`);
+              
+              console.log(`📡 API Response received:`, bomItemsData);
+              console.log('📦 Found BOM items:', bomItemsData.items);
+              
+              // Find main assembly item - prioritize recently created assembly items
+              let mainAssemblyItem = bomItemsData.items
+                .filter((item: any) => item.itemType === 'assembly')
+                .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+              
+              // Fallback: find any item with file3dPath
+              if (!mainAssemblyItem) {
+                mainAssemblyItem = bomItemsData.items.find((item: any) => 
+                  item.file3dPath && item.partNumber?.includes(uploadedFile.name.replace(/\.(step|stp|iges|igs)$/i, '').slice(0, 8))
+                );
+              }
+              
+              // Final fallback: use the most recently created item
+              if (!mainAssemblyItem && bomItemsData.items.length > 0) {
+                mainAssemblyItem = bomItemsData.items.sort((a: any, b: any) => 
+                  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                )[0];
+              }
+              
+              console.log('🎯 Selected main assembly item:', mainAssemblyItem);
+              
+              if (mainAssemblyItem?.id) {
+                try {
+                  // Always try to get 3D file URL, even if file3dPath is not set
+                  console.log('📂 Fetching 3D file URL for item:', mainAssemblyItem.id);
+                  
+                  const fileUrlData = await bomItemsApi.getFileUrl(mainAssemblyItem.id, '3d');
+                  console.log('🔗 File URL data:', fileUrlData);
+                  
+                  const fallbackMaterialRecommendation = response.cadAnalysis?.dfmAnalysis?.aiInsights?.materialRecommendations?.[0] || response.cadAnalysis?.dfm_analysis?.ai_insights?.material_recommendations?.[0];
+                  const fallbackMaterialString = typeof fallbackMaterialRecommendation === 'object' ? fallbackMaterialRecommendation.name || 'Aluminum 6061' : fallbackMaterialRecommendation || 'Aluminum 6061';
+                  
+                  const assemblyData = {
+                    modelUrl: fileUrlData.url,
+                    fileName: uploadedFile.name,
+                    volume: response.cadAnalysis?.geometryFeatures?.volumeMm3 || response.cadAnalysis?.geometry_features?.volume_mm3 || 0,
+                    material: fallbackMaterialString,
+                    bomItemId: mainAssemblyItem.id
+                  };
+
+                  console.log('✅ Calling onAssemblyGenerated with assembly data from fallback:', assemblyData);
+
+                  if (onAssemblyGenerated) {
+                    setAssemblyTree(response.assemblyTree || []);
+                    onAssemblyGenerated(response.assemblyTree || [], assemblyData);
+                  } else {
+                    console.warn('❌ onAssemblyGenerated callback is not defined');
+                  }
+                } catch (fileError) {
+                  console.warn('⚠️ Failed to fetch 3D file URL:', fileError);
+                  
+                  // Even if file URL fetch fails, still call onAssemblyGenerated with tree
+                  if (onAssemblyGenerated) {
+                    setAssemblyTree(response.assemblyTree || []);
+                    onAssemblyGenerated(response.assemblyTree || []);
+                  }
+                }
+              } else {
+                console.warn('⚠️ No suitable main assembly item found');
+                
+                // Still call onAssemblyGenerated with just the tree
+                if (onAssemblyGenerated) {
+                  setAssemblyTree(response.assemblyTree || []);
+                  onAssemblyGenerated(response.assemblyTree || []);
+                }
+              }
+            } catch (error) {
+              console.error(`❌ Error on attempt ${attempt}:`, error);
+              
+              // Retry on network errors
+              if (attempt < maxAttempts) {
+                console.log(`🔄 Network error, retrying in ${attempt * 1000}ms...`);
+                setTimeout(() => fetchAssemblyWithRetries(attempt + 1, maxAttempts), attempt * 1000);
+                return;
+              }
+              
+              console.error('❌ All retry attempts failed');
+              
+              // Still call onAssemblyGenerated with just the tree even after all retries fail
+              if (onAssemblyGenerated) {
+                setAssemblyTree(response.assemblyTree || []);
+                onAssemblyGenerated(response.assemblyTree || []);
+              }
+            }
+          };
+          
+          // Only start the BOM fetch if direct approach wasn't used
+          if (!useDirectApproach) {
+            setTimeout(() => fetchAssemblyWithRetries(), 3000);
+          }
+
+          toast.success('STEP file processed', {
+            description: `Assembly structure extracted and BOM items created`,
+            duration: 4000
+          });
+        } else {
+          // Backend indicates CAD engine not available
+          setProcessingSteps(prev => [...prev, `⚠️ ${response.message}`]);
+          
+          toast.warning('CAD Engine Required', {
+            description: response.message,
+            duration: 6000
+          });
+
+          // Show requirements and next steps
+          console.log('STEP Processing Requirements:', response.requirements);
+          console.log('Next Steps:', response.nextSteps);
+        }
+
+      } catch (apiError: any) {
+        console.error('Backend API error:', apiError);
+        console.error('Full error details:', {
+          message: apiError.message,
+          stack: apiError.stack,
+          code: apiError.code,
+          status: apiError.status,
+          response: apiError.response,
+          details: apiError.details
+        });
+        
+        setProcessingSteps(prev => [...prev, `❌ Backend processing failed: ${apiError.message}`]);
+        
+        toast.error('Processing failed', {
+          description: `Upload error: ${apiError.message}. Check console for details.`,
+          duration: 8000
+        });
+      }
+      
+    } catch (error: any) {
+      console.error('STEP processing error:', error);
+      setProcessingSteps(prev => [...prev, `❌ Error: ${error.message}`]);
+      throw error;
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const toggleNode = (nodeId: string, nodes: AssemblyNode[]): AssemblyNode[] => {
@@ -171,6 +378,8 @@ export function AssemblyTreeGenerator({ onAssemblyGenerated, className }: Assemb
         return 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20';
       case 'sub-assembly':
         return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
+      case 'child-part':
+        return 'bg-orange-500/10 text-orange-700 border-orange-500/20';
       case 'part':
         return 'bg-amber-500/10 text-amber-700 border-amber-500/20';
       case 'hardware':
@@ -217,6 +426,7 @@ export function AssemblyTreeGenerator({ onAssemblyGenerated, className }: Assemb
                 className={`text-[10px] px-1.5 py-0 h-4 ${getTypeColor(node.type)}`}
               >
                 {node.type === 'sub-assembly' ? 'Sub-Assembly' : 
+                 node.type === 'child-part' ? 'Child Part' :
                  node.type.charAt(0).toUpperCase() + node.type.slice(1)}
               </Badge>
               {node.partNumber && (

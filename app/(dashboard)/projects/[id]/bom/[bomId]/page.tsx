@@ -28,15 +28,24 @@ import {
   XCircle,
   AlertCircle,
   Trash2,
+  Layers3,
+  Square,
+  Edit2,
+  Factory,
+  Cpu,
+  AlertTriangle,
 } from 'lucide-react';
 import { BOMItemsFlat, BOMItemDialog, BOMTreeView, BOMItemDetailPanel } from '@/components/features/bom';
+import { AssemblyTreeGenerator } from '@/components/features/bom/AssemblyTreeGenerator';
+import { HierarchicalBOMTree } from '@/components/features/bom/HierarchicalBOMTree';
+import { ModelViewer } from '@/components/ui/model-viewer';
 import { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { bomItemsApi as bomAPI } from '@/lib/api/bom-items';
 import { BOMItemType } from '@/lib/types/bom.types';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
-export default function
-  BOMDetailPage() {
+export default function BOMDetailPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
@@ -52,6 +61,31 @@ export default function
   const [defaultItemType, setDefaultItemType] = useState<BOMItemType>(BOMItemType.ASSEMBLY);
   const [viewingItem, setViewingItem] = useState<BOMItem | null>(null);
   const [preferredView, setPreferredView] = useState<'2d' | '3d'>('3d');
+  const [uploadedAssembly3D, setUploadedAssembly3D] = useState<{
+    modelUrl: string;
+    fileName: string;
+    volume: number;
+    material: string;
+    bomItemId: string;
+  } | null>(null);
+  const [isExplodedView, setIsExplodedView] = useState(true); // Start in exploded view by default
+  const [explodeDistance, setExplodeDistance] = useState(85); // Increased default distance for better separation
+  
+  // BOM Panel States for highlighting and selection
+  const [selectedBOMItems, setSelectedBOMItems] = useState<any[]>([]); // Multiple selection
+  const [hoveredBOMItem, setHoveredBOMItem] = useState<any | null>(null);
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
+  
+  // 3D Assembly Parts - detected from CAD analysis
+  const [detectedParts, setDetectedParts] = useState<any[]>([]);
+  const [use3DParts, setUse3DParts] = useState(true); // Toggle between DB BOM and 3D detected parts
+  
+  // Auto-enable exploded view when "Show Only Selected" is toggled on
+  useEffect(() => {
+    if (showOnlySelected && !isExplodedView) {
+      setIsExplodedView(true);
+    }
+  }, [showOnlySelected, isExplodedView]);
   
   // Import states
   const [isImporting, setIsImporting] = useState(false);
@@ -69,6 +103,10 @@ export default function
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setBulkDeleting] = useState(false);
 
+  // DFM Analysis State
+  const [loadingDFMAnalysis, setLoadingDFMAnalysis] = useState(false);
+  const [assemblyDFMData, setAssemblyDFMData] = useState<any>(null);
+
   // Update viewingItem when bomItemsData changes (e.g., after file upload)
   useEffect(() => {
     if (viewingItem && bomItemsData?.items) {
@@ -78,6 +116,63 @@ export default function
       }
     }
   }, [bomItemsData?.items]);
+
+  // Debug: Monitor uploadedAssembly3D state changes
+  useEffect(() => {
+    console.log('🔍 uploadedAssembly3D state changed:', uploadedAssembly3D);
+  }, [uploadedAssembly3D]);
+
+  // Load existing 3D assembly model on page load
+  useEffect(() => {
+    const loadExisting3DModel = async () => {
+      if (bomItemsData?.items && bomItemsData.items.length > 0 && !uploadedAssembly3D) {
+        console.log('🔍 Checking for existing 3D models in BOM items...');
+        
+        // Find the most recent assembly item with a 3D file
+        const assemblyItems = bomItemsData.items
+          .filter(item => item.itemType === 'assembly' && item.file3dPath)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+        if (assemblyItems.length > 0) {
+          const mainAssembly = assemblyItems[0];
+          console.log('📦 Found existing assembly with 3D file:', mainAssembly);
+          
+          try {
+            // Get the 3D file URL for the existing assembly
+            const fileUrlData = await bomAPI.getFileUrl(mainAssembly.id, '3d');
+            
+            if (fileUrlData?.url) {
+              console.log('✅ Retrieved 3D model URL for existing assembly');
+              
+              // Extract volume from description if not in volume field
+              let volume = mainAssembly.volume || 0;
+              if (volume === 0 && mainAssembly.description) {
+                const volumeMatch = mainAssembly.description.match(/Volume:\s*(\d+(?:\.\d+)?)mm³/);
+                if (volumeMatch) {
+                  volume = parseFloat(volumeMatch[1]);
+                }
+              }
+              
+              const assemblyData = {
+                modelUrl: fileUrlData.url,
+                fileName: mainAssembly.name || mainAssembly.partNumber || 'Assembly Model',
+                volume: volume,
+                material: mainAssembly.material || 'Unknown',
+                bomItemId: mainAssembly.id
+              };
+              
+              setUploadedAssembly3D(assemblyData);
+              console.log('🎯 Set existing assembly 3D model:', assemblyData);
+            }
+          } catch (error) {
+            console.log('⚠️ Could not load 3D model for existing assembly:', error);
+          }
+        }
+      }
+    };
+    
+    loadExisting3DModel();
+  }, [bomItemsData?.items, uploadedAssembly3D]);
 
   const bom = bomData || {
     id: bomId,
@@ -192,6 +287,121 @@ export default function
   const handleViewItem = (item: BOMItem, viewType?: '2d' | '3d') => {
     setViewingItem(item);
     setPreferredView(viewType || '3d');
+  };
+
+  // BOM Item Selection and Highlighting Handlers
+  const handleBOMItemSelect = (item: any) => {
+    const isCurrentlySelected = selectedBOMItems.some(selected => selected.id === item.id);
+    
+    if (isCurrentlySelected) {
+      // Deselecting - remove from selection
+      const newSelection = selectedBOMItems.filter(selected => selected.id !== item.id);
+      setSelectedBOMItems(newSelection);
+      
+      // If no items left, disable show only selected
+      if (newSelection.length === 0) {
+        setShowOnlySelected(false);
+      }
+    } else {
+      // Selecting new item - add to selection and enable show only selected
+      setSelectedBOMItems(prev => [...prev, item]);
+      setShowOnlySelected(true);
+    }
+    
+    console.log('BOM item selection:', item.name, 'Currently selected:', selectedBOMItems.length + (isCurrentlySelected ? -1 : 1), 'parts');
+  };
+
+  const handleBOMItemHover = (item: any | null) => {
+    setHoveredBOMItem(item);
+    if (item) {
+      console.log('Hovered BOM item:', item.name, 'Part Index:', item.partIndex);
+    }
+  };
+
+  // Handle detected parts from 3D assembly analysis
+  const handlePartsDetected = (parts: any[]) => {
+    console.log('🔧 CAD Engine detected parts:', parts.length);
+    
+    // Map detected 3D parts to existing BOM items
+    const existingBOMItems = bomItemsData?.items || [];
+    
+    // Get all BOM items regardless of type for mapping
+    // The 3D parts should map to actual components, not just leaf items
+    const allBOMItems = existingBOMItems.slice(); // All items available for mapping
+    
+    console.log('📋 Total BOM items available for mapping:', allBOMItems.length);
+    console.log('📋 BOM item types:', allBOMItems.map(item => ({ name: item.name, type: item.itemType })));
+    
+    // Create enhanced BOM items that combine real BOM data with 3D detection
+    const enhancedBOMItems = parts.map((part, index) => {
+      // Try to map to existing BOM item if available
+      const correspondingBOMItem = allBOMItems[index] || null;
+      
+      if (correspondingBOMItem) {
+        return {
+          ...correspondingBOMItem,
+          // Keep the original BOM item name, part number, and all properties
+          // Add 3D-specific properties without changing the identity
+          partIndex: index,
+          is3DDetected: true,
+          geometry: part.geometry,
+          volume: part.volume,
+          boundingBox: part.boundingBox,
+          // Use part.id from 3D detection for consistent mapping
+          id: part.id,
+        };
+      } else {
+        // Fallback for extra parts not in BOM - only when there are more 3D parts than BOM items
+        return {
+          id: part.id,
+          name: `Additional Part ${index + 1 - allBOMItems.length}`,
+          partNumber: `EXTRA-${String(index + 1 - allBOMItems.length).padStart(2, '0')}`,
+          itemType: getPartTypeFromGeometry(part),
+          material: 'To Be Determined',
+          quantity: 1,
+          description: `Additional component detected in 3D model`,
+          partIndex: index,
+          is3DDetected: true,
+          isAdditional: true,
+          geometry: part.geometry,
+          volume: part.volume,
+          boundingBox: part.boundingBox,
+        };
+      }
+    });
+    
+    setDetectedParts(enhancedBOMItems);
+    console.log('💎 Enhanced BOM items with 3D data:', {
+      total: enhancedBOMItems.length,
+      mapped: enhancedBOMItems.filter(item => !item.partNumber?.startsWith('EXTRA-')).length,
+      additional: enhancedBOMItems.filter(item => item.partNumber?.startsWith('EXTRA-')).length,
+      mappedItems: enhancedBOMItems.filter(item => !item.partNumber?.startsWith('EXTRA-')).map(item => item.name)
+    });
+  };
+
+  // Estimate part type based on geometry analysis
+  const getPartTypeFromGeometry = (part: any) => {
+    if (!part.boundingBox) return 'part';
+    
+    const dimensions = part.boundingBox;
+    const volume = dimensions.x * dimensions.y * dimensions.z;
+    
+    // Classify based on size and shape
+    if (volume < 1000) return 'fastener'; // Small parts like bolts
+    if (dimensions.x > dimensions.y * 3 || dimensions.y > dimensions.x * 3) return 'bracket'; // Long thin parts
+    if (dimensions.z < Math.min(dimensions.x, dimensions.y) * 0.2) return 'plate'; // Flat parts
+    return 'component';
+  };
+
+  // Estimate part description based on geometry
+  const estimatePartType = (part: any) => {
+    const type = getPartTypeFromGeometry(part);
+    switch (type) {
+      case 'fastener': return 'Bolt/Screw';
+      case 'bracket': return 'Support Bracket';
+      case 'plate': return 'Mounting Plate';
+      default: return 'Mechanical Component';
+    }
   };
 
   // PRODUCTION-GRADE BULK DELETE ALL BOM ITEMS
@@ -1057,6 +1267,116 @@ export default function
     return 'pcs';
   };
 
+  // Handle Assembly DFM Analysis - Updates the Properties Panel
+  const handleRunAssemblyDFMAnalysis = async () => {
+    if (!uploadedAssembly3D?.bomItemId) {
+      toast.error('No assembly model found. Please upload a 3D model first.');
+      return;
+    }
+
+    setLoadingDFMAnalysis(true);
+    
+    try {
+      console.log('Running DFM Analysis for assembly:', uploadedAssembly3D.fileName);
+      
+      // Run CAD analysis on the assembly
+      const result = await bomAPI.analyzeCAD(uploadedAssembly3D.bomItemId, true);
+      
+      if (result?.success || result?.analysis) {
+        // Fetch the complete analysis data
+        const analysisResponse = await bomAPI.getCADAnalysis(uploadedAssembly3D.bomItemId);
+        
+        if (analysisResponse?.success && analysisResponse?.analysis) {
+          setAssemblyDFMData(analysisResponse.analysis);
+          toast.success('DFM Analysis completed! Check the Properties panel for recommendations.');
+        } else {
+          throw new Error('Failed to retrieve analysis results');
+        }
+      } else {
+        throw new Error('Analysis failed - no results returned');
+      }
+    } catch (error: any) {
+      console.error('DFM Analysis error:', error);
+      toast.error('DFM Analysis failed: ' + (error.message || 'Unknown error'));
+    } finally {
+      setLoadingDFMAnalysis(false);
+    }
+  };
+
+  // Generate manufacturing features from DFM analysis data
+  const generateManufacturingFeatures = (analysisData: any) => {
+    const features = [];
+    const mfg = analysisData?.geometryFeatures?.manufacturingFeatures;
+    
+    if (mfg?.holes?.diameters?.length > 0) {
+      mfg.holes.diameters.forEach((diameter: number, index: number) => {
+        features.push({
+          id: `hole-${index}`,
+          type: 'hole',
+          position: { x: 10 + (index * 5), y: 5, z: 2 },
+          dimensions: { diameter },
+          manufacturingProcess: 'CNC Drilling',
+          cycleTime: diameter < 3 ? 0.5 : diameter > 10 ? 1.2 : 0.8,
+          tooling: ['Carbide Drill', 'Coolant System'],
+          warnings: ['Check for burr formation'],
+          aiRecommendations: analysisData.dfmAnalysis?.recommendedProcesses?.includes('CNC Machining') ? 
+            ['Use proper feeds and speeds for material', 'Monitor hole quality'] : 
+            ['Consider alternative drilling method']
+        });
+      });
+    }
+    
+    if (mfg?.pockets?.count > 0) {
+      for (let i = 0; i < Math.min(mfg.pockets.count, 3); i++) {
+        features.push({
+          id: `pocket-${i}`,
+          type: 'pocket',
+          position: { x: 25 + (i * 10), y: 15, z: 8 },
+          dimensions: { depth: mfg.pockets.max_depth || 5 },
+          manufacturingProcess: 'CNC Milling',
+          cycleTime: (mfg.pockets.max_depth || 5) * 0.6,
+          tooling: ['End Mill', 'Roughing Tool'],
+          warnings: mfg.pockets.max_depth > 15 ? ['Watch for tool deflection in deep cuts'] : ['Standard milling operation'],
+          aiRecommendations: analysisData.dfmAnalysis?.recommendedProcesses?.includes('CNC Machining') ? 
+            ['Use trochoidal milling for efficient material removal'] : 
+            ['Consider alternative machining strategy']
+        });
+      }
+    }
+    
+    if (mfg?.thin_walls && mfg.thin_walls > 0) {
+      features.push({
+        id: 'thin-wall-1',
+        type: 'thin_wall',
+        position: { x: 45, y: 8, z: 15 },
+        dimensions: { width: mfg.thin_walls },
+        manufacturingProcess: mfg.thin_walls < 1 ? 'Precision Milling' : 'Standard Milling',
+        cycleTime: mfg.thin_walls < 1 ? 3.5 : 2.5,
+        tooling: mfg.thin_walls < 1 ? ['Small End Mill', 'High-Speed Spindle'] : ['Standard End Mill'],
+        warnings: mfg.thin_walls < 1.5 ? ['High risk of deflection'] : ['Monitor for vibration'],
+        aiRecommendations: ['Use support fixtures', 'Reduce cutting speeds for thin walls']
+      });
+    }
+    
+    if (mfg?.undercuts?.detected) {
+      for (let i = 0; i < Math.min(mfg.undercuts.count || 1, 2); i++) {
+        features.push({
+          id: `undercut-${i}`,
+          type: 'undercut',
+          position: { x: 35 + (i * 8), y: 25, z: 5 },
+          dimensions: { depth: 4 },
+          manufacturingProcess: '5-Axis Machining',
+          cycleTime: 2.0,
+          tooling: ['Ball End Mill', '5-Axis Machine'],
+          warnings: ['Limited tool access', 'Complex setup required'],
+          aiRecommendations: ['Consider design revision to eliminate undercut', 'Use specialized tooling']
+        });
+      }
+    }
+    
+    return features;
+  };
+
   // Enhanced createBOMItem with retry logic and better error handling
   const createBOMItemWithRetry = async (itemData: any, maxRetries: number = 2): Promise<any> => {
     let lastError: any;
@@ -1266,251 +1586,318 @@ export default function
         </CardContent>
       </Card>
 
-      {/* STEP File Upload and Assembly Tree */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            STEP File Upload & Assembly Analysis
-          </CardTitle>
-          <CardDescription>Upload STEP files to automatically generate hierarchical BOM structure with CAD analysis</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* STEP File Upload Section */}
-          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Upload className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Upload STEP File</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Drop your STEP file here or click to browse
-                </p>
-              </div>
-              <Button variant="outline" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Choose STEP File
-              </Button>
-              <p className="text-xs text-muted-foreground">Supports .step, .stp files up to 100MB</p>
-            </div>
-          </div>
-
-          {/* CAD Processing Pipeline */}
-          <div className="bg-muted/30 rounded-lg p-4">
-            <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              CAD Processing Pipeline
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                <span>STEP file → OpenCascade → volume, surface area, holes, walls</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <span>Material DB lookup → density, price/kg</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                <span>Process classifier → CNC / casting / sheet metal</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                <span>Cost formulas → material + machining + setup</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                <span>XGBoost adjustment → correction factor from history</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span><strong>ACCURATE COST ✅</strong></span>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                <span>LLM (optional, async) → explanation + DFM advice</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Hierarchical Assembly Tree */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-lg font-semibold flex items-center gap-2">
-                <Box className="h-5 w-5" />
-                Assembly Tree Structure
-              </h4>
-              <Badge variant="outline" className="text-xs">
-                Auto-Generated from STEP
-              </Badge>
-            </div>
+      {/* STEP File Upload & Assembly Analysis */}
+      <AssemblyTreeGenerator 
+        bomId={bomId}
+        projectId={projectId}
+        onAssemblyGenerated={(tree, assemblyData) => {
+          console.log('🚨 onAssemblyGenerated CALLBACK TRIGGERED!');
+          console.log('🎉 Assembly tree generated:', tree);
+          console.log('🎯 Assembly data received:', assemblyData);
+          
+          // Set the 3D model data for display
+          if (assemblyData) {
+            console.log('✅ Setting uploadedAssembly3D state:', assemblyData);
+            console.log('🔍 Current uploadedAssembly3D before update:', uploadedAssembly3D);
             
-            <div className="space-y-0.5 bg-muted/20 rounded-lg p-4">
-              {/* Root Assembly */}
-              <div className="group hover:bg-muted/50 rounded-md transition-colors">
-                <div className="flex items-center gap-2 py-2 px-2">
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">Main Assembly</p>
-                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
-                      Assembly
-                    </Badge>
+            setUploadedAssembly3D(prev => {
+              console.log('📝 State update function called, prev:', prev, 'new:', assemblyData);
+              return assemblyData;
+            });
+            
+            // Force a small delay to ensure state update is processed
+            setTimeout(() => {
+              console.log('🔄 State update completed, checking if component will re-render');
+            }, 100);
+          } else {
+            console.warn('⚠️ No assembly data received - 3D model will not be displayed');
+          }
+          
+          // Refresh BOM items after successful processing
+          if (tree && tree.length > 0) {
+            console.log('🔄 Refreshing BOM items after tree generation');
+            refetchBOMItems();
+          }
+        }}
+      />
+
+      {/* Debug: Show 3D Model State */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+          <p className="font-medium text-blue-800">Debug: 3D Model State</p>
+          <p className="text-blue-700">
+            uploadedAssembly3D: {uploadedAssembly3D ? 'SET' : 'NOT SET'}
+            {uploadedAssembly3D && (
+              <span> - Model URL: {uploadedAssembly3D.modelUrl ? 'Available' : 'Missing'}</span>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* 3D Assembly Model Display */}
+      {uploadedAssembly3D && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Box className="h-5 w-5" />
+              Assembly 3D Model
+            </CardTitle>
+            <CardDescription>
+              3D visualization of the uploaded {uploadedAssembly3D.fileName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Split Layout: Left Panel for BOM Tree, Right Panel for 3D Viewer */}
+            <div className="grid grid-cols-12 gap-6 min-h-[800px]">
+              
+              {/* Left Panel: BOM Tree (Vertical) */}
+              <div className="col-span-3 border-r pr-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Assembly Parts</h3>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                      onClick={handleRunAssemblyDFMAnalysis}
+                      disabled={loadingDFMAnalysis}
+                      title="Run DFM Analysis for entire assembly"
+                    >
+                      {loadingDFMAnalysis ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Settings className="h-3.5 w-3.5" />
+                      )}
+                      {loadingDFMAnalysis ? 'Analyzing...' : 'DFM Analysis'}
+                    </Button>
                   </div>
-                  <div className="flex items-center gap-4 text-xs">
-                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                      <Box className="h-3 w-3" />
-                      <span>main_assembly.step</span>
-                    </button>
+                  
+                  {/* BOM Items List - Vertical Layout */}
+                  <div className="max-h-[700px] overflow-y-auto space-y-2">
+                    {/* Show either 3D detected parts or database BOM items */}
+                    {use3DParts ? (
+                      // Display 3D detected parts with hierarchy
+                      detectedParts.length > 0 ? (
+                        <HierarchicalBOMTree 
+                          items={detectedParts}
+                          selectedItems={selectedBOMItems}
+                          onItemSelect={handleBOMItemSelect}
+                          onItemHover={handleBOMItemHover}
+                          onEditItem={handleEditItem}
+                        />
+                      ) : (
+                        <div className="text-center text-muted-foreground py-8">
+                          <Box className="h-12 w-12 mx-auto opacity-50 mb-2" />
+                          <p>No 3D parts detected</p>
+                          <p className="text-sm mt-2">Upload assembly to analyze parts</p>
+                        </div>
+                      )
+                    ) : (
+                      // Display database BOM items with hierarchy
+                      bomItemsData?.items && bomItemsData.items.length > 0 ? (
+                        <HierarchicalBOMTree 
+                          items={bomItemsData.items}
+                          selectedItems={selectedBOMItems}
+                          onItemSelect={handleBOMItemSelect}
+                          onItemHover={handleBOMItemHover}
+                          onEditItem={handleEditItem}
+                        />
+                      ) : (
+                        <div className="text-center text-muted-foreground py-8">
+                          <p>No BOM items found</p>
+                          <p className="text-sm mt-2">Add items using the form below</p>
+                        </div>
+                      )
+                    )}
+                  </div>
+                  
+                  {/* Show Only Selected Toggle */}
+                  <div className="flex flex-col gap-2 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-sm font-medium">
+                        <input 
+                          type="checkbox"
+                          checked={showOnlySelected}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked;
+                            setShowOnlySelected(isChecked);
+                            // If unchecking, also clear all selections
+                            if (!isChecked) {
+                              setSelectedBOMItems([]);
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <div className="flex flex-col">
+                          <span>Show Only Selected Parts</span>
+                          {showOnlySelected && selectedBOMItems.length > 0 && (
+                            <span className="text-xs text-gray-500">{selectedBOMItems.length} part{selectedBOMItems.length > 1 ? 's' : ''} selected</span>
+                          )}
+                          {showOnlySelected && selectedBOMItems.length === 0 && (
+                            <span className="text-xs text-gray-500">Auto-enabled exploded view</span>
+                          )}
+                        </div>
+                      </label>
+                      
+                      {selectedBOMItems.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBOMItems([]);
+                            setShowOnlySelected(false);
+                          }}
+                          className="h-7 px-2 text-xs"
+                        >
+                          Clear All ({selectedBOMItems.length})
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {selectedBOMItems.length > 1 && (
+                      <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                        💡 Multiple parts selected. Click parts to add/remove from selection.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-
-              {/* Sub-Assembly */}
-              <div className="group hover:bg-muted/50 rounded-md transition-colors">
-                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '28px'}}>
-                  <div className="flex items-center">
-                    <div className="w-3 h-px bg-border"></div>
-                  </div>
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">Mounting Assembly</p>
-                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-blue-500/10 text-blue-700 border-blue-500/20">
-                      Sub-Assembly
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">#ASM-002</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs">
-                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                      <Box className="h-3 w-3" />
-                      <span>mounting_assembly.step</span>
-                    </button>
-                  </div>
+              
+              {/* Right Panel: 3D Viewer (Full Size) */}
+              <div className="col-span-9">
+                <div className="h-[750px] rounded-lg overflow-hidden border">
+                  <ModelViewer
+                    fileUrl={uploadedAssembly3D.modelUrl}
+                    fileName={uploadedAssembly3D.fileName}
+                    fileType="stl"
+                    bomItemId={uploadedAssembly3D.bomItemId}
+                    isExploded={isExplodedView}
+                    explodeDistance={explodeDistance}
+                    selectedBOMItems={selectedBOMItems}
+                    showOnlySelected={showOnlySelected}
+                    hoveredBOMItem={hoveredBOMItem}
+                    onPartsDetected={handlePartsDetected}
+                    manufacturingFeatures={assemblyDFMData ? 
+                      generateManufacturingFeatures(assemblyDFMData) : 
+                      [
+                        {
+                          id: 'hole-1',
+                          type: 'hole',
+                          position: { x: 10, y: 5, z: 2 },
+                          dimensions: { diameter: 6.5, depth: 12 },
+                          manufacturingProcess: 'CNC Drilling',
+                          cycleTime: 0.8,
+                          tooling: ['6.5mm Drill', 'Coolant System'],
+                          warnings: ['Check for burr formation', 'Ensure proper chip evacuation'],
+                          aiRecommendations: ['Use peck drilling for deep holes', 'Apply cutting fluid for better surface finish']
+                        },
+                        {
+                          id: 'pocket-1',
+                          type: 'pocket',
+                          position: { x: 25, y: 15, z: 8 },
+                          dimensions: { length: 20, width: 15, depth: 5 },
+                          manufacturingProcess: 'CNC Milling',
+                          cycleTime: 3.2,
+                          tooling: ['10mm End Mill', 'Roughing End Mill'],
+                          warnings: ['Watch for tool deflection in deep cuts'],
+                          aiRecommendations: ['Use trochoidal milling for efficient material removal', 'Consider adaptive clearing strategy']
+                        },
+                        {
+                          id: 'thin-wall-1',
+                          type: 'thin_wall',
+                          position: { x: 45, y: 8, z: 15 },
+                          dimensions: { length: 30, width: 2, depth: 10 },
+                          manufacturingProcess: 'Precision Milling',
+                          cycleTime: 2.5,
+                          tooling: ['2mm End Mill', 'High-Speed Spindle'],
+                          warnings: ['High risk of deflection', 'Part may vibrate during machining'],
+                          aiRecommendations: ['Use support fixtures', 'Reduce cutting speeds', 'Consider leaving stock for finishing pass']
+                        },
+                        {
+                          id: 'undercut-1',
+                          type: 'undercut',
+                          position: { x: 35, y: 25, z: 5 },
+                          dimensions: { length: 8, depth: 4 },
+                          manufacturingProcess: 'T-Slot Milling',
+                          cycleTime: 1.5,
+                          tooling: ['T-Slot Cutter', 'Dovetail Cutter'],
+                          warnings: ['Limited tool access', 'Difficult to inspect'],
+                          aiRecommendations: ['Consider EDM for complex undercuts', 'Use specialized undercut tools']
+                        }
+                      ]
+                    }
+                    dfmAnalysisData={assemblyDFMData}
+                    showFeatures={true}
+                  />
                 </div>
-              </div>
-
-              {/* Child Parts */}
-              <div className="group hover:bg-muted/50 rounded-md transition-colors">
-                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '48px'}}>
-                  <div className="flex items-center">
-                    <div className="w-3 h-px bg-border"></div>
+                
+                {/* 3D View Controls */}
+                <div className="mt-4 flex flex-wrap items-center gap-4">
+                <Button 
+                  variant={isExplodedView ? "default" : "outline"} 
+                  onClick={() => setIsExplodedView(!isExplodedView)}
+                  className="gap-2"
+                >
+                  <Layers3 className="h-4 w-4" />
+                  {isExplodedView ? 'Normal View' : 'Exploded View'}
+                </Button>
+                
+                {isExplodedView && (
+                  <div key="explode-distance-control" className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Explode Distance:</span>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={explodeDistance}
+                      className="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      onChange={(e) => {
+                        const distance = parseInt(e.target.value);
+                        setExplodeDistance(distance);
+                        console.log('Explode distance set to:', distance);
+                      }}
+                    />
+                    <span className="text-sm text-muted-foreground min-w-[3ch]">{explodeDistance}</span>
                   </div>
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">Base Plate</p>
-                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/10 text-amber-700 border-amber-500/20">
-                      Part
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">#PRT-001</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs">
-                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                      <FileText className="h-3 w-3" />
-                      <span>base_plate.pdf</span>
-                    </button>
-                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                      <Box className="h-3 w-3" />
-                      <span>base_plate.step</span>
-                    </button>
-                  </div>
+                )}
+                
+                <Button variant="outline" className="gap-2">
+                  <Square className="h-4 w-4" />
+                  Section View
+                </Button>
+                
+                <Button variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Download STL
+                </Button>
                 </div>
-              </div>
 
-              <div className="group hover:bg-muted/50 rounded-md transition-colors">
-                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '48px'}}>
-                  <div className="flex items-center">
-                    <div className="w-3 h-px bg-border"></div>
-                  </div>
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">Mounting Bracket</p>
-                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/10 text-amber-700 border-amber-500/20">
-                      Part
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">#PRT-002</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs">
-                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                      <FileText className="h-3 w-3" />
-                      <span>mounting_bracket.pdf</span>
-                    </button>
-                    <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                      <Box className="h-3 w-3" />
-                      <span>mounting_bracket.step</span>
-                    </button>
-                  </div>
+                {/* Assembly Info Below Controls */}
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
+                <div className="text-center">
+                  <div className="text-sm text-muted-foreground">File Name</div>
+                  <div className="font-semibold">{uploadedAssembly3D.fileName}</div>
                 </div>
-              </div>
-
-              {/* Hardware Components */}
-              <div className="group hover:bg-muted/50 rounded-md transition-colors">
-                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '28px'}}>
-                  <div className="flex items-center">
-                    <div className="w-3 h-px bg-border"></div>
-                  </div>
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">Hardware Kit</p>
-                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-purple-500/10 text-purple-700 border-purple-500/20">
-                      Hardware
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">#HW-001</span>
-                  </div>
+                <div className="text-center">
+                  <div className="text-sm text-muted-foreground">Volume</div>
+                  <div className="font-semibold">{uploadedAssembly3D.volume > 0 ? uploadedAssembly3D.volume.toLocaleString() : 'Processing...'} mm³</div>
                 </div>
-              </div>
-
-              <div className="group hover:bg-muted/50 rounded-md transition-colors">
-                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '48px'}}>
-                  <div className="flex items-center">
-                    <div className="w-3 h-px bg-border"></div>
-                  </div>
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">Bolt M8x20 (Qty: 4)</p>
-                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-gray-500/10 text-gray-700 border-gray-500/20">
-                      Fastener
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">#M8x20</span>
-                  </div>
+                <div className="text-center">
+                  <div className="text-sm text-muted-foreground">Material</div>
+                  <div className="font-semibold">{uploadedAssembly3D.material}</div>
                 </div>
-              </div>
-
-              <div className="group hover:bg-muted/50 rounded-md transition-colors">
-                <div className="flex items-center gap-2 py-1.5 px-2" style={{paddingLeft: '48px'}}>
-                  <div className="flex items-center">
-                    <div className="w-3 h-px bg-border"></div>
-                  </div>
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">Washer M8 (Qty: 4)</p>
-                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-gray-500/10 text-gray-700 border-gray-500/20">
-                      Fastener
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">#W8</span>
-                  </div>
+                <div className="text-center">
+                  <div className="text-sm text-muted-foreground">Status</div>
+                  <Badge variant="outline" className="text-green-600 border-green-600">
+                    Ready
+                  </Badge>
+                </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* BOM Generation Status */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <CheckCircle className="h-3 w-3 text-white" />
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-blue-900 mb-1">Automated BOM Generation Process</h4>
-                <div className="text-xs text-blue-700 space-y-1">
-                  <p>✅ File Validation Layer → STEP file integrity check</p>
-                  <p>✅ CAD Engine → Parse STEP structure using OpenCascade</p>
-                  <p>✅ Assembly Tree Walker → Identify hierarchical relationships</p>
-                  <p>✅ Node Classifier → Assembly / Sub-Assembly / Child Part</p>
-                  <p>✅ BOM Builder → Generate hierarchy + quantities</p>
-                  <p>✅ AI Enrichment Layer → Material, make/buy, description inference</p>
-                  <p>✅ BOM JSON → Supabase integration</p>
-                  <p>✅ Frontend → Render tree in existing BOM UI</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="items" className="space-y-4">

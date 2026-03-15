@@ -83,6 +83,8 @@ interface ModelViewerProps {
   fileName: string;
   fileType: string;
   bomItemId?: string; // For triggering conversion
+  isExploded?: boolean; // For exploded view
+  explodeDistance?: number; // Distance multiplier for explosion (0-100)
   onMeasurements?: (data: {
     volume: number;
     dimensions: { x: number; y: number; z: number };
@@ -92,6 +94,12 @@ interface ModelViewerProps {
   selectedFeature?: ManufacturingFeature | null;
   onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
   showFeatures?: boolean;
+  // BOM Integration Props
+  selectedBOMItems?: any[]; // Selected BOM items for highlighting (multiple selection)
+  showOnlySelected?: boolean; // Show only the selected parts
+  hoveredBOMItem?: any; // Hovered BOM item for highlighting
+  onPartsDetected?: (parts: any[]) => void; // Callback when parts are detected from CAD analysis
+  dfmAnalysisData?: any; // DFM analysis data for showing recommendations in Properties panel
 }
 
 export function ModelViewer({ 
@@ -99,11 +107,18 @@ export function ModelViewer({
   fileName, 
   fileType, 
   bomItemId, 
+  isExploded = false,
+  explodeDistance = 50,
   onMeasurements,
   manufacturingFeatures,
   selectedFeature,
   onFeatureSelect,
-  showFeatures
+  showFeatures,
+  selectedBOMItems,
+  showOnlySelected = false,
+  hoveredBOMItem,
+  onPartsDetected,
+  dfmAnalysisData
 }: ModelViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
@@ -117,9 +132,31 @@ export function ModelViewer({
   const actualFileExt = urlPath.toLowerCase().split('.').pop() || fileExt;
 
   // Check if format is supported for interactive viewing
-  const isInteractiveSupported = ['stl', 'obj'].includes(actualFileExt);
+  const isSTL = fileExt === 'stl' || actualFileExt === 'stl';
+  const isOBJ = fileExt === 'obj' || actualFileExt === 'obj';
+  const isInteractiveSupported = ['stl', 'obj'].includes(actualFileExt) || ['stl', 'obj'].includes(fileExt);
   const isOriginalSTEP = ['step', 'stp', 'iges', 'igs'].includes(fileExt);
   const isConvertedToSTL = isOriginalSTEP && actualFileExt === 'stl';
+  // More robust STL detection - check filename, fileType, and URL
+  const isSTLFromFilename = fileName.toLowerCase().includes('.stl');
+  const isSTLFromFileType = fileType.toLowerCase().includes('stl');
+  const shouldShow3DViewer = isSTL || isOBJ || isConvertedToSTL || isSTLFromFilename || isSTLFromFileType;
+  
+  console.log('🔍 Model Viewer file analysis:', {
+    fileName,
+    fileType,
+    fileExt,
+    actualFileExt,
+    isSTL,
+    isOBJ,
+    isSTLFromFilename,
+    isSTLFromFileType,
+    isInteractiveSupported,
+    isOriginalSTEP,
+    isConvertedToSTL,
+    shouldShow3DViewer,
+    fileUrl: fileUrl.substring(0, 100) + '...'
+  });
 
   const handleConvertToSTL = async () => {
     if (!bomItemId) {
@@ -129,7 +166,9 @@ export function ModelViewer({
 
     setIsConverting(true);
     try {
-      await apiClient.post(`/bom-items/${bomItemId}/convert-step`);
+      await apiClient.post(`/bom-items/${bomItemId}/convert-step`, {}, {
+        timeout: 180000 // 3 minutes timeout for STEP conversion
+      });
 
       toast.success('STEP file converted to STL successfully! Refreshing...');
 
@@ -160,8 +199,9 @@ export function ModelViewer({
     setViewerKey(prev => prev + 1);
   };
 
-  // STEP File that was converted to STL - show in 3D viewer
-  if (isConvertedToSTL) {
+  // Priority check: Always show 3D viewer for STL/OBJ files regardless of other conditions
+  if (shouldShow3DViewer) {
+    console.log('✅ Showing 3D viewer for file:', fileName);
     return (
       <div className="h-[85vh] min-h-[700px] overflow-hidden">
         <Suspense fallback={
@@ -177,11 +217,18 @@ export function ModelViewer({
               key={viewerKey}
               fileUrl={fileUrl}
               fileName={fileName}
+              isExploded={isExploded}
+              explodeDistance={explodeDistance}
               onMeasurements={onMeasurements}
               manufacturingFeatures={manufacturingFeatures}
               selectedFeature={selectedFeature}
               onFeatureSelect={onFeatureSelect}
               showFeatures={showFeatures}
+              selectedBOMItems={selectedBOMItems}
+              showOnlySelected={showOnlySelected}
+              hoveredBOMItem={hoveredBOMItem}
+              onPartsDetected={onPartsDetected}
+              dfmAnalysisData={dfmAnalysisData}
             />
           </ErrorBoundary>
         </Suspense>
@@ -214,8 +261,9 @@ export function ModelViewer({
     );
   }
 
-  // STEP File not yet converted - show placeholder
-  if (isOriginalSTEP && !isConvertedToSTL) {
+  // STEP File not yet converted - show placeholder  
+  if (isOriginalSTEP && !isConvertedToSTL && !shouldShow3DViewer) {
+    console.log('🔄 Showing STEP conversion placeholder for:', fileName);
     return (
       <div className="relative h-full min-h-[400px] border rounded-lg overflow-hidden bg-gradient-to-br from-muted/30 via-muted/10 to-background">
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
@@ -292,11 +340,18 @@ export function ModelViewer({
               key={viewerKey}
               fileUrl={fileUrl}
               fileName={fileName}
+              isExploded={isExploded}
+              explodeDistance={explodeDistance}
               onMeasurements={onMeasurements}
               manufacturingFeatures={manufacturingFeatures}
               selectedFeature={selectedFeature}
               onFeatureSelect={onFeatureSelect}
               showFeatures={showFeatures}
+              selectedBOMItems={selectedBOMItems}
+              showOnlySelected={showOnlySelected}
+              hoveredBOMItem={hoveredBOMItem}
+              onPartsDetected={onPartsDetected}
+              dfmAnalysisData={dfmAnalysisData}
             />
           </ErrorBoundary>
         </Suspense>
@@ -330,6 +385,7 @@ export function ModelViewer({
   }
 
   // Unsupported Format Fallback
+  console.log('❌ Falling back to unsupported format for file:', fileName, 'fileType:', fileType);
   return (
     <div className="relative h-full min-h-[400px] border rounded-lg overflow-hidden bg-muted/20 flex items-center justify-center p-8">
       <div className="text-center max-w-md">

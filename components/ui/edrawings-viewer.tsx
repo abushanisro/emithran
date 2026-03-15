@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-three/drei';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
+import { apiConfig } from '@/lib/api/config';
 import {
   Home,
   Download,
@@ -59,6 +60,8 @@ interface ManufacturingFeature {
 interface EDrawingsViewerProps {
   fileUrl: string;
   fileName: string;
+  isExploded?: boolean;
+  explodeDistance?: number;
   onMeasurements?: (data: {
     volume: number;
     dimensions: { x: number; y: number; z: number };
@@ -68,6 +71,12 @@ interface EDrawingsViewerProps {
   selectedFeature?: ManufacturingFeature | null;
   onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
   showFeatures?: boolean;
+  // BOM Integration Props
+  selectedBOMItems?: any[]; // Selected BOM items for highlighting (multiple selection)
+  showOnlySelected?: boolean; // Show only the selected parts
+  hoveredBOMItem?: any; // Hovered BOM item for highlighting
+  onPartsDetected?: (parts: any[]) => void; // Callback when parts are detected
+  dfmAnalysisData?: any; // Assembly DFM analysis data for Properties panel
 }
 
 // Standard CAD views configuration
@@ -569,6 +578,38 @@ function DFMColorMesh({
 // ─── Feature Insight Tooltip (HTML overlay shown in sidebar, not 3D) ─────────
 // (See ManufacturingAnalysisPanel for sidebar rendering)
 
+// Individual part data for exploded view
+interface ExplodedPart {
+  geometry: THREE.BufferGeometry;
+  centroid: THREE.Vector3;
+  boundingBox: THREE.Box3;
+  explosionDirection: THREE.Vector3;
+  targetPosition: THREE.Vector3;
+  currentPosition: THREE.Vector3;
+  id: string;
+}
+
+// Helper function for part analysis (calculateVolume already exists above)
+function calculateBoundingBoxDimensions(geometry: THREE.BufferGeometry) {
+  try {
+    geometry.computeBoundingBox();
+    const bbox = geometry.boundingBox;
+    if (!bbox) return { length: 0, width: 0, height: 0 };
+    
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    
+    return {
+      length: Math.round(size.x * 1000) / 1000, // Round to 3 decimal places
+      width: Math.round(size.y * 1000) / 1000,
+      height: Math.round(size.z * 1000) / 1000
+    };
+  } catch (error) {
+    console.warn('Error calculating dimensions:', error);
+    return { length: 0, width: 0, height: 0 };
+  }
+}
+
 // STL Model with section plane and measurements
 function STLModel({
   url,
@@ -576,18 +617,26 @@ function STLModel({
   sectionPlane,
   isTransparent,
   isWireframe,
+  isExploded,
+  explodeDistance,
   onLoad,
   onMeasurements,
   manufacturingFeatures,
   selectedFeature,
   onFeatureSelect,
-  showFeatures
+  showFeatures,
+  selectedBOMItems,
+  showOnlySelected,
+  hoveredBOMItem,
+  onPartsDetected
 }: {
   url: string;
   color: string;
   sectionPlane: number;
   isTransparent: boolean;
   isWireframe: boolean;
+  isExploded?: boolean;
+  explodeDistance?: number;
   onLoad?: () => void;
   onMeasurements?: (data: {
     volume: number;
@@ -598,17 +647,1315 @@ function STLModel({
   selectedFeature?: ManufacturingFeature | null;
   onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
   showFeatures?: boolean;
+  selectedBOMItems?: any[];
+  showOnlySelected?: boolean;
+  hoveredBOMItem?: any;
+  onPartsDetected?: (parts: any[]) => void;
 }) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
+  const [explodedParts, setExplodedParts] = useState<ExplodedPart[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStage, setLoadingStage] = useState<string>('Initializing...');
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  
+  // Progressive loading states
+  const [previewReady, setPreviewReady] = useState(false);
+  const [detailsReady, setDetailsReady] = useState(false);
+  
+  // Cache for processed parts to prevent re-calculation on selection changes
+  const [processedPartsCache] = useState(new Map<string, ExplodedPart[]>());
   const meshRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
 
+
+  // Function to separate assembly into individual parts based on connectivity
+  // Principal Engineer Solution: Iterative algorithm with performance optimizations
+  // Optimized part separation with proper caching
+const separateAssemblyParts = useCallback((geometry: THREE.BufferGeometry): ExplodedPart[] => {
+    try {
+      const position = geometry.attributes.position;
+      if (!position) return [];
+
+      const faceCount = position.count / 3;
+      
+      // Performance guard: Adaptive approach for large meshes
+      const MAX_FACES_FULL = 25000;
+      const MAX_FACES_SIMPLIFIED = 200000; // Increased limit - use optimized approach longer
+      
+      if (faceCount > MAX_FACES_SIMPLIFIED) {
+        console.warn(`Mesh extremely large: ${faceCount} faces (limit: ${MAX_FACES_SIMPLIFIED}). Using directional explosion.`);
+        return createSimplifiedExplodedView(geometry);
+      }
+      
+      if (faceCount > MAX_FACES_FULL) {
+        console.log(`Large mesh detected: ${faceCount} faces. Using connected component analysis to detect real mechanical parts.`);
+        return createMechanicalPartSeparation(geometry);
+      }
+
+      console.log(`Processing assembly with ${faceCount} faces...`);
+
+      // Adaptive tolerance based on mesh size
+      geometry.computeBoundingBox();
+      const bbox = geometry.boundingBox!;
+      const size = new THREE.Vector3();
+      bbox.getSize(size);
+      const avgDimension = (size.x + size.y + size.z) / 3;
+      const tolerance = Math.max(0.001, avgDimension * 0.0001);
+
+      // Build vertex adjacency map with optimized key generation
+      const vertexMap = new Map<string, number[]>();
+      const faceConnections = new Map<number, Set<number>>();
+      
+      // Initialize face connections
+      for (let i = 0; i < faceCount; i++) {
+        faceConnections.set(i, new Set());
+      }
+
+      // Process faces in batches to avoid memory spikes
+      const BATCH_SIZE = 1000;
+      for (let batchStart = 0; batchStart < faceCount; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, faceCount);
+        
+        for (let faceIdx = batchStart; faceIdx < batchEnd; faceIdx++) {
+          for (let vertIdx = 0; vertIdx < 3; vertIdx++) {
+            const idx = faceIdx * 3 + vertIdx;
+            const x = position.getX(idx);
+            const y = position.getY(idx);
+            const z = position.getZ(idx);
+            
+            // Optimized key generation with fixed precision
+            const kx = Math.round(x / tolerance);
+            const ky = Math.round(y / tolerance);
+            const kz = Math.round(z / tolerance);
+            const key = `${kx}:${ky}:${kz}`;
+            
+            if (!vertexMap.has(key)) {
+              vertexMap.set(key, []);
+            }
+            vertexMap.get(key)!.push(faceIdx);
+          }
+        }
+      }
+
+      // Build face adjacency efficiently with surface normal analysis
+      let connectionCount = 0;
+      const normalThreshold = 0.5; // ~60 degrees - much more conservative for real parts
+      
+      // Calculate face normals for better part separation
+      const faceNormalMap = new Map<number, THREE.Vector3>();
+      for (let faceIdx = 0; faceIdx < faceCount; faceIdx++) {
+        // Get triangle vertices
+        const idx1 = faceIdx * 3;
+        const idx2 = faceIdx * 3 + 1;
+        const idx3 = faceIdx * 3 + 2;
+        
+        const v1 = new THREE.Vector3(position.getX(idx1), position.getY(idx1), position.getZ(idx1));
+        const v2 = new THREE.Vector3(position.getX(idx2), position.getY(idx2), position.getZ(idx2));
+        const v3 = new THREE.Vector3(position.getX(idx3), position.getY(idx3), position.getZ(idx3));
+        
+        // Calculate face normal using cross product
+        const edge1 = v2.clone().sub(v1);
+        const edge2 = v3.clone().sub(v1);
+        const normal = edge1.cross(edge2).normalize();
+        
+        faceNormalMap.set(faceIdx, normal);
+      }
+      
+      for (const faceIndices of vertexMap.values()) {
+        if (faceIndices.length > 1 && faceIndices.length < 50) { // Skip vertices with too many connections (likely artifacts)
+          for (let i = 0; i < faceIndices.length; i++) {
+            for (let j = i + 1; j < faceIndices.length; j++) {
+              const faceA = faceIndices[i];
+              const faceB = faceIndices[j];
+              
+              // Check surface normal similarity for real part boundaries
+              const normalA = faceNormalMap.get(faceA);
+              const normalB = faceNormalMap.get(faceB);
+              
+              if (normalA && normalB) {
+                const dotProduct = normalA.dot(normalB);
+                // Only connect faces with similar normals (same part surface)
+                if (Math.abs(dotProduct) > normalThreshold) {
+                  faceConnections.get(faceA)!.add(faceB);
+                  faceConnections.get(faceB)!.add(faceA);
+                  connectionCount++;
+                }
+              } else {
+                // Fallback to direct connection if normals not available
+                faceConnections.get(faceA)!.add(faceB);
+                faceConnections.get(faceB)!.add(faceA);
+                connectionCount++;
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`Built ${connectionCount} face connections`);
+
+      // ITERATIVE DFS using stack to avoid call stack overflow
+      const visited = new Set<number>();
+      const components: number[][] = [];
+
+      const iterativeDFS = (startFace: number): number[] => {
+        const component: number[] = [];
+        const stack: number[] = [startFace];
+        
+        while (stack.length > 0) {
+          const currentFace = stack.pop()!;
+          
+          if (visited.has(currentFace)) continue;
+          
+          visited.add(currentFace);
+          component.push(currentFace);
+          
+          // Add all unvisited neighbors to stack
+          const connections = faceConnections.get(currentFace) || new Set();
+          for (const neighbor of connections) {
+            if (!visited.has(neighbor)) {
+              stack.push(neighbor);
+            }
+          }
+          
+          // Safety guard against infinite loops
+          if (component.length > faceCount) {
+            console.warn('Component size exceeded face count, breaking DFS');
+            break;
+          }
+        }
+        
+        return component;
+      };
+
+      // Find all connected components
+      for (let i = 0; i < faceCount; i++) {
+        if (!visited.has(i)) {
+          const component = iterativeDFS(i);
+          if (component.length > 0) {
+            components.push(component);
+          }
+        }
+      }
+
+      // Filter components with improved heuristics
+      const minComponentSize = Math.max(50, Math.floor(faceCount * 0.02)); // 2% minimum - only detect substantial parts
+      const maxComponents = 50; // Allow detection of all actual assembly parts
+      
+      let significantComponents = components.filter(comp => comp.length >= minComponentSize);
+      
+      // Sort by size and take largest components if too many
+      if (significantComponents.length > maxComponents) {
+        significantComponents.sort((a, b) => b.length - a.length);
+        significantComponents = significantComponents.slice(0, maxComponents);
+      }
+
+      console.log(`Assembly analysis: Found ${significantComponents.length} parts from ${faceCount} faces`);
+
+      // Create geometries for each part
+      const parts: ExplodedPart[] = significantComponents.map((faceIndices, partIndex) => {
+        return createPartGeometry(faceIndices, partIndex, significantComponents.length, position, geometry);
+      });
+
+      // Clean up large data structures
+      vertexMap.clear();
+      faceConnections.clear();
+
+      return parts;
+
+    } catch (error) {
+      console.error('Failed to separate assembly parts:', error);
+      // Fallback to simplified view
+      return createSimplifiedExplodedView(geometry);
+    }
+  }, []); // Stable function, no dependencies needed
+
+  // Mechanical part separation using connected component analysis  
+  const createMechanicalPartSeparation = (geometry: THREE.BufferGeometry): ExplodedPart[] => {
+    console.log('Creating mechanical part separation for assembly');
+    
+    try {
+      const position = geometry.attributes.position;
+      const faceCount = position.count / 3;
+      
+      geometry.computeBoundingBox();
+      const bbox = geometry.boundingBox!;
+      const size = new THREE.Vector3();
+      bbox.getSize(size);
+      
+      console.log(`Assembly dimensions: ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm`);
+      
+      // Enhanced part detection using surface normal analysis
+      const vertexMap = new Map<string, number[]>();
+      const faceNormalMap = new Map<number, THREE.Vector3>();
+      const tolerance = Math.min(size.x, size.y, size.z) * 0.001; // Balanced tolerance for real assemblies
+      
+      // Calculate face normals manually for better accuracy
+      for (let faceIdx = 0; faceIdx < faceCount; faceIdx++) {
+        // Get triangle vertices
+        const idx1 = faceIdx * 3;
+        const idx2 = faceIdx * 3 + 1;
+        const idx3 = faceIdx * 3 + 2;
+        
+        const v1 = new THREE.Vector3(position.getX(idx1), position.getY(idx1), position.getZ(idx1));
+        const v2 = new THREE.Vector3(position.getX(idx2), position.getY(idx2), position.getZ(idx2));
+        const v3 = new THREE.Vector3(position.getX(idx3), position.getY(idx3), position.getZ(idx3));
+        
+        // Calculate face normal using cross product
+        const edge1 = v2.clone().sub(v1);
+        const edge2 = v3.clone().sub(v1);
+        const normal = edge1.cross(edge2).normalize();
+        
+        faceNormalMap.set(faceIdx, normal);
+      }
+      
+      for (let faceIdx = 0; faceIdx < faceCount; faceIdx++) {
+        for (let vertIdx = 0; vertIdx < 3; vertIdx++) {
+          const idx = faceIdx * 3 + vertIdx;
+          const x = position.getX(idx);
+          const y = position.getY(idx);
+          const z = position.getZ(idx);
+          
+          // Create vertex key with higher precision for real part boundaries
+          const vertexKey = `${Math.round(x / tolerance)}_${Math.round(y / tolerance)}_${Math.round(z / tolerance)}`;
+          
+          if (!vertexMap.has(vertexKey)) {
+            vertexMap.set(vertexKey, []);
+          }
+          vertexMap.get(vertexKey)!.push(faceIdx);
+        }
+      }
+      
+      // Build face connectivity graph - only connect faces that share an edge
+      const faceConnections = new Map<number, Set<number>>();
+      
+      for (let faceIdx = 0; faceIdx < faceCount; faceIdx++) {
+        faceConnections.set(faceIdx, new Set());
+      }
+      
+      // Only connect faces that share an edge (2 vertices), not just any vertex
+      for (const [vertexKey, faces] of vertexMap.entries()) {
+        if (faces.length > 1 && faces.length < 8) { // Avoid high-degree vertices
+          for (let i = 0; i < faces.length; i++) {
+            for (let j = i + 1; j < faces.length; j++) {
+              const faceA = faces[i];
+              const faceB = faces[j];
+              
+              // Check if faces share an edge (need to share 2 vertices)
+              const sharedVertices = getSharedVertices(faceA, faceB, position, tolerance);
+              if (sharedVertices >= 2) {
+                faceConnections.get(faceA)!.add(faceB);
+                faceConnections.get(faceB)!.add(faceA);
+              }
+            }
+          }
+        }
+      }
+      
+      // Find connected components (real mechanical parts)
+      const visited = new Set<number>();
+      const components: number[][] = [];
+      
+      for (let faceIdx = 0; faceIdx < faceCount; faceIdx++) {
+        if (visited.has(faceIdx)) continue;
+        
+        const component: number[] = [];
+        const stack: number[] = [faceIdx];
+        
+        while (stack.length > 0) {
+          const currentFace = stack.pop()!;
+          if (visited.has(currentFace)) continue;
+          
+          visited.add(currentFace);
+          component.push(currentFace);
+          
+          // Add connected faces to stack
+          const connections = faceConnections.get(currentFace) || new Set();
+          for (const connectedFace of connections) {
+            if (!visited.has(connectedFace)) {
+              stack.push(connectedFace);
+            }
+          }
+        }
+        
+        if (component.length > 0) {
+          components.push(component);
+        }
+      }
+      
+      // Filter components by size - remove tiny artifacts but keep small mechanical parts
+      const minFacesPerPart = Math.max(100, Math.floor(faceCount * 0.01)); // 1% minimum - substantial parts only
+      const maxFacesPerPart = Math.floor(faceCount * 0.8); // No single part should be >80% of assembly
+      
+      // Enhanced filtering for real assembly parts
+      let significantComponents = components.filter(comp => {
+        if (comp.length < minFacesPerPart || comp.length > maxFacesPerPart) {
+          return false;
+        }
+        
+        // Calculate part volume and surface characteristics
+        const partFaces = comp;
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity; 
+        let minZ = Infinity, maxZ = -Infinity;
+        
+        // Calculate bounding box for this component
+        for (const faceIdx of partFaces) {
+          for (let vertIdx = 0; vertIdx < 3; vertIdx++) {
+            const idx = faceIdx * 3 + vertIdx;
+            const x = position.getX(idx);
+            const y = position.getY(idx);
+            const z = position.getZ(idx);
+            
+            minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+            minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+          }
+        }
+        
+        // Calculate dimensions
+        const width = maxX - minX;
+        const height = maxY - minY;
+        const depth = maxZ - minZ;
+        const volume = width * height * depth;
+        
+        // Filter out small surface details - only keep substantial mechanical parts  
+        const totalAssemblyVolume = size.x * size.y * size.z;
+        const minRealPartVolume = Math.max(1.0, totalAssemblyVolume * 0.001); // 0.1% of assembly volume
+        return volume >= minRealPartVolume;
+      });
+      
+      // If we still have too few parts, use backup geometric separation
+      if (significantComponents.length < 10) {
+        console.log('Too few parts detected, adding geometric separation...');
+        const geometricParts = detectGeometricParts(position, faceCount, bbox);
+        significantComponents.push(...geometricParts);
+      }
+      
+      // Sort by size and limit to realistic assembly part count
+      significantComponents.sort((a, b) => b.length - a.length);
+      const maxComponents = Math.min(significantComponents.length, 30); // Realistic limit for typical assemblies  
+      significantComponents = significantComponents.slice(0, maxComponents);
+      
+      console.log(`🔧 Enhanced Part Detection Results:`);
+      console.log(`  - Total faces: ${faceCount}`);
+      console.log(`  - Connected components: ${components.length}`);
+      console.log(`  - Significant parts: ${significantComponents.length}`);
+      console.log(`  - Part size range: ${Math.min(...significantComponents.map(c => c.length))} - ${Math.max(...significantComponents.map(c => c.length))} faces`);
+      console.log(`  - Using surface normal analysis for accurate boundaries`);
+      
+      // Consolidate small adjacent components that likely belong to the same part
+      const consolidatedComponents = consolidateAdjacentParts(significantComponents, position, faceConnections);
+      console.log(`  - After consolidation: ${consolidatedComponents.length} parts`);
+      
+      // Create geometries for each part
+      const parts: ExplodedPart[] = consolidatedComponents.map((faceIndices, partIndex) => {
+        return createPartGeometry(faceIndices, partIndex, consolidatedComponents.length, position, geometry);
+      });
+      
+      // Clean up
+      vertexMap.clear();
+      faceConnections.clear();
+      
+      return parts;
+      
+    } catch (error) {
+      console.error('Mechanical part separation failed:', error);
+      return createOptimizedPartSeparation(geometry);
+    }
+  };
+  
+  // Helper function to check shared vertices between faces
+  const getSharedVertices = (
+    faceA: number, 
+    faceB: number, 
+    position: THREE.BufferAttribute, 
+    tolerance: number
+  ): number => {
+    const verticesA = [];
+    const verticesB = [];
+    
+    for (let i = 0; i < 3; i++) {
+      const idxA = faceA * 3 + i;
+      const idxB = faceB * 3 + i;
+      verticesA.push([position.getX(idxA), position.getY(idxA), position.getZ(idxA)]);
+      verticesB.push([position.getX(idxB), position.getY(idxB), position.getZ(idxB)]);
+    }
+    
+    let sharedCount = 0;
+    for (const vA of verticesA) {
+      for (const vB of verticesB) {
+        const distance = Math.sqrt((vA[0] - vB[0])**2 + (vA[1] - vB[1])**2 + (vA[2] - vB[2])**2);
+        if (distance < tolerance) {
+          sharedCount++;
+          break;
+        }
+      }
+    }
+    
+    return sharedCount;
+  };
+  
+  // Enhanced detection for geometric parts using spatial analysis
+  const detectGeometricParts = (
+    position: THREE.BufferAttribute, 
+    faceCount: number, 
+    bbox: THREE.Box3
+  ): number[][] => {
+    console.log('Using geometric part detection for better separation...');
+    
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    
+    // Use spatial subdivision to create logical parts
+    const gridSize = 6; // Coarser grid for geometric separation
+    const cellSize = {
+      x: size.x / gridSize,
+      y: size.y / gridSize,
+      z: size.z / gridSize
+    };
+    
+    const spatialCells = new Map<string, number[]>();
+    
+    // Assign faces to spatial cells
+    for (let faceIdx = 0; faceIdx < faceCount; faceIdx++) {
+      // Calculate face centroid
+      const centroid = new THREE.Vector3();
+      for (let vertIdx = 0; vertIdx < 3; vertIdx++) {
+        const idx = faceIdx * 3 + vertIdx;
+        centroid.add(new THREE.Vector3(
+          position.getX(idx),
+          position.getY(idx),
+          position.getZ(idx)
+        ));
+      }
+      centroid.divideScalar(3);
+      
+      // Calculate grid cell
+      const cellX = Math.floor((centroid.x - bbox.min.x) / cellSize.x);
+      const cellY = Math.floor((centroid.y - bbox.min.y) / cellSize.y);
+      const cellZ = Math.floor((centroid.z - bbox.min.z) / cellSize.z);
+      
+      const clampedX = Math.max(0, Math.min(gridSize - 1, cellX));
+      const clampedY = Math.max(0, Math.min(gridSize - 1, cellY));
+      const clampedZ = Math.max(0, Math.min(gridSize - 1, cellZ));
+      
+      const cellKey = `${clampedX}-${clampedY}-${clampedZ}`;
+      
+      if (!spatialCells.has(cellKey)) {
+        spatialCells.set(cellKey, []);
+      }
+      spatialCells.get(cellKey)!.push(faceIdx);
+    }
+    
+    // Create parts from non-empty cells
+    const geometricParts: number[][] = [];
+    for (const [cellKey, faces] of spatialCells.entries()) {
+      if (faces.length > 10) { // Minimum faces per geometric part
+        geometricParts.push(faces);
+      }
+    }
+    
+    return geometricParts;
+  };
+
+  // Optimized part separation for medium-large meshes - Enhanced for monolithic assemblies
+  const createOptimizedPartSeparation = (geometry: THREE.BufferGeometry): ExplodedPart[] => {
+    console.log('Creating optimized part separation for large mesh');
+    
+    try {
+      const position = geometry.attributes.position;
+      const faceCount = position.count / 3;
+      
+      // Use density-based clustering for monolithic meshes
+      geometry.computeBoundingBox();
+      const bbox = geometry.boundingBox!;
+      const size = new THREE.Vector3();
+      bbox.getSize(size);
+      const center = new THREE.Vector3();
+      bbox.getCenter(center);
+      
+      console.log(`Assembly dimensions: ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm`);
+      
+      // Enhanced spatial grid with density analysis
+      const gridSize = 30; // Even higher resolution for better small part detection
+      const cellSize = {
+        x: size.x / gridSize,
+        y: size.y / gridSize,
+        z: size.z / gridSize
+      };
+      
+      const cellMap = new Map<string, number[]>();
+      const cellDensity = new Map<string, number>(); // Track face density per cell
+      const cellNormals = new Map<string, THREE.Vector3[]>(); // Track normals per cell for boundary detection
+      const neighborMap = new Map<string, Set<string>>(); // Track neighboring cells for clustering
+      
+      // Assign faces to spatial cells with density tracking
+      for (let faceIdx = 0; faceIdx < faceCount; faceIdx++) {
+        // Calculate face centroid
+        const v1 = new THREE.Vector3(
+          position.getX(faceIdx * 3),
+          position.getY(faceIdx * 3),
+          position.getZ(faceIdx * 3)
+        );
+        const v2 = new THREE.Vector3(
+          position.getX(faceIdx * 3 + 1),
+          position.getY(faceIdx * 3 + 1),
+          position.getZ(faceIdx * 3 + 1)
+        );
+        const v3 = new THREE.Vector3(
+          position.getX(faceIdx * 3 + 2),
+          position.getY(faceIdx * 3 + 2),
+          position.getZ(faceIdx * 3 + 2)
+        );
+        
+        const faceCentroid = new THREE.Vector3()
+          .addVectors(v1, v2)
+          .add(v3)
+          .divideScalar(3);
+        
+        // Calculate face area and normal for density weighting and boundary detection
+        const edge1 = new THREE.Vector3().subVectors(v2, v1);
+        const edge2 = new THREE.Vector3().subVectors(v3, v1);
+        const faceNormal = new THREE.Vector3().crossVectors(edge1, edge2).normalize();
+        const faceArea = new THREE.Vector3().crossVectors(edge1, edge2).length() / 2;
+        
+        // Calculate grid cell
+        const cellX = Math.floor((faceCentroid.x - bbox.min.x) / cellSize.x);
+        const cellY = Math.floor((faceCentroid.y - bbox.min.y) / cellSize.y);
+        const cellZ = Math.floor((faceCentroid.z - bbox.min.z) / cellSize.z);
+        
+        // Clamp to valid range
+        const clampedX = Math.max(0, Math.min(gridSize - 1, cellX));
+        const clampedY = Math.max(0, Math.min(gridSize - 1, cellY));
+        const clampedZ = Math.max(0, Math.min(gridSize - 1, cellZ));
+        
+        const cellKey = `${clampedX}-${clampedY}-${clampedZ}`;
+        
+        if (!cellMap.has(cellKey)) {
+          cellMap.set(cellKey, []);
+          cellDensity.set(cellKey, 0);
+          cellNormals.set(cellKey, []);
+        }
+        cellMap.get(cellKey)!.push(faceIdx);
+        cellDensity.set(cellKey, cellDensity.get(cellKey)! + faceArea);
+        cellNormals.get(cellKey)!.push(faceNormal.clone());
+      }
+      
+      console.log(`Spatial grid populated: ${cellMap.size} cells with geometry`);
+      
+      // Find density peaks (likely part centers) using local maxima detection
+      const densityPeaks: Array<{key: string, density: number, x: number, y: number, z: number}> = [];
+      const avgDensity = Array.from(cellDensity.values()).reduce((a, b) => a + b, 0) / cellDensity.size;
+      const densityThreshold = avgDensity * 2; // Only consider high-density cells
+      
+      for (const [cellKey, density] of cellDensity.entries()) {
+        if (density < densityThreshold) continue;
+        
+        const [x, y, z] = cellKey.split('-').map(Number);
+        
+        // Check if this is a local maximum (higher density than all neighbors)
+        let isLocalMax = true;
+        for (let dx = -2; dx <= 2; dx++) {
+          for (let dy = -2; dy <= 2; dy++) {
+            for (let dz = -2; dz <= 2; dz++) {
+              if (dx === 0 && dy === 0 && dz === 0) continue;
+              
+              const neighborKey = `${x + dx}-${y + dy}-${z + dz}`;
+              const neighborDensity = cellDensity.get(neighborKey) || 0;
+              
+              if (neighborDensity > density) {
+                isLocalMax = false;
+                break;
+              }
+            }
+            if (!isLocalMax) break;
+          }
+          if (!isLocalMax) break;
+        }
+        
+        if (isLocalMax) {
+          densityPeaks.push({key: cellKey, density, x, y, z});
+        }
+      }
+      
+      // Sort peaks by density and select top candidates
+      densityPeaks.sort((a, b) => b.density - a.density);
+      // Take more seed points to ensure we capture all potential parts
+      const selectedPeaks = densityPeaks.slice(0, Math.min(50, densityPeaks.length));
+      
+      console.log(`Found ${selectedPeaks.length} density peaks from ${densityPeaks.length} candidates`);
+      
+      // Build neighborhood relationships for clustering
+      for (const [cellKey, faces] of cellMap.entries()) {
+        if (faces.length === 0) continue;
+        
+        const neighbors = new Set<string>();
+        const [x, y, z] = cellKey.split('-').map(Number);
+        
+        // Check 26 neighboring cells (3x3x3 - 1)
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dz = -1; dz <= 1; dz++) {
+              if (dx === 0 && dy === 0 && dz === 0) continue;
+              
+              const neighborKey = `${x + dx}-${y + dy}-${z + dz}`;
+              if (cellMap.has(neighborKey) && cellMap.get(neighborKey)!.length > 0) {
+                neighbors.add(neighborKey);
+              }
+            }
+          }
+        }
+        
+        neighborMap.set(cellKey, neighbors);
+      }
+      
+      // Use much more aggressive part separation approach
+      // First create individual clusters from each density peak
+      const clusters: string[][] = [];
+      const visited = new Set<string>();
+      
+      // Find seed points from density peaks for part centers
+      const seedPoints = selectedPeaks.map(peak => peak.key);
+      
+      // Create separate clusters for each density peak with very restricted growth
+      for (const seedKey of seedPoints) {
+        if (visited.has(seedKey)) continue;
+        
+        const cluster: string[] = [seedKey];
+        visited.add(seedKey);
+        
+        // Only grow very conservatively - immediate neighbors with similar density
+        const seedDensity = cellDensity.get(seedKey) || 0;
+        const neighbors = neighborMap.get(seedKey) || new Set();
+        
+        for (const neighbor of neighbors) {
+          if (visited.has(neighbor)) continue;
+          
+          const neighborDensity = cellDensity.get(neighbor) || 0;
+          const densityRatio = Math.min(seedDensity, neighborDensity) / Math.max(seedDensity, neighborDensity, 1);
+          
+          // Check both density similarity and normal consistency for part boundaries
+          const seedNormals = cellNormals.get(seedKey) || [];
+          const neighborNormals = cellNormals.get(neighbor) || [];
+          
+          let normalSimilarity = 0;
+          if (seedNormals.length > 0 && neighborNormals.length > 0) {
+            // Calculate average normal for each cell
+            const avgSeedNormal = seedNormals.reduce((sum, n) => sum.add(n), new THREE.Vector3()).normalize();
+            const avgNeighborNormal = neighborNormals.reduce((sum, n) => sum.add(n), new THREE.Vector3()).normalize();
+            normalSimilarity = avgSeedNormal.dot(avgNeighborNormal);
+          }
+          
+          // Very restrictive - require both density and normal similarity
+          const isDensitySimilar = densityRatio > 0.85 && Math.abs(seedDensity - neighborDensity) < 5;
+          const isNormalSimilar = normalSimilarity > 0.7; // Surface normals must be fairly aligned
+          
+          if (isDensitySimilar && (seedNormals.length === 0 || isNormalSimilar)) {
+            cluster.push(neighbor);
+            visited.add(neighbor);
+          }
+        }
+        
+        if (cluster.length > 0) {
+          clusters.push(cluster);
+        }
+      }
+      
+      // Now use geometric analysis to identify additional parts
+      // Look for isolated high-density regions that weren't captured by peaks
+      const remainingHighDensityCells = Array.from(cellMap.keys()).filter(key => {
+        const density = cellDensity.get(key) || 0;
+        return !visited.has(key) && density > 3; // Lower threshold for isolated parts
+      });
+      
+      // Group remaining cells using spatial proximity and normal analysis
+      for (const cellKey of remainingHighDensityCells) {
+        if (visited.has(cellKey)) continue;
+        
+        const cluster: string[] = [cellKey];
+        visited.add(cellKey);
+        
+        const [x, y, z] = cellKey.split('-').map(Number);
+        
+        // Very conservative spatial clustering for small parts
+        for (const otherKey of remainingHighDensityCells) {
+          if (visited.has(otherKey)) continue;
+          
+          const [ox, oy, oz] = otherKey.split('-').map(Number);
+          const distance = Math.sqrt((x-ox)**2 + (y-oy)**2 + (z-oz)**2);
+          
+          // Only cluster very close cells (within 2 grid cells)
+          if (distance <= 2) {
+            cluster.push(otherKey);
+            visited.add(otherKey);
+          }
+        }
+        
+        if (cluster.length > 0) {
+          clusters.push(cluster);
+        }
+      }
+      
+      // Finally, create individual parts from remaining isolated cells
+      for (const [cellKey, faces] of cellMap.entries()) {
+        if (!visited.has(cellKey) && faces.length > 0) {
+          clusters.push([cellKey]);
+          visited.add(cellKey);
+        }
+      }
+      
+      // Convert clusters to parts with very permissive filtering to capture all parts
+      const avgFacesPerPart = faceCount / 22; // Expecting ~22 parts
+      const minFacesForLargePart = Math.max(10, Math.floor(avgFacesPerPart * 0.02)); // Very permissive - 2% of average
+      const minFacesForSmallPart = 1; // Allow even single-face parts (bolts, small components)
+      
+      const allClusters = clusters
+        .map(cluster => {
+          // Combine all faces from cells in this cluster
+          const allFaces: number[] = [];
+          for (const cellKey of cluster) {
+            const cellFaces = cellMap.get(cellKey) || [];
+            allFaces.push(...cellFaces);
+          }
+          return { cluster, faces: allFaces, isSmall: allFaces.length < minFacesForLargePart };
+        })
+        .filter(({ faces, isSmall }) => {
+          // Include all parts above minimum, with different thresholds for small vs large parts
+          return isSmall ? faces.length >= minFacesForSmallPart : faces.length >= minFacesForLargePart;
+        })
+        .sort((a, b) => b.faces.length - a.faces.length);
+      
+      // Take all detected parts, no artificial limit
+      const targetParts = 22;
+      const maxParts = Math.min(allClusters.length, 50); // Allow up to 50 parts
+      const significantClusters = allClusters.slice(0, maxParts);
+      
+      console.log(`Enhanced clustering: Found ${significantClusters.length} parts from ${clusters.length} clusters (${cellMap.size} cells)`);
+      
+      // Create parts from clustered cells
+      const parts: ExplodedPart[] = significantClusters.map(({ faces }, partIndex) => {
+        return createPartGeometry(faces, partIndex, significantClusters.length, position, geometry);
+      });
+      
+      return parts;
+      
+    } catch (error) {
+      console.error('Optimized separation failed:', error);
+      return createSimplifiedExplodedView(geometry);
+    }
+  };
+
+  // Helper function for simplified exploded view (fallback for extremely large meshes)
+  const createSimplifiedExplodedView = (geometry: THREE.BufferGeometry): ExplodedPart[] => {
+    console.log('Creating simplified exploded view');
+    
+    // Calculate geometry center for proper positioning
+    geometry.computeBoundingBox();
+    const bbox = geometry.boundingBox!;
+    const geometryCenter = new THREE.Vector3();
+    bbox.getCenter(geometryCenter);
+    
+    // For extremely large meshes, create logical directional sections
+    const sections = 6; // 6 directional sections for better distribution
+    const parts: ExplodedPart[] = [];
+    
+    for (let i = 0; i < sections; i++) {
+      const angle = (i / sections) * Math.PI * 2;
+      const height = Math.sin(i * 0.8) * 0.4; // Vary height for 3D distribution
+      
+      const direction = new THREE.Vector3(
+        Math.cos(angle) * 0.8,
+        height + 0.3, // Upward bias with variation
+        Math.sin(angle) * 0.8
+      ).normalize();
+
+      parts.push({
+        geometry: geometry.clone(),
+        centroid: geometryCenter.clone(),
+        boundingBox: geometry.boundingBox?.clone() || new THREE.Box3(),
+        explosionDirection: direction,
+        targetPosition: new THREE.Vector3(0, 0, 0),
+        currentPosition: new THREE.Vector3(0, 0, 0), // Start at origin for proper animation
+        id: `simplified-section-${i}`,
+      });
+    }
+    
+    return parts;
+  };
+
+  // Helper function to create part geometry
+  const createPartGeometry = (
+    faceIndices: number[], 
+    partIndex: number, 
+    totalParts: number, 
+    position: THREE.BufferAttribute, 
+    originalGeometry: THREE.BufferGeometry
+  ): ExplodedPart => {
+    const partVertices: number[] = [];
+    const partGeometry = new THREE.BufferGeometry();
+
+    // Extract vertices for this part
+    for (const faceIdx of faceIndices) {
+      for (let vertIdx = 0; vertIdx < 3; vertIdx++) {
+        const idx = faceIdx * 3 + vertIdx;
+        partVertices.push(
+          position.getX(idx),
+          position.getY(idx),
+          position.getZ(idx)
+        );
+      }
+    }
+
+    partGeometry.setAttribute('position', new THREE.Float32BufferAttribute(partVertices, 3));
+    partGeometry.computeVertexNormals();
+    partGeometry.computeBoundingBox();
+
+    // Calculate centroid
+    const bbox = partGeometry.boundingBox!;
+    const centroid = new THREE.Vector3();
+    bbox.getCenter(centroid);
+
+    // Calculate intelligent explosion direction
+    const assemblyBBox = originalGeometry.boundingBox!;
+    const assemblyCenter = new THREE.Vector3();
+    assemblyBBox.getCenter(assemblyCenter);
+    const assemblySize = new THREE.Vector3();
+    assemblyBBox.getSize(assemblySize);
+
+    let explosionDirection = new THREE.Vector3().subVectors(centroid, assemblyCenter);
+    
+    // Normalize by assembly dimensions for better directional separation
+    explosionDirection.divide(assemblySize).normalize();
+    
+    // Enhanced directional logic for better part separation
+    if (explosionDirection.length() < 0.1) {
+      // Create systematic radial distribution
+      const ringCount = Math.ceil(Math.sqrt(totalParts));
+      const ring = Math.floor(partIndex / ringCount);
+      const posInRing = partIndex % ringCount;
+      const angleStep = (2 * Math.PI) / Math.max(1, ringCount);
+      const angle = posInRing * angleStep + (ring * 0.3); // Offset rings slightly
+      
+      const radius = 0.7 + ring * 0.3; // Increase radius for outer rings
+      const height = Math.sin(angle * 2) * 0.4 + ring * 0.2; // Vary height
+      
+      explosionDirection.set(
+        Math.cos(angle) * radius,
+        height,
+        Math.sin(angle) * radius
+      ).normalize();
+    } else {
+      // Amplify existing direction with bias toward major axes
+      const absX = Math.abs(explosionDirection.x);
+      const absY = Math.abs(explosionDirection.y);
+      const absZ = Math.abs(explosionDirection.z);
+      
+      // Enhance dominant axis for cleaner separation
+      if (absX > absY && absX > absZ) {
+        explosionDirection.x *= 1.5;
+      } else if (absY > absX && absY > absZ) {
+        explosionDirection.y *= 1.5;
+      } else {
+        explosionDirection.z *= 1.5;
+      }
+      
+      explosionDirection.normalize();
+    }
+
+    return {
+      geometry: partGeometry,
+      centroid: centroid.clone(),
+      boundingBox: bbox.clone(),
+      explosionDirection: explosionDirection.clone(),
+      targetPosition: new THREE.Vector3(0, 0, 0),
+      currentPosition: centroid.clone(), // CRITICAL FIX: Initialize at centroid position, not origin
+      id: `part-${partIndex + 1}`,
+    };
+  };
+
+  // Helper function to consolidate small adjacent parts 
+  const consolidateAdjacentParts = (components: number[][], position: THREE.BufferAttribute, faceConnections: Map<number, Set<number>>): number[][] => {
+    if (components.length <= 22) return components; // Already at reasonable count
+    
+    // Sort components by size (smallest first for consolidation)
+    const sortedComponents = [...components].sort((a, b) => a.length - b.length);
+    const consolidated: number[][] = [];
+    const used = new Set<number>();
+    
+    for (const component of sortedComponents) {
+      if (used.has(component[0])) continue; // Skip if already consolidated
+      
+      let mergedComponent = [...component];
+      
+      // If this is a small component, try to merge with adjacent larger components
+      if (component.length < components.reduce((sum, c) => sum + c.length, 0) / components.length) {
+        // Find adjacent components
+        for (const face of component) {
+          const adjacentFaces = faceConnections.get(face) || new Set();
+          
+          for (const adjFace of adjacentFaces) {
+            // Find which component contains this adjacent face
+            const targetComponent = sortedComponents.find(comp => 
+              comp.includes(adjFace) && !used.has(comp[0]) && comp !== component
+            );
+            
+            if (targetComponent && targetComponent.length > component.length * 2) {
+              // Merge small component into larger adjacent component
+              mergedComponent.push(...targetComponent);
+              used.add(targetComponent[0]);
+              break;
+            }
+          }
+        }
+      }
+      
+      used.add(component[0]);
+      consolidated.push(mergedComponent);
+    }
+    
+    return consolidated.slice(0, 25); // Limit to reasonable number
+  };
+
+  // Stable callback references to prevent infinite re-renders
+  const stableOnPartsDetected = useRef(onPartsDetected);
+  const stableOnLoad = useRef(onLoad);
+  
+  // Update refs when props change, but don't trigger re-renders
+  useEffect(() => {
+    stableOnPartsDetected.current = onPartsDetected;
+    stableOnLoad.current = onLoad;
+  });
+
+  // Extract common geometry processing logic
+  const processGeometryAfterLoad = useCallback((loadedGeometry: THREE.BufferGeometry) => {
+    // Check geometry size and memory usage before processing
+    const positionArray = loadedGeometry.attributes.position;
+    const faceCount = positionArray ? positionArray.count / 3 : 0;
+    const vertexCount = positionArray ? positionArray.count : 0;
+    const estimatedMemoryMB = (vertexCount * 3 * 4) / (1024 * 1024); // 4 bytes per float
+    
+    console.log('📊 Geometry analysis:', {
+      hasPosition: !!positionArray,
+      faceCount,
+      vertexCount,
+      estimatedMemoryMB: estimatedMemoryMB.toFixed(2),
+      hasNormals: !!loadedGeometry.attributes.normal
+    });
+    
+    // Memory safety check - reject files that are too large
+    if (estimatedMemoryMB > 500) { // 500MB limit
+      console.error('❌ File too large for browser rendering:', estimatedMemoryMB.toFixed(2), 'MB');
+      setLoadingError(`File too large (${estimatedMemoryMB.toFixed(1)}MB). Please use a smaller file or convert to a lower resolution.`);
+      setIsLoading(false);
+      return;
+    }
+    
+    if (faceCount > 1000000) { // 1M triangles limit
+      console.error('❌ Too many triangles for browser rendering:', faceCount);
+      setLoadingError(`File too complex (${faceCount.toLocaleString()} triangles). Please simplify the model.`);
+      setIsLoading(false);
+      return;
+    }
+    
+    setIsLoading(false);
+    setLoadingProgress(100);
+    console.log('✅ Geometry loaded successfully');
+    console.log('📊 Geometry info:', {
+      hasPosition: !!loadedGeometry.attributes.position,
+      faceCount: loadedGeometry.attributes.position ? loadedGeometry.attributes.position.count / 3 : 0,
+      hasNormals: !!loadedGeometry.attributes.normal
+    });
+    
+    console.log('🎯 Setting geometry and starting part analysis...');
+    
+    // Declare detectedParts outside the try block so it's accessible later
+    let detectedParts: ExplodedPart[] = [];
+    
+    try {
+      // Wrap geometry setting in memory error handling
+      try {
+        setGeometry(loadedGeometry);
+      } catch (memoryError) {
+        if (memoryError instanceof RangeError && memoryError.message.includes('Array buffer allocation failed')) {
+          console.error('💥 Memory allocation failed during geometry processing');
+          setLoadingError('File too large for browser memory. Please use a smaller or simplified model.');
+          setIsLoading(false);
+          return;
+        }
+        throw memoryError; // Re-throw if it's not a memory error
+      }
+      
+      // Separate into individual parts for exploded view
+      console.log('🔧 Starting part separation analysis...');
+      
+      const parts = separateAssemblyParts(loadedGeometry);
+      console.log('📈 Part separation results:', {
+        partsDetected: parts.length,
+        parts: parts.map(p => ({ id: p.id, faces: p.geometry.attributes.position.count / 3 }))
+      });
+      
+      if (parts.length > 0) {
+        console.log('✅ Part separation successful:', {
+          partCount: parts.length,
+          parts: parts.map(p => ({ id: p.id, faceCount: p.geometry.attributes.position.count / 3 }))
+        });
+        detectedParts = parts;
+        setExplodedParts(parts);
+      } else {
+        console.warn('⚠️ Part separation failed - no parts detected');
+        console.log('💡 Falling back to simplified directional explosion');
+        // Use the proven simplified exploded view for fallback
+        const fallbackParts = createSimplifiedExplodedView(loadedGeometry);
+        console.log('🔄 Created fallback explosion with', fallbackParts.length, 'virtual parts');
+        setExplodedParts(fallbackParts);
+      }
+    } catch (error) {
+      console.error('❌ Part separation failed:', error);
+      
+      // Check if it's a memory allocation error
+      if (error instanceof RangeError && error.message.includes('Array buffer allocation failed')) {
+        console.error('💥 Memory allocation failed - file too large for browser');
+        setLoadingError('File too large for browser memory. Please use a smaller or simplified model.');
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('🔄 Falling back to simplified directional explosion');
+      // Even on error, provide exploded view functionality
+      try {
+        const fallbackParts = createSimplifiedExplodedView(loadedGeometry);
+        console.log('🔧 Emergency fallback created', fallbackParts.length, 'virtual parts');
+        setExplodedParts(fallbackParts);
+      } catch (fallbackError) {
+        console.error('❌ Even fallback failed:', fallbackError);
+        // If all else fails, just display the geometry without explosion
+        setExplodedParts([]);
+      }
+    }
+    
+    // Notify parent component about detected parts for BOM integration  
+    if (stableOnPartsDetected.current && detectedParts.length > 0) {
+      const partData = detectedParts.map((part, index) => ({
+        id: part.id, // Use the existing part ID instead of regenerating
+        name: `Component ${index + 1}`,
+        geometry: part.geometry,
+        partNumber: part.id.toUpperCase(), // Use part ID as part number
+        material: 'Unknown',
+        quantity: 1,
+        faceCount: part.geometry.attributes.position.count / 3,
+        volume: calculateVolume(part.geometry),
+        ...calculateBoundingBoxDimensions(part.geometry)
+      }));
+      stableOnPartsDetected.current(partData);
+      console.log('💎 Notified parent component with detected parts:', partData.map(p => p.id));
+    } else {
+      console.warn('⚠️ No parts detected or onPartsDetected callback missing');
+      console.log('Parts count:', detectedParts?.length || 0, 'Callback available:', !!stableOnPartsDetected.current);
+    }
+    
+    stableOnLoad.current?.();
+  }, [separateAssemblyParts, createSimplifiedExplodedView, stableOnPartsDetected, stableOnLoad]);
 
   useEffect(() => {
+    if (!url) {
+      console.warn('❌ No URL provided for STL loading');
+      return;
+    }
+    
+    // Prevent duplicate loading of the same URL
+    if (isLoading) {
+      console.log('⚠️ Already loading, skipping duplicate request');
+      return;
+    }
+    
+    // Validate URL format before loading
+    try {
+      new URL(url);
+    } catch (error) {
+      console.error('❌ Invalid URL format:', url);
+      setLoadingError('Invalid file URL format');
+      return;
+    }
+    
+    // Check if this is a STEP file for direct CAD engine processing
+    const isStepFile = url.toLowerCase().includes('.step') || url.toLowerCase().includes('.stp');
+    
+    if (isStepFile) {
+      console.log('🔄 Loading STEP file directly via CAD engine:', url);
+      setLoadingStage('Processing STEP file...');
+      setLoadingProgress(10);
+      
+      // Direct STEP file processing using your CAD engine
+      const loadStepFile = async () => {
+        setIsLoading(true);
+        setLoadingProgress(0);
+        setLoadingError(null);
+        
+        const loadingTimeout = setTimeout(() => {
+          console.error('⏱️ STEP processing timeout after 60 seconds');
+          setLoadingError('Processing timeout - STEP file may be too complex');
+          setIsLoading(false);
+        }, 60000);
+        
+        try {
+          setLoadingStage('Analyzing STEP file...');
+          setLoadingProgress(20);
+          
+          // Send STEP file to your CAD engine using existing endpoint
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch STEP file: ${response.statusText}`);
+          }
+          
+          const stepBlob = await response.blob();
+          const formData = new FormData();
+          formData.append('file', stepBlob, 'model.step');
+          
+          setLoadingStage('Converting with CAD engine...');
+          setLoadingProgress(40);
+          
+          // Use the correct endpoint that your CAD engine supports
+          const cadResponse = await fetch(`${apiConfig.endpoints.cad}/convert/step-to-stl-base64`, {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!cadResponse.ok) {
+            throw new Error(`CAD engine failed: ${cadResponse.statusText}`);
+          }
+          
+          setLoadingStage('Processing converted model...');
+          setLoadingProgress(60);
+          
+          const result = await cadResponse.json();
+          
+          if (!result.success) {
+            throw new Error(result.error || 'STEP processing failed');
+          }
+          
+          setLoadingStage('Loading 3D model...');
+          setLoadingProgress(80);
+          
+          // Handle STL data from your CAD engine
+          if (result.stl_base64) {
+            // Convert base64 STL directly to ArrayBuffer (bypass blob URLs for CSP)
+            const stlData = atob(result.stl_base64);
+            const stlArray = new Uint8Array(stlData.length);
+            for (let i = 0; i < stlData.length; i++) {
+              stlArray[i] = stlData.charCodeAt(i);
+            }
+            
+            setLoadingProgress(90);
+            
+            // Parse STL directly from ArrayBuffer (no blob URLs needed)
+            const loader = new STLLoader();
+            try {
+              const geometry = loader.parse(stlArray.buffer);
+              clearTimeout(loadingTimeout);
+              processGeometryAfterLoad(geometry);
+            } catch (parseError) {
+              clearTimeout(loadingTimeout);
+              console.error('❌ Error parsing converted STL:', parseError);
+              setLoadingError('Failed to parse converted 3D model');
+              setIsLoading(false);
+            }
+            
+          } else {
+            throw new Error('No STL data received from CAD engine');
+          }
+          
+        } catch (error) {
+          clearTimeout(loadingTimeout);
+          console.error('❌ Error processing STEP file:', error);
+          setLoadingError(`Failed to process STEP file: ${error.message}`);
+          setIsLoading(false);
+        }
+      };
+      
+      loadStepFile();
+      return;
+    } else {
+      console.log('🔄 Loading STL file:', url);
+      setIsLoading(true);
+      setLoadingProgress(0);
+      setLoadingError(null);
+    }
+    
     const loader = new STLLoader();
-    loader.load(url, (loadedGeometry) => {
-      setGeometry(loadedGeometry);
+    
+    // Add timeout handling for large files
+    const loadingTimeout = setTimeout(() => {
+      console.error('⏱️ STL loading timeout after 60 seconds');
+      setLoadingError('Loading timeout - file may be too large or server unresponsive');
+      setIsLoading(false);
+    }, 60000); // 60 second timeout
+    
+    loader.load(
+      url, 
+      (loadedGeometry) => {
+        clearTimeout(loadingTimeout);
+        
+        // Use the extracted common processing logic
+        processGeometryAfterLoad(loadedGeometry);
+    }, 
+    (progress) => {
+      if (progress.lengthComputable && progress.total > 0) {
+        const progressPercent = (progress.loaded / progress.total * 100);
+        setLoadingProgress(progressPercent);
+        setLoadingStage(`Loading model... ${progressPercent.toFixed(0)}%`);
+        
+        // Industry standard: Show file size info for large models
+        const sizeMB = progress.total / (1024 * 1024);
+        if (sizeMB > 10) {
+          console.log(`📥 Loading large model (${sizeMB.toFixed(1)}MB): ${progressPercent.toFixed(1)}%`);
+        }
+      } else {
+        setLoadingStage('Processing model data...');
+        setLoadingProgress(Math.min(90, loadingProgress + 5)); // Indeterminate progress
+      }
+    },
+    (error) => {
+      clearTimeout(loadingTimeout);
+      setIsLoading(false);
+      // Provide specific error messages based on error type
+      let errorMessage = 'Failed to load 3D model';
+      if (error.message) {
+        if (error.message.includes('404')) {
+          errorMessage = 'File not found - please check if the 3D model exists';
+        } else if (error.message.includes('403')) {
+          errorMessage = 'Access denied - insufficient permissions';
+        } else if (error.message.includes('NetworkError') || error.message.includes('network')) {
+          errorMessage = 'Network error - please check your connection';
+        } else if (error.message.includes('CORS')) {
+          errorMessage = 'Cross-origin request blocked - file source not accessible';
+        } else if (error instanceof RangeError && error.message.includes('Array buffer allocation failed')) {
+          errorMessage = 'File too large for browser memory. Please use a smaller or simplified model.';
+        } else {
+          errorMessage = `Loading failed: ${error.message}`;
+        }
+      }
+      setLoadingError(errorMessage);
+      console.error('❌ Error loading STL file:', error);
+      console.log('Failed URL:', url);
+      console.log('Error type:', error.type);
+      console.log('Error message:', error.message);
+      
+      // Try to provide helpful error information
+      if (error.message?.includes('404')) {
+        console.error('💥 File not found (404) - Check if the STL file exists at:', url);
+      } else if (error.message?.includes('network')) {
+        console.error('🌐 Network error - Check your internet connection');
+      } else if (error.message?.includes('CORS')) {
+        console.error('🔒 CORS error - Server needs to allow cross-origin requests');
+      }
     });
-  }, [url]);
+    
+    // Cleanup function to clear timeout if component unmounts
+    return () => {
+      clearTimeout(loadingTimeout);
+    };
+  }, [url]); // CRITICAL FIX: Only depend on URL to prevent infinite loading
 
   useEffect(() => {
     if (geometry) {
@@ -673,7 +2020,75 @@ function STLModel({
     };
   }, []);
 
-  if (!geometry) return null;
+  // Optimized explosion calculations - memoized to prevent recalculation on selection changes
+  const explosionTargets = useMemo(() => {
+    console.log('🧨 Explosion calculation:', {
+      explodedPartsLength: explodedParts.length,
+      isExploded,
+      explodeDistance,
+      partsAvailable: explodedParts.length > 0
+    });
+    
+    if (!explodedParts.length) {
+      console.warn('❌ No exploded parts available for explosion');
+      return new Map();
+    }
+    
+    const targets = new Map();
+    const explosionDistance = (explodeDistance / 100) * 120;
+    
+    console.log('💥 Explosion distance multiplier:', explosionDistance);
+    
+    explodedParts.forEach((part, index) => {
+      if (isExploded && explodeDistance > 0) {
+        const explosionOffset = part.explosionDirection.clone().multiplyScalar(explosionDistance);
+        targets.set(part.id, explosionOffset);
+        console.log(`🎯 Part ${index + 1} (${part.id}) explosion target:`, {
+          direction: part.explosionDirection,
+          distance: explosionDistance,
+          offset: explosionOffset,
+          offsetMagnitude: explosionOffset.length()
+        });
+      } else {
+        targets.set(part.id, new THREE.Vector3(0, 0, 0));
+        console.log(`🏠 Part ${index + 1} (${part.id}) returning to origin`);
+      }
+    });
+    return targets;
+  }, [isExploded, explodeDistance, explodedParts.length]); // Only recalculate when these actually change
+
+  // Update exploded parts target positions (optimized)
+  useEffect(() => {
+    if (!explodedParts.length) return;
+    
+    explodedParts.forEach(part => {
+      const targetPos = explosionTargets.get(part.id);
+      if (targetPos) {
+        part.targetPosition.copy(targetPos);
+        // Initialize current position if not set (critical fix for initial render)
+        if (part.currentPosition.length() === 0) {
+          part.currentPosition.copy(targetPos);
+          console.log(`🎯 Initialized current position for part ${part.id}:`, part.currentPosition);
+        }
+      }
+    });
+  }, [explosionTargets, explodedParts]);
+
+  // Optimized animation - only run when there are parts and they need animation
+  useFrame(() => {
+    if (!explodedParts.length) return;
+    
+    // Animate each part independently with minimal computation
+    explodedParts.forEach((part, index) => {
+      const distance = part.currentPosition.distanceTo(part.targetPosition);
+      if (distance > 0.01) { // Only animate if parts are not at target position
+        part.currentPosition.lerp(part.targetPosition, 0.08);
+        if (index === 0 && Math.random() < 0.01) { // Log occasionally for first part only
+          console.log(`🎬 Animating part ${part.id}: distance=${distance.toFixed(3)}, current=${part.currentPosition.toArray().map(n => n.toFixed(2))}, target=${part.targetPosition.toArray().map(n => n.toFixed(2))}`);
+        }
+      }
+    });
+  });
 
   // Detect active DFM types for the legend
   const activeTypes = (manufacturingFeatures || [])
@@ -681,32 +2096,96 @@ function STLModel({
     .filter((t, i, arr) => arr.indexOf(t) === i)
     .filter(t => t in DFM_COLORS) as DFMType[];
 
-  return (
-    <group>
-      {/* Base model — semi-transparent when DFM overlay is active */}
-      <mesh 
-        ref={meshRef} 
-        geometry={geometry} 
-        castShadow 
-        receiveShadow
-        onClick={(event) => {
-          console.log('Base mesh clicked:', event);
-          // Don't stop propagation here to allow DFM mesh to handle it
-        }}
-      >
-        <meshStandardMaterial
-          color={showFeatures ? '#8899aa' : color}
-          metalness={0.2}
-          roughness={0.45}
-          side={THREE.DoubleSide}
-          transparent={isTransparent || !!showFeatures}
-          opacity={isTransparent ? 0.3 : showFeatures ? 0.22 : 1}
-          wireframe={isWireframe}
-        />
-      </mesh>
+  // Show loading state
+  if (isLoading) {
+    return (
+      <group>
+        <Html position={[0, 0, 0]} center>
+          <div className="bg-background/80 backdrop-blur p-4 rounded-lg border">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent animate-spin rounded-full"></div>
+              <div className="text-sm font-medium">Loading 3D Model</div>
+              <div className="text-xs text-muted-foreground">
+                {loadingStage || (loadingProgress > 0 ? `${loadingProgress.toFixed(1)}%` : 'Preparing...')}
+              </div>
+              {/* Industry standard progress bar */}
+              <div className="w-48 h-1.5 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-500 ease-out"
+                  style={{ width: `${Math.max(2, Math.min(100, loadingProgress))}%` }}
+                />
+              </div>
+              {previewReady && !detailsReady && (
+                <div className="text-xs text-yellow-400">
+                  Preview ready • Loading details...
+                </div>
+              )}
+            </div>
+          </div>
+        </Html>
+      </group>
+    );
+  }
 
-      {/* DFM face-color highlight overlay */}
-      {showFeatures && manufacturingFeatures && manufacturingFeatures.length > 0 && (
+  // Show error state
+  if (loadingError) {
+    return (
+      <group>
+        <Html position={[0, 0, 0]} center>
+          <div className="bg-background/80 backdrop-blur p-4 rounded-lg border border-destructive">
+            <div className="flex flex-col items-center gap-3 text-center max-w-sm">
+              <div className="text-destructive">⚠️</div>
+              <div className="text-sm font-medium">Failed to Load 3D Model</div>
+              <div className="text-xs text-muted-foreground">{loadingError}</div>
+            </div>
+          </div>
+        </Html>
+      </group>
+    );
+  }
+
+  if (!geometry) {
+    console.log('❌ No geometry available for rendering');
+    return null;
+  }
+
+  console.log('🎨 Rendering 3D component:', {
+    hasGeometry: !!geometry,
+    isExploded,
+    explodedPartsCount: explodedParts.length,
+    renderingMode: explodedParts.length > 0 && isExploded ? 'exploded' : 'normal',
+    geometryFaces: geometry.attributes.position ? geometry.attributes.position.count / 3 : 0
+  });
+
+  return (
+    <group ref={groupRef}>
+      {/* Always show the original geometry as primary model, then optionally add exploded parts */}
+      {geometry && (
+        <mesh
+          ref={meshRef}
+          geometry={geometry}
+          castShadow
+          receiveShadow
+          visible={!isExploded || explodedParts.length === 0} // Hide when exploded view is active and we have parts
+          onClick={(event) => {
+            console.log('Base mesh clicked:', event);
+            // Don't stop propagation here to allow DFM mesh to handle it
+          }}
+        >
+          <meshStandardMaterial
+            color={showFeatures ? '#8899aa' : color}
+            metalness={0.2}
+            roughness={0.45}
+            side={THREE.DoubleSide}
+            transparent={isTransparent || !!showFeatures}
+            opacity={isTransparent ? 0.3 : showFeatures ? 0.22 : 1}
+            wireframe={isWireframe}
+          />
+        </mesh>
+      )}
+      
+      {/* DFM face-color highlight overlay (only in normal view) */}
+      {showFeatures && manufacturingFeatures && manufacturingFeatures.length > 0 && !isExploded && (
         <DFMColorMesh
           geometry={geometry}
           features={manufacturingFeatures}
@@ -720,20 +2199,125 @@ function STLModel({
             if (isNewSelection && f) {
               onFeatureSelect?.(f);
             } else {
-              // Deselect if clicking same feature
-              console.log('Deselecting feature');
+              // Clicking on the same feature again deselects it
               onFeatureSelect?.(null);
             }
           }}
         />
       )}
-
-
+      
+      {/* Render exploded parts if available and exploded mode is active */}
+      {explodedParts.length > 0 && isExploded ? (
+        // Exploded Parts View - Show individual parts when exploded  
+        explodedParts.map((part, index) => {
+          console.log(`🎯 Rendering exploded part ${part.id}:`, {
+            hasGeometry: !!part.geometry,
+            hasPosition: !!part.geometry?.attributes?.position,
+            faceCount: part.geometry?.attributes?.position?.count ? part.geometry.attributes.position.count / 3 : 0
+          });
+          // Use the part's actual ID to avoid index mismatches
+          const partId = part.id;
+          const isSelected = selectedBOMItems && selectedBOMItems.some(item => item.id === partId);
+          const isHovered = hoveredBOMItem && hoveredBOMItem.id === partId;
+          
+          // Calculate highlighting colors and visibility
+          const shouldHighlight = isSelected || isHovered;
+          const highlightColor = isSelected ? '#00ff88' : isHovered ? '#ffaa00' : color;
+          const highlightOpacity = isSelected ? 0.9 : isHovered ? 0.8 : 0.9;
+          const isVisible = showOnlySelected ? isSelected : true;
+          
+          // Debug logging for part visibility
+          if (showOnlySelected) {
+            console.log(`Part ${partId}: isSelected=${isSelected}, isVisible=${isVisible}, selectedCount=${selectedBOMItems?.length || 0}`);
+          }
+          
+          if (!isVisible) return null;
+          
+          // Skip parts with invalid geometry
+          if (!part.geometry || !part.geometry.attributes.position || part.geometry.attributes.position.count === 0) {
+            console.warn(`⚠️ Skipping part ${part.id} - invalid geometry`);
+            return null;
+          }
+          
+          return (
+            <group key={part.id} position={part.currentPosition}>
+            <mesh
+              geometry={part.geometry}
+              castShadow
+              receiveShadow
+              onClick={(event) => {
+                event.stopPropagation();
+                console.log('🎯 Part selected:', part.id, {
+                  faceCount: part.geometry.attributes.position.count / 3,
+                  volume: calculateVolume(part.geometry),
+                  material: showFeatures ? '#8899aa' : shouldHighlight ? highlightColor : color
+                });
+                
+                // Trigger parent callback for BOM integration
+                if (stableOnPartsDetected.current) {
+                  const selectedPartData = [{
+                    id: part.id,
+                    name: `Selected Component`,
+                    geometry: part.geometry,
+                    partNumber: part.id.toUpperCase(),
+                    material: 'Selected',
+                    quantity: 1,
+                    faceCount: part.geometry.attributes.position.count / 3,
+                    volume: calculateVolume(part.geometry),
+                    selected: true,
+                    timestamp: Date.now()
+                  }];
+                  // Note: Only notify about selection events, not all parts
+                  console.log('🎯 Notifying parent of part selection:', selectedPartData[0].name);
+                }
+              }}
+              onPointerOver={(event) => {
+                event.stopPropagation();
+                document.body.style.cursor = 'pointer';
+                console.log('🔍 Part hovered:', part.id);
+              }}
+              onPointerOut={(event) => {
+                event.stopPropagation();
+                document.body.style.cursor = 'default';
+              }}
+            >
+              <meshStandardMaterial
+                color={showFeatures ? '#8899aa' : shouldHighlight ? highlightColor : color}
+                metalness={shouldHighlight ? 0.4 : 0.2}
+                roughness={shouldHighlight ? 0.3 : 0.45}
+                side={THREE.DoubleSide}
+                transparent={isTransparent || !!showFeatures || shouldHighlight}
+                opacity={isTransparent ? 0.4 : showFeatures ? 0.25 : highlightOpacity}
+                wireframe={isWireframe}
+                emissive={shouldHighlight ? new THREE.Color(highlightColor).multiplyScalar(0.1) : new THREE.Color(0x000000)}
+              />
+            </mesh>
+            
+            {/* Add outline for selected parts */}
+            {shouldHighlight && (
+              <mesh
+                geometry={part.geometry}
+                scale={1.005}
+              >
+                <meshBasicMaterial
+                  color={highlightColor}
+                  side={THREE.BackSide}
+                  transparent={true}
+                  opacity={0.3}
+                />
+              </mesh>
+            )}
+            
+          </group>
+          );
+        })
+      ) : null}
 
       {/* DFM Legend — anchored as HTML overlay */}
-      {showFeatures && activeTypes.length > 0 && (
+      {showFeatures && activeTypes.length > 0 && !isExploded && (
         <DFMLegend activeTypes={activeTypes} />
       )}
+      
     </group>
   );
 }
@@ -773,12 +2357,18 @@ function Scene({
   sectionPlane,
   isTransparent,
   isWireframe,
+  isExploded,
+  explodeDistance,
   onMeasurements,
   onOrientationChange,
   manufacturingFeatures,
   selectedFeature,
   onFeatureSelect,
-  showFeatures
+  showFeatures,
+  selectedBOMItems,
+  showOnlySelected,
+  hoveredBOMItem,
+  onPartsDetected
 }: {
   fileUrl: string;
   modelColor: string;
@@ -791,6 +2381,8 @@ function Scene({
   sectionPlane: number;
   isTransparent: boolean;
   isWireframe: boolean;
+  isExploded?: boolean;
+  explodeDistance?: number;
   onMeasurements?: (data: {
     volume: number;
     dimensions: { x: number; y: number; z: number };
@@ -801,6 +2393,10 @@ function Scene({
   selectedFeature?: ManufacturingFeature | null;
   onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
   showFeatures?: boolean;
+  selectedBOMItems?: any[];
+  showOnlySelected?: boolean;
+  hoveredBOMItem?: any;
+  onPartsDetected?: (parts: any[]) => void;
 }) {
   return (
     <>
@@ -857,12 +2453,18 @@ function Scene({
             sectionPlane={sectionPlane}
             isTransparent={isTransparent}
             isWireframe={isWireframe}
+            isExploded={isExploded}
+            explodeDistance={explodeDistance}
             onLoad={onModelLoad}
             onMeasurements={onMeasurements}
             manufacturingFeatures={manufacturingFeatures}
             selectedFeature={selectedFeature}
             onFeatureSelect={onFeatureSelect}
             showFeatures={showFeatures}
+            selectedBOMItems={selectedBOMItems}
+            showOnlySelected={showOnlySelected}
+            hoveredBOMItem={hoveredBOMItem}
+            onPartsDetected={onPartsDetected}
           />
         </Center>
       </Suspense>
@@ -875,19 +2477,42 @@ function Scene({
         minDistance={0.1}
         maxDistance={1000}
         enabled={!isAnimating}
+        enablePan={true}
+        enableRotate={true}
+        enableZoom={true}
+        screenSpacePanning={false}
+        panSpeed={2}
+        rotateSpeed={0.8}
+        zoomSpeed={1.2}
+        mouseButtons={{
+          LEFT: THREE.MOUSE.ROTATE,   // Rotate
+          MIDDLE: THREE.MOUSE.DOLLY,  // Zoom  
+          RIGHT: THREE.MOUSE.PAN      // Pan
+        }}
+        touches={{
+          ONE: THREE.TOUCH.ROTATE,    // Rotate
+          TWO: THREE.TOUCH.DOLLY_PAN  // Zoom/Pan
+        }}
       />
     </>
   );
 }
 
-export function EDrawingsViewer({ 
+export const EDrawingsViewer = React.memo(function EDrawingsViewer({ 
   fileUrl, 
   fileName, 
+  isExploded = false,
+  explodeDistance = 50,
   onMeasurements,
   manufacturingFeatures,
   selectedFeature,
   onFeatureSelect,
-  showFeatures
+  showFeatures,
+  selectedBOMItems,
+  showOnlySelected = false,
+  hoveredBOMItem,
+  onPartsDetected,
+  dfmAnalysisData
 }: EDrawingsViewerProps) {
   const [loading, setLoading] = useState(true);
   const [modelColor, setModelColor] = useState('#3b82f6');
@@ -903,6 +2528,19 @@ export function EDrawingsViewer({
   const [showCrossSection, setShowCrossSection] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [axesRotation, setAxesRotation] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 });
+  
+  // Internal exploded view state management
+  const [internalIsExploded, setInternalIsExploded] = useState(isExploded);
+  const [internalExplodeDistance, setInternalExplodeDistance] = useState(explodeDistance);
+
+  // Sync with props when they change
+  useEffect(() => {
+    setInternalIsExploded(isExploded);
+  }, [isExploded]);
+
+  useEffect(() => {
+    setInternalExplodeDistance(explodeDistance);
+  }, [explodeDistance]);
   const [measurements, setMeasurements] = useState<{
     volume: number;
     dimensions: { x: number; y: number; z: number };
@@ -913,6 +2551,10 @@ export function EDrawingsViewer({
   const [internalShowFeatures, setInternalShowFeatures] = useState(showFeatures ?? false);
   const features = manufacturingFeatures ?? [];
   const currentSelectedFeature = selectedFeature ?? null;
+  
+  // BOM highlighting state
+  const [highlightedParts, setHighlightedParts] = useState<Set<string>>(new Set());
+  const [selectedParts, setSelectedParts] = useState<Set<string>>(new Set());
 
   // Sync internal state with props
   useEffect(() => {
@@ -920,6 +2562,26 @@ export function EDrawingsViewer({
       setInternalShowFeatures(showFeatures);
     }
   }, [showFeatures]);
+
+  // Handle BOM item selection
+  useEffect(() => {
+    if (selectedBOMItems && selectedBOMItems.length > 0) {
+      setSelectedParts(new Set(selectedBOMItems.map(item => item.id)));
+      console.log('Selected BOM items for 3D highlighting:', selectedBOMItems.map(item => item.name).join(', '));
+    } else {
+      setSelectedParts(new Set());
+    }
+  }, [selectedBOMItems]);
+
+  // Handle BOM item hover highlighting
+  useEffect(() => {
+    if (hoveredBOMItem) {
+      setHighlightedParts(new Set([hoveredBOMItem.id]));
+      console.log('Hovering BOM item for 3D highlighting:', hoveredBOMItem.name);
+    } else {
+      setHighlightedParts(new Set());
+    }
+  }, [hoveredBOMItem]);
 
   // Reusable Vector3 instances to avoid GC pressure from frame callbacks
   const tempVectors = useRef({
@@ -1237,12 +2899,18 @@ export function EDrawingsViewer({
               sectionPlane={sectionPlane}
               isTransparent={isTransparent}
               isWireframe={isWireframe}
+              isExploded={isExploded}
+              explodeDistance={explodeDistance}
               onMeasurements={handleMeasurements}
               onOrientationChange={handleOrientationChange}
               manufacturingFeatures={features}
               selectedFeature={currentSelectedFeature}
               onFeatureSelect={onFeatureSelect}
               showFeatures={internalShowFeatures}
+              selectedBOMItems={selectedBOMItems}
+              showOnlySelected={showOnlySelected}
+              hoveredBOMItem={hoveredBOMItem}
+              onPartsDetected={onPartsDetected}
             />
           </Canvas>
 
@@ -1344,8 +3012,8 @@ export function EDrawingsViewer({
           </div>
 
           {/* File Info */}
-          <div className="absolute top-4 left-4 bg-[#3f3f3f]/90 backdrop-blur-sm border border-[#555555] rounded-lg px-3 py-1.5">
-            <p className="text-xs text-white font-medium">{fileName}</p>
+          <div className="absolute top-4 left-4 bg-[#3f3f3f]/90 backdrop-blur-sm border border-[#555555] rounded-lg px-2 py-1">
+            <p className="text-[10px] text-white font-medium">{fileName}</p>
           </div>
         </div>
 
@@ -1354,25 +3022,25 @@ export function EDrawingsViewer({
           className={`flex-shrink-0 w-64 bg-[#3f3f3f] border-l border-[#555555] flex flex-col max-h-screen transition-transform duration-300 ease-in-out ${showSidebar ? 'translate-x-0' : 'translate-x-full'
             }`}
         >
-          <div className="px-2 py-1.5 border-b border-[#555555]">
-            <h3 className="text-[11px] font-semibold text-white">Properties</h3>
-            <p className="text-[9px] text-gray-400">Model controls and information</p>
+          <div className="px-1.5 py-1 border-b border-[#555555]">
+            <h3 className="text-[9px] font-semibold text-white">Properties</h3>
+            <p className="text-[7px] text-gray-400">Model controls and information</p>
           </div>
 
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-1.5 space-y-1.5 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 scroll-smooth">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-0.5 space-y-0.5 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 scroll-smooth">
             {/* Part Details - Dimensions & Volume */}
             {measurements && (
               <Card className="bg-[#505050] border-[#666666]">
-                <div className="p-1.5 space-y-1">
-                  <h4 className="text-[10px] font-semibold text-white flex items-center gap-1">
+                <div className="p-1 space-y-0.5">
+                  <h4 className="text-[9px] font-semibold text-white flex items-center gap-0.5">
                     <Box className="h-2.5 w-2.5" />
                     Part Details
                   </h4>
-                  <div className="space-y-1 text-[9px]">
+                  <div className="space-y-0.5 text-[8px]">
                     {/* Dimensions */}
                     <div>
                       <span className="text-gray-400 font-medium">Dimensions</span>
-                      <div className="bg-[#3f3f3f] rounded px-1 py-0.5 font-mono text-white text-[10px] mt-0.5">
+                      <div className="bg-[#3f3f3f] rounded px-1 py-0.5 font-mono text-white text-[9px] mt-0.5">
                         {measurements.dimensions.x.toFixed(1)} × {measurements.dimensions.y.toFixed(1)} × {measurements.dimensions.z.toFixed(1)} mm
                       </div>
                     </div>
@@ -1393,140 +3061,11 @@ export function EDrawingsViewer({
               </Card>
             )}
 
-
-            {/* Display Settings */}
-            <Card className="bg-[#505050] border-[#666666]">
-              <div className="p-1.5">
-                <h4 className="text-[10px] font-semibold text-white flex items-center gap-1 mb-1">
-                  <Eye className="h-2.5 w-2.5" />
-                  Display
-                </h4>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[9px] text-gray-300">Color</label>
-                    <input
-                      type="color"
-                      value={modelColor}
-                      onChange={(e) => setModelColor(e.target.value)}
-                      className="h-4 w-8 rounded border border-[#666666] cursor-pointer"
-                      disabled={isWireframe}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-[9px] text-gray-300">Grid</label>
-                    <input
-                      type="checkbox"
-                      checked={showGrid}
-                      onChange={(e) => setShowGrid(e.target.checked)}
-                      className="h-3 w-3 rounded"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-[9px] text-gray-300">Transparent</label>
-                    <input
-                      type="checkbox"
-                      checked={isTransparent}
-                      onChange={(e) => setIsTransparent(e.target.checked)}
-                      className="h-3 w-3 rounded"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-[9px] text-gray-300">Wireframe</label>
-                    <input
-                      type="checkbox"
-                      checked={isWireframe}
-                      onChange={(e) => setIsWireframe(e.target.checked)}
-                      className="h-3 w-3 rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* DFM Feature List in sidebar */}
-            {features.length > 0 && (
-              <Card className="bg-[#505050] border-[#666666]">
-                <div className="p-1.5">
-                  <h4 className="text-[10px] font-semibold text-white flex items-center gap-1 mb-1">
-                    <Target className="h-2.5 w-2.5" />
-                    DFM Features
-                    <span className="ml-auto text-[8px] text-gray-400 font-normal">click to highlight</span>
-                  </h4>
-
-                  {/* Color legend */}
-                  <div className="flex flex-wrap gap-1 mb-1.5">
-                    {(['hole','pocket','thin_wall','undercut'] as const).map(t => (
-                      <span key={t} className="flex items-center gap-0.5 text-[7px] text-gray-300">
-                        <span className="inline-block w-2 h-2 rounded-full" style={{
-                          background: t === 'hole' ? '#FF6B6B' : t === 'pocket' ? '#4ECDC4' : t === 'thin_wall' ? '#FFA07A' : '#D63031'
-                        }} />
-                        {t.replace('_',' ')}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="space-y-1 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-700 pr-1">
-                    {features.map((feature) => {
-                      const featureColor =
-                        feature.type === 'hole' ? '#FF6B6B' :
-                        feature.type === 'pocket' ? '#4ECDC4' :
-                        feature.type === 'thin_wall' ? '#FFA07A' :
-                        feature.type === 'undercut' ? '#D63031' : '#74B9FF';
-                      const isSelected = currentSelectedFeature?.id === feature.id;
-                      return (
-                        <button
-                          key={feature.id}
-                          onClick={() => onFeatureSelect?.(
-                            isSelected ? null : feature
-                          )}
-                          className={`w-full text-left p-1.5 rounded border transition-all ${
-                            isSelected
-                              ? 'border-blue-400 bg-blue-900/30'
-                              : 'border-[#666666] bg-[#3f3f3f] hover:bg-[#484848]'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1 mb-0.5">
-                            <Crosshair
-                              className="h-2.5 w-2.5 flex-shrink-0"
-                              style={{ color: featureColor }}
-                            />
-                            <span
-                              className="text-[9px] font-semibold truncate"
-                              style={{ color: featureColor }}
-                            >
-                              {feature.type.replace('_', ' ').toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="text-[8px] text-gray-300 truncate mb-0.5">
-                            {feature.manufacturingProcess}
-                          </div>
-                          <div className="flex items-center gap-2 text-[7px] text-gray-400">
-                            <span className="flex items-center gap-0.5">
-                              <Clock className="h-1.5 w-1.5" />
-                              {feature.cycleTime}min
-                            </span>
-                          </div>
-                          {feature.warnings.length > 0 && (
-                            <div className="flex items-start gap-0.5 mt-0.5">
-                              <AlertTriangle className="h-2 w-2 text-amber-400 flex-shrink-0 mt-px" />
-                              <span className="text-[7px] text-amber-400 leading-tight">
-                                {feature.warnings[0]}
-                              </span>
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </Card>
-            )}
-
             {/* DFM Insights Panel - Shows detailed analysis for selected feature */}
             {currentSelectedFeature && (
               <Card className="bg-[#505050] border-[#666666]">
-                <div className="p-1.5">
-                  <h4 className="text-[10px] font-semibold text-white flex items-center gap-1 mb-1">
+                <div className="p-1">
+                  <h4 className="text-[9px] font-semibold text-white flex items-center gap-0.5 mb-0.5">
                     <Box className="h-2.5 w-2.5" />
                     DFM Analysis
                     <span className="ml-auto text-[8px] text-gray-400 font-normal">
@@ -1534,7 +3073,7 @@ export function EDrawingsViewer({
                     </span>
                   </h4>
 
-                  <div className="space-y-2 text-[9px]">
+                  <div className="space-y-1 text-[8px]">
                     {/* Feature type and process */}
                     <div>
                       <span className="text-gray-400 font-medium">Process:</span>
@@ -1614,9 +3153,166 @@ export function EDrawingsViewer({
                 </div>
               </Card>
             )}
+
+
+            {/* DFM Feature List in sidebar */}
+            {features.length > 0 && (
+              <Card className="bg-[#505050] border-[#666666]">
+                <div className="p-1">
+                  <h4 className="text-[9px] font-semibold text-white flex items-center gap-0.5 mb-0.5">
+                    <Target className="h-2.5 w-2.5" />
+                    DFM Features
+                    <span className="ml-auto text-[8px] text-gray-400 font-normal">click to highlight</span>
+                  </h4>
+
+                  {/* Color legend */}
+                  <div className="flex flex-wrap gap-0.5 mb-1">
+                    {(['hole','pocket','thin_wall','undercut'] as const).map(t => (
+                      <span key={t} className="flex items-center gap-0.5 text-[7px] text-gray-300">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full" style={{
+                          background: t === 'hole' ? '#FF6B6B' : t === 'pocket' ? '#4ECDC4' : t === 'thin_wall' ? '#FFA07A' : '#D63031'
+                        }} />
+                        {t.replace('_',' ')}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="space-y-0.5 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-700 pr-0.5">
+                    {features.map((feature) => {
+                      const featureColor =
+                        feature.type === 'hole' ? '#FF6B6B' :
+                        feature.type === 'pocket' ? '#4ECDC4' :
+                        feature.type === 'thin_wall' ? '#FFA07A' :
+                        feature.type === 'undercut' ? '#D63031' : '#74B9FF';
+                      const isSelected = currentSelectedFeature?.id === feature.id;
+                      return (
+                        <button
+                          key={feature.id}
+                          onClick={() => onFeatureSelect?.(
+                            isSelected ? null : feature
+                          )}
+                          className={`w-full text-left p-0.5 rounded border transition-all ${
+                            isSelected
+                              ? 'border-blue-400 bg-blue-900/30'
+                              : 'border-[#666666] bg-[#3f3f3f] hover:bg-[#484848]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <Crosshair
+                              className="h-2.5 w-2.5 flex-shrink-0"
+                              style={{ color: featureColor }}
+                            />
+                            <span
+                              className="text-[9px] font-semibold truncate"
+                              style={{ color: featureColor }}
+                            >
+                              {feature.type.replace('_', ' ').toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="text-[8px] text-gray-300 truncate mb-0.5">
+                            {feature.manufacturingProcess}
+                          </div>
+                          <div className="flex items-center gap-2 text-[7px] text-gray-400">
+                            <span className="flex items-center gap-0.5">
+                              <Clock className="h-1.5 w-1.5" />
+                              {feature.cycleTime}min
+                            </span>
+                          </div>
+                          {feature.warnings.length > 0 && (
+                            <div className="flex items-start gap-0.5 mt-0.5">
+                              <AlertTriangle className="h-2 w-2 text-amber-400 flex-shrink-0 mt-px" />
+                              <span className="text-[7px] text-amber-400 leading-tight">
+                                {feature.warnings[0]}
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Assembly DFM Analysis Results */}
+            {dfmAnalysisData && (
+              <>
+                <Card className="bg-[#505050] border-[#666666]">
+                  <div className="p-1 space-y-0.5">
+                    <h4 className="text-[9px] font-semibold text-white flex items-center gap-0.5">
+                      <Target className="h-2.5 w-2.5" />
+                      Assembly DFM Analysis
+                    </h4>
+                    
+                    {/* Manufacturability Score */}
+                    {dfmAnalysisData.dfmAnalysis?.manufacturabilityScore && (
+                      <div className="bg-[#3f3f3f] rounded px-1 py-0.5">
+                        <div className="text-[7px] text-gray-400">Manufacturability Score</div>
+                        <div className="text-[9px] font-bold text-green-400">
+                          {Math.round(dfmAnalysisData.dfmAnalysis.manufacturabilityScore * 100)}%
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Recommended Processes */}
+                    {dfmAnalysisData.dfmAnalysis?.recommendedProcesses?.length > 0 && (
+                      <div className="bg-[#3f3f3f] rounded px-1 py-0.5">
+                        <div className="text-[7px] text-gray-400 mb-0.5">Recommended Processes</div>
+                        <div className="space-y-0.5">
+                          {dfmAnalysisData.dfmAnalysis.recommendedProcesses.slice(0, 3).map((process: string, index: number) => (
+                            <div key={index} className="text-[8px] text-blue-300 flex items-center gap-1">
+                              <span className="w-1 h-1 bg-blue-400 rounded-full flex-shrink-0"></span>
+                              {process}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Warnings */}
+                    {dfmAnalysisData.dfmAnalysis?.warnings?.length > 0 && (
+                      <div className="bg-amber-900/20 border border-amber-600/30 rounded px-1 py-0.5">
+                        <div className="text-[7px] text-amber-400 mb-0.5 flex items-center gap-0.5">
+                          <AlertTriangle className="h-2 w-2" />
+                          Warnings
+                        </div>
+                        <div className="space-y-0.5">
+                          {dfmAnalysisData.dfmAnalysis.warnings.slice(0, 2).map((warning: any, index: number) => (
+                            <div key={index} className="text-[7px] text-amber-300 leading-tight">
+                              {typeof warning === 'string' ? warning : warning.message || 'Manufacturing consideration'}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Geometry Info */}
+                    {dfmAnalysisData.geometryFeatures && (
+                      <div className="bg-[#3f3f3f] rounded px-1 py-0.5">
+                        <div className="text-[7px] text-gray-400 mb-0.5">Geometry Analysis</div>
+                        <div className="grid grid-cols-2 gap-1 text-[7px]">
+                          {dfmAnalysisData.geometryFeatures.volume && (
+                            <div>
+                              <span className="text-gray-400">Volume:</span>
+                              <div className="text-white font-mono">{Math.round(dfmAnalysisData.geometryFeatures.volume).toLocaleString()} mm³</div>
+                            </div>
+                          )}
+                          {dfmAnalysisData.geometryFeatures.complexityScore && (
+                            <div>
+                              <span className="text-gray-400">Complexity:</span>
+                              <div className="text-white font-mono">{dfmAnalysisData.geometryFeatures.complexityScore.toFixed(1)}/10</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
-}
+});

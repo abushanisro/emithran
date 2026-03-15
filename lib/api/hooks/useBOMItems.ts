@@ -42,6 +42,7 @@ export interface BOMItem {
   revision?: string;
   qualityStandard?: string;
   inspectionLevel?: string;
+  volume?: number;
 }
 
 export interface CreateBOMItemDto {
@@ -64,6 +65,7 @@ export interface CreateBOMItemDto {
   maxWidth?: number;
   maxHeight?: number;
   surfaceArea?: number;
+  volume?: number;
 }
 
 export interface UpdateBOMItemDto {
@@ -86,6 +88,7 @@ export interface UpdateBOMItemDto {
   maxWidth?: number;
   maxHeight?: number;
   surfaceArea?: number;
+  volume?: number;
 }
 
 const bomItemKeys = {

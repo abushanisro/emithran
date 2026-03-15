@@ -31,6 +31,7 @@ export interface CADAnalysisResult {
       sustainabilityMetrics?: any;
       costFactors?: any;
       geometricConstraints?: any;
+      manufacturingWarnings?: string[];
       fullAnalysis?: any;
     };
     memoryOptimization: {
@@ -45,6 +46,7 @@ export interface CADAnalysisResult {
     manufacturingReadiness?: string;
   };
   processingTimeMs?: number;
+  metadata?: { timestamp: string };
 }
 
 export interface AnalyzeCADRequest {
@@ -61,9 +63,14 @@ export const bomItemsApi = {
     forceReanalysis = false,
     processContext?: {
       selectedProcess?: string;
+      processCategory?: string;
+      processSubCategory?: string;
+      dfmContext?: string;
+      applicableFeatures?: string[];
       annualVolume?: number;
       material?: string;
       materialGrade?: string;
+      geometryContext?: any;
     }
   ): Promise<CADAnalysisResult> => {
     try {
@@ -72,17 +79,14 @@ export const bomItemsApi = {
         forceReanalysis,
         ...(processContext && {
           processContext: {
-            selectedProcess: processContext.selectedProcess,
-            annualVolume: processContext.annualVolume,
-            material: processContext.material,
-            materialGrade: processContext.materialGrade
+            ...processContext
           }
         })
       };
 
       console.log('CAD Analysis Request:', { bomItemId, requestBody });
 
-      const response = await apiClient.post<CADAnalysisResult>(
+      const response = await apiClient.post<any>(
         `/bom-items/${bomItemId}/analyze-cad`,
         requestBody,
         {
@@ -120,21 +124,8 @@ export const bomItemsApi = {
         return response;
       }
       
-      // If we get here, create a success response
-      return {
-        success: true,
-        analysis: {
-          id: bomItemId,
-          partNumber: `BOM-${bomItemId}`,
-          analysisTimestamp: new Date().toISOString(),
-          analysisVersion: '2.1.0',
-          optimizationStrategy: 'balanced',
-          geometryFeatures: {},
-          dfmAnalysis: {},
-          manufacturingAnalysis: {}
-        },
-        metadata: { timestamp: new Date().toISOString() }
-      };
+      // If no valid analysis data is available, throw error
+      throw new Error('No valid CAD analysis data available');
       
     } catch (error) {
       throw error;

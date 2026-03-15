@@ -443,28 +443,8 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
           }
         }
         
-        // Calculate weight if we have volume and material density
-        if (geo.volumeMm3 && geo.volumeMm3 > 0 && formData.materialGrade) {
-          // Basic material density estimates (kg/mm³)
-          const materialDensities: Record<string, number> = {
-            'aluminum': 2.7e-6, // 2.7 g/cm³
-            'steel': 7.85e-6,   // 7.85 g/cm³
-            'stainless': 8.0e-6, // 8.0 g/cm³
-            'brass': 8.5e-6,    // 8.5 g/cm³
-            'copper': 8.96e-6,  // 8.96 g/cm³
-            'titanium': 4.5e-6  // 4.5 g/cm³
-          };
-          
-          const materialKey = formData.materialGrade.toLowerCase();
-          const density = Object.keys(materialDensities).find(key => 
-            materialKey.includes(key)) ? materialDensities[Object.keys(materialDensities).find(key => 
-            materialKey.includes(key))!] : 2.7e-6; // Default to aluminum
-          
-          const estimatedWeight = geo.volumeMm3 * density; // kg
-          if (estimatedWeight > 0 && estimatedWeight < 1000) { // Sanity check
-            extractedProperties.weight = Math.round(estimatedWeight * 1000) / 1000; // Round to 3 decimal places
-          }
-        }
+        // Weight calculation will be handled by the CAD analysis engine
+        // No mock material density calculations - rely on actual material database lookup
         
         // Update form data with extracted properties
         if (Object.keys(extractedProperties).length > 0) {
