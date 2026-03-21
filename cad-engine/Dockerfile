@@ -30,14 +30,15 @@ RUN conda install -n cad-env -c conda-forge \
     python-json-logger=2.0.7 -y && \
     conda clean -afy
 
-# Install Google Generative AI SDK and requests (needed for AI DFM analysis)
-RUN conda run -n cad-env pip install google-generativeai requests --no-cache-dir
+# Install Claude AI SDK and requests (needed for AI DFM analysis)
+RUN conda run -n cad-env pip install anthropic==0.18.1 requests --no-cache-dir
 
 # Copy application code — includes AI DFM analyzer
 COPY main.py config.py services.py validators.py exceptions.py memory_optimizer.py ai_dfm_analyzer.py ./
 
 # Copy .env for default configuration (API key can be overridden by Docker -e flags)
-COPY .env .env
+COPY .env* ./
+RUN if [ ! -f .env ]; then cp .env.example .env; fi
 
 # Create temp directory for CAD conversions
 RUN mkdir -p /tmp/cad-files
