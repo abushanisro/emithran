@@ -158,6 +158,15 @@ export function ProjectModules({ projectId, bomCount, firstBomId }: ProjectModul
         router.push(`/projects/${projectId}/delivery`);
       },
     },
+    {
+      title: 'Benchmark Analysis',
+      description: 'Compare BOMs across projects, identify cost drivers, and discover VAVE opportunities for optimization',
+      borderColor: 'border-l-4 border-l-yellow-500',
+      status: 'available' as const,
+      onClick: () => {
+        router.push(`/benchmarks?projectId=${projectId}`);
+      },
+    },
   ];
 
   return (

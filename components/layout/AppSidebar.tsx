@@ -10,6 +10,11 @@ import {
   Calculator,
   Table,
   Sigma,
+  BarChart3,
+  Factory,
+  Shield,
+  Truck,
+  Monitor,
 } from 'lucide-react';
 import { NavLink } from '@/components/common/nav-link';
 import { useAuth } from '@/lib/providers/auth';
@@ -132,6 +137,85 @@ export function AppSidebar() {
                   >
                     <FolderKanban className={`h-4 w-4 shrink-0 transition-colors ${isActive('/projects') ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'}`} />
                     {!collapsed && <span className="text-sm">Projects</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Benchmarks */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive('/benchmarks')}>
+                  <NavLink
+                    to="/benchmarks"
+                    className={`sidebar-item group ${isActive('/benchmarks') ? 'sidebar-item-active' : ''}`}
+                    activeClassName="sidebar-item-active"
+                  >
+                    <BarChart3 className={`h-4 w-4 shrink-0 transition-colors ${isActive('/benchmarks') ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'}`} />
+                    {!collapsed && <span className="text-sm">Benchmarks</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="mt-6">
+          <SidebarGroupLabel className="text-sidebar-foreground/40 text-[11px] uppercase tracking-widest font-medium px-3 mb-2">
+            Manufacturing
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {/* Manufacturing Intelligence */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive('/manufacturing')}>
+                  <NavLink
+                    to="/manufacturing"
+                    className={`sidebar-item group ${isActive('/manufacturing') ? 'sidebar-item-active' : ''}`}
+                    activeClassName="sidebar-item-active"
+                  >
+                    <Factory className={`h-4 w-4 shrink-0 transition-colors ${isActive('/manufacturing') ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'}`} />
+                    {!collapsed && <span className="text-sm">Manufacturing</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Quality Management */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive('/quality-management')}>
+                  <NavLink
+                    to="/quality-management"
+                    className={`sidebar-item group ${isActive('/quality-management') ? 'sidebar-item-active' : ''}`}
+                    activeClassName="sidebar-item-active"
+                  >
+                    <Shield className={`h-4 w-4 shrink-0 transition-colors ${isActive('/quality-management') ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'}`} />
+                    {!collapsed && <span className="text-sm">Quality</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Supply Chain */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive('/supply-chain')}>
+                  <NavLink
+                    to="/supply-chain"
+                    className={`sidebar-item group ${isActive('/supply-chain') ? 'sidebar-item-active' : ''}`}
+                    activeClassName="sidebar-item-active"
+                  >
+                    <Truck className={`h-4 w-4 shrink-0 transition-colors ${isActive('/supply-chain') ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'}`} />
+                    {!collapsed && <span className="text-sm">Supply Chain</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* MES (Manufacturing Execution System) */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive('/mes')}>
+                  <NavLink
+                    to="/mes"
+                    className={`sidebar-item group ${isActive('/mes') ? 'sidebar-item-active' : ''}`}
+                    activeClassName="sidebar-item-active"
+                  >
+                    <Monitor className={`h-4 w-4 shrink-0 transition-colors ${isActive('/mes') ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'}`} />
+                    {!collapsed && <span className="text-sm">MES</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

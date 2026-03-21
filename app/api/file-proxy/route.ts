@@ -28,7 +28,6 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1
 const TRUSTED_STORAGE_HOSTS = [
     'supabase.co',
     'supabase.in',
-    'jiobase.com',       // Custom Supabase-compatible instance
     'amazonaws.com',
     'storage.googleapis.com',
 ];

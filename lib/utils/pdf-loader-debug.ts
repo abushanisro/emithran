@@ -13,16 +13,7 @@ export class PDFLoaderDebug {
     console.log(`${this.logPrefix} Original URL:`, url);
     
     // Check for domain mismatches and force correction
-    if (url.includes('emuski.jiobase.com') || url.includes('jiobase.com')) {
-      console.warn(`${this.logPrefix} WARNING: Old domain detected - ${url}`);
-      // Replace with correct Supabase domain
-      const correctedUrl = url.replace(
-        /emuski\.jiobase\.com|.*\.jiobase\.com/g, 
-        'iuvtsvjpmovfymvnmqys.supabase.co'
-      );
-      console.log(`${this.logPrefix} Corrected URL:`, correctedUrl);
-      return correctedUrl;
-    }
+    // Domain validation removed - using direct Supabase URLs only
 
     // Ensure proper Supabase domain
     if (!url.includes('supabase.co') && !url.startsWith('blob:') && !url.startsWith('data:')) {
@@ -87,7 +78,6 @@ export class PDFLoaderDebug {
     const pdfKeys = keys.filter(key => 
       key.includes('pdf') || 
       key.includes('file') || 
-      key.includes('jiobase') ||
       key.includes('supabase')
     );
     
@@ -101,7 +91,6 @@ export class PDFLoaderDebug {
     const sessionPdfKeys = sessionKeys.filter(key => 
       key.includes('pdf') || 
       key.includes('file') || 
-      key.includes('jiobase') ||
       key.includes('supabase')
     );
     

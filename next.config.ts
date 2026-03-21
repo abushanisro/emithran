@@ -120,7 +120,6 @@ const nextConfig: NextConfig = {
       "ws://localhost:*", "http://localhost:*", "http://localhost:4000", "http://localhost:5000",
       "https://*.supabase.co", "wss://*.supabase.co",
       "https://iuvtsvjpmovfymvnmqys.supabase.co", "wss://iuvtsvjpmovfymvnmqys.supabase.co",
-      "https://emuski.jiobase.com", "https://*.jiobase.com", "wss://emuski.jiobase.com", "wss://*.jiobase.com",
       "https://vercel.live", "wss://ws-us3.pusher.app",
       "https://*.railway.app",
       "https://mithran-production.up.railway.app",
