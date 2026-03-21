@@ -1,6 +1,6 @@
 """
 AI-Enhanced DFM Analysis System
-Integrates Google Gemini AI for advanced Design for Manufacturing insights
+Integrates Claude AI for advanced Design for Manufacturing insights
 
 Author: mithran Platform
 Standards: ISO 2768, ASME Y14.5, DFM Best Practices
@@ -28,7 +28,7 @@ except ImportError:
                     _k, _v = _line.split('=', 1)
                     os.environ.setdefault(_k.strip(), _v.strip())
 
-import google.generativeai as genai
+import anthropic
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -73,34 +73,33 @@ class AIEnhancedDFMAnalyzer:
     """
     AI-Enhanced Design for Manufacturing Analyzer
     
-    Combines traditional geometric analysis with Google Gemini AI
+    Combines traditional geometric analysis with Claude AI
     for enterprise-grade manufacturability insights
     """
     
-    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, api_key: Optional[str] = None, model_name: str = "claude-3-5-sonnet-20241022"):
         """
         Initialize AI DFM Analyzer
 
         Args:
-            api_key: Google AI API key (optional, uses env var if not provided)
-            model_name: Gemini model to use
+            api_key: Claude API key (optional, uses env var if not provided)
+            model_name: Claude model to use
         """
-        self.api_key = api_key or os.getenv('GOOGLE_AI_API_KEY')
+        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
         self.model_name = model_name
 
-        # Configure Gemini AI if API key is available
+        # Configure Claude AI if API key is available
         self.ai_enabled = False
         if self.api_key:
             try:
-                genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel(model_name)
+                self.client = anthropic.Anthropic(api_key=self.api_key)
                 self.ai_enabled = True
                 logger.info(f"AI DFM Analysis enabled with {model_name}")
             except Exception as e:
-                logger.warning(f"Failed to initialize Gemini AI: {e}")
+                logger.warning(f"Failed to initialize Claude AI: {e}")
                 self.ai_enabled = False
         else:
-            logger.info("No Google AI API key provided, running without AI enhancement")
+            logger.info("No Claude API key provided, running without AI enhancement")
 
     def analyze_with_ai_enhancement(
         self,
@@ -162,14 +161,23 @@ class AIEnhancedDFMAnalyzer:
         file_name: str,
         user_processes: List[Dict[str, Any]]
     ) -> AIDFMInsights:
-        """Generate AI-powered DFM insights using Gemini — real geometry, real processes."""
+        """Generate AI-powered DFM insights using Claude — real geometry, real processes."""
 
         start_time = time.time()
         prompt = self._create_dfm_analysis_prompt(geometry_features, traditional_dfm, file_name, user_processes)
 
         try:
-            response = self.model.generate_content(prompt)
-            ai_response = response.text
+            response = self.client.messages.create(
+                model=self.model_name,
+                max_tokens=4096,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
+            ai_response = response.content[0].text
             insights = self._parse_ai_response(ai_response)
             processing_time = (time.time() - start_time) * 1000
             insights.generation_time_ms = processing_time

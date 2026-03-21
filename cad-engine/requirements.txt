@@ -29,5 +29,5 @@ python-json-logger==2.0.7
 # Environment variables
 python-dotenv==1.0.1
 
-# AI Enhancement - Google Gemini
-google-generativeai==0.3.2
+# AI Enhancement - Claude
+anthropic==0.18.1
