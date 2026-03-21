@@ -36,9 +36,20 @@ RUN conda run -n cad-env pip install anthropic==0.18.1 requests --no-cache-dir
 # Copy application code — includes AI DFM analyzer
 COPY main.py config.py services.py validators.py exceptions.py memory_optimizer.py ai_dfm_analyzer.py ./
 
-# Copy .env for default configuration (API key can be overridden by Docker -e flags)
-COPY .env* ./
-RUN if [ ! -f .env ]; then cp .env.example .env; fi
+# Create default .env configuration (can be overridden by environment variables)
+RUN echo "# CAD Engine Configuration" > .env && \
+    echo "HOST=0.0.0.0" >> .env && \
+    echo "PORT=5000" >> .env && \
+    echo "LOG_LEVEL=INFO" >> .env && \
+    echo "ENVIRONMENT=production" >> .env && \
+    echo "MAX_FILE_SIZE_MB=50" >> .env && \
+    echo "RATE_LIMIT_PER_MINUTE=10" >> .env && \
+    echo "LINEAR_DEFLECTION=0.1" >> .env && \
+    echo "ANGULAR_DEFLECTION=0.5" >> .env && \
+    echo "TEMP_DIR=/tmp/cad_engine" >> .env && \
+    echo "ANTHROPIC_API_KEY=" >> .env && \
+    echo "CLAUDE_MODEL=claude-3-5-sonnet-20241022" >> .env && \
+    echo "BYPASS_CAD_FORMAT_CHECK=false" >> .env
 
 # Create temp directory for CAD conversions
 RUN mkdir -p /tmp/cad-files
