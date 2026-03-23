@@ -128,62 +128,7 @@ const getManufacturingModules = (projects: any[]) => [
   }
 ];
 
-const getDatabaseModules = (vendors: any[], rawMaterials: any[], mhrRecords: any[], lsrRecords: any[], vendorsApiData?: any) => {
-  return [
-    {
-      id: 'vendors',
-      title: 'Vendors Database',
-      description: 'Comprehensive vendor management and capability assessment',
-      path: '/vendors',
-      count: vendorsApiData?.total || vendors.length, // Use API total if available
-      activeVendors: vendors.filter(v => v.status === 'active').length,
-      inactiveVendors: vendors.filter(v => v.status === 'inactive').length,
-      pendingVendors: vendors.filter(v => v.status === 'pending').length,
-      displayedCount: vendors.length // Show how many are actually loaded
-    },
-  {
-    id: 'raw-materials',
-    title: 'Raw Materials Database',
-    description: 'Material properties, cost data, and inventory management',
-    path: '/raw-materials',
-    count: rawMaterials.length,
-    categories: ['Plastic & Rubber', 'Ferrous Materials'],
-    plasticRubberCount: rawMaterials.filter(rm => {
-      const group = (rm.materialGroup || '').toLowerCase();
-      return group.includes('plastic') || group.includes('rubber') || group.includes('polymer') || group.includes('elastomer') || group.includes('thermoplastic') || group.includes('thermoset');
-    }).length,
-    ferrousCount: rawMaterials.filter(rm => {
-      const group = (rm.materialGroup || '').toLowerCase();
-      return group.includes('ferrous') || group.includes('steel') || group.includes('iron') || group.includes('metal') || group.includes('alloy');
-    }).length
-  },
-  {
-    id: 'mhr',
-    title: 'MHR Database',
-    description: 'Machine Hour Rate calculations and equipment costing',
-    path: '/mhr-database',
-    count: mhrRecords.length,
-    totalMachineHours: mhrRecords.reduce((sum, mhr) => sum + ((mhr.shiftsPerDay * mhr.hoursPerShift * mhr.workingDaysPerYear) || 0), 0)
-  },
-  {
-    id: 'lhr',
-    title: 'LHR Database',
-    description: 'Labor Hour Rate analysis and workforce costing',
-    path: '/lsr',
-    count: lsrRecords.length,
-    totalLaborHours: lsrRecords.reduce((sum, lsr) => sum + (Number(lsr.lhr) || 0), 0),
-    avgLHR: lsrRecords.length > 0 ? (lsrRecords.reduce((sum, lsr) => sum + (Number(lsr.lhr) || 0), 0) / lsrRecords.length) : 0
-  },
-  {
-    id: 'calculators',
-    title: 'Cost Calculators',
-    description: 'Advanced calculators for manufacturing cost estimation',
-    path: '/calculators',
-    count: 5, // Standard calculator count
-    calculatorTypes: ['Material Cost', 'Labor Cost', 'Machine Cost', 'Process Cost', 'Total Cost']
-  }
-];
-};
+
 
 const statusCounts = [
   { status: 'draft', label: 'Draft', count: 0 },
@@ -209,7 +154,6 @@ export default function DashboardPage() {
 
   // Get dynamic modules with real data
   const manufacturingModules = getManufacturingModules(projects);
-  const databaseModules = getDatabaseModules(vendors, rawMaterials, mhrRecords, lsrRecords, vendorsData);
 
   // Calculate real status distribution
   const statusDistribution = statusCounts.map((s) => ({
