@@ -1,7 +1,7 @@
 'use client';
 
 import { PageHeader } from '@/components/layout/PageHeader';
-import { StatCard } from '@/components/features/dashboard';
+
 import { StatusBadge } from '@/components/common/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Plus,
   ArrowRight,
-  TrendingUp,
   BarChart3,
-  Target,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -131,39 +129,6 @@ const getManufacturingModules = (projects: any[]) => [
 ];
 
 const getDatabaseModules = (vendors: any[], rawMaterials: any[], mhrRecords: any[], lsrRecords: any[], vendorsApiData?: any) => {
-  // Debug vendor data to understand the status issue
-  console.log('Vendor API debug:', {
-    total: vendors.length,
-    uniqueStatuses: [...new Set(vendors.map(v => v.status))],
-    statusCounts: {
-      active: vendors.filter(v => v.status === 'active').length,
-      inactive: vendors.filter(v => v.status === 'inactive').length,
-      pending: vendors.filter(v => v.status === 'pending').length,
-      other: vendors.filter(v => !['active', 'inactive', 'pending'].includes(v.status)).length
-    },
-    sampleVendors: vendors.slice(0, 3).map(v => ({ id: v.id, status: v.status, name: v.name })),
-    apiResponse: vendorsApiData?.total || 'unknown total'
-  });
-  
-  // Note: All vendors show as 'active' because CSV import hardcodes status to 'active'
-  // This is expected behavior until backend CSV import logic is updated
-  
-  // Debug raw materials data to understand material group values
-  const uniqueGroups = [...new Set(rawMaterials.map(rm => rm.materialGroup))];
-  console.log('Raw Materials debug:', {
-    total: rawMaterials.length,
-    uniqueMaterialGroups: uniqueGroups,
-    sampleMaterials: rawMaterials.slice(0, 10).map(rm => ({ 
-      id: rm.id, 
-      materialGroup: rm.materialGroup, 
-      material: rm.material 
-    })),
-    groupCounts: uniqueGroups.map(group => ({
-      group,
-      count: rawMaterials.filter(rm => rm.materialGroup === group).length
-    }))
-  });
-  
   return [
     {
       id: 'vendors',
@@ -252,16 +217,6 @@ export default function DashboardPage() {
     count: projects.filter((p) => p.status === s.status).length,
   })).filter((s) => s.count > 0);
 
-  // Debug logging for all data
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Dashboard Data Summary:');
-    console.log('- Projects:', projects.length);
-    console.log('- Vendors:', vendors.length);
-    console.log('- Raw Materials:', rawMaterials.length);
-    console.log('- MHR Records:', mhrRecords.length);
-    console.log('Status distribution:', statusDistribution);
-    console.log('Database modules:', databaseModules.map(m => ({ id: m.id, count: m.count })));
-  }
 
   // Real cost summary in Rupees
   const totalQuoted = projects.reduce((sum, p) => sum + (Number(p.targetPrice) || 0), 0);
@@ -269,23 +224,8 @@ export default function DashboardPage() {
   const savings = totalQuoted - totalShould;
   const savingsPercent = totalQuoted > 0 ? ((savings / totalQuoted) * 100).toFixed(1) : '0';
 
-  // Debug project status distribution for efficiency calculation
-  console.log('Projects debug for efficiency:', {
-    total: projects.length,
-    uniqueStatuses: [...new Set(projects.map(p => p.status))],
-    statusCounts: {
-      draft: projects.filter(p => p.status === 'draft').length,
-      active: projects.filter(p => p.status === 'active').length,
-      completed: projects.filter(p => p.status === 'completed').length,
-      on_hold: projects.filter(p => p.status === 'on_hold').length,
-      cancelled: projects.filter(p => p.status === 'cancelled').length,
-      other: projects.filter(p => !['draft', 'active', 'completed', 'on_hold', 'cancelled'].includes(p.status)).length
-    },
-    sampleProjects: projects.slice(0, 5).map(p => ({ id: p.id, status: p.status, name: p.name }))
-  });
-  
-  // Calculate real efficiency metrics - improved calculation
-  const totalActiveProjects = projects.filter(p => !['cancelled'].includes(p.status)).length;
+  // Calculate real efficiency metrics
+
   const completedProjects = projects.filter(p => p.status === 'completed').length;
   const progressiveProjects = projects.filter(p => ['active', 'completed'].includes(p.status)).length;
   
@@ -312,22 +252,9 @@ export default function DashboardPage() {
     
     systemEfficiency = completionRate + activeRate + resourceUtilization + dataHealthScore;
     
-    // Debug efficiency calculation
-    console.log('System Efficiency Components:', {
-      completionRate: completionRate.toFixed(1),
-      activeRate: activeRate.toFixed(1),
-      resourceUtilization: resourceUtilization.toFixed(1),
-      dataHealthScore: dataHealthScore.toFixed(1),
-      totalEfficiency: systemEfficiency.toFixed(1),
-      resourceCount,
-      progressiveProjects,
-      totalProjects: projects.length
-    });
-    
     // Minimum baseline: if system has active projects and resources, show at least 15%
     if (systemEfficiency < 15 && progressiveProjects > 0 && resourceCount > 0) {
       systemEfficiency = 15 + (progressiveProjects / projects.length) * 10;
-      console.log('Applied minimum baseline efficiency:', systemEfficiency.toFixed(1));
     }
   }
 
@@ -479,311 +406,10 @@ export default function DashboardPage() {
         </Card>
 
         {/* Analytics Module Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {manufacturingModules.map((module) => {
-            const completionRate = module.stats.total > 0 ? (module.stats.active / module.stats.total * 100) : 0;
-            const trendData = Array.from({ length: 7 }, (_, i) => ({
-              day: i + 1,
-              value: Math.floor(Math.random() * module.stats.active) + 1
-            }));
-            
-            return (
-              <Card 
-                key={module.id} 
-                className="border-border/50 bg-card"
-              >
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2 flex-1">
-                      <CardTitle className="text-lg font-semibold">
-                        {module.title}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {module.description}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="text-xs ml-2">
-                      {completionRate.toFixed(0)}% Complete
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <p className="text-2xl font-bold text-primary">{module.stats.active}</p>
-                        <p className="text-xs text-muted-foreground">Active</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-foreground">{module.stats.total}</p>
-                        <p className="text-xs text-muted-foreground">Total</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-green-600">₹{(module.stats.value / 100000).toFixed(1)}L</p>
-                        <p className="text-xs text-muted-foreground">Value</p>
-                      </div>
-                    </div>
-                    
-                    {/* Progress Bar */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span>{completionRate.toFixed(1)}%</span>
-                      </div>
-                      <div className="w-full bg-secondary rounded-full h-2">
-                        <div 
-                          className="bg-primary h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${completionRate}%` }}
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Mini Trend Chart */}
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">7-Day Activity</p>
-                      <div className="flex items-end justify-between space-x-1 h-12">
-                        {trendData.map((data, i) => (
-                          <div
-                            key={i}
-                            className="bg-primary/60 rounded-sm flex-1"
-                            style={{
-                              height: `${Math.max(8, (data.value / Math.max(...trendData.map(d => d.value), 1)) * 48)}px`
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Status Indicator */}
-                    <div className="flex items-center justify-between pt-2 border-t">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                        <span className="text-xs text-muted-foreground">
-                          {module.stats.active > 0 ? 'Active' : 'Idle'}
-                        </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        Updated {Math.floor(Math.random() * 10) + 1}min ago
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+
       </div>
 
-      {/* Database & Tools Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Databases & Calculators</h2>
-            <p className="text-muted-foreground">Access comprehensive databases and calculation tools</p>
-          </div>
-          <Badge variant="outline" className="px-3 py-1">
-            {databaseModules.length} Resources
-          </Badge>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {databaseModules.map((module) => {
-            const utilizationRate = module.count > 0 ? Math.min(100, (module.count / 50) * 100) : 0;
-            
-            // Generate realistic growth trend based on current count
-            const currentCount = module.count || 0;
-            const growthData = Array.from({ length: 6 }, (_, i) => {
-              const baseValue = Math.max(0, currentCount - (5 - i) * Math.floor(currentCount / 10));
-              const variance = Math.floor(currentCount * 0.1);
-              return {
-                month: i + 1,
-                value: Math.max(0, baseValue + Math.floor(Math.random() * variance) - Math.floor(variance / 2))
-              };
-            });
-            
-            return (
-              <Card 
-                key={module.id} 
-                className="border-border/50 bg-card"
-              >
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold">
-                    {module.title}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    {module.description}
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Main Count */}
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-primary">{module.count}</p>
-                      <p className="text-sm text-muted-foreground">Total Records</p>
-                    </div>
-                    
-                    {/* Module-specific Analytics */}
-                    {module.id === 'vendors' && (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="text-center p-2 bg-green-50 dark:bg-green-950/20 rounded">
-                            <p className="font-bold text-green-600">{module.activeVendors || 0}</p>
-                            <p className="text-muted-foreground">Active</p>
-                          </div>
-                          <div className="text-center p-2 bg-orange-50 dark:bg-orange-950/20 rounded">
-                            <p className="font-bold text-orange-600">{module.inactiveVendors || 0}</p>
-                            <p className="text-muted-foreground">Inactive</p>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span>Activation Rate</span>
-                            <span>{module.count > 0 ? ((module.activeVendors || 0) / module.count * 100).toFixed(1) : 0}%</span>
-                          </div>
-                          <div className="w-full bg-secondary rounded-full h-2">
-                            <div 
-                              className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${module.count > 0 ? ((module.activeVendors || 0) / module.count * 100) : 0}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {module.id === 'raw-materials' && (
-                      <div className="space-y-3">
-                        <div className="text-xs space-y-1">
-                          <div className="flex justify-between p-2 bg-secondary/30 rounded">
-                            <span>Plastic & Rubber</span>
-                            <span className="font-semibold">{module.plasticRubberCount || 0}</span>
-                          </div>
-                          <div className="flex justify-between p-2 bg-secondary/30 rounded">
-                            <span>Ferrous Materials</span>
-                            <span className="font-semibold">{module.ferrousCount || 0}</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span>Database Usage</span>
-                            <span>{utilizationRate.toFixed(1)}%</span>
-                          </div>
-                          <div className="w-full bg-secondary rounded-full h-2">
-                            <div 
-                              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${utilizationRate}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {module.id === 'calculators' && (
-                      <div className="space-y-3">
-                        <div className="space-y-1">
-                          {module.calculatorTypes?.slice(0, 3).map((type, i) => (
-                            <div key={i} className="flex justify-between items-center p-1 bg-secondary/30 rounded text-xs">
-                              <span>{type}</span>
-                              <div className="flex items-center space-x-1">
-                                <div className="w-1 h-1 rounded-full bg-green-500"></div>
-                                <span>Ready</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="text-center text-xs text-muted-foreground">
-                          {module.calculatorTypes?.length || 0} Calculators Available
-                        </div>
-                      </div>
-                    )}
-                    
-                    {module.id === 'mhr' && (
-                      <div className="space-y-3">
-                        <div className="text-xs space-y-1">
-                          <div className="flex justify-between p-2 bg-secondary/30 rounded">
-                            <span>Total Machine Hours</span>
-                            <span className="font-semibold">{module.totalMachineHours?.toLocaleString() || 0}</span>
-                          </div>
-                          <div className="flex justify-between p-2 bg-secondary/30 rounded">
-                            <span>Equipment Records</span>
-                            <span className="font-semibold">{module.count}</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span>Utilization</span>
-                            <span>{utilizationRate.toFixed(1)}%</span>
-                          </div>
-                          <div className="w-full bg-secondary rounded-full h-2">
-                            <div 
-                              className="bg-purple-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${utilizationRate}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {module.id === 'lhr' && (
-                      <div className="space-y-3">
-                        <div className="text-xs space-y-1">
-                          <div className="flex justify-between p-2 bg-secondary/30 rounded">
-                            <span>Labor Records</span>
-                            <span className="font-semibold">{module.count}</span>
-                          </div>
-                          <div className="flex justify-between p-2 bg-secondary/30 rounded">
-                            <span>Avg LHR</span>
-                            <span className="font-semibold text-blue-600">₹{module.avgLHR?.toFixed(0) || 0}</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span>Total LHR Value</span>
-                            <span>₹{module.totalLaborHours?.toFixed(0) || 0}</span>
-                          </div>
-                          <div className="w-full bg-secondary rounded-full h-2">
-                            <div 
-                              className="bg-orange-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${utilizationRate}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Growth Trend */}
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">6-Month Trend</p>
-                      <div className="flex items-end justify-between space-x-1 h-8">
-                        {growthData.map((data, i) => (
-                          <div
-                            key={i}
-                            className="bg-primary/40 rounded-sm flex-1"
-                            style={{
-                              height: `${Math.max(4, (data.value / Math.max(...growthData.map(d => d.value), 1)) * 32)}px`
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Status */}
-                    <div className="flex items-center justify-between pt-2 border-t">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                        <span className="text-xs text-muted-foreground">Online</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        Sync {Math.floor(Math.random() * 5) + 1}min ago
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Advanced Analytics Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
