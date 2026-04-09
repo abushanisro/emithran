@@ -180,11 +180,8 @@ export default function ProcessPlanningPage() {
             {/* Raw Materials Section */}
             <RawMaterialsSection bomItemId={selectedPart.id} bomItem={selectedPart} />
 
-            {/* Tooling & Fixtures Section */}
-            <ToolingSection bomItemId={selectedPart.id} bomItem={selectedPart} />
-
             {/* Manufacturing Process Section */}
-            <ManufacturingProcessSection />
+            <ManufacturingProcessSection bomItemId={selectedPart.id} bomItem={selectedPart} />
 
             {/* Packaging & Logistics Section */}
             <PackagingLogisticsSection bomItemId={selectedPart.id} />
@@ -199,6 +196,9 @@ export default function ProcessPlanningPage() {
 
             {/* Parent Estimates Section */}
             <ParentEstimatesSection />
+
+            {/* Tooling & Fixtures Section - Moved to last */}
+            <ToolingSection bomItemId={selectedPart.id} bomItem={selectedPart} />
 
             {/* Action Buttons */}
             <div className="flex items-center justify-between p-4 bg-card border-l-4 border-l-primary rounded-lg shadow-md">

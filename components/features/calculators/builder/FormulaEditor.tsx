@@ -382,7 +382,7 @@ export function FormulaEditor({
           </PopoverTrigger>
           <PopoverContent className="w-64 p-2" align="end">
             <div className="space-y-1 max-h-60 overflow-y-auto">
-              {['SUM', 'AVG', 'MIN', 'MAX', 'IF', 'ROUND'].map((funcName) => {
+              {['SUM', 'AVG', 'MIN', 'MAX', 'IF', 'ROUND', 'LN', 'LOG'].map((funcName) => {
                 const func = FORMULA_FUNCTIONS.find(f => f.name === funcName);
                 return (
                   <button

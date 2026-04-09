@@ -69,6 +69,17 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
   // Track which fields are in edit mode
   const [editingFieldIds, setEditingFieldIds] = useState<Set<string>>(new Set());
 
+  // BOM field selection state
+  const [bomFieldSelection, setBomFieldSelection] = useState<{
+    fieldIndex: number | null;
+    isOpen: boolean;
+    selectedFields: Set<string>;
+  }>({
+    fieldIndex: null,
+    isOpen: false,
+    selectedFields: new Set()
+  });
+
   // Determine which data to use (draft or fetched)
   const currentData = draftCalculator || calculator;
 
@@ -215,56 +226,116 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
     setDeletingFieldId(null);
   };
 
-  const handleCreateBOMFields = (replaceIndex: number) => {
-    if (!currentData) return;
+  // Available BOM fields with their configurations
+  const AVAILABLE_BOM_FIELDS = [
+    {
+      key: 'weight',
+      displayLabel: 'Weight',
+      unit: 'kg',
+      description: 'Total weight of the component'
+    },
+    {
+      key: 'surfaceArea',
+      displayLabel: 'Surface Area',
+      unit: 'mm²',
+      description: 'Total surface area'
+    },
+    {
+      key: 'maxLength',
+      displayLabel: 'Max Length',
+      unit: 'mm',
+      description: 'Maximum length dimension'
+    },
+    {
+      key: 'maxWidth',
+      displayLabel: 'Max Width',
+      unit: 'mm',
+      description: 'Maximum width dimension'
+    },
+    {
+      key: 'maxHeight',
+      displayLabel: 'Max Height',
+      unit: 'mm',
+      description: 'Maximum height dimension'
+    },
+    {
+      key: 'volume',
+      displayLabel: 'Volume',
+      unit: 'mm³',
+      description: 'Total volume of the component'
+    },
+    {
+      key: 'material',
+      displayLabel: 'Material',
+      unit: '',
+      description: 'Material specification'
+    },
+    {
+      key: 'quantity',
+      displayLabel: 'Quantity',
+      unit: 'pcs',
+      description: 'Number of components'
+    }
+  ];
+
+  const handleOpenBOMSelector = (fieldIndex: number) => {
+    setBomFieldSelection({
+      fieldIndex,
+      isOpen: true,
+      selectedFields: new Set()
+    });
+  };
+
+  const handleBOMFieldToggle = (fieldKey: string) => {
+    setBomFieldSelection(prev => {
+      const newSelectedFields = new Set(prev.selectedFields);
+      if (newSelectedFields.has(fieldKey)) {
+        newSelectedFields.delete(fieldKey);
+      } else {
+        newSelectedFields.add(fieldKey);
+      }
+      return {
+        ...prev,
+        selectedFields: newSelectedFields
+      };
+    });
+  };
+
+  const handleCreateBOMFields = () => {
+    if (!currentData || bomFieldSelection.fieldIndex === null) return;
+
+    const replaceIndex = bomFieldSelection.fieldIndex;
+    const selectedFieldKeys = Array.from(bomFieldSelection.selectedFields);
+    
+    if (selectedFieldKeys.length === 0) {
+      // Close selector if no fields selected
+      setBomFieldSelection({ fieldIndex: null, isOpen: false, selectedFields: new Set() });
+      return;
+    }
 
     const currentFields = currentData.fields || [];
-    const fieldCount = currentFields.length;
     
     // Remove the original field that was changed to BOM
     const fieldsWithoutOriginal = currentFields.filter((_, i) => i !== replaceIndex);
     
-    // Define BOM fields to create
-    const bomFields = [
-      {
-        displayLabel: 'Weight',
-        fieldType: 'number' as FieldType,
-        unit: 'kg',
+    // Create selected BOM fields
+    const bomFields = selectedFieldKeys.map(fieldKey => {
+      const fieldConfig = AVAILABLE_BOM_FIELDS.find(f => f.key === fieldKey);
+      if (!fieldConfig) return null;
+      
+      return {
+        displayLabel: fieldConfig.displayLabel,
+        fieldType: fieldConfig.key === 'material' ? 'text' as FieldType : 'number' as FieldType,
+        unit: fieldConfig.unit,
         defaultValue: '',
         displayOrder: replaceIndex
-      },
-      {
-        displayLabel: 'Surface Area',
-        fieldType: 'number' as FieldType,
-        unit: 'mm²',
-        defaultValue: '',
-        displayOrder: replaceIndex + 1
-      },
-      {
-        displayLabel: 'Max Length',
-        fieldType: 'number' as FieldType,
-        unit: 'mm',
-        defaultValue: '',
-        displayOrder: replaceIndex + 2
-      },
-      {
-        displayLabel: 'Max Width',
-        fieldType: 'number' as FieldType,
-        unit: 'mm',
-        defaultValue: '',
-        displayOrder: replaceIndex + 3
-      },
-      {
-        displayLabel: 'Max Height',
-        fieldType: 'number' as FieldType,
-        unit: 'mm',
-        defaultValue: '',
-        displayOrder: replaceIndex + 4
-      }
-    ];
+      };
+    }).filter(Boolean);
 
     // Create the new fields with temporary IDs
     const newFields = bomFields.map((bomField, idx) => {
+      if (!bomField) return null;
+      
       const newFieldId = `temp-bom-${Date.now()}-${idx}`;
       return {
         id: newFieldId,
@@ -272,14 +343,14 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
         displayLabel: bomField.displayLabel,
         fieldType: bomField.fieldType,
         isRequired: false,
-        displayOrder: bomField.displayOrder,
+        displayOrder: bomField.displayOrder + idx,
         unit: bomField.unit,
         defaultValue: bomField.defaultValue,
         sourceField: '',
         lookupConfig: {},
         inputConfig: { decimalPlaces: 2 },
       } as CalculatorField;
-    });
+    }).filter(Boolean) as CalculatorField[];
 
     // Insert new fields at the original position
     const updatedFields = [
@@ -303,6 +374,9 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
       newFieldIds.forEach(id => newSet.add(id));
       return newSet;
     });
+
+    // Close the BOM selector
+    setBomFieldSelection({ fieldIndex: null, isOpen: false, selectedFields: new Set() });
   };
 
   // Formula management removed as it's now integrated into fields
@@ -654,9 +728,9 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
                             value={field.fieldType}
                             disabled={isFieldSaved}
                             onValueChange={(value: FieldType) => {
-                              // Handle BOM selection - create multiple fields automatically
+                              // Handle BOM selection - open selector for field choices
                               if (value === 'bom') {
-                                handleCreateBOMFields(index);
+                                handleOpenBOMSelector(index);
                                 return;
                               }
                               
@@ -891,6 +965,87 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
           {updateCalculator.isPending ? 'Saving...' : 'Save All Changes'}
         </Button>
       </div>
+
+      {/* BOM Field Selector Modal */}
+      {bomFieldSelection.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-lg">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-foreground">Select BOM Fields</h2>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setBomFieldSelection({ fieldIndex: null, isOpen: false, selectedFields: new Set() })}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  ✕
+                </Button>
+              </div>
+              
+              <p className="text-sm text-muted-foreground mb-4">
+                Choose which Bill of Materials fields you want to add to your calculator:
+              </p>
+
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {AVAILABLE_BOM_FIELDS.map((bomField) => (
+                  <div 
+                    key={bomField.key}
+                    className={cn(
+                      "flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all",
+                      "hover:bg-primary/5 hover:border-primary/20",
+                      bomFieldSelection.selectedFields.has(bomField.key) 
+                        ? "bg-primary/10 border-primary/30" 
+                        : "bg-card border-border"
+                    )}
+                    onClick={() => handleBOMFieldToggle(bomField.key)}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={bomFieldSelection.selectedFields.has(bomField.key)}
+                      onChange={() => handleBOMFieldToggle(bomField.key)}
+                      className="mt-1 accent-primary"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-foreground">{bomField.displayLabel}</span>
+                        {bomField.unit && (
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded border border-primary/20">
+                            {bomField.unit}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {bomField.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-between items-center mt-6 pt-4 border-t border-border">
+                <div className="text-sm text-muted-foreground">
+                  {bomFieldSelection.selectedFields.size} field{bomFieldSelection.selectedFields.size !== 1 ? 's' : ''} selected
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline"
+                    onClick={() => setBomFieldSelection({ fieldIndex: null, isOpen: false, selectedFields: new Set() })}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleCreateBOMFields}
+                    disabled={bomFieldSelection.selectedFields.size === 0}
+                  >
+                    Add Selected Fields ({bomFieldSelection.selectedFields.size})
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

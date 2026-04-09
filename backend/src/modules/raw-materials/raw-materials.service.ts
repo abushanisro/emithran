@@ -489,4 +489,134 @@ export class RawMaterialsService {
       categories: MATERIAL_CATEGORY_LABELS,
     };
   }
+
+  async getEnhancedMaterials(
+    query: {
+      page: number;
+      limit: number;
+      category?: string;
+      search?: string;
+    },
+    userId?: string,
+    accessToken?: string
+  ): Promise<{
+    items: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+    success: boolean;
+  }> {
+    this.logger.log('Fetching enhanced raw materials', 'RawMaterialsService');
+
+    // Use the reliable fallback approach directly
+    this.logger.log('Using raw_materials table for enhanced materials', 'RawMaterialsService');
+    
+    let queryBuilder = this.supabaseService
+      .getClient(accessToken)
+      .from('raw_materials')
+      .select('*', { count: 'exact' });
+
+    // Apply filters to query
+    if (query.category && query.category !== 'all') {
+      // Map category codes to material group names
+      const categoryMapping: { [key: string]: string } = {
+        'PLASTIC': 'Plastic & Rubber',
+        'THERMO': 'Plastic & Rubber',
+        'FERROUS': 'Ferrous & Non-Ferrous',
+        'NON_FERROUS': 'Ferrous & Non-Ferrous',
+        'AL_ALLOY': 'Ferrous & Non-Ferrous',
+        'CU_ALLOY': 'Ferrous & Non-Ferrous',
+        'SS': 'Ferrous & Non-Ferrous'
+      };
+      
+      const materialGroup = categoryMapping[query.category] || query.category;
+      queryBuilder = queryBuilder.eq('material_group', materialGroup);
+    }
+
+    if (query.search) {
+      queryBuilder = queryBuilder.or(
+        `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
+      );
+    }
+
+    // Apply pagination
+    const offset = (query.page - 1) * query.limit;
+    queryBuilder = queryBuilder.range(offset, offset + query.limit - 1);
+    queryBuilder = queryBuilder.order('material', { ascending: true });
+
+    const { data, error, count } = await queryBuilder;
+
+    if (error) {
+      this.logger.error(`Enhanced materials query failed: ${error.message}`, 'RawMaterialsService');
+      throw new InternalServerErrorException(`Failed to fetch materials: ${error.message}`);
+    }
+
+    // Transform data to match enhanced format with proper null handling
+    const transformedData = (data || []).map(item => {
+      // Ensure we have valid material name
+      const materialName = item.material || item.material_name || 'Unknown Material';
+      const materialGrade = item.material_grade || '';
+      const materialGroup = item.material_group || 'Unknown';
+      
+      return {
+        id: item.id,
+        materialName: materialName,
+        materialGrade: materialGrade,
+        materialSpecification: item.application || item.material_specification || '',
+        manufacturer: item.manufacturer || '',
+        supplier: item.supplier || '',
+        categoryName: materialGroup,
+        categoryCode: materialGroup === 'Plastic & Rubber' ? 'PLASTIC' : 'FERROUS',
+        colorCode: materialGroup === 'Plastic & Rubber' ? '#4CAF50' : '#FF5722',
+        costPerKg: item.cost || item.cost_per_kg || 0,
+        costPerUnit: item.cost || item.cost_per_unit || 0,
+        unitType: 'kg',
+        densityKgM3: item.density_kg_m3 || null,
+        utsMpa: item.ultimate_tensile_strength || item.uts_mpa || null,
+        ytsMpa: item.yield_tensile_strength || item.yts_mpa || null,
+        elasticModulusGpa: item.elastic_modulus_gpa || null,
+        hardnessValue: item.hardness_value || null,
+        hardnessScale: item.hardness_scale || null,
+        meltingTempCelsius: item.melting_temp_c || item.melting_temp_celsius || null,
+        ejectDeflectionTempCelsius: item.eject_deflection_temp_c || item.eject_deflection_temp_celsius || null,
+        thermalConductivityWMK: item.thermal_conductivity_melt || item.thermal_conductivity_w_m_k || null,
+        specificHeatJGK: item.specific_heat_melt || item.specific_heat_j_g_k || null,
+        maxServiceTempCelsius: item.max_service_temp_celsius || null,
+        moldTempCelsiusMin: item.mold_temp_c || item.mold_temp_celsius_min || null,
+        moldTempCelsiusMax: item.mold_temp_c || item.mold_temp_celsius_max || null,
+        clampingPressureMpa: item.clamping_pressure_mpa || null,
+        injectionPressureMpaMin: item.injection_pressure_mpa_min || null,
+        injectionPressureMpaMax: item.injection_pressure_mpa_max || null,
+        shrinkageRatePercent: item.regrinding_percentage || item.shrinkage_rate_percent || null,
+        storageLocation: item.location || item.storage_location || '',
+        leadTimeDays: item.lead_time_days || null,
+        minimumOrderQuantity: item.minimum_order_quantity || null,
+        qualityGrade: item.quality_grade || '',
+        // Add missing fields
+        country: item.country || '',
+        shape: item.shape || '',
+        status: 'active',
+        createdAt: item.created_at || new Date().toISOString(),
+        updatedAt: item.updated_at || new Date().toISOString(),
+      };
+    });
+
+    return {
+      items: transformedData,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / query.limit),
+        hasNext: query.page < Math.ceil((count || 0) / query.limit),
+        hasPrev: query.page > 1,
+      },
+      success: true,
+    };
+  }
 }

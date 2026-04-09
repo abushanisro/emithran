@@ -42,6 +42,8 @@ export interface CreateProcessCostDto extends ProcessCostInput {
   facilityTypeId?: string;
   supplierId?: string;
   supplierLocationId?: string;
+  mhrId?: string;
+  lsrId?: string;
   isActive?: boolean;
   notes?: string;
 }

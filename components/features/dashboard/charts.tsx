@@ -355,12 +355,6 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
     .filter(p => p.hasData)
     .slice(0, 6);
 
-  // Debug logging for cost savings chart
-  if (process.env.NODE_ENV === 'development') {
-    console.log('CostSavingsChart - Projects received:', projects?.length || 0);
-    console.log('CostSavingsChart - Savings data:', savingsData);
-    console.log('CostSavingsChart - Projects sample:', projects?.slice(0, 2));
-  }
 
   // If no projects with cost data, show projects with placeholder data
   if (savingsData.length === 0 && projects.length > 0) {

@@ -394,13 +394,10 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
         setProcessDataLoading(true);
         setProcessDataError(null);
 
-        console.log('🔍 Loading process data for lot:', lotId);
         const processData = await getProcessesByLot(lotId);
-        console.log('📦 Raw process data received:', processData);
 
         // Update sections with process data
         const dataArray = processData?.data || processData || [];
-        console.log('📋 Data array extracted:', dataArray, 'Length:', dataArray.length);
 
         if (Array.isArray(dataArray) && dataArray.length > 0) {
           // Transform and assign processes to sections
@@ -486,8 +483,6 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
 
           setMainSections(updatedSections);
         } else {
-          console.log('⚠️ No process data found - using default sections');
-          console.log('🔧 Lot ID:', lotId, 'Process data structure:', { processData, dataArray });
           setMainSections(DEFAULT_SECTIONS as any);
         }
       } catch (error) {
@@ -823,11 +818,6 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
         bomParts: selectedBomParts,
       };
 
-      console.log('📤 Creating subtask with data:', {
-        ...subtaskData,
-        targetProcessId: targetProcess.id,
-        sectionName: currentSection.name
-      });
 
       await apiClient.post(
         `/production-planning/processes/${targetProcess.id}/subtasks`,
@@ -1292,256 +1282,173 @@ const ProcessPlanningCore: React.FC<ProcessPlanningProps> = ({
             </div>
           </div>
 
-          {/* Process Sections */}
-          <div className="space-y-4">
-            {filteredMainSections.map((mainSection) => {
-              // Get subtasks for this section - either from processes in this section 
-              // OR from other processes if they have this section in their task name prefix
-              const allSubtasks = mainSections.flatMap((section) =>
-                section.subProcesses.flatMap((process) =>
-                  (process.subTasks || [])
-                    .filter((subtask: SubTask) => {
-                      const taskName = subtask.taskName || subtask.task_name || '';
+          {/* Process Table */}
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left p-3 font-medium text-sm">Task Name</th>
+                  <th className="text-left p-3 font-medium text-sm">Section</th>
+                  <th className="text-left p-3 font-medium text-sm">Operator</th>
+                  <th className="text-left p-3 font-medium text-sm">Status</th>
+                  <th className="text-left p-3 font-medium text-sm">Start Date</th>
+                  <th className="text-left p-3 font-medium text-sm">End Date</th>
+                  <th className="text-left p-3 font-medium text-sm">BOM Parts</th>
+                  <th className="text-left p-3 font-medium text-sm">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  // Collect all subtasks from all sections
+                  const allSubtasks = filteredMainSections.flatMap((section) =>
+                    section.subProcesses.flatMap((process) =>
+                      (process.subTasks || []).map((subtask: SubTask) => {
+                        // Extract section name from task name prefix [SectionName] or use process section
+                        const taskName = subtask.taskName || subtask.task_name || '';
+                        const sectionPrefixMatch = taskName.match(/^\[([^\]]+)\]/);
+                        const sectionName = sectionPrefixMatch ? sectionPrefixMatch[1] : section.name;
+                        const cleanTaskName = taskName.replace(/^\[([^\]]+)\]\s*/, '');
+                        
+                        const bomRequirements = parseBOMRequirements(
+                          (subtask as any).bom_requirements || subtask.bomRequirements
+                        );
 
-                      // Extract intended section from task name prefix [SectionName]
-                      const sectionPrefixMatch = taskName.match(/^\[([^\]]+)\]/);
-                      const intendedSectionFromName = sectionPrefixMatch ? sectionPrefixMatch[1] : null;
+                        return {
+                          ...subtask,
+                          processId: process.id,
+                          sectionName,
+                          displayTaskName: cleanTaskName || taskName,
+                          bomRequirements
+                        };
+                      })
+                    )
+                  );
 
-                      // Show subtask in this section if:
-                      // 1. It belongs to a process in this section AND has no section prefix, OR
-                      // 2. It has this section name in its task name prefix
-                      const belongsToThisSection = section.id === mainSection.id;
-                      const intendedForThisSection = intendedSectionFromName === mainSection.name;
+                  if (allSubtasks.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                          <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                          <p className="mb-2">No sub-tasks created yet</p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowNewSubTask('default-process')}
+                            className="flex items-center gap-1"
+                          >
+                            <Plus className="h-3 w-3" />
+                            Create First Sub Task
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  }
 
-                      return (belongsToThisSection && !intendedSectionFromName) || intendedForThisSection;
-                    })
-                    .map((subtask: SubTask) => {
-                      // Clean up the task name by removing the section prefix for display
-                      const taskName = subtask.taskName || subtask.task_name || '';
-                      const cleanTaskName = taskName.replace(/^\[([^\]]+)\]\s*/, '');
-
-                      return {
-                        ...subtask,
-                        processId: process.id,
-                        displayTaskName: cleanTaskName || taskName // Fallback to original if cleaning fails
-                      };
-                    })
-                )
-              );
-
-              return (
-                <Card key={mainSection.id} className="border-l-4 border-l-green-500">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Collapsible>
-                          <CollapsibleTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleSection(mainSection.id)}
-                              className="p-0 h-auto"
-                            >
-                              {mainSection.isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </CollapsibleTrigger>
-                        </Collapsible>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-lg">{mainSection.name}</h3>
-                            <Badge className={getStatusColor(mainSection.status)}>
-                              <div className="flex items-center gap-1">
-                                {getStatusIcon(mainSection.status)}
-                                {mainSection.status}
-                              </div>
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{mainSection.description}</p>
+                  return allSubtasks.map((subtask: any, index) => (
+                    <tr key={subtask.id || `subtask-${index}`} className="border-b hover:bg-muted/25">
+                      <td className="p-3">
+                        <div className="font-medium text-sm" title={subtask.displayTaskName}>
+                          {subtask.displayTaskName}
                         </div>
-                      </div>
-                    </div>
-                  </CardHeader>
+                        <div className="text-xs text-muted-foreground">
+                          #{(subtask as any).task_sequence || index + 1}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <Badge variant="outline" className="text-xs">
+                          {subtask.sectionName}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-sm">
+                        {subtask.assignedOperator || 'Unassigned'}
+                      </td>
+                      <td className="p-3">
+                        <Badge className={getStatusColor(subtask.status || 'PENDING')}>
+                          {(subtask.status || 'PENDING').toUpperCase()}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-sm">
+                        {subtask.plannedStartDate
+                          ? new Date(subtask.plannedStartDate).toLocaleDateString('en-GB')
+                          : '-'}
+                      </td>
+                      <td className="p-3 text-sm">
+                        {subtask.plannedEndDate
+                          ? new Date(subtask.plannedEndDate).toLocaleDateString('en-GB')
+                          : '-'}
+                      </td>
+                      <td className="p-3">
+                        {subtask.bomRequirements.length > 0 ? (
+                          <div className="space-y-1">
+                            {subtask.bomRequirements.slice(0, 2).map((bomPart: any, bomIndex: number) => {
+                              const partNumber =
+                                bomPart.part_number ||
+                                bomPart.partNumber ||
+                                bomPart.bom_item?.part_number ||
+                                'N/A';
+                              const requiredQuantity =
+                                bomPart.required_quantity ||
+                                bomPart.requiredQuantity ||
+                                0;
+                              const unit = bomPart.unit || bomPart.bom_item?.unit || '';
 
-                  <Collapsible open={mainSection.isExpanded || false}>
-                    <CollapsibleContent>
-                      <CardContent className="pt-0">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium flex items-center gap-2">
-                              <Users className="h-4 w-4" />
-                              Sub-Processes ({mainSection.subProcesses.length})
-                            </h4>
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setShowNewSubTask(mainSection.id)}
-                              className="flex items-center gap-1"
-                            >
-                              <Plus className="h-3 w-3" />
-                              Add Sub Task
-                            </Button>
-                          </div>
-
-                          <div className="space-y-3">
-                            {allSubtasks.length === 0 ? (
-                              <div className="text-center py-8 text-muted-foreground">
-                                <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                <p>No sub-tasks created yet</p>
-                                <p className="text-xs">
-                                  Create sub-tasks using the &quot;Add Sub Task&quot; button
-                                </p>
+                              return (
+                                <div key={bomPart.id || bomIndex} className="text-xs bg-secondary/30 px-2 py-1 rounded border">
+                                  <span className="font-mono font-medium text-primary">{partNumber}</span>
+                                  <span className="ml-2 text-muted-foreground">
+                                    {requiredQuantity}{unit}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {subtask.bomRequirements.length > 2 && (
+                              <div className="text-xs text-muted-foreground">
+                                +{subtask.bomRequirements.length - 2} more
                               </div>
-                            ) : (
-                              allSubtasks.map((subtask, index) => {
-                                const bomRequirements = parseBOMRequirements(
-                                  (subtask as any).bom_requirements || subtask.bomRequirements
-                                );
-
-                                return (
-                                  <div
-                                    key={subtask.id || `subtask-${index}`}
-                                    className="bg-card border border-border/50 rounded-md p-1.5 shadow-sm hover:shadow-card transition-all duration-200 hover:border-primary/30"
-                                  >
-                                    {/* Header */}
-                                    <div className="flex items-center justify-between mb-1">
-                                      <div className="flex items-center gap-1 flex-1 min-w-0">
-                                        <Badge
-                                          variant={
-                                            subtask.status === 'COMPLETED' ? 'default' : 'secondary'
-                                          }
-                                          className="text-xs px-1.5 py-0.5 h-4 shrink-0 bg-primary/10 text-primary border-primary/20"
-                                        >
-                                          {(subtask.status || 'PENDING').toUpperCase()}
-                                        </Badge>
-                                        <h4
-                                          className="font-medium text-sm truncate text-foreground"
-                                          title={(subtask as any).displayTaskName || subtask.taskName}
-                                        >
-                                          {(subtask as any).displayTaskName || subtask.taskName}
-                                        </h4>
-                                      </div>
-                                      <div className="text-xs text-muted-foreground font-mono shrink-0">
-                                        #{(subtask as any).task_sequence || 0}
-                                      </div>
-                                    </div>
-
-                                    {/* Info */}
-                                    <div className="grid grid-cols-2 gap-1.5 text-xs mb-1">
-                                      <div className="min-w-0">
-                                        <span className="text-muted-foreground">Op:</span>
-                                        <span className="font-medium text-foreground ml-1 truncate block">
-                                          {subtask.assignedOperator || 'Unassigned'}
-                                        </span>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <span className="text-muted-foreground">Date:</span>
-                                        <span className="text-foreground ml-1 block truncate">
-                                          {subtask.plannedStartDate && subtask.plannedEndDate
-                                            ? `${new Date(subtask.plannedStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}-${new Date(subtask.plannedEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}`
-                                            : 'Not scheduled'}
-                                        </span>
-                                      </div>
-                                    </div>
-
-                                    {/* BOM Parts */}
-                                    {bomRequirements.length > 0 && (
-                                      <div className="border-t border-border/30 pt-1">
-                                        <div className="flex items-center justify-between mb-0.5">
-                                          <span className="text-xs text-muted-foreground font-medium">
-                                            BOM
-                                          </span>
-                                          <Badge
-                                            variant="outline"
-                                            className="text-xs h-3.5 px-1.5 bg-secondary/50 text-secondary-foreground"
-                                          >
-                                            {bomRequirements.length}
-                                          </Badge>
-                                        </div>
-                                        <div className="space-y-0.5">
-                                          {bomRequirements.map((bomPart: any, bomIndex: number) => {
-                                            const partNumber =
-                                              bomPart.part_number ||
-                                              bomPart.partNumber ||
-                                              bomPart.bom_item?.part_number ||
-                                              'N/A';
-                                            const partName =
-                                              bomPart.part_name ||
-                                              bomPart.partName ||
-                                              bomPart.name ||
-                                              bomPart.bom_item?.name ||
-                                              'Part';
-                                            const requiredQuantity =
-                                              bomPart.required_quantity ||
-                                              bomPart.requiredQuantity ||
-                                              0;
-                                            const unit = bomPart.unit || bomPart.bom_item?.unit || '';
-
-                                            return (
-                                              <div
-                                                key={bomPart.id || bomIndex}
-                                                className="bg-secondary/30 border border-border/20 px-2 py-1 rounded text-xs"
-                                              >
-                                                <div className="flex items-center justify-between">
-                                                  <div className="flex-1 min-w-0">
-                                                    <span className="font-mono font-medium text-primary">
-                                                      {partNumber}
-                                                    </span>
-                                                    <span className="text-muted-foreground ml-1 truncate">
-                                                      {partName.length > 18
-                                                        ? partName.substring(0, 18) + '...'
-                                                        : partName}
-                                                    </span>
-                                                  </div>
-                                                  <span className="font-medium text-foreground shrink-0 ml-1">
-                                                    {requiredQuantity}
-                                                    {unit}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Actions */}
-                                    <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-border/20">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 px-2 text-xs hover:bg-secondary/50"
-                                        onClick={() => handleEditSubtask(subtask)}
-                                      >
-                                        <Edit2 className="h-3 w-3 mr-1" />
-                                        Edit
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                        onClick={() => handleDeleteSubtask(subtask)}
-                                      >
-                                        <Trash2 className="h-3 w-3 mr-1" />
-                                        Del
-                                      </Button>
-                                    </div>
-                                  </div>
-                                );
-                              })
                             )}
                           </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No BOM parts</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 text-xs hover:bg-secondary/50"
+                            onClick={() => handleEditSubtask(subtask)}
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteSubtask(subtask)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </Card>
-              );
-            })}
+                      </td>
+                    </tr>
+                  ));
+                })()}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Add Sub Task Button */}
+          <div className="flex justify-center pt-4">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowNewSubTask('default-process')}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add New Sub Task
+            </Button>
           </div>
 
           {/* Empty State */}

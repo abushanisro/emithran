@@ -1,226 +1,266 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { StatCard } from "@/components/features/dashboard";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Plus, BarChart3, TrendingUp, DollarSign, Weight } from "lucide-react";
+import {
+  useProjects,
+  useBOMItems,
+  useRawMaterials,
+  useProcesses,
+  useVendors,
+  useBOMs,
+} from "@/lib/api/hooks";
+import type {
+  BenchmarkStep,
+  BOMMetricEntry,
+  SelectedBOM,
+  SelectedProject,
+} from "./types";
+import { calculateMetrics, safeNum } from "./utils";
+import { ProjectSelection } from "./components/ProjectSelection";
+import { BOMSelection } from "./components/BOMSelection";
+import { ComparisonView } from "./components/comparison";
 
-export default function BenchmarkDashboardPage() {
+// ─── Page ─────────────────────────────────────────────────────────────────────
+export default function BenchmarkPage() {
   const searchParams = useSearchParams();
-  const projectId = searchParams?.get('projectId');
-  
-  const isProjectContext = Boolean(projectId);
-  const pageTitle = isProjectContext 
-    ? "Project Benchmark Analysis" 
-    : "Benchmark Analysis Dashboard";
-  const pageDescription = isProjectContext
-    ? "Compare this project's BOMs with others to identify optimization opportunities"
-    : "Comprehensive BOM comparison and VAVE opportunity analysis";
+  const projectIdFromUrl = searchParams?.get("projectId");
 
-  return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
-        title={pageTitle}
-        description={pageDescription}
-      >
-        <div className="flex gap-2">
-          {isProjectContext && (
-            <Badge variant="outline" className="mr-2">
-              Project Context: {projectId}
-            </Badge>
-          )}
-          <Button variant="outline">
-            <BarChart3 className="mr-2 h-4 w-4" />
-            Export Report
-          </Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            {isProjectContext ? "Compare with Projects" : "New Benchmark"}
-          </Button>
-        </div>
-      </PageHeader>
+  // ── Remote data ──────────────────────────────────────────────────────────────
+  const { data: projectsData } = useProjects();
+  const projects = projectsData?.projects ?? [];
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Active Benchmarks"
-          value="0"
-          change={0}
-          changeLabel="this month"
-          icon={<BarChart3 className="h-5 w-5 text-primary" />}
-        />
-        <StatCard
-          title="Cost Savings Identified"
-          value="$0"
-          change={0}
-          changeLabel="vs last quarter"
-          icon={<DollarSign className="h-5 w-5 text-green-600" />}
-        />
-        <StatCard
-          title="VAVE Opportunities"
-          value="0"
-          change={0}
-          changeLabel="new this week"
-          icon={<TrendingUp className="h-5 w-5 text-blue-600" />}
-        />
-        <StatCard
-          title="Weight Reduction"
-          value="0%"
-          change={0}
-          changeLabel="average savings"
-          icon={<Weight className="h-5 w-5 text-orange-600" />}
-        />
-      </div>
+  const { data: rawMaterialsData } = useRawMaterials();
+  const { data: processesData } = useProcesses();
+  const { data: vendorsData } = useVendors();
 
-      {/* Overview Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Benchmarks */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Benchmark Studies</CardTitle>
-            <CardDescription>Latest completed analyses</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-12 text-muted-foreground">
-              <BarChart3 className="mx-auto h-12 w-12 mb-4" />
-              <p>No benchmark studies available</p>
-              <p className="text-sm">Create your first benchmark to get started</p>
-            </div>
-          </CardContent>
-        </Card>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawMaterialsRecord = rawMaterialsData as unknown as Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawMaterials: any[] =
+    rawMaterialsRecord?.rawMaterials ?? rawMaterialsRecord?.data ?? [];
+  const processes = processesData?.processes ?? [];
+  const vendors = vendorsData?.vendors ?? [];
 
-        {/* Top Cost Drivers */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Cost Drivers</CardTitle>
-            <CardDescription>Highest impact opportunities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-12 text-muted-foreground">
-              <DollarSign className="mx-auto h-12 w-12 mb-4" />
-              <p>No cost analysis data available</p>
-              <p className="text-sm">Complete benchmarks to identify cost drivers</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+  // ── UI state ─────────────────────────────────────────────────────────────────
+  const [step, setStep] = useState<BenchmarkStep>("project-selection");
+  const [searchProject, setSearchProject] = useState("");
+  const [selectedProject, setSelectedProject] = useState<SelectedProject | null>(null);
+  const [selectedBOMs, setSelectedBOMs] = useState<SelectedBOM[]>([]);
+  const [multiProjectMode, setMultiProjectMode] = useState(false);
+  const [selectedProjects, setSelectedProjects] = useState<SelectedProject[]>([]);
 
-      {/* Performance Metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Performance Metrics</CardTitle>
-          <CardDescription>Overall benchmarking performance</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold">0%</div>
-              <p className="text-sm text-muted-foreground">Average Cost Optimization</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-sm text-muted-foreground">Parts Analyzed</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">$0</div>
-              <p className="text-sm text-muted-foreground">Total Savings Identified</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Cost Analysis Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cost Analysis Dashboard</CardTitle>
-          <CardDescription>Detailed cost comparison and analysis tools</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <BarChart3 className="mx-auto h-12 w-12 mb-4" />
-            <p>Cost analysis tools will be implemented here</p>
-            <p className="text-sm">Including cost comparison charts, breakdown analysis, and trends</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Weight Analysis Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Weight Analysis Dashboard</CardTitle>
-          <CardDescription>Weight comparison and optimization opportunities</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <Weight className="mx-auto h-12 w-12 mb-4" />
-            <p>Weight analysis tools will be implemented here</p>
-            <p className="text-sm">Including weight distribution, material optimization, and reduction opportunities</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* VAVE Opportunities Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>VAVE Opportunities</CardTitle>
-          <CardDescription>Value Analysis Value Engineering recommendations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <TrendingUp className="mx-auto h-12 w-12 mb-4" />
-            <p>VAVE analysis engine will be implemented here</p>
-            <p className="text-sm">Including process optimization, material substitution, and design improvements</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Benchmark Sets Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Benchmark Sets</CardTitle>
-          <CardDescription>
-            {isProjectContext 
-              ? "Compare this project's BOMs with other projects" 
-              : "Manage and create benchmark comparison sets"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isProjectContext ? (
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                <h4 className="font-medium mb-2">Project Context Mode</h4>
-                <p className="text-sm text-muted-foreground">
-                  You're viewing benchmarks for Project {projectId}. Compare this project's BOMs with similar projects to identify:
-                </p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1">
-                  <li>Cost optimization opportunities</li>
-                  <li>Material substitution possibilities</li>
-                  <li>Process improvement areas</li>
-                  <li>Weight reduction potential</li>
-                </ul>
-              </div>
-              <div className="text-center py-8 text-muted-foreground">
-                <Plus className="mx-auto h-12 w-12 mb-4" />
-                <p className="text-lg font-medium mb-2">Ready to Compare Projects</p>
-                <p className="text-sm">Select other projects to benchmark against this one</p>
-                <Button className="mt-4">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Start Project Comparison
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <Plus className="mx-auto h-12 w-12 mb-4" />
-              <p>Benchmark set management will be implemented here</p>
-              <p className="text-sm">Including BOM selection, comparison setup, and analysis configuration</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+  // ── BOMs for single-project mode ─────────────────────────────────────────────
+  const { data: bomsData } = useBOMs(
+    selectedProject ? { projectId: selectedProject.id } : undefined
   );
+  const boms = bomsData?.boms ?? [];
+
+  // ── BOMs for up to 10 projects (fixed hook count — Rules of Hooks) ────────────
+  const p1 = selectedProjects[0];
+  const p2 = selectedProjects[1];
+  const p3 = selectedProjects[2];
+  const p4 = selectedProjects[3];
+  const p5 = selectedProjects[4];
+  const p6 = selectedProjects[5];
+  const p7 = selectedProjects[6];
+  const p8 = selectedProjects[7];
+  const p9 = selectedProjects[8];
+  const p10 = selectedProjects[9];
+
+  const { data: bomsP1 } = useBOMs(p1 ? { projectId: p1.id } : undefined);
+  const { data: bomsP2 } = useBOMs(p2 ? { projectId: p2.id } : undefined);
+  const { data: bomsP3 } = useBOMs(p3 ? { projectId: p3.id } : undefined);
+  const { data: bomsP4 } = useBOMs(p4 ? { projectId: p4.id } : undefined);
+  const { data: bomsP5 } = useBOMs(p5 ? { projectId: p5.id } : undefined);
+  const { data: bomsP6 } = useBOMs(p6 ? { projectId: p6.id } : undefined);
+  const { data: bomsP7 } = useBOMs(p7 ? { projectId: p7.id } : undefined);
+  const { data: bomsP8 } = useBOMs(p8 ? { projectId: p8.id } : undefined);
+  const { data: bomsP9 } = useBOMs(p9 ? { projectId: p9.id } : undefined);
+  const { data: bomsP10 } = useBOMs(p10 ? { projectId: p10.id } : undefined);
+
+  const multiProjectBoms = (
+    [
+      p1 && { projectId: p1.id, projectName: p1.name, boms: bomsP1?.boms ?? [] },
+      p2 && { projectId: p2.id, projectName: p2.name, boms: bomsP2?.boms ?? [] },
+      p3 && { projectId: p3.id, projectName: p3.name, boms: bomsP3?.boms ?? [] },
+      p4 && { projectId: p4.id, projectName: p4.name, boms: bomsP4?.boms ?? [] },
+      p5 && { projectId: p5.id, projectName: p5.name, boms: bomsP5?.boms ?? [] },
+      p6 && { projectId: p6.id, projectName: p6.name, boms: bomsP6?.boms ?? [] },
+      p7 && { projectId: p7.id, projectName: p7.name, boms: bomsP7?.boms ?? [] },
+      p8 && { projectId: p8.id, projectName: p8.name, boms: bomsP8?.boms ?? [] },
+      p9 && { projectId: p9.id, projectName: p9.name, boms: bomsP9?.boms ?? [] },
+      p10 && { projectId: p10.id, projectName: p10.name, boms: bomsP10?.boms ?? [] },
+    ] as const
+  ).filter(
+    (x): x is { projectId: string; projectName: string; boms: any[] } => Boolean(x) // eslint-disable-line @typescript-eslint/no-explicit-any
+  );
+
+  // ── BOM items for up to 10 selected BOMs (fixed hook count) ─────────────────
+  const bi1 = useBOMItems(selectedBOMs[0]?.id);
+  const bi2 = useBOMItems(selectedBOMs[1]?.id);
+  const bi3 = useBOMItems(selectedBOMs[2]?.id);
+  const bi4 = useBOMItems(selectedBOMs[3]?.id);
+  const bi5 = useBOMItems(selectedBOMs[4]?.id);
+  const bi6 = useBOMItems(selectedBOMs[5]?.id);
+  const bi7 = useBOMItems(selectedBOMs[6]?.id);
+  const bi8 = useBOMItems(selectedBOMs[7]?.id);
+  const bi9 = useBOMItems(selectedBOMs[8]?.id);
+  const bi10 = useBOMItems(selectedBOMs[9]?.id);
+
+  const bomItemsQueries = [bi1, bi2, bi3, bi4, bi5, bi6, bi7, bi8, bi9, bi10].slice(
+    0,
+    selectedBOMs.length
+  );
+
+  // ── URL param: auto-select project ───────────────────────────────────────────
+  useEffect(() => {
+    if (projectIdFromUrl && projects.length > 0) {
+      const project = projects.find((p) => p.id === projectIdFromUrl);
+      if (project) handleProjectSelect(project);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectIdFromUrl, projects]);
+
+  // ── Derived: BOM metrics ─────────────────────────────────────────────────────
+  const bomMetrics: BOMMetricEntry[] = selectedBOMs.map((bom, index) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawItems = bomItemsQueries[index]?.data?.items as any[] | undefined;
+    return {
+      bom,
+      metrics: calculateMetrics(rawItems),
+      items: rawItems,
+    };
+  });
+
+  const bomItemCounts = bomItemsQueries.map((q) => q?.data?.items?.length ?? 0);
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const toSelectedProject = (project: any): SelectedProject => ({
+    id: project.id,
+    name: project.name,
+    targetPrice:
+      safeNum(project.targetPrice) ||
+      safeNum(project.shouldCost) ||
+      safeNum(project.targetBomCost),
+    updatedAt: project.updatedAt ?? new Date().toISOString(),
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleProjectSelect = (project: any) => {
+    if (multiProjectMode) {
+      handleMultiProjectToggle(project);
+    } else {
+      setSelectedProject(toSelectedProject(project));
+      setStep("bom-selection");
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleMultiProjectToggle = (project: any) => {
+    const pd = toSelectedProject(project);
+    setSelectedProjects((prev) =>
+      prev.some((p) => p.id === project.id)
+        ? prev.filter((p) => p.id !== project.id)
+        : [...prev, pd]
+    );
+  };
+
+  const handleMultiProjectComparison = () => {
+    if (selectedProjects.length >= 2) setStep("bom-selection");
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleBomToggle = (bom: any) => {
+    const bomData: SelectedBOM = {
+      id: bom.id,
+      name: bom.displayName ?? bom.name,
+      version: bom.version ?? "v1.0",
+      status: bom.status ?? "draft",
+    };
+    setSelectedBOMs((prev) =>
+      prev.some((b) => b.id === bom.id)
+        ? prev.filter((b) => b.id !== bom.id)
+        : [...prev, bomData]
+    );
+  };
+
+  const handleBack = () => {
+    if (step === "comparison") {
+      setStep("bom-selection");
+    } else if (step === "bom-selection") {
+      setStep("project-selection");
+      if (!multiProjectMode) setSelectedProject(null);
+      setSelectedBOMs([]);
+    }
+  };
+
+  const handleSetMultiMode = (v: boolean) => {
+    setMultiProjectMode(v);
+    if (v) {
+      setSelectedProject(null);
+    } else {
+      setSelectedProjects([]);
+    }
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+  if (step === "project-selection") {
+    return (
+      <ProjectSelection
+        projects={projects}
+        multiProjectMode={multiProjectMode}
+        selectedProjects={selectedProjects}
+        searchProject={searchProject}
+        onSearch={setSearchProject}
+        onProjectSelect={handleProjectSelect}
+        onMultiToggle={handleMultiProjectToggle}
+        onSetMultiMode={handleSetMultiMode}
+        onCompareProjects={handleMultiProjectComparison}
+      />
+    );
+  }
+
+  if (step === "bom-selection" && (selectedProject || multiProjectMode)) {
+    return (
+      <BOMSelection
+        selectedProject={selectedProject}
+        multiProjectMode={multiProjectMode}
+        selectedProjects={selectedProjects}
+        selectedBOMs={selectedBOMs}
+        boms={boms}
+        multiProjectBoms={multiProjectBoms}
+        bomItemCounts={bomItemCounts}
+        onBack={handleBack}
+        onBomToggle={handleBomToggle}
+        onCompare={() => {
+          if (selectedBOMs.length >= 2) setStep("comparison");
+        }}
+      />
+    );
+  }
+
+  if (
+    step === "comparison" &&
+    (selectedProject || multiProjectMode) &&
+    selectedBOMs.length >= 2
+  ) {
+    return (
+      <ComparisonView
+        bomMetrics={bomMetrics}
+        selectedBOMs={selectedBOMs}
+        selectedProject={selectedProject}
+        multiProjectMode={multiProjectMode}
+        selectedProjects={selectedProjects}
+        processes={processes}
+        vendors={vendors}
+        rawMaterials={rawMaterials}
+        onBack={handleBack}
+      />
+    );
+  }
+
+  // Fallback — should not normally render
+  return null;
 }

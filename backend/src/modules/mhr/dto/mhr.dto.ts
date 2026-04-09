@@ -136,6 +136,17 @@ export class CreateMHRDto {
   @IsNumber()
   @Min(0)
   profitMarginPercentage: number;
+
+  // Manual Entry Fields
+  @ApiPropertyOptional({ description: 'Flag indicating if this is a manual entry (skips calculation)' })
+  @IsOptional()
+  isManualEntry?: boolean;
+
+  @ApiPropertyOptional({ description: 'Manually entered MHR value (INR per hour)' })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  manualMHRValue?: number;
 }
 
 export class UpdateMHRDto {
@@ -282,6 +293,17 @@ export class UpdateMHRDto {
   @Min(0)
   @IsOptional()
   profitMarginPercentage?: number;
+
+  // Manual Entry Fields
+  @ApiPropertyOptional({ description: 'Flag indicating if this is a manual entry (skips calculation)' })
+  @IsOptional()
+  isManualEntry?: boolean;
+
+  @ApiPropertyOptional({ description: 'Manually entered MHR value (INR per hour)' })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  manualMHRValue?: number;
 }
 
 export class QueryMHRDto {

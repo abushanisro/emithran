@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DataSource } from '@/lib/api/calculators';
 import { DatabaseRecordPicker } from './DatabaseRecordPicker';
@@ -26,6 +25,11 @@ type DatabaseFieldExtractorProps = {
   disabled?: boolean;
   associatedProcessId?: string;
 };
+// Material categories for better organization
+const MATERIAL_CATEGORIES = [
+  { code: 'PLASTIC_RUBBER', label: 'Plastic & Rubber', description: 'Thermoplastic and rubber-based materials' },
+  { code: 'FERROUS_NON_FERROUS', label: 'Ferrous & Non-Ferrous', description: 'All metallic materials including steel and alloys' },
+];
 
 // Define available fields for each data source
 const DATA_SOURCE_FIELDS: Record<DataSource, Array<{ field: string; label: string; description: string }>> = {
@@ -46,12 +50,46 @@ const DATA_SOURCE_FIELDS: Record<DataSource, Array<{ field: string; label: strin
     { field: 'dearnessAllowance', label: 'Dearness Allowance', description: 'DA component' },
   ],
   raw_materials: [
+    // Basic Material Info
     { field: 'material', label: 'Material Name', description: 'Name of the material' },
     { field: 'materialGrade', label: 'Grade', description: 'Material grade/specification' },
     { field: 'materialGroup', label: 'Group', description: 'Material category' },
-    { field: 'density', label: 'Density', description: 'Material density' },
+    { field: 'materialType', label: 'Type', description: 'Material type classification' },
+    { field: 'application', label: 'Application', description: 'Material application' },
+    
+    // Physical Properties
+    { field: 'density', label: 'Density', description: 'Material density (g/cm³)' },
+    { field: 'densityKgM3', label: 'Density (kg/m³)', description: 'Material density in kg/m³' },
+    
+    // Mechanical Properties
+    { field: 'ultimateTensileStrength', label: 'UTS (MPa)', description: 'Ultimate tensile strength' },
+    { field: 'yieldTensileStrength', label: 'YTS (MPa)', description: 'Yield tensile strength' },
+    { field: 'shearingStrength', label: 'Shear Strength (MPa)', description: 'Shearing strength' },
+    
+    // Thermal Properties
+    { field: 'meltingTempC', label: 'Melting Temp (°C)', description: 'Melting temperature' },
+    { field: 'moldTempC', label: 'Mold Temp (°C)', description: 'Recommended mold temperature' },
+    { field: 'ejectDeflectionTempC', label: 'Deflection Temp (°C)', description: 'Heat deflection temperature' },
+    { field: 'thermalConductivityMelt', label: 'Thermal Conductivity', description: 'Thermal conductivity in melt' },
+    { field: 'specificHeatMelt', label: 'Specific Heat', description: 'Specific heat in melt' },
+    
+    // Processing Properties
+    { field: 'clampingPressureMpa', label: 'Clamping Pressure (MPa)', description: 'Required clamping pressure' },
+    { field: 'regrindingPercentage', label: 'Regrind %', description: 'Regrinding percentage allowed' },
+    
+    // Commercial Properties
+    { field: 'cost', label: 'Cost per Unit', description: 'Material cost per unit' },
     { field: 'costPerKg', label: 'Cost per KG', description: 'Price per kilogram' },
+    { field: 'currency', label: 'Currency', description: 'Price currency' },
     { field: 'location', label: 'Location', description: 'Storage location' },
+    { field: 'country', label: 'Country', description: 'Country of origin' },
+    { field: 'shape', label: 'Shape', description: 'Material form/shape' },
+    
+    // Standards
+    { field: 'astmStandard', label: 'ASTM Standard', description: 'ASTM standard specification' },
+    { field: 'dinStandard', label: 'DIN Standard', description: 'DIN standard specification' },
+    { field: 'enStandard', label: 'EN Standard', description: 'EN standard specification' },
+    { field: 'jisStandard', label: 'JIS Standard', description: 'JIS standard specification' },
   ],
   processes: [
     { field: 'processName', label: 'Process Name', description: 'Name of the process' },
@@ -85,6 +123,7 @@ export function DatabaseFieldExtractor({
   const [tablesLoading, setTablesLoading] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [loadedProcessId, setLoadedProcessId] = useState<string | null>(null);
+  const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<string>('');
 
   // Initialize selected table from selectedField
   useEffect(() => {
@@ -148,6 +187,7 @@ export function DatabaseFieldExtractor({
 
     fetchReferenceTables();
   }, [associatedProcessId, selectedRecord, recordId, dataSource, loadedProcessId, referenceTables.length]);
+
 
   useEffect(() => {
     if (dataSource && dataSource !== 'manual') {
@@ -293,63 +333,78 @@ export function DatabaseFieldExtractor({
       </div>
 
       <div className="space-y-4">
-        {/* Record Selection */}
-        <div className="space-y-2">
-          <Label className="text-xs font-medium">Select Record/Table</Label>
-          <DatabaseRecordPicker
-            dataSource={dataSource}
-            value={selectedRecord}
-            associatedProcessId={associatedProcessId}
-            onSelect={(record) => {
-              setSelectedRecord(record?.id || '');
-            }}
-            placeholder={`Select ${dataSource.replace('_', ' ')} record...`}
-            disabled={disabled}
-          />
-        </div>
+        {/* Material Category Selection - Only show for raw_materials */}
+        {dataSource === 'raw_materials' && !disabled && (
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">Material Category</Label>
+            <Select
+              value={selectedMaterialCategory}
+              onValueChange={(value) => {
+                setSelectedMaterialCategory(value);
+                setSelectedRecord(''); // Clear selected record when category changes
+              }}
+              disabled={disabled}
+            >
+              <SelectTrigger className={cn("h-9", disabled ? "bg-secondary/20" : "bg-primary/5 border-primary/10")}>
+                <SelectValue placeholder="Choose material category..." />
+              </SelectTrigger>
+              <SelectContent>
+                {MATERIAL_CATEGORIES.map((category) => (
+                  <SelectItem key={category.code} value={category.code}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{category.label}</span>
+                      <span className="text-xs text-muted-foreground">{category.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-        {/* Field Selection */}
-        <div className="space-y-2">
-          <Label className="text-xs font-medium">Extract Specific Field (Optional)</Label>
-          <Select value={selectedField || ''} onValueChange={onFieldSelect} disabled={disabled}>
-            <SelectTrigger className={cn("h-9", disabled ? "bg-secondary/20" : "bg-primary/5 border-primary/10")}>
-              <SelectValue placeholder="Select field to extract (optional)" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableFields.map((field) => (
-                <SelectItem key={field.field} value={field.field}>
-                  <div className="flex items-center gap-2">
-                    <span>{field.label}</span>
-                    <Badge variant="outline" className="text-[10px]">
-                      {field.field}
-                    </Badge>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Field Selection for Raw Materials */}
+        {dataSource === 'raw_materials' && selectedMaterialCategory && (
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">Select Property to Extract</Label>
+            <Select
+              value={selectedField || ''}
+              onValueChange={onFieldSelect}
+              disabled={disabled}
+            >
+              <SelectTrigger className={cn("h-9", disabled ? "bg-secondary/20" : "bg-primary/5 border-primary/10")}>
+                <SelectValue placeholder="Choose material property..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-64 overflow-y-auto">
+                {availableFields.map((field) => (
+                  <SelectItem key={field.field} value={field.field}>
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">{field.label}</span>
+                      <span className="text-xs text-muted-foreground">{field.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-          {selectedField && (
-            <div className="space-y-3">
-              <div className="flex items-start gap-1 text-xs text-muted-foreground bg-muted/50 p-2 rounded-md">
-                <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="font-medium">
-                    {availableFields.find(f => f.field === selectedField)?.label}:
-                  </span>{' '}
-                  {availableFields.find(f => f.field === selectedField)?.description}
-                </div>
-              </div>
+        {/* Record Selection - Only show for non raw_materials or when category not selected */}
+        {(dataSource !== 'raw_materials' || !selectedMaterialCategory) && (
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">Select Record/Table</Label>
+            <DatabaseRecordPicker
+              dataSource={dataSource}
+              value={selectedRecord}
+              associatedProcessId={associatedProcessId}
+              onSelect={(record) => {
+                setSelectedRecord(record?.id || '');
+              }}
+              placeholder={`Select ${dataSource.replace('_', ' ')} record...`}
+              disabled={disabled}
+            />
+          </div>
+        )}
 
-            </div>
-          )}
-
-          {!selectedField && (
-            <p className="text-xs text-muted-foreground">
-              Leave empty to use the entire record, or select a specific field to extract its value
-            </p>
-          )}
-        </div>
 
         {/* Preview */}
         {selectedField && (

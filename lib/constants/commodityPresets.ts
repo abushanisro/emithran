@@ -15,7 +15,7 @@ export interface CommodityOption {
 }
 
 export const COMMODITY_PRESETS: CommodityOption[] = [
-  // Industry Commodities
+  // Process Group: Plastic & Rubber
   {
     value: 'plastic-rubber',
     label: 'Plastic & Rubber',

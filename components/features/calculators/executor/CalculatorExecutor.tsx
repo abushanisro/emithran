@@ -61,7 +61,7 @@ type ReferenceTableData = {
   rows: Array<Record<string, any>>;
 };
 
-// Function to substitute formula placeholders with actual values
+// Function to substitute formula placeholders with actual values (with units for display)
 function substituteFormulaValues(formula: string, values: FieldValues): string {
   if (!formula) return '';
   
@@ -104,55 +104,227 @@ function substituteFormulaValues(formula: string, values: FieldValues): string {
   return substituted;
 }
 
-// Function to create step-by-step calculation breakdown
-function createCalculationSteps(formula: string, values: FieldValues): Array<{step: number, description: string, calculation: string}> {
+// Function to substitute formula placeholders with pure numerical values (for calculation)
+function substituteNumericalValues(formula: string, values: FieldValues): string {
+  if (!formula) return '';
+  
+  // Replace placeholders like {demo} with just the numerical values
+  let substituted = formula.replace(/\{([^}]+)\}/g, (match, fieldName) => {
+    const fieldKey = Object.keys(values).find(key => 
+      key.toLowerCase().replace(/\s+/g, '') === fieldName.toLowerCase().replace(/\s+/g, '')
+    );
+    
+    if (fieldKey && values[fieldKey] !== null && values[fieldKey] !== undefined) {
+      const value = values[fieldKey];
+      return value?.toString() || match;
+    }
+    
+    return match; // Keep original if no match found
+  });
+  
+  // Replace common constants with numerical values
+  substituted = substituted.replace(/\bPI\b/g, Math.PI.toString());
+  substituted = substituted.replace(/\bE\b/g, Math.E.toString());
+  
+  return substituted;
+}
+
+// Function to create step-by-step calculation breakdown with enhanced demonstration
+function createCalculationSteps(formula: string, values: FieldValues): Array<{step: number, description: string, calculation: string, result?: string, isIntermediate?: boolean}> {
   if (!formula) return [];
   
-  const steps: Array<{step: number, description: string, calculation: string}> = [];
+  const steps: Array<{step: number, description: string, calculation: string, result?: string, isIntermediate?: boolean}> = [];
   let stepCount = 1;
   
   // Step 1: Show original formula with explanation
-  const formulaExplanation = getTurningFormulaExplanation(formula);
+  const formulaExplanation = getTurningFormulaExplanation(formula) || "Original formula";
   steps.push({
     step: stepCount++,
-    description: formulaExplanation || "Original formula",
-    calculation: formula
+    description: formulaExplanation,
+    calculation: formula,
+    isIntermediate: false
   });
   
-  // Step 2: Show substituted values
+  // Step 2: Show field substitution with live values
   const substituted = substituteFormulaValues(formula, values);
   if (substituted !== formula) {
     steps.push({
       step: stepCount++,
-      description: "Substitute known values",
-      calculation: substituted
+      description: "Substitute field values",
+      calculation: substituted,
+      isIntermediate: true
     });
   }
   
-  // Step 3: Show simplified expression (remove units for calculation)
-  const simplified = simplifyForCalculation(substituted);
-  if (simplified !== substituted) {
+  // Step 3: Show function evaluation breakdown using numerical values
+  const numericalSubstituted = substituteNumericalValues(formula, values);
+  const functionBreakdown = evaluateFunctionSteps(numericalSubstituted, values);
+  functionBreakdown.forEach(funcStep => {
     steps.push({
       step: stepCount++,
-      description: "Simplify for calculation",
-      calculation: simplified
+      description: funcStep.description,
+      calculation: funcStep.calculation,
+      result: funcStep.result,
+      isIntermediate: true
+    });
+  });
+  
+  // Step 4: Show arithmetic operations step by step using numerical values
+  const arithmeticSteps = evaluateArithmeticSteps(numericalSubstituted);
+  arithmeticSteps.forEach(arithStep => {
+    steps.push({
+      step: stepCount++,
+      description: arithStep.description,
+      calculation: arithStep.calculation,
+      result: arithStep.result,
+      isIntermediate: true
+    });
+  });
+  
+  // Final step: Show final result
+  try {
+    const finalResult = tryEvaluate(numericalSubstituted);
+    if (finalResult && finalResult !== numericalSubstituted && !isNaN(parseFloat(finalResult))) {
+      steps.push({
+        step: stepCount++,
+        description: "Final result",
+        calculation: `= ${finalResult}`,
+        result: finalResult,
+        isIntermediate: false
+      });
+    }
+  } catch (error) {
+    // Handle evaluation errors gracefully
+  }
+  
+  return steps;
+}
+
+// Enhanced function to break down function evaluations
+function evaluateFunctionSteps(expression: string, values: FieldValues): Array<{description: string, calculation: string, result: string}> {
+  const steps: Array<{description: string, calculation: string, result: string}> = [];
+  
+  // Look for common functions and evaluate them step by step
+  const functionPattern = /(SUM|AVG|MIN|MAX|LN|LOG|SQRT|POW|ABS|ROUND)\s*\([^)]+\)/g;
+  const matches = expression.match(functionPattern);
+  
+  if (matches) {
+    matches.forEach(match => {
+      try {
+        const funcName = match.match(/(SUM|AVG|MIN|MAX|LN|LOG|SQRT|POW|ABS|ROUND)/)?.[0];
+        const args = match.match(/\(([^)]+)\)/)?.[1];
+        
+        if (funcName && args) {
+          // Special handling for mathematical functions
+          let functionResult: string;
+          let description: string;
+          let calculationDisplay: string;
+          
+          if (funcName === 'LOG') {
+            const argValue = parseFloat(args.trim());
+            if (!isNaN(argValue) && argValue > 0) {
+              functionResult = Math.log10(argValue).toFixed(3);
+              description = `Evaluate LOG function (base 10)`;
+              calculationDisplay = `LOG(${argValue}) = log₁₀(${argValue})`;
+            } else {
+              functionResult = args;
+              description = `Evaluate ${funcName} function`;
+              calculationDisplay = `${funcName}(${args})`;
+            }
+          } else if (funcName === 'LN') {
+            const argValue = parseFloat(args.trim());
+            if (!isNaN(argValue) && argValue > 0) {
+              functionResult = Math.log(argValue).toFixed(3);
+              description = `Evaluate LN function (natural log, base e)`;
+              calculationDisplay = `LN(${argValue}) = logₑ(${argValue})`;
+            } else {
+              functionResult = args;
+              description = `Evaluate ${funcName} function`;
+              calculationDisplay = `${funcName}(${args})`;
+            }
+          } else {
+            // Handle other functions
+            const evaluatedArgs = args.split(',').map(arg => {
+              const trimmed = arg.trim();
+              const argValue = tryEvaluate(trimmed);
+              return argValue !== trimmed ? `${trimmed} = ${argValue}` : trimmed;
+            }).join(', ');
+            
+            functionResult = tryEvaluate(match);
+            description = `Evaluate ${funcName} function`;
+            calculationDisplay = `${funcName}(${evaluatedArgs})`;
+          }
+          
+          steps.push({
+            description,
+            calculation: calculationDisplay,
+            result: functionResult
+          });
+        }
+      } catch (error) {
+        // Skip functions that can't be evaluated
+      }
     });
   }
   
-  // Step 4: Show intermediate calculations (for common patterns)
-  if (simplified.includes('*') || simplified.includes('/') || simplified.includes('+') || simplified.includes('-')) {
-    try {
-      const evaluated = evaluateFormulaSteps(simplified);
-      evaluated.forEach((evalStep, index) => {
+  return steps;
+}
+
+// Enhanced function to break down arithmetic operations
+function evaluateArithmeticSteps(expression: string): Array<{description: string, calculation: string, result: string}> {
+  const steps: Array<{description: string, calculation: string, result: string}> = [];
+  
+  // Handle parentheses first
+  const parenthesesPattern = /\([^()]+\)/g;
+  const parenthesesMatches = expression.match(parenthesesPattern);
+  
+  if (parenthesesMatches) {
+    parenthesesMatches.forEach(match => {
+      const innerExpression = match.slice(1, -1); // Remove parentheses
+      const result = tryEvaluate(innerExpression);
+      
+      if (result !== innerExpression) {
         steps.push({
-          step: stepCount++,
-          description: evalStep.description,
-          calculation: evalStep.calculation
+          description: "Evaluate expression in parentheses",
+          calculation: `${match} = ${result}`,
+          result: result
         });
-      });
-    } catch (error) {
-      // If evaluation fails, just show the final substitution
-    }
+      }
+    });
+  }
+  
+  // Handle multiplication and division (higher precedence)
+  const multiplyDividePattern = /\d+(?:\.\d+)?\s*[*/]\s*\d+(?:\.\d+)?/g;
+  const mdMatches = expression.match(multiplyDividePattern);
+  
+  if (mdMatches) {
+    mdMatches.slice(0, 3).forEach(match => { // Limit to first 3 operations
+      const result = tryEvaluate(match);
+      if (result !== match) {
+        steps.push({
+          description: "Multiply/divide",
+          calculation: `${match} = ${result}`,
+          result: result
+        });
+      }
+    });
+  }
+  
+  // Handle addition and subtraction
+  const addSubtractPattern = /\d+(?:\.\d+)?\s*[+-]\s*\d+(?:\.\d+)?/g;
+  const asMatches = expression.match(addSubtractPattern);
+  
+  if (asMatches) {
+    asMatches.slice(0, 3).forEach(match => { // Limit to first 3 operations
+      const result = tryEvaluate(match);
+      if (result !== match) {
+        steps.push({
+          description: "Add/subtract",
+          calculation: `${match} = ${result}`,
+          result: result
+        });
+      }
+    });
   }
   
   return steps;
@@ -572,11 +744,74 @@ function evaluateFormulaSteps(expression: string): Array<{description: string, c
   return steps;
 }
 
-// Safe evaluation function
+// Safe evaluation function with mathematical functions
 function tryEvaluate(expr: string): string {
   try {
-    // Simple math evaluation for numeric expressions
-    const numericExpr = expr.replace(/[^0-9+\-*/.()]/g, '');
+    // First, handle mathematical functions like LOG, LN, etc.
+    let processedExpr = expr;
+    
+    // Handle LOG function (base 10)
+    processedExpr = processedExpr.replace(/LOG\s*\(\s*([^)]+)\s*\)/g, (match, arg) => {
+      const argValue = parseFloat(arg);
+      if (!isNaN(argValue) && argValue > 0) {
+        return Math.log10(argValue).toString();
+      }
+      return match;
+    });
+    
+    // Handle LN function (natural log, base e)
+    processedExpr = processedExpr.replace(/LN\s*\(\s*([^)]+)\s*\)/g, (match, arg) => {
+      const argValue = parseFloat(arg);
+      if (!isNaN(argValue) && argValue > 0) {
+        return Math.log(argValue).toString();
+      }
+      return match;
+    });
+    
+    // Handle SQRT function
+    processedExpr = processedExpr.replace(/SQRT\s*\(\s*([^)]+)\s*\)/g, (match, arg) => {
+      const argValue = parseFloat(arg);
+      if (!isNaN(argValue) && argValue >= 0) {
+        return Math.sqrt(argValue).toString();
+      }
+      return match;
+    });
+    
+    // Handle ABS function
+    processedExpr = processedExpr.replace(/ABS\s*\(\s*([^)]+)\s*\)/g, (match, arg) => {
+      const argValue = parseFloat(arg);
+      if (!isNaN(argValue)) {
+        return Math.abs(argValue).toString();
+      }
+      return match;
+    });
+    
+    // Handle POW function (power)
+    processedExpr = processedExpr.replace(/POW\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)/g, (match, base, exp) => {
+      const baseValue = parseFloat(base);
+      const expValue = parseFloat(exp);
+      if (!isNaN(baseValue) && !isNaN(expValue)) {
+        return Math.pow(baseValue, expValue).toString();
+      }
+      return match;
+    });
+    
+    // Handle ROUND function
+    processedExpr = processedExpr.replace(/ROUND\s*\(\s*([^,)]+)(?:\s*,\s*([^)]+))?\s*\)/g, (match, value, decimals) => {
+      const val = parseFloat(value);
+      const dec = decimals ? parseInt(decimals) : 0;
+      if (!isNaN(val)) {
+        return val.toFixed(dec);
+      }
+      return match;
+    });
+    
+    // Replace mathematical constants
+    processedExpr = processedExpr.replace(/\bPI\b/g, Math.PI.toString());
+    processedExpr = processedExpr.replace(/\bE\b/g, Math.E.toString());
+    
+    // Now evaluate the processed expression for basic arithmetic
+    const numericExpr = processedExpr.replace(/[^0-9+\-*/.()e]/g, '');
     if (numericExpr && numericExpr.length > 0) {
       const result = Function(`"use strict"; return (${numericExpr})`)();
       if (typeof result === 'number' && !isNaN(result)) {
@@ -781,16 +1016,13 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
     setRetryCount(0);
 
     try {
-      console.log('🚀 Starting calculation with input values:', fieldValues);
       const result = await executeCalculatorMutation.mutateAsync({
         calculatorId,
         inputValues: fieldValues,
       });
 
-      console.log('✅ Raw mutation result:', result);
 
       if (result.success) {
-        console.log('🎯 Calculator execution result:', result);
         setResults(result.results);
 
         // Fetch lookup tables to display below results
@@ -1289,6 +1521,90 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
         </Card>
       )}
 
+      {/* Live Calculation Preview */}
+      {calculator.fields?.some(field => field.fieldType === 'calculated') && Object.keys(fieldValues).length > 0 && (
+        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Live Calculation Preview
+              <Badge variant="secondary">Updates in real-time</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {calculator.fields
+                ?.filter((field) => field.fieldType === 'calculated' && field.defaultValue)
+                .map((field) => {
+                  const calculationSteps = createCalculationSteps(field.defaultValue, fieldValues);
+                  
+                  return (
+                    <div key={field.id} className="bg-white dark:bg-gray-950 p-4 rounded-lg border">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">{field.displayLabel || field.fieldName}</Label>
+                          <Badge variant="outline">Live Preview</Badge>
+                        </div>
+                        
+                        <div className="font-mono text-sm bg-muted p-3 rounded border">
+                          {field.defaultValue}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-sm text-green-600">
+                          <CheckCircle className="h-4 w-4" />
+                          Formula is valid - Preview updates as you change inputs
+                        </div>
+                        
+                        {/* Live calculation breakdown */}
+                        {calculationSteps.length > 0 && (
+                          <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border">
+                            <h5 className="text-xs font-semibold mb-3 text-gray-700 dark:text-gray-300">
+                              Live Calculation Steps:
+                            </h5>
+                            <div className="space-y-2">
+                              {calculationSteps.slice(0, 4).map((step, index) => (
+                                <div key={index} className="flex gap-2 items-center text-xs">
+                                  <div className={`w-5 h-5 text-white rounded-full flex items-center justify-center text-xs font-bold ${
+                                    step.isIntermediate ? 'bg-blue-500' : step.step === 1 ? 'bg-purple-500' : 'bg-green-500'
+                                  }`}>
+                                    {step.step}
+                                  </div>
+                                  <div className="flex-1 font-mono text-xs bg-white dark:bg-gray-950 p-2 rounded border">
+                                    {step.calculation}
+                                  </div>
+                                  {step.result && step.isIntermediate && (
+                                    <span className="text-green-600 font-bold text-xs">→ {step.result}</span>
+                                  )}
+                                </div>
+                              ))}
+                              
+                              {/* Show final result if available */}
+                              {calculationSteps.length > 0 && (
+                                <div className="flex gap-2 items-center pt-2 border-t">
+                                  <div className="w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                    ✓
+                                  </div>
+                                  <div className="flex-1 font-mono text-sm bg-green-50 dark:bg-green-950/30 p-2 rounded border border-green-200 font-bold text-green-800 dark:text-green-200">
+                                    Preview: {tryEvaluate(substituteNumericalValues(field.defaultValue, fieldValues))} {field.unit || ''}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="text-xs text-muted-foreground">
+                          This preview updates automatically when you change input values above. Click "Calculate" to get the official result.
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Results - Show both calculated fields and formulas */}
       {results && (
         <Card>
@@ -1391,13 +1707,29 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                     <div className="space-y-3">
                                       {createCalculationSteps(field.defaultValue, fieldValues).map((step, index) => (
                                         <div key={index} className="flex gap-3 items-start">
-                                          <div className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                          <div className={`flex-shrink-0 w-7 h-7 text-white rounded-full flex items-center justify-center text-xs font-bold ${
+                                            step.isIntermediate ? 'bg-blue-500' : step.step === 1 ? 'bg-purple-500' : 'bg-green-500'
+                                          }`}>
                                             {step.step}
                                           </div>
                                           <div className="flex-1 min-w-0">
-                                            <p className="text-xs text-muted-foreground mb-1">{step.description}:</p>
-                                            <div className="bg-white dark:bg-gray-950 p-2 rounded border font-mono text-sm overflow-x-auto">
-                                              {step.calculation}
+                                            <div className="flex items-center justify-between mb-1">
+                                              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{step.description}</p>
+                                              {step.result && (
+                                                <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
+                                                  = {step.result}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="bg-white dark:bg-gray-950 p-3 rounded border font-mono text-sm overflow-x-auto border-l-4 border-blue-500">
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-gray-800 dark:text-gray-200">{step.calculation}</span>
+                                                {step.result && step.isIntermediate && (
+                                                  <span className="text-green-600 dark:text-green-400 font-bold ml-3">
+                                                    → {step.result}
+                                                  </span>
+                                                )}
+                                              </div>
                                             </div>
                                           </div>
                                         </div>

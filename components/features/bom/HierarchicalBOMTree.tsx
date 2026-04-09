@@ -211,7 +211,6 @@ export function HierarchicalBOMTree({
                     onClick={(e) => {
                       e.stopPropagation();
                       // TODO: Implement DFM analysis for specific part
-                      console.log('DFM Analysis for:', item);
                     }}
                     title="Run DFM Analysis"
                   >

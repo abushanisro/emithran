@@ -36,6 +36,52 @@ export class MHRService {
   }
 
   /**
+   * Create a complete MHRCalculationResult for manual entries
+   * All values set to 0 except the manual MHR value
+   */
+  private createManualEntryCalculation(manualMHRValue: number): MHRCalculationResult {
+    return {
+      // Working Hours Calculations
+      workingHoursPerYear: 0,
+      availableHoursPerYear: 0,
+      effectiveHoursPerYear: 0,
+      
+      // Cost Components - Per Hour
+      depreciationPerHour: 0,
+      interestPerHour: 0,
+      insurancePerHour: 0,
+      rentPerHour: 0,
+      maintenancePerHour: 0,
+      electricityPerHour: 0,
+      
+      // Totals - Per Hour
+      costOfOwnershipPerHour: 0,
+      totalFixedCostPerHour: manualMHRValue,
+      totalVariableCostPerHour: 0,
+      totalOperatingCostPerHour: manualMHRValue,
+      adminOverheadPerHour: 0,
+      profitMarginPerHour: 0,
+      totalMachineHourRate: manualMHRValue,
+      
+      // Annual Costs
+      depreciationPerAnnum: 0,
+      interestPerAnnum: 0,
+      insurancePerAnnum: 0,
+      rentPerAnnum: 0,
+      maintenancePerAnnum: 0,
+      electricityPerAnnum: 0,
+      totalFixedCostPerAnnum: 0,
+      totalVariableCostPerAnnum: 0,
+      totalAnnualCost: manualMHRValue * 8 * 250, // Estimate: 8hrs/day * 250 days
+      
+      // Capital Investment Breakdown
+      accessoriesCost: 0,
+      installationCost: 0,
+      totalCapitalInvestment: 0,
+    };
+  }
+
+  /**
    * Calculate all MHR metrics based on input parameters
    * Uses the calculation engine for clean separation of concerns
    *
@@ -108,8 +154,17 @@ export class MHRService {
     }
 
     const records = (data || []).map(row => {
-      // Recalculate on fetch to ensure accuracy (skip validation for DB data)
-      const calculations = this.calculateMHR(this.mapRowToDto(row), true);
+      // For manual entries, use stored values; for others, recalculate to ensure accuracy
+      let calculations: MHRCalculationResult;
+      
+      if (row.is_manual_entry && row.manual_mhr_value) {
+        // Use complete calculation result for manual entries
+        calculations = this.createManualEntryCalculation(parseFloat(row.manual_mhr_value));
+      } else {
+        // Recalculate for automatic entries (skip validation for DB data)
+        calculations = this.calculateMHR(this.mapRowToDto(row), true);
+      }
+      
       return MHRResponseDto.fromDatabase({ ...row, calculations: JSON.stringify(calculations) });
     });
 
@@ -151,16 +206,33 @@ export class MHRService {
       throw new NotFoundException(`MHR record with ID ${id} was not found or you do not have access to it.`);
     }
 
-    // Recalculate to ensure accuracy (skip validation for DB data)
-    const calculations = this.calculateMHR(this.mapRowToDto(data), true);
+    // For manual entries, use stored calculations; for others, recalculate to ensure accuracy
+    let calculations: MHRCalculationResult;
+    
+    if (data.is_manual_entry && data.manual_mhr_value) {
+      // Use complete calculation result for manual entries
+      calculations = this.createManualEntryCalculation(parseFloat(data.manual_mhr_value));
+    } else {
+      // Recalculate for automatic entries (skip validation for DB data)
+      calculations = this.calculateMHR(this.mapRowToDto(data), true);
+    }
+    
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
   }
 
   async create(createMHRDto: CreateMHRDto, userId: string, accessToken: string): Promise<MHRResponseDto> {
     this.logger.log(`Creating MHR record for user: ${userId}`, 'MHRService');
 
-    // Calculate all metrics
-    const calculations = this.calculateMHR(createMHRDto);
+    // Handle manual entry mode
+    let calculations: MHRCalculationResult;
+    if (createMHRDto.isManualEntry && createMHRDto.manualMHRValue) {
+      this.logger.log(`Using manual MHR value: ${createMHRDto.manualMHRValue}`, 'MHRService');
+      // Create complete calculation result for manual entry
+      calculations = this.createManualEntryCalculation(createMHRDto.manualMHRValue);
+    } else {
+      // Calculate all metrics using the engine
+      calculations = this.calculateMHR(createMHRDto);
+    }
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
@@ -192,6 +264,8 @@ export class MHRService {
         electricity_cost_per_kwh: createMHRDto.electricityCostPerKwh,
         admin_overhead_percentage: createMHRDto.adminOverheadPercentage,
         profit_margin_percentage: createMHRDto.profitMarginPercentage,
+        is_manual_entry: createMHRDto.isManualEntry || false,
+        manual_mhr_value: createMHRDto.manualMHRValue || null,
         total_machine_hour_rate: calculations.totalMachineHourRate,
         total_fixed_cost_per_hour: calculations.totalFixedCostPerHour,
         total_variable_cost_per_hour: calculations.totalVariableCostPerHour,
@@ -252,7 +326,17 @@ export class MHRService {
 
     // Merge existing data with updates for calculation
     const mergedData = { ...this.mapRowToDto(existing), ...updateMHRDto };
-    const calculations = this.calculateMHR(mergedData);
+    
+    // Handle manual entry mode
+    let calculations: MHRCalculationResult;
+    if (updateMHRDto.isManualEntry && updateMHRDto.manualMHRValue) {
+      this.logger.log(`Using manual MHR value for update: ${updateMHRDto.manualMHRValue}`, 'MHRService');
+      // Create complete calculation result for manual entry
+      calculations = this.createManualEntryCalculation(updateMHRDto.manualMHRValue);
+    } else {
+      // Calculate all metrics using the engine
+      calculations = this.calculateMHR(mergedData);
+    }
 
     const updateData: any = {};
     if (updateMHRDto.location !== undefined) updateData.location = updateMHRDto.location;
@@ -280,6 +364,8 @@ export class MHRService {
     if (updateMHRDto.electricityCostPerKwh !== undefined) updateData.electricity_cost_per_kwh = updateMHRDto.electricityCostPerKwh;
     if (updateMHRDto.adminOverheadPercentage !== undefined) updateData.admin_overhead_percentage = updateMHRDto.adminOverheadPercentage;
     if (updateMHRDto.profitMarginPercentage !== undefined) updateData.profit_margin_percentage = updateMHRDto.profitMarginPercentage;
+    if (updateMHRDto.isManualEntry !== undefined) updateData.is_manual_entry = updateMHRDto.isManualEntry;
+    if (updateMHRDto.manualMHRValue !== undefined) updateData.manual_mhr_value = updateMHRDto.manualMHRValue;
 
     // Update calculated values
     updateData.total_machine_hour_rate = calculations.totalMachineHourRate;
@@ -395,6 +481,8 @@ export class MHRService {
       electricityCostPerKwh: parseFloat(row.electricityCostPerKwh || row.electricity_cost_per_kwh || 0),
       adminOverheadPercentage: parseFloat(row.adminOverheadPercentage || row.admin_overhead_percentage || 0),
       profitMarginPercentage: parseFloat(row.profitMarginPercentage || row.profit_margin_percentage || 0),
+      isManualEntry: row.isManualEntry || row.is_manual_entry || false,
+      manualMHRValue: row.manualMHRValue || (row.manual_mhr_value ? parseFloat(row.manual_mhr_value) : 0),
     };
   }
 }

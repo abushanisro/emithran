@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Search, FileDown, FileText, Edit, Trash2, Calculator } from 'lucide-react';
 import { useMHRRecords, useDeleteMHR } from '@/lib/api/hooks';
+import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
 import { formatCurrency } from '@/lib/utils';
 import { exportMHRToPDF } from '@/lib/utils/exportMHRToPDF';
@@ -28,7 +29,39 @@ export default function MHRDatabasePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data, isLoading } = useMHRRecords({ search, limit: 50 });
+  const { data: allMappings } = useProcessCalculatorMappings();
   const deleteMutation = useDeleteMHR();
+
+  // Helper function to resolve process hierarchy from MHR record
+  const resolveProcessHierarchy = (record: any) => {
+    if (!allMappings?.mappings) {
+      return {
+        processGroup: record.commodityCode || '-',
+        processRoute: '-',
+        operation: record.specification || '-'
+      };
+    }
+
+    // Try to find exact match by operation (specification)
+    const exactMatch = allMappings.mappings.find(mapping => 
+      mapping.operation === record.specification
+    );
+
+    if (exactMatch) {
+      return {
+        processGroup: exactMatch.processGroup,
+        processRoute: exactMatch.processRoute,
+        operation: exactMatch.operation
+      };
+    }
+
+    // Fallback: use stored values
+    return {
+      processGroup: record.commodityCode || '-',
+      processRoute: '-',
+      operation: record.specification || '-'
+    };
+  };
 
   const handleCreate = () => {
     setEditingId(null);
@@ -55,7 +88,9 @@ export default function MHRDatabasePage() {
     const headers = [
       'Machine Name',
       'Location',
-      'Commodity Code',
+      'Process Group',
+      'Process Route', 
+      'Operation',
       'Manufacturer',
       'Model',
       'Machine Hour Rate (₹)',
@@ -65,18 +100,23 @@ export default function MHRDatabasePage() {
       'Created At',
     ];
 
-    const rows = data.records.map(record => [
-      record.machineName,
-      record.location,
-      getCommodityLabel(record.commodityCode),
-      record.manufacturer || '-',
-      record.model || '-',
-      record.calculations.totalMachineHourRate.toFixed(2),
-      record.calculations.totalFixedCostPerHour.toFixed(2),
-      record.calculations.totalVariableCostPerHour.toFixed(2),
-      record.calculations.totalAnnualCost.toFixed(2),
-      new Date(record.createdAt).toLocaleDateString(),
-    ]);
+    const rows = data.records.map(record => {
+      const hierarchy = resolveProcessHierarchy(record);
+      return [
+        record.machineName,
+        record.location,
+        hierarchy.processGroup,
+        hierarchy.processRoute,
+        hierarchy.operation,
+        record.manufacturer || '-',
+        record.model || '-',
+        record.calculations.totalMachineHourRate.toFixed(2),
+        record.calculations.totalFixedCostPerHour.toFixed(2),
+        record.calculations.totalVariableCostPerHour.toFixed(2),
+        record.calculations.totalAnnualCost.toFixed(2),
+        new Date(record.createdAt).toLocaleDateString(),
+      ];
+    });
 
     const csvContent = [
       headers.join(','),
@@ -218,7 +258,9 @@ export default function MHRDatabasePage() {
                   <TableRow>
                     <TableHead>Machine Name</TableHead>
                     <TableHead>Location</TableHead>
-                    <TableHead>Commodity Code</TableHead>
+                    <TableHead>Process Group</TableHead>
+                    <TableHead>Process Route</TableHead>
+                    <TableHead>Operation</TableHead>
                     <TableHead className="text-right">MHR (₹/hr)</TableHead>
                     <TableHead className="text-right">Fixed Cost</TableHead>
                     <TableHead className="text-right">Variable Cost</TableHead>
@@ -227,25 +269,29 @@ export default function MHRDatabasePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.records.map((record) => (
-                    <TableRow key={record.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell className="font-medium">{record.machineName}</TableCell>
-                      <TableCell>{record.location}</TableCell>
-                      <TableCell>{getCommodityLabel(record.commodityCode)}</TableCell>
-                      <TableCell className="text-right font-semibold text-primary">
-                        {formatCurrency(record.calculations.totalMachineHourRate)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(record.calculations.totalFixedCostPerHour)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(record.calculations.totalVariableCostPerHour)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(record.calculations.totalAnnualCost)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                  {data.records.map((record) => {
+                    const hierarchy = resolveProcessHierarchy(record);
+                    return (
+                      <TableRow key={record.id} className="cursor-pointer hover:bg-muted/50">
+                        <TableCell className="font-medium">{record.machineName}</TableCell>
+                        <TableCell>{record.location}</TableCell>
+                        <TableCell>{hierarchy.processGroup}</TableCell>
+                        <TableCell>{hierarchy.processRoute}</TableCell>
+                        <TableCell>{hierarchy.operation}</TableCell>
+                        <TableCell className="text-right font-semibold text-primary">
+                          {formatCurrency(record.calculations.totalMachineHourRate)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(record.calculations.totalFixedCostPerHour)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(record.calculations.totalVariableCostPerHour)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(record.calculations.totalAnnualCost)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -268,10 +314,11 @@ export default function MHRDatabasePage() {
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, Loader2, Target } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 import { ProcessCostDialog } from './ProcessCostDialog';
-import ManufacturingAnalysisPanel from '@/components/features/bom/ManufacturingAnalysisPanel';
 import {
   useProcessCosts,
   useCreateProcessCost,
@@ -12,39 +11,18 @@ import {
   useDeleteProcessCost,
 } from '@/lib/api/hooks/useProcessCosts';
 
-interface ManufacturingFeature {
-  id: string;
-  type: 'hole' | 'pocket' | 'slot' | 'boss' | 'rib' | 'thin_wall' | 'overhang' | 'undercut';
-  position: { x: number; y: number; z: number };
-  dimensions: { length?: number; width?: number; diameter?: number; depth?: number };
-  manufacturingProcess: string;
-  cycleTime: number;
-  tooling: string[];
-  warnings: string[];
-  aiRecommendations: string[];
-}
 
 interface ManufacturingProcessSectionProps {
   bomItemId?: string;
   bomItem?: any;
-  onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
-  onFeaturesUpdate?: (features: ManufacturingFeature[]) => void;
-  selectedFeature?: ManufacturingFeature | null;
-  manufacturingFeatures?: ManufacturingFeature[];
 }
 
 export function ManufacturingProcessSection({ 
   bomItemId, 
-  bomItem, 
-  onFeatureSelect,
-  onFeaturesUpdate,
-  selectedFeature,
-  manufacturingFeatures
+  bomItem
 }: ManufacturingProcessSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editProcess, setEditProcess] = useState<any | null>(null);
-  const [showDFMAnalysis, setShowDFMAnalysis] = useState(false);
-  const [selectedProcessForAnalysis, setSelectedProcessForAnalysis] = useState<string | null>(null);
 
   // Use the bomItem prop directly instead of fetching
   const bomItemData = bomItem;
@@ -73,48 +51,60 @@ export function ManufacturingProcessSection({
     setDialogOpen(true);
   };
 
+  // Get sorted processes for display
+  const sortedProcesses = [...processes].sort((a, b) => (a.opNbr || 0) - (b.opNbr || 0));
+
+  // No automatic resequencing - just sort for display
+
   const handleDialogSubmit = async (data: any) => {
     if (!bomItemId) {
       return;
     }
 
+
     try {
       if (editProcess?.id) {
         // Update existing process
+        const updateData = {
+          opNbr: data.opNbr,
+          processGroup: data.group, // Maps from 'group' to 'processGroup'
+          processRoute: data.processRoute,
+          operation: data.operation,
+          mhrId: data.mhrId,
+          lsrId: data.lsrId,
+          directRate: data.directRate || 0,
+          indirectRate: data.indirectRate || 0,
+          fringeRate: data.fringeRate || 0,
+          machineRate: data.machineRate || 0,
+          machineValue: data.machineValue || 0,
+          laborRate: data.laborRate || 0,
+          shiftPatternHoursPerDay: data.shiftPatternHoursPerDay || 8,
+          setupManning: data.setupManning,
+          setupTime: data.setupTime,
+          batchSize: data.batchSize,
+          heads: data.heads,
+          cycleTime: data.cycleTime,
+          partsPerCycle: data.partsPerCycle,
+          scrap: data.scrap,
+          facilityId: data.facilityId,
+          facilityRateId: data.facilityRateId,
+          notes: data.notes,
+        };
+        
         await updateMutation.mutateAsync({
           id: editProcess.id,
-          data: {
-            opNbr: data.opNbr,
-            processGroup: data.group,
-            processRoute: data.processRoute,
-            operation: data.operation,
-            directRate: data.directRate || 0,
-            indirectRate: data.indirectRate || 0,
-            fringeRate: data.fringeRate || 0,
-            machineRate: data.machineRate || 0,
-            machineValue: data.machineValue || 0,
-            laborRate: data.laborRate || 0,
-            shiftPatternHoursPerDay: data.shiftPatternHoursPerDay || 8,
-            setupManning: data.setupManning,
-            setupTime: data.setupTime,
-            batchSize: data.batchSize,
-            heads: data.heads,
-            cycleTime: data.cycleTime,
-            partsPerCycle: data.partsPerCycle,
-            scrap: data.scrap,
-            facilityId: data.facilityId,
-            facilityRateId: data.facilityRateId,
-            notes: data.notes,
-          },
+          data: updateData,
         });
       } else {
         // Create new process
-        await createMutation.mutateAsync({
+        const createData = {
           bomItemId,
           opNbr: data.opNbr,
           processGroup: data.group,
           processRoute: data.processRoute,
           operation: data.operation,
+          mhrId: data.mhrId,
+          lsrId: data.lsrId,
           directRate: data.directRate || 0,
           indirectRate: data.indirectRate || 0,
           fringeRate: data.fringeRate || 0,
@@ -132,12 +122,15 @@ export function ManufacturingProcessSection({
           facilityId: data.facilityId,
           facilityRateId: data.facilityRateId,
           isActive: true,
-        });
+        };
+        
+        await createMutation.mutateAsync(createData);
       }
 
       setDialogOpen(false);
       setEditProcess(null);
     } catch (error) {
+      console.error('Error saving process:', error);
     }
   };
 
@@ -153,17 +146,9 @@ export function ManufacturingProcessSection({
   };
 
   const calculateTotal = () => {
-    return processes.reduce((sum, p) => sum + (p.totalCostPerPart || 0), 0).toFixed(2);
+    return sortedProcesses.reduce((sum, p) => sum + (p.totalCostPerPart || 0), 0).toFixed(2);
   };
 
-  const handleProcessAnalysis = (process: any) => {
-    setSelectedProcessForAnalysis(process.processGroup || process.operation || 'Selected Process');
-    setShowDFMAnalysis(true);
-  };
-
-  const toggleDFMAnalysis = () => {
-    setShowDFMAnalysis(!showDFMAnalysis);
-  };
 
   if (isLoading) {
     return (
@@ -183,20 +168,7 @@ export function ManufacturingProcessSection({
     <div className="space-y-4">
       <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
         <div className="bg-primary py-3 px-4">
-          <div className="flex items-center justify-between">
-            <h6 className="m-0 font-semibold text-primary-foreground">Manufacturing Processes</h6>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleDFMAnalysis}
-                className="text-primary-foreground hover:bg-primary-foreground/20"
-              >
-                <Target className="h-4 w-4 mr-1" />
-                {showDFMAnalysis ? 'Hide' : 'Show'} DFM Analysis
-              </Button>
-            </div>
-          </div>
+          <h6 className="m-0 font-semibold text-primary-foreground">Manufacturing Processes</h6>
         </div>
       <div className="bg-card p-4">
         <div className="overflow-x-auto">
@@ -213,11 +185,11 @@ export function ManufacturingProcessSection({
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">Parts/Cycle</th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-20">Scrap %</th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">Total Cost (₹)</th>
-                <th className="p-3 text-center text-xs font-semibold w-32">Actions</th>
+                <th className="p-3 text-center text-xs font-semibold w-24">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {processes.length === 0 ? (
+              {sortedProcesses.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="p-8 text-center text-muted-foreground">
                     <p className="text-sm">No manufacturing processes added yet</p>
@@ -226,20 +198,14 @@ export function ManufacturingProcessSection({
                 </tr>
               ) : (
                 <>
-                  {processes.map((process) => {
-                    const isSelected = selectedProcessForAnalysis === (process.processGroup || process.operation || 'Selected Process');
-                    
+                  {sortedProcesses.map((process) => {
                     return (
-                      <tr key={process.id} 
-                          className={`hover:bg-secondary/50 transition-all duration-200 ${
-                            isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-                          }`}
-                      >
+                      <tr key={process.id} className="hover:bg-secondary/50">
                         <td className="p-3 border-r border-border text-xs">{process.opNbr || 0}</td>
                         <td className="p-3 border-r border-border text-xs">
                           <div className="space-y-0.5">
                             {process.processGroup && (
-                              <div className={`font-semibold ${isSelected ? 'text-blue-700' : 'text-primary'}`}>
+                              <div className="font-semibold text-primary">
                                 {process.processGroup}
                               </div>
                             )}
@@ -250,7 +216,14 @@ export function ManufacturingProcessSection({
                               <div className="text-xs">{process.operation}</div>
                             )}
                             {!process.processGroup && !process.processRoute && !process.operation && (
-                              <span className="text-muted-foreground italic">Not specified</span>
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground italic text-xs">Process Selection (Hierarchical)</div>
+                                <div className="text-xs text-amber-600">
+                                  <div>1. Group → Select process group</div>
+                                  <div>2. Process Route → Select Group first</div>
+                                  <div>3. Operations → Select Process Route first</div>
+                                </div>
+                              </div>
                             )}
                           </div>
                         </td>
@@ -270,15 +243,6 @@ export function ManufacturingProcessSection({
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-7 w-7 p-0 ${isSelected ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : ''}`}
-                              onClick={() => handleProcessAnalysis(process)}
-                              title="Analyze DFM"
-                            >
-                              <Target className="h-3 w-3" />
-                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -326,18 +290,6 @@ export function ManufacturingProcessSection({
       </div>
       </div>
 
-      {/* DFM Analysis Panel */}
-      {showDFMAnalysis && (
-        <ManufacturingAnalysisPanel 
-          bomItemId={bomItemId || ''}
-          bomItem={bomItemData}
-          selectedProcess={selectedProcessForAnalysis}
-          onFeatureSelect={onFeatureSelect}
-          onFeaturesUpdate={onFeaturesUpdate}
-          selectedFeature={selectedFeature}
-          manufacturingFeatures={manufacturingFeatures}
-        />
-      )}
 
       <ProcessCostDialog
         open={dialogOpen}
@@ -345,6 +297,7 @@ export function ManufacturingProcessSection({
         onSubmit={handleDialogSubmit}
         editData={editProcess}
         bomItemData={bomItemData}
+        existingProcesses={processes}
       />
     </div>
   );

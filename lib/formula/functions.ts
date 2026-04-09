@@ -101,6 +101,24 @@ export const FORMULA_FUNCTIONS: FormulaFunction[] = [
     maxArgs: 2,
     example: 'POW({radius}, 2) * 3.14159',
   },
+  {
+    name: 'LN',
+    description: 'Natural logarithm (base e)',
+    syntax: 'LN(value)',
+    category: 'math',
+    minArgs: 1,
+    maxArgs: 1,
+    example: 'LN({concentration})',
+  },
+  {
+    name: 'LOG',
+    description: 'Logarithm base 10',
+    syntax: 'LOG(value)',
+    category: 'math',
+    minArgs: 1,
+    maxArgs: 1,
+    example: 'LOG({volume})',
+  },
 
   // Logical Functions
   {

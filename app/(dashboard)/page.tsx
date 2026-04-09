@@ -493,21 +493,21 @@ export default function DashboardPage() {
           {projects.length > 0 ? (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-6 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
-                  <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Total Quoted</p>
-                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                <div className="text-center p-6 rounded-xl bg-primary/5 border border-primary/20">
+                  <p className="text-sm text-primary mb-1 uppercase tracking-wider font-bold">Total Quoted</p>
+                  <p className="text-2xl font-bold text-foreground">
                     ₹{totalQuoted.toLocaleString('en-IN')}
                   </p>
                 </div>
-                <div className="text-center p-6 rounded-xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900">
-                  <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">Should Cost</p>
-                  <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                <div className="text-center p-6 rounded-xl bg-purple-500/5 border border-purple-500/20">
+                  <p className="text-sm text-purple-400 mb-1 uppercase tracking-wider font-bold">Should Cost</p>
+                  <p className="text-2xl font-bold text-foreground">
                     ₹{totalShould.toLocaleString('en-IN')}
                   </p>
                 </div>
-                <div className="text-center p-6 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
-                  <p className="text-sm text-green-600 dark:text-green-400 mb-1">Savings</p>
-                  <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+                <div className="text-center p-6 rounded-xl bg-success/5 border border-success/20">
+                  <p className="text-sm text-success mb-1 uppercase tracking-wider font-bold">Savings</p>
+                  <p className="text-2xl font-bold text-success">
                     ₹{savings.toLocaleString('en-IN')}
                   </p>
                   <p className="text-xs text-green-600 dark:text-green-400 mt-1">

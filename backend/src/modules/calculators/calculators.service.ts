@@ -477,6 +477,18 @@ export class CalculatorsServiceV2 {
       IF: (condition: boolean, trueValue: any, falseValue: any) => {
         return condition ? trueValue : falseValue;
       },
+      LN: (value: number) => {
+        if (value <= 0) {
+          throw new Error('LN function requires a positive value');
+        }
+        return Math.log(value); // Natural logarithm (base e)
+      },
+      LOG: (value: number) => {
+        if (value <= 0) {
+          throw new Error('LOG function requires a positive value');
+        }
+        return Math.log10(value); // Logarithm base 10
+      },
     };
 
     // Create extended scope with custom functions

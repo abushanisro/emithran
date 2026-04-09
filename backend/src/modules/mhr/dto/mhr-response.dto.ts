@@ -175,6 +175,13 @@ export class MHRResponseDto {
   @ApiProperty()
   profitMarginPercentage: number;
 
+  // Manual Entry Fields
+  @ApiProperty()
+  isManualEntry: boolean;
+
+  @ApiProperty({ nullable: true })
+  manualMHRValue?: number;
+
   // Calculated Results
   @ApiProperty()
   calculations: MHRCalculationResult;
@@ -214,6 +221,8 @@ export class MHRResponseDto {
       electricityCostPerKwh: parseFloat(row.electricity_cost_per_kwh),
       adminOverheadPercentage: parseFloat(row.admin_overhead_percentage),
       profitMarginPercentage: parseFloat(row.profit_margin_percentage),
+      isManualEntry: row.is_manual_entry || false,
+      manualMHRValue: row.manual_mhr_value ? parseFloat(row.manual_mhr_value) : undefined,
       calculations: JSON.parse(row.calculations || '{}'),
       createdAt: row.created_at,
       updatedAt: row.updated_at,

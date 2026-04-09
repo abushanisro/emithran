@@ -820,7 +820,12 @@ export function RawMaterialDialog({
             )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-semibold">Gross Usage</label>
+                <label className="text-sm font-semibold">
+                  Gross Usage 
+                  <span className="text-muted-foreground text-xs ml-1">
+                    (Unit Reference: kg)
+                  </span>
+                </label>
                 <div className="flex gap-2">
                   <Input
                     type="number"
@@ -863,7 +868,12 @@ export function RawMaterialDialog({
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold">Net Usage</label>
+                <label className="text-sm font-semibold">
+                  Net Usage 
+                  <span className="text-muted-foreground text-xs ml-1">
+                    (Unit Reference: kg)
+                  </span>
+                </label>
                 <div className="flex gap-2">
                   <Input
                     type="number"

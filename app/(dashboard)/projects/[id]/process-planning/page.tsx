@@ -972,9 +972,6 @@ function ProcessPlanningPageContent() {
                 {/* Raw Materials Section */}
                 <RawMaterialsSection bomItemId={selectedItem.id} bomItem={selectedItem} />
 
-                {/* Tooling & Fixtures Section */}
-                <ToolingSection bomItemId={selectedItem.id} bomItem={selectedItem} />
-
                 {/* Manufacturing Process Section */}
                 <ManufacturingProcessSection bomItemId={selectedItem.id} bomItem={selectedItem} />
 
@@ -983,6 +980,9 @@ function ProcessPlanningPageContent() {
 
                 {/* Procured Parts Section */}
                 <ProcuredPartsSection bomItemId={selectedItem.id} />
+
+                {/* Tooling & Fixtures Section - Moved to last */}
+                <ToolingSection bomItemId={selectedItem.id} bomItem={selectedItem} />
               </>
             ) : (
               <div className="text-center py-8 bg-card border-2 border-dashed border-border rounded-lg">

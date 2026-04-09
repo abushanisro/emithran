@@ -32,6 +32,28 @@ export class RawMaterialsController {
 
   constructor(private readonly rawMaterialsService: RawMaterialsService) { }
 
+  @Get('enhanced')
+  @ApiOperation({ summary: 'Get enhanced raw materials with comprehensive properties' })
+  @ApiResponse({ status: 200, description: 'Enhanced materials retrieved successfully' })
+  async getEnhancedMaterials(
+    @CurrentUser() user: User, 
+    @AccessToken() token: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('category') category?: string,
+    @Query('search') search?: string
+  ) {
+    const pageNum = page ? parseInt(page) : 1;
+    const limitNum = limit ? parseInt(limit) : 50;
+    
+    return this.rawMaterialsService.getEnhancedMaterials({
+      page: pageNum,
+      limit: limitNum,
+      category,
+      search
+    }, user.id, token);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all raw materials' })
   @ApiResponse({ status: 200, description: 'Raw materials retrieved successfully', type: RawMaterialListResponseDto })
@@ -50,7 +72,26 @@ export class RawMaterialsController {
   @ApiOperation({ summary: 'Get available material categories' })
   @ApiResponse({ status: 200, description: 'Material categories retrieved successfully' })
   async getMaterialCategories() {
-    return this.rawMaterialsService.getMaterialCategories();
+    // Return categories in the format expected by the frontend
+    return {
+      success: true,
+      categories: [
+        {
+          id: 'plastic',
+          category_name: 'Plastic & Rubber',
+          category_code: 'PLASTIC',
+          color_code: '#4CAF50',
+          description: 'Polymeric materials including thermoplastics and thermosets'
+        },
+        {
+          id: 'ferrous',
+          category_name: 'Ferrous & Non-Ferrous',
+          category_code: 'FERROUS',
+          color_code: '#FF5722',
+          description: 'Iron-based and non-iron metals and alloys'
+        }
+      ]
+    };
   }
 
   @Get('statistics')

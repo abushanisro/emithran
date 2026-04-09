@@ -34,6 +34,7 @@ interface ProcessCostDialogProps {
   onSubmit: (data: any) => void;
   editData?: any;
   bomItemData?: any;
+  existingProcesses?: any[];
 }
 
 export function ProcessCostDialog({
@@ -42,6 +43,7 @@ export function ProcessCostDialog({
   onSubmit,
   editData,
   bomItemData,
+  existingProcesses = [],
 }: ProcessCostDialogProps) {
   const [opNbr, setOpNbr] = useState<number>(0);
   const [location, setLocation] = useState<string>('');
@@ -54,14 +56,14 @@ export function ProcessCostDialog({
   // Resource selections
   const [selectedMHRId, setSelectedMHRId] = useState<string>('');
   const [selectedLSRId, setSelectedLSRId] = useState<string>('');
-  const [setupManning, setSetupManning] = useState<number>(1);
-  const [setupTime, setSetupTime] = useState<number>(0);
-  const [batchSize, setBatchSize] = useState<number>(1);
-  const [heads, setHeads] = useState<number>(1);
-  const [cycleTime, setCycleTime] = useState<number>(0);
-  const [partsPerCycle, setPartsPerCycle] = useState<number>(1);
-  const [scrap, setScrap] = useState<number>(0);
-  const [machineValue, setMachineValue] = useState<number>(0);
+  const [setupManning, setSetupManning] = useState<number | string>('');
+  const [setupTime, setSetupTime] = useState<number | string>('');
+  const [batchSize, setBatchSize] = useState<number | string>('');
+  const [heads, setHeads] = useState<number | string>('');
+  const [cycleTime, setCycleTime] = useState<number | string>('');
+  const [partsPerCycle, setPartsPerCycle] = useState<number | string>('');
+  const [scrap, setScrap] = useState<number | string>('');
+  const [machineValue, setMachineValue] = useState<number | string>('');
   const [totalCost, setTotalCost] = useState<number>(0);
 
   // Preserve facilityId and facilityRateId from editData for updates
@@ -98,6 +100,16 @@ export function ProcessCostDialog({
 
   // Check for errors
   const hasErrors = mhrError || lsrError || hierarchyError || calculatorsError;
+
+  // Function to suggest next operation number (but user can change it)
+  const getSuggestedOpNbr = () => {
+    if (!existingProcesses || existingProcesses.length === 0) {
+      return 1; // Start with 1
+    }
+    
+    const maxOpNbr = Math.max(...existingProcesses.map(p => p.opNbr || 0));
+    return maxOpNbr + 1; // Next sequential number
+  };
 
   // Get process groups from hierarchy
   const processGroups = useMemo(() => {
@@ -407,14 +419,21 @@ export function ProcessCostDialog({
   // Load edit data (wait for data to be loaded before populating)
   useEffect(() => {
     if (editData && open && !isLoadingHierarchy && !isLoadingMHR && !isLoadingLSR) {
+      
       setOpNbr(editData.opNbr || 0);
       setLocation(editData.location || '');
       setSelectedGroup(editData.processGroup || '');
       setSelectedRoute(editData.processRoute || '');
       setSelectedOperation(editData.operation || '');
       setSelectedProcessCalculatorId(editData.processCalculatorId || '');
-      setSelectedMHRId(editData.mhrId || '');
-      setSelectedLSRId(editData.lsrId ? String(editData.lsrId) : '');
+      
+      // Use the actual field names from the process data
+      const mhrId = editData.mhrId || editData.machineId || '';
+      const lsrId = editData.lsrId ? String(editData.lsrId) : (editData.laborId ? String(editData.laborId) : '');
+      
+      setSelectedMHRId(mhrId);
+      setSelectedLSRId(lsrId);
+      
       setSetupManning(editData.setupManning || 1);
       setSetupTime(editData.setupTime || 0);
       setBatchSize(editData.batchSize || 1);
@@ -426,8 +445,8 @@ export function ProcessCostDialog({
       setFacilityId(editData.facilityId);
       setFacilityRateId(editData.facilityRateId);
     } else if (!editData && open) {
-      // Reset for new entry
-      setOpNbr(0);
+      // Reset for new entry - suggest next operation number but user can change it
+      setOpNbr(getSuggestedOpNbr()); // Suggest next operation number but user can enter any number
       setLocation('');
       setSelectedGroup('');
       setSelectedRoute('');
@@ -435,40 +454,48 @@ export function ProcessCostDialog({
       setSelectedProcessCalculatorId('');
       setSelectedMHRId('');
       setSelectedLSRId('');
-      setSetupManning(1);
-      setSetupTime(0);
-      setBatchSize(1);
-      setHeads(1);
-      setCycleTime(0);
-      setPartsPerCycle(1);
-      setScrap(0);
-      setMachineValue(0);
+      setSetupManning('');
+      setSetupTime('');
+      setBatchSize('');
+      setHeads('');
+      setCycleTime('');
+      setPartsPerCycle('');
+      setScrap('');
+      setMachineValue('');
       setFacilityId(undefined);
       setFacilityRateId(undefined);
     }
-  }, [editData, open, isLoadingHierarchy, isLoadingMHR, isLoadingLSR]);
+  }, [editData, open, isLoadingHierarchy, isLoadingMHR, isLoadingLSR, mhrData, lsrData, existingProcesses]);
 
-  // Calculate total cost using MHR and LSR
+  // Calculate total cost using MHR and LSR or default rates
   useEffect(() => {
-    if (selectedMHR && selectedLSR && cycleTime > 0 && batchSize > 0 && partsPerCycle > 0) {
-      // Get rates
-      const machineRate = selectedMHR.calculations.totalMachineHourRate;
-      const labourRate = selectedLSR.lhr;
+    const cycleTimeNum = parseFloat(cycleTime as string) || 0;
+    const batchSizeNum = parseFloat(batchSize as string) || 0;
+    const partsPerCycleNum = parseFloat(partsPerCycle as string) || 0;
+    const setupManningNum = parseFloat(setupManning as string) || 0;
+    const setupTimeNum = parseFloat(setupTime as string) || 0;
+    const headsNum = parseFloat(heads as string) || 0;
+    const scrapNum = parseFloat(scrap as string) || 0;
+    
+    if (cycleTimeNum > 0 && batchSizeNum > 0 && partsPerCycleNum > 0) {
+      // Get rates - use selected rates if available, otherwise use defaults
+      const machineRate = selectedMHR ? selectedMHR.calculations.totalMachineHourRate : 113.10;
+      const labourRate = selectedLSR ? selectedLSR.lhr : 327.89;
 
       // Setup cost (labour cost for setup time)
-      const setupCostPerPart = (setupManning * setupTime * labourRate) / (60 * batchSize);
+      const setupCostPerPart = (setupManningNum * setupTimeNum * labourRate) / (60 * batchSizeNum);
 
       // Cycle cost
-      const cycleTimeHours = cycleTime / 3600; // Convert seconds to hours
-      const labourCostPerCycle = cycleTimeHours * labourRate * heads;
+      const cycleTimeHours = cycleTimeNum / 3600; // Convert seconds to hours
+      const labourCostPerCycle = cycleTimeHours * labourRate * headsNum;
       const machineCostPerCycle = cycleTimeHours * machineRate;
-      const totalCycleCostPerPart = (labourCostPerCycle + machineCostPerCycle) / partsPerCycle;
+      const totalCycleCostPerPart = (labourCostPerCycle + machineCostPerCycle) / partsPerCycleNum;
 
       // Total before scrap
       const baseCost = setupCostPerPart + totalCycleCostPerPart;
 
       // Add scrap
-      const scrapCost = (baseCost * scrap) / 100;
+      const scrapCost = (baseCost * scrapNum) / 100;
       const total = baseCost + scrapCost;
 
       setTotalCost(Math.max(0, total));
@@ -479,9 +506,19 @@ export function ProcessCostDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedMHRId || !selectedLSRId || cycleTime <= 0 || batchSize <= 0) {
+    
+    const cycleTimeNum = parseFloat(cycleTime as string) || 0;
+    const batchSizeNum = parseFloat(batchSize as string) || 0;
+    
+    if (cycleTimeNum <= 0) {
+      alert('Please enter a valid Cycle Time (greater than 0)');
       return;
     }
+    if (batchSizeNum <= 0) {
+      alert('Please enter a valid Batch Size (greater than 0)');
+      return;
+    }
+
 
     onSubmit({
       id: editData?.id,
@@ -496,16 +533,16 @@ export function ProcessCostDialog({
       machineName: selectedMHR?.machineName || '',
       operationName: selectedOperation || '',
       processRouteName: selectedRoute || '',
-      machineRate: selectedMHR?.calculations.totalMachineHourRate || 0,
-      laborRate: selectedLSR?.lhr || 0,
-      setupManning,
-      setupTime,
-      batchSize,
-      heads,
-      cycleTime,
-      partsPerCycle,
-      scrap,
-      machineValue,
+      machineRate: selectedMHR?.calculations.totalMachineHourRate || 113.10,
+      laborRate: selectedLSR?.lhr || 327.89,
+      setupManning: parseFloat(setupManning as string) || 0,
+      setupTime: parseFloat(setupTime as string) || 0,
+      batchSize: parseFloat(batchSize as string) || 0,
+      heads: parseFloat(heads as string) || 0,
+      cycleTime: parseFloat(cycleTime as string) || 0,
+      partsPerCycle: parseFloat(partsPerCycle as string) || 0,
+      scrap: parseFloat(scrap as string) || 0,
+      machineValue: parseFloat(machineValue as string) || 0,
       totalCost,
       facilityId,
       facilityRateId,
@@ -542,15 +579,16 @@ export function ProcessCostDialog({
               <div className="space-y-4">
               {/* Op Nbr */}
               <div className="space-y-2">
-                <Label>Op Nbr</Label>
+                <Label>Op Nbr <span className="text-muted-foreground text-xs">(Enter any number - table will sort by sequence)</span></Label>
                 <Input
                   type="number"
+                  step="1"
                   value={opNbr}
                   onChange={(e) => {
                     const val = e.target.value;
                     setOpNbr(val === '' ? 0 : parseInt(val) || 0);
                   }}
-                  placeholder="Enter operation number"
+                  placeholder="Enter operation number (e.g. 5, 10, 20, 100)"
                 />
               </div>
 
@@ -764,8 +802,7 @@ export function ProcessCostDialog({
                             min="0"
                             value={machineValue}
                             onChange={(e) => {
-                              const val = e.target.value;
-                              setMachineValue(val === '' ? 0 : parseFloat(val) || 0);
+                              setMachineValue(e.target.value);
                             }}
                             placeholder="Enter machine value"
                             className="flex-1"
@@ -830,23 +867,39 @@ export function ProcessCostDialog({
               )}
 
               {/* Rate Information */}
-              {selectedMHR && selectedLSR && (
-                <>
-                  <Card className="bg-secondary/20">
-                    <CardHeader>
-                      <CardTitle className="text-sm">Selected Rates</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Machine Rate:</span>
-                        <span className="ml-2 font-bold">₹{selectedMHR.calculations.totalMachineHourRate.toFixed(2)}/hr</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Labour Rate:</span>
-                        <span className="ml-2 font-bold">₹{selectedLSR.lhr.toFixed(2)}/hr</span>
-                      </div>
-                    </CardContent>
-                  </Card>
+              {selectedMHR && selectedLSR ? (
+                <Card className="bg-secondary/20">
+                  <CardHeader>
+                    <CardTitle className="text-sm">Selected Rates</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Machine Rate:</span>
+                      <span className="ml-2 font-bold">₹{selectedMHR.calculations.totalMachineHourRate.toFixed(2)}/hr</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Labour Rate:</span>
+                      <span className="ml-2 font-bold">₹{selectedLSR.lhr.toFixed(2)}/hr</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="bg-secondary/20">
+                  <CardHeader>
+                    <CardTitle className="text-sm">Selected Rates</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Machine Rate:</span>
+                      <span className="ml-2 font-bold">₹113.10/hr</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Labour Rate:</span>
+                      <span className="ml-2 font-bold">₹327.89/hr</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -857,8 +910,7 @@ export function ProcessCostDialog({
                         min="0"
                         value={setupManning}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          setSetupManning(val === '' ? 0 : parseFloat(val) || 0);
+                          setSetupManning(e.target.value);
                         }}
                         placeholder="Enter setup manning"
                       />
@@ -872,8 +924,7 @@ export function ProcessCostDialog({
                         min="0"
                         value={setupTime}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          setSetupTime(val === '' ? 0 : parseFloat(val) || 0);
+                          setSetupTime(e.target.value);
                         }}
                         placeholder="Enter setup time"
                       />
@@ -886,11 +937,9 @@ export function ProcessCostDialog({
                       <Input
                         type="number"
                         step="0.01"
-                        min="1"
                         value={batchSize}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          setBatchSize(val === '' ? 1 : parseFloat(val) || 1);
+                          setBatchSize(e.target.value);
                         }}
                         placeholder="Enter batch size"
                         required
@@ -905,8 +954,7 @@ export function ProcessCostDialog({
                         min="0"
                         value={heads}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          setHeads(val === '' ? 0 : parseFloat(val) || 0);
+                          setHeads(e.target.value);
                         }}
                         placeholder="Enter number of heads"
                       />
@@ -920,11 +968,9 @@ export function ProcessCostDialog({
                         <Input
                           type="number"
                           step="0.01"
-                          min="1"
                           value={cycleTime}
                           onChange={(e) => {
-                            const val = e.target.value;
-                            setCycleTime(val === '' ? 0 : parseFloat(val) || 0);
+                            setCycleTime(e.target.value);
                           }}
                           placeholder="Enter cycle time"
                           required
@@ -953,8 +999,7 @@ export function ProcessCostDialog({
                         min="1"
                         value={partsPerCycle}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          setPartsPerCycle(val === '' ? 1 : parseFloat(val) || 1);
+                          setPartsPerCycle(e.target.value);
                         }}
                         placeholder="Enter parts per cycle"
                         required
@@ -971,25 +1016,22 @@ export function ProcessCostDialog({
                       max="100"
                       value={scrap}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        setScrap(val === '' ? 0 : parseFloat(val) || 0);
+                        setScrap(e.target.value);
                       }}
                       placeholder="Enter scrap percentage"
                     />
                   </div>
 
-                  {/* Total Cost Display */}
-                  <Card className="bg-primary/10 border border-primary/20">
-                    <CardContent className="pt-6">
-                      <Label className="block mb-2">Total Cost</Label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">INR</span>
-                        <span className="text-2xl font-bold text-primary">₹{totalCost.toFixed(2)}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              )}
+              {/* Total Cost Display */}
+              <Card className="bg-primary/10 border border-primary/20">
+                <CardContent className="pt-6">
+                  <Label className="block mb-2">Total Cost</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">INR</span>
+                    <span className="text-2xl font-bold text-primary">₹{totalCost.toFixed(2)}</span>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
               <DialogFooter className="mt-6">
@@ -998,7 +1040,7 @@ export function ProcessCostDialog({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!selectedMHRId || !selectedLSRId || cycleTime <= 0 || batchSize <= 0}
+                  disabled={cycleTime <= 0 || batchSize <= 0}
                 >
                   {editData ? 'Update Process' : 'Add Process'}
                 </Button>
@@ -1010,16 +1052,12 @@ export function ProcessCostDialog({
 
       {/* Calculator Side Panel */}
       <Sheet open={calculatorOpen} onOpenChange={(open) => {
-        console.log('Calculator onOpenChange called with:', open);
-        
         // Prevent calculator from closing if lookup table is open
         if (!open && showLookupTable) {
-          console.log('Preventing calculator close because lookup table is open');
           return;
         }
         
         if (!open) {
-          console.log('Calculator closing - also closing lookup table');
           // When closing calculator, also close lookup table
           setShowLookupTable(false);
           setSelectedLookupField(null);
@@ -1247,7 +1285,6 @@ export function ProcessCostDialog({
 
       {/* Lookup Table Panel */}
       {showLookupTable && lookupTableData && (() => {
-        console.log('Rendering lookup table:', { showLookupTable, hasData: !!lookupTableData, tableName: lookupTableData?.tableName });
         return (
           <>
             {/* Backdrop */}
@@ -1354,13 +1391,11 @@ export function ProcessCostDialog({
                           e.preventDefault();
                         }}
                         onClick={(e) => {
-                          console.log('Lookup table row clicked');
                           e.stopPropagation();
                           e.preventDefault();
                           e.nativeEvent?.stopImmediatePropagation?.();
                           
                           if (selectedLookupField && outputValue !== undefined) {
-                            console.log('Setting calculator input:', selectedLookupField.fieldName, outputValue);
                             setCalculatorInputs((prev: Record<string, any>) => ({
                               ...prev,
                               [selectedLookupField.fieldName]: typeof outputValue === "number"
@@ -1371,7 +1406,6 @@ export function ProcessCostDialog({
                           
                           // Use setTimeout to ensure state updates don't conflict
                           setTimeout(() => {
-                            console.log('Closing lookup table only');
                             // Close ONLY lookup table after selection
                             setShowLookupTable(false);
                             setSelectedLookupField(null);

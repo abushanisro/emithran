@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
@@ -24,7 +25,7 @@ import {
 import { useCreateMHR, useUpdateMHR, useMHRRecord } from '@/lib/api/hooks';
 import type { CreateMHRData } from '@/lib/api/mhr';
 import { toast } from 'sonner';
-import { COMMODITY_PRESETS, getCommodityPreset, MANUFACTURING_PROCESSES } from '@/lib/constants/commodityPresets';
+import { useProcessHierarchy, useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { mhrFormSchema, type MHRFormData } from '@/lib/validations/mhrValidation';
 
 interface MHRFormDialogProps {
@@ -34,7 +35,8 @@ interface MHRFormDialogProps {
 }
 
 const getDefaultValues = (): MHRFormData => {
-  const defaultPreset = getCommodityPreset('plastic-rubber') || {
+  // Default preset values without any hardcoded commodity selection
+  const defaultPreset = {
     shiftsPerDay: 3.00,
     hoursPerShift: 8.00,
     workingDaysPerYear: 260.00,
@@ -52,12 +54,12 @@ const getDefaultValues = (): MHRFormData => {
 
   return {
     location: 'India',
-    commodityCode: 'plastic-rubber',
+    commodityCode: '', // No default commodity code - user must select
     machineName: '',
     machineDescription: '',
     manufacturer: '',
     model: '',
-    specification: '',
+    specification: '', // No default specification - user must select
     landedMachineCost: 100000, // Set a default non-zero value
     machineFootprintSqm: 10.00,
     rentPerSqmPerMonth: 100.00,
@@ -71,6 +73,86 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   const { data: existingRecord } = useMHRRecord(editingId || '', { enabled: !!editingId });
   const createMutation = useCreateMHR();
   const updateMutation = useUpdateMHR();
+  
+  // Get dynamic process hierarchy from API
+  const { data: processHierarchy } = useProcessHierarchy();
+  const { data: allMappings } = useProcessCalculatorMappings();
+  
+  // Hierarchical selection state
+  const [selectedGroup, setSelectedGroup] = useState<string>('');
+  const [selectedRoute, setSelectedRoute] = useState<string>('');
+  const [selectedOperation, setSelectedOperation] = useState<string>('');
+  
+  // Transform API data for hierarchical dropdowns
+  const processGroups = useMemo(() => {
+    if (!processHierarchy?.processGroups) return [];
+    
+    const uniqueGroups = [...new Set(processHierarchy.processGroups)];
+    return uniqueGroups.map((group) => ({
+      value: group,
+      label: group,
+      description: `${group} manufacturing processes`
+    }));
+  }, [processHierarchy?.processGroups]);
+  
+  // Process routes filtered by selected group
+  const processRoutes = useMemo(() => {
+    if (!allMappings?.mappings || !selectedGroup) return [];
+    
+    const routesForGroup = allMappings.mappings
+      .filter(mapping => mapping.processGroup === selectedGroup)
+      .map(mapping => mapping.processRoute);
+    
+    const uniqueRoutes = [...new Set(routesForGroup)];
+    return uniqueRoutes.map((route) => ({
+      value: route,
+      label: route,
+      description: `${route} process route`
+    }));
+  }, [allMappings?.mappings, selectedGroup]);
+  
+  // Operations filtered by selected group and route
+  const operations = useMemo(() => {
+    if (!allMappings?.mappings || !selectedGroup || !selectedRoute) return [];
+    
+    const operationsForRoute = allMappings.mappings
+      .filter(mapping => 
+        mapping.processGroup === selectedGroup && 
+        mapping.processRoute === selectedRoute
+      )
+      .map(mapping => mapping.operation);
+    
+    const uniqueOperations = [...new Set(operationsForRoute)];
+    return uniqueOperations.map((operation) => ({
+      value: operation,
+      label: operation,
+      description: `${operation} operation`
+    }));
+  }, [allMappings?.mappings, selectedGroup, selectedRoute]);
+  
+  // Manual edit mode state
+  const [isManualMode, setIsManualMode] = useState(false);
+  const [manualMHRValue, setManualMHRValue] = useState<number>(0);
+
+  // Handlers for hierarchical selection
+  const handleGroupChange = (group: string) => {
+    setSelectedGroup(group);
+    setSelectedRoute('');
+    setSelectedOperation('');
+    setValue('commodityCode', group);
+    setValue('specification', '');
+  };
+
+  const handleRouteChange = (route: string) => {
+    setSelectedRoute(route);
+    setSelectedOperation('');
+    setValue('specification', '');
+  };
+
+  const handleOperationChange = (operation: string) => {
+    setSelectedOperation(operation);
+    setValue('specification', operation);
+  };
 
   const {
     register,
@@ -86,21 +168,7 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
     mode: 'onBlur', // Validate on blur for better UX
   });
 
-  // Watch commodity code changes
-  const commodityCode = watch('commodityCode');
-
-  // Apply commodity preset when commodity code changes (only for new records)
-  useEffect(() => {
-    if (!editingId && commodityCode) {
-      const preset = getCommodityPreset(commodityCode);
-      if (preset) {
-        // Only update preset fields, keep user-entered machine-specific fields
-        Object.entries(preset).forEach(([key, value]) => {
-          setValue(key as keyof CreateMHRData, value as any);
-        });
-      }
-    }
-  }, [commodityCode, editingId, setValue]);
+  // No commodity preset logic - all values are manually entered
 
   useEffect(() => {
     if (existingRecord) {
@@ -131,20 +199,114 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
         adminOverheadPercentage: existingRecord.adminOverheadPercentage,
         profitMarginPercentage: existingRecord.profitMarginPercentage,
       });
+      
+      // Load manual entry settings - check both camelCase and snake_case variants
+      const isManual = Boolean(
+        existingRecord.isManualEntry || 
+        (existingRecord as any).is_manual_entry
+      );
+      
+      const manualValue = Number(
+        existingRecord.manualMHRValue || 
+        (existingRecord as any).manual_mhr_value || 
+        0
+      );
+      
+      
+      setIsManualMode(isManual);
+      setManualMHRValue(manualValue);
+      
+      // Set hierarchical selection state from existing record
+      if (existingRecord.commodityCode && allMappings?.mappings) {
+        // Find the mapping that matches the existing record's specification
+        const matchingMapping = allMappings.mappings.find(mapping => 
+          mapping.operation === existingRecord.specification
+        );
+        
+        if (matchingMapping) {
+          setSelectedGroup(matchingMapping.processGroup);
+          setSelectedRoute(matchingMapping.processRoute);
+          setSelectedOperation(matchingMapping.operation);
+        } else {
+          // If no mapping found, try to set group from commodityCode
+          setSelectedGroup(existingRecord.commodityCode);
+          setSelectedRoute('');
+          setSelectedOperation('');
+        }
+      }
     } else {
       reset(getDefaultValues());
+      setIsManualMode(false);
+      setManualMHRValue(0);
+      setSelectedGroup('');
+      setSelectedRoute('');
+      setSelectedOperation('');
     }
-  }, [existingRecord, reset]);
+  }, [existingRecord, reset, allMappings]);
 
   const onSubmit = async (data: MHRFormData) => {
     try {
+      // Validate hierarchical selection
+      if (!selectedGroup) {
+        toast.error('Please select a process group');
+        return;
+      }
+      
+      let submitData = data;
+      
+      // If manual mode is enabled, create simplified data with manual MHR value
+      if (isManualMode) {
+        if (manualMHRValue <= 0) {
+          toast.error('Please enter a valid MHR value greater than 0');
+          return;
+        }
+        
+        // Create minimal data structure for manual mode
+        submitData = {
+          // Required basic fields
+          machineName: data.machineName,
+          location: data.location,
+          commodityCode: data.commodityCode,
+          machineDescription: data.machineDescription || '',
+          manufacturer: data.manufacturer || '',
+          model: data.model || '',
+          specification: data.specification || '',
+          
+          // Set minimal defaults for required fields (won't be used for calculations)
+          shiftsPerDay: 1,
+          hoursPerShift: 8,
+          workingDaysPerYear: 250,
+          plannedMaintenanceHoursPerYear: 0,
+          capacityUtilizationRate: 85,
+          landedMachineCost: manualMHRValue, // Store manual value as landed cost for reference
+          accessoriesCostPercentage: 0,
+          installationCostPercentage: 10,
+          paybackPeriodYears: 10,
+          interestRatePercentage: 0,
+          insuranceRatePercentage: 0,
+          maintenanceCostPercentage: 0,
+          machineFootprintSqm: 0,
+          rentPerSqmPerMonth: 0,
+          powerKwhPerHour: 0,
+          electricityCostPerKwh: 0,
+          adminOverheadPercentage: 0,
+          profitMarginPercentage: 0,
+          
+          // Add manual flag and value for backend processing
+          isManualEntry: true,
+          manualMHRValue: manualMHRValue,
+        } as any;
+      }
+      
       if (editingId) {
-        await updateMutation.mutateAsync({ id: editingId, data });
+        await updateMutation.mutateAsync({ id: editingId, data: submitData });
       } else {
-        await createMutation.mutateAsync(data);
+        await createMutation.mutateAsync(submitData);
       }
       onOpenChange(false);
       reset(getDefaultValues());
+      setIsManualMode(false);
+      setManualMHRValue(0);
     } catch (error: any) {
       console.error('Failed to save MHR record:', error);
       // Enhanced error handling beyond what mutation hooks provide
@@ -170,6 +332,12 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   const handleClose = () => {
     onOpenChange(false);
     reset(getDefaultValues());
+    setIsManualMode(false);
+    setManualMHRValue(0);
+    // Reset hierarchical selection state
+    setSelectedGroup('');
+    setSelectedRoute('');
+    setSelectedOperation('');
   };
 
   return (
@@ -186,10 +354,10 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="operation">Operation</TabsTrigger>
-              <TabsTrigger value="costs">Costs</TabsTrigger>
-              <TabsTrigger value="utilities">Utilities</TabsTrigger>
-              <TabsTrigger value="margins">Margins</TabsTrigger>
+              <TabsTrigger value="operation" disabled={isManualMode}>Operation</TabsTrigger>
+              <TabsTrigger value="costs" disabled={isManualMode}>Costs</TabsTrigger>
+              <TabsTrigger value="utilities" disabled={isManualMode}>Utilities</TabsTrigger>
+              <TabsTrigger value="margins" disabled={isManualMode}>Margins</TabsTrigger>
             </TabsList>
 
             {/* Basic Information Tab */}
@@ -215,60 +383,75 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="commodityCode">Commodity Code *</Label>
-                  <Controller
-                    name="commodityCode"
-                    control={control}
-                    rules={{ required: true }}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select commodity type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {COMMODITY_PRESETS.map((commodity) => (
-                            <SelectItem key={commodity.value} value={commodity.value}>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{commodity.label}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {commodity.description}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.commodityCode && (
+                  <Label htmlFor="processGroup">Process Group *</Label>
+                  <Select onValueChange={handleGroupChange} value={selectedGroup}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select process group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {processGroups.map((group, index) => (
+                        <SelectItem key={`${group.value}-${index}`} value={group.value}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{group.label}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {group.description}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!selectedGroup && (
                     <span className="text-sm text-destructive">Required</span>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="manufacturingProcess">Manufacturing Process</Label>
-                  <Controller
-                    name="specification"
-                    control={control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select manufacturing process" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MANUFACTURING_PROCESSES.map((process) => (
-                            <SelectItem key={process.value} value={process.value}>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{process.label}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {process.description}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
+                  <Label htmlFor="processRoute">Process Route</Label>
+                  <Select 
+                    onValueChange={handleRouteChange} 
+                    value={selectedRoute}
+                    disabled={!selectedGroup}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedGroup ? "Select process route" : "Select group first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {processRoutes.map((route, index) => (
+                        <SelectItem key={`${route.value}-${index}`} value={route.value}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{route.label}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {route.description}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="operation">Operation</Label>
+                  <Select 
+                    onValueChange={handleOperationChange} 
+                    value={selectedOperation}
+                    disabled={!selectedRoute}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedRoute ? "Select operation" : "Select route first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {operations.map((operation, index) => (
+                        <SelectItem key={`${operation.value}-${index}`} value={operation.value}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{operation.label}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {operation.description}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="manufacturer">Manufacturer</Label>
@@ -289,6 +472,59 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
                     {...register('machineDescription')}
                     placeholder="Brief description"
                   />
+                </div>
+                
+                {/* Manual MHR Edit Option */}
+                <div className="col-span-2 space-y-4 border-t pt-4 mt-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="manual-mode"
+                      checked={isManualMode}
+                      onCheckedChange={setIsManualMode}
+                    />
+                    <Label htmlFor="manual-mode" className="text-sm font-medium">
+                      Manual MHR Entry (Skip automatic calculation)
+                    </Label>
+                  </div>
+                  
+                  {isManualMode && (
+                    <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                            Manual Entry Mode
+                          </span>
+                        </div>
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          Enter the MHR value directly. The cost calculation tabs will be disabled.
+                        </p>
+                        <div className="space-y-2">
+                          <Label htmlFor="manualMHR" className="text-sm font-semibold">
+                            Machine Hour Rate (MHR) - ₹/hour *
+                          </Label>
+                          <Input
+                            id="manualMHR"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={manualMHRValue === 0 ? '' : manualMHRValue}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setManualMHRValue(val === '' ? 0 : parseFloat(val) || 0);
+                            }}
+                            placeholder="Enter MHR value directly (e.g., 500.00)"
+                            className="max-w-md"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            This will override all automatic calculations
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </TabsContent>

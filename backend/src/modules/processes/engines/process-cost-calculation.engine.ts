@@ -113,24 +113,20 @@ export interface ProcessCostResult {
 /**
  * Process Cost Calculation Engine
  *
- * Implements standard manufacturing cost engineering formulas:
+ * Implements simplified manufacturing cost formulas:
  *
- * 1. Setup Cost Per Part:
- *    - Setup Hours = Setup Time (minutes) / 60
- *    - Setup Labor = Setup Hours × Manning × Direct Rate
- *    - Setup Overhead = Setup Hours × Manning × (Indirect + Fringe)
- *    - Setup Machine = Setup Hours × Machine Rate
- *    - Setup Cost Per Part = Total Setup Cost / Batch Size
+ * 1. Setup Cost:
+ *    - Setup Cost = (Setup time in hr × (MHR + LHR)) / Batch Size
+ *    - Where: LHR = Labor Hour Rate, MHR = Machine Hour Rate
  *
- * 2. Cycle Cost Per Part:
- *    - Cycle Hours Per Part = (Cycle Time (seconds) / 3600) / Parts Per Cycle
- *    - Labor Cost = Cycle Hours × Heads × Direct Rate
- *    - Overhead Cost = Cycle Hours × Heads × (Indirect + Fringe)
- *    - Machine Cost = Cycle Hours × Machine Rate
+ * 2. Labour Cost:
+ *    - Labour Cost = LHR × Cycle time in hr
  *
- * 3. Total Cost:
- *    - Cost Before Scrap = Setup Cost Per Part + Cycle Cost Per Part
- *    - Total Cost = Cost Before Scrap / (1 - Scrap% / 100)
+ * 3. Machine Cost:
+ *    - Machine Cost = MHR × Cycle Time in hr
+ *
+ * 4. Total Cost:
+ *    - Total Cost = Setup Cost + Labour Cost + Machine Cost
  */
 export class ProcessCostCalculationEngine {
   private readonly precision = PROCESS_COST_CONSTANTS.PRECISION;
@@ -295,9 +291,8 @@ export class ProcessCostCalculationEngine {
   }
 
   /**
-   * Calculate setup costs
-   *
-   * Setup is a one-time cost distributed across the batch
+   * Calculate setup costs using simplified formula
+   * Formula: Setup Cost = (Setup time in hr × (MHR + LHR)) / Batch Size
    */
   private calculateSetupCosts(
     setupTimeHours: number,
@@ -308,20 +303,20 @@ export class ProcessCostCalculationEngine {
     machineRate: number,
     batchSize: number
   ) {
-    // Labor cost during setup
-    const setupLaborCost = setupTimeHours * setupManning * directRate;
-
-    // Overhead costs during setup (indirect + fringe)
-    const setupOverheadCost = setupTimeHours * setupManning * (indirectRate + fringeRate);
-
-    // Machine/equipment cost during setup
-    const setupMachineCost = setupTimeHours * machineRate;
-
-    // Total setup cost for the batch
-    const totalSetupCost = setupLaborCost + setupOverheadCost + setupMachineCost;
-
-    // Allocate setup cost to each part in the batch
-    const setupCostPerPart = totalSetupCost / batchSize;
+    // LHR = Labor Hour Rate (directRate)
+    const LHR = directRate;
+    
+    // MHR = Machine Hour Rate (machineRate)  
+    const MHR = machineRate;
+    
+    // Setup Cost = (Setup time in hr × (MHR + LHR)) / Batch Size
+    const setupCostPerPart = (setupTimeHours * (MHR + LHR)) / batchSize;
+    
+    // Calculate individual components for breakdown (optional for display)
+    const setupLaborCost = setupTimeHours * LHR;
+    const setupMachineCost = setupTimeHours * MHR;
+    const totalSetupCost = setupTimeHours * (MHR + LHR);
+    const setupOverheadCost = 0; // Not used in simplified formula
 
     return {
       setupLaborCost: this.round(setupLaborCost, this.precision.COST),
@@ -333,9 +328,9 @@ export class ProcessCostCalculationEngine {
   }
 
   /**
-   * Calculate cycle costs (production run costs per part)
-   *
-   * These costs apply to each part produced
+   * Calculate cycle costs using simplified formulas
+   * Labour Cost = LHR × Cycle time in hr
+   * Machine Cost = MHR × Cycle Time in hr
    */
   private calculateCycleCosts(
     cycleTimePerPartHours: number,
@@ -345,17 +340,23 @@ export class ProcessCostCalculationEngine {
     fringeRate: number,
     machineRate: number
   ) {
-    // Labor cost per part (direct labor × number of operators)
-    const cycleLaborCostPerPart = cycleTimePerPartHours * heads * directRate;
+    // LHR = Labor Hour Rate (directRate)
+    const LHR = directRate;
+    
+    // MHR = Machine Hour Rate (machineRate)
+    const MHR = machineRate;
+    
+    // Labour Cost = LHR × Cycle time in hr
+    const cycleLaborCostPerPart = LHR * cycleTimePerPartHours;
 
-    // Overhead cost per part (indirect + fringe × number of operators)
-    const cycleOverheadCostPerPart = cycleTimePerPartHours * heads * (indirectRate + fringeRate);
+    // Machine Cost = MHR × Cycle Time in hr  
+    const cycleMachineCostPerPart = MHR * cycleTimePerPartHours;
 
-    // Machine cost per part
-    const cycleMachineCostPerPart = cycleTimePerPartHours * machineRate;
+    // No overhead cost in simplified formula
+    const cycleOverheadCostPerPart = 0;
 
-    // Total cycle cost per part
-    const totalCycleCostPerPart = cycleLaborCostPerPart + cycleOverheadCostPerPart + cycleMachineCostPerPart;
+    // Total cycle cost per part = Labour Cost + Machine Cost
+    const totalCycleCostPerPart = cycleLaborCostPerPart + cycleMachineCostPerPart;
 
     return {
       cycleLaborCostPerPart: this.round(cycleLaborCostPerPart, this.precision.COST),
@@ -366,15 +367,8 @@ export class ProcessCostCalculationEngine {
   }
 
   /**
-   * Calculate total cost with scrap adjustment
-   *
-   * Scrap increases cost because you need to produce more parts
-   * to get the required good parts
-   *
-   * Formula: Total Cost = Cost Before Scrap / (1 - Scrap% / 100)
-   *
-   * Example: If scrap is 2%, you need to produce 102 parts to get 100 good parts
-   * So the cost per good part increases by dividing by 0.98
+   * Calculate total cost using simplified formula
+   * Total Cost = Setup Cost + Labour Cost + Machine Cost
    */
   private calculateTotalCosts(
     setupCostPerPart: number,
@@ -382,23 +376,13 @@ export class ProcessCostCalculationEngine {
     scrapPercentage: number,
     batchSize: number
   ) {
-    // Cost per part before scrap adjustment
-    const totalCostBeforeScrap = setupCostPerPart + cycleCostPerPart;
-
-    // Scrap factor: (1 - scrap% / 100)
-    // If scrap = 2%, factor = 0.98
-    const scrapFactor = 1 - (scrapPercentage / 100);
-
-    // Prevent division by zero if scrap is 100%
-    if (scrapFactor <= 0) {
-      throw new Error('Scrap percentage cannot be 100% or greater');
-    }
-
-    // Final cost per part adjusted for scrap
-    const totalCostPerPart = totalCostBeforeScrap / scrapFactor;
-
-    // Additional cost incurred due to scrap
-    const scrapAdjustment = totalCostPerPart - totalCostBeforeScrap;
+    // Total Cost = Setup Cost + Labour Cost + Machine Cost  
+    const totalCostPerPart = setupCostPerPart + cycleCostPerPart;
+    
+    // For simplified formula, we don't apply scrap adjustment
+    const totalCostBeforeScrap = totalCostPerPart;
+    const scrapFactor = 1; // No scrap adjustment
+    const scrapAdjustment = 0; // No additional scrap cost
 
     // Total cost for entire batch
     const totalBatchCost = totalCostPerPart * batchSize;
@@ -413,7 +397,7 @@ export class ProcessCostCalculationEngine {
   }
 
   /**
-   * Calculate efficiency metrics for analysis
+   * Calculate efficiency metrics for analysis (simplified approach)
    */
   private calculateEfficiencyMetrics(
     setupCosts: ReturnType<typeof this.calculateSetupCosts>,
@@ -437,15 +421,14 @@ export class ProcessCostCalculationEngine {
       };
     }
 
-    // Cost breakdown percentages
+    // Cost breakdown percentages for simplified formula
     const setupTimePercentage = (setupCosts.setupCostPerPart / total) * 100;
     const cycleTimePercentage = (cycleCosts.totalCycleCostPerPart / total) * 100;
-    const scrapCostPercentage = (totalCosts.scrapAdjustment / total) * 100;
+    const scrapCostPercentage = 0; // No scrap adjustment in simplified formula
 
-    // Calculate total labor and machine costs
-    const totalLaborCost = setupCosts.setupLaborCost + setupCosts.setupOverheadCost +
-                          cycleCosts.cycleLaborCostPerPart + cycleCosts.cycleOverheadCostPerPart;
-    const totalMachineCost = setupCosts.setupMachineCost + cycleCosts.cycleMachineCostPerPart;
+    // Calculate labor and machine costs based on simplified approach
+    const totalLaborCost = cycleCosts.cycleLaborCostPerPart; // Only cycle labor cost  
+    const totalMachineCost = cycleCosts.cycleMachineCostPerPart; // Only cycle machine cost
 
     const laborCostPercentage = (totalLaborCost / total) * 100;
     const machineCostPercentage = (totalMachineCost / total) * 100;
