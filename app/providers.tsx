@@ -9,16 +9,6 @@ import { SupabaseAuthProvider } from '@/lib/providers/supabase-auth-provider'
 import { initializeApiClient } from '@/lib/api/init'
 import { useCorrelationContext } from '@/lib/hooks/useCorrelationContext'
 
-import dynamic from 'next/dynamic'
-
-// Dynamically import React Query DevTools (development only)
-const ReactQueryDevtools = dynamic(
-  () =>
-    import('@tanstack/react-query-devtools').then((mod) => ({
-      default: mod.ReactQueryDevtools,
-    })),
-  { ssr: false }
-)
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // Initialize correlation context for request tracing (without auth dependency)
@@ -37,9 +27,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
             {children}
             <Sonner />
           </TooltipProvider>
-          {process.env.NODE_ENV === 'development' && (
-            <ReactQueryDevtools initialIsOpen={false} />
-          )}
         </QueryProvider>
       </SupabaseAuthProvider>
     </ThemeProvider>
