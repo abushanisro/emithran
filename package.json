@@ -82,12 +82,15 @@
     "react-hook-form": "^7.61.1",
     "react-leaflet": "^5.0.0",
     "react-resizable-panels": "^2.1.9",
+    "postcss": "^8.5.6",
     "recharts": "^2.15.4",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "tailwindcss": "^3.4.17",
     "three": "^0.182.0",
     "typescript": "^5.9.3",
+    "autoprefixer": "^10.4.21",
     "vaul": "^1.1.2",
     "xlsx": "^0.18.5",
     "zod": "^3.25.76"
@@ -101,10 +104,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/xlsx": "^0.0.35",
-    "autoprefixer": "^10.4.21",
     "eslint": "^9.32.0",
-    "eslint-config-next": "^16.1.1",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17"
+    "eslint-config-next": "^16.1.1"
   }
 }

@@ -13,7 +13,12 @@ import { useVendors, useUploadVendorsCsv, useDeleteAllVendors, useCreateVendor }
 import { Plus, Search, Upload, MapPin, Factory, Award, Filter, Trash2, ExternalLink, TrendingUp, X, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import type { VendorQuery, CreateVendorData } from '@/lib/api/vendors';
-import { IndiaMap } from '@/components/ui/india-map';
+import dynamic from 'next/dynamic';
+
+const IndiaMap = dynamic(() => import('@/components/ui/india-map').then(mod => ({ default: mod.IndiaMap })), { 
+  ssr: false,
+  loading: () => <div className="h-80 bg-muted animate-pulse rounded-md" />
+});
 import { useCounterAnimation } from '@/hooks/use-counter-animation';
 import { EQUIPMENT_TYPES, getAllCategories } from '@/lib/constants/equipment-types';
 
