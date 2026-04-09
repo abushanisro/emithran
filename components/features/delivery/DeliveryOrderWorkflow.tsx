@@ -57,7 +57,12 @@ import {
 } from '@/lib/api/hooks/useDelivery';
 import { toast } from 'sonner';
 import RouteCalculator from './RouteCalculator';
-import RouteMap from './RouteMap';
+import dynamic from 'next/dynamic';
+
+const RouteMap = dynamic(() => import('./RouteMap'), { 
+  ssr: false,
+  loading: () => <div className="h-64 bg-muted animate-pulse rounded-md" />
+});
 
 interface DeliveryOrderWorkflowProps {
   projectId: string;
