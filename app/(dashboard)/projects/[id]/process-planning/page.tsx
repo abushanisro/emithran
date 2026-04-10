@@ -96,6 +96,13 @@ function ProcessPlanningPageContent() {
     refetchBOMs();
   }, [projectId, refetchBOMs]);
 
+  // Auto-select first BOM when BOMs are loaded and no BOM is selected
+  useEffect(() => {
+    if (boms.length > 0 && !selectedBomId) {
+      setSelectedBomId(boms[0].id);
+    }
+  }, [boms, selectedBomId]);
+
   // Sync activeTab with URL parameter changes
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -996,37 +1003,51 @@ function ProcessPlanningPageContent() {
 
           {/* TAB 3: COST ANALYSIS - For Cost Engineers */}
           <TabsContent value="costing" className="space-y-6">
-            {selectedBomId ? (
+            {boms.length > 0 ? (
               <div className="space-y-6">
-                {/* Cost Analysis Engine - Overview and Charts */}
-                <CostAnalysisEngine
-                  bomId={selectedBomId}
-                  bomName={boms.find(b => b.id === selectedBomId)?.name || "Assembly"}
-                  itemCount={bomItems.length || 2}
-                />
+                {/* Show cost analysis for all BOMs or the selected one */}
+                {boms.map((bom, index) => {
+                  // Only show selected BOM if one is selected, otherwise show first BOM
+                  const targetBom = selectedBomId ? (bom.id === selectedBomId ? bom : null) : (index === 0 ? bom : null);
+                  if (!targetBom) return null;
+                  
+                  // Get items for this BOM
+                  const currentBomItems = targetBom.id === selectedBomId ? bomItems : [];
+                  
+                  return (
+                    <div key={targetBom.id} className="space-y-6">
+                      {/* Cost Analysis Engine - Overview and Charts */}
+                      <CostAnalysisEngine
+                        bomId={targetBom.id}
+                        bomName={targetBom.name || "Assembly"}
+                        itemCount={currentBomItems.length || 2}
+                      />
 
-                {/* Detailed BOM Cost Report - Part-by-Part Breakdown */}
-                <div className="border-t border-border pt-6">
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-foreground">Detailed BOM Cost Breakdown</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Comprehensive part-by-part cost analysis with raw materials, processes, and margins
-                    </p>
-                  </div>
-                  <BomCostReportWrapper
-                    bomId={selectedBomId}
-                    bomName={boms.find(b => b.id === selectedBomId)?.name || "Assembly"}
-                  />
-                </div>
+                      {/* Detailed BOM Cost Report - Part-by-Part Breakdown */}
+                      <div className="border-t border-border pt-6">
+                        <div className="mb-4">
+                          <h3 className="text-lg font-semibold text-foreground">Detailed BOM Cost Breakdown</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Comprehensive part-by-part cost analysis with raw materials, processes, and margins
+                          </p>
+                        </div>
+                        <BomCostReportWrapper
+                          bomId={targetBom.id}
+                          bomName={targetBom.name || "Assembly"}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <Card>
                 <CardContent className="py-12">
                   <div className="text-center">
                     <DollarSign className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold text-foreground mb-2">Select a BOM to Start Cost Analysis</h3>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">No BOMs Available</h3>
                     <p className="text-sm text-muted-foreground">
-                      Select a BOM from the Project Overview tab to begin comprehensive cost analysis
+                      Create a BOM in the Project Overview to begin cost analysis
                     </p>
                   </div>
                 </CardContent>

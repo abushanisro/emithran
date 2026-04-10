@@ -223,7 +223,36 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
   };
 
   /**
-   * Calculate comprehensive cost data for a BOM
+   * Fetch all cost data for multiple BOM items in batch (optimized)
+   */
+  const fetchBulkCostData = async (bomItems: BOMItem[]) => {
+    const itemIds = bomItems.map(item => item.id);
+    
+    try {
+      // Single bulk API call instead of multiple individual calls
+      const [rawMaterials, processes, tooling, packaging, procuredParts] = await Promise.all([
+        apiClient.post('/raw-material-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}})),
+        apiClient.post('/process-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}})),
+        apiClient.post('/tooling-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}})),
+        apiClient.post('/packaging-logistics-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}})),
+        apiClient.post('/procured-parts-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}}))
+      ]);
+
+      return {
+        rawMaterials: rawMaterials.data || {},
+        processes: processes.data || {},
+        tooling: tooling.data || {},
+        packaging: packaging.data || {},
+        procuredParts: procuredParts.data || {}
+      };
+    } catch (error) {
+      console.error('Bulk cost fetch failed, falling back to individual calls:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Calculate comprehensive cost data for a BOM (optimized)
    */
   const calculateBomCosts = async (bomId: string, itemCount?: number): Promise<void> => {
     // Prevent multiple simultaneous calculations for the same BOM
@@ -247,14 +276,34 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
         return;
       }
       
-      const itemCosts: CostCalculationResult[] = [];
+      // Try bulk fetch first for better performance
+      const bulkCostData = await fetchBulkCostData(bomItems);
       
-      // Calculate costs for each actual BOM item
-      for (const bomItem of bomItems) {
-        // Get cost data from backend services for this item
-        const costData = await calculateRealItemCost(bomItem);
-        itemCosts.push(costData);
-      }
+      // Process all items in parallel instead of sequentially
+      const itemCostPromises = bomItems.map(async (bomItem) => {
+        if (bulkCostData) {
+          // Use bulk data if available
+          const rawMaterialCost = bulkCostData.rawMaterials[bomItem.id] || 0;
+          const processCost = bulkCostData.processes[bomItem.id] || 0;
+          const toolingCost = bulkCostData.tooling[bomItem.id] || 0;
+          const packagingCost = bulkCostData.packaging[bomItem.id] || 0;
+          const procuredPartsCost = bulkCostData.procuredParts[bomItem.id] || 0;
+          
+          return await calculateItemCostWithData(bomItem, {
+            rawMaterialCost,
+            processCost,
+            toolingCost,
+            packagingCost,
+            procuredPartsCost
+          });
+        } else {
+          // Fallback to individual calculation
+          return await calculateRealItemCost(bomItem);
+        }
+      });
+      
+      // Wait for all parallel calculations to complete
+      const itemCosts = await Promise.all(itemCostPromises);
       
       // Store individual item costs
       setBomCosts(prev => new Map(prev.set(bomId, itemCosts)));
@@ -273,6 +322,88 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
         return newSet;
       });
       setIsCalculating(false);
+    }
+  };
+
+  /**
+   * Calculate item cost using pre-fetched bulk data
+   */
+  const calculateItemCostWithData = async (bomItem: BOMItem, costData: {
+    rawMaterialCost: number;
+    processCost: number;
+    toolingCost: number;
+    packagingCost: number;
+    procuredPartsCost: number;
+  }): Promise<CostCalculationResult> => {
+    try {
+      // If item has user-provided cost data, use it
+      if (bomItem.unitCost && bomItem.unitCost > 0) {
+        const totalCost = bomItem.unitCost * bomItem.quantity;
+        const toolingCostAmount = totalCost * 0.05;
+        const breakdown = {
+          rawMaterialCost: totalCost * 0.4,
+          processCost: totalCost * 0.3,
+          toolingCost: toolingCostAmount,
+          packagingLogisticsCost: totalCost * 0.1,
+          procuredPartsCost: totalCost * 0.15,
+          overheadCost: totalCost * 0.15,
+          directCost: totalCost,
+          sgaCost: totalCost * 0.125,
+          profitAmount: totalCost * 0.08,
+          totalCost: totalCost,
+          sellingPrice: totalCost * 1.205,
+        };
+
+        return {
+          itemId: bomItem.id,
+          breakdown,
+          margins: {
+            grossMarginAmount: breakdown.sellingPrice - breakdown.directCost,
+            grossMarginPercentage: ((breakdown.sellingPrice - breakdown.directCost) / breakdown.sellingPrice) * 100,
+            netMarginAmount: breakdown.profitAmount,
+            netMarginPercentage: (breakdown.profitAmount / breakdown.sellingPrice) * 100,
+          },
+          efficiency: {
+            materialEfficiency: 85,
+            processEfficiency: 80,
+            overallEfficiency: 82.5,
+          },
+        };
+      }
+
+      // Use pre-fetched cost data
+      const totalCost = costData.rawMaterialCost + costData.processCost + 
+                       costData.toolingCost + costData.packagingCost + costData.procuredPartsCost;
+      
+      return {
+        itemId: bomItem.id,
+        breakdown: {
+          rawMaterialCost: costData.rawMaterialCost,
+          processCost: costData.processCost,
+          toolingCost: costData.toolingCost,
+          packagingLogisticsCost: costData.packagingCost,
+          procuredPartsCost: costData.procuredPartsCost,
+          overheadCost: totalCost * 0.15,
+          directCost: totalCost,
+          sgaCost: totalCost * 0.125,
+          profitAmount: totalCost * 0.08,
+          totalCost: totalCost,
+          sellingPrice: totalCost * 1.205,
+        },
+        margins: {
+          grossMarginAmount: totalCost * 1.205 - totalCost,
+          grossMarginPercentage: ((totalCost * 1.205 - totalCost) / (totalCost * 1.205)) * 100,
+          netMarginAmount: totalCost * 0.08,
+          netMarginPercentage: (totalCost * 0.08 / (totalCost * 1.205)) * 100,
+        },
+        efficiency: {
+          materialEfficiency: 85,
+          processEfficiency: 80,
+          overallEfficiency: 82.5,
+        },
+      };
+    } catch (error) {
+      return costEngine.generateSampleCostData(bomItem.itemType);
     }
   };
 

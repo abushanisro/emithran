@@ -180,13 +180,23 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
     return (
       <div className="space-y-6">
         <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <RefreshCw className="w-12 h-12 mx-auto text-primary mb-4 animate-spin" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">Calculating Costs...</h3>
-              <p className="text-sm text-muted-foreground">
-                Running cost analysis engine for {bomName}
-              </p>
+          <CardContent className="py-8">
+            <div className="text-center max-w-md mx-auto">
+              <div className="relative">
+                <RefreshCw className="w-12 h-12 mx-auto text-primary mb-4 animate-spin" />
+                <div className="absolute inset-0 w-12 h-12 mx-auto border-2 border-primary/20 rounded-full animate-pulse" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-3">Cost Analysis in Progress</h3>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Processing {bomName}</p>
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                  <div className="bg-primary h-2 rounded-full animate-pulse" style={{width: '60%'}} />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                  <span>Fetching cost data</span>
+                  <span>Optimized processing</span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

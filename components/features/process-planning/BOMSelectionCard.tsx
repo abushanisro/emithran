@@ -225,12 +225,12 @@ export function BOMSelectionCard({
           </>
         )}
 
-        {/* Empty State */}
-        {!selectedBomId && (
+        {/* Empty State - Only show if no BOMs available */}
+        {boms.length === 0 && (
           <div className="text-center py-6 px-4">
-            <p className="text-sm font-medium text-muted-foreground mb-1">No BOM Selected</p>
+            <p className="text-sm font-medium text-muted-foreground mb-1">No BOMs Available</p>
             <p className="text-xs text-muted-foreground">
-              Select a BOM from the dropdown above to start process planning
+              Create a BOM in your project to start process planning
             </p>
           </div>
         )}

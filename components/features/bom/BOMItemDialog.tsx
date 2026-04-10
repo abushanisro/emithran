@@ -25,10 +25,7 @@ import {
 } from '@/components/ui/select';
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
-  CommandInput,
-  CommandItem,
   CommandList,
 } from '@/components/ui/command';
 import {
@@ -45,20 +42,18 @@ import {
   XCircle, 
   Loader2, 
   HelpCircle,
-  Clock,
+  ChevronsUpDown,
+  RefreshCw,
   Plus,
-  ChevronDown,
-  Check,
-  ChevronsUpDown
+  Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createBOMItem, updateBOMItem } from '@/lib/api/hooks/useBOMItems';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
 import { bomItemsApi } from '@/lib/api/bom-items';
-
 // Enhanced error handling types for BOM management
 type EnhancedBOMError = {
   category: 'validation' | 'duplication' | 'hierarchy' | 'fileupload' | 'network' | 'permission' | 'business' | 'data';
@@ -377,8 +372,23 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
   }, [formData]);
 
   // Function to analyze 3D file and extract physical properties
-  const analyze3DFile = async (file: File) => {
-    if (!file) return;
+  const analyze3DFile = async (file: File | null) => {
+    // If file is null, try to analyze existing 3D file for the item
+    if (!file && !item?.file3dPath) {
+      toast.warning('No 3D file available', {
+        description: 'Upload a 3D model file first to extract properties',
+        duration: 3000
+      });
+      return;
+    }
+    
+    if (!file && !item?.id) {
+      toast.warning('Cannot analyze', {
+        description: 'Save the item first, then upload a 3D file',
+        duration: 3000
+      });
+      return;
+    }
     
     setIsAnalyzing3D(true);
     
@@ -389,21 +399,24 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         duration: 3000
       });
 
-      // Create FormData to upload the 3D file temporarily
-      const formDataUpload = new FormData();
-      formDataUpload.append('file3d', file);
+      // Create FormData to upload the 3D file temporarily (only if new file)
+      let formDataUpload;
+      if (file) {
+        formDataUpload = new FormData();
+        formDataUpload.append('file3d', file);
+      }
       
-      // Create a temporary item ID for analysis (we'll use the current bomId or create temp)
-      const tempItemId = item?.id || `temp-${Date.now()}`;
+      // For analysis, we only need the item ID if it exists
       
-      // If this is an existing item, we can analyze it directly
       // If it's new, we need to handle it differently
       let analysisResult;
       
       if (item?.id) {
-        // For existing items, upload file and analyze
+        // For existing items, upload file (if new) and analyze
         try {
-          await apiClient.uploadFiles(`/bom-items/${item.id}/upload-files`, formDataUpload);
+          if (formDataUpload) {
+            await apiClient.uploadFiles(`/bom-items/${item.id}/upload-files`, formDataUpload);
+          }
           analysisResult = await bomItemsApi.analyzeCAD(item.id, true);
         } catch (error) {
           console.warn('Could not upload and analyze file:', error);
@@ -1167,12 +1180,31 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
 
             {/* Physical Properties */}
             <div className="border-t pt-4">
-              <div className="flex items-center gap-2 mb-3">
-                <h4 className="text-sm font-medium">Physical Properties (Optional)</h4>
-                {(formData.weight > 0 || formData.surfaceArea > 0 || formData.maxLength > 0) && (
-                  <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/20 px-2 py-1 rounded">
-                    Auto-extracted
-                  </span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium">Physical Properties (Optional)</h4>
+                  {(formData.weight > 0 || formData.surfaceArea > 0 || formData.maxLength > 0) && (
+                    <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/20 px-2 py-1 rounded">
+                      Auto-extracted
+                    </span>
+                  )}
+                </div>
+                {item?.file3dPath && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => analyze3DFile(null)}
+                    disabled={isAnalyzing3D}
+                    className="h-8 px-3 text-xs"
+                  >
+                    {isAnalyzing3D ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    {isAnalyzing3D ? 'Analyzing...' : 'Auto-Fill from 3D'}
+                  </Button>
                 )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

@@ -46,10 +46,10 @@ export function RawMaterialDialog({
   const [country, setCountry] = useState<string>('');
   const [selectedQuarter, setSelectedQuarter] = useState<string>('q1');
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
-  const [grossUsage, setGrossUsage] = useState<number>(0);
-  const [netUsage, setNetUsage] = useState<number>(0);
-  const [scrap, setScrap] = useState<number>(0);
-  const [overhead, setOverhead] = useState<number>(0);
+  const [grossUsage, setGrossUsage] = useState<number | ''>('');
+  const [netUsage, setNetUsage] = useState<number | ''>('');
+  const [scrap, setScrap] = useState<number | ''>('');
+  const [overhead, setOverhead] = useState<number | ''>('');
   const [totalCost, setTotalCost] = useState<number>(0);
   const [manualUnitCost, setManualUnitCost] = useState<number>(0);
 
@@ -440,9 +440,9 @@ export function RawMaterialDialog({
         scrap,
         overhead,
         calculations: {
-          materialCost: grossUsage * finalUnitCost,
-          scrapCost: (grossUsage * finalUnitCost * scrap) / 100,
-          overheadCost: (grossUsage * finalUnitCost * overhead) / 100
+          materialCost: grossUsageNum * finalUnitCost,
+          scrapCost: (grossUsageNum * finalUnitCost * (typeof scrap === 'number' ? scrap : 0)) / 100,
+          overheadCost: (grossUsageNum * finalUnitCost * (typeof overhead === 'number' ? overhead : 0)) / 100
         }
       });
 
@@ -451,9 +451,12 @@ export function RawMaterialDialog({
         return;
       }
 
-      const materialCost = grossUsage * finalUnitCost;
-      const scrapCost = (materialCost * scrap) / 100;
-      const overheadCost = (materialCost * overhead) / 100;
+      const grossUsageNum = typeof grossUsage === 'number' ? grossUsage : 0;
+      const materialCost = grossUsageNum * finalUnitCost;
+      const scrapPercent = typeof scrap === 'number' ? scrap : 0;
+      const overheadPercent = typeof overhead === 'number' ? overhead : 0;
+      const scrapCost = (materialCost * scrapPercent) / 100;
+      const overheadCost = (materialCost * overheadPercent) / 100;
       const total = materialCost + scrapCost + overheadCost;
       setTotalCost(Math.max(0, total));
     } else {
@@ -830,10 +833,10 @@ export function RawMaterialDialog({
                   <Input
                     type="number"
                     step="0.01"
-                    value={grossUsage === 0 ? '' : grossUsage}
+                    value={grossUsage === '' ? '' : grossUsage.toString()}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setGrossUsage(val === '' ? 0 : parseFloat(val) || 0);
+                      setGrossUsage(val === '' ? '' : parseFloat(val) || 0);
                     }}
                     placeholder="Enter gross usage"
                     className="flex-1"
@@ -878,10 +881,10 @@ export function RawMaterialDialog({
                   <Input
                     type="number"
                     step="0.01"
-                    value={netUsage === 0 ? '' : netUsage}
+                    value={netUsage === '' ? '' : netUsage.toString()}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setNetUsage(val === '' ? 0 : parseFloat(val) || 0);
+                      setNetUsage(val === '' ? '' : parseFloat(val) || 0);
                     }}
                     placeholder="Enter net usage"
                     className="flex-1"
@@ -922,10 +925,10 @@ export function RawMaterialDialog({
                 <Input
                   type="number"
                   step="0.01"
-                  value={scrap === 0 ? '' : scrap}
+                  value={scrap === '' ? '' : scrap.toString()}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setScrap(val === '' ? 0 : parseFloat(val) || 0);
+                    setScrap(val === '' ? '' : parseFloat(val) || 0);
                   }}
                   placeholder="Enter scrap percentage"
                   disabled={!selectedMaterialId && !editData}
@@ -937,10 +940,10 @@ export function RawMaterialDialog({
                 <Input
                   type="number"
                   step="0.01"
-                  value={overhead === 0 ? '' : overhead}
+                  value={overhead === '' ? '' : overhead.toString()}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setOverhead(val === '' ? 0 : parseFloat(val) || 0);
+                    setOverhead(val === '' ? '' : parseFloat(val) || 0);
                   }}
                   placeholder="Enter overhead percentage"
                   disabled={!selectedMaterialId && !editData}

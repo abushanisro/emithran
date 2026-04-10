@@ -30,8 +30,8 @@ export function ProcuredPartDialog({
   const [part, setPart] = useState<string>('');
   const [unitCost, setUnitCost] = useState<number>(0);
   const [noOff, setNoOff] = useState<number>(0);
-  const [scrapPercentage, setScrapPercentage] = useState<number>(0);
-  const [overheadPercentage, setOverheadPercentage] = useState<number>(0);
+  const [scrapPercentage, setScrapPercentage] = useState<number | ''>('');
+  const [overheadPercentage, setOverheadPercentage] = useState<number | ''>('');
   const [totalCost, setTotalCost] = useState<number>(0);
 
   // Load edit data
@@ -57,8 +57,10 @@ export function ProcuredPartDialog({
   // Calculate total cost
   useEffect(() => {
     const baseCost = unitCost * noOff;
-    const scrapCost = (baseCost * scrapPercentage) / 100;
-    const overheadCost = (baseCost * overheadPercentage) / 100;
+    const scrapPercent = typeof scrapPercentage === 'number' ? scrapPercentage : 0;
+    const overheadPercent = typeof overheadPercentage === 'number' ? overheadPercentage : 0;
+    const scrapCost = (baseCost * scrapPercent) / 100;
+    const overheadCost = (baseCost * overheadPercent) / 100;
     const total = baseCost + scrapCost + overheadCost;
     setTotalCost(Math.max(0, total));
   }, [unitCost, noOff, scrapPercentage, overheadPercentage]);
@@ -156,8 +158,11 @@ export function ProcuredPartDialog({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={scrapPercentage || ''}
-                  onChange={(e) => setScrapPercentage(parseFloat(e.target.value) || 0)}
+                  value={scrapPercentage === '' ? '' : scrapPercentage.toString()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setScrapPercentage(value === '' ? '' : Number(value) || 0);
+                  }}
                   placeholder="Enter scrap percentage"
                 />
               </div>
@@ -168,8 +173,11 @@ export function ProcuredPartDialog({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={overheadPercentage || ''}
-                  onChange={(e) => setOverheadPercentage(parseFloat(e.target.value) || 0)}
+                  value={overheadPercentage === '' ? '' : overheadPercentage.toString()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setOverheadPercentage(value === '' ? '' : Number(value) || 0);
+                  }}
                   placeholder="Enter overhead percentage"
                 />
               </div>
