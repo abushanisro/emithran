@@ -20,7 +20,6 @@ import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculat
 import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
 import { formatCurrency } from '@/lib/utils';
 import { exportMHRToPDF } from '@/lib/utils/exportMHRToPDF';
-import { getCommodityLabel } from '@/lib/constants/commodityPresets';
 
 export default function MHRDatabasePage() {
   const router = useRouter();

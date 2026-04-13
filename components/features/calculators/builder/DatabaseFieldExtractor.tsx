@@ -136,6 +136,15 @@ export function DatabaseFieldExtractor({
     }
   }, [selectedField, disabled]);
 
+  // Auto-set material category for raw materials if field is already configured
+  useEffect(() => {
+    if (dataSource === 'raw_materials' && selectedField && !selectedMaterialCategory && disabled) {
+      // If we have a saved field but no category selected, default to ferrous category
+      // This ensures saved fields display properly after refresh
+      setSelectedMaterialCategory('FERROUS_NON_FERROUS');
+    }
+  }, [dataSource, selectedField, selectedMaterialCategory, disabled]);
+
   // Fetch reference tables when process ID changes
   useEffect(() => {
     const fetchReferenceTables = async () => {

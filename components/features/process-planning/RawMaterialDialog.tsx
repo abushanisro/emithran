@@ -176,9 +176,94 @@ export function RawMaterialDialog({
     setSelectedLookupField(field);
 
     try {
+      // Case 1: Raw Materials database lookup
+      if (field.dataSource === 'raw_materials') {
+        const { apiClient } = await import('@/lib/api/client');
+        
+        try {
+          // Use enhanced materials endpoint to get all material data
+          const categoryParam = field.materialCategory === 'PLASTIC_RUBBER' ? 'PLASTIC' : 
+                               field.materialCategory === 'FERROUS_NON_FERROUS' ? 'FERROUS' :
+                               'FERROUS'; // Default to ferrous
+          
+          const response = await apiClient.get('/raw-materials/enhanced', { 
+            params: { 
+              limit: 500,
+              category: categoryParam
+            } 
+          });
+          
+          if (response?.items) {
+            // Transform raw materials data into lookup table format
+            const fieldPropertyMap = {
+              'meltingTempCelsius': 'Melting Temp (°C)',
+              'densityKgM3': 'Density (kg/m³)',
+              'costPerKg': 'Cost per kg (₹)',
+              'costPerUnit': 'Cost per unit (₹)',
+              'utsMpa': 'UTS (MPa)',
+              'ytsMpa': 'YTS (MPa)',
+              'thermalConductivityWMK': 'Thermal Conductivity (W/mK)',
+              'specificHeatJGK': 'Specific Heat (J/gK)',
+              'moldTempCelsiusMin': 'Min Mold Temp (°C)',
+              'moldTempCelsiusMax': 'Max Mold Temp (°C)',
+            };
+            
+            // Create column definitions based on available properties
+            const columns = [
+              { name: 'materialName', key: 'materialName', label: 'Material Name', dataType: 'text' },
+              { name: 'materialGrade', key: 'materialGrade', label: 'Grade', dataType: 'text' },
+              { name: 'categoryName', key: 'categoryName', label: 'Category', dataType: 'text' }
+            ];
+            
+            // Add the specific property column being looked up
+            if (field.sourceProperty && fieldPropertyMap[field.sourceProperty]) {
+              columns.push({ 
+                name: field.sourceProperty,
+                key: field.sourceProperty, 
+                label: fieldPropertyMap[field.sourceProperty], 
+                dataType: 'number' 
+              });
+            }
+            
+            // Transform materials into rows
+            const rows = response.items
+              .filter(material => {
+                // Filter by property availability
+                if (field.sourceProperty) {
+                  return material[field.sourceProperty] != null && material[field.sourceProperty] > 0;
+                }
+                return true;
+              })
+              .map(material => ({
+                materialName: material.materialName || '',
+                materialGrade: material.materialGrade || '',
+                categoryName: material.categoryName || '',
+                [field.sourceProperty]: material[field.sourceProperty] || 0
+              }));
+
+            const tableData = {
+              fieldName: field.fieldName,
+              fieldLabel: field.displayLabel || field.fieldName,
+              tableName: `Raw Materials - ${fieldPropertyMap[field.sourceProperty] || field.sourceProperty}`,
+              tableId: 'raw_materials_' + field.sourceProperty,
+              column_definitions: columns,
+              rows: rows,
+            };
+            
+            setLookupTableData(tableData);
+            setShowLookupTable(true);
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to fetch raw materials data:', error);
+          // Fall through to existing process table logic
+        }
+      }
+
+      // Case 2: Process reference tables (existing logic)
       const { processesApi } = await import('@/lib/api/processes');
 
-      // Case 1: sourceField is set — fetch by table ID directly
+      // sourceField is set — fetch by table ID directly
       if (field.sourceField) {
         let tableId = field.sourceField;
         if (field.sourceField.startsWith('from_')) {
@@ -423,6 +508,7 @@ export function RawMaterialDialog({
       
       // If no cost from material, use manual input
       const finalUnitCost = unitCost || manualUnitCost || 0;
+      const grossUsageNum = typeof grossUsage === 'number' ? grossUsage : 0;
 
       // Debug logging
       console.log('Cost Calculation Debug:', {
@@ -450,8 +536,6 @@ export function RawMaterialDialog({
         setTotalCost(0);
         return;
       }
-
-      const grossUsageNum = typeof grossUsage === 'number' ? grossUsage : 0;
       const materialCost = grossUsageNum * finalUnitCost;
       const scrapPercent = typeof scrap === 'number' ? scrap : 0;
       const overheadPercent = typeof overhead === 'number' ? overhead : 0;
@@ -463,6 +547,112 @@ export function RawMaterialDialog({
       setTotalCost(0);
     }
   }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, editData]);
+
+  // Auto-populate calculator fields when material is selected
+  useEffect(() => {
+    if (selectedMaterial && selectedCalculator) {
+      const updatedInputs = { ...calculatorInputs };
+      let hasUpdates = false;
+      
+      console.log('Auto-populating fields for material:', selectedMaterial);
+      console.log('Available material properties:', Object.keys(selectedMaterial));
+      console.log('Selected calculator:', selectedCalculator);
+      console.log('Calculator fields:', selectedCalculator.fields);
+      
+      // Find fields configured with raw materials database lookup
+      const rawMaterialFields = selectedCalculator.fields
+        ?.filter((field: any) => 
+          field.fieldType === 'database_lookup' && 
+          field.dataSource === 'raw_materials' && 
+          (field.sourceProperty || field.sourceField)  // Support both sourceProperty and sourceField
+        );
+      
+      console.log('Raw materials fields found:', rawMaterialFields);
+      
+      rawMaterialFields?.forEach((field: any) => {
+          // Use sourceProperty if available, fallback to sourceField
+          const sourceProperty = field.sourceProperty || field.sourceField;
+          console.log(`Looking for property "${sourceProperty}" in material for field "${field.fieldName}"`);
+          
+          // Map calculator sourceProperty to actual API field names - Complete mapping for all raw material fields
+          const propertyMappings = {
+            // Legacy API mappings
+            'meltingTempCelsius': 'meltingTempC',
+            'densityKgM3': 'densityKgM3',
+            'costPerKg': 'cost',
+            'costPerUnit': 'unitCost',
+            'utsMpa': 'ultimateTensileStrength',
+            'ytsMpa': 'yieldTensileStrength',
+            'thermalConductivityWMK': 'thermalConductivityMelt',
+            'specificHeatJGK': 'specificHeatMelt',
+            'moldTempCelsiusMin': 'moldTempC',
+            'moldTempCelsiusMax': 'moldTempC',
+            'ejectDeflectionTempCelsius': 'ejectDeflectionTempC',
+            
+            // Basic Material Info - Direct mappings
+            'material': 'material',
+            'materialGrade': 'materialGrade',
+            'materialGroup': 'materialGroup',
+            'materialType': 'materialType',
+            'materialDescription': 'materialDescription',
+            'application': 'application',
+            
+            // Physical Properties
+            'density': 'densityKgM3',
+            
+            // Mechanical Properties - Direct mappings for all existing fields
+            'ultimateTensileStrength': 'ultimateTensileStrength',
+            'yieldTensileStrength': 'yieldTensileStrength',
+            'shearingStrength': 'shearingStrength',
+            
+            // Thermal Properties
+            'meltingTempC': 'meltingTempC',
+            'moldTempC': 'moldTempC',
+            'ejectDeflectionTempC': 'ejectDeflectionTempC',
+            'thermalConductivityMelt': 'thermalConductivityMelt',
+            'specificHeatMelt': 'specificHeatMelt',
+            
+            // Processing Properties
+            'clampingPressureMpa': 'clampingPressureMpa',
+            'regrindingPercentage': 'regrindingPercentage',
+            'regrinding': 'regrinding',
+            
+            // Commercial Properties
+            'cost': 'cost',
+            'unitCost': 'unitCost',
+            'currency': 'currency',
+            'location': 'location',
+            'country': 'country',
+            'shape': 'shape',
+            
+            // Standards
+            'astmStandard': 'astmStandard',
+            'dinStandard': 'dinStandard',
+            'enStandard': 'enStandard',
+            'jisStandard': 'jisStandard'
+          };
+          
+          // Get the correct API field name
+          const actualPropertyName = propertyMappings[sourceProperty] || sourceProperty;
+          
+          // Get the property value using the correct API field name
+          const propertyValue = selectedMaterial[actualPropertyName];
+          
+          console.log(`Property mapping: "${sourceProperty}" -> "${actualPropertyName}" = ${propertyValue}`);
+          
+          if (propertyValue !== undefined && propertyValue !== null && propertyValue > 0) {
+            updatedInputs[field.fieldName] = propertyValue;
+            hasUpdates = true;
+            console.log(`Updated field "${field.fieldName}" with value ${propertyValue} from property "${actualPropertyName}"`);
+          }
+        });
+      
+      if (hasUpdates) {
+        console.log('Updating calculator inputs:', updatedInputs);
+        setCalculatorInputs(updatedInputs);
+      }
+    }
+  }, [selectedMaterial, selectedCalculator]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1058,16 +1248,86 @@ export function RawMaterialDialog({
                         const fieldNameLower = (field.fieldName || '').toLowerCase();
                         
                         const isLookupTableField = 
-                          // Only show for explicitly configured database lookup fields
+                          // Show for database lookup fields with processes data source
                           (field.fieldType === 'database_lookup' && field.dataSource === 'processes') ||
-                          // Only show for fields with sourceField starting with 'from_' (linked to reference tables)
+                          // Show for fields with sourceField starting with 'from_' (linked to reference tables)
                           (field.sourceField && field.sourceField.startsWith('from_'));
+                          // Note: Raw materials fields now auto-populate, no eye icon needed
 
                         return (
                           <div key={field.id} className="space-y-2">
                             <Label htmlFor={field.fieldName}>
                               {field.displayLabel || field.fieldName}
                               {field.unit && <span className="text-muted-foreground ml-1">({field.unit})</span>}
+                              {field.fieldType === 'database_lookup' && field.dataSource === 'raw_materials' && (
+                                <div className="ml-2 inline-flex flex-col gap-1">
+                                  {(() => {
+                                    const sourceProperty = field.sourceProperty || field.sourceField;
+                                    
+                                    // Property display mappings for better UI labels
+                                    const propertyDisplayNames: Record<string, string> = {
+                                      // Basic Material Info
+                                      'material': 'Material Name',
+                                      'materialGrade': 'Material Grade',
+                                      'materialGroup': 'Material Group',
+                                      'materialType': 'Material Type',
+                                      'materialDescription': 'Material Description',
+                                      
+                                      // Physical Properties
+                                      'density': 'Density (kg/m³)',
+                                      'densityKgM3': 'Density (kg/m³)',
+                                      
+                                      // Mechanical Properties
+                                      'ultimateTensileStrength': 'Ultimate Tensile Strength (MPa)',
+                                      'yieldTensileStrength': 'Yield Tensile Strength (MPa)',
+                                      'shearingStrength': 'Shearing Strength (MPa)',
+                                      
+                                      // Thermal Properties
+                                      'meltingTempC': 'Melting Temperature (°C)',
+                                      'moldTempC': 'Mold Temperature (°C)',
+                                      'ejectDeflectionTempC': 'Heat Deflection Temperature (°C)',
+                                      'thermalConductivityMelt': 'Thermal Conductivity (W/mK)',
+                                      'specificHeatMelt': 'Specific Heat (J/gK)',
+                                      
+                                      // Processing Properties
+                                      'clampingPressureMpa': 'Clamping Pressure (MPa)',
+                                      'regrindingPercentage': 'Regrinding Percentage (%)',
+                                      'regrinding': 'Regrinding Allowed',
+                                      
+                                      // Commercial Properties
+                                      'cost': 'Cost per Unit',
+                                      'unitCost': 'Unit Cost',
+                                      'currency': 'Currency',
+                                      'location': 'Location',
+                                      'country': 'Country of Origin',
+                                      'shape': 'Material Shape',
+                                      
+                                      // Standards
+                                      'astmStandard': 'ASTM Standard',
+                                      'dinStandard': 'DIN Standard',
+                                      'enStandard': 'EN Standard',
+                                      'jisStandard': 'JIS Standard',
+                                      
+                                      // Legacy mappings
+                                      'meltingTempCelsius': 'Melting Temperature (°C)',
+                                      'costPerKg': 'Cost per kg',
+                                      'costPerUnit': 'Cost per Unit',
+                                      'utsMpa': 'Ultimate Tensile Strength (MPa)',
+                                      'ytsMpa': 'Yield Tensile Strength (MPa)',
+                                      'thermalConductivityWMK': 'Thermal Conductivity (W/mK)',
+                                      'specificHeatJGK': 'Specific Heat (J/gK)'
+                                    };
+                                    
+                                    const displayName = propertyDisplayNames[sourceProperty] || sourceProperty;
+                                    
+                                    return sourceProperty ? (
+                                      <span className="text-[10px] text-muted-foreground bg-gray-50 px-1.5 py-0.5 rounded border">
+                                        {displayName}
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                </div>
+                              )}
                             </Label>
 
                             {isLookupTableField ? (

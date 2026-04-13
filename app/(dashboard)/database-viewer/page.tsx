@@ -12,15 +12,6 @@ import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 
-/**
- * Database Viewer - For Testing & Verification
- *
- * This page allows you to:
- * 1. View all data stored in the database
- * 2. Verify that BOM items are being saved
- * 3. Test API connectivity
- * 4. Debug data issues
- */
 export default function DatabaseViewerPage() {
   const [selectedBomId, setSelectedBomId] = useState<string | undefined>();
 
@@ -42,9 +33,7 @@ export default function DatabaseViewerPage() {
   };
 
   const renderDataStatus = (isLoading: boolean, count: number) => {
-    if (isLoading) {
-      return <Badge variant="outline">Loading...</Badge>;
-    }
+    if (isLoading) return <Badge variant="outline">Loading...</Badge>;
     return count > 0 ? (
       <Badge variant="default" className="gap-1">
         <CheckCircle2 className="h-3 w-3" />
@@ -158,9 +147,7 @@ export default function DatabaseViewerPage() {
                         </div>
                         <Badge>{project.status}</Badge>
                       </div>
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        ID: {project.id}
-                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">ID: {project.id}</div>
                     </div>
                   ))}
                 </div>
@@ -187,7 +174,9 @@ export default function DatabaseViewerPage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <h4 className="font-semibold">{bom.name}</h4>
-                          <p className="text-sm text-muted-foreground">{bom.description || 'No description'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {bom.description || 'No description'}
+                          </p>
                         </div>
                         <Button
                           variant="outline"
@@ -223,7 +212,7 @@ export default function DatabaseViewerPage() {
             <CardContent>
               {!selectedBomId ? (
                 <p className="text-muted-foreground">
-                  Go to the BOMs tab and click "View Items" on a BOM to see its items here.
+                  Go to the BOMs tab and click &quot;View Items&quot; on a BOM to see its items here.
                 </p>
               ) : itemsLoading ? (
                 <p className="text-muted-foreground">Loading...</p>
@@ -256,9 +245,7 @@ export default function DatabaseViewerPage() {
                           <span className="text-muted-foreground">Sort:</span> {item.sortOrder}
                         </div>
                       </div>
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        ID: {item.id}
-                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">ID: {item.id}</div>
                     </div>
                   ))}
                 </div>
@@ -285,13 +272,13 @@ export default function DatabaseViewerPage() {
                       <div className="flex items-start justify-between">
                         <div>
                           <h4 className="font-semibold">{vendor.name}</h4>
-                          <p className="text-sm text-muted-foreground">{vendor.supplierCode || vendor.city || 'N/A'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {vendor.supplierCode || vendor.city || 'N/A'}
+                          </p>
                         </div>
                         <Badge>{vendor.status}</Badge>
                       </div>
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        ID: {vendor.id}
-                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">ID: {vendor.id}</div>
                     </div>
                   ))}
                 </div>
@@ -309,10 +296,11 @@ export default function DatabaseViewerPage() {
         <CardContent className="space-y-2 text-sm">
           <p><strong>1. Check Status Cards:</strong> See how many records you have in each table</p>
           <p><strong>2. View Data:</strong> Click through tabs to see actual data from your database</p>
-          <p><strong>3. Verify BOM Items:</strong> Go to BOMs tab → Click "View Items" → Check Items tab</p>
-          <p><strong>4. Refresh Data:</strong> Click "Refresh All" button to reload all data from database</p>
+          <p><strong>3. Verify BOM Items:</strong> Go to BOMs tab → Click &quot;View Items&quot; → Check Items tab</p>
+          <p><strong>4. Refresh Data:</strong> Click &quot;Refresh All&quot; button to reload all data from database</p>
           <p className="text-muted-foreground pt-2">
-            This page directly queries your Supabase database. If you don't see data here but you created it, check:
+            This page directly queries your Supabase database. If you don&apos;t see data here but
+            you created it, check:
             <br />• Browser console for errors
             <br />• Supabase dashboard for RLS policy issues
             <br />• Backend logs for API errors

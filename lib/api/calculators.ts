@@ -43,6 +43,7 @@ export type CalculatorField = {
   dataSource?: DataSource;
   sourceTable?: string;
   sourceField?: string;
+  sourceProperty?: string;  // Property name for auto-population in process planning
   lookupConfig: Record<string, any>;
   defaultValue?: string;
   unit?: string;
@@ -121,6 +122,7 @@ export type CreateFieldData = {
   dataSource?: DataSource;
   sourceTable?: string;
   sourceField?: string;
+  sourceProperty?: string;  // Property name for auto-population
   lookupConfig?: Record<string, any>;
   defaultValue?: string;
   unit?: string;

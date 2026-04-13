@@ -33,9 +33,6 @@ export class RawMaterialsService {
       queryBuilder = queryBuilder.eq('material', query.material);
     }
 
-    if (query.country) {
-      queryBuilder = queryBuilder.eq('country', query.country);
-    }
 
 
     // Search across multiple fields
@@ -73,7 +70,7 @@ export class RawMaterialsService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material_group, material, material_grade, country, shape');
+      .select('material_group, material, material_grade, shape');
 
     if (error) {
       this.logger.error(`Error fetching filter options: ${error.message}`, 'RawMaterialsService');
@@ -83,13 +80,11 @@ export class RawMaterialsService {
     // Extract unique values
     const materialGroups = [...new Set(data.map(m => m.material_group).filter(Boolean))].sort();
     const materialTypes = [...new Set(data.map(m => m.material).filter(Boolean))].sort();
-    const countries = [...new Set(data.map(m => m.country).filter(Boolean))].sort();
     const grades = [...new Set(data.map(m => m.material_grade).filter(Boolean))].sort();
 
     return {
       materialGroups,
       materialTypes,
-      countries,
       grades,
     };
   }
@@ -148,7 +143,6 @@ export class RawMaterialsService {
         din_standard: createRawMaterialDto.din_standard,
         en_standard: createRawMaterialDto.en_standard,
         jis_standard: createRawMaterialDto.jis_standard,
-        country: createRawMaterialDto.country,
         shape: createRawMaterialDto.shape,
         user_id: userId,
       })
@@ -205,7 +199,6 @@ export class RawMaterialsService {
       din_standard: dto.din_standard,
       en_standard: dto.en_standard,
       jis_standard: dto.jis_standard,
-      country: dto.country,
       shape: dto.shape,
       user_id: userId,
     }));
@@ -278,7 +271,6 @@ export class RawMaterialsService {
     if (updateRawMaterialDto.din_standard !== undefined) updateData.din_standard = handleStringField(updateRawMaterialDto.din_standard);
     if (updateRawMaterialDto.en_standard !== undefined) updateData.en_standard = handleStringField(updateRawMaterialDto.en_standard);
     if (updateRawMaterialDto.jis_standard !== undefined) updateData.jis_standard = handleStringField(updateRawMaterialDto.jis_standard);
-    if (updateRawMaterialDto.country !== undefined) updateData.country = handleStringField(updateRawMaterialDto.country);
     if (updateRawMaterialDto.shape !== undefined) updateData.shape = handleStringField(updateRawMaterialDto.shape);
 
     this.logger.debug(`Update data to be sent to database: ${JSON.stringify(updateData, null, 2)}`, 'RawMaterialsService');
@@ -354,7 +346,7 @@ export class RawMaterialsService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material_group, material, material_abbreviation')
+      .select('material_group, material')
       .order('material_group', { ascending: true })
       .order('material', { ascending: true });
 
@@ -371,7 +363,6 @@ export class RawMaterialsService {
       }
       acc[group].push({
         material: row.material,
-        abbreviation: row.material_abbreviation,
       });
       return acc;
     }, {});
@@ -598,7 +589,6 @@ export class RawMaterialsService {
         minimumOrderQuantity: item.minimum_order_quantity || null,
         qualityGrade: item.quality_grade || '',
         // Add missing fields
-        country: item.country || '',
         shape: item.shape || '',
         status: 'active',
         createdAt: item.created_at || new Date().toISOString(),

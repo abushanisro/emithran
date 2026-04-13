@@ -181,13 +181,13 @@ export function DatabaseRecordPicker({
             });
             break;
           case 'raw_materials':
-            endpoint = '/raw-materials';
+            endpoint = '/raw-materials/enhanced';
             mapFunction = (item: any) => ({
               id: item.id,
-              displayLabel: `${item.material || 'Unknown'}${item.materialGrade ? ` - ${item.materialGrade}` : ''}`,
+              displayLabel: `${item.materialName || item.material || 'Unknown'}${item.materialGrade ? ` - ${item.materialGrade}` : ''}`,
               metadata: {
                 group: item.materialGroup || 'N/A',
-                location: item.location || 'N/A'
+                category: item.categoryName || 'N/A'
               },
             });
             break;

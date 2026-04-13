@@ -51,7 +51,7 @@ import { toast } from 'sonner';
 import { createBOMItem, updateBOMItem } from '@/lib/api/hooks/useBOMItems';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
 import { bomItemsApi } from '@/lib/api/bom-items';
 // Enhanced error handling types for BOM management
@@ -201,42 +201,156 @@ interface BOMItemDialogProps {
 export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, parentItemId, defaultItemType, getAutoParent }: BOMItemDialogProps) {
   const queryClient = useQueryClient();
   
-  // State for material grade combobox
+  // State for material category and grade selection
+  const [materialCategoryOpen, setMaterialCategoryOpen] = useState(false);
   const [materialGradeOpen, setMaterialGradeOpen] = useState(false);
   const [materialGradeSearch, setMaterialGradeSearch] = useState('');
+  const [debouncedMaterialGradeSearch, setDebouncedMaterialGradeSearch] = useState('');
+  const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | ''>('');
   
-  // Get raw materials for material grade dropdown (only ferrous and non-ferrous)
-  const { data: rawMaterialsData, isLoading: isLoadingMaterials } = useRawMaterials({
-    search: materialGradeSearch,
-    limit: 100 // Limit for better performance with search
+  // Debounce search input to reduce API calls - only when dropdown is open
+  useEffect(() => {
+    if (!materialGradeOpen) return;
+    
+    const timer = setTimeout(() => {
+      setDebouncedMaterialGradeSearch(materialGradeSearch);
+    }, 500); // Increased to 500ms to reduce API calls
+    
+    return () => clearTimeout(timer);
+  }, [materialGradeSearch, materialGradeOpen]);
+  
+  // Get raw materials based on selected category using specific API endpoints
+  const { data: rawMaterialsData, isLoading: isLoadingMaterials } = useQuery({
+    queryKey: ['raw-materials', selectedMaterialCategory, debouncedMaterialGradeSearch],
+    queryFn: async () => {
+      if (!selectedMaterialCategory) {
+        return { items: [] };
+      }
+      
+      // Use enhanced materials endpoint which has the actual data
+      const endpoint = '/raw-materials/enhanced';
+      
+      const params: any = { 
+        limit: 500, // Increase limit to get all materials (289 ferrous + 178 plastic)
+        // Add category parameter for filtering
+        category: selectedMaterialCategory === 'PLASTIC_RUBBER' ? 'PLASTIC' : 'FERROUS'
+      };
+      
+      // Only add search if it's a simple string without special SQL characters
+      if (debouncedMaterialGradeSearch && debouncedMaterialGradeSearch.trim()) {
+        // Sanitize search string to avoid SQL parsing errors
+        const sanitizedSearch = debouncedMaterialGradeSearch
+          .replace(/[,()%]/g, ' ')  // Replace problematic characters
+          .trim()
+          .split(/\s+/)
+          .filter(word => word.length > 2)  // Only use words longer than 2 chars
+          .join(' ');
+          
+        if (sanitizedSearch.length > 0) {
+          params.search = sanitizedSearch;
+        }
+      }
+      
+      try {
+        const response = await apiClient.get(endpoint, { params });
+        
+        // Debug: Log the first few items to understand the response structure
+        if (response?.items?.length > 0) {
+          console.log('Enhanced materials API response sample:', {
+            firstItem: response.items[0],
+            totalItems: response.items.length,
+            availableFields: Object.keys(response.items[0])
+          });
+        }
+        
+        return response;
+      } catch (error: any) {
+        console.warn('API Error:', error?.message);
+        
+        // If search fails due to special characters, retry without search
+        if (error?.message?.includes('failed to parse logic tree') && params.search) {
+          console.warn('Search query failed, retrying without search:', params.search);
+          delete params.search;
+          const response = await apiClient.get(endpoint, { params });
+          return response;
+        }
+        
+        // If circuit breaker is open, return cached/fallback data
+        if (error?.message?.includes('Circuit breaker is OPEN')) {
+          console.warn('Circuit breaker is open, returning minimal fallback data');
+          return { items: [] };
+        }
+        
+        // For schema errors, return empty results instead of crashing
+        if (error?.message?.includes('does not exist') || error?.message?.includes('column')) {
+          console.error('Database schema error:', error?.message);
+          return { items: [] };
+        }
+        
+        throw error;
+      }
+    },
+    enabled: !!selectedMaterialCategory && (materialGradeOpen || !debouncedMaterialGradeSearch),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: (failureCount, error: any) => {
+      // Don't retry circuit breaker errors or schema errors
+      if (error?.message?.includes('Circuit breaker is OPEN') || 
+          error?.message?.includes('does not exist') || 
+          error?.message?.includes('column')) {
+        return false;
+      }
+      // Retry other errors up to 2 times
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
   
-  // Extract unique material grades (only ferrous and non-ferrous materials)
+  // Extract unique material grades based on selected category with proper API filtering
   const materialOptions = React.useMemo(() => {
-    if (!rawMaterialsData?.items) return [];
+    if (!rawMaterialsData?.items || !selectedMaterialCategory) return [];
     
-    // Filter for only ferrous and non-ferrous materials
-    const filteredMaterials = rawMaterialsData.items.filter(material => {
-      const materialGroup = material.materialGroup?.toLowerCase() || '';
-      const materialName = material.material?.toLowerCase() || '';
-      
-      // Exclude plastic and rubber materials
-      const isPlastic = materialGroup.includes('plastic') || materialName.includes('plastic') || 
-                       materialGroup.includes('polymer') || materialName.includes('polymer');
-      const isRubber = materialGroup.includes('rubber') || materialName.includes('rubber') ||
-                      materialGroup.includes('elastomer') || materialName.includes('elastomer');
-      
-      return !isPlastic && !isRubber && material.materialGrade && material.materialGrade.trim();
-    });
+    // Extract specific material names/grades instead of generic categories
+    // Priority: Use the actual material name which contains the specific grade info
+    const gradesWithMaterials = rawMaterialsData.items
+      .map(material => {
+        // Enhanced materials API uses different field names (camelCase from backend transformation)
+        // Use materialName only (like "100Cr6 |1.3505", "11SMn30") - ignore materialGrade
+        const specificGrade = material.materialName?.trim() ||
+                             material.material?.trim();
+        
+        if (!specificGrade || specificGrade.length === 0) {
+          return null;
+        }
+        
+        return {
+          grade: specificGrade, // This contains "100Cr6 |1.3505", "11SMn30", etc.
+          material: material.materialName || material.material,
+          materialGroup: material.materialGroup || material.categoryName,
+          materialType: material.materialType,
+          materialDescription: material.materialDescription || material.description,
+          density: material.density || material.densityKgM3,
+          cost: material.unitCost || material.cost,
+          currency: material.currency,
+          // Include additional properties for better display (handle both camelCase and snake_case)
+          ultimateTensileStrength: material.ultimateTensileStrength || material.ultimate_tensile_strength,
+          yieldTensileStrength: material.yieldTensileStrength || material.yield_tensile_strength,
+          shearingStrength: material.shearingStrength || material.shearing_strength,
+          astmStandard: material.astmStandard || material.astm_standard,
+          dinStandard: material.dinStandard || material.din_standard,
+          enStandard: material.enStandard || material.en_standard,
+          jisStandard: material.jisStandard || material.jis_standard
+        };
+      })
+      .filter(item => item !== null)
+      .map(item => item!);
     
-    // Extract unique material grades
-    const grades = filteredMaterials
-      .map(material => material.materialGrade!.trim())
-      .filter((grade, index, array) => array.indexOf(grade) === index)
-      .sort();
+    // Remove duplicates while preserving material info
+    const uniqueGrades = gradesWithMaterials.filter((item, index, array) => 
+      array.findIndex(g => g.grade === item.grade) === index
+    ).sort((a, b) => a.grade.localeCompare(b.grade));
       
-    return grades;
-  }, [rawMaterialsData]);
+    return uniqueGrades;
+  }, [rawMaterialsData, selectedMaterialCategory]);
   const [loading, setLoading] = useState(false);
   const [autoParentId, setAutoParentId] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -252,6 +366,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     annualVolume: 1000,
     unit: 'pcs',
     material: '',
+    materialCategory: '' as 'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | '',
     materialGrade: '',
     makeBuy: 'make' as 'make' | 'buy',
     unitCost: '',
@@ -371,20 +486,25 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     };
   }, [formData]);
 
-  // Function to analyze 3D file and extract physical properties
-  const analyze3DFile = async (file: File | null) => {
-    // If file is null, try to analyze existing 3D file for the item
-    if (!file && !item?.file3dPath) {
-      toast.warning('No 3D file available', {
-        description: 'Upload a 3D model file first to extract properties',
-        duration: 3000
-      });
-      return;
+  // Sync material category selection and reset material grade when category changes
+  useEffect(() => {
+    if (formData.materialCategory !== selectedMaterialCategory) {
+      setSelectedMaterialCategory(formData.materialCategory);
     }
-    
-    if (!file && !item?.id) {
-      toast.warning('Cannot analyze', {
-        description: 'Save the item first, then upload a 3D file',
+  }, [formData.materialCategory]);
+
+  useEffect(() => {
+    // Reset material grade when category changes
+    if (formData.materialGrade && selectedMaterialCategory !== formData.materialCategory) {
+      setFormData(prev => ({ ...prev, materialGrade: '' }));
+    }
+  }, [selectedMaterialCategory]);
+
+  // Function to fetch existing 3D model properties from the item data
+  const fetch3DProperties = async () => {
+    if (!item?.id) {
+      toast.warning('Save the item first', {
+        description: 'Create the BOM item first to access 3D properties',
         duration: 3000
       });
       return;
@@ -393,101 +513,58 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     setIsAnalyzing3D(true);
     
     try {
-      // First, create a temporary BOM item to upload and analyze the file
-      toast.info('Analyzing 3D model...', {
-        description: 'Extracting physical properties from your CAD file',
-        duration: 3000
+      toast.info('Loading 3D properties...', {
+        description: 'Fetching stored physical properties',
+        duration: 2000
       });
 
-      // Create FormData to upload the 3D file temporarily (only if new file)
-      let formDataUpload;
-      if (file) {
-        formDataUpload = new FormData();
-        formDataUpload.append('file3d', file);
+      // Use existing properties from the item instead of CAD analysis API
+      const extractedProperties: Partial<typeof formData> = {};
+      
+      // Get properties from the item data
+      if (item.weight && item.weight > 0) {
+        extractedProperties.weight = item.weight;
       }
       
-      // For analysis, we only need the item ID if it exists
+      if (item.surfaceArea && item.surfaceArea > 0) {
+        extractedProperties.surfaceArea = item.surfaceArea;
+      }
       
-      // If it's new, we need to handle it differently
-      let analysisResult;
+      if (item.maxLength && item.maxLength > 0) {
+        extractedProperties.maxLength = item.maxLength;
+      }
       
-      if (item?.id) {
-        // For existing items, upload file (if new) and analyze
-        try {
-          if (formDataUpload) {
-            await apiClient.uploadFiles(`/bom-items/${item.id}/upload-files`, formDataUpload);
-          }
-          analysisResult = await bomItemsApi.analyzeCAD(item.id, true);
-        } catch (error) {
-          console.warn('Could not upload and analyze file:', error);
-          return;
-        }
-      } else {
-        // For new items, we can't analyze until the item is created
-        // Show a different message
-        toast.info('3D file selected', {
-          description: 'Physical properties will be extracted after creating the item',
-          duration: 2000
+      if (item.maxWidth && item.maxWidth > 0) {
+        extractedProperties.maxWidth = item.maxWidth;
+      }
+      
+      if (item.maxHeight && item.maxHeight > 0) {
+        extractedProperties.maxHeight = item.maxHeight;
+      }
+      
+      // Update form data with existing properties
+      if (Object.keys(extractedProperties).length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          ...extractedProperties
+        }));
+        
+        const extractedCount = Object.keys(extractedProperties).length;
+        toast.success(`Loaded ${extractedCount} properties`, {
+          description: `Restored from saved data: ${Object.keys(extractedProperties).join(', ')}`,
+          duration: 4000
         });
-        return;
-      }
-      
-      if (analysisResult?.success && analysisResult.analysis?.geometryFeatures) {
-        const geo = analysisResult.analysis.geometryFeatures;
-        
-        // Extract physical properties from the analysis
-        const extractedProperties: Partial<typeof formData> = {};
-        
-        // Surface area (convert from mm² to match form units)
-        if (geo.surfaceAreaMm2 && geo.surfaceAreaMm2 > 0) {
-          extractedProperties.surfaceArea = Math.round(geo.surfaceAreaMm2 * 100) / 100; // Round to 2 decimal places
-        }
-        
-        // Bounding box dimensions
-        if (geo.boundingBox) {
-          if (geo.boundingBox.length && geo.boundingBox.length > 0) {
-            extractedProperties.maxLength = Math.round(geo.boundingBox.length * 100) / 100;
-          }
-          if (geo.boundingBox.width && geo.boundingBox.width > 0) {
-            extractedProperties.maxWidth = Math.round(geo.boundingBox.width * 100) / 100;
-          }
-          if (geo.boundingBox.height && geo.boundingBox.height > 0) {
-            extractedProperties.maxHeight = Math.round(geo.boundingBox.height * 100) / 100;
-          }
-        }
-        
-        // Weight calculation will be handled by the CAD analysis engine
-        // No mock material density calculations - rely on actual material database lookup
-        
-        // Update form data with extracted properties
-        if (Object.keys(extractedProperties).length > 0) {
-          setFormData(prev => ({
-            ...prev,
-            ...extractedProperties
-          }));
-          
-          const extractedCount = Object.keys(extractedProperties).length;
-          toast.success(`Extracted ${extractedCount} properties`, {
-            description: `Automatically populated: ${Object.keys(extractedProperties).join(', ')}`,
-            duration: 4000
-          });
-        } else {
-          toast.warning('Limited analysis results', {
-            description: 'Could not extract physical properties from this file',
-            duration: 3000
-          });
-        }
       } else {
-        toast.warning('Analysis incomplete', {
-          description: 'Could not analyze the 3D file. Please check the file format.',
+        toast.info('No stored properties', {
+          description: 'No physical properties found in the saved item data',
           duration: 3000
         });
       }
       
     } catch (error: any) {
-      console.error('3D Analysis Error:', error);
-      toast.error('Analysis failed', {
-        description: 'Could not analyze the 3D file. Please try again later.',
+      console.error('3D Properties Load Error:', error);
+      toast.error('Failed to load properties', {
+        description: 'Could not load stored properties.',
         duration: 4000
       });
     } finally {
@@ -531,6 +608,15 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
 
   useEffect(() => {
     if (item) {
+      // Determine material category from existing material grade or material
+      let materialCategory: 'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | '' = '';
+      if (item.materialGrade || item.material) {
+        const materialInfo = (item.materialGrade || item.material || '').toLowerCase();
+        const isPlastic = materialInfo.includes('plastic') || materialInfo.includes('polymer') || 
+                         materialInfo.includes('rubber') || materialInfo.includes('elastomer');
+        materialCategory = isPlastic ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS';
+      }
+
       setFormData({
         name: item.name || '',
         partNumber: item.partNumber || '',
@@ -540,6 +626,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         annualVolume: item.annualVolume || 1000,
         unit: item.unit || 'pcs',
         material: item.material || '',
+        materialCategory,
         materialGrade: item.materialGrade || '',
         makeBuy: item.makeBuy || 'make',
         unitCost: item.unitCost ? item.unitCost.toString() : '',
@@ -552,6 +639,9 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         file2d: null,
         file3d: null,
       });
+      
+      // Set the selected material category for the API filtering
+      setSelectedMaterialCategory(materialCategory);
     } else {
       setFormData({
         name: '',
@@ -562,6 +652,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         annualVolume: 1000,
         unit: 'pcs',
         material: '',
+        materialCategory: '',
         materialGrade: '',
         makeBuy: 'make',
         unitCost: '',
@@ -574,6 +665,9 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         file2d: null,
         file3d: null,
       });
+      
+      // Reset material category selection for new items
+      setSelectedMaterialCategory('');
     }
   }, [item, open, defaultItemType]);
 
@@ -606,6 +700,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         annualVolume: formData.annualVolume,
         unit: formData.unit,
         material: formData.material || undefined,
+        materialCategory: formData.materialCategory || undefined,
         materialGrade: formData.materialGrade || undefined,
         bomLevel: formData.bomLevel,
         makeBuy: formData.makeBuy,
@@ -854,110 +949,184 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
               />
             </div>
 
+            {/* Material Category Selection */}
             <div className="grid gap-2">
-              <Label htmlFor="materialGrade">Material Grade</Label>
-              <div className="relative">
-                <Input
-                  id="materialGrade"
-                  value={formData.materialGrade || ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFormData({ ...formData, materialGrade: value });
-                    setMaterialGradeSearch(value);
-                    if (!materialGradeOpen) {
-                      setMaterialGradeOpen(true);
-                    }
-                  }}
-                  onFocus={() => {
-                    setMaterialGradeOpen(true);
-                    setMaterialGradeSearch(formData.materialGrade || '');
-                  }}
-                  onClick={() => {
-                    setMaterialGradeOpen(true);
-                  }}
-                  placeholder="Type or select material grade..."
-                  className="pr-10"
-                  disabled={isLoadingMaterials}
-                />
-                <Popover open={materialGradeOpen} onOpenChange={setMaterialGradeOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                      type="button"
-                    >
-                      <ChevronsUpDown className="h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent 
-                    className="w-full p-0" 
-                    align="start"
-                    onOpenAutoFocus={(e) => e.preventDefault()}
-                    onCloseAutoFocus={(e) => e.preventDefault()}
-                  >
-                    <Command shouldFilter={false} className="max-h-[300px]">
-                      <CommandList className="max-h-[300px] overflow-y-auto">
-                        <CommandGroup>
-                          {materialOptions.map((grade) => (
-                            <div
-                              key={grade}
-                              onClick={() => {
-                                setFormData({ 
-                                  ...formData, 
-                                  materialGrade: grade === formData.materialGrade ? '' : grade 
-                                });
-                                setMaterialGradeOpen(false);
-                              }}
-                              className={`
-                                flex cursor-pointer items-center px-3 py-2 text-sm
-                                ${formData.materialGrade === grade 
-                                  ? 'bg-blue-500 text-white font-medium' 
-                                  : 'text-black dark:text-white bg-white dark:bg-gray-800'
-                                }
-                              `}
-                              style={{
-                                opacity: 1,
-                                color: formData.materialGrade === grade ? 'white' : 'inherit'
-                              }}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${
-                                  formData.materialGrade === grade ? "opacity-100" : "opacity-0"
-                                }`}
-                                style={{ opacity: formData.materialGrade === grade ? 1 : 0 }}
-                              />
-                              <span 
-                                className="font-medium"
-                                style={{ opacity: 1, color: 'inherit' }}
-                              >
-                                {grade}
-                              </span>
-                            </div>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              {isLoadingMaterials && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Loading material grades from database...
-                </p>
-              )}
-              {!isLoadingMaterials && materialOptions.length === 0 && materialGradeSearch && (
-                <p className="text-xs text-muted-foreground">
-                  No material grades found matching "{materialGradeSearch}". You can still use this custom value.
-                </p>
-              )}
-              {!isLoadingMaterials && materialOptions.length === 0 && !materialGradeSearch && (
-                <p className="text-xs text-muted-foreground">
-                  No material grades available. Add materials to the raw materials database first.
-                </p>
-              )}
+              <Label htmlFor="materialCategory">Material Category</Label>
+              <Select
+                value={formData.materialCategory}
+                onValueChange={(value: 'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | '') => {
+                  setFormData({ 
+                    ...formData, 
+                    materialCategory: value,
+                    materialGrade: '' // Reset material grade when category changes
+                  });
+                  setSelectedMaterialCategory(value);
+                  setMaterialGradeSearch('');
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select material category..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PLASTIC_RUBBER">Plastic & Rubber</SelectItem>
+                  <SelectItem value="FERROUS_NON_FERROUS">Ferrous & Non-Ferrous (Metals)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {formData.materialCategory === 'PLASTIC_RUBBER' && 
+                  `Thermoplastic and rubber-based materials including polymers, elastomers, and composites (${rawMaterialsData?.items?.length || 0} available)`
+                }
+                {formData.materialCategory === 'FERROUS_NON_FERROUS' && 
+                  `All metallic materials including iron-based materials (steel, cast iron) and non-iron metals (aluminum, copper, titanium) (${rawMaterialsData?.items?.length || 0} available)`
+                }
+                {!formData.materialCategory && "Choose the type of material to see relevant grades from your database"}
+              </p>
             </div>
+
+            {/* Material Grade Selection - Only show if category is selected */}
+            {formData.materialCategory && (
+              <div className="grid gap-2">
+                <Label htmlFor="materialGrade">Material Grade</Label>
+                <div className="relative">
+                  <Input
+                    id="materialGrade"
+                    value={formData.materialGrade || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, materialGrade: value });
+                      // Only trigger search if dropdown is open
+                      if (materialGradeOpen) {
+                        setMaterialGradeSearch(value);
+                      }
+                    }}
+                    onFocus={() => {
+                      setMaterialGradeOpen(true);
+                      setMaterialGradeSearch(formData.materialGrade || '');
+                    }}
+                    onClick={() => {
+                      setMaterialGradeOpen(true);
+                    }}
+                    placeholder={`Type or select ${formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} grade...`}
+                    className="pr-10"
+                    disabled={isLoadingMaterials}
+                  />
+                  <Popover open={materialGradeOpen} onOpenChange={setMaterialGradeOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        type="button"
+                      >
+                        <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                      className="w-full p-0" 
+                      align="start"
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                      onCloseAutoFocus={(e) => e.preventDefault()}
+                    >
+                      <Command shouldFilter={false} className="max-h-[300px]">
+                        <CommandList className="max-h-[300px] overflow-y-auto">
+                          <CommandGroup>
+                            {materialOptions.map((gradeInfo) => (
+                              <div
+                                key={gradeInfo.grade}
+                                onClick={() => {
+                                  setFormData({ 
+                                    ...formData, 
+                                    materialGrade: gradeInfo.grade === formData.materialGrade ? '' : gradeInfo.grade 
+                                  });
+                                  setMaterialGradeOpen(false);
+                                }}
+                                className={`
+                                  flex cursor-pointer items-center justify-between px-3 py-2 text-sm
+                                  ${formData.materialGrade === gradeInfo.grade 
+                                    ? 'bg-blue-500 text-white font-medium' 
+                                    : 'text-black dark:text-white bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                  }
+                                `}
+                              >
+                                <div className="flex items-center">
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      formData.materialGrade === gradeInfo.grade ? "opacity-100" : "opacity-0"
+                                    }`}
+                                  />
+                                  <div>
+                                    <span className="font-medium">{gradeInfo.grade}</span>
+                                    {gradeInfo.materialDescription && (
+                                      <div className="text-xs opacity-75">
+                                        {gradeInfo.materialDescription}
+                                      </div>
+                                    )}
+                                    {gradeInfo.astmStandard && (
+                                      <div className="text-xs opacity-60">
+                                        ASTM: {gradeInfo.astmStandard}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-xs opacity-75">
+                                  {gradeInfo.density && `${gradeInfo.density} g/cm³`}
+                                  {gradeInfo.cost && (
+                                    <div>
+                                      ₹{gradeInfo.cost.toFixed(2)}
+                                    </div>
+                                  )}
+                                  {gradeInfo.ultimateTensileStrength && (
+                                    <div>
+                                      UTS: {gradeInfo.ultimateTensileStrength} MPa
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                {materialGradeOpen && isLoadingMaterials && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Loading {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic & rubber' : 'metal'} materials...
+                  </p>
+                )}
+                {!isLoadingMaterials && materialOptions.length === 0 && materialGradeSearch && (
+                  <p className="text-xs text-muted-foreground">
+                    No {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} grades found matching "{materialGradeSearch}". You can still use this custom value.
+                  </p>
+                )}
+                {!isLoadingMaterials && materialOptions.length === 0 && !materialGradeSearch && (
+                  <div className="text-xs text-muted-foreground">
+                    {rawMaterialsData?.items?.length === 0 ? (
+                      <div className="space-y-1">
+                        <p>Unable to load {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} materials from database.</p>
+                        <button 
+                          onClick={() => queryClient.invalidateQueries({ queryKey: ['raw-materials'] })}
+                          className="text-blue-600 hover:text-blue-800 underline"
+                        >
+                          Try again
+                        </button>
+                      </div>
+                    ) : (
+                      <p>
+                        No {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} material options available for this category.
+                        {rawMaterialsData?.items?.length > 0 && ` (${rawMaterialsData.items.length} materials found but missing grade/type/name data)`}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {!isLoadingMaterials && materialOptions.length > 0 && (
+                  <p className="text-xs text-green-600">
+                    Found {materialOptions.length} unique {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic & rubber' : 'metal'} material options from {rawMaterialsData?.items?.length || 0} materials in your database
+                  </p>
+                )}
+              </div>
+            )}
 
 
             {/* Make or Buy Decision */}
@@ -1056,10 +1225,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     setFormData({ ...formData, file3d: file });
-                    // Trigger automatic analysis if file is selected
-                    if (file) {
-                      analyze3DFile(file);
-                    }
+                    // Note: Physical properties will be extracted after file upload and item creation
                   }}
                   className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80"
                 />
@@ -1189,12 +1355,12 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                     </span>
                   )}
                 </div>
-                {item?.file3dPath && (
+                {item?.id && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => analyze3DFile(null)}
+                    onClick={fetch3DProperties}
                     disabled={isAnalyzing3D}
                     className="h-8 px-3 text-xs"
                   >
@@ -1203,7 +1369,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                     ) : (
                       <RefreshCw className="h-3 w-3 mr-1" />
                     )}
-                    {isAnalyzing3D ? 'Analyzing...' : 'Auto-Fill from 3D'}
+                    {isAnalyzing3D ? 'Loading...' : 'Auto-Fill from 3D'}
                   </Button>
                 )}
               </div>

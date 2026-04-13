@@ -50,13 +50,11 @@ import {
   Search,
   Plus,
   Calendar,
-  FolderKanban,
   ArrowUpDown,
   ArrowLeft,
   Download,
   Edit,
   Trash2,
-  MoreHorizontal,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -76,28 +74,29 @@ export default function BOMManagementPage() {
     status: 'draft' as 'draft' | 'approved' | 'released' | 'obsolete',
   });
 
-  // Use project-specific filtering when projectId is available
-  const { data, refetch } = useBOMs({ 
+  const { data, refetch } = useBOMs({
     search: searchQuery,
-    ...(projectId && { projectId })
+    ...(projectId && { projectId }),
   });
   const { data: projectsData } = useProjects();
-  
-  // Get current project data when in project context
-  const currentProject = projectId && projectsData?.projects?.find(p => p.id === projectId);
+
+  // Fix: Use explicit find with null guard instead of short-circuit assignment
+  const currentProject = projectId
+    ? projectsData?.projects?.find((p) => p.id === projectId) ?? null
+    : null;
+
   const createBOMMutation = useCreateBOM();
   const updateBOMMutation = useUpdateBOM();
   const deleteBOMMutation = useDeleteBOM();
 
   const handleCreateBOM = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!bomFormData.name) return;
-    
-    // Use current project ID if available, otherwise get first available project ID
+
     const targetProjectId = projectId || projectsData?.projects?.[0]?.id;
     if (!targetProjectId) return;
-    
+
     try {
       await createBOMMutation.mutateAsync({
         name: bomFormData.name,
@@ -106,17 +105,16 @@ export default function BOMManagementPage() {
         version: bomFormData.version,
         status: bomFormData.status,
       });
-      
+
       setIsCreateDialogOpen(false);
       setBomFormData({
         name: '',
         description: '',
         version: '1.0',
-        status: 'draft' as 'draft' | 'approved' | 'released' | 'obsolete',
+        status: 'draft',
       });
       refetch();
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   const resetCreateForm = () => {
@@ -124,7 +122,7 @@ export default function BOMManagementPage() {
       name: '',
       description: '',
       version: '1.0',
-      status: 'draft' as 'draft' | 'approved' | 'released' | 'obsolete',
+      status: 'draft',
     });
     setIsCreateDialogOpen(false);
   };
@@ -142,9 +140,9 @@ export default function BOMManagementPage() {
 
   const handleUpdateBOM = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedBOM || !bomFormData.name) return;
-    
+
     try {
       await updateBOMMutation.mutateAsync({
         id: selectedBOM.id,
@@ -155,19 +153,17 @@ export default function BOMManagementPage() {
           status: bomFormData.status,
         },
       });
-      
+
       setIsEditDialogOpen(false);
       setSelectedBOM(null);
       setBomFormData({
         name: '',
         description: '',
         version: '1.0',
-        status: 'draft' as 'draft' | 'approved' | 'released' | 'obsolete',
+        status: 'draft',
       });
       refetch();
-    } catch (error) {
-      // Failed to update BOM
-    }
+    } catch (error) {}
   };
 
   const handleDeleteBOM = (bom: any) => {
@@ -177,24 +173,23 @@ export default function BOMManagementPage() {
 
   const confirmDeleteBOM = async () => {
     if (!selectedBOM) return;
-    
+
     try {
       await deleteBOMMutation.mutateAsync(selectedBOM.id);
       setIsDeleteDialogOpen(false);
       setSelectedBOM(null);
       refetch();
-    } catch (error) {
-      // Failed to delete BOM
-    }
+    } catch (error) {}
   };
 
   const boms = data?.boms || [];
 
   const filteredBoms = searchQuery
-    ? boms.filter((bom) =>
-      bom.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (bom.version && bom.version.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
+    ? boms.filter(
+        (bom) =>
+          bom.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (bom.version && bom.version.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
     : boms;
 
   const stats = {
@@ -207,13 +202,25 @@ export default function BOMManagementPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => router.push(projectId ? `/projects/${projectId}` : '/projects')} className="gap-2">
+        <Button
+          variant="outline"
+          onClick={() => router.push(projectId ? `/projects/${projectId}` : '/projects')}
+          className="gap-2"
+        >
           <ArrowLeft className="h-4 w-4" />
           Back to Project
         </Button>
         <PageHeader
-          title={projectId ? `BOM Management - ${currentProject?.name || 'Project'}` : "BOM Management"}
-          description={projectId ? `Manage Bills of Materials for ${currentProject?.name || 'this project'}` : "Manage Bills of Materials across all projects"}
+          title={
+            projectId
+              ? `BOM Management - ${currentProject?.name ?? 'Project'}`
+              : 'BOM Management'
+          }
+          description={
+            projectId
+              ? `Manage Bills of Materials for ${currentProject?.name ?? 'this project'}`
+              : 'Manage Bills of Materials across all projects'
+          }
         >
           <div className="flex items-center gap-2">
             <Button variant="outline" className="gap-2">
@@ -233,7 +240,9 @@ export default function BOMManagementPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalBoms}</div>
-            <p className="text-xs text-muted-foreground">{projectId ? 'In this project' : 'Across all projects'}</p>
+            <p className="text-xs text-muted-foreground">
+              {projectId ? 'In this project' : 'Across all projects'}
+            </p>
           </CardContent>
         </Card>
 
@@ -285,7 +294,11 @@ export default function BOMManagementPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>{projectId ? 'Project BOMs' : 'All BOMs'}</CardTitle>
-              <CardDescription>{projectId ? `View and manage BOMs for ${currentProject?.name || 'this project'}` : 'View and manage all Bills of Materials'}</CardDescription>
+              <CardDescription>
+                {projectId
+                  ? `View and manage BOMs for ${currentProject?.name ?? 'this project'}`
+                  : 'View and manage all Bills of Materials'}
+              </CardDescription>
             </div>
           </div>
           <div className="mt-4">
@@ -336,19 +349,23 @@ export default function BOMManagementPage() {
                       onClick={() => router.push(`/projects/${bom.projectId}/bom/${bom.id}`)}
                     >
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{bom.name}</p>
-                        </div>
+                        <p className="font-medium">{bom.name}</p>
                       </TableCell>
                       <TableCell>
-                        <p className="text-sm text-muted-foreground">{bom.description || 'No description'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {bom.description || 'No description'}
+                        </p>
                       </TableCell>
                       <TableCell>
                         <p className="text-sm">v{bom.version}</p>
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={bom.status === 'released' || bom.status === 'approved' ? 'default' : 'secondary'}
+                          variant={
+                            bom.status === 'released' || bom.status === 'approved'
+                              ? 'default'
+                              : 'secondary'
+                          }
                           className="capitalize"
                         >
                           {bom.status}
@@ -408,10 +425,13 @@ export default function BOMManagementPage() {
       </Card>
 
       {/* Create BOM Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
-        if (!open) resetCreateForm();
-        else setIsCreateDialogOpen(true);
-      }}>
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) resetCreateForm();
+          else setIsCreateDialogOpen(true);
+        }}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <form onSubmit={handleCreateBOM}>
             <DialogHeader>
@@ -426,16 +446,18 @@ export default function BOMManagementPage() {
                 <Input
                   id="name"
                   value={bomFormData.name}
-                  onChange={(e) => setBomFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => setBomFormData((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="Enter BOM name"
                   required
                 />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="status">Status</Label>
-                <Select 
-                  value={bomFormData.status} 
-                  onValueChange={(value: 'draft' | 'approved' | 'released' | 'obsolete') => setBomFormData(prev => ({ ...prev, status: value }))}
+                <Select
+                  value={bomFormData.status}
+                  onValueChange={(value: 'draft' | 'approved' | 'released' | 'obsolete') =>
+                    setBomFormData((prev) => ({ ...prev, status: value }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
@@ -453,7 +475,7 @@ export default function BOMManagementPage() {
                 <Input
                   id="version"
                   value={bomFormData.version}
-                  onChange={(e) => setBomFormData(prev => ({ ...prev, version: e.target.value }))}
+                  onChange={(e) => setBomFormData((prev) => ({ ...prev, version: e.target.value }))}
                   placeholder="1.0"
                 />
               </div>
@@ -462,22 +484,20 @@ export default function BOMManagementPage() {
                 <Textarea
                   id="description"
                   value={bomFormData.description}
-                  onChange={(e) => setBomFormData(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) =>
+                    setBomFormData((prev) => ({ ...prev, description: e.target.value }))
+                  }
                   placeholder="Enter BOM description (optional)"
                   rows={3}
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={resetCreateForm}
-              >
+              <Button type="button" variant="outline" onClick={resetCreateForm}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={!bomFormData.name || createBOMMutation.isPending}
               >
                 {createBOMMutation.isPending ? 'Creating...' : 'Create BOM'}
@@ -503,16 +523,18 @@ export default function BOMManagementPage() {
                 <Input
                   id="edit-name"
                   value={bomFormData.name}
-                  onChange={(e) => setBomFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => setBomFormData((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="Enter BOM name"
                   required
                 />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-status">Status</Label>
-                <Select 
-                  value={bomFormData.status} 
-                  onValueChange={(value: 'draft' | 'approved' | 'released' | 'obsolete') => setBomFormData(prev => ({ ...prev, status: value }))}
+                <Select
+                  value={bomFormData.status}
+                  onValueChange={(value: 'draft' | 'approved' | 'released' | 'obsolete') =>
+                    setBomFormData((prev) => ({ ...prev, status: value }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
@@ -530,7 +552,7 @@ export default function BOMManagementPage() {
                 <Input
                   id="edit-version"
                   value={bomFormData.version}
-                  onChange={(e) => setBomFormData(prev => ({ ...prev, version: e.target.value }))}
+                  onChange={(e) => setBomFormData((prev) => ({ ...prev, version: e.target.value }))}
                   placeholder="1.0"
                 />
               </div>
@@ -539,22 +561,24 @@ export default function BOMManagementPage() {
                 <Textarea
                   id="edit-description"
                   value={bomFormData.description}
-                  onChange={(e) => setBomFormData(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) =>
+                    setBomFormData((prev) => ({ ...prev, description: e.target.value }))
+                  }
                   placeholder="Enter BOM description (optional)"
                   rows={3}
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => setIsEditDialogOpen(false)}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={!bomFormData.name || updateBOMMutation.isPending}
               >
                 {updateBOMMutation.isPending ? 'Updating...' : 'Update BOM'}
@@ -570,7 +594,8 @@ export default function BOMManagementPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete BOM</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{selectedBOM?.name}"? This action cannot be undone and will permanently remove the BOM and all its items.
+              Are you sure you want to delete &quot;{selectedBOM?.name}&quot;? This action cannot
+              be undone and will permanently remove the BOM and all its items.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -588,10 +613,7 @@ export default function BOMManagementPage() {
 
       {/* Workflow Navigation - Bottom */}
       {projectId && (
-        <WorkflowNavigation 
-          currentModuleId="bom" 
-          projectId={projectId}
-        />
+        <WorkflowNavigation currentModuleId="bom" projectId={projectId} />
       )}
     </div>
   );

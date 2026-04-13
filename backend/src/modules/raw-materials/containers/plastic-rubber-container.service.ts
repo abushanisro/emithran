@@ -202,12 +202,9 @@ export class PlasticRubberContainerService {
     if (query.material) {
       queryBuilder = queryBuilder.eq('material', query.material);
     }
-    if (query.country) {
-      queryBuilder = queryBuilder.eq('country', query.country);
-    }
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `material.ilike.%${query.search}%,material_abbreviation.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
+        `material.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
       );
     }
     return queryBuilder;

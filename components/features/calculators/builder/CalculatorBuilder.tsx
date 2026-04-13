@@ -404,6 +404,7 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
         dataSource: field.dataSource,
         sourceTable: field.sourceTable,
         sourceField: field.sourceField,
+        sourceProperty: field.sourceProperty || field.sourceField,  // Include sourceProperty for auto-population
         lookupConfig: field.lookupConfig,
         defaultValue: field.defaultValue,
         unit: field.unit,
@@ -894,6 +895,7 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
                               onFieldSelect={(selectedField) => {
                                 handleUpdateField(index, {
                                   sourceField: selectedField,
+                                  sourceProperty: selectedField,  // Store both for compatibility
                                   lookupConfig: {} // reset lookupConfig when field changes
                                 });
                               }}
