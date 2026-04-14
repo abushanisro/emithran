@@ -121,6 +121,7 @@ export class RawMaterialResponseDto {
       enStandard: row.en_standard,
       jisStandard: row.jis_standard,
       shape: row.shape,
+      country: row.country,
       // Plastic-specific properties
       regrinding: row.regrinding,
       regrindingPercentage: row.regrinding_percentage ? parseFloat(row.regrinding_percentage) : undefined,

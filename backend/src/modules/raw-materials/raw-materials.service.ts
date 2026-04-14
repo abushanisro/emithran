@@ -70,7 +70,7 @@ export class RawMaterialsService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material_group, material, material_grade, shape');
+      .select('material_group, material, material_grade, shape, country');
 
     if (error) {
       this.logger.error(`Error fetching filter options: ${error.message}`, 'RawMaterialsService');
@@ -81,10 +81,12 @@ export class RawMaterialsService {
     const materialGroups = [...new Set(data.map(m => m.material_group).filter(Boolean))].sort();
     const materialTypes = [...new Set(data.map(m => m.material).filter(Boolean))].sort();
     const grades = [...new Set(data.map(m => m.material_grade).filter(Boolean))].sort();
+    const countries = [...new Set(data.map(m => m.country).filter(Boolean))].sort();
 
     return {
       materialGroups,
       materialTypes,
+      countries,
       grades,
     };
   }

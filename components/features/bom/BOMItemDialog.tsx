@@ -33,14 +33,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { 
-  FileText, 
-  Package, 
-  AlertTriangle, 
-  CheckCircle, 
-  Info, 
-  XCircle, 
-  Loader2, 
+import {
+  FileText,
+  Package,
+  AlertTriangle,
+  CheckCircle,
+  Info,
+  XCircle,
+  Loader2,
   HelpCircle,
   ChevronsUpDown,
   RefreshCw,
@@ -52,9 +52,62 @@ import { createBOMItem, updateBOMItem } from '@/lib/api/hooks/useBOMItems';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
-import { bomItemsApi } from '@/lib/api/bom-items';
-// Enhanced error handling types for BOM management
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type MaterialCategory = 'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | '';
+
+interface RawMaterial {
+  materialName?: string;
+  material?: string;
+  materialGroup?: string;
+  categoryName?: string;
+  materialType?: string;
+  materialDescription?: string;
+  description?: string;
+  density?: number;
+  densityKgM3?: number;
+  unitCost?: number;
+  cost?: number;
+  currency?: string;
+  ultimateTensileStrength?: number;
+  ultimate_tensile_strength?: number;
+  yieldTensileStrength?: number;
+  yield_tensile_strength?: number;
+  shearingStrength?: number;
+  shearing_strength?: number;
+  astmStandard?: string;
+  astm_standard?: string;
+  dinStandard?: string;
+  din_standard?: string;
+  enStandard?: string;
+  en_standard?: string;
+  jisStandard?: string;
+  jis_standard?: string;
+}
+
+interface RawMaterialsResponse {
+  items: RawMaterial[];
+}
+
+interface MaterialOption {
+  grade: string;
+  material: string | undefined;
+  materialGroup: string | undefined;
+  materialType: string | undefined;
+  materialDescription: string | undefined;
+  density: number | undefined;
+  cost: number | undefined;
+  currency: string | undefined;
+  ultimateTensileStrength: number | undefined;
+  yieldTensileStrength: number | undefined;
+  shearingStrength: number | undefined;
+  astmStandard: string | undefined;
+  dinStandard: string | undefined;
+  enStandard: string | undefined;
+  jisStandard: string | undefined;
+}
+
 type EnhancedBOMError = {
   category: 'validation' | 'duplication' | 'hierarchy' | 'fileupload' | 'network' | 'permission' | 'business' | 'data';
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -67,29 +120,27 @@ type EnhancedBOMError = {
   affectedFields?: string[];
 };
 
-/**
- * Categorize BOM-specific errors with manufacturing context
- */
-function categorizeBOMError(error: any): EnhancedBOMError {
-  const errorMessage = error?.message?.toLowerCase() || '';
-  const statusCode = error?.status || error?.code;
-  
-  // Validation errors (High severity - prevents BOM creation)
+// ─── Error Categorization ─────────────────────────────────────────────────────
+
+function categorizeBOMError(error: unknown): EnhancedBOMError {
+  const err = error as Record<string, unknown>;
+  const errorMessage = (typeof err?.message === 'string' ? err.message : '').toLowerCase();
+  const statusCode = (err?.status ?? err?.code) as number | undefined;
+
   if (errorMessage.includes('validation') || errorMessage.includes('required') || statusCode === 400) {
     return {
       category: 'validation',
       severity: 'high',
       userMessage: 'Invalid BOM Data',
-      technicalMessage: error?.message,
+      technicalMessage: err?.message as string | undefined,
       suggestion: 'Please review all required fields and ensure values are within acceptable ranges',
       actionable: true,
       recoverable: true,
       helpUrl: '/help/bom-validation',
-      affectedFields: error?.fields || []
+      affectedFields: (err?.fields as string[]) ?? []
     };
   }
-  
-  // Duplication errors (Medium severity - business rule violation)
+
   if (errorMessage.includes('duplicate') || errorMessage.includes('unique') || statusCode === 409) {
     return {
       category: 'duplication',
@@ -101,8 +152,7 @@ function categorizeBOMError(error: any): EnhancedBOMError {
       helpUrl: '/help/part-numbering'
     };
   }
-  
-  // Hierarchy errors (High severity - affects BOM structure)
+
   if (errorMessage.includes('parent') || errorMessage.includes('hierarchy') || errorMessage.includes('circular')) {
     return {
       category: 'hierarchy',
@@ -113,8 +163,7 @@ function categorizeBOMError(error: any): EnhancedBOMError {
       recoverable: true
     };
   }
-  
-  // File upload errors (Low to medium severity)
+
   if (errorMessage.includes('file') || errorMessage.includes('upload') || errorMessage.includes('size') || errorMessage.includes('format')) {
     const severity = errorMessage.includes('size') || errorMessage.includes('format') ? 'medium' : 'low';
     return {
@@ -126,8 +175,7 @@ function categorizeBOMError(error: any): EnhancedBOMError {
       recoverable: true
     };
   }
-  
-  // Permission errors (Medium severity)
+
   if (errorMessage.includes('permission') || errorMessage.includes('forbidden') || statusCode === 403) {
     return {
       category: 'permission',
@@ -138,9 +186,8 @@ function categorizeBOMError(error: any): EnhancedBOMError {
       recoverable: false
     };
   }
-  
-  // Network errors (Critical severity)
-  if (errorMessage.includes('network') || errorMessage.includes('timeout') || statusCode >= 500) {
+
+  if (errorMessage.includes('network') || errorMessage.includes('timeout') || (statusCode !== undefined && statusCode >= 500)) {
     return {
       category: 'network',
       severity: 'critical',
@@ -150,8 +197,7 @@ function categorizeBOMError(error: any): EnhancedBOMError {
       recoverable: true
     };
   }
-  
-  // Business rule errors (Medium severity)
+
   if (errorMessage.includes('business') || errorMessage.includes('rule') || errorMessage.includes('constraint')) {
     return {
       category: 'business',
@@ -162,8 +208,7 @@ function categorizeBOMError(error: any): EnhancedBOMError {
       recoverable: true
     };
   }
-  
-  // Data errors (Low severity)
+
   if (errorMessage.includes('not found') || statusCode === 404) {
     return {
       category: 'data',
@@ -174,18 +219,19 @@ function categorizeBOMError(error: any): EnhancedBOMError {
       recoverable: false
     };
   }
-  
-  // Default error
+
   return {
     category: 'data',
     severity: 'medium',
     userMessage: 'Unexpected Error',
-    technicalMessage: error?.message,
+    technicalMessage: err?.message as string | undefined,
     suggestion: 'Please try again. If the problem persists, contact support.',
     actionable: true,
     recoverable: true
   };
 }
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface BOMItemDialogProps {
   bomId: string;
@@ -198,159 +244,149 @@ interface BOMItemDialogProps {
   getAutoParent?: (type: BOMItemType) => string | null;
 }
 
-export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, parentItemId, defaultItemType, getAutoParent }: BOMItemDialogProps) {
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function BOMItemDialog({
+  bomId,
+  item,
+  open,
+  onOpenChange,
+  onSuccess,
+  parentItemId,
+  defaultItemType,
+  getAutoParent
+}: BOMItemDialogProps) {
   const queryClient = useQueryClient();
-  
-  // State for material category and grade selection
-  const [materialCategoryOpen, setMaterialCategoryOpen] = useState(false);
+
   const [materialGradeOpen, setMaterialGradeOpen] = useState(false);
   const [materialGradeSearch, setMaterialGradeSearch] = useState('');
   const [debouncedMaterialGradeSearch, setDebouncedMaterialGradeSearch] = useState('');
-  const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | ''>('');
-  
-  // Debounce search input to reduce API calls - only when dropdown is open
+  const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<MaterialCategory>('');
+
+  // Debounce search input
   useEffect(() => {
     if (!materialGradeOpen) return;
-    
     const timer = setTimeout(() => {
       setDebouncedMaterialGradeSearch(materialGradeSearch);
-    }, 500); // Increased to 500ms to reduce API calls
-    
+    }, 500);
     return () => clearTimeout(timer);
   }, [materialGradeSearch, materialGradeOpen]);
-  
-  // Get raw materials based on selected category using specific API endpoints
-  const { data: rawMaterialsData, isLoading: isLoadingMaterials } = useQuery({
+
+  // Fetch raw materials
+  const { data: rawMaterialsData, isLoading: isLoadingMaterials } = useQuery<RawMaterialsResponse>({
     queryKey: ['raw-materials', selectedMaterialCategory, debouncedMaterialGradeSearch],
-    queryFn: async () => {
-      if (!selectedMaterialCategory) {
-        return { items: [] };
-      }
-      
-      // Use enhanced materials endpoint which has the actual data
+    queryFn: async (): Promise<RawMaterialsResponse> => {
+      if (!selectedMaterialCategory) return { items: [] };
+
       const endpoint = '/raw-materials/enhanced';
-      
-      const params: any = { 
-        limit: 500, // Increase limit to get all materials (289 ferrous + 178 plastic)
-        // Add category parameter for filtering
+      const params: Record<string, unknown> = {
+        limit: 500,
         category: selectedMaterialCategory === 'PLASTIC_RUBBER' ? 'PLASTIC' : 'FERROUS'
       };
-      
-      // Only add search if it's a simple string without special SQL characters
-      if (debouncedMaterialGradeSearch && debouncedMaterialGradeSearch.trim()) {
-        // Sanitize search string to avoid SQL parsing errors
+
+      if (debouncedMaterialGradeSearch?.trim()) {
         const sanitizedSearch = debouncedMaterialGradeSearch
-          .replace(/[,()%]/g, ' ')  // Replace problematic characters
+          .replace(/[,()%]/g, ' ')
           .trim()
           .split(/\s+/)
-          .filter(word => word.length > 2)  // Only use words longer than 2 chars
+          .filter((word: string) => word.length > 2)
           .join(' ');
-          
         if (sanitizedSearch.length > 0) {
           params.search = sanitizedSearch;
         }
       }
-      
+
       try {
-        const response = await apiClient.get(endpoint, { params });
-        
-        // Debug: Log the first few items to understand the response structure
+        const response = await apiClient.get(endpoint, { params }) as RawMaterialsResponse;
+
         if (response?.items?.length > 0) {
           console.log('Enhanced materials API response sample:', {
             firstItem: response.items[0],
             totalItems: response.items.length,
-            availableFields: Object.keys(response.items[0])
+            availableFields: Object.keys(response.items[0]!)
           });
         }
-        
+
         return response;
-      } catch (error: any) {
-        console.warn('API Error:', error?.message);
-        
-        // If search fails due to special characters, retry without search
-        if (error?.message?.includes('failed to parse logic tree') && params.search) {
+      } catch (error: unknown) {
+        const err = error as Record<string, unknown>;
+        console.warn('API Error:', err?.message);
+
+        if (typeof err?.message === 'string' && err.message.includes('failed to parse logic tree') && params.search) {
           console.warn('Search query failed, retrying without search:', params.search);
           delete params.search;
-          const response = await apiClient.get(endpoint, { params });
-          return response;
+          return (await apiClient.get(endpoint, { params })) as RawMaterialsResponse;
         }
-        
-        // If circuit breaker is open, return cached/fallback data
-        if (error?.message?.includes('Circuit breaker is OPEN')) {
+
+        if (typeof err?.message === 'string' && err.message.includes('Circuit breaker is OPEN')) {
           console.warn('Circuit breaker is open, returning minimal fallback data');
           return { items: [] };
         }
-        
-        // For schema errors, return empty results instead of crashing
-        if (error?.message?.includes('does not exist') || error?.message?.includes('column')) {
-          console.error('Database schema error:', error?.message);
+
+        if (
+          typeof err?.message === 'string' &&
+          (err.message.includes('does not exist') || err.message.includes('column'))
+        ) {
+          console.error('Database schema error:', err.message);
           return { items: [] };
         }
-        
+
         throw error;
       }
     },
     enabled: !!selectedMaterialCategory && (materialGradeOpen || !debouncedMaterialGradeSearch),
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    retry: (failureCount, error: any) => {
-      // Don't retry circuit breaker errors or schema errors
-      if (error?.message?.includes('Circuit breaker is OPEN') || 
-          error?.message?.includes('does not exist') || 
-          error?.message?.includes('column')) {
+    staleTime: 1000 * 60 * 5,
+    retry: (failureCount: number, error: unknown) => {
+      const err = error as Record<string, unknown>;
+      if (
+        typeof err?.message === 'string' &&
+        (err.message.includes('Circuit breaker is OPEN') ||
+          err.message.includes('does not exist') ||
+          err.message.includes('column'))
+      ) {
         return false;
       }
-      // Retry other errors up to 2 times
       return failureCount < 2;
     },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
-  
-  // Extract unique material grades based on selected category with proper API filtering
-  const materialOptions = React.useMemo(() => {
+
+  // Derive material options
+  const materialOptions = useMemo((): MaterialOption[] => {
     if (!rawMaterialsData?.items || !selectedMaterialCategory) return [];
-    
-    // Extract specific material names/grades instead of generic categories
-    // Priority: Use the actual material name which contains the specific grade info
-    const gradesWithMaterials = rawMaterialsData.items
-      .map(material => {
-        // Enhanced materials API uses different field names (camelCase from backend transformation)
-        // Use materialName only (like "100Cr6 |1.3505", "11SMn30") - ignore materialGrade
-        const specificGrade = material.materialName?.trim() ||
-                             material.material?.trim();
-        
-        if (!specificGrade || specificGrade.length === 0) {
-          return null;
-        }
-        
+
+    const gradesWithMaterials: MaterialOption[] = rawMaterialsData.items
+      .map((material: RawMaterial): MaterialOption | null => {
+        const specificGrade = material.materialName?.trim() ?? material.material?.trim();
+        if (!specificGrade || specificGrade.length === 0) return null;
+
         return {
-          grade: specificGrade, // This contains "100Cr6 |1.3505", "11SMn30", etc.
-          material: material.materialName || material.material,
-          materialGroup: material.materialGroup || material.categoryName,
+          grade: specificGrade,
+          material: material.materialName ?? material.material,
+          materialGroup: material.materialGroup ?? material.categoryName,
           materialType: material.materialType,
-          materialDescription: material.materialDescription || material.description,
-          density: material.density || material.densityKgM3,
-          cost: material.unitCost || material.cost,
+          materialDescription: material.materialDescription ?? material.description,
+          density: material.density ?? material.densityKgM3,
+          cost: material.unitCost ?? material.cost,
           currency: material.currency,
-          // Include additional properties for better display (handle both camelCase and snake_case)
-          ultimateTensileStrength: material.ultimateTensileStrength || material.ultimate_tensile_strength,
-          yieldTensileStrength: material.yieldTensileStrength || material.yield_tensile_strength,
-          shearingStrength: material.shearingStrength || material.shearing_strength,
-          astmStandard: material.astmStandard || material.astm_standard,
-          dinStandard: material.dinStandard || material.din_standard,
-          enStandard: material.enStandard || material.en_standard,
-          jisStandard: material.jisStandard || material.jis_standard
+          ultimateTensileStrength: material.ultimateTensileStrength ?? material.ultimate_tensile_strength,
+          yieldTensileStrength: material.yieldTensileStrength ?? material.yield_tensile_strength,
+          shearingStrength: material.shearingStrength ?? material.shearing_strength,
+          astmStandard: material.astmStandard ?? material.astm_standard,
+          dinStandard: material.dinStandard ?? material.din_standard,
+          enStandard: material.enStandard ?? material.en_standard,
+          jisStandard: material.jisStandard ?? material.jis_standard
         };
       })
-      .filter(item => item !== null)
-      .map(item => item!);
-    
-    // Remove duplicates while preserving material info
-    const uniqueGrades = gradesWithMaterials.filter((item, index, array) => 
-      array.findIndex(g => g.grade === item.grade) === index
-    ).sort((a, b) => a.grade.localeCompare(b.grade));
-      
-    return uniqueGrades;
+      .filter((item: MaterialOption | null): item is MaterialOption => item !== null);
+
+    return gradesWithMaterials
+      .filter((item: MaterialOption, index: number, array: MaterialOption[]) =>
+        array.findIndex((g: MaterialOption) => g.grade === item.grade) === index
+      )
+      .sort((a: MaterialOption, b: MaterialOption) => a.grade.localeCompare(b.grade));
   }, [rawMaterialsData, selectedMaterialCategory]);
+
   const [loading, setLoading] = useState(false);
   const [autoParentId, setAutoParentId] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -366,7 +402,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     annualVolume: 1000,
     unit: 'pcs',
     material: '',
-    materialCategory: '' as 'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | '',
+    materialCategory: '' as MaterialCategory,
     materialGrade: '',
     makeBuy: 'make' as 'make' | 'buy',
     unitCost: '',
@@ -379,38 +415,30 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     file2d: null as File | null,
     file3d: null as File | null,
   });
-  
-  // Calculate form completion percentage
+
   const calculateCompletionPercentage = () => {
     const requiredFields = ['name', 'partNumber', 'quantity', 'annualVolume', 'itemType'];
     const optionalFields = ['description', 'materialGrade', 'weight'];
-    
     let completed = 0;
     let total = requiredFields.length + optionalFields.length;
-    
-    // Required fields (weighted more)
+
     requiredFields.forEach(field => {
       if (formData[field as keyof typeof formData] && String(formData[field as keyof typeof formData]).trim()) {
         completed += 2;
       }
-      total += 1; // Extra weight for required fields
+      total += 1;
     });
-    
-    // Optional fields
     optionalFields.forEach(field => {
       if (formData[field as keyof typeof formData] && String(formData[field as keyof typeof formData]).trim()) {
         completed += 1;
       }
     });
-    
     return Math.round((completed / total) * 100);
   };
-  
-  // Real-time validation with debouncing
+
   const validationStatus = useMemo(() => {
     const errors: Record<string, string> = {};
-    
-    // Required field validation - Name is required
+
     if (!formData.name.trim()) {
       errors.name = 'Item name is required';
     } else if (formData.name.length < 3) {
@@ -418,8 +446,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     } else if (formData.name.length > 100) {
       errors.name = 'Name must not exceed 100 characters';
     }
-    
-    // Required field validation - Part Number is required
+
     if (!formData.partNumber.trim()) {
       errors.partNumber = 'Part number is required';
     } else if (formData.partNumber.length < 2) {
@@ -427,58 +454,44 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     } else if (formData.partNumber.length > 50) {
       errors.partNumber = 'Part number must not exceed 50 characters';
     }
-    
-    // Quantity validation
+
     if (formData.quantity <= 0) {
       errors.quantity = 'Quantity must be greater than 0';
     } else if (formData.quantity > 10000) {
       errors.quantity = 'Quantity seems unusually high. Please verify.';
     }
-    
-    // Annual volume validation
+
     if (formData.annualVolume <= 0) {
       errors.annualVolume = 'Annual volume must be greater than 0';
     } else if (formData.annualVolume > 10000000) {
       errors.annualVolume = 'Annual volume seems extremely high. Please verify.';
     }
-    
-    
-    // Physical properties validation
+
     if (formData.weight && formData.weight < 0) {
       errors.weight = 'Weight cannot be negative';
     } else if (formData.weight && formData.weight > 10000) {
       errors.weight = 'Weight seems extremely high for a component';
     }
-    
-    if (formData.maxLength && formData.maxLength < 0) {
-      errors.maxLength = 'Length cannot be negative';
-    }
-    if (formData.maxWidth && formData.maxWidth < 0) {
-      errors.maxWidth = 'Width cannot be negative';
-    }
-    if (formData.maxHeight && formData.maxHeight < 0) {
-      errors.maxHeight = 'Height cannot be negative';
-    }
-    if (formData.surfaceArea && formData.surfaceArea < 0) {
-      errors.surfaceArea = 'Surface area cannot be negative';
-    }
-    
-    // Unit cost validation for buy items
+
+    if (formData.maxLength && formData.maxLength < 0) errors.maxLength = 'Length cannot be negative';
+    if (formData.maxWidth && formData.maxWidth < 0) errors.maxWidth = 'Width cannot be negative';
+    if (formData.maxHeight && formData.maxHeight < 0) errors.maxHeight = 'Height cannot be negative';
+    if (formData.surfaceArea && formData.surfaceArea < 0) errors.surfaceArea = 'Surface area cannot be negative';
+
     const unitCostNum = parseFloat(formData.unitCost) || 0;
     if (formData.makeBuy === 'buy' && (!formData.unitCost || unitCostNum <= 0)) {
       errors.unitCost = 'Unit cost is required for purchased items';
     } else if (formData.makeBuy === 'buy' && unitCostNum > 1000000) {
       errors.unitCost = 'Unit cost seems extremely high. Please verify.';
     }
-    
-    // File size validation
-    if (formData.file2d && formData.file2d.size > 10 * 1024 * 1024) { // 10MB limit
+
+    if (formData.file2d && formData.file2d.size > 10 * 1024 * 1024) {
       errors.file2d = 'File size must be less than 10MB';
     }
-    if (formData.file3d && formData.file3d.size > 25 * 1024 * 1024) { // 25MB limit for 3D files
+    if (formData.file3d && formData.file3d.size > 25 * 1024 * 1024) {
       errors.file3d = 'File size must be less than 25MB';
     }
-    
+
     return {
       errors,
       isValid: Object.keys(errors).length === 0,
@@ -486,7 +499,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
     };
   }, [formData]);
 
-  // Sync material category selection and reset material grade when category changes
+  // Sync material category
   useEffect(() => {
     if (formData.materialCategory !== selectedMaterialCategory) {
       setSelectedMaterialCategory(formData.materialCategory);
@@ -494,13 +507,11 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
   }, [formData.materialCategory]);
 
   useEffect(() => {
-    // Reset material grade when category changes
     if (formData.materialGrade && selectedMaterialCategory !== formData.materialCategory) {
       setFormData(prev => ({ ...prev, materialGrade: '' }));
     }
   }, [selectedMaterialCategory]);
 
-  // Function to fetch existing 3D model properties from the item data
   const fetch3DProperties = async () => {
     if (!item?.id) {
       toast.warning('Save the item first', {
@@ -509,48 +520,21 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       });
       return;
     }
-    
-    setIsAnalyzing3D(true);
-    
-    try {
-      toast.info('Loading 3D properties...', {
-        description: 'Fetching stored physical properties',
-        duration: 2000
-      });
 
-      // Use existing properties from the item instead of CAD analysis API
+    setIsAnalyzing3D(true);
+    try {
+      toast.info('Loading 3D properties...', { description: 'Fetching stored physical properties', duration: 2000 });
       const extractedProperties: Partial<typeof formData> = {};
-      
-      // Get properties from the item data
-      if (item.weight && item.weight > 0) {
-        extractedProperties.weight = item.weight;
-      }
-      
-      if (item.surfaceArea && item.surfaceArea > 0) {
-        extractedProperties.surfaceArea = item.surfaceArea;
-      }
-      
-      if (item.maxLength && item.maxLength > 0) {
-        extractedProperties.maxLength = item.maxLength;
-      }
-      
-      if (item.maxWidth && item.maxWidth > 0) {
-        extractedProperties.maxWidth = item.maxWidth;
-      }
-      
-      if (item.maxHeight && item.maxHeight > 0) {
-        extractedProperties.maxHeight = item.maxHeight;
-      }
-      
-      // Update form data with existing properties
+
+      if (item.weight && item.weight > 0) extractedProperties.weight = item.weight;
+      if (item.surfaceArea && item.surfaceArea > 0) extractedProperties.surfaceArea = item.surfaceArea;
+      if (item.maxLength && item.maxLength > 0) extractedProperties.maxLength = item.maxLength;
+      if (item.maxWidth && item.maxWidth > 0) extractedProperties.maxWidth = item.maxWidth;
+      if (item.maxHeight && item.maxHeight > 0) extractedProperties.maxHeight = item.maxHeight;
+
       if (Object.keys(extractedProperties).length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          ...extractedProperties
-        }));
-        
-        const extractedCount = Object.keys(extractedProperties).length;
-        toast.success(`Loaded ${extractedCount} properties`, {
+        setFormData(prev => ({ ...prev, ...extractedProperties }));
+        toast.success(`Loaded ${Object.keys(extractedProperties).length} properties`, {
           description: `Restored from saved data: ${Object.keys(extractedProperties).join(', ')}`,
           duration: 4000
         });
@@ -560,47 +544,31 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
           duration: 3000
         });
       }
-      
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('3D Properties Load Error:', error);
-      toast.error('Failed to load properties', {
-        description: 'Could not load stored properties.',
-        duration: 4000
-      });
+      toast.error('Failed to load properties', { description: 'Could not load stored properties.', duration: 4000 });
     } finally {
       setIsAnalyzing3D(false);
     }
   };
-  
-  // Update validation errors when form changes
+
   useEffect(() => {
     setValidationErrors(validationStatus.errors);
   }, [validationStatus.errors]);
 
-  // Auto-assign parent and BOM level when item type changes
   useEffect(() => {
     if (!item && getAutoParent) {
-      const autoParent = getAutoParent(formData.itemType);
-      setAutoParentId(autoParent);
+      setAutoParentId(getAutoParent(formData.itemType));
     }
-    
-    // Auto-assign BOM level based on item type
+
     let bomLevel = 'L0';
     switch (formData.itemType) {
-      case BOMItemType.ASSEMBLY:
-        bomLevel = 'L0';
-        break;
-      case BOMItemType.SUB_ASSEMBLY:
-        bomLevel = 'L1';
-        break;
-      case BOMItemType.CHILD_PART:
-        bomLevel = 'L2';
-        break;
-      default:
-        bomLevel = 'L0';
+      case BOMItemType.ASSEMBLY: bomLevel = 'L0'; break;
+      case BOMItemType.SUB_ASSEMBLY: bomLevel = 'L1'; break;
+      case BOMItemType.CHILD_PART: bomLevel = 'L2'; break;
+      default: bomLevel = 'L0';
     }
-    
-    // Update bomLevel only if it's different to avoid infinite loops
+
     if (formData.bomLevel !== bomLevel) {
       setFormData(prev => ({ ...prev, bomLevel }));
     }
@@ -608,12 +576,11 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
 
   useEffect(() => {
     if (item) {
-      // Determine material category from existing material grade or material
-      let materialCategory: 'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | '' = '';
+      let materialCategory: MaterialCategory = '';
       if (item.materialGrade || item.material) {
         const materialInfo = (item.materialGrade || item.material || '').toLowerCase();
-        const isPlastic = materialInfo.includes('plastic') || materialInfo.includes('polymer') || 
-                         materialInfo.includes('rubber') || materialInfo.includes('elastomer');
+        const isPlastic = materialInfo.includes('plastic') || materialInfo.includes('polymer') ||
+          materialInfo.includes('rubber') || materialInfo.includes('elastomer');
         materialCategory = isPlastic ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS';
       }
 
@@ -639,8 +606,6 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         file2d: null,
         file3d: null,
       });
-      
-      // Set the selected material category for the API filtering
       setSelectedMaterialCategory(materialCategory);
     } else {
       setFormData({
@@ -665,16 +630,13 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         file2d: null,
         file3d: null,
       });
-      
-      // Reset material category selection for new items
       setSelectedMaterialCategory('');
     }
   }, [item, open, defaultItemType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Pre-submission validation
+
     if (!validationStatus.isValid) {
       toast.error('Please fix validation errors before saving', {
         description: 'Check highlighted fields and try again',
@@ -682,11 +644,10 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       });
       return;
     }
-    
+
     setLoading(true);
 
     try {
-      // Use explicit parentItemId if provided, otherwise use auto-assigned parent
       const finalParentId = parentItemId !== undefined ? parentItemId : autoParentId;
 
       const payload = {
@@ -730,11 +691,10 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         });
       }
 
-      // Upload files if provided with progress tracking
       if (formData.file2d || formData.file3d) {
         const formDataUpload = new FormData();
         const fileNames: string[] = [];
-        
+
         if (formData.file2d) {
           formDataUpload.append('file2d', formData.file2d);
           fileNames.push(formData.file2d.name);
@@ -745,25 +705,18 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
         }
 
         try {
-          // Simulate progress for better UX
           setUploadProgress({ file2d: 0, file3d: 0 });
-          
-          // Upload with simulated progress
           await apiClient.uploadFiles(`/bom-items/${itemId}/upload-files`, formDataUpload);
-          
           setUploadProgress({ file2d: 100, file3d: 100 });
-          
-          toast.success(`Files uploaded successfully`, {
+          toast.success('Files uploaded successfully', {
             description: `${fileNames.join(', ')} attached to ${formData.name}`,
             duration: 4000
           });
-        } catch (uploadError: any) {
+        } catch (uploadError: unknown) {
           const errorInfo = categorizeBOMError(uploadError);
-          
-          // Enhanced file upload error handling
           const baseMessage = `Item saved but file upload ${errorInfo.recoverable ? 'failed' : 'was blocked'}`;
-          
-          toast.error(`${baseMessage}`, {
+
+          toast.error(baseMessage, {
             description: errorInfo.suggestion,
             duration: errorInfo.severity === 'critical' ? 10000 : 7000,
             action: errorInfo.recoverable ? {
@@ -772,32 +725,27 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                 try {
                   await apiClient.uploadFiles(`/bom-items/${itemId}/upload-files`, formDataUpload);
                   toast.success('Files uploaded successfully on retry');
-                } catch (retryError) {
+                } catch {
                   toast.error('Upload failed again. Please try manually later.');
                 }
               }
             } : undefined
           });
-          
+
           setUploadProgress({});
         }
       }
 
-      // Invalidate React Query cache to refresh the tree immediately
       await queryClient.invalidateQueries({ queryKey: ['bom-items', 'list', bomId] });
-
       onOpenChange(false);
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorInfo = categorizeBOMError(error);
-      
-      // Enhanced error categorization and user feedback
-      const toastOptions: any = {
+      const toastOptions: Parameters<typeof toast.error>[1] & { action?: { label: string; onClick: () => void } } = {
         description: errorInfo.suggestion,
         duration: errorInfo.severity === 'critical' ? 10000 : 7000
       };
-      
-      // Add contextual actions based on error category
+
       if (errorInfo.actionable && errorInfo.recoverable) {
         switch (errorInfo.category) {
           case 'validation':
@@ -812,22 +760,20 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
               }
             };
             break;
-            
           case 'duplication':
             toastOptions.action = {
               label: 'Generate New Part#',
               onClick: () => {
                 const timestamp = new Date().toISOString().slice(2, 10).replace(/-/g, '');
                 const randomSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
-                setFormData(prev => ({ 
-                  ...prev, 
-                  partNumber: `${prev.partNumber || 'PT'}-${timestamp}-${randomSuffix}` 
+                setFormData(prev => ({
+                  ...prev,
+                  partNumber: `${prev.partNumber || 'PT'}-${timestamp}-${randomSuffix}`
                 }));
                 toast.info('New part number generated. Please review and adjust as needed.');
               }
             };
             break;
-            
           case 'network':
             toastOptions.action = {
               label: 'Retry Save',
@@ -836,17 +782,16 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
             break;
         }
       }
-      
-      // Show categorized error message
+
       toast.error(errorInfo.userMessage, toastOptions);
-      
-      // Log detailed error for debugging
+
+      const err = error as Record<string, unknown>;
       console.error('BOM Item Save Error:', {
         category: errorInfo.category,
         severity: errorInfo.severity,
-        message: (error as any)?.message ?? String(error),
-        status: (error as any)?.status ?? (error as any)?.statusCode,
-        stack: (error as any)?.stack,
+        message: err?.message ?? String(error),
+        status: err?.status ?? err?.statusCode,
+        stack: err?.stack,
         formData: { ...formData, file2d: formData.file2d?.name, file3d: formData.file3d?.name },
       });
     } finally {
@@ -854,11 +799,12 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
       setUploadProgress({});
     }
   };
-  
-  // Toggle contextual help
+
   const toggleHelp = (field: string) => {
     setShowHelp(prev => ({ ...prev, [field]: !prev[field] }));
   };
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -875,7 +821,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                   {item ? 'Update item details and specifications' : 'Add a new item to the Bill of Materials'}
                 </DialogDescription>
               </div>
-              
+
               {!item && (
                 <div className="text-right">
                   <div className="text-sm font-medium text-muted-foreground">Completion</div>
@@ -886,8 +832,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                 </div>
               )}
             </div>
-            
-            {/* Validation Summary */}
+
             {Object.keys(validationErrors).length > 0 && (
               <Alert variant="destructive" className="py-2">
                 <AlertTriangle className="h-4 w-4" />
@@ -902,6 +847,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4">
+            {/* Name */}
             <div className="grid gap-2">
               <Label htmlFor="name">Name *</Label>
               <Input
@@ -920,6 +866,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
               )}
             </div>
 
+            {/* Part Number */}
             <div className="grid gap-2">
               <Label htmlFor="partNumber">Part Number *</Label>
               <Input
@@ -938,6 +885,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
               )}
             </div>
 
+            {/* Description */}
             <div className="grid gap-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
@@ -949,17 +897,13 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
               />
             </div>
 
-            {/* Material Category Selection */}
+            {/* Material Category */}
             <div className="grid gap-2">
               <Label htmlFor="materialCategory">Material Category</Label>
               <Select
                 value={formData.materialCategory}
-                onValueChange={(value: 'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | '') => {
-                  setFormData({ 
-                    ...formData, 
-                    materialCategory: value,
-                    materialGrade: '' // Reset material grade when category changes
-                  });
+                onValueChange={(value: MaterialCategory) => {
+                  setFormData({ ...formData, materialCategory: value, materialGrade: '' });
                   setSelectedMaterialCategory(value);
                   setMaterialGradeSearch('');
                 }}
@@ -968,22 +912,22 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                   <SelectValue placeholder="Select material category..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PLASTIC_RUBBER">Plastic & Rubber</SelectItem>
-                  <SelectItem value="FERROUS_NON_FERROUS">Ferrous & Non-Ferrous (Metals)</SelectItem>
+                  <SelectItem value="PLASTIC_RUBBER">Plastic &amp; Rubber</SelectItem>
+                  <SelectItem value="FERROUS_NON_FERROUS">Ferrous &amp; Non-Ferrous (Metals)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {formData.materialCategory === 'PLASTIC_RUBBER' && 
-                  `Thermoplastic and rubber-based materials including polymers, elastomers, and composites (${rawMaterialsData?.items?.length || 0} available)`
+                {formData.materialCategory === 'PLASTIC_RUBBER' &&
+                  `Thermoplastic and rubber-based materials including polymers, elastomers, and composites (${rawMaterialsData?.items?.length ?? 0} available)`
                 }
-                {formData.materialCategory === 'FERROUS_NON_FERROUS' && 
-                  `All metallic materials including iron-based materials (steel, cast iron) and non-iron metals (aluminum, copper, titanium) (${rawMaterialsData?.items?.length || 0} available)`
+                {formData.materialCategory === 'FERROUS_NON_FERROUS' &&
+                  `All metallic materials including iron-based materials (steel, cast iron) and non-iron metals (aluminum, copper, titanium) (${rawMaterialsData?.items?.length ?? 0} available)`
                 }
-                {!formData.materialCategory && "Choose the type of material to see relevant grades from your database"}
+                {!formData.materialCategory && 'Choose the type of material to see relevant grades from your database'}
               </p>
             </div>
 
-            {/* Material Grade Selection - Only show if category is selected */}
+            {/* Material Grade */}
             {formData.materialCategory && (
               <div className="grid gap-2">
                 <Label htmlFor="materialGrade">Material Grade</Label>
@@ -994,18 +938,13 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                     onChange={(e) => {
                       const value = e.target.value;
                       setFormData({ ...formData, materialGrade: value });
-                      // Only trigger search if dropdown is open
-                      if (materialGradeOpen) {
-                        setMaterialGradeSearch(value);
-                      }
+                      if (materialGradeOpen) setMaterialGradeSearch(value);
                     }}
                     onFocus={() => {
                       setMaterialGradeOpen(true);
                       setMaterialGradeSearch(formData.materialGrade || '');
                     }}
-                    onClick={() => {
-                      setMaterialGradeOpen(true);
-                    }}
+                    onClick={() => setMaterialGradeOpen(true)}
                     placeholder={`Type or select ${formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} grade...`}
                     className="pr-10"
                     disabled={isLoadingMaterials}
@@ -1021,8 +960,8 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                         <ChevronsUpDown className="h-4 w-4 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent 
-                      className="w-full p-0" 
+                    <PopoverContent
+                      className="w-full p-0"
                       align="start"
                       onOpenAutoFocus={(e) => e.preventDefault()}
                       onCloseAutoFocus={(e) => e.preventDefault()}
@@ -1030,55 +969,43 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                       <Command shouldFilter={false} className="max-h-[300px]">
                         <CommandList className="max-h-[300px] overflow-y-auto">
                           <CommandGroup>
-                            {materialOptions.map((gradeInfo) => (
+                            {materialOptions.map((gradeInfo: MaterialOption) => (
                               <div
                                 key={gradeInfo.grade}
                                 onClick={() => {
-                                  setFormData({ 
-                                    ...formData, 
-                                    materialGrade: gradeInfo.grade === formData.materialGrade ? '' : gradeInfo.grade 
+                                  setFormData({
+                                    ...formData,
+                                    materialGrade: gradeInfo.grade === formData.materialGrade ? '' : gradeInfo.grade
                                   });
                                   setMaterialGradeOpen(false);
                                 }}
                                 className={`
                                   flex cursor-pointer items-center justify-between px-3 py-2 text-sm
-                                  ${formData.materialGrade === gradeInfo.grade 
-                                    ? 'bg-blue-500 text-white font-medium' 
+                                  ${formData.materialGrade === gradeInfo.grade
+                                    ? 'bg-blue-500 text-white font-medium'
                                     : 'text-black dark:text-white bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
                                   }
                                 `}
                               >
                                 <div className="flex items-center">
                                   <Check
-                                    className={`mr-2 h-4 w-4 ${
-                                      formData.materialGrade === gradeInfo.grade ? "opacity-100" : "opacity-0"
-                                    }`}
+                                    className={`mr-2 h-4 w-4 ${formData.materialGrade === gradeInfo.grade ? 'opacity-100' : 'opacity-0'}`}
                                   />
                                   <div>
                                     <span className="font-medium">{gradeInfo.grade}</span>
                                     {gradeInfo.materialDescription && (
-                                      <div className="text-xs opacity-75">
-                                        {gradeInfo.materialDescription}
-                                      </div>
+                                      <div className="text-xs opacity-75">{gradeInfo.materialDescription}</div>
                                     )}
                                     {gradeInfo.astmStandard && (
-                                      <div className="text-xs opacity-60">
-                                        ASTM: {gradeInfo.astmStandard}
-                                      </div>
+                                      <div className="text-xs opacity-60">ASTM: {gradeInfo.astmStandard}</div>
                                     )}
                                   </div>
                                 </div>
                                 <div className="text-xs opacity-75">
                                   {gradeInfo.density && `${gradeInfo.density} g/cm³`}
-                                  {gradeInfo.cost && (
-                                    <div>
-                                      ₹{gradeInfo.cost.toFixed(2)}
-                                    </div>
-                                  )}
+                                  {gradeInfo.cost && <div>₹{gradeInfo.cost.toFixed(2)}</div>}
                                   {gradeInfo.ultimateTensileStrength && (
-                                    <div>
-                                      UTS: {gradeInfo.ultimateTensileStrength} MPa
-                                    </div>
+                                    <div>UTS: {gradeInfo.ultimateTensileStrength} MPa</div>
                                   )}
                                 </div>
                               </div>
@@ -1089,6 +1016,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                     </PopoverContent>
                   </Popover>
                 </div>
+
                 {materialGradeOpen && isLoadingMaterials && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -1097,7 +1025,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                 )}
                 {!isLoadingMaterials && materialOptions.length === 0 && materialGradeSearch && (
                   <p className="text-xs text-muted-foreground">
-                    No {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} grades found matching "{materialGradeSearch}". You can still use this custom value.
+                    No {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} grades found matching &quot;{materialGradeSearch}&quot;. You can still use this custom value.
                   </p>
                 )}
                 {!isLoadingMaterials && materialOptions.length === 0 && !materialGradeSearch && (
@@ -1105,7 +1033,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                     {rawMaterialsData?.items?.length === 0 ? (
                       <div className="space-y-1">
                         <p>Unable to load {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} materials from database.</p>
-                        <button 
+                        <button
                           onClick={() => queryClient.invalidateQueries({ queryKey: ['raw-materials'] })}
                           className="text-blue-600 hover:text-blue-800 underline"
                         >
@@ -1115,21 +1043,20 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                     ) : (
                       <p>
                         No {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} material options available for this category.
-                        {rawMaterialsData?.items?.length > 0 && ` (${rawMaterialsData.items.length} materials found but missing grade/type/name data)`}
+                        {(rawMaterialsData?.items?.length ?? 0) > 0 && ` (${rawMaterialsData!.items.length} materials found but missing grade/type/name data)`}
                       </p>
                     )}
                   </div>
                 )}
                 {!isLoadingMaterials && materialOptions.length > 0 && (
                   <p className="text-xs text-green-600">
-                    Found {materialOptions.length} unique {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic & rubber' : 'metal'} material options from {rawMaterialsData?.items?.length || 0} materials in your database
+                    Found {materialOptions.length} unique {formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic & rubber' : 'metal'} material options from {rawMaterialsData?.items?.length ?? 0} materials in your database
                   </p>
                 )}
               </div>
             )}
 
-
-            {/* Make or Buy Decision */}
+            {/* Make or Buy */}
             <div className="grid gap-3 border-t pt-4">
               <Label>Make or Buy Decision</Label>
               <div className="flex gap-4">
@@ -1157,12 +1084,9 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                 </label>
               </div>
               <p className="text-xs text-muted-foreground">
-                {formData.makeBuy === 'make'
-                  ? 'Part will be manufactured in-house'
-                  : 'Part will be purchased from supplier'}
+                {formData.makeBuy === 'make' ? 'Part will be manufactured in-house' : 'Part will be purchased from supplier'}
               </p>
 
-              {/* Cost field - only shown for Buy option */}
               {formData.makeBuy === 'buy' && (
                 <div className="grid gap-2 mt-2 p-4 border rounded-lg bg-muted/30">
                   <Label htmlFor="unitCost" className="flex items-center gap-2">
@@ -1176,9 +1100,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                     min="0"
                     placeholder="Enter supplier quoted price"
                     value={formData.unitCost}
-                    onChange={(e) => {
-                      setFormData({ ...formData, unitCost: e.target.value });
-                    }}
+                    onChange={(e) => setFormData({ ...formData, unitCost: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
                     Supplier quoted price per unit in Indian Rupees (INR)
@@ -1187,6 +1109,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
               )}
             </div>
 
+            {/* File Uploads */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="file2d" className="flex items-center gap-2">
@@ -1207,9 +1130,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                     <span className="text-green-600 dark:text-green-400">({(formData.file2d.size / 1024 / 1024).toFixed(1)} MB)</span>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Upload technical drawings, blueprints, or dimensional sketches
-                  </p>
+                  <p className="text-xs text-muted-foreground">Upload technical drawings, blueprints, or dimensional sketches</p>
                 )}
               </div>
 
@@ -1222,11 +1143,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                   id="file3d"
                   type="file"
                   accept=".stp,.step,.stl,.obj,.iges,.igs"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    setFormData({ ...formData, file3d: file });
-                    // Note: Physical properties will be extracted after file upload and item creation
-                  }}
+                  onChange={(e) => setFormData({ ...formData, file3d: e.target.files?.[0] || null })}
                   className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80"
                 />
                 {formData.file3d ? (
@@ -1240,29 +1157,20 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                       {isAnalyzing3D ? 'Analyzing: ' : 'Selected: '}{formData.file3d.name}
                     </span>
                     <span className="text-green-600 dark:text-green-400">({(formData.file3d.size / 1024 / 1024).toFixed(1)} MB)</span>
-                    {isAnalyzing3D && (
-                      <span className="text-blue-600 dark:text-blue-400 font-medium">Extracting properties...</span>
-                    )}
+                    {isAnalyzing3D && <span className="text-blue-600 dark:text-blue-400 font-medium">Extracting properties...</span>}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Upload CAD models for automatic property extraction and manufacturing analysis
-                  </p>
+                  <p className="text-xs text-muted-foreground">Upload CAD models for automatic property extraction and manufacturing analysis</p>
                 )}
               </div>
             </div>
 
+            {/* Quantity & Annual Volume */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="quantity">Quantity *</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => toggleHelp('quantity')}
-                  >
+                  <Button type="button" variant="ghost" size="sm" className="h-auto p-0 text-muted-foreground hover:text-foreground" onClick={() => toggleHelp('quantity')}>
                     <HelpCircle className="h-3 w-3" />
                   </Button>
                 </div>
@@ -1277,11 +1185,9 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                 />
                 {validationErrors.quantity && (
                   <div className="flex items-center gap-1 text-xs text-red-600">
-                    <XCircle className="h-3 w-3" />
-                    <span>{validationErrors.quantity}</span>
+                    <XCircle className="h-3 w-3" /><span>{validationErrors.quantity}</span>
                   </div>
                 )}
-                
                 {showHelp.quantity && (
                   <Alert className="mt-2">
                     <Info className="h-4 w-4" />
@@ -1290,7 +1196,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                       <ul className="list-disc list-inside space-y-1">
                         <li>Number of this item needed in the parent assembly</li>
                         <li>Should be the quantity per assembly, not total production</li>
-                        <li>For example: If an engine needs 4 pistons, enter "4"</li>
+                        <li>For example: If an engine needs 4 pistons, enter &quot;4&quot;</li>
                         <li>Must be a positive integer greater than 0</li>
                       </ul>
                     </AlertDescription>
@@ -1301,13 +1207,7 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
               <div className="grid gap-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="annualVolume">Annual Volume *</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => toggleHelp('annualVolume')}
-                  >
+                  <Button type="button" variant="ghost" size="sm" className="h-auto p-0 text-muted-foreground hover:text-foreground" onClick={() => toggleHelp('annualVolume')}>
                     <HelpCircle className="h-3 w-3" />
                   </Button>
                 </div>
@@ -1322,11 +1222,9 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                 />
                 {validationErrors.annualVolume && (
                   <div className="flex items-center gap-1 text-xs text-red-600">
-                    <XCircle className="h-3 w-3" />
-                    <span>{validationErrors.annualVolume}</span>
+                    <XCircle className="h-3 w-3" /><span>{validationErrors.annualVolume}</span>
                   </div>
                 )}
-                
                 {showHelp.annualVolume && (
                   <Alert className="mt-2">
                     <Info className="h-4 w-4" />
@@ -1350,98 +1248,45 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-medium">Physical Properties (Optional)</h4>
                   {(formData.weight > 0 || formData.surfaceArea > 0 || formData.maxLength > 0) && (
-                    <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/20 px-2 py-1 rounded">
-                      Auto-extracted
-                    </span>
+                    <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/20 px-2 py-1 rounded">Auto-extracted</span>
                   )}
                 </div>
                 {item?.id && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={fetch3DProperties}
-                    disabled={isAnalyzing3D}
-                    className="h-8 px-3 text-xs"
-                  >
-                    {isAnalyzing3D ? (
-                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                    ) : (
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                    )}
+                  <Button type="button" variant="outline" size="sm" onClick={fetch3DProperties} disabled={isAnalyzing3D} className="h-8 px-3 text-xs">
+                    {isAnalyzing3D ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
                     {isAnalyzing3D ? 'Loading...' : 'Auto-Fill from 3D'}
                   </Button>
                 )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="weight">Weight (kg)</Label>
-                  <Input
-                    id="weight"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={formData.weight || ''}
-                    onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="surfaceArea">Surface Area (mm²)</Label>
-                  <Input
-                    id="surfaceArea"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.surfaceArea || ''}
-                    onChange={(e) => setFormData({ ...formData, surfaceArea: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="maxLength">Max Length (mm)</Label>
-                  <Input
-                    id="maxLength"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.maxLength || ''}
-                    onChange={(e) => setFormData({ ...formData, maxLength: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="maxWidth">Max Width (mm)</Label>
-                  <Input
-                    id="maxWidth"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.maxWidth || ''}
-                    onChange={(e) => setFormData({ ...formData, maxWidth: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="maxHeight">Max Height (mm)</Label>
-                  <Input
-                    id="maxHeight"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.maxHeight || ''}
-                    onChange={(e) => setFormData({ ...formData, maxHeight: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
+                {[
+                  { id: 'weight', label: 'Weight (kg)', step: '0.001' },
+                  { id: 'surfaceArea', label: 'Surface Area (mm²)', step: '0.01' },
+                  { id: 'maxLength', label: 'Max Length (mm)', step: '0.01' },
+                  { id: 'maxWidth', label: 'Max Width (mm)', step: '0.01' },
+                  { id: 'maxHeight', label: 'Max Height (mm)', step: '0.01' },
+                ].map(({ id, label, step }) => (
+                  <div key={id} className="grid gap-2">
+                    <Label htmlFor={id}>{label}</Label>
+                    <Input
+                      id={id}
+                      type="number"
+                      step={step}
+                      min="0"
+                      value={formData[id as keyof typeof formData] as number || ''}
+                      onChange={(e) => setFormData({ ...formData, [id]: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 
+            {/* UOM & Item Type */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="unit">UOM</Label>
-                <Select
-                  value={formData.unit}
-                  onValueChange={(value) => setFormData({ ...formData, unit: value })}
-                >
-                  <SelectTrigger id="unit">
-                    <SelectValue placeholder="Select unit" />
-                  </SelectTrigger>
+                <Select value={formData.unit} onValueChange={(value) => setFormData({ ...formData, unit: value })}>
+                  <SelectTrigger id="unit"><SelectValue placeholder="Select unit" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pcs">Pieces</SelectItem>
                     <SelectItem value="kg">Kilograms</SelectItem>
@@ -1455,81 +1300,49 @@ export function BOMItemDialog({ bomId, item, open, onOpenChange, onSuccess, pare
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="itemType">Type *</Label>
-                  <Badge variant="secondary" className="text-xs">
-                    BOM Level: {formData.bomLevel}
-                  </Badge>
+                  <Badge variant="secondary" className="text-xs">BOM Level: {formData.bomLevel}</Badge>
                 </div>
-                <Select
-                  value={formData.itemType}
-                  onValueChange={(value) => setFormData({ ...formData, itemType: value as BOMItemType })}
-                >
-                  <SelectTrigger id="itemType">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
+                <Select value={formData.itemType} onValueChange={(value) => setFormData({ ...formData, itemType: value as BOMItemType })}>
+                  <SelectTrigger id="itemType"><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(ITEM_TYPE_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <div className="space-y-1">
                   {!item && autoParentId && formData.itemType !== BOMItemType.ASSEMBLY && (
                     <p className="text-xs text-muted-foreground">
-                      Will be added under: {
-                        formData.itemType === BOMItemType.SUB_ASSEMBLY ? 'Latest Assembly' :
-                          formData.itemType === BOMItemType.CHILD_PART ? 'Latest Sub-Assembly' : ''
-                      }
+                      Will be added under:{' '}
+                      {formData.itemType === BOMItemType.SUB_ASSEMBLY ? 'Latest Assembly' :
+                        formData.itemType === BOMItemType.CHILD_PART ? 'Latest Sub-Assembly' : ''}
                     </p>
                   )}
-                  <p className="text-xs text-muted-foreground">
-                    BOM Level is automatically assigned based on item type
-                  </p>
+                  <p className="text-xs text-muted-foreground">BOM Level is automatically assigned based on item type</p>
                 </div>
               </div>
             </div>
-
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={loading || !validationStatus.isValid}
-              className="min-w-24"
-            >
+            <Button type="submit" disabled={loading || !validationStatus.isValid} className="min-w-24">
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {item ? 'Updating...' : 'Creating...'}
                   {(uploadProgress.file2d !== undefined || uploadProgress.file3d !== undefined) && (
                     <span className="ml-2 text-xs opacity-75">
-                      {uploadProgress.file2d || uploadProgress.file3d || 0}%
+                      {uploadProgress.file2d ?? uploadProgress.file3d ?? 0}%
                     </span>
                   )}
                 </>
+              ) : item ? (
+                <><CheckCircle className="mr-2 h-4 w-4" />Update Item</>
               ) : (
-                <>
-                  {item ? (
-                    <>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      Update Item
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Item
-                    </>
-                  )}
-                </>
+                <><Plus className="mr-2 h-4 w-4" />Create Item</>
               )}
             </Button>
           </DialogFooter>
