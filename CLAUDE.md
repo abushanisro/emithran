@@ -94,24 +94,24 @@ Code reviews are opportunities for knowledge sharing, quality assurance, and tea
 - Ask questions to understand context
 
 ### Feedback Categories
-- **🚫 Blocking**: Must be fixed before merge
-- **⚠️ Important**: Should be addressed
-- **💡 Suggestion**: Consider for improvement
-- **❓ Question**: Seeking clarification
-- **👍 Praise**: Acknowledge good practices
+- **Blocking**: Must be fixed before merge
+- **Important**: Should be addressed
+- **Suggestion**: Consider for improvement
+- **Question**: Seeking clarification
+- **Praise**: Acknowledge good practices
 
 ### Example Comments
 ```
-🚫 This function doesn't handle null inputs, which could cause NPE in production.
+This function doesn't handle null inputs, which could cause NPE in production.
 Suggestion: Add null checks or use Optional<T>.
 
-💡 Consider using a builder pattern here for better readability when creating 
+Consider using a builder pattern here for better readability when creating 
 complex objects with many parameters.
 
-❓ Why did you choose this algorithm over the standard library implementation?
+Why did you choose this algorithm over the standard library implementation?
 Is there a specific performance requirement?
 
-👍 Excellent error handling here - clear messages and proper exception types.
+Excellent error handling here - clear messages and proper exception types.
 ```
 
 ## Common Anti-Patterns to Flag
