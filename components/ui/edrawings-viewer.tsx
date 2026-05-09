@@ -28,7 +28,14 @@ import {
   Clock,
   AlertTriangle,
   Crosshair,
+  Layers,
+  Ruler,
+  X,
 } from 'lucide-react';
+import { MeasurementOverlay } from './measurement-overlay';
+import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, MeasureUnit, ArcSelection } from './measurement-overlay';
+import { getResultColors } from './measurement-overlay';
+import { MeasurementPanel } from './measurement-panel';
 
 // Manufacturing Feature Interface
 interface ManufacturingFeature {
@@ -52,6 +59,7 @@ interface EDrawingsViewerProps {
     volume: number;
     dimensions: { x: number; y: number; z: number };
     surfaceArea: number;
+    projectedArea?: number;
   }) => void;
   manufacturingFeatures?: ManufacturingFeature[];
   selectedFeature?: ManufacturingFeature | null;
@@ -71,6 +79,209 @@ function getBufferAttribute(geometry: THREE.BufferGeometry, name: string): THREE
   return attr as THREE.BufferAttribute;
 }
 
+// ─── Measurement Algorithms ───────────────────────────────────────────────────
+
+// Compute per-triangle normals from a non-indexed BufferGeometry
+function computeTriangleNormals(pos: THREE.BufferAttribute, triCount: number): THREE.Vector3[] {
+  const out: THREE.Vector3[] = new Array(triCount);
+  for (let i = 0; i < triCount; i++) {
+    const a = new THREE.Vector3(pos.getX(i*3),   pos.getY(i*3),   pos.getZ(i*3));
+    const b = new THREE.Vector3(pos.getX(i*3+1), pos.getY(i*3+1), pos.getZ(i*3+1));
+    const c = new THREE.Vector3(pos.getX(i*3+2), pos.getY(i*3+2), pos.getZ(i*3+2));
+    out[i] = new THREE.Vector3()
+      .crossVectors(new THREE.Vector3().subVectors(b, a), new THREE.Vector3().subVectors(c, a))
+      .normalize();
+  }
+  return out;
+}
+
+// Build adjacency: adj[i] = list of triangle indices that share an edge with triangle i
+function buildTriangleAdjacency(pos: THREE.BufferAttribute, triCount: number): number[][] {
+  const SCALE = 1e4;
+  const round = (v: number) => Math.round(v * SCALE);
+  const vtMap = new Map<string, number[]>();
+
+  for (let ti = 0; ti < triCount; ti++) {
+    for (let vi = 0; vi < 3; vi++) {
+      const idx = ti * 3 + vi;
+      const k = `${round(pos.getX(idx))},${round(pos.getY(idx))},${round(pos.getZ(idx))}`;
+      const list = vtMap.get(k);
+      if (list) list.push(ti); else vtMap.set(k, [ti]);
+    }
+  }
+
+  const sharedCount = new Map<string, number>();
+  for (const tris of vtMap.values()) {
+    if (tris.length < 2) continue;
+    for (let i = 0; i < tris.length; i++) {
+      for (let j = i + 1; j < tris.length; j++) {
+        const a = Math.min(tris[i]!, tris[j]!), b = Math.max(tris[i]!, tris[j]!);
+        const k = `${a},${b}`;
+        sharedCount.set(k, (sharedCount.get(k) ?? 0) + 1);
+      }
+    }
+  }
+
+  const adj: number[][] = Array.from({ length: triCount }, () => []);
+  for (const [k, cnt] of sharedCount) {
+    if (cnt >= 2) {
+      const [a, b] = k.split(',').map(Number) as [number, number];
+      adj[a]!.push(b); adj[b]!.push(a);
+    }
+  }
+  return adj;
+}
+
+// BFS to find the connected flat face group starting from a triangle
+function findFaceGroup(
+  startTri: number,
+  normals: THREE.Vector3[],
+  adj: number[][],
+  threshold = 0.9994, // cos(2°)
+): number[] {
+  const startNormal = normals[startTri];
+  if (!startNormal) return [startTri];
+  const visited = new Uint8Array(normals.length);
+  visited[startTri] = 1;
+  const queue = [startTri];
+  const result = [startTri];
+  let qi = 0;
+  while (qi < queue.length && result.length < 5000) {
+    const cur = queue[qi++]!;
+    for (const nb of (adj[cur] ?? [])) {
+      if (visited[nb]) continue;
+      visited[nb] = 1;
+      if (normals[nb]!.dot(startNormal) >= threshold) {
+        result.push(nb);
+        queue.push(nb);
+      }
+    }
+  }
+  return result;
+}
+
+// Screen-space distance from point (px,py) to segment (x1,y1)-(x2,y2)
+function screenDistToSeg(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx*dx + dy*dy;
+  if (lenSq < 0.001) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(0, Math.min(1, ((px - x1)*dx + (py - y1)*dy) / lenSq));
+  return Math.hypot(px - (x1 + t*dx), py - (y1 + t*dy));
+}
+
+// Closest points between two line segments — standard Eberly algorithm
+function closestPointsOnSegments(
+  p1: THREE.Vector3, p2: THREE.Vector3,
+  p3: THREE.Vector3, p4: THREE.Vector3,
+): { cp1: THREE.Vector3; cp2: THREE.Vector3; dist: number } {
+  const d1 = new THREE.Vector3().subVectors(p2, p1);
+  const d2 = new THREE.Vector3().subVectors(p4, p3);
+  const r  = new THREE.Vector3().subVectors(p1, p3);
+  const a = d1.dot(d1), e = d2.dot(d2), f = d2.dot(r);
+  let s: number, t: number;
+  if (a <= 1e-10 && e <= 1e-10) {
+    return { cp1: p1.clone(), cp2: p3.clone(), dist: r.length() };
+  }
+  if (a <= 1e-10) {
+    s = 0; t = Math.max(0, Math.min(1, f / e));
+  } else {
+    const c = d1.dot(r);
+    if (e <= 1e-10) {
+      t = 0; s = Math.max(0, Math.min(1, -c / a));
+    } else {
+      const b = d1.dot(d2), denom = a * e - b * b;
+      s = denom > 1e-10 ? Math.max(0, Math.min(1, (b*f - c*e) / denom)) : 0;
+      t = (b*s + f) / e;
+      if (t < 0) { t = 0; s = Math.max(0, Math.min(1, -c / a)); }
+      else if (t > 1) { t = 1; s = Math.max(0, Math.min(1, (b - c) / a)); }
+    }
+  }
+  const cp1 = p1.clone().addScaledVector(d1, s);
+  const cp2 = p3.clone().addScaledVector(d2, t);
+  return { cp1, cp2, dist: cp1.distanceTo(cp2) };
+}
+
+// Compute the full measurement result between two selections
+function computeMeasurementBetween(selA: MeasureSelection, selB: MeasureSelection): Omit<MeasureResult, 'id' | 'createdAt'> {
+  let lineStart: THREE.Vector3;
+  let lineEnd: THREE.Vector3;
+  let normalDistanceMm: number | undefined;
+  let isParallel: boolean | undefined;
+  let measureType: MeasureResult['measureType'];
+
+  const getPoint = (s: MeasureSelection): THREE.Vector3 => {
+    if (s.type === 'face')   return s.centroid.clone();
+    if (s.type === 'edge')   return s.midpoint.clone();
+    if (s.type === 'arc')    return s.center.clone();
+    return s.point.clone();
+  };
+
+  if (selA.type === 'arc' && selB.type === 'arc') {
+    measureType = 'arc-arc';
+    lineStart = selA.center.clone();
+    lineEnd   = selB.center.clone();
+    // Check if coaxial
+    const axisDot = Math.abs(selA.axis.dot(selB.axis));
+    isParallel = axisDot > 0.9994;
+    if (isParallel) {
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(selA.axis, selA.center);
+      normalDistanceMm = Math.abs(plane.distanceToPoint(selB.center));
+    }
+  } else if (selA.type === 'arc') {
+    measureType = 'mixed';
+    lineStart = selA.center.clone();
+    lineEnd   = getPoint(selB);
+    if (selB.type === 'face') {
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(selB.normal, selB.centroid);
+      normalDistanceMm = Math.abs(plane.distanceToPoint(selA.center));
+    }
+  } else if (selB.type === 'arc') {
+    return computeMeasurementBetween(selB, selA);
+  } else if (selA.type === 'face' && selB.type === 'face') {
+    measureType = 'face-face';
+    const dot = Math.abs(selA.normal.dot(selB.normal));
+    isParallel = dot > 0.9994;
+    lineStart = selA.centroid.clone();
+    if (isParallel) {
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(selA.normal, selA.centroid);
+      normalDistanceMm = Math.abs(plane.distanceToPoint(selB.centroid));
+      lineEnd = selB.centroid.clone().addScaledVector(selA.normal, -plane.distanceToPoint(selB.centroid));
+    } else {
+      lineEnd = selB.centroid.clone();
+    }
+  } else if (selA.type === 'edge' && selB.type === 'edge') {
+    measureType = 'edge-edge';
+    const { cp1, cp2, dist } = closestPointsOnSegments(selA.start, selA.end, selB.start, selB.end);
+    lineStart = cp1; lineEnd = cp2;
+    normalDistanceMm = dist;
+  } else if (selA.type === 'vertex' && selB.type === 'vertex') {
+    measureType = 'point-point';
+    lineStart = selA.point.clone();
+    lineEnd   = selB.point.clone();
+  } else if (selA.type === 'face' && selB.type === 'vertex') {
+    measureType = 'mixed';
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(selA.normal, selA.centroid);
+    normalDistanceMm = Math.abs(plane.distanceToPoint(selB.point));
+    lineStart = selA.centroid.clone();
+    lineEnd   = selB.point.clone();
+  } else if (selA.type === 'vertex' && selB.type === 'face') {
+    return computeMeasurementBetween(selB, selA);
+  } else {
+    measureType = 'mixed';
+    lineStart = getPoint(selA);
+    lineEnd   = getPoint(selB);
+  }
+
+  const dv = new THREE.Vector3().subVectors(lineEnd, lineStart);
+  return {
+    selA, selB, measureType,
+    distanceMm: lineStart.distanceTo(lineEnd),
+    deltaXMm: dv.x, deltaYMm: dv.y, deltaZMm: dv.z,
+    normalDistanceMm, isParallel,
+    lineStart, lineEnd,
+  };
+}
+
 // Standard CAD views configuration
 const getCADViews = (distance: number) => ({
   home: { position: [distance, distance, distance] as [number, number, number], name: 'Home' },
@@ -82,6 +293,50 @@ const getCADViews = (distance: number) => ({
   left: { position: [-distance, 0, 0] as [number, number, number], name: 'Left' },
   isometric: { position: [distance, distance, distance] as [number, number, number], name: 'Isometric' },
 });
+
+// View direction vectors for projected face highlighting
+const VIEW_DIRECTIONS: Record<string, [number, number, number]> = {
+  front:     [0, 0, 1],
+  back:      [0, 0, -1],
+  top:       [0, 1, 0],
+  bottom:    [0, -1, 0],
+  right:     [1, 0, 0],
+  left:      [-1, 0, 0],
+  home:      [0.577, 0.577, 0.577],
+  isometric: [0.577, 0.577, 0.577],
+};
+
+const VIEW_COLORS: Record<string, string> = {
+  front:     '#06b6d4',
+  back:      '#f97316',
+  top:       '#22c55e',
+  bottom:    '#a855f7',
+  right:     '#3b82f6',
+  left:      '#ef4444',
+  home:      '#60a5fa',
+  isometric: '#60a5fa',
+};
+
+function computeProjectedFaces(geometry: THREE.BufferGeometry, view: string): number[] {
+  const pos = geometry.attributes.position as THREE.BufferAttribute;
+  if (!pos) return [];
+  const dirArr = VIEW_DIRECTIONS[view] ?? VIEW_DIRECTIONS.front!;
+  const viewDir = new THREE.Vector3(...dirArr).normalize();
+  const indices: number[] = [];
+  const triangleCount = Math.floor(pos.count / 3);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), normal = new THREE.Vector3();
+  for (let i = 0; i < triangleCount; i++) {
+    a.fromBufferAttribute(pos, i * 3);
+    b.fromBufferAttribute(pos, i * 3 + 1);
+    c.fromBufferAttribute(pos, i * 3 + 2);
+    ab.subVectors(b, a);
+    ac.subVectors(c, a);
+    normal.crossVectors(ab, ac).normalize();
+    if (normal.dot(viewDir) > 0.1) indices.push(i);
+  }
+  return indices;
+}
 
 function CameraFitter({ onFit, resetKey }: { onFit: (distance: number) => void; resetKey?: string }) {
   const { scene, camera } = useThree();
@@ -462,6 +717,291 @@ function DFMColorMesh({
   );
 }
 
+// ─── Measurement Highlight Components ────────────────────────────────────────
+
+function FaceHighlight({ triangleIndices, geometry, color, opacity = 0.45 }: {
+  triangleIndices: number[];
+  geometry: THREE.BufferGeometry;
+  color: string;
+  opacity?: number;
+}) {
+  const geo = useMemo(() => {
+    const posAttr = getBufferAttribute(geometry, 'position');
+    if (!posAttr || triangleIndices.length === 0) return null;
+    const verts = new Float32Array(triangleIndices.length * 9);
+    triangleIndices.forEach((ti, i) => {
+      for (let vi = 0; vi < 3; vi++) {
+        const idx = ti * 3 + vi;
+        verts[i * 9 + vi * 3]     = posAttr.getX(idx);
+        verts[i * 9 + vi * 3 + 1] = posAttr.getY(idx);
+        verts[i * 9 + vi * 3 + 2] = posAttr.getZ(idx);
+      }
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    return g;
+  }, [triangleIndices, geometry]);
+  useEffect(() => () => { geo?.dispose(); }, [geo]);
+  if (!geo) return null;
+  return (
+    <mesh geometry={geo} renderOrder={100}>
+      <meshBasicMaterial color={color} transparent opacity={opacity} depthTest={false} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+function EdgeHighlight({ start, end, color }: {
+  start: THREE.Vector3; end: THREE.Vector3; color: string;
+}) {
+  const obj = useMemo(() => {
+    const g = new THREE.BufferGeometry().setFromPoints([start.clone(), end.clone()]);
+    const m = new THREE.LineBasicMaterial({ color, depthTest: false, linewidth: 4 });
+    const line = new THREE.Line(g, m);
+    return line;
+  }, [start, end, color]);
+  useEffect(() => () => {
+    obj.geometry.dispose();
+    (obj.material as THREE.Material).dispose();
+  }, [obj]);
+  return <primitive object={obj} renderOrder={101} />;
+}
+
+function VertexHighlight({ point, color, size }: {
+  point: THREE.Vector3; color: string; size: number;
+}) {
+  return (
+    <mesh position={point} renderOrder={102}>
+      <sphereGeometry args={[size * 1.5, 10, 10]} />
+      <meshBasicMaterial color={color} depthTest={false} transparent opacity={0.9} />
+    </mesh>
+  );
+}
+
+// Detect cylindrical surface (hole/boss) from a hit triangle
+function detectCylinder(
+  faceIndex: number,
+  pos: THREE.BufferAttribute,
+  normals: THREE.Vector3[],
+  adj: number[][],
+  mesh: THREE.Mesh,
+): ArcSelection | null {
+  // BFS with loose threshold — cylindrical normals rotate so tight threshold would miss them
+  const visited = new Uint8Array(normals.length);
+  visited[faceIndex] = 1;
+  const queue = [faceIndex];
+  const group: number[] = [faceIndex];
+  let qi = 0;
+  while (qi < queue.length && group.length < 3000) {
+    const cur = queue[qi++]!;
+    for (const nb of (adj[cur] ?? [])) {
+      if (visited[nb]) continue;
+      visited[nb] = 1;
+      if ((normals[nb]?.dot(normals[cur]!) ?? 0) > 0.17) {
+        group.push(nb);
+        queue.push(nb);
+      }
+    }
+  }
+  if (group.length < 6) return null;
+
+  // Find cylinder axis — cross product of two non-parallel normals in the group
+  const n0 = normals[group[0]!]!;
+  let axis: THREE.Vector3 | null = null;
+  for (let i = 1; i < group.length; i++) {
+    const ni = normals[group[i]!]!;
+    if (Math.abs(n0.dot(ni)) < 0.98) {
+      axis = new THREE.Vector3().crossVectors(n0, ni).normalize();
+      break;
+    }
+  }
+  if (!axis) return null;
+
+  // Verify all normals are roughly perpendicular to the axis (cylindrical check)
+  const sample = Math.min(group.length, 30);
+  let perpCount = 0;
+  for (let i = 0; i < sample; i++) {
+    if (Math.abs(normals[group[i]!]!.dot(axis)) < 0.20) perpCount++;
+  }
+  if (perpCount < sample * 0.6) return null;
+
+  // Collect world-space vertices
+  const worldVerts: THREE.Vector3[] = [];
+  for (const ti of group) {
+    for (let vi = 0; vi < 3; vi++) {
+      const idx = ti * 3 + vi;
+      const v = new THREE.Vector3(pos.getX(idx), pos.getY(idx), pos.getZ(idx));
+      worldVerts.push(mesh.localToWorld(v));
+    }
+  }
+
+  // Centroid + world axis
+  const centroid = new THREE.Vector3();
+  for (const v of worldVerts) centroid.add(v);
+  centroid.divideScalar(worldVerts.length);
+  const worldAxis = axis.clone().transformDirection(mesh.matrixWorld).normalize();
+
+  // Compute per-vertex radial distances from axis through centroid
+  const radii: number[] = worldVerts.map(v => {
+    const d = new THREE.Vector3().subVectors(v, centroid);
+    const axComp = worldAxis.clone().multiplyScalar(d.dot(worldAxis));
+    return new THREE.Vector3().subVectors(d, axComp).length();
+  });
+
+  const avgR = radii.reduce((a, b) => a + b, 0) / radii.length;
+  if (avgR < 1e-6) return null;
+  const stdDev = Math.sqrt(radii.reduce((acc, r) => acc + (r - avgR) ** 2, 0) / radii.length);
+  if (stdDev / avgR > 0.25) return null; // too irregular to be a circle
+
+  return { type: 'arc', center: centroid, radius: avgR, axis: worldAxis, triangleIndices: group };
+}
+
+// Classify a raycast hit into face / edge / vertex / arc selection
+function classifyHit(
+  hit: THREE.Intersection,
+  camera: THREE.Camera,
+  normals: THREE.Vector3[],
+  adj: number[][],
+  subMode: MeasureSubMode = 'auto',
+): MeasureSelection {
+  const mesh = hit.object as THREE.Mesh;
+  const pos = getBufferAttribute(mesh.geometry as THREE.BufferGeometry, 'position');
+  if (!pos || hit.faceIndex == null) {
+    return { type: 'vertex', point: hit.point.clone() };
+  }
+
+  const faceIndex = hit.faceIndex;
+  const triBase = faceIndex * 3;
+
+  const getWorldVert = (idx: number) => {
+    const v = new THREE.Vector3(pos.getX(idx), pos.getY(idx), pos.getZ(idx));
+    return mesh.localToWorld(v);
+  };
+
+  const vA = getWorldVert(triBase);
+  const vB = getWorldVert(triBase + 1);
+  const vC = getWorldVert(triBase + 2);
+
+  // ── Arc/circle mode ──────────────────────────────────────────────────────
+  if (subMode === 'arc') {
+    const arc = detectCylinder(faceIndex, pos, normals, adj, mesh);
+    if (arc) return arc;
+    // Fallback: snap to nearest vertex
+    return { type: 'vertex', point: vA };
+  }
+
+  // ── Point mode ───────────────────────────────────────────────────────────
+  if (subMode === 'point') {
+    // Return nearest vertex of the hit triangle
+    const project = (v: THREE.Vector3) => {
+      const ndc = v.clone().project(camera);
+      return { x: (ndc.x + 1) * window.innerWidth / 2, y: (-ndc.y + 1) * window.innerHeight / 2 };
+    };
+    const hitNDC = hit.point.clone().project(camera);
+    const px = (hitNDC.x + 1) * window.innerWidth / 2;
+    const py = (-hitNDC.y + 1) * window.innerHeight / 2;
+    let bestV = vA, bestDist = Infinity;
+    for (const v of [vA, vB, vC]) {
+      const s = project(v);
+      const d = Math.hypot(px - s.x, py - s.y);
+      if (d < bestDist) { bestDist = d; bestV = v; }
+    }
+    return { type: 'vertex', point: bestV };
+  }
+
+  // ── Edge mode ─────────────────────────────────────────────────────────────
+  if (subMode === 'edge') {
+    const project = (v: THREE.Vector3) => {
+      const ndc = v.clone().project(camera);
+      return { x: (ndc.x + 1) * window.innerWidth / 2, y: (-ndc.y + 1) * window.innerHeight / 2 };
+    };
+    const hitNDC = hit.point.clone().project(camera);
+    const px = (hitNDC.x + 1) * window.innerWidth / 2;
+    const py = (-hitNDC.y + 1) * window.innerHeight / 2;
+    const sA = project(vA), sB = project(vB), sC = project(vC);
+    let bestEdgeDist = Infinity;
+    let bestEdge = { start: vA, end: vB, midpoint: new THREE.Vector3().addVectors(vA, vB).multiplyScalar(0.5) };
+    for (const [p1, p2, s1, s2] of [
+      [vA, vB, sA, sB], [vB, vC, sB, sC], [vC, vA, sC, sA],
+    ] as [THREE.Vector3, THREE.Vector3, {x:number;y:number}, {x:number;y:number}][]) {
+      const d = screenDistToSeg(px, py, s1.x, s1.y, s2.x, s2.y);
+      if (d < bestEdgeDist) {
+        bestEdgeDist = d;
+        bestEdge = { start: p1.clone(), end: p2.clone(), midpoint: new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5) };
+      }
+    }
+    return { type: 'edge', ...bestEdge };
+  }
+
+  // ── Face mode ─────────────────────────────────────────────────────────────
+  if (subMode === 'face') {
+    const triIndices = findFaceGroup(faceIndex, normals, adj);
+    const centroid = new THREE.Vector3();
+    for (const ti of triIndices) {
+      for (let vi = 0; vi < 3; vi++) {
+        const idx = ti * 3 + vi;
+        const v = new THREE.Vector3(pos.getX(idx), pos.getY(idx), pos.getZ(idx));
+        mesh.localToWorld(v);
+        centroid.add(v);
+      }
+    }
+    centroid.divideScalar(triIndices.length * 3);
+    const faceNormal = (normals[faceIndex] ?? new THREE.Vector3(0, 1, 0)).clone()
+      .transformDirection(mesh.matrixWorld).normalize();
+    return { type: 'face', triangleIndices: triIndices, normal: faceNormal, centroid };
+  }
+
+  // ── Auto mode ─────────────────────────────────────────────────────────────
+  const project = (v: THREE.Vector3) => {
+    const ndc = v.clone().project(camera);
+    return { x: (ndc.x + 1) * window.innerWidth / 2, y: (-ndc.y + 1) * window.innerHeight / 2 };
+  };
+  const sA = project(vA), sB = project(vB), sC = project(vC);
+  const hitNDC = hit.point.clone().project(camera);
+  const px = (hitNDC.x + 1) * window.innerWidth / 2;
+  const py = (-hitNDC.y + 1) * window.innerHeight / 2;
+
+  // Vertex snap — 14px
+  for (const { v, s } of [{ v: vA, s: sA }, { v: vB, s: sB }, { v: vC, s: sC }]) {
+    if (Math.hypot(px - s.x, py - s.y) < 14) return { type: 'vertex', point: v };
+  }
+
+  // Edge snap — 10px
+  let bestEdgeDist = Infinity;
+  let bestEdge: { start: THREE.Vector3; end: THREE.Vector3; midpoint: THREE.Vector3 } | null = null;
+  for (const [p1, p2, s1, s2] of [
+    [vA, vB, sA, sB], [vB, vC, sB, sC], [vC, vA, sC, sA],
+  ] as [THREE.Vector3, THREE.Vector3, {x:number;y:number}, {x:number;y:number}][]) {
+    const d = screenDistToSeg(px, py, s1.x, s1.y, s2.x, s2.y);
+    if (d < 10 && d < bestEdgeDist) {
+      bestEdgeDist = d;
+      bestEdge = { start: p1.clone(), end: p2.clone(), midpoint: new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5) };
+    }
+  }
+  if (bestEdge) return { type: 'edge', ...bestEdge };
+
+  // Auto-detect arc: try tight face group first, if small → try cylinder
+  const tightGroup = findFaceGroup(faceIndex, normals, adj);
+  if (tightGroup.length <= 8) {
+    const arc = detectCylinder(faceIndex, pos, normals, adj, mesh);
+    if (arc) return arc;
+  }
+
+  // Face
+  const centroid = new THREE.Vector3();
+  for (const ti of tightGroup) {
+    for (let vi = 0; vi < 3; vi++) {
+      const idx = ti * 3 + vi;
+      const v = new THREE.Vector3(pos.getX(idx), pos.getY(idx), pos.getZ(idx));
+      mesh.localToWorld(v);
+      centroid.add(v);
+    }
+  }
+  centroid.divideScalar(tightGroup.length * 3);
+  const faceNormal = (normals[faceIndex] ?? new THREE.Vector3(0, 1, 0)).clone()
+    .transformDirection(mesh.matrixWorld).normalize();
+  return { type: 'face', triangleIndices: tightGroup, normal: faceNormal, centroid };
+}
+
 interface ExplodedPart {
   geometry: THREE.BufferGeometry;
   centroid: THREE.Vector3;
@@ -500,6 +1040,7 @@ function STLModel({
   explodeDistance,
   onLoad,
   onMeasurements,
+  onGeometryLoad,
   manufacturingFeatures,
   selectedFeature,
   onFeatureSelect,
@@ -508,6 +1049,16 @@ function STLModel({
   showOnlySelected,
   hoveredBOMItem,
   onPartsDetected,
+  measureMode,
+  measureSubMode,
+  measureSelA,
+  measureResults,
+  selectedResultId,
+  onMeasureClick,
+  onMeasureHover,
+  projectedFaceIndices,
+  projectedHighlightColor,
+  showProjectedHighlight,
 }: {
   url: string;
   color: string;
@@ -517,7 +1068,8 @@ function STLModel({
   isExploded?: boolean;
   explodeDistance?: number;
   onLoad?: () => void;
-  onMeasurements?: (data: { volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number }) => void;
+  onMeasurements?: (data: { volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number; projectedArea?: number }) => void;
+  onGeometryLoad?: (geometry: THREE.BufferGeometry) => void;
   manufacturingFeatures?: ManufacturingFeature[];
   selectedFeature?: ManufacturingFeature | null;
   onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
@@ -526,6 +1078,16 @@ function STLModel({
   showOnlySelected?: boolean;
   hoveredBOMItem?: any;
   onPartsDetected?: (parts: any[]) => void;
+  measureMode?: MeasureMode;
+  measureSubMode?: MeasureSubMode;
+  measureSelA?: MeasureSelection | null;
+  measureResults?: MeasureResult[];
+  selectedResultId?: string | null;
+  onMeasureClick?: (sel: MeasureSelection) => void;
+  onMeasureHover?: (sel: MeasureSelection | null) => void;
+  projectedFaceIndices?: number[] | null;
+  projectedHighlightColor?: string;
+  showProjectedHighlight?: boolean;
 }) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [explodedParts, setExplodedParts] = useState<ExplodedPart[]>([]);
@@ -538,6 +1100,11 @@ function STLModel({
 
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
+
+  // ─── Measurement classification refs ─────────────────────────────────────
+  const normalsRef = useRef<THREE.Vector3[]>([]);
+  const adjRef = useRef<number[][]>([]);
+  const [localHoverSel, setLocalHoverSel] = useState<MeasureSelection | null>(null);
 
   // ─── Part Separation Helpers ──────────────────────────────────────────────
 
@@ -1183,6 +1750,7 @@ function STLModel({
     try {
       try {
         setGeometry(loadedGeometry);
+        onGeometryLoad?.(loadedGeometry); // Pass geometry to parent component
       } catch (memErr) {
         if (memErr instanceof RangeError && (memErr as Error).message.includes('Array buffer allocation failed')) {
           setLoadingError('File too large for browser memory. Please use a smaller model.');
@@ -1367,6 +1935,16 @@ function STLModel({
     return () => clearTimeout(loadingTimeout);
   }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ─── Pre-compute normals + adjacency for measurement classification ─────────
+  useEffect(() => {
+    if (!geometry) { normalsRef.current = []; adjRef.current = []; return; }
+    const pos = getBufferAttribute(geometry, 'position');
+    if (!pos) return;
+    const triCount = Math.floor(pos.count / 3);
+    normalsRef.current = computeTriangleNormals(pos, triCount);
+    adjRef.current = buildTriangleAdjacency(pos, triCount);
+  }, [geometry]);
+
   // ─── Measurements ────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -1526,6 +2104,30 @@ function STLModel({
           castShadow
           receiveShadow
           visible={!isExploded || explodedParts.length === 0}
+          onClick={(e) => {
+            const isMeasuring = measureMode === 'PICKING_A' || measureMode === 'PICKING_B';
+            if (isMeasuring && e.intersections.length > 0) {
+              e.stopPropagation();
+              const sel = classifyHit(e.intersections[0]!, e.camera, normalsRef.current, adjRef.current, measureSubMode ?? 'auto');
+              onMeasureClick?.(sel);
+            }
+          }}
+          onPointerMove={(e) => {
+            const isMeasuring = measureMode === 'PICKING_A' || measureMode === 'PICKING_B';
+            if (isMeasuring && e.intersections.length > 0) {
+              e.stopPropagation();
+              const sel = classifyHit(e.intersections[0]!, e.camera, normalsRef.current, adjRef.current, measureSubMode ?? 'auto');
+              setLocalHoverSel(sel);
+              onMeasureHover?.(sel);
+            }
+          }}
+          onPointerLeave={() => {
+            const isMeasuring = measureMode === 'PICKING_A' || measureMode === 'PICKING_B';
+            if (isMeasuring) {
+              setLocalHoverSel(null);
+              onMeasureHover?.(null);
+            }
+          }}
         >
           <meshStandardMaterial
             color={showFeatures ? '#8899aa' : color}
@@ -1606,6 +2208,62 @@ function STLModel({
       {showFeatures && activeTypes.length > 0 && !isExploded && (
         <DFMLegend activeTypes={activeTypes} />
       )}
+
+      {/* ─── Measurement highlights ─── */}
+      {geometry && measureMode !== 'IDLE' && (() => {
+        geometry.computeBoundingBox();
+        const bbox = geometry.boundingBox;
+        const s = bbox ? new THREE.Vector3() : null;
+        if (s && bbox) bbox.getSize(s);
+        const d = s ? Math.sqrt(s.x**2 + s.y**2 + s.z**2) : 2;
+        const markerSize = Math.min(Math.max(d * 0.008, 0.05), 5);
+
+        const renderSel = (sel: MeasureSelection | null, color: string, keyPrefix: string) => {
+          if (!sel) return null;
+          if (sel.type === 'face') {
+            return <FaceHighlight key={keyPrefix} triangleIndices={sel.triangleIndices} geometry={geometry} color={color} opacity={0.55} />;
+          }
+          if (sel.type === 'arc') {
+            return <FaceHighlight key={keyPrefix} triangleIndices={sel.triangleIndices} geometry={geometry} color={color} opacity={0.4} />;
+          }
+          if (sel.type === 'edge') {
+            return <EdgeHighlight key={keyPrefix} start={sel.start} end={sel.end} color={color} />;
+          }
+          return <VertexHighlight key={keyPrefix} point={sel.point} color={color} size={markerSize} />;
+        };
+
+        return (
+          <>
+            {/* Persistent colored highlights — only selected result if one is chosen */}
+            {(measureResults ?? [])
+              .filter(r => !selectedResultId || r.id === selectedResultId)
+              .map((r) => {
+              const idx = (measureResults ?? []).indexOf(r);
+              const { a: colA, b: colB } = getResultColors(idx);
+              return (
+                <group key={r.id}>
+                  {renderSel(r.selA, colA, `${r.id}-a`)}
+                  {renderSel(r.selB, colB, `${r.id}-b`)}
+                </group>
+              );
+            })}
+
+            {/* Live in-progress: hover (white) + locked A (bright blue) */}
+            {renderSel(localHoverSel, '#ffffff', 'hover')}
+            {renderSel(measureSelA ?? null, '#60a5fa', 'selA')}
+          </>
+        );
+      })()}
+
+      {/* Projected area face highlight */}
+      {showProjectedHighlight && projectedFaceIndices && projectedFaceIndices.length > 0 && geometry && (
+        <FaceHighlight
+          triangleIndices={projectedFaceIndices}
+          geometry={geometry}
+          color={projectedHighlightColor ?? '#06b6d4'}
+          opacity={0.42}
+        />
+      )}
     </group>
   );
 }
@@ -1633,18 +2291,32 @@ function Scene({
   isAnimating, sectionPlane, isTransparent, isWireframe, isExploded, explodeDistance,
   onMeasurements, onOrientationChange, manufacturingFeatures, selectedFeature,
   onFeatureSelect, showFeatures, selectedBOMItems, showOnlySelected, hoveredBOMItem, onPartsDetected,
+  onGeometryLoad,
+  measureMode, measureSubMode, measureSelA, measureResults, selectedResultId, onMeshMeasureClick, onMeshMeasureHover,
+  projectedFaceIndices, projectedHighlightColor, showProjectedHighlight,
 }: {
   fileUrl: string; modelColor: string; showGrid: boolean;
   viewPosition: [number, number, number]; autoFit: boolean;
   onFit: (distance: number) => void; onModelLoad: () => void;
   isAnimating: boolean; sectionPlane: number; isTransparent: boolean; isWireframe: boolean;
   isExploded?: boolean; explodeDistance?: number;
-  onMeasurements?: (data: { volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number }) => void;
+  onMeasurements?: (data: { volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number; projectedArea?: number }) => void;
   onOrientationChange: (matrix: THREE.Matrix4) => void;
   manufacturingFeatures?: ManufacturingFeature[]; selectedFeature?: ManufacturingFeature | null;
   onFeatureSelect?: (feature: ManufacturingFeature | null) => void; showFeatures?: boolean;
   selectedBOMItems?: any[]; showOnlySelected?: boolean; hoveredBOMItem?: any;
   onPartsDetected?: (parts: any[]) => void;
+  onGeometryLoad?: (geometry: THREE.BufferGeometry) => void;
+  measureMode: MeasureMode;
+  measureSubMode: MeasureSubMode;
+  measureSelA?: MeasureSelection | null;
+  measureResults: MeasureResult[];
+  selectedResultId: string | null;
+  onMeshMeasureClick: (sel: MeasureSelection) => void;
+  onMeshMeasureHover: (sel: MeasureSelection | null) => void;
+  projectedFaceIndices: number[];
+  projectedHighlightColor: string;
+  showProjectedHighlight: boolean;
 }) {
   return (
     <>
@@ -1680,17 +2352,28 @@ function Scene({
             url={fileUrl} color={modelColor} sectionPlane={sectionPlane}
             isTransparent={isTransparent} isWireframe={isWireframe}
             isExploded={isExploded} explodeDistance={explodeDistance}
-            onLoad={onModelLoad} onMeasurements={onMeasurements}
+            onLoad={onModelLoad} onMeasurements={onMeasurements} onGeometryLoad={onGeometryLoad}
             manufacturingFeatures={manufacturingFeatures} selectedFeature={selectedFeature}
             onFeatureSelect={onFeatureSelect} showFeatures={showFeatures}
             selectedBOMItems={selectedBOMItems} showOnlySelected={showOnlySelected}
             hoveredBOMItem={hoveredBOMItem} onPartsDetected={onPartsDetected}
+            measureMode={measureMode}
+            measureSubMode={measureSubMode}
+            measureSelA={measureSelA}
+            measureResults={measureResults}
+            selectedResultId={selectedResultId}
+            onMeasureClick={onMeshMeasureClick}
+            onMeasureHover={onMeshMeasureHover}
+            projectedFaceIndices={projectedFaceIndices}
+            projectedHighlightColor={projectedHighlightColor}
+            showProjectedHighlight={showProjectedHighlight}
           />
         </Center>
       </Suspense>
 
+
       <OrbitControls
-        makeDefault enableDamping dampingFactor={0.05}
+        makeDefault enableDamping={false}
         minDistance={0.1} maxDistance={1000} enabled={!isAnimating}
         enablePan enableRotate enableZoom screenSpacePanning={false}
         panSpeed={2} rotateSpeed={0.8} zoomSpeed={1.2}
@@ -1709,10 +2392,9 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   selectedBOMItems, showOnlySelected = false, hoveredBOMItem, onPartsDetected, dfmAnalysisData,
 }: EDrawingsViewerProps) {
   const [loading, setLoading] = useState(true);
-  const [modelColor] = useState('#3b82f6');
+  const [modelColor] = useState('#aaaaaa');
   const [showGrid, setShowGrid] = useState(true);
   const [currentView, setCurrentView] = useState<string>('home');
-  const [cameraDistance, setCameraDistance] = useState(5);
   const [autoFit, setAutoFit] = useState(true);
   const [viewPosition, setViewPosition] = useState<[number, number, number]>([5, 5, 5]);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -1726,6 +2408,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
     volume: number;
     dimensions: { x: number; y: number; z: number };
     surfaceArea: number;
+    projectedArea?: number;
   } | null>(null);
   const [internalShowFeatures, setInternalShowFeatures] = useState(showFeatures ?? false);
 
@@ -1745,16 +2428,389 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   const webglCleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => () => { webglCleanupRef.current?.(); }, []);
 
-  const CAD_VIEWS = getCADViews(cameraDistance);
+
+  // Store the current geometry for projected area calculation
+  const [currentGeometry, setCurrentGeometry] = useState<THREE.BufferGeometry | null>(null);
+  const [showProjectedAreaHighlight, setShowProjectedAreaHighlight] = useState(false);
+const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
+  const fittedDistanceRef = useRef(15);
+
+  // ─── Measurement Tool State ────────────────────────────────────────────────
+  const [measureMode, setMeasureMode] = useState<MeasureMode>('IDLE');
+  const [measureSubMode, setMeasureSubMode] = useState<MeasureSubMode>('face');
+  const [measureSelA, setMeasureSelA] = useState<MeasureSelection | null>(null);
+  const [hoverSel, setHoverSel] = useState<MeasureSelection | null>(null);
+  const [measureResults, setMeasureResults] = useState<MeasureResult[]>([]);
+  const [measureUnit, setMeasureUnit] = useState<MeasureUnit>('mm');
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+
+  // Marker size: 1% of bounding box diagonal, clamped to a reasonable range
+  const measureMarkerSize = useMemo(() => {
+    if (!currentGeometry) return 0.5;
+    currentGeometry.computeBoundingBox();
+    const bbox = currentGeometry.boundingBox;
+    if (!bbox) return 0.5;
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    const diag = Math.sqrt(size.x ** 2 + size.y ** 2 + size.z ** 2);
+    return Math.min(Math.max(diag * 0.008, 0.05), 5);
+  }, [currentGeometry]);
+
+  // Cursor crosshair when measurement mode is active
+  useEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+    el.style.cursor = (measureMode === 'PICKING_A' || measureMode === 'PICKING_B') ? 'crosshair' : '';
+  }, [measureMode]);
+
+  const handleMeshMeasureClick = useCallback((sel: MeasureSelection) => {
+    if (measureMode === 'PICKING_A') {
+      setMeasureSelA(sel);
+      setHoverSel(null);
+      setMeasureMode('PICKING_B');
+    } else if (measureMode === 'PICKING_B' && measureSelA) {
+      const partial = computeMeasurementBetween(measureSelA, sel);
+      const result: MeasureResult = { id: crypto.randomUUID(), createdAt: Date.now(), ...partial };
+      setMeasureResults(prev => [...prev, result]);
+      setSelectedResultId(result.id);
+      // Auto-reset: immediately ready for next measurement
+      setMeasureSelA(null);
+      setHoverSel(null);
+      setMeasureMode('PICKING_A');
+    }
+  }, [measureMode, measureSelA]);
+
+  const handleMeshMeasureHover = useCallback((sel: MeasureSelection | null) => {
+    setHoverSel(sel);
+  }, []);
+
+  const startMeasure = useCallback(() => {
+    setMeasureMode('PICKING_A');
+    setMeasureSelA(null);
+    setHoverSel(null);
+    setMeasureResults([]);
+    setSelectedResultId(null);
+  }, []);
+
+  const exitMeasure = useCallback(() => {
+    setMeasureMode('IDLE');
+    setMeasureSelA(null);
+    setHoverSel(null);
+    setSelectedResultId(null);
+  }, []);
+
+  const deleteMeasureResult = useCallback((id: string) => {
+    setMeasureResults(prev => prev.filter(r => r.id !== id));
+    setSelectedResultId(prev => prev === id ? null : prev);
+  }, []);
+
+  const clearAllMeasureResults = useCallback(() => {
+    setMeasureResults([]);
+    setSelectedResultId(null);
+    setMeasureMode('IDLE');
+    setMeasureSelA(null);
+    setHoverSel(null);
+  }, []);
+
+  // Calculate accurate 2D projected silhouette area (like casting a shadow)
+  const calculateProjectedAreaFromMesh = useCallback((geometry: THREE.BufferGeometry | null, view: string): number => {
+    if (!geometry) return 0;
+
+    const position = getBufferAttribute(geometry, 'position');
+    if (!position || position.count === 0) return 0;
+
+    // Define projection direction and coordinate mapping
+    let projectionPlane: 'xy' | 'xz' | 'yz';
+    let projectionDirection: THREE.Vector3;
+    
+    switch (view) {
+      case 'front':
+      case 'back':
+        projectionPlane = 'xy'; // Project onto XY plane (width × height)
+        projectionDirection = new THREE.Vector3(0, 0, view === 'front' ? 1 : -1);
+        break;
+      case 'top':
+      case 'bottom':
+        projectionPlane = 'xz'; // Project onto XZ plane (width × depth)
+        projectionDirection = new THREE.Vector3(0, view === 'top' ? -1 : 1, 0);
+        break;
+      case 'right':
+      case 'left':
+        projectionPlane = 'yz'; // Project onto YZ plane (height × depth)
+        projectionDirection = new THREE.Vector3(view === 'right' ? -1 : 1, 0, 0);
+        break;
+      case 'isometric':
+      case 'home':
+        // For isometric, use a diagonal projection
+        projectionPlane = 'xy';
+        projectionDirection = new THREE.Vector3(1, 1, 1).normalize();
+        break;
+      default:
+        projectionPlane = 'xy';
+        projectionDirection = new THREE.Vector3(0, 0, 1);
+    }
+
+    // Collect all triangle silhouettes projected onto the 2D plane
+    const projected2DTriangles: Array<{points: THREE.Vector2[], isVisible: boolean}> = [];
+    const highlightVertices: number[] = [];
+    const highlightColors: number[] = [];
+
+    // First pass: collect all forward-facing triangles with depth information
+    const candidateTriangles: Array<{
+      vertices: [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+      center: THREE.Vector3;
+      normal: THREE.Vector3;
+      depthFromView: number;
+      projected2D: [THREE.Vector2, THREE.Vector2, THREE.Vector2];
+    }> = [];
+    
+    for (let i = 0; i < position.count; i += 3) {
+      const v1 = new THREE.Vector3(position.getX(i), position.getY(i), position.getZ(i));
+      const v2 = new THREE.Vector3(position.getX(i + 1), position.getY(i + 1), position.getZ(i + 1));
+      const v3 = new THREE.Vector3(position.getX(i + 2), position.getY(i + 2), position.getZ(i + 2));
+      
+      // Calculate triangle normal and center
+      const edge1 = new THREE.Vector3().subVectors(v2, v1);
+      const edge2 = new THREE.Vector3().subVectors(v3, v1);
+      const triangleNormal = new THREE.Vector3().crossVectors(edge1, edge2).normalize();
+      const triangleCenter = new THREE.Vector3().addVectors(v1, v2).add(v3).multiplyScalar(1/3);
+      
+      // Check if triangle faces toward the viewer (external face only)
+      const dotProduct = triangleNormal.dot(projectionDirection);
+      if (dotProduct <= 0.01) continue; // Skip back-facing or edge-on triangles
+      
+      // Calculate depth from view direction (higher = more external/closer to viewer)
+      const depthFromView = triangleCenter.dot(projectionDirection);
+      
+      // Project 3D points to 2D coordinates
+      const p1 = project3DTo2D(v1, projectionPlane);
+      const p2 = project3DTo2D(v2, projectionPlane);
+      const p3 = project3DTo2D(v3, projectionPlane);
+      
+      candidateTriangles.push({
+        vertices: [v1, v2, v3],
+        center: triangleCenter,
+        normal: triangleNormal,
+        depthFromView,
+        projected2D: [p1, p2, p3]
+      });
+    }
+    
+    // Second pass: keep only the most external (frontmost) triangles in each 2D region
+    const gridResolution = 100; // Higher resolution for better external face detection
+    const bounds2D = new THREE.Box2();
+    candidateTriangles.forEach(tri => {
+      tri.projected2D.forEach(p => bounds2D.expandByPoint(p));
+    });
+    
+    if (bounds2D.isEmpty()) {
+      return 0;
+    }
+    
+    const gridWidth = bounds2D.max.x - bounds2D.min.x;
+    const gridHeight = bounds2D.max.y - bounds2D.min.y;
+    const cellWidth = gridWidth / gridResolution;
+    const cellHeight = gridHeight / gridResolution;
+    
+    // Create depth buffer - only keep the most external triangle in each cell
+    const depthBuffer: Map<string, { triangle: typeof candidateTriangles[0], depth: number }> = new Map();
+    
+    candidateTriangles.forEach(triangle => {
+      const [p1, p2, p3] = triangle.projected2D;
+      
+      // Find all grid cells this triangle overlaps
+      const minX = Math.floor((Math.min(p1.x, p2.x, p3.x) - bounds2D.min.x) / cellWidth);
+      const maxX = Math.ceil((Math.max(p1.x, p2.x, p3.x) - bounds2D.min.x) / cellWidth);
+      const minY = Math.floor((Math.min(p1.y, p2.y, p3.y) - bounds2D.min.y) / cellHeight);
+      const maxY = Math.ceil((Math.max(p1.y, p2.y, p3.y) - bounds2D.min.y) / cellHeight);
+      
+      for (let x = Math.max(0, minX); x <= Math.min(gridResolution - 1, maxX); x++) {
+        for (let y = Math.max(0, minY); y <= Math.min(gridResolution - 1, maxY); y++) {
+          const cellKey = `${x},${y}`;
+          const existing = depthBuffer.get(cellKey);
+          
+          if (!existing || triangle.depthFromView > existing.depth + 0.001) {
+            // This triangle is more external (closer to viewer) in this cell
+            depthBuffer.set(cellKey, { triangle, depth: triangle.depthFromView });
+          }
+        }
+      }
+    });
+    
+    // Third pass: collect only the external face triangles
+    const externalTriangles = new Set<typeof candidateTriangles[0]>();
+    depthBuffer.forEach(({ triangle }) => {
+      externalTriangles.add(triangle);
+    });
+    
+    // Add external triangles to the projection and highlight
+    externalTriangles.forEach(triangle => {
+      projected2DTriangles.push({
+        points: triangle.projected2D,
+        isVisible: true
+      });
+      
+      // Add to highlight (only external faces)
+      const [v1, v2, v3] = triangle.vertices;
+      highlightVertices.push(
+        v1.x, v1.y, v1.z,
+        v2.x, v2.y, v2.z,
+        v3.x, v3.y, v3.z
+      );
+      
+      // Color external faces in bright blue to distinguish from internal
+      for (let j = 0; j < 3; j++) {
+        highlightColors.push(0.1, 0.6, 1.0); // Bright blue for external faces only
+      }
+    });
+
+    // Calculate the area of the complete 2D silhouette boundary
+    const visibleTriangles = projected2DTriangles.filter(t => t.isVisible);
+    const silhouetteArea = calculateSilhouetteArea(visibleTriangles);
+    
+    return silhouetteArea;
+  }, []);
+
+  // Helper function to project 3D point to 2D based on view plane
+  const project3DTo2D = (point: THREE.Vector3, plane: 'xy' | 'xz' | 'yz'): THREE.Vector2 => {
+    switch (plane) {
+      case 'xy': return new THREE.Vector2(point.x, point.y);
+      case 'xz': return new THREE.Vector2(point.x, point.z);
+      case 'yz': return new THREE.Vector2(point.y, point.z);
+    }
+  };
+
+  // Calculate area of complete 2D silhouette boundary (full continuous area)
+  const calculateSilhouetteArea = (triangles: Array<{points: THREE.Vector2[]}>): number => {
+    if (triangles.length === 0) return 0;
+    
+    // Create a unified point cloud from all external triangles
+    const allPoints: THREE.Vector2[] = [];
+    triangles.forEach(triangle => {
+      triangle.points.forEach(point => {
+        allPoints.push(new THREE.Vector2(point.x, point.y));
+      });
+    });
+    
+    if (allPoints.length === 0) return 0;
+    
+    // Find the convex hull to get the complete silhouette boundary
+    const hull = computeConvexHull(allPoints);
+    
+    if (hull.length < 3) return 0;
+    
+    // Calculate area of the complete silhouette polygon using shoelace formula
+    let area = 0;
+    for (let i = 0; i < hull.length; i++) {
+      const j = (i + 1) % hull.length;
+      area += hull[i]!.x * hull[j]!.y;
+      area -= hull[j]!.x * hull[i]!.y;
+    }
+    
+    return Math.abs(area) / 2;
+  };
+  
+  // Compute convex hull using Graham scan algorithm for complete boundary
+  const computeConvexHull = (points: THREE.Vector2[]): THREE.Vector2[] => {
+    if (points.length <= 1) return points;
+    
+    // Remove duplicate points
+    const uniquePoints = points.filter((point, index, arr) => 
+      index === arr.findIndex(p => Math.abs(p.x - point.x) < 0.001 && Math.abs(p.y - point.y) < 0.001)
+    );
+    
+    if (uniquePoints.length <= 2) return uniquePoints;
+    
+    // Find the bottom-most point (lowest Y, then leftmost X)
+    let start: THREE.Vector2 = uniquePoints[0]!;
+    for (const point of uniquePoints) {
+      if (point.y < start.y || (Math.abs(point.y - start.y) < 0.001 && point.x < start.x)) {
+        start = point;
+      }
+    }
+
+    // Sort points by polar angle relative to start point
+    const sortedPoints = uniquePoints
+      .filter(p => p !== start)
+      .sort((a, b) => {
+        const angleA = Math.atan2(a.y - start!.y, a.x - start!.x);
+        const angleB = Math.atan2(b.y - start!.y, b.x - start!.x);
+        if (Math.abs(angleA - angleB) < 0.001) {
+          const distA = start!.distanceToSquared(a);
+          const distB = start!.distanceToSquared(b);
+          return distA - distB;
+        }
+        return angleA - angleB;
+      });
+
+    // Graham scan
+    const hull: THREE.Vector2[] = [start];
+
+    for (const point of sortedPoints) {
+      // Remove points that create clockwise turn
+      while (hull.length > 1 && crossProduct(hull[hull.length - 2]!, hull[hull.length - 1]!, point) <= 0) {
+        hull.pop();
+      }
+      hull.push(point);
+    }
+    
+    return hull;
+  };
+  
+  // Calculate cross product for three points (used in convex hull)
+  const crossProduct = (o: THREE.Vector2, a: THREE.Vector2, b: THREE.Vector2): number => {
+    return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  };
+
+  // Legacy fallback for when geometry is not available
+  const calculateProjectedAreaFallback = useCallback((dimensions: { x: number; y: number; z: number }, view: string): number => {
+    switch (view) {
+      case 'front':
+      case 'back':
+        return dimensions.x * dimensions.y;
+      case 'top':
+      case 'bottom':
+        return dimensions.x * dimensions.z;
+      case 'right':
+      case 'left':
+        return dimensions.y * dimensions.z;
+      case 'isometric':
+      case 'home':
+        return Math.sqrt(Math.pow(dimensions.x * dimensions.y, 2) + Math.pow(dimensions.y * dimensions.z, 2) + Math.pow(dimensions.x * dimensions.z, 2)) / Math.sqrt(3);
+      default:
+        return dimensions.x * dimensions.y;
+    }
+  }, []);
 
   const handleMeasurements = useCallback((data: {
     volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number;
   }) => {
-    setMeasurements(data);
-    onMeasurements?.(data);
-  }, [onMeasurements]);
+    // Use mesh-based calculation if geometry is available, otherwise fallback to bounding box
+    const projectedArea = currentGeometry 
+      ? calculateProjectedAreaFromMesh(currentGeometry, currentView)
+      : calculateProjectedAreaFallback(data.dimensions, currentView);
+      
+    const measurementsWithProjection = { ...data, projectedArea };
+    setMeasurements(measurementsWithProjection);
+    onMeasurements?.(measurementsWithProjection);
+  }, [onMeasurements, calculateProjectedAreaFromMesh, calculateProjectedAreaFallback, currentView, currentGeometry]);
 
   const handleModelLoad = useCallback(() => setLoading(false), []);
+  
+  const handleGeometryLoad = useCallback((geometry: THREE.BufferGeometry) => {
+    setCurrentGeometry(geometry);
+
+    // Recalculate projected area with the new geometry
+    if (measurements) {
+      const projectedArea = calculateProjectedAreaFromMesh(geometry, currentView);
+      setMeasurements(prev => prev ? { ...prev, projectedArea } : null);
+    }
+
+    // Compute projected face highlight for initial view
+    setProjectedFaceIndices(computeProjectedFaces(geometry, currentView));
+    setShowProjectedAreaHighlight(true);
+  }, [calculateProjectedAreaFromMesh, currentView, measurements]);
 
   const handleOrientationChange = useCallback((matrix: THREE.Matrix4) => {
     const { x: xAxis, y: yAxis, z: zAxis } = tempVectors.current;
@@ -1769,15 +2825,37 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   }, []);
 
   const handleFit = (distance: number) => {
-    setCameraDistance(distance);
+    fittedDistanceRef.current = distance;
     setViewPosition([distance, distance, distance]);
     setAutoFit(false);
   };
 
   const handleViewChange = (view: string) => {
     setCurrentView(view);
-    const viewConfig = CAD_VIEWS[view as keyof typeof CAD_VIEWS];
-    if (viewConfig) { setViewPosition(viewConfig.position); setAutoFit(false); }
+    
+    // Use the fitted distance so the model stays fully visible
+    const fixedDistance = fittedDistanceRef.current;
+    const viewsWithDistance = getCADViews(fixedDistance);
+    const viewConfig = viewsWithDistance[view as keyof typeof viewsWithDistance];
+    
+    if (viewConfig) {
+      setViewPosition(viewConfig.position);
+      setAutoFit(false); // Disable auto-fit to prevent interference with view switching
+    }
+    
+    // Recalculate projected area for the new view using mesh data if available
+    if (measurements) {
+      const projectedArea = currentGeometry
+        ? calculateProjectedAreaFromMesh(currentGeometry, view)
+        : calculateProjectedAreaFallback(measurements.dimensions, view);
+      setMeasurements(prev => prev ? { ...prev, projectedArea } : null);
+    }
+
+    // Compute and auto-enable projected face highlight for the new view
+    if (currentGeometry) {
+      setProjectedFaceIndices(computeProjectedFaces(currentGeometry, view));
+      setShowProjectedAreaHighlight(true);
+    }
   };
 
   const handleResetView = () => {
@@ -1855,6 +2933,26 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
               className={`text-white hover:bg-[#505050] ${isAnimating ? 'bg-[#505050]' : ''}`}>
               {isAnimating ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowProjectedAreaHighlight(v => !v)}
+              className={`text-white hover:bg-[#505050] ${showProjectedAreaHighlight ? 'bg-[#505050]' : ''}`}
+              title="Toggle Projected Area Highlight"
+            >
+              <Layers className="h-4 w-4" />
+            </Button>
+            <Separator orientation="vertical" className="h-6 bg-[#555555]" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={measureMode === 'IDLE' ? startMeasure : exitMeasure}
+              className={`text-white hover:bg-[#505050] gap-1.5 text-xs font-medium ${measureMode !== 'IDLE' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+              title="Measure tool — click two points on the model"
+            >
+              <Ruler className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Measure</span>
+            </Button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1873,7 +2971,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
       {/* Main Content */}
       <div className="flex-1 flex relative">
         {/* 3D Viewport */}
-        <div className="flex-1 relative bg-gradient-to-b from-[#4a4a4a] to-[#2d2d2d]">
+        <div ref={canvasContainerRef} className="flex-1 relative bg-gradient-to-b from-[#4a4a4a] to-[#2d2d2d]">
           <Canvas
             shadows
             dpr={[1, 2]}
@@ -1905,7 +3003,28 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
               onFeatureSelect={onFeatureSelect} showFeatures={internalShowFeatures}
               selectedBOMItems={selectedBOMItems} showOnlySelected={showOnlySelected}
               hoveredBOMItem={hoveredBOMItem} onPartsDetected={onPartsDetected}
+              onGeometryLoad={handleGeometryLoad}
+              measureMode={measureMode}
+              measureSubMode={measureSubMode}
+              measureSelA={measureSelA}
+              measureResults={measureResults}
+              selectedResultId={selectedResultId}
+              onMeshMeasureClick={handleMeshMeasureClick}
+              onMeshMeasureHover={handleMeshMeasureHover}
+              projectedFaceIndices={projectedFaceIndices}
+              projectedHighlightColor={VIEW_COLORS[currentView] ?? '#06b6d4'}
+              showProjectedHighlight={showProjectedAreaHighlight}
             />
+            {measureMode !== 'IDLE' && (
+              <MeasurementOverlay
+                mode={measureMode}
+                selA={measureSelA}
+                results={measureResults}
+                unit={measureUnit}
+                markerSize={measureMarkerSize}
+                selectedResultId={selectedResultId}
+              />
+            )}
           </Canvas>
 
           {loading && (
@@ -1979,6 +3098,48 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
                       <span className="text-gray-400">Surface</span>
                       <span className="text-white font-mono text-[10px]">{measurements.surfaceArea.toFixed(2)} mm²</span>
                     </div>
+                    <div
+                      className="flex items-center justify-between cursor-pointer rounded px-0.5 py-0.5 transition-colors hover:bg-[#3a3a3a]"
+                      onClick={() => setShowProjectedAreaHighlight(v => !v)}
+                      title="Click to toggle projected area highlight"
+                    >
+                      <span className="text-gray-400 flex items-center gap-1">
+                        <span className="inline-block w-2 h-2 rounded-sm" style={{ background: VIEW_COLORS[currentView] ?? '#06b6d4', opacity: showProjectedAreaHighlight ? 1 : 0.3 }} />
+                        Projected ({currentView})
+                      </span>
+                      <span className="text-white font-mono text-[10px]">{measurements.projectedArea?.toFixed(2)} mm²</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Projected Area Info Card */}
+            {measurements && showProjectedAreaHighlight && projectedFaceIndices.length > 0 && (
+              <Card className="border" style={{ background: '#2a2a2a', borderColor: (VIEW_COLORS[currentView] ?? '#06b6d4') + '55' }}>
+                <div className="p-1 space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[9px] font-semibold text-white flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: VIEW_COLORS[currentView] ?? '#06b6d4' }} />
+                      Projected — <span className="capitalize">{currentView}</span>
+                    </h4>
+                    <button
+                      onClick={() => setShowProjectedAreaHighlight(false)}
+                      className="text-gray-500 hover:text-white transition-colors"
+                      title="Hide highlight"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] text-gray-400">Projected area</span>
+                    <span className="font-mono text-[11px] font-bold" style={{ color: VIEW_COLORS[currentView] ?? '#06b6d4' }}>
+                      {measurements.projectedArea?.toFixed(2)} mm²
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] text-gray-400">Facing faces</span>
+                    <span className="font-mono text-[9px] text-white">{projectedFaceIndices.length.toLocaleString()}</span>
                   </div>
                 </div>
               </Card>
@@ -2159,6 +3320,24 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
                   )}
                 </div>
               </Card>
+            )}
+
+            {measureMode !== 'IDLE' && (
+              <MeasurementPanel
+                mode={measureMode}
+                selA={measureSelA}
+                hoverSel={hoverSel}
+                results={measureResults}
+                unit={measureUnit}
+                measureSubMode={measureSubMode}
+                selectedResultId={selectedResultId}
+                onSelectResult={(id) => setSelectedResultId(prev => prev === id ? null : id)}
+                onUnitChange={setMeasureUnit}
+                onSubModeChange={setMeasureSubMode}
+                onExit={exitMeasure}
+                onDelete={deleteMeasureResult}
+                onClearAll={clearAllMeasureResults}
+              />
             )}
           </div>
         </div>

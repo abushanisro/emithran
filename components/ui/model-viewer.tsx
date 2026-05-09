@@ -142,21 +142,7 @@ export function ModelViewer({
   const isSTLFromFileType = fileType.toLowerCase().includes('stl');
   const shouldShow3DViewer = isSTL || isOBJ || isConvertedToSTL || isSTLFromFilename || isSTLFromFileType;
   
-  console.log('🔍 Model Viewer file analysis:', {
-    fileName,
-    fileType,
-    fileExt,
-    actualFileExt,
-    isSTL,
-    isOBJ,
-    isSTLFromFilename,
-    isSTLFromFileType,
-    isInteractiveSupported,
-    isOriginalSTEP,
-    isConvertedToSTL,
-    shouldShow3DViewer,
-    fileUrl: fileUrl.substring(0, 100) + '...'
-  });
+  // File analysis for 3D viewer decision
 
   const handleConvertToSTL = async () => {
     if (!bomItemId) {
@@ -201,7 +187,6 @@ export function ModelViewer({
 
   // Priority check: Always show 3D viewer for STL/OBJ files regardless of other conditions
   if (shouldShow3DViewer) {
-    console.log('✅ Showing 3D viewer for file:', fileName);
     return (
       <div className="h-[85vh] min-h-[700px] overflow-hidden">
         <Suspense fallback={
@@ -263,7 +248,6 @@ export function ModelViewer({
 
   // STEP File not yet converted - show placeholder  
   if (isOriginalSTEP && !isConvertedToSTL && !shouldShow3DViewer) {
-    console.log('🔄 Showing STEP conversion placeholder for:', fileName);
     return (
       <div className="relative h-full min-h-[400px] border rounded-lg overflow-hidden bg-gradient-to-br from-muted/30 via-muted/10 to-background">
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
@@ -385,7 +369,6 @@ export function ModelViewer({
   }
 
   // Unsupported Format Fallback
-  console.log('❌ Falling back to unsupported format for file:', fileName, 'fileType:', fileType);
   return (
     <div className="relative h-full min-h-[400px] border rounded-lg overflow-hidden bg-muted/20 flex items-center justify-center p-8">
       <div className="text-center max-w-md">

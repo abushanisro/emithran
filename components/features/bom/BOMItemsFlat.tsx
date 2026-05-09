@@ -13,15 +13,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Edit2, Trash2, Plus, ChevronDown, ChevronUp, FileText, Box, GripVertical, ArrowRight, Move } from 'lucide-react';
+import { Edit2, Trash2, Plus, ChevronDown, ChevronUp, FileText, Box, GripVertical } from 'lucide-react';
+// ✅ Fix 6133: Removed unused imports: ArrowRight, Move
 import { toast } from 'sonner';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useQueryClient } from '@tanstack/react-query';
 import { BOMItemType } from '@/lib/types/bom.types';
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 interface BOMItemsFlatProps {
   bomId: string;
-  onEditItem: (item: any) => void;
+  onEditItem: (item: BOMItem) => void;
   onViewItem?: (item: BOMItem, viewType?: '2d' | '3d') => void;
   onAddChildItem?: (parentId: string, childType: BOMItemType) => void;
 }
@@ -31,601 +36,430 @@ interface TreeNode extends BOMItem {
   depth: number;
 }
 
+// ---------------------------------------------------------------------------
+// Helpers (pure, defined outside component to avoid re-creation)
+// ---------------------------------------------------------------------------
+
+const TYPE_ORDER: Record<string, number> = {
+  assembly: 0,
+  sub_assembly: 1,
+  child_part: 2,
+};
+
+function sortNodes(nodes: TreeNode[]): void {
+  nodes.sort((a, b) => {
+    const aTypeOrder = TYPE_ORDER[a.itemType] ?? 3;
+    const bTypeOrder = TYPE_ORDER[b.itemType] ?? 3;
+    if (aTypeOrder !== bTypeOrder) return aTypeOrder - bTypeOrder;
+
+    const aSortOrder = a.sortOrder || 0;
+    const bSortOrder = b.sortOrder || 0;
+
+    if (aSortOrder > 0 && bSortOrder > 0 && aSortOrder !== bSortOrder) return aSortOrder - bSortOrder;
+    if (aSortOrder > 0 && bSortOrder === 0) return -1;
+    if (bSortOrder > 0 && aSortOrder === 0) return 1;
+
+    const aCreated = new Date(a.createdAt).getTime();
+    const bCreated = new Date(b.createdAt).getTime();
+    if (aCreated !== bCreated) return aCreated - bCreated;
+
+    return a.name.localeCompare(b.name);
+  });
+
+  nodes.forEach(node => {
+    if (node.children.length > 0) sortNodes(node.children);
+  });
+}
+
+function getDefaultBomLevel(itemType: string): string {
+  switch (itemType) {
+    case 'assembly':    return 'L0';
+    case 'sub_assembly': return 'L1';
+    case 'child_part':  return 'L2';
+    default:            return 'L0';
+  }
+}
+
+function getItemTypeBadge(type: string): React.ReactElement {
+  const typeConfig: Record<string, { label: string; className: string }> = {
+    assembly:     { label: 'Assembly',     className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
+    sub_assembly: { label: 'Sub-Assembly', className: 'bg-blue-500/10 text-blue-700 border-blue-500/20' },
+    child_part:   { label: 'Child Part',   className: 'bg-amber-500/10 text-amber-700 border-amber-500/20' },
+  };
+
+  const config = typeConfig[type] ?? { label: type, className: 'bg-muted text-muted-foreground border-muted' };
+
+  return (
+    <Badge variant="outline" className={`font-medium text-xs ${config.className}`}>
+      {config.label}
+    </Badge>
+  );
+}
+
+function getBorderColor(type: string, depth: number = 0): string {
+  const intensity = Math.max(500 - depth * 100, 300);
+  switch (type) {
+    case 'assembly':    return depth === 0 ? 'border-l-emerald-500' : `border-l-emerald-${intensity}`;
+    case 'sub_assembly': return depth <= 1 ? 'border-l-blue-500'   : `border-l-blue-${intensity}`;
+    case 'child_part':  return depth <= 2 ? 'border-l-amber-500'   : `border-l-amber-${intensity}`;
+    default:            return 'border-l-gray-500';
+  }
+}
+
+function getChildType(parentType: string): BOMItemType | null {
+  switch (parentType) {
+    case 'assembly':    return BOMItemType.SUB_ASSEMBLY;
+    case 'sub_assembly': return BOMItemType.CHILD_PART;
+    default:            return null;
+  }
+}
+
+// ✅ Fix 2339: proper unknown → typed error extraction
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return 'An unexpected error occurred';
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: BOMItemsFlatProps) {
   const { data, isLoading, refetch } = useBOMItems(bomId);
   const queryClient = useQueryClient();
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<BOMItem | null>(null);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [draggedItem, setDraggedItem] = useState<BOMItem | null>(null);
-  const [dragOverItem, setDragOverItem] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [itemToDelete, setItemToDelete]         = useState<BOMItem | null>(null);
+  const [expandedItems, setExpandedItems]       = useState<Set<string>>(new Set());
+  const [draggedItem, setDraggedItem]           = useState<BOMItem | null>(null);
+  const [dragOverItem, setDragOverItem]         = useState<string | null>(null);
+  const [isDragging, setIsDragging]             = useState(false);
+  const [isUpdating, setIsUpdating]             = useState(false);
 
-  const items = data?.items || [];
+  const items = data?.items ?? [];
 
-  // Build tree structure with circular reference detection
+  // -------------------------------------------------------------------------
+  // Tree builder
+  // -------------------------------------------------------------------------
+
   const buildTree = useCallback((flatItems: BOMItem[]): TreeNode[] => {
     if (flatItems.length === 0) return [];
 
     const itemMap = new Map<string, TreeNode>();
     const roots: TreeNode[] = [];
 
-    // Create all nodes first
-    flatItems.forEach(item => {
-      itemMap.set(item.id, { ...item, children: [], depth: 0 });
-    });
+    flatItems.forEach(item => itemMap.set(item.id, { ...item, children: [], depth: 0 }));
 
-    // Build parent-child relationships
     flatItems.forEach(item => {
       const node = itemMap.get(item.id)!;
-      
-      // Check if item has a parent
-      if (item.parentItemId && item.parentItemId.trim() !== '') {
+
+      if (item.parentItemId?.trim()) {
         const parent = itemMap.get(item.parentItemId);
         if (parent) {
-          // Add this node as child of parent
           parent.children.push(node);
           node.depth = parent.depth + 1;
         } else {
-          // Parent not found in current items, treat as root
           console.warn(`Parent ${item.parentItemId} not found for item ${item.name}, treating as root`);
           roots.push(node);
         }
       } else {
-        // No parent, this is a root item
         roots.push(node);
       }
     });
 
-    // Sort children within each node by item type, then by sort order, then by name
-    const sortChildren = (nodes: TreeNode[]) => {
-      nodes.forEach(node => {
-        if (node.children.length > 0) {
-          node.children.sort((a, b) => {
-            const typeOrder = { 'assembly': 0, 'sub_assembly': 1, 'child_part': 2 };
-            const aOrder = typeOrder[a.itemType] || 3;
-            const bOrder = typeOrder[b.itemType] || 3;
-            if (aOrder !== bOrder) return aOrder - bOrder;
-            
-            // If same type, sort by sortOrder first, but treat 0 as "newly created"
-            const aSortOrder = a.sortOrder || 0;
-            const bSortOrder = b.sortOrder || 0;
-            
-            // If both have meaningful sort orders (> 0), use them
-            if (aSortOrder > 0 && bSortOrder > 0 && aSortOrder !== bSortOrder) {
-              return aSortOrder - bSortOrder;
-            }
-            
-            // If one has a meaningful sort order and other is 0/default, prioritize the meaningful one
-            if (aSortOrder > 0 && bSortOrder === 0) return -1; // a comes first
-            if (bSortOrder > 0 && aSortOrder === 0) return 1;  // b comes first
-            
-            // If both have same sortOrder (including 0), sort by creation time (older first, newer last)
-            const aCreated = new Date(a.createdAt).getTime();
-            const bCreated = new Date(b.createdAt).getTime();
-            if (aCreated !== bCreated) return aCreated - bCreated;
-            
-            return a.name.localeCompare(b.name);
-          });
-          sortChildren(node.children);
-        }
-      });
-    };
+    sortNodes(roots);
 
-    // Sort roots by item type, then by sort order, then by name
-    roots.sort((a, b) => {
-      const typeOrder = { 'assembly': 0, 'sub_assembly': 1, 'child_part': 2 };
-      const aOrder = typeOrder[a.itemType] || 3;
-      const bOrder = typeOrder[b.itemType] || 3;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      
-      // If same type, sort by sortOrder first, but treat 0 as "newly created"
-      const aSortOrder = a.sortOrder || 0;
-      const bSortOrder = b.sortOrder || 0;
-      
-      // If both have meaningful sort orders (> 0), use them
-      if (aSortOrder > 0 && bSortOrder > 0 && aSortOrder !== bSortOrder) {
-        return aSortOrder - bSortOrder;
-      }
-      
-      // If one has a meaningful sort order and other is 0/default, prioritize the meaningful one
-      if (aSortOrder > 0 && bSortOrder === 0) return -1; // a comes first
-      if (bSortOrder > 0 && aSortOrder === 0) return 1;  // b comes first
-      
-      // If both have same sortOrder (including 0), sort by creation time (older first, newer last)
-      const aCreated = new Date(a.createdAt).getTime();
-      const bCreated = new Date(b.createdAt).getTime();
-      if (aCreated !== bCreated) return aCreated - bCreated;
-      
-      return a.name.localeCompare(b.name);
-    });
-
-    sortChildren(roots);
-
-    // Only log in development and avoid excessive logging
     if (process.env.NODE_ENV === 'development' && flatItems.length > 0) {
-      console.log('Tree structure built:', {
-        totalItems: flatItems.length,
-        rootItems: roots.length,
-        itemSummary: flatItems.map(item => ({
-          name: item.name,
-          type: item.itemType,
-          parentId: item.parentItemId || 'root',
-          bomLevel: item.bomLevel
-        })),
-        builtTree: roots.map(root => ({
-          id: root.id,
-          name: root.name,
-          type: root.itemType,
-          depth: root.depth,
-          childrenCount: root.children.length,
-          children: root.children.map(child => ({
-            name: child.name,
-            type: child.itemType,
-            parentId: child.parentItemId,
-            depth: child.depth
-          }))
-        }))
-      });
+      console.log('Tree structure built:', { totalItems: flatItems.length, rootItems: roots.length });
     }
 
     return roots;
   }, []);
 
-  const treeData = useMemo(() => {
-    console.log('Rebuilding tree with items:', {
-      count: items.length,
-      timestamp: Date.now(),
-      items: items.map(item => ({
-        name: item.name,
-        type: item.itemType,
-        parentId: item.parentItemId,
-        bomLevel: item.bomLevel,
-        id: item.id,
-        updatedAt: item.updatedAt,
-        createdAt: item.createdAt,
-        sortOrder: item.sortOrder
-      }))
-    });
-    const tree = buildTree(items);
-    console.log('Tree built result:', tree.length, 'root items', tree);
-    return tree;
-  }, [items.length, items.map(item => `${item.id}-${item.parentItemId}-${item.itemType}-${item.bomLevel}-${item.updatedAt}-${item.createdAt}-${item.sortOrder}`).join(','), buildTree]);
+  const treeData = useMemo(
+    () => buildTree(items),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      items.length,
+      items.map(i => `${i.id}-${i.parentItemId}-${i.itemType}-${i.bomLevel}-${i.updatedAt}-${i.createdAt}-${i.sortOrder}`).join(','),
+      buildTree,
+    ],
+  );
 
-  // Only expand root level assemblies by default
+  // Auto-expand root assemblies on first load
   useEffect(() => {
     if (items.length === 0) return;
-    
+
     const rootAssemblies = new Set(
       items
-        .filter(item => item.itemType === 'assembly' && (!item.parentItemId || item.parentItemId.trim() === ''))
-        .map(item => item.id)
+        .filter(item => item.itemType === 'assembly' && !item.parentItemId?.trim())
+        .map(item => item.id),
     );
-    
-    // Only update if there are changes
+
     setExpandedItems(prev => {
-      if (prev.size === rootAssemblies.size && [...prev].every(id => rootAssemblies.has(id))) {
-        return prev; // No changes needed
-      }
+      if (prev.size === rootAssemblies.size && [...prev].every(id => rootAssemblies.has(id))) return prev;
       return rootAssemblies;
     });
-  }, [items.length]);
+  }, [items.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // -------------------------------------------------------------------------
+  // UI actions
+  // -------------------------------------------------------------------------
 
   const toggleExpand = (itemId: string) => {
     setExpandedItems(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
+      next.has(itemId) ? next.delete(itemId) : next.add(itemId);
       return next;
     });
   };
 
-  // Drag and drop handlers
+  const handleDeleteClick   = (item: BOMItem) => { setItemToDelete(item); setDeleteDialogOpen(true); };
+  const handleAddChild      = (item: BOMItem) => {
+    const childType = getChildType(item.itemType);
+    if (childType && onAddChildItem) onAddChildItem(item.id, childType);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete) return;
+    try {
+      await deleteBOMItem(itemToDelete.id);
+      toast.success(`"${itemToDelete.name}" has been deleted successfully from the BOM.`);
+      refetch();
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error);
+      let friendly = 'Failed to delete item. Please try again.';
+      if (msg.includes('permission'))  friendly = 'You do not have permission to delete this item.';
+      else if (msg.includes('network')) friendly = 'Network error. Please check your connection and try again.';
+      else if (msg.includes('dependency')) friendly = 'Cannot delete: remove child items first.';
+      else if (msg.includes('not found'))  friendly = 'Item not found. It may have already been deleted.';
+      else friendly = `Failed to delete item: ${msg}`;
+      toast.error(friendly, { duration: 6000 });
+    } finally {
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // Drag & Drop
+  // -------------------------------------------------------------------------
+
+  const resetDrag = () => { setDraggedItem(null); setDragOverItem(null); setIsDragging(false); };
+
   const handleDragStart = (e: React.DragEvent, item: BOMItem) => {
-    e.stopPropagation(); // Prevent event bubbling
+    e.stopPropagation();
     setDraggedItem(item);
     setIsDragging(true);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', item.id);
-    
-    // Create a custom drag image that shows only this item
-    const dragElement = e.currentTarget as HTMLElement;
-    const clone = dragElement.cloneNode(true) as HTMLElement;
-    clone.style.opacity = '0.8';
-    clone.style.transform = 'rotate(2deg)';
-    clone.style.width = dragElement.offsetWidth + 'px';
-    
-    // Temporarily add to body for drag image
+
+    const el    = e.currentTarget as HTMLElement;
+    const clone = el.cloneNode(true) as HTMLElement;
+    clone.style.cssText = `opacity:0.8;transform:rotate(2deg);width:${el.offsetWidth}px`;
     document.body.appendChild(clone);
-    e.dataTransfer.setDragImage(clone, dragElement.offsetWidth / 2, 20);
-    
-    // Clean up after drag starts
-    setTimeout(() => {
-      if (document.body.contains(clone)) {
-        document.body.removeChild(clone);
-      }
-    }, 0);
+    e.dataTransfer.setDragImage(clone, el.offsetWidth / 2, 20);
+    setTimeout(() => document.body.contains(clone) && document.body.removeChild(clone), 0);
   };
 
-  const handleDragEnd = () => {
-    setDraggedItem(null);
-    setDragOverItem(null);
-    setIsDragging(false);
-  };
+  const handleDragEnd   = () => resetDrag();
 
-  const handleDragOver = (e: React.DragEvent, targetItem: BOMItem) => {
+  const handleDragOver  = (e: React.DragEvent, targetItem: BOMItem) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    
-    if (draggedItem && draggedItem.id !== targetItem.id) {
-      setDragOverItem(targetItem.id);
-    }
+    if (draggedItem && draggedItem.id !== targetItem.id) setDragOverItem(targetItem.id);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    // Only clear drag over if we're actually leaving the element
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setDragOverItem(null);
-    }
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverItem(null);
   };
 
   const handleDrop = async (e: React.DragEvent, targetItem: BOMItem) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (!draggedItem || draggedItem.id === targetItem.id || isUpdating) {
-      handleDragEnd();
-      return;
-    }
-    
-    // Prevent multiple simultaneous operations
-    if (draggedItem.id !== e.dataTransfer.getData('text/plain')) {
-      handleDragEnd();
-      return;
-    }
 
-    // Check if trying to drop an item inside its own hierarchy (prevent circular reference)
-    const isCircularMove = (draggedId: string, targetId: string): boolean => {
-      // Only check if we're dropping INSIDE the target (making target a parent)
-      // Don't prevent moving to siblings or completely different hierarchies
-      
-      if (targetItem.itemType === 'child_part') {
-        // Dropping on child part makes it a sibling, not circular
-        return false;
-      }
-      
-      // Check if target would become a descendant of dragged item
-      const wouldCreateCircle = (currentId: string, searchId: string, visited = new Set<string>()): boolean => {
-        if (visited.has(currentId) || currentId === searchId) {
-          return currentId === searchId;
-        }
-        visited.add(currentId);
-        
-        // Find all direct children of current item
-        const children = items.filter(item => item.parentItemId === currentId);
-        
-        // Check if searchId is among children or descendants
-        return children.some(child => 
-          child.id === searchId || wouldCreateCircle(child.id, searchId, new Set(visited))
-        );
-      };
+    if (!draggedItem || draggedItem.id === targetItem.id || isUpdating) { resetDrag(); return; }
+    if (draggedItem.id !== e.dataTransfer.getData('text/plain'))        { resetDrag(); return; }
 
-      return wouldCreateCircle(draggedId, targetId);
+    // Circular reference guard
+    const wouldCreateCircle = (currentId: string, searchId: string, visited = new Set<string>()): boolean => {
+      if (visited.has(currentId) || currentId === searchId) return currentId === searchId;
+      visited.add(currentId);
+      return items
+        .filter(i => i.parentItemId === currentId)
+        .some(child => child.id === searchId || wouldCreateCircle(child.id, searchId, new Set(visited)));
     };
 
-    if (isCircularMove(draggedItem.id, targetItem.id)) {
-      toast.error('Invalid move', {
-        description: 'Cannot move an item into its own sub-components',
-        duration: 4000
-      });
-      handleDragEnd();
+    if (targetItem.itemType !== 'child_part' && wouldCreateCircle(draggedItem.id, targetItem.id)) {
+      toast.error('Invalid move', { description: 'Cannot move an item into its own sub-components', duration: 4000 });
+      resetDrag();
       return;
     }
 
-    // Check if this is a reordering within the same parent (sort order change)
-    const isSameParentReorder = draggedItem.parentItemId === targetItem.parentItemId && 
-                                draggedItem.itemType === targetItem.itemType;
-    
-    if (isSameParentReorder) {
-      // Same parent reordering - update sort orders
-      console.log('Same parent reordering:', {
-        draggedItem: { name: draggedItem.name, sortOrder: draggedItem.sortOrder },
-        targetItem: { name: targetItem.name, sortOrder: targetItem.sortOrder }
-      });
-      
-      // Get all siblings (items with same parent)
-      const siblings = items.filter(item => 
-        item.parentItemId === draggedItem.parentItemId && 
-        item.itemType === draggedItem.itemType
-      ).sort((a, b) => a.sortOrder - b.sortOrder);
-      
-      // Remove dragged item from siblings list
-      const siblingsWithoutDragged = siblings.filter(item => item.id !== draggedItem.id);
-      
-      // Find target position
-      const targetIndex = siblingsWithoutDragged.findIndex(item => item.id === targetItem.id);
-      
-      // Insert dragged item at target position
-      siblingsWithoutDragged.splice(targetIndex, 0, draggedItem);
-      
-      // Update sort orders for all affected items
-      const updatePayloads = siblingsWithoutDragged.map((item, index) => ({
-        id: item.id,
-        sortOrder: index
-      }));
-      
-      try {
-        // Use the batch reorder API if available
+    const isSameParentReorder =
+      draggedItem.parentItemId === targetItem.parentItemId &&
+      draggedItem.itemType     === targetItem.itemType;
+
+    try {
+      setIsUpdating(true);
+
+      if (isSameParentReorder) {
+        // ── Same-parent reorder ──────────────────────────────────────────────
+        const siblings = items
+          .filter(i => i.parentItemId === draggedItem.parentItemId && i.itemType === draggedItem.itemType)
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+
+        const withoutDragged = siblings.filter(i => i.id !== draggedItem.id);
+        const targetIndex    = withoutDragged.findIndex(i => i.id === targetItem.id);
+        withoutDragged.splice(targetIndex, 0, draggedItem);
+
+        const updatePayloads = withoutDragged.map((item, index) => ({ id: item.id, sortOrder: index }));
+
         if (typeof updateBOMItemsSortOrder === 'function') {
           await updateBOMItemsSortOrder(updatePayloads);
         } else {
-          // Fallback: update each item individually
           for (const payload of updatePayloads) {
             if (payload.sortOrder !== items.find(i => i.id === payload.id)?.sortOrder) {
               await updateBOMItem(payload.id, { sortOrder: payload.sortOrder });
             }
           }
         }
-        
-        toast.success(`Reordered "${draggedItem.name}" within ${draggedItem.itemType.replace('_', ' ')}`, {
-          duration: 3000
-        });
-      } catch (error) {
-        console.error('Error reordering items:', error);
-        toast.error('Failed to reorder items', {
-          description: 'Please try again or check your permissions',
-          duration: 5000
-        });
-        handleDragEnd();
-        return;
-      }
-    } else {
-      // Different parent - position swapping logic
-      
-      // Store original positions
-      const draggedOriginalParent = draggedItem.parentItemId || null;
-      const draggedOriginalLevel = draggedItem.bomLevel;
-      const draggedOriginalType = draggedItem.itemType;
-      
-      const targetOriginalParent = targetItem.parentItemId || null;
-      const targetOriginalLevel = targetItem.bomLevel;
-      const targetOriginalType = targetItem.itemType;
-      
-      // Validate if this is a valid move
-      const isValidMove = (dragged: BOMItem, target: BOMItem): boolean => {
-        // Same item type and same parent = reordering (handled above)
-        if (dragged.itemType === target.itemType && dragged.parentItemId === target.parentItemId) {
-          return false; // This should have been handled by same-parent reordering
-        }
-        
-        // Assembly to Assembly at root level = valid reordering
-        if (dragged.itemType === 'assembly' && target.itemType === 'assembly' &&
-            (!dragged.parentItemId || dragged.parentItemId.trim() === '') &&
-            (!target.parentItemId || target.parentItemId.trim() === '')) {
-          return true;
-        }
-        
-        // Child part to Sub-assembly/Assembly = making it a sibling/child (valid)
-        if (dragged.itemType === 'child_part' && 
-            (target.itemType === 'sub_assembly' || target.itemType === 'assembly')) {
-          return true;
-        }
-        
-        // Sub-assembly to Assembly = making it a child (valid)
-        if (dragged.itemType === 'sub_assembly' && target.itemType === 'assembly') {
-          return true;
-        }
-        
-        // Assembly to Sub-assembly/Child = invalid (assembly can't be child of smaller components)
-        if (dragged.itemType === 'assembly' && 
-            (target.itemType === 'sub_assembly' || target.itemType === 'child_part')) {
-          return false;
-        }
-        
-        // Sub-assembly to Child part = invalid (sub-assembly can't be child of part)
-        if (dragged.itemType === 'sub_assembly' && target.itemType === 'child_part') {
-          return false;
-        }
-        
-        return false; // Default to invalid
-      };
-      
-      if (!isValidMove(draggedItem, targetItem)) {
-        toast.error('Invalid move', {
-          description: `Cannot move ${draggedItem.itemType.replace('_', ' ')} to ${targetItem.itemType.replace('_', ' ')}`,
-          duration: 4000
-        });
-        handleDragEnd();
-        return;
-      }
-      
-      // Check if both items are root-level assemblies
-      const bothAreRootAssemblies = (
-        (draggedItem.itemType === 'assembly' && (!draggedItem.parentItemId || draggedItem.parentItemId.trim() === '')) &&
-        (targetItem.itemType === 'assembly' && (!targetItem.parentItemId || targetItem.parentItemId.trim() === ''))
-      );
-      
-      if (bothAreRootAssemblies) {
-        // Root assembly reordering - just swap sort orders, keep them as root items
-        const draggedSortOrder = draggedItem.sortOrder;
-        const targetSortOrder = targetItem.sortOrder;
-        
-        try {
-          await updateBOMItem(draggedItem.id, { sortOrder: targetSortOrder });
-          await updateBOMItem(targetItem.id, { sortOrder: draggedSortOrder });
-          
-          toast.success(`Reordered assemblies`, {
-            description: `${draggedItem.name} ↔ ${targetItem.name} order swapped`,
-            duration: 3000
-          });
-        } catch (error) {
-          console.error('Error reordering assemblies:', error);
-          toast.error('Failed to reorder assemblies', {
-            description: 'Please try again or check your permissions',
-            duration: 5000
-          });
-          handleDragEnd();
-          return;
-        }
+
+        toast.success(`Reordered "${draggedItem.name}"`, { duration: 3000 });
+
       } else {
-        // Different parent hierarchy move - proper parent-child assignment
-        
-        // Calculate new positions for dragged item based on target
-        let draggedNewBomLevel: string;
-        let draggedNewParentId: string | null;
-        let draggedNewItemType = draggedItem.itemType; // Keep original type
-        
-        // Determine where the dragged item should go based on target
-        if (targetItem.itemType === 'assembly') {
-          // Moving to assembly - become a child of the assembly
-          draggedNewParentId = targetItem.id;
-          draggedNewBomLevel = draggedItem.itemType === 'sub_assembly' ? 'L1' : 'L2';
-        } else if (targetItem.itemType === 'sub_assembly') {
-          // Moving to sub-assembly - become a child of the sub-assembly  
-          draggedNewParentId = targetItem.id;
-          draggedNewBomLevel = 'L2';
-        } else {
-          // Moving to child part - become sibling (same parent as target)
-          draggedNewParentId = targetItem.parentItemId || null;
-          draggedNewBomLevel = targetItem.bomLevel || 'L2';
-        }
-        
-        // No changes to target item - it stays in place
-        
-        // Check if there are actually changes to make for the dragged item
-        const draggedHasChanges = (
-          draggedOriginalParent !== draggedNewParentId || 
-          draggedOriginalLevel !== draggedNewBomLevel || 
-          draggedOriginalType !== draggedNewItemType
-        );
-        
-        if (!draggedHasChanges) {
-          // No changes needed
-          handleDragEnd();
-          return;
-        }
+        // ── Cross-hierarchy move ─────────────────────────────────────────────
+        const bothRootAssemblies =
+          draggedItem.itemType === 'assembly' && !draggedItem.parentItemId?.trim() &&
+          targetItem.itemType  === 'assembly' && !targetItem.parentItemId?.trim();
 
-        console.log('Hierarchy Move Operation:', {
-          dragged: {
-            id: draggedItem.id,
-            name: draggedItem.name,
-            from: { parentId: draggedOriginalParent, level: draggedOriginalLevel, type: draggedOriginalType },
-            to: { parentId: draggedNewParentId, level: draggedNewBomLevel, type: draggedNewItemType }
-          },
-          target: {
-            id: targetItem.id,
-            name: targetItem.name,
-            note: 'Target remains unchanged'
+        if (bothRootAssemblies) {
+          await updateBOMItem(draggedItem.id, { sortOrder: targetItem.sortOrder });
+          await updateBOMItem(targetItem.id,  { sortOrder: draggedItem.sortOrder });
+          toast.success('Assemblies reordered', { description: `${draggedItem.name} ↔ ${targetItem.name}`, duration: 3000 });
+
+        } else {
+          // Validate move legality
+          const isValidMove = (): boolean => {
+            const { itemType: d } = draggedItem;
+            const { itemType: t } = targetItem;
+            if (d === 'assembly' && (t === 'sub_assembly' || t === 'child_part')) return false;
+            if (d === 'sub_assembly' && t === 'child_part') return false;
+            if (d === 'child_part'   && (t === 'sub_assembly' || t === 'assembly')) return true;
+            if (d === 'sub_assembly' && t === 'assembly') return true;
+            return false;
+          };
+
+          if (!isValidMove()) {
+            toast.error('Invalid move', {
+              description: `Cannot move ${draggedItem.itemType.replace('_', ' ')} to ${targetItem.itemType.replace('_', ' ')}`,
+              duration: 4000,
+            });
+            resetDrag();
+            setIsUpdating(false);
+            return;
           }
-        });
 
-        // Update only the dragged item
-        const draggedUpdatePayload = {
-          parentItemId: draggedNewParentId,
-          bomLevel: draggedNewBomLevel,
-          itemType: draggedNewItemType
-        };
-        await updateBOMItem(draggedItem.id, draggedUpdatePayload);
+          // Compute new parent & bomLevel for the dragged item
+          let newParentId: string | undefined;
+          let newBomLevel: string;
 
-        // Determine the relationship description
-        let relationshipDesc = '';
-        if (targetItem.itemType === 'assembly') {
-          relationshipDesc = `moved under assembly "${targetItem.name}"`;
-        } else if (targetItem.itemType === 'sub_assembly') {
-          relationshipDesc = `moved under sub-assembly "${targetItem.name}"`;
-        } else {
-          relationshipDesc = `moved to same level as "${targetItem.name}"`;
+          if (targetItem.itemType === 'assembly') {
+            newParentId = targetItem.id;
+            newBomLevel = draggedItem.itemType === 'sub_assembly' ? 'L1' : 'L2';
+          } else if (targetItem.itemType === 'sub_assembly') {
+            newParentId = targetItem.id;
+            newBomLevel = 'L2';
+          } else {
+            // child_part → become sibling
+            // ✅ Fix 2345: use `undefined` instead of `null` to match UpdateBOMItemDto
+            newParentId = targetItem.parentItemId ?? undefined;
+            newBomLevel = targetItem.bomLevel || 'L2';
+          }
+
+          const noChange =
+            draggedItem.parentItemId === (newParentId ?? null) &&
+            draggedItem.bomLevel     === newBomLevel           &&
+            draggedItem.itemType     === draggedItem.itemType;   // always same
+
+          if (!noChange) {
+            await updateBOMItem(draggedItem.id, {
+              parentItemId: newParentId,   // ✅ undefined, not null
+              bomLevel:     newBomLevel,
+              itemType:     draggedItem.itemType,
+            });
+
+            const desc =
+              targetItem.itemType === 'assembly'    ? `moved under assembly "${targetItem.name}"` :
+              targetItem.itemType === 'sub_assembly' ? `moved under sub-assembly "${targetItem.name}"` :
+              `moved to same level as "${targetItem.name}"`;
+
+            toast.success(`Moved "${draggedItem.name}"`, { description: desc, duration: 3000 });
+          }
         }
-
-        toast.success(`Moved "${draggedItem.name}"`, {
-          description: relationshipDesc,
-          duration: 3000
-        });
       }
-    }
 
-    try {
-      setIsUpdating(true);
-
-      // Invalidate the cache to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['bom-items'] });
+      await refetch();
 
-      // Refresh the data and wait for it to complete
-      const refreshResult = await refetch();
-      console.log('Data refreshed after drag:', {
-        success: refreshResult.isSuccess,
-        newData: refreshResult.data?.items?.map(item => ({
-          name: item.name,
-          type: item.itemType,
-          parentId: item.parentItemId,
-          bomLevel: item.bomLevel
-        }))
-      });
-
-    } catch (error) {
-      console.error('Error updating item level:', error);
-      toast.error('Failed to move item', {
-        description: error?.message || 'Please try again or check your permissions',
-        duration: 5000
-      });
+    } catch (error: unknown) {
+      // ✅ Fix 2339: getErrorMessage handles unknown type safely
+      const msg = getErrorMessage(error);
+      toast.error('Failed to move item', { description: msg || 'Please try again.', duration: 5000 });
     } finally {
       setIsUpdating(false);
-      handleDragEnd();
+      resetDrag();
     }
   };
 
-  // Render item with nested children
+  // -------------------------------------------------------------------------
+  // Render helpers
+  // -------------------------------------------------------------------------
+
   const renderItem = (item: TreeNode, depth: number = 0): React.ReactElement => {
-    const hasChildren = item.children && item.children.length > 0;
-    const isExpanded = expandedItems.has(item.id);
-    
-    const isDraggedOver = dragOverItem === item.id;
+    const hasChildren    = item.children.length > 0;
+    const isExpanded     = expandedItems.has(item.id);
+    const isDraggedOver  = dragOverItem === item.id;
     const isBeingDragged = draggedItem?.id === item.id;
-    
-    // Calculate indentation based on depth
-    const indentationPadding = depth * 20;
+    const childType      = getChildType(item.itemType);
 
     return (
       <div key={item.id} className="mb-2">
-        {/* Main item card with indentation */}
         <div
-          style={{ marginLeft: `${indentationPadding}px` }}
+          style={{ marginLeft: `${depth * 20}px` }}
           draggable
-          onDragStart={(e) => handleDragStart(e, item)}
+          onDragStart={e  => handleDragStart(e, item)}
           onDragEnd={handleDragEnd}
-          onDragOver={(e) => handleDragOver(e, item)}
-          onDragLeave={(e) => handleDragLeave(e)}
-          onDrop={(e) => handleDrop(e, item)}
-          onClick={(e) => {
-            // Prevent clicks during drag operations
-            if (isDragging) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
-          className={`rounded-md border bg-card text-card-foreground shadow-sm border-l-4 transition-all duration-200 relative
-            ${getBorderColor(item.itemType, depth)}
-            ${isBeingDragged ? 'opacity-50' : ''}
-            ${isDraggedOver ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50 dark:bg-blue-950/20' : ''}
-            ${isDragging && !isBeingDragged ? 'hover:ring-2 hover:ring-green-400' : ''}
-            ${isUpdating ? 'cursor-wait opacity-75' : 'cursor-move'}
-          `}
+          onDragOver={e   => handleDragOver(e, item)}
+          onDragLeave={handleDragLeave}
+          onDrop={e       => handleDrop(e, item)}
+          onClick={e      => { if (isDragging) { e.preventDefault(); e.stopPropagation(); } }}
+          className={[
+            'rounded-md border bg-card text-card-foreground shadow-sm border-l-4 transition-all duration-200 relative',
+            getBorderColor(item.itemType, depth),
+            isBeingDragged  ? 'opacity-50'                                                              : '',
+            isDraggedOver   ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50 dark:bg-blue-950/20'       : '',
+            isDragging && !isBeingDragged ? 'hover:ring-2 hover:ring-green-400'                         : '',
+            isUpdating      ? 'cursor-wait opacity-75'                                                   : 'cursor-move',
+          ].join(' ')}
         >
-          {/* Depth indicator line for nested items */}
+          {/* Depth indicator */}
           {depth > 0 && (
-            <div 
+            <div
               className="absolute left-0 top-0 bottom-0 w-0.5 bg-border"
-              style={{ left: `-${indentationPadding - 10}px` }}
+              style={{ left: `-${depth * 20 - 10}px` }}
             />
           )}
-          
+
           <div className="p-4">
             <div className="flex flex-col md:flex-row items-start justify-between gap-3">
+
+              {/* Left: metadata */}
               <div className="flex-1 min-w-0 w-full">
+                {/* Header row */}
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <div className="flex items-center gap-1">
                     <GripVertical className={`h-4 w-4 transition-colors cursor-grab active:cursor-grabbing ${
@@ -638,80 +472,48 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                         className="h-6 w-6 p-0 rounded-full border"
                         onClick={() => toggleExpand(item.id)}
                       >
-                        {isExpanded ? (
-                          <ChevronUp className="h-3.5 w-3.5" />
-                        ) : (
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        )}
+                        {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                       </Button>
                     )}
                   </div>
+
                   <h3 className="text-base font-semibold text-foreground truncate max-w-[200px] md:max-w-none">
                     {item.name}
                   </h3>
+
                   {getItemTypeBadge(item.itemType)}
+
                   {isDragging && !isBeingDragged && draggedItem && (
                     <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/20 border-purple-300">
                       Drop to Swap Positions ↔
                     </Badge>
                   )}
-                  {/* Show circular reference warning */}
-                  {(() => {
-                    const hasCircular = item.parentItemId && 
-                      items.some(other => other.id === item.parentItemId && other.parentItemId === item.id);
-                    
-                    return hasCircular ? (
-                      <Badge variant="destructive" className="text-xs">
-                        ⚠️ Circular Ref
-                      </Badge>
-                    ) : null;
-                  })()}
+
+                  {/* Circular reference warning */}
+                  {item.parentItemId && items.some(o => o.id === item.parentItemId && o.parentItemId === item.id) && (
+                    <Badge variant="destructive" className="text-xs">Circular Ref</Badge>
+                  )}
                 </div>
+
+                {/* Detail grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-2 gap-y-1 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Part No: </span>
-                    <span className="font-medium">{item.partNumber || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Qty: </span>
-                    <span className="font-medium">{item.quantity}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">UOM: </span>
-                    <span className="font-medium">{item.unit}</span>
-                  </div>
+                  <div><span className="text-muted-foreground">Part No: </span><span className="font-medium">{item.partNumber || '—'}</span></div>
+                  <div><span className="text-muted-foreground">Qty: </span><span className="font-medium">{item.quantity}</span></div>
+                  <div><span className="text-muted-foreground">UOM: </span><span className="font-medium">{item.unit}</span></div>
                   <div>
                     <span className="text-muted-foreground">Level: </span>
                     <Badge variant="outline" className="h-4 text-[10px] font-medium px-1">
-                      {item.bomLevel || (() => {
-                        switch (item.itemType) {
-                          case 'assembly': return 'L0';
-                          case 'sub_assembly': return 'L1';
-                          case 'child_part': return 'L2';
-                          default: return 'L0';
-                        }
-                      })()}
+                      {item.bomLevel || getDefaultBomLevel(item.itemType)}
                     </Badge>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Volume: </span>
-                    <span className="font-medium">{item.annualVolume.toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Type: </span>
-                    <span className="font-medium">
-                      {item.makeBuy === 'buy' ? 'Buy' : 'Make'}
-                    </span>
-                  </div>
-                  
+                  <div><span className="text-muted-foreground">Volume: </span><span className="font-medium">{item.annualVolume.toLocaleString()}</span></div>
+                  <div><span className="text-muted-foreground">Type: </span><span className="font-medium">{item.makeBuy === 'buy' ? 'Buy' : 'Make'}</span></div>
+
                   <div className="col-span-2 sm:col-span-3 lg:col-span-2">
                     <span className="text-muted-foreground">Description: </span>
                     <span className="font-medium" title={item.description || ''}>{item.description || '—'}</span>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Material: </span>
-                    <span className="font-medium">{item.materialGrade || '—'}</span>
-                  </div>
+                  <div><span className="text-muted-foreground">Material: </span><span className="font-medium">{item.materialGrade || '—'}</span></div>
                   <div>
                     <span className="text-muted-foreground">Weight: </span>
                     <span className="font-medium">{item.weight && item.weight > 0 ? `${item.weight.toFixed(3)} kg` : '—'}</span>
@@ -719,10 +521,9 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                   <div>
                     <span className="text-muted-foreground">Dimensions: </span>
                     <span className="font-medium">
-                      {(item.maxLength && item.maxLength > 0) || (item.maxWidth && item.maxWidth > 0) || (item.maxHeight && item.maxHeight > 0) 
+                      {(item.maxLength ?? 0) > 0 || (item.maxWidth ?? 0) > 0 || (item.maxHeight ?? 0) > 0
                         ? `${item.maxLength || 0}×${item.maxWidth || 0}×${item.maxHeight || 0} mm`
-                        : '—'
-                      }
+                        : '—'}
                     </span>
                   </div>
                   <div>
@@ -731,50 +532,27 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                       {item.surfaceArea && item.surfaceArea > 0 ? `${(item.surfaceArea / 1000).toFixed(1)}k mm²` : '—'}
                     </span>
                   </div>
-                  
                 </div>
               </div>
+
+              {/* Right: action buttons */}
               <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end mt-4 md:mt-0">
                 {item.file2dPath && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onViewItem?.(item, '2d')}
-                    title="View 2D Drawing"
-                  >
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '2d')} title="View 2D Drawing">
                     <FileText className="h-4 w-4" />
                   </Button>
                 )}
                 {item.file3dPath && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onViewItem?.(item, '3d')}
-                    title="View 3D Model"
-                  >
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '3d')} title="View 3D Model">
                     <Box className="h-4 w-4" />
                   </Button>
                 )}
-                {getChildType(item.itemType) && (
-                  <Button
-                    variant="default"
-                    size="icon"
-                    className="h-8 w-8 rounded-full"
-                    onClick={() => handleAddChild(item)}
-                    title="Add Component"
-                  >
+                {childType && (
+                  <Button variant="default" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAddChild(item)} title="Add Component">
                     <Plus className="h-4 w-4" />
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => onEditItem(item)}
-                  title="Edit"
-                >
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onEditItem(item)} title="Edit">
                   <Edit2 className="h-4 w-4" />
                 </Button>
                 <Button
@@ -790,7 +568,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
             </div>
           </div>
 
-          {/* Nested children with proper depth */}
+          {/* Nested children */}
           {isExpanded && hasChildren && (
             <div className="mt-2 space-y-1">
               {item.children.map(child => renderItem(child, depth + 1))}
@@ -801,104 +579,9 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
     );
   };
 
-  const handleDeleteClick = (item: BOMItem) => {
-    setItemToDelete(item);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (itemToDelete) {
-      try {
-        await deleteBOMItem(itemToDelete.id);
-        toast.success(`"${itemToDelete.name}" has been deleted successfully from the BOM.`);
-        refetch();
-      } catch (error: any) {
-        let errorMessage = 'Failed to delete item. Please try again.';
-        if (error?.message) {
-          if (error.message.includes('permission')) {
-            errorMessage = 'You do not have permission to delete this item. Please contact your administrator.';
-          } else if (error.message.includes('network')) {
-            errorMessage = 'Failed to delete item due to network error. Please check your connection and try again.';
-          } else if (error.message.includes('dependency')) {
-            errorMessage = 'Cannot delete this item because other items depend on it. Please remove child items first.';
-          } else if (error.message.includes('not found')) {
-            errorMessage = 'Item not found. It may have already been deleted.';
-          } else {
-            errorMessage = `Failed to delete item: ${error.message}`;
-          }
-        }
-        toast.error(errorMessage, { duration: 6000 });
-      } finally {
-        setDeleteDialogOpen(false);
-        setItemToDelete(null);
-      }
-    }
-  };
-
-  const getItemTypeBadge = (type: string) => {
-    const typeConfig: Record<string, { label: string; className: string }> = {
-      assembly: {
-        label: 'Assembly',
-        className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
-      },
-      sub_assembly: {
-        label: 'Sub-Assembly',
-        className: 'bg-blue-500/10 text-blue-700 border-blue-500/20'
-      },
-      child_part: {
-        label: 'Child Part',
-        className: 'bg-amber-500/10 text-amber-700 border-amber-500/20'
-      },
-    };
-
-    const config = typeConfig[type] || {
-      label: type,
-      className: 'bg-muted text-muted-foreground border-muted'
-    };
-
-    return (
-      <Badge
-        variant="outline"
-        className={`font-medium text-xs ${config.className}`}
-      >
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const getChildType = (parentType: string): BOMItemType | null => {
-    switch (parentType) {
-      case 'assembly':
-        return BOMItemType.SUB_ASSEMBLY;
-      case 'sub_assembly':
-        return BOMItemType.CHILD_PART;
-      case 'child_part':
-        return null;
-      default:
-        return null;
-    }
-  };
-
-  const handleAddChild = (item: BOMItem) => {
-    const childType = getChildType(item.itemType);
-    if (childType && onAddChildItem) {
-      onAddChildItem(item.id, childType);
-    }
-  };
-
-  const getBorderColor = (type: string, depth: number = 0) => {
-    const intensity = Math.max(500 - (depth * 100), 300); // Darker for deeper nesting
-    switch (type) {
-      case 'assembly':
-        return depth === 0 ? 'border-l-emerald-500' : `border-l-emerald-${intensity}`;
-      case 'sub_assembly':
-        return depth <= 1 ? 'border-l-blue-500' : `border-l-blue-${intensity}`;
-      case 'child_part':
-        return depth <= 2 ? 'border-l-amber-500' : `border-l-amber-${intensity}`;
-      default:
-        return 'border-l-gray-500';
-    }
-  };
+  // -------------------------------------------------------------------------
+  // Loading / empty states
+  // -------------------------------------------------------------------------
 
   if (isLoading) {
     return (
@@ -920,43 +603,38 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Detect orphaned items (items missing from the rendered tree)
+  // -------------------------------------------------------------------------
+
+  const renderedIds = new Set<string>();
+  const collectIds  = (nodes: TreeNode[]) => nodes.forEach(n => { renderedIds.add(n.id); collectIds(n.children); });
+  collectIds(treeData);
+  const orphanedItems = items.filter(item => !renderedIds.has(item.id));
+
+  if (orphanedItems.length > 0) {
+    console.warn('Orphaned items found:', orphanedItems.map(i => ({ name: i.name, id: i.id, parentId: i.parentItemId })));
+  }
+
+  // -------------------------------------------------------------------------
+  // Main render
+  // -------------------------------------------------------------------------
+
   return (
     <>
       <div className="space-y-2">
-        {/* Render tree structure */}
         {treeData.map(item => renderItem(item, 0))}
-        
-        {/* Debug: Show orphaned items that weren't included in tree */}
-        {(() => {
-          const renderedIds = new Set<string>();
-          const collectRenderedIds = (nodes: TreeNode[]) => {
-            nodes.forEach(node => {
-              renderedIds.add(node.id);
-              if (node.children) {
-                collectRenderedIds(node.children);
-              }
-            });
-          };
-          collectRenderedIds(treeData);
-          
-          const orphanedItems = items.filter(item => !renderedIds.has(item.id));
-          
-          if (orphanedItems.length > 0) {
-            console.warn('Orphaned items found:', orphanedItems.map(item => ({ name: item.name, id: item.id, parentId: item.parentItemId })));
-            
-            return (
-              <div className="mt-4 p-4 border border-orange-300 rounded-lg bg-orange-50 dark:bg-orange-950/20">
-                <h4 className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
-                  Orphaned Items (Missing Parent Reference)
-                </h4>
-                <div className="space-y-2">
-                  {orphanedItems.map(item => renderItem({ ...item, children: [], depth: 0 }, 0))}
-                </div>
-              </div>
-            );
-          }
-          return null;
-        })()}
+
+        {orphanedItems.length > 0 && (
+          <div className="mt-4 p-4 border border-orange-300 rounded-lg bg-orange-50 dark:bg-orange-950/20">
+            <h4 className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
+              Orphaned Items (Missing Parent Reference)
+            </h4>
+            <div className="space-y-2">
+              {orphanedItems.map(item => renderItem({ ...item, children: [], depth: 0 }, 0))}
+            </div>
+          </div>
+        )}
       </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

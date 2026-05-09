@@ -1363,7 +1363,7 @@ export default function ManufacturingAnalysisPanel({
                                 color: 'var(--foreground, inherit)'
                               } : {}}
                             >
-                              {isIncompatible ? '⚠ ' : ''}{feature.type.replace('_', ' ').toUpperCase()}
+                              {isIncompatible ? 'WARNING: ' : ''}{feature.type.replace('_', ' ').toUpperCase()}
                             </Badge>
                             <span className={`text-sm font-medium ${isIncompatible ? 'text-red-600' : ''}`}>
                               {feature.manufacturingProcess}

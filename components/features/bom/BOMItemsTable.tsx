@@ -283,7 +283,7 @@ export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTab
       await refetch(); // Refresh the data
       
       // Success feedback with context
-      toast.success(`✅ "${itemToDelete.name}" deleted successfully`, {
+      toast.success(`"${itemToDelete.name}" deleted successfully`, {
         description: 'The BOM has been updated and dependencies are maintained.',
         duration: 4000
       });
@@ -333,7 +333,7 @@ export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTab
           break;
           
         case 'data':
-          toast.warning(`ℹ️ ${errorInfo.userMessage}`, {
+          toast.warning(`${errorInfo.userMessage}`, {
             ...toastOptions,
             action: {
               label: 'Refresh BOM',
@@ -343,7 +343,7 @@ export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTab
           break;
           
         default:
-          toast.error(`❌ ${errorInfo.userMessage}`, toastOptions);
+          toast.error(`${errorInfo.userMessage}`, toastOptions);
       }
       
       // Log for debugging

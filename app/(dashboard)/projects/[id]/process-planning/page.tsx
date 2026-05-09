@@ -920,61 +920,58 @@ function ProcessPlanningPageContent() {
                   </CardContent>
                 </Card>
 
-                {/* 3D MODEL & 2D DRAWING VIEWERS */}
+                {/* 3D MODEL VIEWER — full height with all tools */}
                 <div className="border border-border rounded-lg overflow-hidden shadow-md">
-                  <div className="bg-primary p-3">
-                    <h2 className="text-sm font-semibold text-primary-foreground">3D Model & 2D Drawing Viewers</h2>
+                  <div className="bg-primary p-3 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-primary-foreground">3D Model Viewer</h2>
+                    {selectedItem.file3dPath && (
+                      <span className="text-xs text-primary-foreground/70 font-mono">
+                        {selectedItem.file3dPath.split('.').pop()?.toUpperCase()}
+                      </span>
+                    )}
                   </div>
-                  <div className="bg-card p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* 3D Viewer */}
-                      <div>
-                        <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">3D Model (.STEP)</h3>
-                        <div className="aspect-square bg-secondary border border-border rounded flex items-center justify-center overflow-hidden">
-                          {selectedItem.file3dPath && file3dUrl ? (
-                            <ModelViewer
-                              fileUrl={file3dUrl}
-                              fileName={selectedItem.file3dPath.split('/').pop() || selectedItem.name || 'model'}
-                              fileType={selectedItem.file3dPath.split('.').pop() || 'step'}
-                              bomItemId={selectedItem.id}
-                              onMeasurements={handleModelMeasurements}
-                            />
-                          ) : (
-                            <div className="text-center text-muted-foreground">
-                              <p className="text-sm">No 3D file available</p>
-                            </div>
-                          )}
-                        </div>
+                  <div className="bg-card">
+                    {selectedItem.file3dPath && file3dUrl ? (
+                      <ModelViewer
+                        fileUrl={file3dUrl}
+                        fileName={selectedItem.file3dPath.split('/').pop() || selectedItem.name || 'model'}
+                        fileType={selectedItem.file3dPath.split('.').pop() || 'step'}
+                        bomItemId={selectedItem.id}
+                        onMeasurements={handleModelMeasurements}
+                      />
+                    ) : (
+                      <div className="h-64 flex items-center justify-center text-muted-foreground">
+                        <p className="text-sm">No 3D file available for this part</p>
                       </div>
+                    )}
+                  </div>
+                </div>
 
-                      {/* 2D Viewer */}
-                      <div>
-                        <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">2D Drawing (PDF/Image)</h3>
-                        <div className="aspect-square bg-secondary border border-border rounded flex items-center justify-center overflow-hidden">
-                          {selectedItem.file2dPath && file2dUrl ? (
-                            <Viewer2D
-                              fileUrl={file2dUrl}
-                              fileName={selectedItem.file2dPath.split('/').pop() || selectedItem.name || 'drawing'}
-                              fileType={
-                                selectedItem.file2dPath.toLowerCase().endsWith('.pdf')
-                                  ? 'pdf'
-                                  : ['.png', '.jpg', '.jpeg', '.webp'].some((ext) =>
-                                    selectedItem.file2dPath?.toLowerCase().endsWith(ext)
-                                  )
-                                    ? 'img'
-                                    : 'other'
-                              }
-                            />
-                          ) : (
-                            <div className="text-center text-muted-foreground">
-                              <p className="text-sm">No 2D drawing available</p>
-                            </div>
-                          )}
-                        </div>
+                {/* 2D DRAWING VIEWER */}
+                {selectedItem.file2dPath && file2dUrl && (
+                  <div className="border border-border rounded-lg overflow-hidden shadow-md">
+                    <div className="bg-muted p-3">
+                      <h2 className="text-sm font-semibold">2D Drawing</h2>
+                    </div>
+                    <div className="bg-card p-4">
+                      <div className="h-[600px] bg-secondary border border-border rounded overflow-hidden">
+                        <Viewer2D
+                          fileUrl={file2dUrl}
+                          fileName={selectedItem.file2dPath.split('/').pop() || selectedItem.name || 'drawing'}
+                          fileType={
+                            selectedItem.file2dPath.toLowerCase().endsWith('.pdf')
+                              ? 'pdf'
+                              : ['.png', '.jpg', '.jpeg', '.webp'].some((ext) =>
+                                selectedItem.file2dPath?.toLowerCase().endsWith(ext)
+                              )
+                                ? 'img'
+                                : 'other'
+                          }
+                        />
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Raw Materials Section */}
                 <RawMaterialsSection bomItemId={selectedItem.id} bomItem={selectedItem} />

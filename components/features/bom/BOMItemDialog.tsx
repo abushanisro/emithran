@@ -299,27 +299,16 @@ export function BOMItemDialog({
       try {
         const response = await apiClient.get(endpoint, { params }) as RawMaterialsResponse;
 
-        if (response?.items?.length > 0) {
-          console.log('Enhanced materials API response sample:', {
-            firstItem: response.items[0],
-            totalItems: response.items.length,
-            availableFields: Object.keys(response.items[0]!)
-          });
-        }
 
         return response;
       } catch (error: unknown) {
         const err = error as Record<string, unknown>;
-        console.warn('API Error:', err?.message);
-
         if (typeof err?.message === 'string' && err.message.includes('failed to parse logic tree') && params.search) {
-          console.warn('Search query failed, retrying without search:', params.search);
           delete params.search;
           return (await apiClient.get(endpoint, { params })) as RawMaterialsResponse;
         }
 
         if (typeof err?.message === 'string' && err.message.includes('Circuit breaker is OPEN')) {
-          console.warn('Circuit breaker is open, returning minimal fallback data');
           return { items: [] };
         }
 
@@ -327,7 +316,6 @@ export function BOMItemDialog({
           typeof err?.message === 'string' &&
           (err.message.includes('does not exist') || err.message.includes('column'))
         ) {
-          console.error('Database schema error:', err.message);
           return { items: [] };
         }
 
@@ -545,7 +533,6 @@ export function BOMItemDialog({
         });
       }
     } catch (error: unknown) {
-      console.error('3D Properties Load Error:', error);
       toast.error('Failed to load properties', { description: 'Could not load stored properties.', duration: 4000 });
     } finally {
       setIsAnalyzing3D(false);
@@ -784,16 +771,6 @@ export function BOMItemDialog({
       }
 
       toast.error(errorInfo.userMessage, toastOptions);
-
-      const err = error as Record<string, unknown>;
-      console.error('BOM Item Save Error:', {
-        category: errorInfo.category,
-        severity: errorInfo.severity,
-        message: err?.message ?? String(error),
-        status: err?.status ?? err?.statusCode,
-        stack: err?.stack,
-        formData: { ...formData, file2d: formData.file2d?.name, file3d: formData.file3d?.name },
-      });
     } finally {
       setLoading(false);
       setUploadProgress({});
