@@ -179,7 +179,12 @@ export class ProcessCostService {
     };
 
     // Calculate costs
-    const calculationResult = this.calculationEngine.calculate(calculationInput);
+    let calculationResult: ReturnType<typeof this.calculationEngine.calculate>;
+    try {
+      calculationResult = this.calculationEngine.calculate(calculationInput);
+    } catch (err: any) {
+      throw new BadRequestException(err.message || 'Invalid process cost input');
+    }
 
     // Prepare database record
     const recordData = {
@@ -284,7 +289,7 @@ export class ProcessCostService {
         }
       }
       
-      throw new InternalServerErrorException('Failed to create process cost record. Please check your input and try again.');
+      throw new InternalServerErrorException(`Failed to create process cost record: ${error?.message || 'Unknown database error'}`);
     }
 
     return ProcessCostResponseDto.fromDatabase(data);
@@ -590,5 +595,31 @@ export class ProcessCostService {
 
     this.logger.log(`Total process cost for BOM item ${bomItemId}: ${totalCost}`, 'ProcessCostService');
     return totalCost;
+  }
+
+  async getBulkTotalCosts(
+    bomItemIds: string[],
+    accessToken?: string,
+  ): Promise<Record<string, number>> {
+    if (bomItemIds.length === 0) return {};
+
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('process_cost_records')
+      .select('bom_item_id, total_cost_per_part, total_cost_before_scrap')
+      .in('bom_item_id', bomItemIds)
+      .eq('is_active', true);
+
+    if (error) {
+      this.logger.error(`Error fetching bulk process costs: ${error.message}`, 'ProcessCostService');
+      throw new InternalServerErrorException(`Failed to fetch bulk process costs: ${error.message}`);
+    }
+
+    const totals: Record<string, number> = Object.fromEntries(bomItemIds.map(id => [id, 0]));
+    for (const row of data ?? []) {
+      const cost = row.total_cost_per_part || row.total_cost_before_scrap || 0;
+      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + cost;
+    }
+    return totals;
   }
 }

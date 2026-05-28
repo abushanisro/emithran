@@ -276,4 +276,29 @@ export class ProcuredPartsCostService {
     this.logger.log(`Total procured parts cost for BOM item ${bomItemId}: ${totalCost}`, 'ProcuredPartsCostService');
     return totalCost;
   }
+
+  async getBulkTotalCosts(
+    bomItemIds: string[],
+    accessToken?: string,
+  ): Promise<Record<string, number>> {
+    if (bomItemIds.length === 0) return {};
+
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('procured_parts_cost_records')
+      .select('bom_item_id, total_cost')
+      .in('bom_item_id', bomItemIds)
+      .eq('is_active', true);
+
+    if (error) {
+      this.logger.error(`Error fetching bulk procured parts costs: ${error.message}`, 'ProcuredPartsCostService');
+      throw new InternalServerErrorException(`Failed to fetch bulk procured parts costs: ${error.message}`);
+    }
+
+    const totals: Record<string, number> = Object.fromEntries(bomItemIds.map(id => [id, 0]));
+    for (const row of data ?? []) {
+      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + (row.total_cost || 0);
+    }
+    return totals;
+  }
 }

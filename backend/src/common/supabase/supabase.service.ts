@@ -173,8 +173,9 @@ export class SupabaseService {
 
       const adminUser = users?.users?.find(user => user.email === 'emuski@mithran.com');
       return adminUser?.id || null;
-    } catch (error) {
-      console.warn('Error getting admin user ID:', error);
+    } catch (error: any) {
+      const msg = error?.cause?.code ?? error?.message ?? 'unknown';
+      console.warn('Failed to get admin user ID:', msg);
       return null;
     }
   }

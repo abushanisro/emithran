@@ -314,36 +314,39 @@ function transformComponentDataToPartWise(
     costData.forEach(item => {
       if (item.isRanking) return; // Skip ranking rows
 
+      const clamp = (v: number | undefined, min = 0, max = Infinity) =>
+        Math.min(max, Math.max(min, Math.round((v ?? 0) * 100) / 100));
+
       switch (item.costComponent) {
         case "Raw Material Cost":
-          vendorData.rawMaterialCost = Math.round((item.supplierValues[vendorIndex] || 0) * 100) / 100;
+          vendorData.rawMaterialCost = clamp(item.supplierValues[vendorIndex]);
           break;
         case "Process Cost":
-          vendorData.processCost = Math.round((item.supplierValues[vendorIndex] || 0) * 100) / 100;
+          vendorData.processCost = clamp(item.supplierValues[vendorIndex]);
           break;
         case "Overheads & Profit":
-          vendorData.overheadsProfit = Math.round((item.supplierValues[vendorIndex] || 0) * 100) / 100;
+          vendorData.overheadsProfit = clamp(item.supplierValues[vendorIndex]);
           break;
         case "Packing & Forwarding Cost":
-          vendorData.packingForwardingCost = Math.round((item.supplierValues[vendorIndex] || 0) * 100) / 100;
+          vendorData.packingForwardingCost = clamp(item.supplierValues[vendorIndex]);
           break;
         case "Payment Terms":
           vendorData.paymentTerms = item.paymentTerms?.[vendorIndex] || '';
           break;
         case "Net Price/unit":
-          vendorData.netPriceUnit = Math.round((item.supplierValues[vendorIndex] || 0) * 100) / 100;
+          vendorData.netPriceUnit = clamp(item.supplierValues[vendorIndex]);
           break;
         case "Development cost":
-          vendorData.developmentCost = Math.round((item.supplierValues[vendorIndex] || 0) * 100) / 100;
+          vendorData.developmentCost = clamp(item.supplierValues[vendorIndex]);
           break;
         case "Financial Risk":
-          vendorData.financialRisk = item.supplierValues[vendorIndex];
+          vendorData.financialRisk = clamp(item.supplierValues[vendorIndex], 0, 100);
           break;
         case "Cost Competency Score":
-          vendorData.costCompetencyScore = item.supplierValues[vendorIndex];
+          vendorData.costCompetencyScore = clamp(item.supplierValues[vendorIndex]);
           break;
         case "Lead Time Days":
-          vendorData.leadTimeDays = item.supplierValues[vendorIndex];
+          vendorData.leadTimeDays = clamp(item.supplierValues[vendorIndex]);
           break;
       }
     });
@@ -1393,8 +1396,9 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                         <Input
                           type="number"
                           step="0.01"
+                          min={0}
                           value={getCurrentBaseValue(row.id)}
-                          onChange={(e) => updateBaseValueLocal(row.id, parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateBaseValueLocal(row.id, Math.max(0, parseFloat(e.target.value) || 0))}
                           className="w-24 h-8 bg-gray-700 border-gray-600 text-white text-sm text-center"
                           placeholder="0.00"
                         />
@@ -1457,8 +1461,9 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                               <Input
                                 type="number"
                                 step="0.01"
+                                min={0}
                                 value={currentValue}
-                                onChange={(e) => updateSupplierValueLocal(row.id, index, parseFloat(e.target.value) || 0)}
+                                onChange={(e) => updateSupplierValueLocal(row.id, index, Math.max(0, parseFloat(e.target.value) || 0))}
                                 className={`w-20 h-8 bg-gray-700 border-gray-600 text-white text-sm text-center ${colorClass} font-medium`}
                                 placeholder="0.00"
                               />

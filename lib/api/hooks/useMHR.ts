@@ -128,3 +128,29 @@ export function useDeleteMHR() {
     },
   });
 }
+
+export function useDeleteAllMHR() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => mhrApi.deleteAll(),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: mhrKeys.lists() });
+      toast.success(`Deleted ${result.deleted} MHR records`);
+    },
+    onError: () => toast.error('Failed to delete all MHR records'),
+  });
+}
+
+export function useImportMHRFromExcel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => mhrApi.importFromExcel(file),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: mhrKeys.lists() });
+      toast.success(`MHR: ${result.imported} imported, ${result.skipped} skipped`);
+    },
+    onError: () => {
+      toast.error('Failed to import MHR records from Excel');
+    },
+  });
+}

@@ -10,7 +10,7 @@ export enum BOMItemType {
 }
 
 export const ITEM_TYPE_LABELS: Record<BOMItemType, string> = {
-  [BOMItemType.ASSEMBLY]: 'Assembly',
-  [BOMItemType.SUB_ASSEMBLY]: 'Sub-Assembly',
-  [BOMItemType.CHILD_PART]: 'Child Part',
+  [BOMItemType.ASSEMBLY]: 'L0 — Assembly',
+  [BOMItemType.SUB_ASSEMBLY]: 'L1 — Sub-Assembly',
+  [BOMItemType.CHILD_PART]: 'L2 — Component / Child Part',
 };

@@ -182,6 +182,23 @@ export class MHRResponseDto {
   @ApiProperty({ nullable: true })
   manualMHRValue?: number;
 
+  // India 2026 extended fields
+  @ApiProperty({ nullable: true }) processGroup?: string;
+  @ApiProperty({ nullable: true }) processCategory?: string;
+  @ApiProperty({ nullable: true }) machineClass?: string;
+  @ApiProperty({ nullable: true }) automationLevel?: string;
+  @ApiProperty({ nullable: true }) operators?: number;
+  @ApiProperty({ nullable: true }) wageGrade?: string;
+  @ApiProperty({ nullable: true }) machinePriceUsd?: number;
+  @ApiProperty({ nullable: true }) manufacturerCountry?: string;
+  @ApiProperty({ nullable: true }) setupTimeHr?: number;
+  @ApiProperty({ nullable: true }) lhrInrPerHr?: number;
+  @ApiProperty({ nullable: true }) usdLaborRatePerHr?: number;
+  @ApiProperty({ nullable: true }) usdLhrBase?: number;
+  @ApiProperty({ nullable: true }) usdLhrBurden?: number;
+  @ApiProperty({ nullable: true }) usdLhrTotal?: number;
+  @ApiProperty({ nullable: true }) specs?: Record<string, any>;
+
   // Calculated Results
   @ApiProperty()
   calculations: MHRCalculationResult;
@@ -223,6 +240,21 @@ export class MHRResponseDto {
       profitMarginPercentage: parseFloat(row.profit_margin_percentage),
       isManualEntry: row.is_manual_entry || false,
       manualMHRValue: row.manual_mhr_value ? parseFloat(row.manual_mhr_value) : undefined,
+      processGroup: row.process_group ?? undefined,
+      processCategory: row.process_category ?? undefined,
+      machineClass: row.machine_class ?? undefined,
+      automationLevel: row.automation_level ?? undefined,
+      operators: row.operators ?? undefined,
+      wageGrade: row.wage_grade ?? undefined,
+      machinePriceUsd: row.machine_price_usd ? parseFloat(row.machine_price_usd) : undefined,
+      manufacturerCountry: row.manufacturer_country ?? undefined,
+      setupTimeHr: row.setup_time_hr ? parseFloat(row.setup_time_hr) : undefined,
+      lhrInrPerHr: row.lhr_inr_per_hr ? parseFloat(row.lhr_inr_per_hr) : undefined,
+      usdLaborRatePerHr: row.usd_labor_rate_per_hr ? parseFloat(row.usd_labor_rate_per_hr) : undefined,
+      usdLhrBase: row.usd_lhr_base ? parseFloat(row.usd_lhr_base) : undefined,
+      usdLhrBurden: row.usd_lhr_burden ? parseFloat(row.usd_lhr_burden) : undefined,
+      usdLhrTotal: row.usd_lhr_total ? parseFloat(row.usd_lhr_total) : undefined,
+      specs: row.specs ?? undefined,
       calculations: JSON.parse(row.calculations || '{}'),
       createdAt: row.created_at,
       updatedAt: row.updated_at,

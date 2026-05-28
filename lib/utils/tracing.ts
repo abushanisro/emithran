@@ -1,12 +1,12 @@
 /**
  * Distributed Tracing & Correlation ID System
- * 
+ *
  * Production-grade request tracing that enables:
  * - End-to-end request tracking (Frontend → API → Database)
  * - Incident debugging and root cause analysis
  * - Performance monitoring across services
  * - OpenTelemetry-compatible trace/span IDs
- * 
+ *
  * Industry Standards:
  * - W3C Trace Context (traceparent, tracestate)
  * - OpenTelemetry specification compliance
@@ -21,7 +21,7 @@ import { isProduction } from '../config';
  */
 export interface TraceContext {
   traceId: string;        // 32 hex chars (128 bits)
-  spanId: string;         // 16 hex chars (64 bits)  
+  spanId: string;         // 16 hex chars (64 bits)
   parentSpanId?: string;  // 16 hex chars (64 bits)
   flags: string;          // 2 hex chars (8 bits)
   traceState?: string;    // Vendor-specific data
@@ -55,15 +55,15 @@ function generateSecureHex(length: number): string {
 function generateUUID(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
-  
+
   // Set version (4) and variant bits
-  bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
-  bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant 10
-  
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40; // Version 4
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80; // Variant 10
+
   const hex = Array.from(bytes)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
-    
+
   return [
     hex.slice(0, 8),
     hex.slice(8, 12),
@@ -81,11 +81,11 @@ function generateRequestId(): string {
   let result = '';
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
-  
+
   for (let i = 0; i < 8; i++) {
-    result += chars[bytes[i] % chars.length];
+    result += chars[(bytes[i] ?? 0) % chars.length] ?? '';
   }
-  
+
   return result;
 }
 
@@ -96,7 +96,7 @@ export function createTraceContext(parentSpanId?: string): TraceContext {
   return {
     traceId: generateSecureHex(32),     // 128-bit trace ID
     spanId: generateSecureHex(16),      // 64-bit span ID
-    parentSpanId,                       // Parent span if child
+    ...(parentSpanId !== undefined ? { parentSpanId } : {}),
     flags: '01',                        // Sampled flag
     traceState: `mithran=${Date.now()}` // Custom trace state
   };
@@ -110,14 +110,18 @@ export function parseTraceparent(traceparent: string): TraceContext | null {
   if (parts.length !== 4 || parts[0] !== '00') {
     return null; // Invalid format
   }
-  
-  const [version, traceId, spanId, flags] = parts;
-  
+
+  const [, traceId, spanId, flags] = parts;
+
+  if (!traceId || !spanId || !flags) {
+    return null;
+  }
+
   // Validate format
   if (traceId.length !== 32 || spanId.length !== 16 || flags.length !== 2) {
     return null;
   }
-  
+
   return {
     traceId,
     spanId,
@@ -149,7 +153,7 @@ export function createChildSpan(parentTrace: TraceContext): TraceContext {
  */
 class CorrelationManager {
   private context: CorrelationContext | null = null;
-  
+
   /**
    * Initialize new correlation context
    */
@@ -159,30 +163,33 @@ class CorrelationManager {
     userId?: string;
   }): CorrelationContext {
     const { traceparent, sessionId, userId } = options || {};
-    
+
     // Parse existing trace context or create new one
-    const trace = traceparent 
+    const trace = traceparent
       ? parseTraceparent(traceparent) || createTraceContext()
       : createTraceContext();
-    
-    this.context = {
+
+    const resolvedUserId = userId && isProduction ? this.hashUserId(userId) : userId;
+
+    const ctx: CorrelationContext = {
       correlationId: generateUUID(),
       requestId: generateRequestId(),
-      sessionId,
-      userId: userId && isProduction ? this.hashUserId(userId) : userId,
+      ...(sessionId !== undefined ? { sessionId } : {}),
+      ...(resolvedUserId !== undefined ? { userId: resolvedUserId } : {}),
       trace
     };
-    
-    return this.context;
+
+    this.context = ctx;
+    return ctx;
   }
-  
+
   /**
    * Get current correlation context
    */
   get(): CorrelationContext | null {
     return this.context;
   }
-  
+
   /**
    * Create child context for sub-requests
    */
@@ -190,14 +197,14 @@ class CorrelationManager {
     if (!this.context) {
       throw new Error('No correlation context initialized');
     }
-    
+
     return {
       ...this.context,
       requestId: generateRequestId(),     // New request ID for sub-request
       trace: createChildSpan(this.context.trace)
     };
   }
-  
+
   /**
    * Get correlation headers for HTTP requests
    */
@@ -205,7 +212,7 @@ class CorrelationManager {
     if (!this.context) {
       return {};
     }
-    
+
     return {
       'traceparent': formatTraceparent(this.context.trace),
       'x-correlation-id': this.context.correlationId,
@@ -215,7 +222,7 @@ class CorrelationManager {
       ...(this.context.trace.traceState && { 'tracestate': this.context.trace.traceState })
     };
   }
-  
+
   /**
    * Get structured log metadata
    */
@@ -223,7 +230,7 @@ class CorrelationManager {
     if (!this.context) {
       return {};
     }
-    
+
     return {
       correlationId: this.context.correlationId,
       requestId: this.context.requestId,
@@ -234,7 +241,7 @@ class CorrelationManager {
       userId: this.context.userId
     };
   }
-  
+
   /**
    * Hash user ID for production security
    */
@@ -262,26 +269,25 @@ export function correlationMiddleware() {
   return (req: any, res: any, next: any) => {
     // Extract existing trace headers
     const traceparent = req.headers.traceparent;
-    const correlationId = req.headers['x-correlation-id'];
     const sessionId = req.headers['x-session-id'];
     const userId = req.headers['x-user-id'];
-    
+
     // Initialize correlation context
     const context = correlationManager.initialize({
       traceparent,
       sessionId,
       userId
     });
-    
+
     // Add to request for access in controllers
     req.correlationContext = context;
-    
+
     // Add response headers for client tracking
     const headers = correlationManager.getHeaders();
     Object.entries(headers).forEach(([key, value]) => {
       res.setHeader(key, value);
     });
-    
+
     next();
   };
 }
@@ -294,7 +300,7 @@ export function withCorrelation<T extends (...args: any[]) => Promise<any>>(
 ): T {
   return (async (...args: any[]) => {
     const headers = correlationManager.getHeaders();
-    
+
     // Merge correlation headers with existing request headers
     if (args[0] && typeof args[0] === 'object') {
       args[0].headers = {
@@ -302,7 +308,7 @@ export function withCorrelation<T extends (...args: any[]) => Promise<any>>(
         ...headers
       };
     }
-    
+
     return await requestFn(...args);
   }) as T;
 }
@@ -312,13 +318,12 @@ export function withCorrelation<T extends (...args: any[]) => Promise<any>>(
  */
 export class PerformanceTracer {
   private startTime: number;
-  private context: CorrelationContext;
-  
-  constructor(operationName: string) {
+
+  constructor(_operationName: string) {
     this.startTime = performance.now();
-    this.context = correlationManager.get() || correlationManager.initialize();
+    correlationManager.get() || correlationManager.initialize();
   }
-  
+
   /**
    * End trace and return performance metrics
    */
@@ -327,7 +332,7 @@ export class PerformanceTracer {
     metadata: Record<string, any>;
   } {
     const duration = performance.now() - this.startTime;
-    
+
     return {
       duration,
       metadata: {
@@ -345,22 +350,16 @@ export class PerformanceTracer {
 export async function traceOperation<T>(
   operationName: string,
   operation: () => Promise<T>,
-  metadata?: Record<string, any>
+  _metadata?: Record<string, any>
 ): Promise<T> {
   const tracer = new PerformanceTracer(operationName);
-  
+
   try {
     const result = await operation();
-    const timing = tracer.end(operationName);
-    
-    // Operation completed successfully
-    
+    tracer.end(operationName);
     return result;
   } catch (error) {
-    const timing = tracer.end(operationName);
-    
-    // Operation failed - error will be thrown
-    
+    tracer.end(operationName);
     throw error;
   }
 }
@@ -369,10 +368,13 @@ export async function traceOperation<T>(
  * Initialize correlation context from request headers (for client-side)
  */
 export function initializeFromHeaders(headers: Headers): CorrelationContext {
+  const traceparent = headers.get('traceparent') ?? undefined;
+  const sessionId = headers.get('x-session-id') ?? undefined;
+  const userId = headers.get('x-user-id') ?? undefined;
   return correlationManager.initialize({
-    traceparent: headers.get('traceparent') || undefined,
-    sessionId: headers.get('x-session-id') || undefined,
-    userId: headers.get('x-user-id') || undefined
+    ...(traceparent !== undefined ? { traceparent } : {}),
+    ...(sessionId !== undefined ? { sessionId } : {}),
+    ...(userId !== undefined ? { userId } : {}),
   });
 }
 

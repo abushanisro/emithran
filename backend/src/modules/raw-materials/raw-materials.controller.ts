@@ -383,26 +383,38 @@ export class RawMaterialsController {
         try {
           const rowData: any = row;
 
-          // Map Excel columns to DTO properties with comprehensive column name matching
-          const rawMaterialGroup = getColumnValue(rowData, 'MaterialGroup', 'Material Group', 'material_group', 'MATERIALGROUP');
-          
-          // Map Excel material group values to system values
-          const materialGroup = this.mapMaterialGroupFromExcel(rawMaterialGroup);
-          
-          // For plastic materials, MaterialGrade often contains the actual material name (like ABS)
+          // Detect file type: ferrous file has 'GROUP\n(Ferrous/\nNon-Ferrous)' column
+          const ferrousGroupRaw = getColumnValue(rowData, 'GROUP\n(Ferrous/\nNon-Ferrous)');
+          let materialGroup: string;
+          let materialTypeFromExcel: string | undefined;
+
+          if (ferrousGroupRaw !== undefined) {
+            // ── Ferrous / Non-Ferrous file ──
+            materialGroup = 'Ferrous & Non-Ferrous';
+            materialTypeFromExcel = getColumnValue(rowData, 'MATERIAL\nTYPE', 'MATERIAL TYPE', 'MaterialType');
+          } else {
+            // ── Plastics / Rubber file ──
+            materialTypeFromExcel = getColumnValue(rowData,
+              'GROUP', 'Group', 'MaterialGroup', 'Material Group', 'material_group', 'MATERIALGROUP');
+            const rawCategory = getColumnValue(rowData,
+              'CATEGORY', 'Category', 'MaterialCategory', 'Material Category');
+            materialGroup = rawCategory
+              ? this.mapMaterialGroupFromExcel(rawCategory)
+              : this.mapMaterialGroupFromExcel(materialTypeFromExcel || '');
+          }
+
           const material = getColumnValue(
-            rowData, 
-            'Material', 
-            'MaterialDescription', 
-            'Material Description', 
-            'MaterialGrade',  // Add MaterialGrade as a potential material field
-            'Material Grade',
-            'material', 
+            rowData,
+            'DESCRIPTION\n(Material Name)',   // ferrous file
+            'DESCRIPTION (Material Name)',
+            'MATERIAL NAME',                  // plastics file
+            'Material Name',
+            'Material',
+            'MaterialDescription',
+            'Material Description',
+            'material',
             'material_description',
-            'material_grade',
             'MATERIAL',
-            'MATERIALDESCRIPTION',
-            'MATERIALGRADE'
           );
 
           // Validate required fields first
@@ -419,15 +431,15 @@ export class RawMaterialsController {
             );
           }
 
-          // Extract specific heat and thermal conductivity with logging
-          // Note: Adding exact column names from user's Excel including mangled encodings
+          // Extract specific heat and thermal conductivity
           const specificHeatRaw = getColumnValue(
             rowData,
-            'Specific Heat of Melt (J / g * Ã\x82Â°C)', // Exact from Excel
+            'SPECIFIC HEAT\n(J/g·°C)',        // actual Excel header (with newline)
+            'SPECIFIC HEAT (J/g·°C)',          // actual Excel header (flat)
+            'Specific Heat (J/g·°C)',
             'Specific Heat of Melt',
             'Specific Heat of Melt (J / g * °C)',
             'Specific Heat of Melt (J / g * Â°C)',
-            'Specific Heat of Melt (J / g * ÃÂ°C)',
             'SpecificHeatMelt',
             'specific_heat_melt',
             'Specific Heat',
@@ -435,11 +447,12 @@ export class RawMaterialsController {
           );
           const thermalCondRaw = getColumnValue(
             rowData,
-            'Thermal Conductivity of Melt (Watts / m * Ã\x82Â°C)', // Exact from Excel
+            'THERMAL COND.\n(W/m·°C)',         // actual Excel header (with newline)
+            'THERMAL COND. (W/m·°C)',           // actual Excel header (flat)
+            'Thermal Cond. (W/m·°C)',
             'Thermal Conductivity of Melt',
             'Thermal Conductivity of Melt (Watts / m * °C)',
             'Thermal Conductivity of Melt (Watts / m * Â°C)',
-            'Thermal Conductivity of Melt (Watts / m * ÃÂ°C)',
             'ThermalConductivityMelt',
             'thermal_conductivity_melt',
             'Thermal Conductivity',
@@ -459,46 +472,55 @@ export class RawMaterialsController {
           const createDto: CreateRawMaterialDto = {
             materialGroup,
             material,
-            materialGrade: getColumnValue(
-              rowData, 
-              'Grade',
-              'Type',
-              'MaterialType',
-              'Material Type',
-              'material_type',
-              'Subtype',
-              'Category'
-            ),
-            regrinding: this.convertBooleanToYesNo(getColumnValue(rowData, 'Regrinding', 'regrinding', 'REGRINDING')),
-            regrindingPercentage: parseNumeric(getColumnValue(rowData, 'Regrinding%', 'Regrinding Percentage', 'regrinding_percentage', 'RegrindingPercentage')),
-            clampingPressureMpa: parseNumeric(getColumnValue(rowData, 'Clamping Pressure (MPa)', 'ClampingPressureMpa', 'clamping_pressure_mpa', 'Clamping Pressure', 'Clamp Pressure (MPa)', 'Clamp Pressure')),
-            ejectDeflectionTempC: parseNumeric(getColumnValue(rowData, 'Eject Deflection Temp (Â°C)', 'Eject Deflection Temp (°C)', 'Eject Temp (Â°C)', 'Eject Temp (°C)', 'EjectDeflectionTempC', 'eject_deflection_temp_c', 'Eject Temp')),
-            meltingTempC: parseNumeric(getColumnValue(rowData, 'Melting Temp (Â°C)', 'Melting Temp (°C)', 'Melt Temp (Â°C)', 'Melt Temp (°C)', 'MeltingTempC', 'melting_temp_c', 'Melting Temperature', 'Melt Temp')),
-            moldTempC: parseNumeric(getColumnValue(rowData, 'Mold Temp (Â°C)', 'Mold Temp (°C)', 'MoldTempC', 'mold_temp_c', 'Mold Temperature')),
-            densityKgM3: parseNumeric(getColumnValue(
-              rowData, 
-              'Density (kg / m^3)', 
-              'Density (kg/m³)', 
-              'Density (kg/mÂ³)', 
-              'DensityKgM3', 
-              'density_kg_m3', 
-              'Density',
-              'DENSITY'
-            )),
+            materialType: materialTypeFromExcel,
+            materialGrade: getColumnValue(rowData,
+              'GRADE /\nCONDITION', 'GRADE / CONDITION',          // ferrous file
+              'Grade', 'MaterialGrade', 'Material Grade', 'material_grade'),
+            matlState: getColumnValue(rowData,
+              'TYPE\n(State)', 'TYPE (State)',                     // ferrous file
+              'Material State', 'matlState', 'State'),
+            stockForm: getColumnValue(rowData,
+              'SHAPE /\nSTOCK FORM', 'SHAPE / STOCK FORM',        // ferrous / plastics
+              'Shape / Stock Form', 'Stock Form', 'StockForm', 'stock_form'),
+            regrinding: this.convertBooleanToYesNo(getColumnValue(rowData, 'REGRINDING', 'Regrinding', 'regrinding')),
+            regrindingPercentage: parseNumeric(getColumnValue(rowData, 'REGRIND %', 'Regrind %', 'Regrinding%', 'Regrinding Percentage', 'regrinding_percentage', 'RegrindingPercentage')),
+            clampingPressureMpa: parseNumeric(getColumnValue(rowData, 'CLAMP PRESSURE\n(MPa)', 'CLAMP PRESSURE (MPa)', 'Clamping Pressure (MPa)', 'ClampingPressureMpa', 'clamping_pressure_mpa')),
+            ejectDeflectionTempC: parseNumeric(getColumnValue(rowData, 'EJECT DEFLECT\nTEMP (°C)', 'EJECT DEFLECT TEMP (°C)', 'Eject Deflection Temp (°C)', 'EjectDeflectionTempC', 'eject_deflection_temp_c')),
+            meltingTempC: parseNumeric(getColumnValue(rowData, 'MELTING\nTEMP (°C)', 'MELTING TEMP (°C)', 'Melting Temp (°C)', 'MeltingTempC', 'melting_temp_c')),
+            moldTempC: parseNumeric(getColumnValue(rowData, 'MOLD\nTEMP (°C)', 'MOLD TEMP (°C)', 'Mold Temp (°C)', 'MoldTempC', 'mold_temp_c')),
+            densityKgM3: parseNumeric(getColumnValue(rowData,
+              'DENSITY\n(kg/m³)', 'DENSITY (kg/m³)', 'Density (kg/m³)', 'DensityKgM3', 'density_kg_m3')),
             specificHeatMelt: parseNumeric(specificHeatRaw),
             thermalConductivityMelt: parseNumeric(thermalCondRaw),
-            cost: parseNumeric(getColumnValue(rowData, 'Unit Cost ($)', 'Unit Cost', 'Cost', 'cost', 'COST', 'unit_cost', 'UnitCost')),
-            
-            // New material properties mapping with extensive column name matching
-            density: parseNumeric(getColumnValue(rowData, 'Density', 'density', 'DENSITY', 'Density (g/cm³)', 'Density g/cm³')),
-            ultimate_tensile_strength: parseNumeric(getColumnValue(rowData, 'UltimateTensileStrength', 'Ultimate Tensile Strength', 'UTS', 'UTS MPa', 'ultimate_tensile_strength', 'UTS_MPa')),
-            yield_tensile_strength: parseNumeric(getColumnValue(rowData, 'YeildTensileStrength', 'Yield Tensile Strength', 'YTS', 'YTS MPa', 'yield_tensile_strength', 'YTS_MPa')),
-            shearing_strength: parseNumeric(getColumnValue(rowData, 'ShearingStrength', 'Shearing Strength', 'Shear', 'Shear MPa', 'shearing_strength', 'Shear_MPa')),
-            astm_standard: getColumnValue(rowData, 'ASTM Standard', 'ASTM_Standard', 'astm_standard', 'ASTM', 'ASTMStandard'),
-            din_standard: getColumnValue(rowData, 'DIN Standard', 'DIN_Standard', 'din_standard', 'DIN', 'DINStandard'),
-            en_standard: getColumnValue(rowData, 'EN Standard', 'EN_Standard', 'en_standard', 'EN', 'ENStandard'),
-            jis_standard: getColumnValue(rowData, 'JIS Standard', 'JIS_Standard', 'jis_standard', 'JIS', 'JISStandard'),
-            shape: mapShapeValue(getColumnValue(rowData, 'Shape', 'shape', 'SHAPE')),
+            currency: 'USD' as any,
+            // Regional costs — plastics format: 'COST\nFrance\n(USD/kg)'; ferrous format: 'FRANCE'
+            costFrance:  parseNumeric(getColumnValue(rowData, 'FRANCE', 'COST\nFrance\n(USD/kg)', 'COST France (USD/kg)', 'Cost France (USD/kg)')),
+            costGermany: parseNumeric(getColumnValue(rowData, 'GERMANY', 'COST\nGermany\n(USD/kg)', 'COST Germany (USD/kg)', 'Cost Germany (USD/kg)')),
+            costWEurope: parseNumeric(getColumnValue(rowData, 'W. EUROPE', 'COST\nW. Europe\n(USD/kg)', 'COST W. Europe (USD/kg)', 'Cost W. Europe (USD/kg)')),
+            costUsa:     parseNumeric(getColumnValue(rowData, 'USA', 'COST\nUSA\n(USD/kg)', 'COST USA (USD/kg)', 'Cost USA (USD/kg)')),
+            costIndia:   parseNumeric(getColumnValue(rowData, 'INDIA', 'COST\nIndia\n(USD/kg)', 'COST India (USD/kg)', 'Cost India (USD/kg)')),
+            costEEurope: parseNumeric(getColumnValue(rowData, 'E. EUROPE', 'COST\nE. Europe\n(USD/kg)', 'COST E. Europe (USD/kg)', 'Cost E. Europe (USD/kg)')),
+            costChina:   parseNumeric(getColumnValue(rowData, 'CHINA', 'COST\nChina\n(USD/kg)', 'COST China (USD/kg)', 'Cost China (USD/kg)')),
+            cost: parseNumeric(getColumnValue(rowData, 'INDIA', 'COST\nIndia\n(USD/kg)', 'COST India (USD/kg)', 'Unit Cost ($)', 'Unit Cost', 'Cost', 'cost', 'COST')),
+            // Material properties — ferrous uses 'DENSITY\n(g/cm³)', 'UTS\n(MPa)', etc.
+            density: parseNumeric(getColumnValue(rowData,
+              'DENSITY\n(g/cm³)', 'DENSITY (g/cm³)',               // ferrous file
+              'Density (g/cm³)', 'Density', 'density', 'DENSITY')),
+            ultimate_tensile_strength: parseNumeric(getColumnValue(rowData,
+              'UTS\n(MPa)', 'UTS (MPa)',                           // ferrous file
+              'UltimateTensileStrength', 'Ultimate Tensile Strength', 'UTS', 'ultimate_tensile_strength')),
+            yield_tensile_strength: parseNumeric(getColumnValue(rowData,
+              'YTS\n(MPa)', 'YTS (MPa)',                           // ferrous file
+              'YeildTensileStrength', 'Yield Tensile Strength', 'YTS', 'yield_tensile_strength')),
+            shearing_strength: parseNumeric(getColumnValue(rowData,
+              'SHEAR\n(MPa)', 'SHEAR (MPa)',                       // ferrous file
+              'ShearingStrength', 'Shearing Strength', 'Shear', 'shearing_strength')),
+            astm_standard: getColumnValue(rowData, 'ASTM', 'ASTM Standard', 'ASTM_Standard', 'astm_standard'),
+            din_standard:  getColumnValue(rowData, 'DIN',  'DIN Standard',  'DIN_Standard',  'din_standard'),
+            en_standard:   getColumnValue(rowData, 'EN',   'EN Standard',   'EN_Standard',   'en_standard'),
+            jis_standard:  getColumnValue(rowData, 'JIS',  'JIS Standard',  'JIS_Standard',  'jis_standard'),
+            shape: mapShapeValue(getColumnValue(rowData,
+              'SHAPE /\nSTOCK FORM', 'SHAPE / STOCK FORM', 'Shape / Stock Form', 'Shape', 'shape', 'SHAPE')),
           };
 
           // Add to valid materials array for batch insert
@@ -605,39 +627,50 @@ export class RawMaterialsController {
     const lowerGroup = excelMaterialGroup.toLowerCase().trim();
 
     // Map Excel values to PLASTIC & RUBBER materials
-    if (lowerGroup.includes('plastic') || 
-        lowerGroup.includes('rubber') || 
-        lowerGroup.includes('polymer') || 
+    if (lowerGroup.includes('plastic') ||
+        lowerGroup.includes('rubber') ||
+        lowerGroup.includes('polymer') ||
         lowerGroup.includes('elastomer') ||
+        lowerGroup.includes('thermoplastic') ||
+        lowerGroup.includes('thermoset') ||
+        lowerGroup.includes('silicone') ||
+        lowerGroup.includes('polyurethane') ||
         lowerGroup === 'plastics' ||
         lowerGroup === 'plastic' ||
-        lowerGroup.includes('thermoplastic') ||
-        lowerGroup.includes('abs') ||
-        lowerGroup.includes('pvc') ||
-        lowerGroup.includes('pe') ||
-        lowerGroup.includes('pp')) {
+        lowerGroup === 'abs' ||
+        lowerGroup === 'pvc' ||
+        lowerGroup === 'pp' ||
+        lowerGroup === 'pe' ||
+        lowerGroup === 'pa' ||
+        lowerGroup === 'pc' ||
+        lowerGroup === 'pet' ||
+        lowerGroup === 'pom' ||
+        lowerGroup === 'pmma' ||
+        lowerGroup === 'ps' ||
+        lowerGroup === 'san') {
       return 'Plastic & Rubber';
     }
 
-    // Map Excel values to FERROUS & NON-FERROUS materials  
-    if (lowerGroup.includes('ferrous') || 
-        lowerGroup.includes('steel') || 
-        lowerGroup.includes('iron') || 
+    // Map Excel values to FERROUS & NON-FERROUS materials
+    if (lowerGroup.includes('ferrous') ||
+        lowerGroup.includes('steel') ||
+        lowerGroup.includes('iron') ||
         lowerGroup.includes('metal') ||
         lowerGroup.includes('aluminum') ||
+        lowerGroup.includes('aluminium') ||
         lowerGroup.includes('copper') ||
         lowerGroup.includes('titanium') ||
         lowerGroup.includes('zinc') ||
         lowerGroup.includes('brass') ||
         lowerGroup.includes('bronze') ||
+        lowerGroup.includes('stainless') ||
+        lowerGroup.includes('alloy') ||
         lowerGroup === 'ferrous' ||
-        lowerGroup === 'metals' ||
-        lowerGroup === 'alloy' ||
-        lowerGroup.includes('stainless')) {
+        lowerGroup === 'metals') {
       return 'Ferrous & Non-Ferrous';
     }
 
-    // If no mapping found, return the original value with proper case formatting
+    // If no mapping found, return original with proper casing
     return excelMaterialGroup.split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');

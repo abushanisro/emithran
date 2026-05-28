@@ -1,6 +1,11 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    // Language and Environment
+    /**
+     * =========================================================
+     * LANGUAGE + RUNTIME
+     * =========================================================
+     */
     "target": "ES2022",
     "lib": [
       "ES2022",
@@ -8,41 +13,107 @@
       "DOM.Iterable"
     ],
     "jsx": "react-jsx",
-    // Modules
+    /**
+     * =========================================================
+     * MODULE SYSTEM
+     * =========================================================
+     */
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
-    // Emit
+    "allowImportingTsExtensions": false,
+    "verbatimModuleSyntax": true,
+    /**
+     * =========================================================
+     * EMIT
+     * =========================================================
+     */
     "noEmit": true,
     "incremental": true,
-    // Interop Constraints
+    /**
+     * =========================================================
+     * STRICTNESS
+     * =========================================================
+     */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    /**
+     * =========================================================
+     * CODE QUALITY
+     * =========================================================
+     */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    /**
+     * =========================================================
+     * MODULE INTEROP
+     * =========================================================
+     */
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    // Type Checking
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitReturns": true,
+    /**
+     * =========================================================
+     * PERFORMANCE
+     * =========================================================
+     */
     "skipLibCheck": true,
-    // Next.js specific
-    "allowJs": true,
+    /**
+     * =========================================================
+     * NEXT.JS 16
+     * =========================================================
+     */
+    "allowJs": false,
     "plugins": [
       {
         "name": "next"
       }
     ],
-    // Path Mapping
-    "baseUrl": ".",
+    /**
+     * =========================================================
+     * PATH ALIASES
+     * =========================================================
+     */
     "paths": {
       "@/*": [
         "./*"
       ]
-    }
+    },
+    /**
+     * =========================================================
+     * TYPES
+     * =========================================================
+     */
+    "types": [
+      "node"
+    ],
+    /**
+     * =========================================================
+     * MODERN FEATURES
+     * =========================================================
+     */
+    "useDefineForClassFields": true
   },
+  /**
+   * ===========================================================
+   * INCLUDED FILES
+   * ===========================================================
+   */
   "include": [
     "next-env.d.ts",
     "**/*.ts",
@@ -50,11 +121,20 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
+  /**
+   * ===========================================================
+   * EXCLUDED FILES
+   * ===========================================================
+   */
   "exclude": [
     "node_modules",
+    ".next",
+    "dist",
+    "build",
+    "coverage",
     "backend",
     "docs",
-    "dist",
-    "build"
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }

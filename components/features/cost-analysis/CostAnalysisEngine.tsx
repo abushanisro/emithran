@@ -4,20 +4,23 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  DollarSign, 
-  TrendingUp, 
-  Package, 
-  Cog, 
-  Target, 
+import {
+  DollarSign,
+  TrendingUp,
+  Package,
+  Cog,
+  Target,
   Calculator,
   FileDown,
   RefreshCw,
   Zap,
-  Wrench
+  Wrench,
+  Box
 } from 'lucide-react';
 import { useCostData } from '@/lib/providers/cost-data-provider';
 import { exportService } from '@/lib/services/export-service';
+import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
+import { bomItemsApi } from '@/lib/api/bom-items';
 
 interface CostAnalysisEngineProps {
   bomId: string;
@@ -129,13 +132,42 @@ const CustomBarChart = ({ data, colors }: { data: any[], colors: string[] }) => 
   );
 };
 
-export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({ 
-  bomId, 
+export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
+  bomId,
   bomName = "Assembly",
-  itemCount = 2 
+  itemCount = 2
 }) => {
   const { calculateBomCosts, getCostData, getAggregatedData, isCalculating } = useCostData();
-  
+  const [modelImageUrl, setModelImageUrl] = useState<string | null>(null);
+  const [modelFileName, setModelFileName] = useState<string>('');
+  const [imageLoading, setImageLoading] = useState(false);
+
+  // Fetch BOM items to find one with an uploaded file
+  const { data: bomItemsData } = useBOMItems(bomId);
+
+  // Auto-fetch signed URL from the first BOM item that has a file
+  useEffect(() => {
+    const items = bomItemsData?.items || bomItemsData || [];
+    const itemArray = Array.isArray(items) ? items : [];
+    const itemWithFile = itemArray.find((item: any) => item.file3dPath || item.file2dPath);
+    if (!itemWithFile) return;
+
+    const fileType = itemWithFile.file3dPath ? '3d' : '2d';
+    const filePath: string = itemWithFile.file3dPath || itemWithFile.file2dPath || '';
+    const fileName = filePath.split('/').pop() || '';
+
+    setImageLoading(true);
+    bomItemsApi.getFileUrl(itemWithFile.id, fileType)
+      .then((res) => {
+        if (res?.url) {
+          setModelImageUrl(res.url);
+          setModelFileName(fileName);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setImageLoading(false));
+  }, [bomItemsData]);
+
   const costData = getCostData(bomId);
   const aggregated = getAggregatedData(bomId);
 
@@ -236,6 +268,37 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* 3D Model Preview */}
+      {(modelImageUrl || imageLoading) && (
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            {imageLoading ? (
+              <div className="h-56 flex items-center justify-center bg-muted/30">
+                <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : modelImageUrl ? (
+              <div className="relative">
+                <img
+                  src={modelImageUrl}
+                  alt="3D Model"
+                  className="w-full h-64 object-contain bg-muted/20"
+                  onError={() => setModelImageUrl(null)}
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Box className="w-4 h-4 text-white/80" />
+                    <span className="text-white text-sm font-medium">{bomName}</span>
+                    {modelFileName && (
+                      <span className="text-white/60 text-xs ml-1">· {modelFileName}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header Controls */}
       <div className="flex items-center justify-between">
         <div>

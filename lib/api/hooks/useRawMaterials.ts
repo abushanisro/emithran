@@ -18,7 +18,7 @@ export interface RawMaterial {
   materialGroup: string;
   material: string;
   materialGrade?: string;
-  materialType?: string;
+  materialType?: string;   // stores Excel GROUP (ABS, Acetal, etc.)
   materialDescription?: string;
   densityKgM3?: number;
   cost?: number;
@@ -27,7 +27,16 @@ export interface RawMaterial {
   userId: string;
   createdAt: Date;
   updatedAt: Date;
-  
+
+  // Regional costs
+  costFrance?: number;
+  costGermany?: number;
+  costWEurope?: number;
+  costUsa?: number;
+  costIndia?: number;
+  costEEurope?: number;
+  costChina?: number;
+
   // Material properties
   density?: number;
   ultimate_tensile_strength?: number;
@@ -45,8 +54,10 @@ export interface RawMaterial {
   jis_standard?: string;
   jisStandard?: string;
   shape?: MaterialShape;
+  stockForm?: string;
+  matlState?: string;
   country?: Country;
-  
+
   // Plastic-specific properties
   regrinding?: string;
   regrindingPercentage?: number;

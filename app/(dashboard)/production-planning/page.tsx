@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Factory, Calendar, TrendingUp, Clock, Package, Users } from 'lucide-react';
+import { Plus, Factory, Calendar, TrendingUp, Clock, Package } from 'lucide-react';
 import { ProductionLotsTable } from '@/components/features/production-planning/ProductionLotsTable';
 import { CreateProductionLotModal } from '@/components/features/production-planning/CreateProductionLotModal';
 import { ProductionDashboard } from '@/components/features/production-planning/ProductionDashboard';
@@ -24,10 +24,10 @@ export default function ProductionPlanningPage() {
   const { data: dashboardData } = useProductionDashboard();
 
   const statusCounts = {
-    planned: lots.filter(lot => lot.status === 'planned').length,
-    in_production: lots.filter(lot => lot.status === 'in_production').length,
-    completed: lots.filter(lot => lot.status === 'completed').length,
-    on_hold: lots.filter(lot => lot.status === 'on_hold').length,
+    planned: lots.filter((lot: any) => lot.status === 'planned').length,
+    in_production: lots.filter((lot: any) => lot.status === 'in_production').length,
+    completed: lots.filter((lot: any) => lot.status === 'completed').length,
+    on_hold: lots.filter((lot: any) => lot.status === 'on_hold').length,
   };
 
   return (

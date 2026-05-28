@@ -22,6 +22,7 @@ import {
   DollarSign,
   Users,
   Undo2,
+  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -30,7 +31,9 @@ import {
   useUpdateVendorEvaluation,
   useUpdateEvaluationScores,
   useCompleteSupplierNomination,
+  useAddVendorsToNomination,
 } from '@/lib/api/hooks/useSupplierNominations';
+import { VendorSelectionModal } from './VendorSelectionModal';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 import {
   Recommendation,
@@ -733,6 +736,7 @@ export function SupplierNominationPage({
   const [capabilityData, setCapabilityData] = useState<any[]>([]);
   const [isLoadingScores, setIsLoadingScores] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
+  const [addVendorsOpen, setAddVendorsOpen] = useState(false);
 
   const vendorsQuery = useMemo(() => ({ status: 'active' as const, limit: 1000 }), []);
   const { data: vendorsResponse } = useVendors(vendorsQuery);
@@ -745,6 +749,7 @@ export function SupplierNominationPage({
   const updateEvaluationMutation = useUpdateVendorEvaluation(nominationId);
   const updateScoresMutation = useUpdateEvaluationScores(nominationId);
   const completeNominationMutation = useCompleteSupplierNomination();
+  const addVendorsMutation = useAddVendorsToNomination(nominationId);
 
   const vendors = vendorsResponse?.vendors ?? [];
 
@@ -882,6 +887,11 @@ export function SupplierNominationPage({
     toast.info('Export functionality will be available soon');
   };
 
+  const handleAddVendors = async (vendorIds: string[]) => {
+    await addVendorsMutation.mutateAsync(vendorIds);
+    toast.success(`${vendorIds.length} vendor(s) added to nomination`);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 p-6">
@@ -965,6 +975,15 @@ export function SupplierNominationPage({
             >
               <Download className="h-4 w-4 mr-2" />
               Export
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddVendorsOpen(true)}
+              className="border-blue-600 text-blue-400 hover:bg-blue-900/20"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Vendors
             </Button>
             <Button
               onClick={handleCompleteNomination}
@@ -1233,6 +1252,14 @@ export function SupplierNominationPage({
           </div>
         )}
       </div>
+
+      <VendorSelectionModal
+        isOpen={addVendorsOpen}
+        onClose={() => setAddVendorsOpen(false)}
+        onSelectVendors={handleAddVendors}
+        selectedVendorIds={nomination.vendorEvaluations.map(e => e.vendorId)}
+        nominationId={nominationId}
+      />
     </div>
   );
 }

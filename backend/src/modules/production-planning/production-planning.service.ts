@@ -184,7 +184,7 @@ export class ProductionPlanningService {
               item_type,
               material,
               material_grade,
-              unit_cost_inr,
+              unit_cost,
               total_cost_inr,
               make_buy
             )
@@ -229,7 +229,7 @@ export class ProductionPlanningService {
             item_type,
             material,
             material_grade,
-            unit_cost_inr,
+            unit_cost,
             total_cost_inr,
             make_buy
           `)
@@ -276,7 +276,7 @@ export class ProductionPlanningService {
               item_type,
               material,
               material_grade,
-              unit_cost_inr,
+              unit_cost,
               total_cost_inr,
               make_buy
             )
@@ -345,7 +345,7 @@ export class ProductionPlanningService {
                 item_type,
                 material,
                 material_grade,
-                unit_cost_inr,
+                unit_cost,
                 total_cost_inr,
                 make_buy
               `)
@@ -432,7 +432,7 @@ export class ProductionPlanningService {
             item_type,
             material,
             material_grade,
-            unit_cost_inr,
+            unit_cost,
             total_cost_inr,
             make_buy
           `)

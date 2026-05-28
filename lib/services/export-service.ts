@@ -95,8 +95,8 @@ export class ExportService {
     ];
 
     summaryItems.forEach(([label, value]) => {
-      doc.text(label, 20, yPosition);
-      doc.text(value, 100, yPosition);
+      doc.text(label ?? '', 20, yPosition);
+      doc.text(value ?? '', 100, yPosition);
       yPosition += 8;
     });
 
@@ -117,9 +117,9 @@ export class ExportService {
     ];
 
     breakdownItems.forEach(([label, value, percentage]) => {
-      doc.text(label, 20, yPosition);
-      doc.text(value, 80, yPosition);
-      doc.text(percentage, 140, yPosition);
+      doc.text(label ?? '', 20, yPosition);
+      doc.text(value ?? '', 80, yPosition);
+      doc.text(percentage ?? '', 140, yPosition);
       yPosition += 8;
     });
 
@@ -213,7 +213,7 @@ export class ExportService {
     return {
       bomId,
       bomName,
-      projectName,
+      ...(projectName !== undefined ? { projectName } : {}),
       summary: {
         totalCost: aggregated.totalCost || 0,
         sellingPrice: aggregated.totalSellingPrice || 0,

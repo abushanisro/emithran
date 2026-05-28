@@ -203,6 +203,20 @@ export class ProcessCostController {
   }
 
   /**
+   * Get total process costs for multiple BOM items in a single request
+   */
+  @Post('bulk-total')
+  @ApiOperation({ summary: 'Get total process costs for multiple BOM items' })
+  @ApiResponse({ status: 201, description: 'Returns a map of bomItemId → totalCost' })
+  async getBulkTotalCosts(
+    @Body('bomItemIds') bomItemIds: string[],
+    @AccessToken() accessToken: string,
+  ): Promise<Record<string, number>> {
+    if (!Array.isArray(bomItemIds) || bomItemIds.length === 0) return {};
+    return this.processCostService.getBulkTotalCosts(bomItemIds, accessToken);
+  }
+
+  /**
    * Get total process cost for a BOM item
    */
   @Get('bom-item/:bomItemId/total')

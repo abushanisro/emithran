@@ -231,6 +231,7 @@ Best regards,
 
     for (const template of matchingTemplates) {
       for (const channel of template.channels) {
+        if (channel === 'webhook') continue; // webhook not handled by sendNotification
         if (this.shouldSendNotification(channel, customerPreferences)) {
           try {
             const result = await this.sendNotification(
@@ -271,8 +272,8 @@ Best regards,
 
     const customerPreferences: NotificationPreferences = {
       customerId: 'custom',
-      email: channel === 'email' ? recipient : undefined,
-      phone: channel === 'sms' ? recipient : undefined,
+      ...(channel === 'email' ? { email: recipient } : {}),
+      ...(channel === 'sms' ? { phone: recipient } : {}),
       timezone: 'Asia/Kolkata',
       language: 'en',
       channels: { email: true, sms: true, push: true },
@@ -368,7 +369,7 @@ Best regards,
   /**
    * Get delivery analytics and notification metrics
    */
-  getNotificationAnalytics(dateRange: { from: Date; to: Date }) {
+  getNotificationAnalytics(_dateRange: { from: Date; to: Date }) {
     // In production, this would query your analytics database
     return {
       totalNotifications: 1250,
@@ -478,7 +479,7 @@ Best regards,
 
       if (response.ok) {
         const messageId = response.headers.get('X-Message-Id');
-        return { success: true, channel: 'email', messageId: messageId || undefined };
+        return { success: true, channel: 'email', ...(messageId ? { messageId } : {}) };
       } else {
         const error = await response.text();
         return { success: false, channel: 'email', error };
@@ -493,8 +494,8 @@ Best regards,
   }
 
   private async sendSMS(
-    to: string,
-    message: string
+    _to: string,
+    _message: string
   ): Promise<NotificationResult> {
     if (!this.apiKeys.twilio) {
       // Simulate success for demo
@@ -515,9 +516,9 @@ Best regards,
   }
 
   private async sendPushNotification(
-    userId: string,
-    title: string,
-    body: string
+    _userId: string,
+    _title: string,
+    _body: string
   ): Promise<NotificationResult> {
     if (!this.apiKeys.firebase) {
       // Simulate success for demo
@@ -558,8 +559,8 @@ Best regards,
   }
 
   private async scheduleNotification(
-    scheduledFor: Date,
-    notification: {
+    _scheduledFor: Date,
+    _notification: {
       subject: string;
       body: string;
       orderId: string;

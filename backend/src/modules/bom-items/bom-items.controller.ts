@@ -8,21 +8,26 @@ import {
   Param,
   Query,
   UploadedFiles,
+  UploadedFile,
   UseInterceptors,
   BadRequestException,
   Logger,
   Patch,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import * as path from 'path';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { BOMItemsService } from './bom-items.service';
 import { CreateBOMItemDto, UpdateBOMItemDto, QueryBOMItemsDto, BOMItemType } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
+import { AutoFillResponseDto } from './dto/auto-fill.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { FileStorageService } from './services/file-storage.service';
 import { StepConverterService } from './services/step-converter.service';
 import { CADAnalysisService } from './services/cad-analysis.service';
+import { AutoFillService } from './services/auto-fill.service';
 import axios from 'axios';
 
 // Define User type if not available
@@ -43,7 +48,38 @@ export class BOMItemsController {
     private readonly fileStorageService: FileStorageService,
     private readonly stepConverterService: StepConverterService,
     private readonly cadAnalysisService: CADAnalysisService,
+    private readonly autoFillService: AutoFillService,
   ) {}
+
+  // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
+  @Post('analyze-for-autofill')
+  @ApiOperation({ summary: 'Analyze a 3D file and return auto-fill suggestions (stateless, no DB write)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Auto-fill suggestions returned', type: AutoFillResponseDto })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 100 * 1024 * 1024 },
+    }),
+  )
+  async analyzeForAutoFill(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<AutoFillResponseDto> {
+    if (!file) {
+      throw new BadRequestException('file is required');
+    }
+    const allowedExts = ['.step', '.stp', '.stl', '.iges', '.igs', '.obj'];
+    const ext = path.extname(file.originalname ?? '').toLowerCase();
+    if (!allowedExts.includes(ext)) {
+      throw new BadRequestException(`Unsupported file type: ${ext || '(none)'}. Allowed: ${allowedExts.join(', ')}`);
+    }
+    if (!user?.id) {
+      throw new BadRequestException('User authentication required');
+    }
+    return this.autoFillService.analyzeAndSuggest(file.buffer, file.originalname, user.id, token);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Get all BOM items' })
@@ -284,7 +320,7 @@ export class BOMItemsController {
     // Check if it's a STEP file
     const isStepFile = this.stepConverterService.isStepFile(bomItem.file3dPath);
     if (!isStepFile) {
-      throw new BadRequestException('File is not a STEP file. Only .step, .stp, .iges, .igs files can be converted');
+      throw new BadRequestException('File is not a supported CAD file. Only .step, .stp, .iges, .igs, .sldprt files can be converted');
     }
 
     // Get project ID from BOM
@@ -614,7 +650,7 @@ export class BOMItemsController {
       
       // Validate file type
       if (!this.stepConverterService.isStepFile(stepFile.originalname)) {
-        throw new BadRequestException('Invalid file type. Please upload a STEP (.step, .stp) or IGES (.iges, .igs) file.');
+        throw new BadRequestException('Invalid file type. Please upload a STEP (.step, .stp), IGES (.iges, .igs), or SolidWorks (.sldprt) file.');
       }
 
       // Validate file size (100MB limit)

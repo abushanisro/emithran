@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -226,93 +225,93 @@ interface ManufacturingFeature {
   const isPdf2d = lowerPath && lowerPath.endsWith('.pdf');
 
   return (
-    <div className="fixed right-0 top-0 h-full w-full md:w-[90vw] lg:w-[80vw] xl:w-[75vw] bg-background border-l shadow-2xl z-50 overflow-y-auto">
-      <Card className="h-full rounded-none border-0">
-        <CardHeader className="border-b sticky top-0 bg-background z-10">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <CardTitle className="text-xl">{item.name}</CardTitle>
-                {(item.file3dPath || item.file2dPath) && (
-                  <Badge
-                    variant={
-                      (preferredView === '3d' && item.file3dPath) || (!item.file2dPath && item.file3dPath)
-                        ? 'default'
-                        : 'secondary'
-                    }
-                    className="text-xs"
-                  >
-                    {(preferredView === '3d' && item.file3dPath) || (!item.file2dPath && item.file3dPath) ? (
-                      <>
-                        <Box className="h-3 w-3 mr-1" />
-                        3D Model
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-3 w-3 mr-1" />
-                        2D Drawing
-                      </>
-                    )}
-                  </Badge>
-                )}
-              </div>
-              {item.partNumber && (
-                <p className="text-sm text-muted-foreground">Part #: {item.partNumber}</p>
+    <div className="fixed right-0 top-0 h-screen w-full md:w-[90vw] lg:w-[80vw] xl:w-[75vw] bg-background border-l shadow-2xl z-50 flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex-shrink-0 border-b bg-background px-6 py-4">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-xl font-semibold">{item.name}</h2>
+              {(item.file3dPath || item.file2dPath) && (
+                <Badge
+                  variant={
+                    (preferredView === '3d' && item.file3dPath) || (!item.file2dPath && item.file3dPath)
+                      ? 'default'
+                      : 'secondary'
+                  }
+                  className="text-xs"
+                >
+                  {(preferredView === '3d' && item.file3dPath) || (!item.file2dPath && item.file3dPath) ? (
+                    <>
+                      <Box className="h-3 w-3 mr-1" />
+                      3D Model
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-3 w-3 mr-1" />
+                      2D Drawing
+                    </>
+                  )}
+                </Badge>
               )}
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
+            {item.partNumber && (
+              <p className="text-sm text-muted-foreground">Part #: {item.partNumber}</p>
+            )}
           </div>
-        </CardHeader>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
 
-        <CardContent>
-          {/* Tab Navigation */}
-          <div className="flex gap-2 mb-6 border-b">
-            {item.file3dPath && (
-              <button
-                onClick={() => setActiveTab('3d')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                  activeTab === '3d' 
-                    ? 'border-primary text-primary bg-primary/5' 
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Box className="h-4 w-4 inline mr-2" />
-                3D Model
-              </button>
-            )}
-            {item.file2dPath && (
-              <button
-                onClick={() => setActiveTab('2d')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                  activeTab === '2d' 
-                    ? 'border-primary text-primary bg-primary/5' 
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <FileText className="h-4 w-4 inline mr-2" />
-                2D Drawing
-              </button>
-            )}
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mt-3 border-b -mb-px">
+          {item.file3dPath && (
             <button
-              onClick={() => setActiveTab('analysis')}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === 'analysis' 
-                  ? 'border-primary text-primary bg-primary/5' 
+              onClick={() => setActiveTab('3d')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === '3d'
+                  ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Factory className="h-4 w-4 inline mr-2" />
-              DFM Analysis
+              <Box className="h-4 w-4 inline mr-2" />
+              3D Model
             </button>
-          </div>
+          )}
+          {item.file2dPath && (
+            <button
+              onClick={() => setActiveTab('2d')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === '2d'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <FileText className="h-4 w-4 inline mr-2" />
+              2D Drawing
+            </button>
+          )}
+          <button
+            onClick={() => setActiveTab('analysis')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'analysis'
+                ? 'border-primary text-primary bg-primary/5'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Factory className="h-4 w-4 inline mr-2" />
+            DFM Analysis
+          </button>
+        </div>
+      </div>
 
-          <div className="mt-6">
+      {/* Tab content — flex-1 so it fills all remaining height */}
+      <div className="flex-1 overflow-hidden">
 
             {/* 3D Model Tab Content */}
             {activeTab === '3d' && (
-              <div className="space-y-4">
+              <div className="h-full flex flex-col">
                 {loading && (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -320,21 +319,23 @@ interface ManufacturingFeature {
                 )}
 
                 {!loading && file3dUrl && (
-                  <ModelViewer
-                    key={file3dUrl}
-                    fileUrl={file3dUrl}
-                    fileName={item.file3dPath?.split('/').pop() || 'model'}
-                    fileType={item.file3dPath?.split('.').pop() || 'stl'}
-                    bomItemId={item.id}
-                    manufacturingFeatures={manufacturingFeatures}
-                    selectedFeature={selectedFeature}
-                    onFeatureSelect={setSelectedFeature}
-                    showFeatures={showFeatures}
-                  />
+                  <div className="flex-1 overflow-hidden">
+                    <ModelViewer
+                      key={file3dUrl}
+                      fileUrl={file3dUrl}
+                      fileName={item.file3dPath?.split('/').pop() || 'model'}
+                      fileType={item.file3dPath?.split('.').pop() || 'stl'}
+                      bomItemId={item.id}
+                      manufacturingFeatures={manufacturingFeatures}
+                      selectedFeature={selectedFeature}
+                      onFeatureSelect={setSelectedFeature}
+                      showFeatures={showFeatures}
+                    />
+                  </div>
                 )}
 
                 {!loading && !file3dUrl && (
-                  <div className="text-center py-12 text-muted-foreground">
+                  <div className="flex items-center justify-center flex-1 text-muted-foreground">
                     <p className="text-sm">3D model could not be loaded</p>
                   </div>
                 )}
@@ -343,7 +344,7 @@ interface ManufacturingFeature {
 
             {/* 2D Drawing Tab Content */}
             {activeTab === '2d' && (
-              <div className="space-y-4">
+              <div className="h-full overflow-y-auto p-6 space-y-4">
                 {loading && (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -424,7 +425,7 @@ interface ManufacturingFeature {
               </div>
             )}
 
-                {!item.file2dPath && !item.file3dPath && (
+                {!item.file2dPath && !item.file3dPath && activeTab !== 'analysis' && (
                   <div className="border rounded-lg p-6">
                 <div className="text-center mb-6">
                   <Upload className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
@@ -500,34 +501,33 @@ interface ManufacturingFeature {
 
             {/* Manufacturing Analysis Tab Content */}
             {activeTab === 'analysis' && (
-              <ManufacturingAnalysisPanel
-                bomItemId={item.id}
-                bomItem={{
-                  annualVolume: item.annualVolume,
-                  material: item.material,
-                  materialGrade: item.materialGrade
-                }}
-                selectedProcess={selectedProcessForHighlight}
-                onFeatureSelect={(feature) => {
-                  setSelectedFeature(feature);
-                  setShowFeatures(true);
-                  // Switch to 3D tab to show 3D model with highlighted feature
-                  if (feature && item.file3dPath) {
-                    setActiveTab('3d');
-                  }
-                }}
-                onFeaturesUpdate={(features) => {
-                  setManufacturingFeatures(features);
-                  setShowFeatures(features.length > 0);
-                }}
-                onProcessHighlight={handleProcessHighlight}
-                selectedFeature={selectedFeature}
-                manufacturingFeatures={manufacturingFeatures}
-              />
+              <div className="h-full overflow-y-auto p-6">
+                <ManufacturingAnalysisPanel
+                  bomItemId={item.id}
+                  bomItem={{
+                    annualVolume: item.annualVolume,
+                    material: item.material,
+                    materialGrade: item.materialGrade
+                  }}
+                  selectedProcess={selectedProcessForHighlight}
+                  onFeatureSelect={(feature) => {
+                    setSelectedFeature(feature);
+                    setShowFeatures(true);
+                    if (feature && item.file3dPath) {
+                      setActiveTab('3d');
+                    }
+                  }}
+                  onFeaturesUpdate={(features) => {
+                    setManufacturingFeatures(features);
+                    setShowFeatures(features.length > 0);
+                  }}
+                  onProcessHighlight={handleProcessHighlight}
+                  selectedFeature={selectedFeature}
+                  manufacturingFeatures={manufacturingFeatures}
+                />
+              </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

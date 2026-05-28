@@ -1108,37 +1108,6 @@ function STLModel({
 
   // ─── Part Separation Helpers ──────────────────────────────────────────────
 
-  const createSimplifiedExplodedView = useCallback((geo: THREE.BufferGeometry): ExplodedPart[] => {
-    geo.computeBoundingBox();
-    const bbox = geo.boundingBox!;
-    const geometryCenter = new THREE.Vector3();
-    bbox.getCenter(geometryCenter);
-
-    const sections = 6;
-    const parts: ExplodedPart[] = [];
-
-    for (let i = 0; i < sections; i++) {
-      const angle = (i / sections) * Math.PI * 2;
-      const height = Math.sin(i * 0.8) * 0.4;
-      const direction = new THREE.Vector3(
-        Math.cos(angle) * 0.8,
-        height + 0.3,
-        Math.sin(angle) * 0.8,
-      ).normalize();
-
-      parts.push({
-        geometry: geo.clone(),
-        centroid: geometryCenter.clone(),
-        boundingBox: geo.boundingBox?.clone() ?? new THREE.Box3(),
-        explosionDirection: direction,
-        targetPosition: new THREE.Vector3(0, 0, 0),
-        currentPosition: new THREE.Vector3(0, 0, 0),
-        id: `simplified-section-${i}`,
-      });
-    }
-    return parts;
-  }, []);
-
   const createPartGeometry = useCallback((
     faceIndices: number[],
     partIndex: number,
@@ -1202,10 +1171,34 @@ function STLModel({
       boundingBox: bbox.clone(),
       explosionDirection: explosionDirection.clone(),
       targetPosition: new THREE.Vector3(0, 0, 0),
-      currentPosition: centroid.clone(),
+      currentPosition: new THREE.Vector3(0, 0, 0), // Start at model origin — vertices encode position
       id: `part-${partIndex + 1}`,
     };
   }, []);
+
+  const createSimplifiedExplodedView = useCallback((geo: THREE.BufferGeometry): ExplodedPart[] => {
+    geo.computeBoundingBox();
+    const center = new THREE.Vector3();
+    geo.boundingBox!.getCenter(center);
+    const posAttr = geo.attributes['position'] as THREE.BufferAttribute;
+    if (!posAttr) return [];
+    const faceCount = Math.floor(posAttr.count / 3);
+
+    // Bucket faces by 60° wedge of face centroid in XZ plane
+    const buckets: number[][] = Array.from({ length: 6 }, () => []);
+    for (let f = 0; f < faceCount; f++) {
+      const cx = (posAttr.getX(f*3) + posAttr.getX(f*3+1) + posAttr.getX(f*3+2)) / 3 - center.x;
+      const cz = (posAttr.getZ(f*3) + posAttr.getZ(f*3+1) + posAttr.getZ(f*3+2)) / 3 - center.z;
+      const angle = Math.atan2(cz, cx);
+      const bucket = Math.floor(((angle + Math.PI) / (Math.PI * 2)) * 6) % 6;
+      buckets[bucket]!.push(f);
+    }
+
+    const nonEmpty = buckets.filter(b => b.length > 0);
+    return nonEmpty.map((faceIndices, i) =>
+      createPartGeometry(faceIndices, i, nonEmpty.length, posAttr, geo)
+    );
+  }, [createPartGeometry]);
 
   const getSharedVertices = useCallback((
     faceA: number,
@@ -1986,17 +1979,25 @@ function STLModel({
   // ─── Section plane ───────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (meshRef.current) {
-      const mat = meshRef.current.material as any;
-      if (sectionPlane > 0) {
-        mat.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), sectionPlane - 0.5)];
-        mat.clipShadows = true;
-      } else {
-        mat.clippingPlanes = [];
-      }
-      (meshRef.current.material as THREE.Material).needsUpdate = true;
+    if (!meshRef.current) return;
+    const mat = meshRef.current.material as any;
+    if (sectionPlane > 0 && geometry) {
+      geometry.computeBoundingBox();
+      const bbox = geometry.boundingBox!;
+      const yMin = bbox.min.y;
+      const yMax = bbox.max.y;
+      // <Center> translates the model so its centroid sits at world origin.
+      // After that, world Y runs from -(yMax-yMin)/2 to +(yMax-yMin)/2.
+      // Map sectionPlane (0→1): 0.5 → cutY=0 (mid-height), 0 → bottom, 1 → top
+      const cutY = (sectionPlane - 0.5) * (yMax - yMin);
+      // Plane normal (0,-1,0): visible where y <= cutY — hides top, shows bottom (cross-section)
+      mat.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), cutY)];
+      mat.clipShadows = true;
+    } else {
+      mat.clippingPlanes = [];
     }
-  }, [sectionPlane]);
+    (meshRef.current.material as THREE.Material).needsUpdate = true;
+  }, [sectionPlane, geometry]);
 
   useEffect(() => {
     return () => {
@@ -2008,27 +2009,35 @@ function STLModel({
 
   // ─── Explosion targets ──────────────────────────────────────────────────
 
+  const partGroupRefs = useRef<Map<string, THREE.Group>>(new Map());
+
   const explosionTargets = useMemo(() => {
     if (!explodedParts.length) return new Map<string, THREE.Vector3>();
     const targets = new Map<string, THREE.Vector3>();
-    const dist = ((explodeDistance ?? 0) / 100) * 120;
+
+    // Scale relative to model bounding box so any model size looks right
+    geometry?.computeBoundingBox();
+    const size = new THREE.Vector3();
+    geometry?.boundingBox?.getSize(size);
+    const modelDiag = size.length() || 100;
+    const dist = ((explodeDistance ?? 0) / 100) * modelDiag * 0.8;
 
     explodedParts.forEach((part) => {
-      if (isExploded && (explodeDistance ?? 0) > 0) {
-        targets.set(part.id, part.explosionDirection.clone().multiplyScalar(dist));
-      } else {
-        targets.set(part.id, new THREE.Vector3(0, 0, 0));
-      }
+      targets.set(
+        part.id,
+        isExploded && (explodeDistance ?? 0) > 0
+          ? part.explosionDirection.clone().multiplyScalar(dist)
+          : new THREE.Vector3(0, 0, 0),
+      );
     });
     return targets;
-  }, [isExploded, explodeDistance, explodedParts.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isExploded, explodeDistance, explodedParts.length, geometry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     explodedParts.forEach(part => {
       const tp = explosionTargets.get(part.id);
       if (tp) {
         part.targetPosition.copy(tp);
-        if (part.currentPosition.length() === 0) part.currentPosition.copy(tp);
       }
     });
   }, [explosionTargets, explodedParts]);
@@ -2037,7 +2046,12 @@ function STLModel({
     if (!explodedParts.length) return;
     explodedParts.forEach((part) => {
       const d = part.currentPosition.distanceTo(part.targetPosition);
-      if (d > 0.01) part.currentPosition.lerp(part.targetPosition, 0.08);
+      if (d > 0.01) {
+        part.currentPosition.lerp(part.targetPosition, 0.08);
+      }
+      // Drive the Three.js group directly — bypasses React for smooth animation
+      const group = partGroupRefs.current.get(part.id);
+      if (group) group.position.copy(part.currentPosition);
     });
   });
 
@@ -2172,7 +2186,13 @@ function STLModel({
             if (!isVisible) return null;
 
             return (
-              <group key={part.id} position={part.currentPosition}>
+              <group
+                key={part.id}
+                ref={(el) => {
+                  if (el) partGroupRefs.current.set(part.id, el);
+                  else partGroupRefs.current.delete(part.id);
+                }}
+              >
                 <mesh
                   geometry={part.geometry}
                   castShadow
@@ -2402,7 +2422,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   const [isTransparent, setIsTransparent] = useState(false);
   const [isWireframe, setIsWireframe] = useState(false);
   const [showCrossSection, setShowCrossSection] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [axesRotation, setAxesRotation] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 });
   const [measurements, setMeasurements] = useState<{
     volume: number;
@@ -2410,14 +2430,14 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
     surfaceArea: number;
     projectedArea?: number;
   } | null>(null);
-  const [internalShowFeatures, setInternalShowFeatures] = useState(showFeatures ?? false);
+  const [internalShowFeatures, setInternalShowFeatures] = useState(false);
+  const [internalSelectedFeature, setInternalSelectedFeature] = useState<ManufacturingFeature | null>(null);
 
   const features = manufacturingFeatures ?? [];
-  const currentSelectedFeature = selectedFeature ?? null;
+  // Use prop if parent manages selection, otherwise fall back to internal state
+  const currentSelectedFeature = selectedFeature !== undefined ? (selectedFeature ?? null) : internalSelectedFeature;
 
-  useEffect(() => {
-    if (showFeatures !== undefined) setInternalShowFeatures(showFeatures);
-  }, [showFeatures]);
+  // showFeatures prop intentionally not synced — user controls this via the toolbar button
 
   const tempVectors = useRef({
     x: new THREE.Vector3(),
@@ -2807,9 +2827,8 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       setMeasurements(prev => prev ? { ...prev, projectedArea } : null);
     }
 
-    // Compute projected face highlight for initial view
+    // Compute projected face indices but keep highlight off until user enables it
     setProjectedFaceIndices(computeProjectedFaces(geometry, currentView));
-    setShowProjectedAreaHighlight(true);
   }, [calculateProjectedAreaFromMesh, currentView, measurements]);
 
   const handleOrientationChange = useCallback((matrix: THREE.Matrix4) => {
@@ -2851,10 +2870,9 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       setMeasurements(prev => prev ? { ...prev, projectedArea } : null);
     }
 
-    // Compute and auto-enable projected face highlight for the new view
+    // Recompute projected faces for the new view (keep user's highlight toggle state)
     if (currentGeometry) {
       setProjectedFaceIndices(computeProjectedFaces(currentGeometry, view));
-      setShowProjectedAreaHighlight(true);
     }
   };
 
@@ -2898,7 +2916,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               <>
                 <Separator orientation="vertical" className="h-6 bg-[#555555]" />
                 <Button variant="outline" size="sm" onClick={() => setInternalShowFeatures(v => !v)}
-                  className={`gap-1.5 font-medium text-xs ${internalShowFeatures ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+                  className={`gap-1.5 font-medium text-xs ${internalShowFeatures ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
                   <Target className="h-3.5 w-3.5" /> DFM Features ({features.length})
                 </Button>
               </>
@@ -2980,6 +2998,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               localClippingEnabled: true, preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false,
             }}
             onCreated={(state) => {
+              state.gl.localClippingEnabled = true;
               const canvas = state.gl.domElement;
               const onLost = (e: Event) => { e.preventDefault(); setLoading(true); };
               const onRestored = () => setLoading(false);
@@ -3069,8 +3088,8 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
           </div>
         </div>
 
-        {/* Right Sidebar */}
-        <div className={`flex-shrink-0 w-64 bg-[#3f3f3f] border-l border-[#555555] flex flex-col max-h-screen transition-transform duration-300 ease-in-out ${showSidebar ? 'translate-x-0' : 'translate-x-full'}`}>
+        {/* Right Sidebar — absolutely positioned so it overlays the canvas without shrinking it */}
+        <div className={`absolute right-0 top-0 h-full w-64 bg-[#3f3f3f] border-l border-[#555555] flex flex-col z-10 transition-transform duration-300 ease-in-out ${showSidebar ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="px-1.5 py-1 border-b border-[#555555]">
             <h3 className="text-[9px] font-semibold text-white">Properties</h3>
             <p className="text-[7px] text-gray-400">Model controls and information</p>
@@ -3236,7 +3255,12 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                       const isSel = currentSelectedFeature?.id === feature.id;
                       return (
                         <button key={feature.id}
-                          onClick={() => onFeatureSelect?.(isSel ? null : feature)}
+                          onClick={() => {
+                            const next = isSel ? null : feature;
+                            onFeatureSelect?.(next);
+                            setInternalSelectedFeature(next);
+                            if (next) setInternalShowFeatures(true);
+                          }}
                           className={`w-full text-left p-0.5 rounded border transition-all ${isSel ? 'border-blue-400 bg-blue-900/30' : 'border-[#666666] bg-[#3f3f3f] hover:bg-[#484848]'}`}
                         >
                           <div className="flex items-center gap-1 mb-0.5">

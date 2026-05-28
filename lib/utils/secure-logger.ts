@@ -92,7 +92,7 @@ function maskSensitiveData(text: string): string {
   if (isProduction) {
     masked = masked.replace(SENSITIVE_PATTERNS.EMAIL, (email) => {
       const [user, domain] = email.split('@');
-      return `${user.slice(0, 2)}***@${domain}`;
+      return `${user?.slice(0, 2) ?? ''}***@${domain}`;
     });
   }
   

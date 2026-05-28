@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import { useProject } from '@/lib/api/hooks/useProjects';
 import { useBOM } from '@/lib/api/hooks/useBOM';
-import { useBOMItems, deleteBOMItem, createBOMItem, CreateBOMItemDto } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItems, deleteBOMItem, createBOMItem, type CreateBOMItemDto } from '@/lib/api/hooks/useBOMItems';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,13 +28,12 @@ import {
   AlertCircle,
   Trash2,
   Layers3,
-  Square,
 } from 'lucide-react';
 import { BOMItemsFlat, BOMItemDialog, BOMTreeView, BOMItemDetailPanel } from '@/components/features/bom';
 import { AssemblyTreeGenerator } from '@/components/features/bom/AssemblyTreeGenerator';
 import { HierarchicalBOMTree } from '@/components/features/bom/HierarchicalBOMTree';
 import { ModelViewer } from '@/components/ui/model-viewer';
-import { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { bomItemsApi as bomAPI } from '@/lib/api/bom-items';
 import { BOMItemType } from '@/lib/types/bom.types';
 import { toast } from 'sonner';
@@ -82,66 +81,6 @@ const LEVEL_BY_ITEM_TYPE: Record<string, number> = {
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-// Default manufacturing features shown before DFM analysis runs
-const DEFAULT_MANUFACTURING_FEATURES = [
-  {
-    id: 'hole-1',
-    type: 'hole',
-    position: { x: 10, y: 5, z: 2 },
-    dimensions: { diameter: 6.5, depth: 12 },
-    manufacturingProcess: 'CNC Drilling',
-    cycleTime: 0.8,
-    tooling: ['6.5mm Drill', 'Coolant System'],
-    warnings: ['Check for burr formation', 'Ensure proper chip evacuation'],
-    aiRecommendations: [
-      'Use peck drilling for deep holes',
-      'Apply cutting fluid for better surface finish',
-    ],
-  },
-  {
-    id: 'pocket-1',
-    type: 'pocket',
-    position: { x: 25, y: 15, z: 8 },
-    dimensions: { length: 20, width: 15, depth: 5 },
-    manufacturingProcess: 'CNC Milling',
-    cycleTime: 3.2,
-    tooling: ['10mm End Mill', 'Roughing End Mill'],
-    warnings: ['Watch for tool deflection in deep cuts'],
-    aiRecommendations: [
-      'Use trochoidal milling for efficient material removal',
-      'Consider adaptive clearing strategy',
-    ],
-  },
-  {
-    id: 'thin-wall-1',
-    type: 'thin_wall',
-    position: { x: 45, y: 8, z: 15 },
-    dimensions: { length: 30, width: 2, depth: 10 },
-    manufacturingProcess: 'Precision Milling',
-    cycleTime: 2.5,
-    tooling: ['2mm End Mill', 'High-Speed Spindle'],
-    warnings: ['High risk of deflection', 'Part may vibrate during machining'],
-    aiRecommendations: [
-      'Use support fixtures',
-      'Reduce cutting speeds',
-      'Consider leaving stock for finishing pass',
-    ],
-  },
-  {
-    id: 'undercut-1',
-    type: 'undercut',
-    position: { x: 35, y: 25, z: 5 },
-    dimensions: { length: 8, depth: 4 },
-    manufacturingProcess: 'T-Slot Milling',
-    cycleTime: 1.5,
-    tooling: ['T-Slot Cutter', 'Dovetail Cutter'],
-    warnings: ['Limited tool access', 'Difficult to inspect'],
-    aiRecommendations: [
-      'Consider EDM for complex undercuts',
-      'Use specialized undercut tools',
-    ],
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Pure utility functions (no component state)
@@ -303,80 +242,6 @@ function parseRowData(headers: string[], values: string[], rowIndex: number): an
   return item;
 }
 
-function generateManufacturingFeatures(analysisData: any): any[] {
-  const features: any[] = [];
-  const mfg = analysisData?.geometryFeatures?.manufacturingFeatures;
-  const recommendedProcesses: string[] =
-    analysisData?.dfmAnalysis?.recommendedProcesses ?? [];
-
-  mfg?.holes?.diameters?.forEach((diameter: number, index: number) => {
-    features.push({
-      id: `hole-${index}`,
-      type: 'hole',
-      position: { x: 10 + index * 5, y: 5, z: 2 },
-      dimensions: { diameter },
-      manufacturingProcess: 'CNC Drilling',
-      cycleTime: diameter < 3 ? 0.5 : diameter > 10 ? 1.2 : 0.8,
-      tooling: ['Carbide Drill', 'Coolant System'],
-      warnings: ['Check for burr formation'],
-      aiRecommendations: recommendedProcesses.includes('CNC Machining')
-        ? ['Use proper feeds and speeds for material', 'Monitor hole quality']
-        : ['Consider alternative drilling method'],
-    });
-  });
-
-  const pocketCount = Math.min(mfg?.pockets?.count ?? 0, 3);
-  for (let i = 0; i < pocketCount; i++) {
-    const depth = mfg.pockets.max_depth ?? 5;
-    features.push({
-      id: `pocket-${i}`,
-      type: 'pocket',
-      position: { x: 25 + i * 10, y: 15, z: 8 },
-      dimensions: { depth },
-      manufacturingProcess: 'CNC Milling',
-      cycleTime: depth * 0.6,
-      tooling: ['End Mill', 'Roughing Tool'],
-      warnings: depth > 15 ? ['Watch for tool deflection in deep cuts'] : ['Standard milling operation'],
-      aiRecommendations: recommendedProcesses.includes('CNC Machining')
-        ? ['Use trochoidal milling for efficient material removal']
-        : ['Consider alternative machining strategy'],
-    });
-  }
-
-  if (mfg?.thin_walls > 0) {
-    features.push({
-      id: 'thin-wall-1',
-      type: 'thin_wall',
-      position: { x: 45, y: 8, z: 15 },
-      dimensions: { width: mfg.thin_walls },
-      manufacturingProcess: mfg.thin_walls < 1 ? 'Precision Milling' : 'Standard Milling',
-      cycleTime: mfg.thin_walls < 1 ? 3.5 : 2.5,
-      tooling: mfg.thin_walls < 1 ? ['Small End Mill', 'High-Speed Spindle'] : ['Standard End Mill'],
-      warnings: mfg.thin_walls < 1.5 ? ['High risk of deflection'] : ['Monitor for vibration'],
-      aiRecommendations: ['Use support fixtures', 'Reduce cutting speeds for thin walls'],
-    });
-  }
-
-  const undercutCount = Math.min(mfg?.undercuts?.count ?? 0, 2);
-  for (let i = 0; i < undercutCount; i++) {
-    features.push({
-      id: `undercut-${i}`,
-      type: 'undercut',
-      position: { x: 35 + i * 8, y: 25, z: 5 },
-      dimensions: { depth: 4 },
-      manufacturingProcess: '5-Axis Machining',
-      cycleTime: 2.0,
-      tooling: ['Ball End Mill', '5-Axis Machine'],
-      warnings: ['Limited tool access', 'Complex setup required'],
-      aiRecommendations: [
-        'Consider design revision to eliminate undercut',
-        'Use specialized tooling',
-      ],
-    });
-  }
-
-  return features;
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -408,7 +273,7 @@ export default function BOMDetailPage() {
   const bomId = params.bomId as string;
 
   const { data: project } = useProject(projectId);
-  const { data: bomData } = useBOM(bomId);
+  const { data: bomData, isLoading: bomLoading, isError: bomError } = useBOM(bomId);
   const { data: bomItemsData, refetch: refetchBOMItems } = useBOMItems(bomId);
 
   // -------------------------------------------------------------------------
@@ -425,7 +290,7 @@ export default function BOMDetailPage() {
   // 3D viewer state
   // -------------------------------------------------------------------------
   const [uploadedAssembly3D, setUploadedAssembly3D] = useState<Assembly3DState | null>(null);
-  const [isExplodedView, setIsExplodedView] = useState(true);
+  const [isExplodedView, setIsExplodedView] = useState(false);
   const [explodeDistance, setExplodeDistance] = useState(85);
 
   // -------------------------------------------------------------------------
@@ -454,8 +319,7 @@ export default function BOMDetailPage() {
   // -------------------------------------------------------------------------
   // DFM analysis state
   // -------------------------------------------------------------------------
-  const [loadingDFMAnalysis, setLoadingDFMAnalysis] = useState(false);
-  const [assemblyDFMData, setAssemblyDFMData] = useState<any>(null);
+  const [assemblyDFMData] = useState<any>(null);
 
   // -------------------------------------------------------------------------
   // Effects
@@ -468,10 +332,6 @@ export default function BOMDetailPage() {
     if (updated) setViewingItem(updated);
   }, [bomItemsData?.items]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-enable exploded view when "Show Only Selected" is toggled on
-  useEffect(() => {
-    if (showOnlySelected && !isExplodedView) setIsExplodedView(true);
-  }, [showOnlySelected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load existing 3D assembly on mount (once, if not yet loaded)
   useEffect(() => {
@@ -646,30 +506,6 @@ export default function BOMDetailPage() {
   // Handlers — DFM analysis
   // -------------------------------------------------------------------------
 
-  const handleRunAssemblyDFMAnalysis = async () => {
-    if (!uploadedAssembly3D?.bomItemId) {
-      toast.error('No assembly model found. Please upload a 3D model first.');
-      return;
-    }
-
-    setLoadingDFMAnalysis(true);
-    try {
-      const result = await bomAPI.analyzeCAD(uploadedAssembly3D.bomItemId, true);
-      if (!result?.success && !result?.analysis) throw new Error('Analysis returned no results');
-
-      const analysisResponse = await bomAPI.getCADAnalysis(uploadedAssembly3D.bomItemId);
-      if (!analysisResponse?.success || !analysisResponse?.analysis) {
-        throw new Error('Failed to retrieve analysis results');
-      }
-
-      setAssemblyDFMData(analysisResponse.analysis);
-      toast.success('DFM Analysis completed. Check the Properties panel for recommendations.');
-    } catch (err: any) {
-      toast.error('DFM Analysis failed: ' + (err.message ?? 'Unknown error'));
-    } finally {
-      setLoadingDFMAnalysis(false);
-    }
-  };
 
   // -------------------------------------------------------------------------
   // Handlers — bulk delete
@@ -1101,20 +937,38 @@ export default function BOMDetailPage() {
     throw new Error(`Failed after ${maxRetries + 1} attempts: ${lastError?.message}`);
   };
 
-  // -------------------------------------------------------------------------
-  // Derived manufacturing features (memoized on analysis data)
-  // -------------------------------------------------------------------------
-  const activeManufacturingFeatures = assemblyDFMData
-    ? generateManufacturingFeatures(assemblyDFMData)
-    : DEFAULT_MANUFACTURING_FEATURES;
 
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
+  if (bomLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (bomError || (!bomLoading && !bomData)) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4 max-w-md">
+          <h2 className="text-xl font-semibold">BOM Not Found</h2>
+          <p className="text-muted-foreground">
+            This BOM may have been deleted or you may not have permission to view it.
+          </p>
+          <Button onClick={() => router.push(projectId ? `/bom?projectId=${projectId}` : '/projects')}>
+            Back to BOM Management
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={bom.name} description={bom.description}>
+      <PageHeader title={bom.name} description={bom.description ?? ''}>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -1258,18 +1112,6 @@ export default function BOMDetailPage() {
               <div className="col-span-3 border-r pr-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Assembly Parts</h3>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                    onClick={handleRunAssemblyDFMAnalysis}
-                    disabled={loadingDFMAnalysis}
-                  >
-                    {loadingDFMAnalysis
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <Settings className="h-3.5 w-3.5" />}
-                    {loadingDFMAnalysis ? 'Analyzing…' : 'DFM Analysis'}
-                  </Button>
                 </div>
 
                 <div className="max-h-[700px] overflow-y-auto space-y-2">
@@ -1356,7 +1198,6 @@ export default function BOMDetailPage() {
                     showOnlySelected={showOnlySelected}
                     hoveredBOMItem={hoveredBOMItem}
                     onPartsDetected={handlePartsDetected}
-                    manufacturingFeatures={activeManufacturingFeatures as any}
                     dfmAnalysisData={assemblyDFMData}
                     showFeatures
                   />
@@ -1387,11 +1228,6 @@ export default function BOMDetailPage() {
                       <span className="text-sm text-muted-foreground w-8">{explodeDistance}</span>
                     </div>
                   )}
-
-                  <Button variant="outline" className="gap-2">
-                    <Square className="h-4 w-4" />
-                    Section View
-                  </Button>
 
                   <Button variant="outline" className="gap-2">
                     <Download className="h-4 w-4" />
@@ -1473,7 +1309,7 @@ export default function BOMDetailPage() {
             <CardContent>
               <BOMTreeView
                 items={bomItems}
-                projectName={project?.name}
+                projectName={project?.name ?? ''}
                 projectId={projectId}
                 onAddItem={handleAddTreeItem}
                 onEditItem={handleEditItem}

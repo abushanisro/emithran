@@ -119,15 +119,6 @@ export function useProcessData(options: UseProcessDataOptions): UseProcessDataRe
       // Or if they have section info?
       // Assuming naive update based on ID:
 
-      const newSections = initialSections.map(section => {
-        // If section has an ID that matches a process group? Unlikely.
-        // If processes have `sectionId`?
-        // Without knowing, we just return initialSections for structure, 
-        // and populate subProcesses if any match?
-        // Actually, if we return processes directly, maybe sections are just UI containers?
-        // Let's assume the API returns processes that match the `subProcesses` structure.
-        return { ...section, subProcesses: processes }; // Very naive!
-      });
 
       // Better: Use API response directly if it matches MainProcessSection structure?
       // No, API returns Process[]. 
@@ -273,11 +264,6 @@ export function withProcessDataErrorBoundary<P extends object>(
 ): React.ComponentType<P> {
   return function ProcessDataErrorBoundary(props: P) {
     const [error, setError] = useState<Error | null>(null);
-
-    const handleError = useCallback((error: Error) => {
-      logger.error('Process data error boundary triggered', { error });
-      setError(error);
-    }, []);
 
     if (error) {
       return (

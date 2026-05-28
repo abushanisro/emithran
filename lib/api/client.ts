@@ -1,3 +1,4 @@
+
 /**
  * API Client for mithran Microservices
  *
@@ -672,8 +673,15 @@ class ApiClient {
           }
 
           // Normal mode: throw error for calling code to handle
+          // NestJS validation pipes return { message: string[], error: string, statusCode }
+          // so we must check data.message (array or string) when data.error is not an object
+          const rawMessage = (data as any).message;
+          const extractedMessage =
+            data.error?.message ||
+            (Array.isArray(rawMessage) ? rawMessage.join('. ') : rawMessage) ||
+            `Request failed with status ${response.status}`;
           throw new ApiError(
-            data.error?.message || `Request failed with status ${response.status}`,
+            extractedMessage,
             response.status,
             data.error?.code,
             data.error?.details,
@@ -884,31 +892,32 @@ class ApiClient {
           let errorMessage: string;
 
           if (String(error.message || '').includes('Failed to fetch')) {
-            // Improved error classification based on auth state and timing
-            const hasValidToken = this.hasTokenSync();
             const readinessState = appReadiness.getState();
             const isLocalhost = url.includes('localhost') || url.includes('127.0.0.1');
+            // AUTH_READY (and beyond) means appReadiness.setAuthValidated() was called,
+            // i.e. Supabase confirmed a live session. Use this as the auth truth source
+            // instead of hasTokenSync() which only checks localStorage — @supabase/ssr
+            // stores sessions in cookies, so localStorage is always empty.
+            const authConfirmed = readinessState === 'AUTH_READY'
+              || readinessState === 'BACKEND_READY'
+              || readinessState === 'READY';
 
             if (readinessState === 'BOOTING' || readinessState === 'AUTH_INITIALIZING') {
               // Auth system still initializing - this is a race condition, not a real error
               errorCode = 'AUTH_INITIALIZING';
               errorMessage = 'Request made during auth initialization. Please wait...';
-            } else if (!hasValidToken && readinessState === 'AUTH_READY') {
-              // Auth finished but no token available - expired or failed
-              errorCode = 'AUTH_EXPIRED';
-              errorMessage = 'Session expired. Please sign in again.';
-            } else if (hasValidToken && isLocalhost) {
-              // Have token but local backend is unreachable
+            } else if (authConfirmed && isLocalhost) {
+              // Auth is valid but local backend is unreachable
               errorCode = 'BACKEND_UNREACHABLE';
               errorMessage = 'Connection failed - check if backend server is running and accessible.';
-            } else if (hasValidToken) {
-              // Have token but remote backend failed - network issue
+            } else if (authConfirmed) {
+              // Auth is valid but remote backend failed - network issue
               errorCode = 'NETWORK_ERROR';
               errorMessage = `Network error - please check your connection to ${url}`;
             } else {
-              // Default case - likely auth/CORS related
-              errorCode = 'CONNECTION_ERROR';
-              errorMessage = 'Connection failed. Please refresh the page and try again.';
+              // Auth not confirmed - session likely expired or never established
+              errorCode = 'AUTH_EXPIRED';
+              errorMessage = 'Session expired. Please sign in again.';
             }
           } else if (String(error.message || '').includes('aborted') || String(error.message || '').includes('cancelled')) {
             errorCode = 'REQUEST_ABORTED_OR_BLOCKED';

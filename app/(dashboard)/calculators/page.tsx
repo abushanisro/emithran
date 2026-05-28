@@ -10,10 +10,21 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCalculators, useCreateCalculator, useDeleteCalculator, useUpdateCalculator } from '@/lib/api/hooks';
 
+const CATEGORY_TABS = [
+  { label: 'All', value: '' },
+  { label: 'Sheet Metal', value: 'sheet_metal' },
+  { label: 'Costing', value: 'costing' },
+  { label: 'Material', value: 'material' },
+  { label: 'Process', value: 'process' },
+  { label: 'Tooling', value: 'tooling' },
+  { label: 'Custom', value: 'custom' },
+];
+
 export default function CalculatorsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     name: '',
@@ -38,6 +49,8 @@ export default function CalculatorsPage() {
 
   const { data, isLoading } = useCalculators({
     search: searchQuery || undefined,
+    calcCategory: activeCategory || undefined,
+    limit: 100,
   });
 
   const createCalculatorMutation = useCreateCalculator();
@@ -218,6 +231,23 @@ export default function CalculatorsPage() {
           <Plus className="h-4 w-4 mr-2" />
           {processFilters.operation ? `New ${processFilters.operation} Calculator` : 'New'}
         </Button>
+      </div>
+
+      {/* Category Tabs */}
+      <div className="flex gap-1 flex-wrap border-b border-border pb-2">
+        {CATEGORY_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setActiveCategory(tab.value)}
+            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+              activeCategory === tab.value
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Search */}

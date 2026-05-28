@@ -1,6 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import dynamic from 'next/dynamic';
+
+const BOMItemThumbnail = dynamic(
+  () => import('./BOMItemThumbnail').then((m) => m.BOMItemThumbnail),
+  { ssr: false, loading: () => null }
+);
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -456,6 +462,14 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
 
           <div className="p-4">
             <div className="flex flex-col md:flex-row items-start justify-between gap-3">
+
+              {/* Thumbnail */}
+              {(item.file3dPath || item.file2dPath) && (
+                <BOMItemThumbnail
+                  item={item}
+                  onClick={() => onViewItem?.(item, item.file3dPath ? '3d' : '2d')}
+                />
+              )}
 
               {/* Left: metadata */}
               <div className="flex-1 min-w-0 w-full">

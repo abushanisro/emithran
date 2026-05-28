@@ -24,7 +24,6 @@ export class CreateLSRDto {
 
   @IsNumber()
   @Min(0)
-  @Max(100)
   perksPercentage: number;
 
   @IsNumber()
@@ -38,52 +37,50 @@ export class CreateLSRDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  // India 2026 extended fields
+  @IsOptional() @IsString() processGroup?: string;
+  @IsOptional() @IsString() machineName?: string;
+  @IsOptional() @IsString() machineDescription?: string;
+  @IsOptional() @IsString() manufacturer?: string;
+  @IsOptional() @IsString() manufacturerCountry?: string;
+  @IsOptional() @IsString() wageGrade?: string;
+  @IsOptional() @IsNumber() @Min(1) operators?: number;
+  @IsOptional() @IsNumber() @Min(0) shiftsPerDay?: number;
+  @IsOptional() @IsNumber() @Min(0) hoursPerShift?: number;
+  @IsOptional() @IsNumber() @Min(0) workingDaysPerYear?: number;
+  @IsOptional() @IsNumber() @Min(0) totalHrsPerYear?: number;
+  @IsOptional() @IsNumber() @Min(0) usdLaborRatePerHr?: number;
+  @IsOptional() @IsNumber() @Min(0) usdLhrBase?: number;
+  @IsOptional() @IsNumber() @Min(0) usdLhrBurden?: number;
+  @IsOptional() @IsNumber() @Min(0) usdLhrTotal?: number;
 }
 
 export class UpdateLSRDto {
-  @IsOptional()
-  @IsString()
-  labourCode?: string;
-
-  @IsOptional()
-  @IsString()
-  labourType?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  minimumWagePerDay?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  minimumWagePerMonth?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  dearnessAllowance?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  perksPercentage?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  lhr?: number;
-
-  @IsOptional()
-  @IsString()
-  reference?: string;
-
-  @IsOptional()
-  @IsString()
-  location?: string;
+  @IsOptional() @IsString() labourCode?: string;
+  @IsOptional() @IsString() labourType?: string;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsNumber() @Min(0) minimumWagePerDay?: number;
+  @IsOptional() @IsNumber() @Min(0) minimumWagePerMonth?: number;
+  @IsOptional() @IsNumber() @Min(0) dearnessAllowance?: number;
+  @IsOptional() @IsNumber() @Min(0) perksPercentage?: number;
+  @IsOptional() @IsNumber() @Min(0) lhr?: number;
+  @IsOptional() @IsString() reference?: string;
+  @IsOptional() @IsString() location?: string;
+  // India 2026 extended fields
+  @IsOptional() @IsString() processGroup?: string;
+  @IsOptional() @IsString() machineName?: string;
+  @IsOptional() @IsString() machineDescription?: string;
+  @IsOptional() @IsString() manufacturer?: string;
+  @IsOptional() @IsString() manufacturerCountry?: string;
+  @IsOptional() @IsString() wageGrade?: string;
+  @IsOptional() @IsNumber() @Min(1) operators?: number;
+  @IsOptional() @IsNumber() @Min(0) shiftsPerDay?: number;
+  @IsOptional() @IsNumber() @Min(0) hoursPerShift?: number;
+  @IsOptional() @IsNumber() @Min(0) workingDaysPerYear?: number;
+  @IsOptional() @IsNumber() @Min(0) totalHrsPerYear?: number;
+  @IsOptional() @IsNumber() @Min(0) usdLaborRatePerHr?: number;
+  @IsOptional() @IsNumber() @Min(0) usdLhrBase?: number;
+  @IsOptional() @IsNumber() @Min(0) usdLhrBurden?: number;
+  @IsOptional() @IsNumber() @Min(0) usdLhrTotal?: number;
 }

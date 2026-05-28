@@ -31,7 +31,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         email: 'developer@mithran.dev',
         created_at: new Date().toISOString(),
         user_metadata: { full_name: 'Developer User' }
-      } as User;
+      } as unknown as User;
       
       setUser(mockUser)
       setLoading(false)
@@ -44,20 +44,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       return
     }
 
-    // Get initial session
-    const getInitialSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        setUser(session?.user ?? null)
-      } catch (error) {
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    getInitialSession()
-
-    // Listen for auth changes
+    // onAuthStateChange fires INITIAL_SESSION immediately on setup — no need
+    // to call getSession() separately (doing both causes a race condition).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setUser(session?.user ?? null)

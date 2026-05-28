@@ -120,9 +120,10 @@ export class StepConverterService {
 
       return stlBuffer;
     } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
       this.logger.error(
-        `STEP to STL conversion failed: ${error.message}`,
-        error.stack,
+        `STEP to STL conversion failed: ${err.message}`,
+        err.stack,
       );
 
       // Provide detailed error message
@@ -148,7 +149,7 @@ export class StepConverterService {
         }
       }
 
-      throw new Error(`STEP conversion failed: ${error.message}`);
+      throw new Error(`STEP conversion failed: ${err.message}`);
     }
   }
 
@@ -157,14 +158,14 @@ export class StepConverterService {
    */
   isStepFile(filename: string): boolean {
     const ext = filename.toLowerCase().split('.').pop();
-    return ['step', 'stp', 'iges', 'igs'].includes(ext || '');
+    return ['step', 'stp', 'iges', 'igs', 'sldprt'].includes(ext || '');
   }
 
   /**
    * Get supported CAD file extensions
    */
   getSupportedExtensions(): string[] {
-    return ['step', 'stp', 'iges', 'igs'];
+    return ['step', 'stp', 'iges', 'igs', 'sldprt'];
   }
 
   /**

@@ -81,11 +81,13 @@ export class CreateProcessCostDto {
   // Resource References
   @ApiPropertyOptional({ description: 'Machine Hour Record ID', example: 'uuid' })
   @IsOptional()
+  @ValidateIf(o => o.mhrId != null && o.mhrId !== '')
   @IsUUID()
   mhrId?: string;
 
   @ApiPropertyOptional({ description: 'Labour Standard Record ID', example: 'uuid' })
   @IsOptional()
+  @ValidateIf(o => o.lsrId != null && o.lsrId !== '')
   @IsUUID()
   lsrId?: string;
 
@@ -282,11 +284,13 @@ export class UpdateProcessCostDto {
   // Resource References
   @ApiPropertyOptional({ description: 'Machine Hour Record ID', example: 'uuid' })
   @IsOptional()
+  @ValidateIf(o => o.mhrId != null && o.mhrId !== '')
   @IsUUID()
   mhrId?: string;
 
   @ApiPropertyOptional({ description: 'Labour Standard Record ID', example: 'uuid' })
   @IsOptional()
+  @ValidateIf(o => o.lsrId != null && o.lsrId !== '')
   @IsUUID()
   lsrId?: string;
 

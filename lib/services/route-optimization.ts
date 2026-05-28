@@ -80,12 +80,13 @@ class RouteOptimizationService {
     }
 
     if (waypoints.length === 1) {
-      const route = await this.calculateRoute(start, waypoints[0]);
+      const wp = waypoints[0]!;
+      const route = await this.calculateRoute(start, wp);
       return {
-        waypoints: returnToStart ? [start, waypoints[0], start] : [start, waypoints[0]],
+        waypoints: returnToStart ? [start, wp, start] : [start, wp],
         totalDistance: returnToStart ? route.distance * 2 : route.distance,
         totalDuration: returnToStart ? route.duration * 2 : route.duration,
-        routes: returnToStart ? [route, await this.calculateRoute(waypoints[0], start)] : [route]
+        routes: returnToStart ? [route, await this.calculateRoute(wp, start)] : [route]
       };
     }
 
@@ -235,7 +236,7 @@ class RouteOptimizationService {
 
       // Find nearest unvisited waypoint
       for (let i = 0; i < unvisited.length; i++) {
-        const distance = this.calculateHaversineDistance(current, unvisited[i]);
+        const distance = this.calculateHaversineDistance(current, unvisited[i]!);
         if (distance < nearestDistance) {
           nearestDistance = distance;
           nearestIndex = i;
@@ -243,14 +244,14 @@ class RouteOptimizationService {
       }
 
       // Calculate actual route to nearest waypoint
-      const nearest = unvisited[nearestIndex];
+      const nearest = unvisited[nearestIndex]!;
       nearestRoute = await this.calculateRoute(current, nearest);
-      
+
       orderedWaypoints.push(nearest);
       routes.push(nearestRoute);
       totalDistance += nearestRoute.distance;
       totalDuration += nearestRoute.duration;
-      
+
       current = nearest;
       unvisited.splice(nearestIndex, 1);
     }

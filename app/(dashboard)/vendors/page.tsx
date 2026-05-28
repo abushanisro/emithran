@@ -164,8 +164,10 @@ export default function VendorsPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-        toast.error('Please select a CSV file');
+      const name = file.name.toLowerCase();
+      const isValid = name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls');
+      if (!isValid) {
+        toast.error('Please select a CSV or Excel (.xlsx) file');
         return;
       }
       setSelectedFile(file);
@@ -353,7 +355,7 @@ export default function VendorsPage() {
             className="gap-2"
           >
             <Upload className="h-4 w-4" />
-            Import CSV
+            Import File
           </Button>
           <Button
             variant="outline"
@@ -977,13 +979,13 @@ export default function VendorsPage() {
         </div>
       </div>
 
-      {/* Upload CSV Dialog */}
+      {/* Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Import Suppliers from CSV</DialogTitle>
+            <DialogTitle>Import Suppliers</DialogTitle>
             <DialogDescription>
-              Upload your vendor database CSV file to import all suppliers at once
+              Upload a CSV or Excel (.xlsx) file to import suppliers. Columns: Supplier Name, Full Address, Website, Company Phone, Industries Served, Process, Materials, Countries Served, Annual Turnover, Certifications, Inspection Options, QMS Metrics, QMS Procedures, Workshop/Facility, Warehouse, Packing, Logistics, Max Capacity, Avg Utilization, Shift Hours, Shifts/Day, Working Days/Wk, In-House Testing, Operators, Engineers, Prod. Managers, Contact 1, Title 1, Email 1, Phone 1, Contact 2, Title 2, Email 2, Phone 2, Company Profile, Machine List.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
@@ -991,7 +993,7 @@ export default function VendorsPage() {
               <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <input
                 type="file"
-                accept=".csv"
+                accept=".csv,.xlsx,.xls"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="csv-upload"
@@ -1000,8 +1002,9 @@ export default function VendorsPage() {
                 htmlFor="csv-upload"
                 className="cursor-pointer text-sm text-primary hover:underline"
               >
-                Click to upload CSV file
+                Click to upload CSV or Excel file
               </label>
+              <p className="mt-1 text-xs text-muted-foreground">Supported formats: .csv, .xlsx</p>
               {selectedFile && (
                 <p className="mt-2 text-sm text-muted-foreground">
                   Selected: {selectedFile.name}
@@ -1013,7 +1016,7 @@ export default function VendorsPage() {
               disabled={!selectedFile || uploadCsvMutation.isPending}
               className="w-full"
             >
-              {uploadCsvMutation.isPending ? 'Uploading...' : 'Upload CSV'}
+              {uploadCsvMutation.isPending ? 'Uploading...' : 'Upload File'}
             </Button>
           </div>
         </DialogContent>

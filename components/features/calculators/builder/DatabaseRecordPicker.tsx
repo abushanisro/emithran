@@ -324,7 +324,7 @@ export function DatabaseRecordPicker({
                         size="sm"
                         className="w-full"
                         onClick={() => {
-                          window.open('/mhr-database', '_blank');
+                          window.open('/hr-rates', '_blank');
                           handleClose();
                         }}
                       >
@@ -337,7 +337,7 @@ export function DatabaseRecordPicker({
                         size="sm"
                         className="w-full"
                         onClick={() => {
-                          window.open('/lhr-database', '_blank');
+                          window.open('/hr-rates', '_blank');
                           handleClose();
                         }}
                       >

@@ -1,266 +1,300 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import {
-  useProjects,
-  useBOMItems,
-  useRawMaterials,
-  useProcesses,
-  useVendors,
-  useBOMs,
-} from "@/lib/api/hooks";
-import type {
-  BenchmarkStep,
-  BOMMetricEntry,
-  SelectedBOM,
-  SelectedProject,
-} from "./types";
-import { calculateMetrics, safeNum } from "./utils";
-import { ProjectSelection } from "./components/ProjectSelection";
-import { BOMSelection } from "./components/BOMSelection";
-import { ComparisonView } from "./components/comparison";
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { BarChart2, Plus, Activity, Layers, CalendarDays, ChevronRight } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useBenchmarkSessions, useCreateBenchmarkSession } from '@/lib/api/hooks/useBenchmarkSessions';
+import type { BenchmarkSession } from '@/lib/api/benchmark-sessions';
+import { BenchmarkSessionDetail } from './components/BenchmarkSessionDetail';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const STATUS_LABELS: Record<BenchmarkSession['status'], string> = {
+  draft: 'Draft',
+  active: 'Active',
+  archived: 'Archived',
+};
+
+const STATUS_COLORS: Record<BenchmarkSession['status'], string> = {
+  draft: 'bg-muted text-muted-foreground border-muted',
+  active: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  archived: 'bg-muted/60 text-muted-foreground/60 border-border',
+};
+
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function isThisMonth(dateString: string): boolean {
+  const d = new Date(dateString);
+  const now = new Date();
+  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function BenchmarkPage() {
   const searchParams = useSearchParams();
-  const projectIdFromUrl = searchParams?.get("projectId");
+  const projectIdFromUrl = searchParams?.get('projectId') ?? null;
 
-  // ── Remote data ──────────────────────────────────────────────────────────────
-  const { data: projectsData } = useProjects();
-  const projects = projectsData?.projects ?? [];
+  const [step, setStep] = useState<'list' | 'detail'>('list');
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState({ name: '', description: '' });
+  const [formLoading, setFormLoading] = useState(false);
 
-  const { data: rawMaterialsData } = useRawMaterials();
-  const { data: processesData } = useProcesses();
-  const { data: vendorsData } = useVendors();
+  const { data: sessionsRaw, isLoading } = useBenchmarkSessions();
+  const createSession = useCreateBenchmarkSession();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rawMaterialsRecord = rawMaterialsData as unknown as Record<string, any>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rawMaterials: any[] =
-    rawMaterialsRecord?.rawMaterials ?? rawMaterialsRecord?.data ?? [];
-  const processes = processesData?.processes ?? [];
-  const vendors = vendorsData?.vendors ?? [];
+  const sessions: BenchmarkSession[] = (sessionsRaw as BenchmarkSession[]) ?? [];
 
-  // ── UI state ─────────────────────────────────────────────────────────────────
-  const [step, setStep] = useState<BenchmarkStep>("project-selection");
-  const [searchProject, setSearchProject] = useState("");
-  const [selectedProject, setSelectedProject] = useState<SelectedProject | null>(null);
-  const [selectedBOMs, setSelectedBOMs] = useState<SelectedBOM[]>([]);
-  const [multiProjectMode, setMultiProjectMode] = useState(false);
-  const [selectedProjects, setSelectedProjects] = useState<SelectedProject[]>([]);
+  // Stats
+  const activeSessions = sessions.filter((s) => s.status === 'active').length;
+  const totalBOMsCompared = sessions.reduce((sum, s) => sum + (s.bomCount ?? 0), 0);
+  const sessionsThisMonth = sessions.filter((s) => isThisMonth(s.updatedAt)).length;
 
-  // ── BOMs for single-project mode ─────────────────────────────────────────────
-  const { data: bomsData } = useBOMs(
-    selectedProject ? { projectId: selectedProject.id } : undefined
-  );
-  const boms = bomsData?.boms ?? [];
-
-  // ── BOMs for up to 10 projects (fixed hook count — Rules of Hooks) ────────────
-  const p1 = selectedProjects[0];
-  const p2 = selectedProjects[1];
-  const p3 = selectedProjects[2];
-  const p4 = selectedProjects[3];
-  const p5 = selectedProjects[4];
-  const p6 = selectedProjects[5];
-  const p7 = selectedProjects[6];
-  const p8 = selectedProjects[7];
-  const p9 = selectedProjects[8];
-  const p10 = selectedProjects[9];
-
-  const { data: bomsP1 } = useBOMs(p1 ? { projectId: p1.id } : undefined);
-  const { data: bomsP2 } = useBOMs(p2 ? { projectId: p2.id } : undefined);
-  const { data: bomsP3 } = useBOMs(p3 ? { projectId: p3.id } : undefined);
-  const { data: bomsP4 } = useBOMs(p4 ? { projectId: p4.id } : undefined);
-  const { data: bomsP5 } = useBOMs(p5 ? { projectId: p5.id } : undefined);
-  const { data: bomsP6 } = useBOMs(p6 ? { projectId: p6.id } : undefined);
-  const { data: bomsP7 } = useBOMs(p7 ? { projectId: p7.id } : undefined);
-  const { data: bomsP8 } = useBOMs(p8 ? { projectId: p8.id } : undefined);
-  const { data: bomsP9 } = useBOMs(p9 ? { projectId: p9.id } : undefined);
-  const { data: bomsP10 } = useBOMs(p10 ? { projectId: p10.id } : undefined);
-
-  const multiProjectBoms = (
-    [
-      p1 && { projectId: p1.id, projectName: p1.name, boms: bomsP1?.boms ?? [] },
-      p2 && { projectId: p2.id, projectName: p2.name, boms: bomsP2?.boms ?? [] },
-      p3 && { projectId: p3.id, projectName: p3.name, boms: bomsP3?.boms ?? [] },
-      p4 && { projectId: p4.id, projectName: p4.name, boms: bomsP4?.boms ?? [] },
-      p5 && { projectId: p5.id, projectName: p5.name, boms: bomsP5?.boms ?? [] },
-      p6 && { projectId: p6.id, projectName: p6.name, boms: bomsP6?.boms ?? [] },
-      p7 && { projectId: p7.id, projectName: p7.name, boms: bomsP7?.boms ?? [] },
-      p8 && { projectId: p8.id, projectName: p8.name, boms: bomsP8?.boms ?? [] },
-      p9 && { projectId: p9.id, projectName: p9.name, boms: bomsP9?.boms ?? [] },
-      p10 && { projectId: p10.id, projectName: p10.name, boms: bomsP10?.boms ?? [] },
-    ] as const
-  ).filter(
-    (x): x is { projectId: string; projectName: string; boms: any[] } => Boolean(x) // eslint-disable-line @typescript-eslint/no-explicit-any
-  );
-
-  // ── BOM items for up to 10 selected BOMs (fixed hook count) ─────────────────
-  const bi1 = useBOMItems(selectedBOMs[0]?.id);
-  const bi2 = useBOMItems(selectedBOMs[1]?.id);
-  const bi3 = useBOMItems(selectedBOMs[2]?.id);
-  const bi4 = useBOMItems(selectedBOMs[3]?.id);
-  const bi5 = useBOMItems(selectedBOMs[4]?.id);
-  const bi6 = useBOMItems(selectedBOMs[5]?.id);
-  const bi7 = useBOMItems(selectedBOMs[6]?.id);
-  const bi8 = useBOMItems(selectedBOMs[7]?.id);
-  const bi9 = useBOMItems(selectedBOMs[8]?.id);
-  const bi10 = useBOMItems(selectedBOMs[9]?.id);
-
-  const bomItemsQueries = [bi1, bi2, bi3, bi4, bi5, bi6, bi7, bi8, bi9, bi10].slice(
-    0,
-    selectedBOMs.length
-  );
-
-  // ── URL param: auto-select project ───────────────────────────────────────────
+  // Auto-open if URL has a sessionId matching a session
   useEffect(() => {
-    if (projectIdFromUrl && projects.length > 0) {
-      const project = projects.find((p) => p.id === projectIdFromUrl);
-      if (project) handleProjectSelect(project);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectIdFromUrl, projects]);
+    // For now, projectIdFromUrl is stored in state to pass down to the detail component.
+    // If there's only one session or the URL encodes a sessionId, we could auto-open.
+    // The URL param ?projectId= is forwarded to BenchmarkSessionDetail.
+  }, [projectIdFromUrl, sessions]);
 
-  // ── Derived: BOM metrics ─────────────────────────────────────────────────────
-  const bomMetrics: BOMMetricEntry[] = selectedBOMs.map((bom, index) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawItems = bomItemsQueries[index]?.data?.items as any[] | undefined;
-    return {
-      bom,
-      metrics: calculateMetrics(rawItems),
-      items: rawItems,
-    };
-  });
-
-  const bomItemCounts = bomItemsQueries.map((q) => q?.data?.items?.length ?? 0);
-
-  // ── Handlers ─────────────────────────────────────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const toSelectedProject = (project: any): SelectedProject => ({
-    id: project.id,
-    name: project.name,
-    targetPrice:
-      safeNum(project.targetPrice) ||
-      safeNum(project.shouldCost) ||
-      safeNum(project.targetBomCost),
-    updatedAt: project.updatedAt ?? new Date().toISOString(),
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleProjectSelect = (project: any) => {
-    if (multiProjectMode) {
-      handleMultiProjectToggle(project);
-    } else {
-      setSelectedProject(toSelectedProject(project));
-      setStep("bom-selection");
+  const handleCreate = async () => {
+    if (!form.name.trim()) return;
+    setFormLoading(true);
+    try {
+      const created = await createSession.mutateAsync({
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+      });
+      setCreateOpen(false);
+      setForm({ name: '', description: '' });
+      setSelectedSessionId((created as BenchmarkSession).id);
+      setStep('detail');
+    } finally {
+      setFormLoading(false);
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleMultiProjectToggle = (project: any) => {
-    const pd = toSelectedProject(project);
-    setSelectedProjects((prev) =>
-      prev.some((p) => p.id === project.id)
-        ? prev.filter((p) => p.id !== project.id)
-        : [...prev, pd]
-    );
-  };
-
-  const handleMultiProjectComparison = () => {
-    if (selectedProjects.length >= 2) setStep("bom-selection");
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleBomToggle = (bom: any) => {
-    const bomData: SelectedBOM = {
-      id: bom.id,
-      name: bom.displayName ?? bom.name,
-      version: bom.version ?? "v1.0",
-      status: bom.status ?? "draft",
-    };
-    setSelectedBOMs((prev) =>
-      prev.some((b) => b.id === bom.id)
-        ? prev.filter((b) => b.id !== bom.id)
-        : [...prev, bomData]
-    );
-  };
-
-  const handleBack = () => {
-    if (step === "comparison") {
-      setStep("bom-selection");
-    } else if (step === "bom-selection") {
-      setStep("project-selection");
-      if (!multiProjectMode) setSelectedProject(null);
-      setSelectedBOMs([]);
-    }
-  };
-
-  const handleSetMultiMode = (v: boolean) => {
-    setMultiProjectMode(v);
-    if (v) {
-      setSelectedProject(null);
-    } else {
-      setSelectedProjects([]);
-    }
-  };
-
-  // ── Render ───────────────────────────────────────────────────────────────────
-  if (step === "project-selection") {
+  // ── Detail view ──────────────────────────────────────────────────────────────
+  if (step === 'detail' && selectedSessionId) {
     return (
-      <ProjectSelection
-        projects={projects}
-        multiProjectMode={multiProjectMode}
-        selectedProjects={selectedProjects}
-        searchProject={searchProject}
-        onSearch={setSearchProject}
-        onProjectSelect={handleProjectSelect}
-        onMultiToggle={handleMultiProjectToggle}
-        onSetMultiMode={handleSetMultiMode}
-        onCompareProjects={handleMultiProjectComparison}
-      />
-    );
-  }
-
-  if (step === "bom-selection" && (selectedProject || multiProjectMode)) {
-    return (
-      <BOMSelection
-        selectedProject={selectedProject}
-        multiProjectMode={multiProjectMode}
-        selectedProjects={selectedProjects}
-        selectedBOMs={selectedBOMs}
-        boms={boms}
-        multiProjectBoms={multiProjectBoms}
-        bomItemCounts={bomItemCounts}
-        onBack={handleBack}
-        onBomToggle={handleBomToggle}
-        onCompare={() => {
-          if (selectedBOMs.length >= 2) setStep("comparison");
+      <BenchmarkSessionDetail
+        sessionId={selectedSessionId}
+        projectIdFromUrl={projectIdFromUrl}
+        onBack={() => {
+          setStep('list');
+          setSelectedSessionId(null);
         }}
       />
     );
   }
 
-  if (
-    step === "comparison" &&
-    (selectedProject || multiProjectMode) &&
-    selectedBOMs.length >= 2
-  ) {
-    return (
-      <ComparisonView
-        bomMetrics={bomMetrics}
-        selectedBOMs={selectedBOMs}
-        selectedProject={selectedProject}
-        multiProjectMode={multiProjectMode}
-        selectedProjects={selectedProjects}
-        processes={processes}
-        vendors={vendors}
-        rawMaterials={rawMaterials}
-        onBack={handleBack}
-      />
-    );
-  }
+  // ── List view ────────────────────────────────────────────────────────────────
+  return (
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart2 className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold">Benchmark Sessions</h1>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Compare BOMs across projects, identify cost drivers and VAVE opportunities
+          </p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Session
+        </Button>
+      </div>
 
-  // Fallback — should not normally render
-  return null;
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card style={{ background: 'hsl(220 18% 10%)' }}>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ background: 'hsl(187 100% 42% / 0.12)' }}>
+                <Activity className="h-5 w-5" style={{ color: 'hsl(187 100% 42%)' }} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{activeSessions}</p>
+                <p className="text-xs text-muted-foreground">Active Sessions</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card style={{ background: 'hsl(220 18% 10%)' }}>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ background: 'hsl(187 100% 42% / 0.12)' }}>
+                <Layers className="h-5 w-5" style={{ color: 'hsl(187 100% 42%)' }} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{totalBOMsCompared}</p>
+                <p className="text-xs text-muted-foreground">Total BOMs Compared</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card style={{ background: 'hsl(220 18% 10%)' }}>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ background: 'hsl(187 100% 42% / 0.12)' }}>
+                <CalendarDays className="h-5 w-5" style={{ color: 'hsl(187 100% 42%)' }} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{sessionsThisMonth}</p>
+                <p className="text-xs text-muted-foreground">Sessions This Month</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Session cards */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-48 rounded-xl" />
+          ))}
+        </div>
+      ) : sessions.length === 0 ? (
+        <Card className="border-dashed" style={{ background: 'hsl(220 18% 10%)' }}>
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
+            <div className="p-4 rounded-full bg-muted">
+              <BarChart2 className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-lg">No benchmark sessions yet</p>
+              <p className="text-muted-foreground text-sm mt-1">
+                Create your first session to start comparing BOMs across projects
+              </p>
+            </div>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create First Session
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sessions.map((session) => (
+            <Card
+              key={session.id}
+              className="cursor-pointer transition-shadow group hover:shadow-lg"
+              style={{ background: 'hsl(220 18% 10%)' }}
+              onClick={() => {
+                setSelectedSessionId(session.id);
+                setStep('detail');
+              }}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base truncate">{session.name}</CardTitle>
+                    {session.description && (
+                      <CardDescription className="mt-0.5 line-clamp-2">
+                        {session.description}
+                      </CardDescription>
+                    )}
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={`shrink-0 ml-2 text-[10px] ${STATUS_COLORS[session.status] ?? ''}`}
+                  >
+                    {STATUS_LABELS[session.status] ?? session.status}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-2 text-center mb-3">
+                  <div className="rounded-lg bg-muted/40 py-2">
+                    <p className="text-lg font-bold">{session.selectedProjects?.length ?? 0}</p>
+                    <p className="text-[10px] text-muted-foreground">Projects</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/40 py-2">
+                    <p className="text-lg font-bold">{session.bomCount ?? 0}</p>
+                    <p className="text-[10px] text-muted-foreground">BOMs</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground mb-3">
+                  Updated {formatDate(session.updatedAt)}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full group-hover:bg-primary/10 transition-colors"
+                  style={{ color: 'hsl(187 100% 42%)' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedSessionId(session.id);
+                    setStep('detail');
+                  }}
+                >
+                  Open
+                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Create dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md" style={{ background: 'hsl(220 18% 10%)' }}>
+          <DialogHeader>
+            <DialogTitle>New Benchmark Session</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="bs-name">Session Name *</Label>
+              <Input
+                id="bs-name"
+                placeholder="e.g. Q2 2026 Motor Assembly Benchmark"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreate();
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bs-desc">Description</Label>
+              <Textarea
+                id="bs-desc"
+                placeholder="Brief description of this benchmark session…"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={!form.name.trim() || formLoading}>
+              {formLoading ? 'Creating…' : 'Create Session'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

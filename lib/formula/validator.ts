@@ -133,7 +133,7 @@ function validateParentheses(formula: string): ValidationError[] {
     errors.push({
       type: 'syntax',
       message: `${openCount} unclosed parenthesis${openCount > 1 ? 'es' : ''}`,
-      position: openPositions[openPositions.length - 1],
+      ...(openPositions[openPositions.length - 1] !== undefined ? { position: openPositions[openPositions.length - 1] } : {}),
     });
   }
 
@@ -171,7 +171,7 @@ function validateBraces(formula: string): ValidationError[] {
     errors.push({
       type: 'syntax',
       message: `${openCount} unclosed brace${openCount > 1 ? 's' : ''}`,
-      position: openPositions[openPositions.length - 1],
+      ...(openPositions[openPositions.length - 1] !== undefined ? { position: openPositions[openPositions.length - 1] } : {}),
     });
   }
 
@@ -356,7 +356,7 @@ export function getAutocompleteSuggestions(
           suggestions.push({
             type: 'function',
             value: func,
-            description: funcDef?.description,
+            ...(funcDef?.description !== undefined ? { description: funcDef.description } : {}),
           });
         }
       }
@@ -370,7 +370,7 @@ export function getAutocompleteSuggestions(
         suggestions.push({
           type: 'function',
           value: func,
-          description: funcDef?.description,
+          ...(funcDef?.description !== undefined ? { description: funcDef.description } : {}),
         });
       }
 

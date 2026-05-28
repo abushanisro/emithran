@@ -31,7 +31,7 @@ export function useCorrelationContext(userId?: string) {
       // Initialize correlation context with user information
       const context = generateCorrelationContext({
         sessionId: sessionId.current,
-        userId
+        ...(userId !== undefined ? { userId } : {})
       });
 
       initialized.current = true;
@@ -57,7 +57,7 @@ export function useCorrelationContext(userId?: string) {
       if (current && current.userId !== userId) {
         // Create new context with updated user ID
         generateCorrelationContext({
-          sessionId: sessionId.current,
+          ...(sessionId.current !== undefined ? { sessionId: sessionId.current } : {}),
           userId
         });
       }

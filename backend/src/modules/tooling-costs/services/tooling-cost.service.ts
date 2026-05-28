@@ -8,7 +8,7 @@
  * @version 1.0.0
  */
 
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import {
   CreateToolingCostDto,
@@ -352,5 +352,30 @@ export class ToolingCostService {
       this.logger.error('Error in getTotalCostForBomItem:', error);
       throw error;
     }
+  }
+
+  async getBulkTotalCosts(
+    bomItemIds: string[],
+    accessToken?: string,
+  ): Promise<Record<string, number>> {
+    if (bomItemIds.length === 0) return {};
+
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('tooling_cost_records')
+      .select('bom_item_id, total_cost')
+      .in('bom_item_id', bomItemIds)
+      .eq('is_active', true);
+
+    if (error) {
+      this.logger.error('Error fetching bulk tooling costs:', error);
+      throw new InternalServerErrorException(`Failed to fetch bulk tooling costs: ${error.message}`);
+    }
+
+    const totals: Record<string, number> = Object.fromEntries(bomItemIds.map(id => [id, 0]));
+    for (const row of data ?? []) {
+      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + (parseFloat(row.total_cost) || 0);
+    }
+    return totals;
   }
 }

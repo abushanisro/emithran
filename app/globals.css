@@ -4,7 +4,108 @@
 
 @layer base {
   :root {
-    /* mithran Brand Theme - Dark with Cyan accent */
+    /* mithran Dark Theme — pure black base */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 187 100% 42%;
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 55%;
+
+    --accent: 187 100% 42%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 187 100% 42%;
+
+    --radius: 0.75rem;
+
+    /* Custom tokens */
+    --success: 160 70% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 200 90% 50%;
+    --info-foreground: 0 0% 100%;
+
+    /* Chart colors */
+    --chart-1: 187 100% 42%;
+    --chart-2: 160 70% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 280 70% 50%;
+    --chart-5: 0 72% 51%;
+
+    /* Sidebar — pure black */
+    --sidebar-background: 0 0% 2%;
+    --sidebar-foreground: 0 0% 88%;
+    --sidebar-primary: 187 100% 42%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 8%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 12%;
+    --sidebar-ring: 187 100% 42%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(187 100% 42%), hsl(187 100% 55%));
+    --gradient-accent: linear-gradient(135deg, hsl(160 70% 40%), hsl(160 70% 50%));
+    --gradient-dark: linear-gradient(180deg, hsl(0 0% 0%), hsl(0 0% 2%));
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.5);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.6), 0 2px 4px -2px hsl(0 0% 0% / 0.5);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.6), 0 4px 6px -4px hsl(0 0% 0% / 0.5);
+    --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.5), 0 1px 2px -1px hsl(0 0% 0% / 0.4);
+    --shadow-glow: 0 0 20px hsl(187 100% 42% / 0.15);
+  }
+
+  /* Explicit dark class — pure black and white */
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 187 100% 42%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 187 100% 42%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 187 100% 42%;
+    --sidebar-background: 0 0% 2%;
+    --sidebar-foreground: 0 0% 88%;
+    --sidebar-primary: 187 100% 42%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 8%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 12%;
+    --sidebar-ring: 187 100% 42%;
+  }
+
+  /* Original mithran brand palette — dark blue-gray with cyan accent */
+  .brand {
     --background: 220 20% 7%;
     --foreground: 210 20% 95%;
 
@@ -33,24 +134,6 @@
     --input: 220 15% 18%;
     --ring: 187 100% 42%;
 
-    --radius: 0.75rem;
-
-    /* Custom tokens */
-    --success: 160 70% 40%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --info: 200 90% 50%;
-    --info-foreground: 0 0% 100%;
-
-    /* Chart colors */
-    --chart-1: 187 100% 42%;
-    --chart-2: 160 70% 45%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 280 70% 50%;
-    --chart-5: 0 72% 51%;
-
-    /* Sidebar - Darker variant */
     --sidebar-background: 220 20% 5%;
     --sidebar-foreground: 210 20% 85%;
     --sidebar-primary: 187 100% 42%;
@@ -60,12 +143,6 @@
     --sidebar-border: 220 15% 15%;
     --sidebar-ring: 187 100% 42%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(187 100% 42%), hsl(187 100% 55%));
-    --gradient-accent: linear-gradient(135deg, hsl(160 70% 40%), hsl(160 70% 50%));
-    --gradient-dark: linear-gradient(180deg, hsl(220 20% 7%), hsl(220 20% 4%));
-
-    /* Shadows */
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -4px hsl(0 0% 0% / 0.3);
@@ -74,41 +151,62 @@
   }
 
   .light {
-    --background: 210 20% 98%;
-    --foreground: 220 20% 10%;
+    /* Main surfaces */
+    --background: 0 0% 100%;
+    --foreground: 220 20% 6%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card: 0 0% 98%;
+    --card-foreground: 220 20% 6%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
+    --popover-foreground: 220 20% 6%;
 
-    --primary: 187 100% 35%;
+    --primary: 187 100% 32%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 15% 93%;
-    --secondary-foreground: 220 20% 20%;
+    --secondary: 210 15% 90%;
+    --secondary-foreground: 220 20% 12%;
 
-    --muted: 210 15% 95%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 210 15% 91%;
+    --muted-foreground: 215 20% 28%;   /* dark enough to read at 9-10px */
 
-    --accent: 187 100% 35%;
+    --accent: 187 100% 32%;
     --accent-foreground: 0 0% 100%;
 
-    --border: 214 20% 88%;
-    --input: 214 20% 88%;
-    --ring: 187 100% 35%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --sidebar-background: 220 20% 10%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 187 100% 42%;
-    --sidebar-primary-foreground: 220 20% 7%;
-    --sidebar-accent: 220 18% 15%;
-    --sidebar-accent-foreground: 210 20% 95%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 187 100% 42%;
+    --border: 214 20% 70%;             /* clearly visible on white */
+    --input: 214 20% 72%;
+    --ring: 187 100% 32%;
+
+    /* Sidebar — fully light in light mode */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 220 20% 10%;
+    --sidebar-primary: 187 100% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 15% 88%;
+    --sidebar-accent-foreground: 220 20% 6%;
+    --sidebar-border: 214 20% 72%;
+    --sidebar-ring: 187 100% 32%;
+
+    /* Shadows — lighter for light mode */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.06);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.08), 0 2px 4px -2px hsl(0 0% 0% / 0.06);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.08), 0 4px 6px -4px hsl(0 0% 0% / 0.06);
+    --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.06), 0 1px 2px -1px hsl(0 0% 0% / 0.04);
+    --shadow-glow: 0 0 20px hsl(187 100% 32% / 0.10);
   }
 }
+
+/* ── Interface density ──────────────────────────────────────────────────────── */
+/* Compact: scale html font-size from 16px → 14px so all rem units shrink      */
+/* proportionally — padding, margin, font-size, border-radius, everything.     */
+html.compact {
+  font-size: 14px;
+}
+
+/* Comfortable (default): no override needed — Tailwind already uses 16px base */
 
 @layer base {
   * {
@@ -205,6 +303,28 @@
     @apply bg-muted-foreground/40;
   }
 
+  /* Table horizontal + vertical scrollbar */
+  .overflow-x-scroll::-webkit-scrollbar,
+  .overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+    height: 8px;
+  }
+
+  .overflow-x-scroll::-webkit-scrollbar-track,
+  .overflow-y-auto::-webkit-scrollbar-track {
+    @apply bg-secondary/40 rounded;
+  }
+
+  .overflow-x-scroll::-webkit-scrollbar-thumb,
+  .overflow-y-auto::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded;
+  }
+
+  .overflow-x-scroll::-webkit-scrollbar-thumb:hover,
+  .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/60;
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -238,4 +358,9 @@
       transform: translateY(0);
     }
   }
+}
+@media print {
+  body * { visibility: hidden !important; }
+  .print-scope, .print-scope * { visibility: visible !important; }
+  .print-scope { position: fixed; top: 0; left: 0; width: 100%; }
 }

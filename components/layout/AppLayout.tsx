@@ -8,6 +8,7 @@ import { AppSidebar } from './AppSidebar';
 import { Loader2, Menu, Bell, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MithranAICreditsBar } from './MithranAICreditsBar';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -107,6 +108,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </Button>
             </div>
           </header>
+          <MithranAICreditsBar />
           <main className="flex-1 p-4 sm:p-6 overflow-auto overflow-x-hidden">
             {children}
           </main>

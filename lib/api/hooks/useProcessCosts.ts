@@ -132,9 +132,12 @@ export function useCreateProcessCost() {
       toast.success('Process cost added successfully');
     },
     onError: (error: any) => {
-      const status = error?.status || error?.response?.status;
+      const status = error?.statusCode || error?.status || error?.response?.status;
       if (status === 400) {
-        toast.error('Please check all process cost details are filled out correctly.');
+        const msg = error?.message;
+        toast.error(msg && msg !== `Request failed with status 400`
+          ? msg
+          : 'Please check all process cost details are filled out correctly.');
       } else if (status === 404) {
         toast.error('The selected BOM item or process no longer exists.');
       } else if (status === 409) {
@@ -144,7 +147,7 @@ export function useCreateProcessCost() {
       } else if (status === 422) {
         toast.error('Please ensure all rates and quantities are valid numbers.');
       } else {
-        toast.error('Unable to add process cost. Please try again or contact support.');
+        toast.error(error?.message || 'Unable to add process cost. Please try again or contact support.');
       }
     },
   });
@@ -174,9 +177,12 @@ export function useUpdateProcessCost() {
       toast.success('Process cost updated successfully');
     },
     onError: (error: any) => {
-      const status = error?.status || error?.response?.status;
+      const status = error?.statusCode || error?.status || error?.response?.status;
       if (status === 400) {
-        toast.error('Please check that all process cost information is valid.');
+        const msg = error?.message;
+        toast.error(msg && msg !== `Request failed with status 400`
+          ? msg
+          : 'Please check that all process cost information is valid.');
       } else if (status === 404) {
         toast.error('This process cost record no longer exists. It may have been deleted.');
       } else if (status === 409) {

@@ -70,9 +70,9 @@ export function ManufacturingProcessSection({
           processGroup: data.group, // Maps from 'group' to 'processGroup'
           processRoute: data.processRoute,
           operation: data.operation,
-          mhrId: data.mhrId,
-          lsrId: data.lsrId,
-          directRate: data.directRate || 0,
+          mhrId: data.mhrId || undefined,
+          lsrId: data.lsrId || undefined,
+          directRate: data.directRate || data.laborRate || 0,
           indirectRate: data.indirectRate || 0,
           fringeRate: data.fringeRate || 0,
           machineRate: data.machineRate || 0,
@@ -90,7 +90,7 @@ export function ManufacturingProcessSection({
           facilityRateId: data.facilityRateId,
           notes: data.notes,
         };
-        
+
         await updateMutation.mutateAsync({
           id: editProcess.id,
           data: updateData,
@@ -103,9 +103,9 @@ export function ManufacturingProcessSection({
           processGroup: data.group,
           processRoute: data.processRoute,
           operation: data.operation,
-          mhrId: data.mhrId,
-          lsrId: data.lsrId,
-          directRate: data.directRate || 0,
+          mhrId: data.mhrId || undefined,
+          lsrId: data.lsrId || undefined,
+          directRate: data.directRate || data.laborRate || 0,
           indirectRate: data.indirectRate || 0,
           fringeRate: data.fringeRate || 0,
           machineRate: data.machineRate || 0,

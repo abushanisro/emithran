@@ -249,6 +249,64 @@ export function useDeleteBOMItem() {
   });
 }
 
+// ── Auto-fill types ───────────────────────────────────────────────────────────
+
+export interface AutoFillGeometry {
+  volume: number;
+  surfaceArea: number;
+  boundingBox: { length: number; width: number; height: number };
+  holeCount: number;
+  pocketCount: number;
+  thinWallCount: number;
+  weight: number;
+}
+
+export interface AutoFillSuggestions {
+  name: string;
+  partNumber: string;
+  materialCategory: string;
+  materialGrade: string;
+  materialId: string | null;
+  density: number | null;
+  processType: string;
+  makeBuy: 'make' | 'buy';
+  itemType: 'assembly' | 'sub_assembly' | 'child_part';
+}
+
+export interface AutoFillCosts {
+  materialCostPerKg: number | null;
+  mhrRate: number | null;
+  lhrRate: number | null;
+  estimatedCycleTimeMin: number;
+  calculatorId: string | null;
+  estimatedUnitCost: number | null;
+}
+
+export interface AutoFillResponse {
+  fileName: string;
+  geometry: AutoFillGeometry;
+  suggestions: AutoFillSuggestions;
+  costs: AutoFillCosts;
+  confidence: { overall: number; geometry: number; material: number; process: number; cost: number };
+  cadEngineAvailable: boolean;
+}
+
+// ── Auto-fill standalone function ─────────────────────────────────────────────
+
+export async function analyzeForAutoFill(file: File): Promise<AutoFillResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const data = await apiClient.uploadFiles<AutoFillResponse>('/bom-items/analyze-for-autofill', form);
+  if (!data) throw new Error('No response from auto-fill analysis');
+  return data;
+}
+
+export function useAnalyzeForAutoFill() {
+  return useMutation({
+    mutationFn: (file: File) => analyzeForAutoFill(file),
+  });
+}
+
 // Standalone functions for non-hook usage
 export async function createBOMItem(dto: CreateBOMItemDto): Promise<BOMItem> {
   const data = await apiClient.post<BOMItem>('/bom-items', dto);

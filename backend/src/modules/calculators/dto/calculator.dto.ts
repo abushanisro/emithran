@@ -30,6 +30,7 @@ export enum CalculatorCategory {
   PROCESS = 'process',
   TOOLING = 'tooling',
   CUSTOM = 'custom',
+  SHEET_METAL = 'sheet_metal',
 }
 
 export enum FieldType {
@@ -40,6 +41,7 @@ export enum FieldType {
   CALCULATED = 'calculated',
   MULTI_SELECT = 'multi_select',
   CONST = 'const',
+  TABLE_LOOKUP = 'table_lookup',
 }
 
 export enum DataSource {
@@ -48,6 +50,7 @@ export enum DataSource {
   RAW_MATERIALS = 'raw_materials',
   PROCESSES = 'processes',
   MANUAL = 'manual',
+  SHEET_METAL_LOOKUP = 'sheet_metal_lookup',
 }
 
 export enum FormulaType {
@@ -397,14 +400,29 @@ export class QueryCalculatorDto {
   @IsNumber()
   @IsOptional()
   @Min(1)
+  @Type(() => Number)
   page?: number;
 
   @ApiPropertyOptional()
   @IsNumber()
   @IsOptional()
   @Min(1)
-  @Max(100)
+  @Max(200)
+  @Type(() => Number)
   limit?: number;
+}
+
+/**
+ * DTO for sheet metal parameterized lookup table queries
+ */
+export class SheetMetalLookupDto {
+  @ApiProperty({ description: 'Table name: stroke_rate | handling_time | tool_setup | manual_stroke | laser_cut | sampling_plan' })
+  @IsString()
+  tableName: string;
+
+  @ApiProperty({ description: 'Key-value params used to match rows (e.g. { tonnage: 100, complexity: "simple" })' })
+  @IsObject()
+  params: Record<string, any>;
 }
 
 /**

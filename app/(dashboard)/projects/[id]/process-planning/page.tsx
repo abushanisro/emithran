@@ -13,7 +13,8 @@ import { useProcessPlanningSpecsByBomItem } from '@/lib/api/hooks/useProcessPlan
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { Viewer2D } from '@/components/ui/viewer-2d';
 import { apiClient } from '@/lib/api/client';
-import { Badge } from '@/components/ui/badge'; 
+import { bomItemsApi } from '@/lib/api/bom-items';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, DollarSign } from 'lucide-react';
 
 // Reset circuit breaker on page load if it's stuck
@@ -77,9 +78,10 @@ function ProcessPlanningPageContent() {
     hardness: '',
   });
 
-  const handleModelMeasurements = (_data: any) => {
+  const [manufacturingFeatures, setManufacturingFeatures] = useState<any[]>([]);
+  const [selectedFeature, setSelectedFeature] = useState<any | null>(null);
 
-  };
+  const handleModelMeasurements = (_data: any) => {};
 
   // Fetch data with loading and error states - force fresh data with higher limit
   const { data: bomsData, isLoading: bomsLoading, error: bomsError, refetch: refetchBOMs } = useBOMs({
@@ -128,6 +130,39 @@ function ProcessPlanningPageContent() {
   const { data: bomItemsData, isLoading: bomItemsLoading, error: bomItemsError } = useBOMItems(selectedBomId);
   const bomItems = bomItemsData?.items || [];
   const selectedItem = bomItems.find((item) => item.partNumber === selectedPartNumber);
+
+  // DFM features — always seed with all detectable types when a 3D file is present.
+  // DFMColorMesh detects features from geometry itself; this list just enables each type.
+  const DEFAULT_DFM_FEATURES = [
+    { id: 'hole',      type: 'hole'      as const, position: { x:0,y:0,z:0 }, dimensions: {}, manufacturingProcess: 'Drilling',        cycleTime: 0, tooling: [], warnings: [], aiRecommendations: [] },
+    { id: 'pocket',    type: 'pocket'    as const, position: { x:0,y:0,z:0 }, dimensions: {}, manufacturingProcess: 'Milling',          cycleTime: 0, tooling: [], warnings: [], aiRecommendations: [] },
+    { id: 'thin_wall', type: 'thin_wall' as const, position: { x:0,y:0,z:0 }, dimensions: {}, manufacturingProcess: 'Precision Milling', cycleTime: 0, tooling: [], warnings: [], aiRecommendations: [] },
+    { id: 'undercut',  type: 'undercut'  as const, position: { x:0,y:0,z:0 }, dimensions: {}, manufacturingProcess: 'T-Slot Milling',   cycleTime: 0, tooling: [], warnings: [], aiRecommendations: [] },
+  ];
+
+  useEffect(() => {
+    if (!selectedItem?.id || !selectedItem.file3dPath) {
+      setManufacturingFeatures([]);
+      setSelectedFeature(null);
+      return;
+    }
+    // Seed immediately so the DFM button appears while analysis loads
+    setManufacturingFeatures(DEFAULT_DFM_FEATURES);
+    setSelectedFeature(null);
+
+    bomItemsApi.getCADAnalysis(selectedItem.id)
+      .then((result: any) => {
+        const stored =
+          result?.analysis?.geometryFeatures?.manufacturingFeatures ??
+          result?.analysis?.features ??
+          result?.features ?? [];
+        if (Array.isArray(stored) && stored.length > 0) {
+          setManufacturingFeatures(stored);
+        }
+        // else keep the default seed
+      })
+      .catch(() => { /* keep default seed */ });
+  }, [selectedItem?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load process planning specifications for the selected BOM item
   const { data: processSpecs } = useProcessPlanningSpecsByBomItem(selectedItem?.id);
@@ -930,7 +965,7 @@ function ProcessPlanningPageContent() {
                       </span>
                     )}
                   </div>
-                  <div className="bg-card">
+                  <div className="bg-card h-[calc(100vh-220px)] min-h-[600px]">
                     {selectedItem.file3dPath && file3dUrl ? (
                       <ModelViewer
                         fileUrl={file3dUrl}
@@ -938,9 +973,12 @@ function ProcessPlanningPageContent() {
                         fileType={selectedItem.file3dPath.split('.').pop() || 'step'}
                         bomItemId={selectedItem.id}
                         onMeasurements={handleModelMeasurements}
+                        manufacturingFeatures={manufacturingFeatures}
+                        selectedFeature={selectedFeature}
+                        onFeatureSelect={setSelectedFeature}
                       />
                     ) : (
-                      <div className="h-64 flex items-center justify-center text-muted-foreground">
+                      <div className="h-full flex items-center justify-center text-muted-foreground">
                         <p className="text-sm">No 3D file available for this part</p>
                       </div>
                     )}

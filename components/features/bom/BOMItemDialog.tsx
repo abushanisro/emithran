@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import {
   Dialog,
   DialogContent,
@@ -45,13 +46,17 @@ import {
   ChevronsUpDown,
   RefreshCw,
   Plus,
-  Check
+  Check,
+  X,
+  Cpu,
+  DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createBOMItem, updateBOMItem } from '@/lib/api/hooks/useBOMItems';
+import { createBOMItem, updateBOMItem, analyzeForAutoFill, type AutoFillResponse } from '@/lib/api/hooks/useBOMItems';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,6 +124,16 @@ type EnhancedBOMError = {
   helpUrl?: string;
   affectedFields?: string[];
 };
+
+// ─── Multi-file upload types ──────────────────────────────────────────────────
+
+interface PendingFile {
+  id: string;
+  file: File;
+  status: 'pending' | 'analyzing' | 'ready' | 'error';
+  result?: AutoFillResponse;
+  error?: string;
+}
 
 // ─── Error Categorization ─────────────────────────────────────────────────────
 
@@ -381,6 +396,13 @@ export function BOMItemDialog({
   const [uploadProgress, setUploadProgress] = useState<{ file2d?: number; file3d?: number }>({});
   const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
   const [isAnalyzing3D, setIsAnalyzing3D] = useState(false);
+
+  // ── Multi-file / auto-fill state ──────────────────────────────────────────
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
+  const [isBatchCreating, setIsBatchCreating] = useState(false);
+  const [activeResult, setActiveResult] = useState<AutoFillResponse | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     partNumber: '',
@@ -539,6 +561,113 @@ export function BOMItemDialog({
     }
   };
 
+  // ── Auto-fill helpers ─────────────────────────────────────────────────────
+
+  const populateFormFromResult = useCallback((r: AutoFillResponse) => {
+    const filled = new Set<string>();
+    setFormData(prev => {
+      const patch: Partial<typeof prev> = {};
+      if (!prev.name) { patch.name = r.suggestions.name; filled.add('name'); }
+      if (!prev.partNumber) { patch.partNumber = r.suggestions.partNumber; filled.add('partNumber'); }
+      if (!prev.weight) { patch.weight = r.geometry.weight; filled.add('weight'); }
+      if (!prev.surfaceArea) { patch.surfaceArea = r.geometry.surfaceArea; filled.add('surfaceArea'); }
+      if (!prev.maxLength) { patch.maxLength = r.geometry.boundingBox.length; filled.add('maxLength'); }
+      if (!prev.maxWidth) { patch.maxWidth = r.geometry.boundingBox.width; filled.add('maxWidth'); }
+      if (!prev.maxHeight) { patch.maxHeight = r.geometry.boundingBox.height; filled.add('maxHeight'); }
+      if (!prev.materialCategory && r.suggestions.materialCategory) {
+        patch.materialCategory = r.suggestions.materialCategory as MaterialCategory;
+        filled.add('materialCategory');
+        setSelectedMaterialCategory(r.suggestions.materialCategory as MaterialCategory);
+      }
+      if (!prev.materialGrade && r.suggestions.materialGrade) {
+        patch.materialGrade = r.suggestions.materialGrade;
+        filled.add('materialGrade');
+      }
+      if (!prev.makeBuy || prev.makeBuy === 'make') {
+        patch.makeBuy = r.suggestions.makeBuy;
+        filled.add('makeBuy');
+      }
+      if (r.suggestions.itemType) {
+        patch.itemType = r.suggestions.itemType as BOMItemType;
+        filled.add('itemType');
+      }
+      return { ...prev, ...patch };
+    });
+    setAutoFilledFields(filled);
+    setActiveResult(r);
+  }, []);
+
+  const updatePendingFileStatus = useCallback((id: string, status: PendingFile['status'], error?: string) => {
+    setPendingFiles(prev => prev.map(pf => pf.id === id ? { ...pf, status, error } : pf));
+  }, []);
+
+  const updatePendingFileResult = useCallback((id: string, result: AutoFillResponse) => {
+    setPendingFiles(prev => prev.map(pf => pf.id === id ? { ...pf, status: 'ready' as const, result } : pf));
+  }, []);
+
+  const analyzeFile = useCallback(async (item: PendingFile, isFirst: boolean) => {
+    updatePendingFileStatus(item.id, 'analyzing');
+    try {
+      const result = await analyzeForAutoFill(item.file);
+      updatePendingFileResult(item.id, result);
+      if (isFirst) {
+        setActiveFileId(item.id);
+        populateFormFromResult(result);
+      }
+    } catch (e: any) {
+      updatePendingFileStatus(item.id, 'error', e?.message ?? 'Analysis failed');
+      toast.error(`Could not analyze ${item.file.name}`, {
+        description: 'Check that the file is a valid STEP / STL / IGES and try again.',
+        duration: 5000,
+      });
+    }
+  }, [updatePendingFileStatus, updatePendingFileResult, populateFormFromResult]);
+
+  const handleFileDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (!acceptedFiles.length) return;
+    const isFirstBatch = pendingFiles.length === 0;
+    const newItems: PendingFile[] = acceptedFiles.map(f => ({
+      id: crypto.randomUUID(),
+      file: f,
+      status: 'pending' as const,
+    }));
+    setPendingFiles(prev => [...prev, ...newItems]);
+    // Set the first file in formData for backwards-compatible single-file upload
+    if (isFirstBatch && acceptedFiles[0]) {
+      const firstFile = acceptedFiles[0];
+      setFormData(prev => ({ ...prev, file3d: firstFile }));
+    }
+    await Promise.allSettled(
+      newItems.map((item, i) => analyzeFile(item, isFirstBatch && i === 0))
+    );
+  }, [pendingFiles.length, analyzeFile]);
+
+  const removePendingFile = useCallback((id: string) => {
+    setPendingFiles(prev => {
+      const next = prev.filter(pf => pf.id !== id);
+      if (activeFileId === id) {
+        const nextReady = next.find(pf => pf.status === 'ready');
+        if (nextReady?.result) {
+          setActiveFileId(nextReady.id);
+          populateFormFromResult(nextReady.result);
+        } else {
+          setActiveFileId(null);
+          setActiveResult(null);
+          setAutoFilledFields(new Set());
+        }
+      }
+      return next;
+    });
+  }, [activeFileId, populateFormFromResult]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: handleFileDrop,
+    accept: { 'application/octet-stream': ['.step', '.stp', '.stl', '.iges', '.igs', '.obj'] },
+    maxSize: 100 * 1024 * 1024,
+    multiple: true,
+    noClick: false,
+  });
+
   useEffect(() => {
     setValidationErrors(validationStatus.errors);
   }, [validationStatus.errors]);
@@ -619,6 +748,11 @@ export function BOMItemDialog({
       });
       setSelectedMaterialCategory('');
     }
+    // Reset multi-file state whenever dialog opens fresh
+    setPendingFiles([]);
+    setActiveFileId(null);
+    setAutoFilledFields(new Set());
+    setActiveResult(null);
   }, [item, open, defaultItemType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -781,6 +915,73 @@ export function BOMItemDialog({
     setShowHelp(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
+  // ── Batch create ──────────────────────────────────────────────────────────
+
+  const handleBatchCreate = async () => {
+    const readyFiles = pendingFiles.filter(pf => pf.status === 'ready' && pf.result);
+    if (!readyFiles.length) return;
+    setIsBatchCreating(true);
+
+    const finalParentId = parentItemId !== undefined ? parentItemId : autoParentId;
+    let successCount = 0;
+
+    for (const pf of readyFiles) {
+      try {
+        populateFormFromResult(pf.result!);
+        const r = pf.result!;
+        const payload = {
+          bomId,
+          name: r.suggestions.name,
+          partNumber: r.suggestions.partNumber,
+          itemType: (r.suggestions.itemType as BOMItemType) || BOMItemType.CHILD_PART,
+          parentItemId: finalParentId || undefined,
+          quantity: 1,
+          annualVolume: 1000,
+          unit: 'pcs',
+          materialCategory: r.suggestions.materialCategory || undefined,
+          materialGrade: r.suggestions.materialGrade || undefined,
+          makeBuy: r.suggestions.makeBuy || 'make',
+          weight: r.geometry.weight || undefined,
+          maxLength: r.geometry.boundingBox.length || undefined,
+          maxWidth: r.geometry.boundingBox.width || undefined,
+          maxHeight: r.geometry.boundingBox.height || undefined,
+          surfaceArea: r.geometry.surfaceArea || undefined,
+        };
+        const newItem = await createBOMItem(payload);
+
+        const uploadForm = new FormData();
+        uploadForm.append('file3d', pf.file);
+        try {
+          await apiClient.uploadFiles(`/bom-items/${newItem.id}/upload-files`, uploadForm);
+        } catch (_) { /* file upload failure is non-fatal */ }
+
+        successCount++;
+        toast.success(`Created: ${r.suggestions.name}`);
+      } catch (err: any) {
+        toast.error(`Failed to create item from ${pf.file.name}`, {
+          description: err?.message ?? 'Unknown error',
+          duration: 5000,
+        });
+      }
+    }
+
+    await queryClient.invalidateQueries({ queryKey: ['bom-items', 'list', bomId] });
+    setIsBatchCreating(false);
+    if (successCount > 0) {
+      onSuccess?.();
+      onOpenChange(false);
+    }
+  };
+
+  // ── Auto badge ──────────────────────────────────────────────────────────────
+
+  const AutoBadge = ({ field }: { field: string }) =>
+    autoFilledFields.has(field) ? (
+      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-cyan-500 border-cyan-500/40 ml-1">
+        Auto
+      </Badge>
+    ) : null;
+
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -826,12 +1027,15 @@ export function BOMItemDialog({
           <div className="grid gap-4">
             {/* Name */}
             <div className="grid gap-2">
-              <Label htmlFor="name">Name *</Label>
+              <Label htmlFor="name" className="flex items-center">Name * <AutoBadge field="name" /></Label>
               <Input
                 id="name"
                 placeholder="e.g., Cylinder Head Assembly"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  setAutoFilledFields(prev => { const s = new Set(prev); s.delete('name'); return s; });
+                }}
                 className={validationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
                 required
               />
@@ -845,12 +1049,15 @@ export function BOMItemDialog({
 
             {/* Part Number */}
             <div className="grid gap-2">
-              <Label htmlFor="partNumber">Part Number *</Label>
+              <Label htmlFor="partNumber" className="flex items-center">Part Number * <AutoBadge field="partNumber" /></Label>
               <Input
                 id="partNumber"
                 placeholder="e.g., CH-2024-001"
                 value={formData.partNumber}
-                onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, partNumber: e.target.value });
+                  setAutoFilledFields(prev => { const s = new Set(prev); s.delete('partNumber'); return s; });
+                }}
                 className={validationErrors.partNumber ? 'border-red-500 focus:border-red-500' : ''}
                 required
               />
@@ -876,7 +1083,7 @@ export function BOMItemDialog({
 
             {/* Material Category */}
             <div className="grid gap-2">
-              <Label htmlFor="materialCategory">Material Category</Label>
+              <Label htmlFor="materialCategory" className="flex items-center">Material Category <AutoBadge field="materialCategory" /></Label>
               <Select
                 value={formData.materialCategory}
                 onValueChange={(value: MaterialCategory) => {
@@ -1111,33 +1318,141 @@ export function BOMItemDialog({
                 )}
               </div>
 
+              {/* Multi-file 3D upload dropzone */}
               <div className="grid gap-2">
-                <Label htmlFor="file3d" className="flex items-center gap-2">
+                <Label className="flex items-center gap-2">
                   <Package className="h-4 w-4" />
-                  3D Model (STEP, STL, IGES, OBJ)
+                  3D Models (STEP, STL, IGES, OBJ)
+                  {pendingFiles.length > 0 && (
+                    <Badge variant="secondary" className="text-xs ml-1">
+                      {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
                 </Label>
-                <Input
-                  id="file3d"
-                  type="file"
-                  accept=".stp,.step,.stl,.obj,.iges,.igs"
-                  onChange={(e) => setFormData({ ...formData, file3d: e.target.files?.[0] || null })}
-                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80"
-                />
-                {formData.file3d ? (
-                  <div className="flex items-center gap-2 text-xs bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded p-2">
-                    {isAnalyzing3D ? (
-                      <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                    ) : (
-                      <CheckCircle className="h-3 w-3 text-green-600" />
+
+                <div
+                  {...getRootProps()}
+                  className={cn(
+                    'border-2 border-dashed rounded-lg p-4 transition-colors cursor-pointer',
+                    isDragActive
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/60 hover:bg-muted/30',
+                  )}
+                >
+                  <input {...getInputProps()} />
+
+                  {pendingFiles.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground py-2">
+                      <Package className="h-7 w-7 opacity-50" />
+                      <p className="text-sm font-medium">
+                        {isDragActive ? 'Drop files here…' : 'Drop STEP / STL / IGES files, or click to browse'}
+                      </p>
+                      <p className="text-xs">Multiple files supported · 100 MB max each · Auto-fills form from geometry</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                      {pendingFiles.map((pf) => (
+                        <div
+                          key={pf.id}
+                          onClick={() => {
+                            setActiveFileId(pf.id);
+                            if (pf.result) {
+                              setAutoFilledFields(new Set());
+                              populateFormFromResult(pf.result);
+                            }
+                          }}
+                          className={cn(
+                            'flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors select-none',
+                            pf.id === activeFileId
+                              ? 'bg-primary/10 border border-primary/30'
+                              : 'hover:bg-muted',
+                          )}
+                        >
+                          {pf.status === 'analyzing' && <Loader2 className="h-3 w-3 animate-spin text-blue-500 shrink-0" />}
+                          {pf.status === 'ready'     && <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />}
+                          {pf.status === 'error'     && <XCircle className="h-3 w-3 text-red-500 shrink-0" />}
+                          {pf.status === 'pending'   && <div className="h-3 w-3 rounded-full bg-muted-foreground/30 shrink-0" />}
+                          <span className="text-sm truncate flex-1 min-w-0">{pf.file.name}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {(pf.file.size / 1024 / 1024).toFixed(1)} MB
+                          </span>
+                          {pf.result && (
+                            <>
+                              <Badge variant="secondary" className="text-xs shrink-0">{pf.result.suggestions.processType}</Badge>
+                              {pf.result.suggestions.materialGrade && (
+                                <Badge variant="outline" className="text-xs shrink-0 max-w-[80px] truncate">
+                                  {pf.result.suggestions.materialGrade}
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                          {pf.status === 'error' && (
+                            <span className="text-xs text-red-500 shrink-0 max-w-[100px] truncate" title={pf.error}>
+                              {pf.error}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); removePendingFile(pf.id); }}
+                            className="ml-1 shrink-0 text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <p className="text-xs text-muted-foreground pt-1 px-1">
+                        Click a file to load its properties · Drop more files to add
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Cost preview from active auto-fill result */}
+                {activeResult?.costs && (
+                  <div className="rounded-md bg-muted/50 border p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="h-3 w-3 text-cyan-500" />
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Cost Preview · review before saving
+                      </p>
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 text-cyan-500 border-cyan-500/40 ml-auto">
+                        {Math.round((activeResult.confidence.overall ?? 0) * 100)}% confidence
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      {activeResult.costs.materialCostPerKg !== null && (
+                        <>
+                          <span className="text-muted-foreground">Material cost/kg</span>
+                          <span className="font-mono">₹ {activeResult.costs.materialCostPerKg?.toFixed(2)}</span>
+                        </>
+                      )}
+                      {activeResult.costs.mhrRate !== null && (
+                        <>
+                          <span className="text-muted-foreground">Machine hour rate</span>
+                          <span className="font-mono">₹ {activeResult.costs.mhrRate?.toFixed(2)}/hr</span>
+                        </>
+                      )}
+                      {activeResult.costs.lhrRate !== null && (
+                        <>
+                          <span className="text-muted-foreground">Labour hour rate</span>
+                          <span className="font-mono">₹ {activeResult.costs.lhrRate?.toFixed(2)}/hr</span>
+                        </>
+                      )}
+                      {activeResult.costs.estimatedUnitCost !== null && (
+                        <>
+                          <span className="text-muted-foreground font-medium">Est. unit cost</span>
+                          <span className="font-mono font-semibold text-primary">
+                            ₹ {activeResult.costs.estimatedUnitCost?.toFixed(2)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    {!activeResult.cadEngineAvailable && (
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                        ⚠ CAD engine offline — geometry from bounding-box estimate
+                      </p>
                     )}
-                    <span className="text-green-700 dark:text-green-300">
-                      {isAnalyzing3D ? 'Analyzing: ' : 'Selected: '}{formData.file3d.name}
-                    </span>
-                    <span className="text-green-600 dark:text-green-400">({(formData.file3d.size / 1024 / 1024).toFixed(1)} MB)</span>
-                    {isAnalyzing3D && <span className="text-blue-600 dark:text-blue-400 font-medium">Extracting properties...</span>}
                   </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Upload CAD models for automatic property extraction and manufacturing analysis</p>
                 )}
               </div>
             </div>
@@ -1228,12 +1543,6 @@ export function BOMItemDialog({
                     <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/20 px-2 py-1 rounded">Auto-extracted</span>
                   )}
                 </div>
-                {item?.id && (
-                  <Button type="button" variant="outline" size="sm" onClick={fetch3DProperties} disabled={isAnalyzing3D} className="h-8 px-3 text-xs">
-                    {isAnalyzing3D ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                    {isAnalyzing3D ? 'Loading...' : 'Auto-Fill from 3D'}
-                  </Button>
-                )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {[
@@ -1244,14 +1553,20 @@ export function BOMItemDialog({
                   { id: 'maxHeight', label: 'Max Height (mm)', step: '0.01' },
                 ].map(({ id, label, step }) => (
                   <div key={id} className="grid gap-2">
-                    <Label htmlFor={id}>{label}</Label>
+                    <Label htmlFor={id} className="flex items-center">
+                      {label}
+                      <AutoBadge field={id} />
+                    </Label>
                     <Input
                       id={id}
                       type="number"
                       step={step}
                       min="0"
                       value={formData[id as keyof typeof formData] as number || ''}
-                      onChange={(e) => setFormData({ ...formData, [id]: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, [id]: parseFloat(e.target.value) || 0 });
+                        setAutoFilledFields(prev => { const s = new Set(prev); s.delete(id); return s; });
+                      }}
                     />
                   </div>
                 ))}
@@ -1301,11 +1616,29 @@ export function BOMItemDialog({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading || isBatchCreating}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !validationStatus.isValid} className="min-w-24">
+
+            {/* Batch create when multiple analyzed files are queued */}
+            {!item && pendingFiles.filter(pf => pf.status === 'ready').length > 1 && (
+              <Button
+                type="button"
+                variant="default"
+                onClick={handleBatchCreate}
+                disabled={isBatchCreating || loading}
+                className="min-w-36"
+              >
+                {isBatchCreating ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating…</>
+                ) : (
+                  <><DollarSign className="mr-2 h-4 w-4" />Create {pendingFiles.filter(pf => pf.status === 'ready').length} BOM Items</>
+                )}
+              </Button>
+            )}
+
+            <Button type="submit" disabled={loading || isBatchCreating || !validationStatus.isValid} className="min-w-24">
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

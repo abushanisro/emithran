@@ -627,6 +627,139 @@ export class CalculatorsServiceV2 {
   }
 
   // ============================================================================
+  // SHEET METAL LOOKUP TABLE RESOLVER
+  // ============================================================================
+
+  /**
+   * Resolves a parameterized lookup from one of the 6 sheet metal lookup tables.
+   * Uses the Supabase anon client (public read, no auth required).
+   *
+   * Supported tables:
+   *   stroke_rate    → params: { tonnage, complexity }
+   *   handling_time  → params: { weight_kg }
+   *   tool_setup     → params: { setup_type, key_value }
+   *   manual_stroke  → params: { thickness_mm, tonnage, complexity }
+   *   laser_cut      → params: { material, thickness_mm, laser_power_w }
+   *   sampling_plan  → params: { batch_size, complexity_level (1|2|3) }
+   */
+  async resolveSheetMetalLookup(tableName: string, params: Record<string, any>) {
+    const client = this.supabaseService.getAdminClient();
+
+    switch (tableName) {
+      case 'stroke_rate': {
+        const tonnage = Number(params.tonnage);
+        const complexity = String(params.complexity || 'simple').toLowerCase();
+        const col = complexity === 'complex' ? 'eff_complex'
+                  : complexity === 'inter' ? 'eff_inter'
+                  : 'eff_simple';
+        const { data, error } = await client
+          .from('sm_lookup_stroke_rate')
+          .select(`tonnage, ${col}`)
+          .lte('tonnage', tonnage)
+          .order('tonnage', { ascending: false })
+          .limit(1)
+          .single();
+        if (error || !data) return { value: null };
+        return { value: (data as any)[col], row: data };
+      }
+
+      case 'handling_time': {
+        const weight = Number(params.weight_kg);
+        const { data, error } = await client
+          .from('sm_lookup_handling_time')
+          .select('weight_max_kg, handling_min')
+          .gte('weight_max_kg', weight)
+          .order('weight_max_kg', { ascending: true })
+          .limit(1)
+          .single();
+        if (error || !data) return { value: null };
+        return { value: (data as any).handling_min, row: data };
+      }
+
+      case 'tool_setup': {
+        const setupType = String(params.setup_type || 'press');
+        const keyValue = Number(params.key_value);
+        const { data, error } = await client
+          .from('sm_lookup_tool_setup')
+          .select('key_value, loading_time_min')
+          .eq('setup_type', setupType)
+          .lte('key_value', keyValue)
+          .order('key_value', { ascending: false })
+          .limit(1)
+          .single();
+        if (error || !data) return { value: null };
+        return { value: (data as any).loading_time_min, row: data };
+      }
+
+      case 'manual_stroke': {
+        const thickness = Number(params.thickness_mm);
+        const tonnage = Number(params.tonnage);
+        const complexity = String(params.complexity || 'simple').toLowerCase();
+        // Find closest thickness and tonnage ≤ requested values
+        const { data, error } = await client
+          .from('sm_lookup_manual_stroke')
+          .select('thickness_mm, tonnage, complexity, stroke_time_sec')
+          .eq('complexity', complexity)
+          .lte('thickness_mm', thickness)
+          .lte('tonnage', tonnage)
+          .order('thickness_mm', { ascending: false })
+          .order('tonnage', { ascending: false })
+          .limit(1)
+          .single();
+        if (error || !data) return { value: null };
+        return { value: (data as any).stroke_time_sec, row: data };
+      }
+
+      case 'laser_cut': {
+        const material = String(params.material || '');
+        const thickness = Number(params.thickness_mm);
+        const laserPower = Number(params.laser_power_w);
+        const { data, error } = await client
+          .from('sm_lookup_laser_cut')
+          .select('material, thickness_mm, kerf_mm, laser_power_w, cutting_speed_m_per_min')
+          .ilike('material', `%${material}%`)
+          .eq('thickness_mm', thickness)
+          .eq('laser_power_w', laserPower)
+          .limit(1)
+          .single();
+        if (error || !data) return { value: null };
+        return {
+          value: (data as any).cutting_speed_m_per_min,
+          kerf: (data as any).kerf_mm,
+          row: data,
+        };
+      }
+
+      case 'sampling_plan': {
+        const batchSize = Number(params.batch_size);
+        const level = Number(params.complexity_level || 1);
+        const pctCol = level === 3 ? 'sampling_pct_l3'
+                     : level === 2 ? 'sampling_pct_l2'
+                     : 'sampling_pct_l1';
+        const qtyCol = level === 3 ? 'sample_qty_l3'
+                     : level === 2 ? 'sample_qty_l2'
+                     : 'sample_qty_l1';
+        const { data, error } = await client
+          .from('sm_lookup_sampling_plan')
+          .select(`batch_size_from, batch_size_to, ${pctCol}, ${qtyCol}`)
+          .lte('batch_size_from', batchSize)
+          .gte('batch_size_to', batchSize)
+          .limit(1)
+          .single();
+        if (error || !data) return { value: null };
+        return {
+          value: (data as any)[pctCol],
+          sampleQty: (data as any)[qtyCol],
+          row: data,
+        };
+      }
+
+      default:
+        throw new Error(`Unknown sheet metal lookup table: ${tableName}`);
+    }
+  }
+
+  // ============================================================================
   // FIELD OPERATIONS (GRANULAR)
   // ============================================================================
 

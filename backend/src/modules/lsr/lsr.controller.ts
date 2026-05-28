@@ -10,7 +10,11 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { LSRService } from './lsr.service';
 import { CreateLSRDto, UpdateLSRDto } from './lsr.dto';
@@ -109,5 +113,18 @@ export class LSRController {
     @AccessToken() token: string,
   ) {
     return this.lsrService.bulkCreate(data, user.id, token);
+  }
+
+  @Post('import-excel')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Import LHR records from Excel (.xlsx)' })
+  @ApiResponse({ status: 201, description: 'LHR records imported successfully' })
+  async importFromExcel(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.lsrService.importFromExcel(file.buffer, user.id, token);
   }
 }

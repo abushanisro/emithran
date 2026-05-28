@@ -1,7 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { costEngine, CostCalculationResult } from '@/lib/services/cost-engine';
+import React, { createContext, useContext, useState } from 'react';
+import type { ReactNode } from 'react';
+import { costEngine } from '@/lib/services/cost-engine';
+import type { CostCalculationResult } from '@/lib/services/cost-engine';
 import { apiClient } from '@/lib/api/client';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 
@@ -161,7 +163,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    */
   const fetchRawMaterialCost = async (bomItemId: string): Promise<number> => {
     try {
-      const response = await apiClient.get(`/raw-material-costs/bom-item/${bomItemId}/total`);
+      const response = await apiClient.get(`/raw-material-costs/bom-item/${bomItemId}/total`) as any;
       return response.totalCost || response.data?.totalCost || 0;
     } catch (error) {
       return 0; // Default if no data available
@@ -173,7 +175,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    */
   const fetchProcessCost = async (bomItemId: string): Promise<number> => {
     try {
-      const response = await apiClient.get(`/process-costs/bom-item/${bomItemId}/total`);
+      const response = await apiClient.get(`/process-costs/bom-item/${bomItemId}/total`) as any;
       return response.totalCost || response.data?.totalCost || 0;
     } catch (error) {
       return 0; // Default if no data available
@@ -185,7 +187,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    */
   const fetchToolingCost = async (bomItemId: string): Promise<number> => {
     try {
-      const response = await apiClient.get(`/tooling-costs/bom-item/${bomItemId}/total`);
+      const response = await apiClient.get(`/tooling-costs/bom-item/${bomItemId}/total`) as any;
       console.log(`Tooling cost response for ${bomItemId}:`, response);
       const cost = response.totalCost || response.data?.totalCost || 0;
       console.log(`Extracted tooling cost for ${bomItemId}: ${cost}`);
@@ -201,7 +203,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    */
   const fetchPackagingCost = async (bomItemId: string): Promise<number> => {
     try {
-      const response = await apiClient.get(`/packaging-logistics-costs/bom-item/${bomItemId}/total`);
+      const response = await apiClient.get(`/packaging-logistics-costs/bom-item/${bomItemId}/total`) as any;
       const cost = response.totalCost || response.data?.totalCost || 0;
       return cost;
     } catch (error) {
@@ -214,7 +216,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    */
   const fetchProcuredPartsCost = async (bomItemId: string): Promise<number> => {
     try {
-      const response = await apiClient.get(`/procured-parts-costs/bom-item/${bomItemId}/total`);
+      const response = await apiClient.get(`/procured-parts-costs/bom-item/${bomItemId}/total`) as any;
       const cost = response.totalCost || response.data?.totalCost || 0;
       return cost;
     } catch (error) {
@@ -227,26 +229,29 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
    */
   const fetchBulkCostData = async (bomItems: BOMItem[]) => {
     const itemIds = bomItems.map(item => item.id);
-    
+
     try {
-      // Single bulk API call instead of multiple individual calls
       const [rawMaterials, processes, tooling, packaging, procuredParts] = await Promise.all([
-        apiClient.post('/raw-material-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}})),
-        apiClient.post('/process-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}})),
-        apiClient.post('/tooling-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}})),
-        apiClient.post('/packaging-logistics-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}})),
-        apiClient.post('/procured-parts-costs/bulk-total', { bomItemIds: itemIds }).catch(() => ({data: {}}))
+        apiClient.post('/raw-material-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null),
+        apiClient.post('/process-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null),
+        apiClient.post('/tooling-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null),
+        apiClient.post('/packaging-logistics-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null),
+        apiClient.post('/procured-parts-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null)
       ]);
 
+      // If all bulk endpoints failed (don't exist yet), fall back to individual calls
+      if (!rawMaterials && !processes && !tooling && !packaging && !procuredParts) {
+        return null;
+      }
+
       return {
-        rawMaterials: rawMaterials.data || {},
-        processes: processes.data || {},
-        tooling: tooling.data || {},
-        packaging: packaging.data || {},
-        procuredParts: procuredParts.data || {}
+        rawMaterials: (rawMaterials as any) || {},
+        processes: (processes as any) || {},
+        tooling: (tooling as any) || {},
+        packaging: (packaging as any) || {},
+        procuredParts: (procuredParts as any) || {},
       };
     } catch (error) {
-      console.error('Bulk cost fetch failed, falling back to individual calls:', error);
       return null;
     }
   };
@@ -254,7 +259,7 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
   /**
    * Calculate comprehensive cost data for a BOM (optimized)
    */
-  const calculateBomCosts = async (bomId: string, itemCount?: number): Promise<void> => {
+  const calculateBomCosts = async (bomId: string, _itemCount?: number): Promise<void> => {
     // Prevent multiple simultaneous calculations for the same BOM
     if (calculatingBoms.has(bomId) || isCalculating) {
       return;
@@ -265,8 +270,8 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
     
     try {
       // Fetch actual BOM items from API
-      const response = await apiClient.get(`/boms/${bomId}/items`);
-      
+      const response = await apiClient.get(`/boms/${bomId}/items`) as any;
+
       // Handle different response structures - the response IS the data
       const bomItems: BOMItem[] = response.items || response.data || [];
       

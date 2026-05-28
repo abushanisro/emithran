@@ -2,18 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { 
-  ArrowLeft, 
-  Package, 
-  Calendar, 
-  Users, 
-  TrendingUp, 
+import {
+  ArrowLeft,
+  Calendar,
+  TrendingUp,
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -36,7 +34,6 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
   const [lot, setLot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [lotId, setLotId] = useState<string>('');
-  const [processes, setProcesses] = useState<any[]>([]);
   const [tabClickCounts, setTabClickCounts] = useState<Record<string, number>>({});
 
   // Track tab clicks for analytics and user behavior with schedule name tracking
@@ -144,24 +141,23 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
         
         // Fetch lot details
         
-        const lotResponse = await productionPlanningApi.getProductionLotById(lotId);
+        const lotResponse = await productionPlanningApi.getProductionLotById(lotId) as any;
 
 // Fetch processes for this lot
         
-        const processesResponse = await productionPlanningApi.getProcessesByLot(lotId);
-        
-        setProcesses(processesResponse || []);
-        
+        const processesRaw = await productionPlanningApi.getProcessesByLot(lotId);
+        const processesResponse: any[] = Array.isArray(processesRaw) ? processesRaw : [];
+
         // Calculate real statistics from processes and subtasks
-        const processCount = processesResponse?.length || 0;
-        const completedProcesses = processesResponse?.filter((p: any) => p.status === 'COMPLETED').length || 0;
-        const inProgressProcesses = processesResponse?.filter((p: any) => p.status === 'IN_PROGRESS').length || 0;
+        const processCount = processesResponse.length;
+        const completedProcesses = processesResponse.filter((p: any) => p.status === 'COMPLETED').length;
+        const inProgressProcesses = processesResponse.filter((p: any) => p.status === 'IN_PROGRESS').length;
         
         // Include subtasks in progress calculation for more granular tracking
         let totalTasks = processCount;
         let completedTasks = completedProcesses;
         
-        processesResponse?.forEach((process: any) => {
+        processesResponse.forEach((process: any) => {
           const subtasks = process.subtasks || [];
           totalTasks += subtasks.length;
           completedTasks += subtasks.filter((st: any) => st.status === 'COMPLETED').length;
@@ -170,7 +166,7 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
         // Calculate progress percentage based on total tasks (processes + subtasks)
         const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
         
-        console.log('📊 Progress Calculation:', {
+        console.log('Progress Calculation:', {
           processCount,
           completedProcesses,
           totalTasks,
@@ -179,7 +175,7 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
         });
         
         // Calculate total estimated hours from all processes and subtasks
-        const totalEstimatedHours = processesResponse?.reduce((total: number, process: any) => {
+        const totalEstimatedHours = processesResponse.reduce((total: number, process: any) => {
           const processHours = process.estimated_hours || process.estimatedHours || 0;
           const subtaskHours = (process.subtasks || []).reduce((subSum: number, subtask: any) => 
             subSum + (subtask.estimated_hours || subtask.estimatedHours || 0), 0);
@@ -187,7 +183,7 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
         }, 0) || 0;
         
         // Calculate actual hours (if tracking is implemented)
-        const totalActualHours = processesResponse?.reduce((total: number, process: any) => {
+        const totalActualHours = processesResponse.reduce((total: number, process: any) => {
           const processHours = process.actual_hours || process.actualHours || 0;
           const subtaskHours = (process.subtasks || []).reduce((subSum: number, subtask: any) => 
             subSum + (subtask.actual_hours || subtask.actualHours || 0), 0);
@@ -196,7 +192,7 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
         
         // Calculate material costs from BOM requirements
         let totalMaterialCost = 0;
-        processesResponse?.forEach((process: any) => {
+        processesResponse.forEach((process: any) => {
           (process.subtasks || []).forEach((subtask: any) => {
             (subtask.bom_requirements || subtask.bomRequirements || []).forEach((bomPart: any) => {
               const quantity = bomPart.required_quantity || bomPart.requiredQuantity || 0;
@@ -434,7 +430,7 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
           >
             Tracking
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
-            {tabClickCounts.schedule > 0 && (
+            {(tabClickCounts['schedule'] ?? 0) > 0 && (
               <span className="absolute -bottom-1 -right-1 text-xs bg-primary text-primary-foreground px-1 rounded-full min-w-[16px] h-4 flex items-center justify-center">
                 {tabClickCounts.schedule}
               </span>

@@ -13,7 +13,8 @@ import {
   CreateFieldDto,
   UpdateFieldDto,
   CreateFormulaDto,
-  UpdateFormulaDto
+  UpdateFormulaDto,
+  SheetMetalLookupDto,
 } from './dto/calculator.dto';
 
 @ApiTags('Calculators')
@@ -93,6 +94,19 @@ export class CalculatorsController {
     @AccessToken() token: string,
   ) {
     return this.calculatorsService.execute(id, dto, user.id, token);
+  }
+
+  // ========================================
+  // SHEET METAL LOOKUP ENDPOINT
+  // ========================================
+
+  @Post('sheet-metal/lookup')
+  @ApiOperation({ summary: 'Resolve a sheet metal parameterized lookup table' })
+  @ApiResponse({ status: 200, description: 'Lookup resolved' })
+  async sheetMetalLookup(
+    @Body() dto: SheetMetalLookupDto,
+  ) {
+    return this.calculatorsService.resolveSheetMetalLookup(dto.tableName, dto.params);
   }
 
   // ========================================

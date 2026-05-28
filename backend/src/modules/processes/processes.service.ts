@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import * as ExcelJS from 'exceljs';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import {
@@ -633,9 +634,27 @@ export class ProcessesService {
       throw new InternalServerErrorException(`Failed to fetch process hierarchy: ${error.message}`);
     }
 
-    const processGroups = [...new Set(data.map((row) => row.process_group))].sort();
-    const processRoutes = [...new Set(data.map((row) => row.process_route))].sort();
-    const operations = [...new Set(data.map((row) => row.operation))].sort();
+    const HEADER_SKIP = new Set(['s.no', 'sno', 's no', 'sl no', 'basic info', 'location',
+      'process group', 'process route', 'process_group', 'process_route', 'operation',
+      'name', 'type', 'category', 'description', 'serial no', 'sr no']);
+
+    const isValidName = (v: any): boolean => {
+      if (v == null || typeof v !== 'string') return false;
+      const t = v.trim();
+      return (
+        t.length > 0 &&
+        t.length <= 100 &&
+        isNaN(Number(t)) &&
+        !t.includes('|') &&
+        !t.includes('USD→INR') &&
+        !t.includes('USD->INR') &&
+        !HEADER_SKIP.has(t.toLowerCase())
+      );
+    };
+
+    const processGroups = [...new Set(data.map((row) => row.process_group).filter(isValidName))].sort();
+    const processRoutes = [...new Set(data.map((row) => row.process_route).filter(isValidName))].sort();
+    const operations = [...new Set(data.map((row) => row.operation).filter(isValidName))].sort();
 
     return {
       processGroups,
@@ -690,5 +709,190 @@ export class ProcessesService {
     }
 
     return data || [];
+  }
+
+  // ============================================================================
+  // EXCEL IMPORT / BULK OPERATIONS
+  // ============================================================================
+
+  async importCalculatorMappingsFromExcel(
+    fileBuffer: Buffer,
+    replaceExisting: boolean,
+    userId: string,
+    accessToken: string,
+  ): Promise<{ imported: number; skipped: number }> {
+    const workbook = new ExcelJS.Workbook();
+    const arrayBuffer = fileBuffer.buffer.slice(
+      fileBuffer.byteOffset,
+      fileBuffer.byteOffset + fileBuffer.byteLength,
+    ) as ArrayBuffer;
+    await workbook.xlsx.load(arrayBuffer);
+
+    // Find the process mappings sheet: prefer named match, then scan for header match
+    const PROCESS_SHEET_NAMES = ['processes', 'process', 'process mappings', 'process_mappings',
+      'calculator mappings', 'process calculator', 'ref_process', 'process routes'];
+    const namedSheet = workbook.worksheets.find(ws =>
+      PROCESS_SHEET_NAMES.includes(ws.name.toLowerCase().trim())
+    );
+    // If no named match, find the first sheet whose first row contains "process" keywords
+    const headerSheet = !namedSheet ? workbook.worksheets.find(ws => {
+      const r1 = ws.getRow(1);
+      for (let c = 1; c <= 5; c++) {
+        const v = String(r1.getCell(c).value || '').toLowerCase();
+        if (v.includes('process group') || v.includes('process route') || v.includes('process_group')) return true;
+      }
+      return false;
+    }) : null;
+    const sheet = namedSheet ?? headerSheet ?? workbook.worksheets[0];
+    if (!sheet) throw new BadRequestException('No worksheet found in Excel file');
+
+    // Known column-header / sub-header values to skip
+    const SKIP_VALUES = new Set(['s.no', 'sno', 's no', 'sl no', 'sr no', 'serial no',
+      'basic info', 'location', 'process group', 'process route', 'process_group',
+      'process_route', 'operation', 'name', 'type', 'category', 'description']);
+
+    // Parse sheet with forward-fill on the merged "Process Type" column
+    const seenKeys = new Set<string>();
+    const rows: Array<{ processGroup: string; processRoute: string; operation: string }> = [];
+    let lastProcessGroup: string | null = null;
+    let isHeader = true;
+
+    const isValidLabel = (v: string | null): v is string =>
+      v !== null &&
+      v.length > 0 &&
+      v.length <= 100 &&
+      isNaN(Number(v)) &&
+      !v.includes('|') &&
+      !v.includes('USD→INR') &&
+      !v.includes('USD->INR') &&
+      !SKIP_VALUES.has(v.toLowerCase().trim());
+
+    sheet.eachRow((row) => {
+      if (isHeader) { isHeader = false; return; }
+
+      const rawGroup = row.getCell(1).value;
+      const rawRoute = row.getCell(2).value;
+      const rawOp   = row.getCell(3).value;
+
+      const processGroup = rawGroup ? String(rawGroup).trim() : null;
+      const processRoute = rawRoute ? String(rawRoute).trim() : null;
+      const operation    = rawOp   ? String(rawOp).trim()   : null;
+
+      // Skip sub-header rows
+      if (processGroup && SKIP_VALUES.has(processGroup.toLowerCase())) return;
+
+      if (isValidLabel(processGroup)) lastProcessGroup = processGroup;
+      if (!lastProcessGroup || !isValidLabel(processRoute) || !isValidLabel(operation)) return;
+
+      // Deduplicate within the batch at parse time
+      const key = `${lastProcessGroup}\x00${processRoute}\x00${operation}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+
+      rows.push({ processGroup: lastProcessGroup, processRoute, operation });
+    });
+
+    if (rows.length === 0) throw new BadRequestException('No valid rows found in Excel file');
+
+    const client = this.supabaseService.getClient(accessToken);
+
+    if (replaceExisting) {
+      const { error: delError } = await client
+        .from('process_calculator_mappings')
+        .delete()
+        .not('id', 'is', null);
+
+      if (delError) {
+        this.logger.error(`Failed to clear existing mappings: ${delError.message}`, 'ProcessesService');
+        throw new InternalServerErrorException(`Failed to clear existing mappings: ${delError.message}`);
+      }
+    }
+
+    const records = rows.map((r, i) => ({
+      process_group: r.processGroup,
+      process_route: r.processRoute,
+      operation:     r.operation,
+      is_active:     true,
+      display_order: i,
+    }));
+
+    let imported = 0;
+    const CHUNK_SIZE = 200;
+
+    for (let offset = 0; offset < records.length; offset += CHUNK_SIZE) {
+      const chunk = records.slice(offset, offset + CHUNK_SIZE);
+
+      // upsert respects the unique constraint (process_group, process_route, operation)
+      // ignoreDuplicates: true → silently skips rows that already exist when appending
+      const { data, error } = await client
+        .from('process_calculator_mappings')
+        .upsert(chunk, {
+          onConflict: 'process_group,process_route,operation',
+          ignoreDuplicates: true,
+        })
+        .select('id');
+
+      if (error) {
+        this.logger.error(
+          `Import chunk error at offset ${offset}: ${error.message}`,
+          'ProcessesService',
+        );
+      } else {
+        imported += (data ?? []).length;
+      }
+    }
+
+    // Also auto-create process records (operation → process_name, processRoute → process_category)
+    const uniqueNames = new Set<string>();
+    const processRecords = rows
+      .filter(r => {
+        if (uniqueNames.has(r.operation)) return false;
+        uniqueNames.add(r.operation);
+        return true;
+      })
+      .map(r => ({
+        process_name:     r.operation,
+        process_category: r.processRoute,
+        user_id:          userId,
+        is_global:        false,
+      }));
+
+    if (processRecords.length > 0) {
+      const { data: existingProcs } = await client
+        .from('processes')
+        .select('process_name')
+        .eq('user_id', userId);
+      const existingProcNames = new Set((existingProcs ?? []).map((p: any) => p.process_name as string));
+      const newProcessRecords = processRecords.filter(p => !existingProcNames.has(p.process_name));
+
+      if (newProcessRecords.length > 0) {
+        const { error: procError } = await client.from('processes').insert(newProcessRecords);
+        if (procError) {
+          this.logger.error(`Process auto-create error: ${procError.message}`, 'ProcessesService');
+        } else {
+          this.logger.log(`Auto-created ${newProcessRecords.length} process records from Excel`, 'ProcessesService');
+        }
+      }
+    }
+
+    return { imported, skipped: records.length - imported };
+  }
+
+  async clearAllCalculatorMappings(accessToken: string): Promise<{ deleted: number }> {
+    this.logger.log('Clearing all process calculator mappings', 'ProcessesService');
+
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('process_calculator_mappings')
+      .delete()
+      .not('id', 'is', null)
+      .select('id');
+
+    if (error) {
+      this.logger.error(`Error clearing calculator mappings: ${error.message}`, 'ProcessesService');
+      throw new InternalServerErrorException(`Failed to clear mappings: ${error.message}`);
+    }
+
+    return { deleted: (data ?? []).length };
   }
 }

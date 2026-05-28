@@ -9,30 +9,26 @@
 -- This function checks if the current user's email exists in authorized_users
 -- and is active. Used by all RLS policies.
 CREATE OR REPLACE FUNCTION is_user_authorized()
-RETURNS BOOLEAN AS $
+RETURNS BOOLEAN AS $$
 DECLARE
   user_email TEXT;
   is_active_user BOOLEAN;
 BEGIN
-  -- Get the email of the currently authenticated user
   SELECT email INTO user_email
   FROM auth.users
   WHERE id = auth.uid();
 
-  -- If no email found, not authorized
   IF user_email IS NULL THEN
     RETURN FALSE;
   END IF;
 
-  -- Check if user exists in authorized_users and is active
   SELECT is_active INTO is_active_user
   FROM authorized_users
   WHERE email = user_email;
 
-  -- Return true only if user found and active
   RETURN COALESCE(is_active_user, FALSE);
 END;
-$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
 -- UPDATE ALL TABLE POLICIES TO REQUIRE AUTHORIZATION

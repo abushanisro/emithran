@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { useCalculator, useExecuteCalculator } from '@/lib/api/hooks';
+import { calculatorsApi } from '@/lib/api/calculators';
 
 type CalculatorExecutorProps = {
   calculatorId: string;
@@ -837,6 +838,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
   const [expandedFormulas, setExpandedFormulas] = useState<Set<string>>(new Set());
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
   const [retryCount, setRetryCount] = useState(0);
+  const [resolvedTableLookups, setResolvedTableLookups] = useState<Record<string, any>>({});
 
   // Initialize field values when calculator loads
   useEffect(() => {
@@ -993,6 +995,49 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
     }
   };
 
+  // Resolve all table_lookup fields and return their values
+  const resolveTableLookupFields = async (currentFieldValues: FieldValues): Promise<Record<string, number | null>> => {
+    if (!calculator?.fields) return {};
+
+    const tableLookupFields = calculator.fields.filter((f: any) => f.fieldType === 'table_lookup');
+    if (tableLookupFields.length === 0) return {};
+
+    const resolved: Record<string, number | null> = {};
+
+    await Promise.all(
+      tableLookupFields.map(async (field: any) => {
+        try {
+          const cfg = field.inputConfig as any;
+          if (!cfg?.table_name) return;
+
+          // Build params by reading values from other fields
+          const params: Record<string, any> = {};
+          if (cfg.param_fields) {
+            for (const [paramKey, sourceFieldName] of Object.entries(cfg.param_fields as Record<string, string>)) {
+              // Allow literal values via _literal suffix convention
+              if (paramKey.endsWith('_literal')) {
+                params[paramKey.replace('_literal', '')] = sourceFieldName;
+              } else {
+                const val = currentFieldValues[sourceFieldName];
+                if (val != null) params[paramKey] = val;
+              }
+            }
+          }
+
+          const res = await calculatorsApi.sheetMetalLookup(cfg.table_name, params);
+          const resultKey = cfg.result_key || 'value';
+          const value = resultKey === 'kerf' ? (res.kerf ?? null) : (res.value ?? null);
+          resolved[field.fieldName] = value;
+        } catch {
+          resolved[field.fieldName] = null;
+        }
+      })
+    );
+
+    setResolvedTableLookups(resolved);
+    return resolved;
+  };
+
   const handleExecute = async () => {
     if (!calculator) return;
 
@@ -1002,7 +1047,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
       setFieldErrors(validationErrors);
       const errorCount = validationErrors.filter(e => getErrorSeverity(e.type) === 'error').length;
       const warningCount = validationErrors.filter(e => getErrorSeverity(e.type) === 'warning').length;
-      
+
       if (errorCount > 0) {
         toast.error(`Please fix ${errorCount} error${errorCount > 1 ? 's' : ''} before calculating`);
         return;
@@ -1015,10 +1060,14 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
     setExecutionError(null);
     setRetryCount(0);
 
+    // Resolve table_lookup fields first, merge into inputValues
+    const tableLookupValues = await resolveTableLookupFields(fieldValues);
+    const mergedInputValues = { ...fieldValues, ...tableLookupValues };
+
     try {
       const result = await executeCalculatorMutation.mutateAsync({
         calculatorId,
-        inputValues: fieldValues,
+        inputValues: mergedInputValues,
       });
 
 
@@ -1311,8 +1360,8 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {calculator.fields
-            ?.filter((field) => 
-              field.fieldType !== 'calculated'
+            ?.filter((field) =>
+              field.fieldType !== 'calculated' && field.fieldType !== 'table_lookup'
             )
             .map((field) => {
               const fieldError = fieldErrors.find(e => e.field === field.fieldName);
@@ -1416,6 +1465,38 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
             })}
         </CardContent>
       </Card>
+
+      {/* Table Lookup Auto-Resolved Fields */}
+      {calculator.fields?.some((f: any) => f.fieldType === 'table_lookup') && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Table2 className="h-4 w-4" />
+              Auto-Resolved Lookup Values
+              <Badge variant="secondary" className="text-xs">From Reference Tables</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {calculator.fields
+              ?.filter((field: any) => field.fieldType === 'table_lookup')
+              .map((field: any) => {
+                const resolved = resolvedTableLookups[field.fieldName];
+                return (
+                  <div key={field.id} className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">{field.displayLabel || field.fieldName}</Label>
+                    <div className="px-3 py-2 bg-muted rounded border text-sm font-mono flex items-center justify-between">
+                      <span>{resolved != null ? Number(resolved).toFixed(4) : '—'}</span>
+                      {field.unit && <span className="text-xs text-muted-foreground ml-2">{field.unit}</span>}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Table: {field.inputConfig?.table_name ?? '?'}
+                    </p>
+                  </div>
+                );
+              })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Reference Table Viewer */}
       {viewingTableFor && (

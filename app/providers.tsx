@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/lib/providers/theme-provider'
+import { DensityProvider } from '@/lib/providers/density-provider'
 import { QueryProvider } from '@/lib/providers/query-provider'
 import { SupabaseAuthProvider } from '@/lib/providers/supabase-auth-provider'
 import { initializeApiClient } from '@/lib/api/init'
@@ -21,14 +22,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider>
-      <SupabaseAuthProvider>
-        <QueryProvider>
-          <TooltipProvider>
-            {children}
-            <Sonner />
-          </TooltipProvider>
-        </QueryProvider>
-      </SupabaseAuthProvider>
+      <DensityProvider>
+        <SupabaseAuthProvider>
+          <QueryProvider>
+            <TooltipProvider>
+              {children}
+              <Sonner />
+            </TooltipProvider>
+          </QueryProvider>
+        </SupabaseAuthProvider>
+      </DensityProvider>
     </ThemeProvider>
   )
 }

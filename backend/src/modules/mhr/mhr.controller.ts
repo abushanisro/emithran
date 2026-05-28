@@ -9,7 +9,11 @@ import {
   Param,
   Query,
   Logger,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MHRService } from './mhr.service';
 import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
@@ -90,5 +94,27 @@ export class MHRController {
       this.logger.error(`Failed to delete MHR record ${id}: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  @Delete()
+  @ApiOperation({ summary: 'Delete all MHR records for the current user' })
+  @ApiResponse({ status: 200, description: 'All MHR records deleted' })
+  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
+    this.logger.log(`Deleting all MHR records for user ${user.id}`);
+    return this.mhrService.removeAll(user.id, token);
+  }
+
+  @Post('import-excel')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Import MHR records from Excel (.xlsx)' })
+  @ApiResponse({ status: 201, description: 'MHR records imported successfully' })
+  async importFromExcel(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    this.logger.log(`Importing MHR records from Excel for user ${user.id}`);
+    return this.mhrService.importFromExcel(file.buffer, user.id, token);
   }
 }

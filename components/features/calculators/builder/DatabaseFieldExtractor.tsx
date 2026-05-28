@@ -105,6 +105,11 @@ const DATA_SOURCE_FIELDS: Record<DataSource, Array<{ field: string; label: strin
     { field: 'fromRunnerDia', label: 'From Runner Dia Table', description: 'Lookup from Runner Diameter Selection table' },
   ],
   manual: [],
+  sheet_metal_lookup: [
+    { field: 'value', label: 'Resolved Value', description: 'Primary resolved value from the lookup table' },
+    { field: 'kerf', label: 'Kerf Width', description: 'Laser kerf width (Table 5 only)' },
+    { field: 'sampleQty', label: 'Sample Qty', description: 'Sampling quantity (Table 6 only)' },
+  ],
 };
 
 

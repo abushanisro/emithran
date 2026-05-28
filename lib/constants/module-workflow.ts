@@ -139,7 +139,7 @@ export const WORKFLOW_MODULES: WorkflowModule[] = [
 export const getNextModule = (currentModuleId: string): WorkflowModule | null => {
   const currentIndex = WORKFLOW_MODULES.findIndex(module => module.id === currentModuleId);
   if (currentIndex >= 0 && currentIndex < WORKFLOW_MODULES.length - 1) {
-    return WORKFLOW_MODULES[currentIndex + 1];
+    return WORKFLOW_MODULES[currentIndex + 1] ?? null;
   }
   return null;
 };
@@ -147,7 +147,7 @@ export const getNextModule = (currentModuleId: string): WorkflowModule | null =>
 export const getPreviousModule = (currentModuleId: string): WorkflowModule | null => {
   const currentIndex = WORKFLOW_MODULES.findIndex(module => module.id === currentModuleId);
   if (currentIndex > 0) {
-    return WORKFLOW_MODULES[currentIndex - 1];
+    return WORKFLOW_MODULES[currentIndex - 1] ?? null;
   }
   return null;
 };

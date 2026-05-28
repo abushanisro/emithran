@@ -1,7 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Suspense, useState, Component, ReactNode } from 'react';
+import { Suspense, useState, Component } from 'react';
+import type { ReactNode } from 'react';
 import { Loader2, Download, RotateCcw, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -32,7 +33,7 @@ class ErrorBoundary extends Component<
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error) {
+  override componentDidCatch(error: Error) {
     console.error('WebGL Error:', error);
     const message = error.message.includes('WebGL') 
       ? 'WebGL context lost. Your graphics card may be experiencing issues.'
@@ -40,7 +41,7 @@ class ErrorBoundary extends Component<
     this.props.onError(message);
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return null; // Let parent handle error display
     }
@@ -54,7 +55,7 @@ const EDrawingsViewer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="absolute inset-0 flex items-center justify-center bg-[#2d2d2d]">
+      <div className="h-full w-full flex items-center justify-center bg-[#2d2d2d]">
         <div className="text-center text-white">
           <Loader2 className="h-12 w-12 mx-auto mb-3 animate-spin" />
           <p className="text-sm font-medium">Initializing 3D viewer...</p>
@@ -135,7 +136,7 @@ export function ModelViewer({
   const isSTL = fileExt === 'stl' || actualFileExt === 'stl';
   const isOBJ = fileExt === 'obj' || actualFileExt === 'obj';
   const isInteractiveSupported = ['stl', 'obj'].includes(actualFileExt) || ['stl', 'obj'].includes(fileExt);
-  const isOriginalSTEP = ['step', 'stp', 'iges', 'igs'].includes(fileExt);
+  const isOriginalSTEP = ['step', 'stp', 'iges', 'igs', 'sldprt'].includes(fileExt);
   const isConvertedToSTL = isOriginalSTEP && actualFileExt === 'stl';
   // More robust STL detection - check filename, fileType, and URL
   const isSTLFromFilename = fileName.toLowerCase().includes('.stl');
@@ -188,9 +189,9 @@ export function ModelViewer({
   // Priority check: Always show 3D viewer for STL/OBJ files regardless of other conditions
   if (shouldShow3DViewer) {
     return (
-      <div className="h-[85vh] min-h-[700px] overflow-hidden">
+      <div className="h-full min-h-[400px] relative overflow-hidden">
         <Suspense fallback={
-          <div className="absolute inset-0 flex items-center justify-center bg-[#4a4a4a]">
+          <div className="h-full w-full flex items-center justify-center bg-[#4a4a4a]">
             <div className="text-center text-white">
               <Loader2 className="h-12 w-12 mx-auto mb-3 animate-spin" />
               <p className="text-sm font-medium">Loading 3D model...</p>
@@ -204,16 +205,16 @@ export function ModelViewer({
               fileName={fileName}
               isExploded={isExploded}
               explodeDistance={explodeDistance}
-              onMeasurements={onMeasurements}
-              manufacturingFeatures={manufacturingFeatures}
-              selectedFeature={selectedFeature}
-              onFeatureSelect={onFeatureSelect}
-              showFeatures={showFeatures}
-              selectedBOMItems={selectedBOMItems}
-              showOnlySelected={showOnlySelected}
-              hoveredBOMItem={hoveredBOMItem}
-              onPartsDetected={onPartsDetected}
-              dfmAnalysisData={dfmAnalysisData}
+              {...(onMeasurements ? { onMeasurements } : {})}
+              {...(manufacturingFeatures !== undefined ? { manufacturingFeatures } : {})}
+              {...(selectedFeature !== undefined ? { selectedFeature } : {})}
+              {...(onFeatureSelect ? { onFeatureSelect } : {})}
+              {...(showFeatures !== undefined ? { showFeatures } : {})}
+              {...(selectedBOMItems !== undefined ? { selectedBOMItems } : {})}
+              {...(showOnlySelected !== undefined ? { showOnlySelected } : {})}
+              {...(hoveredBOMItem !== undefined ? { hoveredBOMItem } : {})}
+              {...(onPartsDetected ? { onPartsDetected } : {})}
+              {...(dfmAnalysisData !== undefined ? { dfmAnalysisData } : {})}
             />
           </ErrorBoundary>
         </Suspense>
@@ -310,9 +311,9 @@ export function ModelViewer({
   // Interactive 3D Viewer (STL/OBJ)
   if (isInteractiveSupported) {
     return (
-      <div className="h-[85vh] min-h-[700px] overflow-hidden">
+      <div className="h-full min-h-[400px] relative overflow-hidden">
         <Suspense fallback={
-          <div className="absolute inset-0 flex items-center justify-center bg-[#4a4a4a]">
+          <div className="h-full w-full flex items-center justify-center bg-[#4a4a4a]">
             <div className="text-center text-white">
               <Loader2 className="h-12 w-12 mx-auto mb-3 animate-spin" />
               <p className="text-sm font-medium">Loading 3D model...</p>
@@ -326,16 +327,16 @@ export function ModelViewer({
               fileName={fileName}
               isExploded={isExploded}
               explodeDistance={explodeDistance}
-              onMeasurements={onMeasurements}
-              manufacturingFeatures={manufacturingFeatures}
-              selectedFeature={selectedFeature}
-              onFeatureSelect={onFeatureSelect}
-              showFeatures={showFeatures}
-              selectedBOMItems={selectedBOMItems}
-              showOnlySelected={showOnlySelected}
-              hoveredBOMItem={hoveredBOMItem}
-              onPartsDetected={onPartsDetected}
-              dfmAnalysisData={dfmAnalysisData}
+              {...(onMeasurements ? { onMeasurements } : {})}
+              {...(manufacturingFeatures !== undefined ? { manufacturingFeatures } : {})}
+              {...(selectedFeature !== undefined ? { selectedFeature } : {})}
+              {...(onFeatureSelect ? { onFeatureSelect } : {})}
+              {...(showFeatures !== undefined ? { showFeatures } : {})}
+              {...(selectedBOMItems !== undefined ? { selectedBOMItems } : {})}
+              {...(showOnlySelected !== undefined ? { showOnlySelected } : {})}
+              {...(hoveredBOMItem !== undefined ? { hoveredBOMItem } : {})}
+              {...(onPartsDetected ? { onPartsDetected } : {})}
+              {...(dfmAnalysisData !== undefined ? { dfmAnalysisData } : {})}
             />
           </ErrorBoundary>
         </Suspense>

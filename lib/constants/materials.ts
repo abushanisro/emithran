@@ -220,13 +220,13 @@ export function getCurrencyForCountry(country: Country): Currency {
 
 export function getCompatibleShapes(category: MaterialCategory): MaterialShape[] {
   return Object.entries(SHAPE_CATEGORY_MAPPING)
-    .filter(([_, categories]) => categories.includes(category))
+    .filter(([_, categories]) => (categories as readonly string[]).includes(category))
     .map(([shape]) => shape as MaterialShape);
 }
 
 export function isShapeCompatibleWithCategory(shape: MaterialShape, category: MaterialCategory): boolean {
   const compatibleCategories = SHAPE_CATEGORY_MAPPING[shape];
-  return compatibleCategories.includes(category);
+  return (compatibleCategories as readonly string[]).includes(category);
 }
 
 export function formatCurrency(amount: number, currency: Currency): string {

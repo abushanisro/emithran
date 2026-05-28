@@ -238,8 +238,8 @@ CREATE INDEX IF NOT EXISTS idx_projects_name_active
 ON projects(name) WHERE status = 'active';
 
 -- BOMs indexes
-CREATE INDEX IF NOT EXISTS idx_boms_project_active 
-ON boms(project_id) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_boms_project_active
+ON boms(project_id);
 
 CREATE INDEX IF NOT EXISTS idx_boms_project_version 
 ON boms(project_id, version);

@@ -18,7 +18,10 @@ STEP_MAGIC_NUMBERS = [
 ]
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {'.step', '.stp', '.iges', '.igs'}
+ALLOWED_EXTENSIONS = {'.step', '.stp', '.iges', '.igs', '.sldprt'}
+
+# Extensions that bypass STEP magic number check (proprietary binary formats)
+BINARY_NATIVE_EXTENSIONS = {'.sldprt'}
 
 
 class FileValidator:
@@ -74,35 +77,40 @@ class FileValidator:
         
         return file_ext
     
-    def validate_magic_number(self, file_path: str) -> None:
+    def validate_magic_number(self, file_path: str, file_ext: str = '') -> None:
         """
         Validate file content using magic number (file signature)
-        
-        This prevents users from uploading malicious files with renamed extensions
-        
+
+        This prevents users from uploading malicious files with renamed extensions.
+        Proprietary binary formats (e.g. .sldprt) bypass the STEP header check.
+
         Args:
             file_path: Path to file
-            
+            file_ext: Lowercase file extension (used to skip check for native formats)
+
         Raises:
             InvalidFileTypeError: If file signature doesn't match STEP format
         """
+        if file_ext in BINARY_NATIVE_EXTENSIONS:
+            return
+
         try:
             # Read first 512 bytes for magic number check
             with open(file_path, 'rb') as f:
                 header = f.read(512)
-            
+
             # Check for STEP magic numbers
             is_valid = any(
-                magic_num in header 
+                magic_num in header
                 for magic_num in STEP_MAGIC_NUMBERS
             )
-            
+
             if not is_valid:
                 raise InvalidFileTypeError(
                     "File content does not match STEP format. "
                     "Please upload a valid STEP/IGES file."
                 )
-        
+
         except IOError as e:
             raise InvalidFileTypeError(f"Cannot read file for validation: {str(e)}")
     
@@ -122,12 +130,12 @@ class FileValidator:
         """
         # 1. Validate extension
         file_ext = self.validate_file_extension(filename)
-        
+
         # 2. Validate size
         self.validate_file_size(file_path)
-        
-        # 3. Validate magic number (content)
-        self.validate_magic_number(file_path)
+
+        # 3. Validate magic number (content); skipped for native binary formats
+        self.validate_magic_number(file_path, file_ext)
         
         # Return validated info
         file_size = os.path.getsize(file_path)

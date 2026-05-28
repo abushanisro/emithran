@@ -129,23 +129,26 @@ export function CreateNominationDialog({
             const existingVendorIndex = existingVendors.findIndex(v => v.vendorId === vendor.id);
             
             if (existingVendorIndex >= 0) {
-              // Update existing vendor - increment RFQ count
-              existingVendors[existingVendorIndex].rfqCount++;
-              if (vendor.responded && vendor.quoteAmount) {
-                existingVendors[existingVendorIndex].responded = true;
-                existingVendors[existingVendorIndex].quoteAmount = vendor.quoteAmount;
-                existingVendors[existingVendorIndex].leadTimeDays = vendor.leadTimeDays;
+              const existing = existingVendors[existingVendorIndex];
+              if (existing) {
+                existing.rfqCount++;
+                if (vendor.responded && vendor.quoteAmount) {
+                  existing.responded = true;
+                  existing.quoteAmount = vendor.quoteAmount;
+                  if (vendor.leadTimeDays !== undefined) {
+                    existing.leadTimeDays = vendor.leadTimeDays;
+                  }
+                }
               }
             } else {
-              // Add new vendor
               existingVendors.push({
                 vendorId: vendor.id,
                 vendorName: vendor.name,
-                vendorEmail: vendor.email,
-                responded: vendor.responded || false,
-                quoteAmount: vendor.quoteAmount,
-                leadTimeDays: vendor.leadTimeDays,
-                rfqCount: 1
+                responded: vendor.responded,
+                rfqCount: 1,
+                ...(vendor.email !== undefined && { vendorEmail: vendor.email }),
+                ...(vendor.quoteAmount !== undefined && { quoteAmount: vendor.quoteAmount }),
+                ...(vendor.leadTimeDays !== undefined && { leadTimeDays: vendor.leadTimeDays }),
               });
             }
           });
@@ -358,18 +361,18 @@ export function CreateNominationDialog({
     const formData: CreateSupplierNominationData = {
       nominationName: nominationName.trim(),
       description: description.trim(),
-      nominationType: NominationType.MANUFACTURER, // Fixed value since field was removed
+      nominationType: NominationType.MANUFACTURER,
       projectId,
-      evaluationGroupId,
+      ...(evaluationGroupId !== undefined && { evaluationGroupId }),
       vendorIds: selectedVendorIds,
       ...(selectedBomItems.length > 0 && {
         bomParts: selectedBomItems.map(item => ({
           bomItemId: item.id,
           bomItemName: item.name,
-          partNumber: item.partNumber,
-          material: item.material,
           quantity: item.quantity,
-          vendorIds: selectedVendorIds // All selected vendors apply to selected BOM parts
+          vendorIds: selectedVendorIds,
+          ...(item.partNumber !== undefined && { partNumber: item.partNumber }),
+          ...(item.material !== undefined && { material: item.material }),
         }))
       })
     };

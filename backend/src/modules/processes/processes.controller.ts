@@ -8,7 +8,11 @@ import {
   Body,
   Param,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ProcessesService } from './processes.service';
 import {
@@ -44,6 +48,25 @@ export class ProcessesController {
   // PROCESS CALCULATOR MAPPING ENDPOINTS (Must be before :id routes)
   // Routes ordered: most specific -> general -> dynamic params
   // ============================================================================
+
+  @Post('calculator-mappings/import-excel')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Import process calculator mappings from Excel file' })
+  @ApiResponse({ status: 201, description: 'Mappings imported successfully' })
+  async importCalculatorMappings(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('replaceExisting') replaceExisting: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.processesService.importCalculatorMappingsFromExcel(
+      file.buffer,
+      replaceExisting === 'true',
+      user.id,
+      token,
+    );
+  }
 
   @Get('calculator-mappings/hierarchy')
   @ApiOperation({ summary: 'Get unique process hierarchy values for filters' })
@@ -93,6 +116,13 @@ export class ProcessesController {
     @AccessToken() token: string,
   ): Promise<ProcessCalculatorMappingResponseDto> {
     return this.processesService.updateProcessCalculatorMapping(id, updateDto, token);
+  }
+
+  @Delete('calculator-mappings')
+  @ApiOperation({ summary: 'Clear all process calculator mappings' })
+  @ApiResponse({ status: 200, description: 'All process calculator mappings deleted' })
+  async clearAllCalculatorMappings(@AccessToken() token: string) {
+    return this.processesService.clearAllCalculatorMappings(token);
   }
 
   @Delete('calculator-mappings/:id')

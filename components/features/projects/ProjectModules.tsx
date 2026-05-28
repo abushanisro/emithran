@@ -212,6 +212,15 @@ export function ProjectModules({ projectId, bomCount, firstBomId }: ProjectModul
         router.push(`/benchmarks?projectId=${projectId}`);
       },
     },
+    {
+      title: 'VAVE',
+      description: 'Value Analysis & Value Engineering — AI-accelerated cost reduction using SCAMPER, TRIZ, and should-cost analysis',
+      borderColor: 'border-l-4 border-l-violet-500',
+      status: 'available' as const,
+      onClick: () => {
+        router.push(`/vave?sourceProjectId=${projectId}`);
+      },
+    },
   ];
 
   return (

@@ -19,3 +19,5 @@ export * from './useProcesses';
 export * from './useProcessRoutes';
 export * from './useAuthEnabled';
 export * from './useCadEngine';
+export * from './useVave';
+export * from './useBenchmarkSessions';

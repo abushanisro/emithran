@@ -11,7 +11,7 @@ import logging
 import json
 import time
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 # Load .env file if present (needed inside Docker where env vars may not be set)
 try:

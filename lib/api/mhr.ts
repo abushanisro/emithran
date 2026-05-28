@@ -63,6 +63,22 @@ export type MHRRecord = {
   electricityCostPerKwh: number;
   adminOverheadPercentage: number;
   profitMarginPercentage: number;
+  // India 2026 extended fields
+  processGroup?: string;
+  processCategory?: string;
+  machineClass?: string;
+  automationLevel?: string;
+  operators?: number;
+  wageGrade?: string;
+  machinePriceUsd?: number;
+  manufacturerCountry?: string;
+  setupTimeHr?: number;
+  lhrInrPerHr?: number;
+  usdLaborRatePerHr?: number;
+  usdLhrBase?: number;
+  usdLhrBurden?: number;
+  usdLhrTotal?: number;
+  specs?: Record<string, any>;
   calculations: MHRCalculationResult;
   createdAt: string;
   updatedAt: string;
@@ -94,6 +110,19 @@ export type CreateMHRData = {
   electricityCostPerKwh: number;
   adminOverheadPercentage: number;
   profitMarginPercentage: number;
+  // India 2026 extended fields
+  machineClass?: string;
+  automationLevel?: string;
+  wageGrade?: string;
+  operators?: number;
+  machinePriceUsd?: number;
+  manufacturerCountry?: string;
+  setupTimeHr?: number;
+  lhrInrPerHr?: number;
+  usdLaborRatePerHr?: number;
+  usdLhrBase?: number;
+  usdLhrBurden?: number;
+  usdLhrTotal?: number;
 };
 
 export type UpdateMHRData = Partial<CreateMHRData>;
@@ -162,5 +191,24 @@ export const mhrApi = {
    */
   delete: async (id: string): Promise<void> => {
     return apiClient.delete(`/mhr/${id}`);
+  },
+
+  /**
+   * Delete all MHR records for the current user
+   */
+  deleteAll: async (): Promise<{ deleted: number }> => {
+    return apiClient.delete<{ deleted: number }>('/mhr') ?? { deleted: 0 };
+  },
+
+  /**
+   * Import MHR records from Excel file
+   */
+  importFromExcel: async (file: File): Promise<{ imported: number; skipped: number; errors: string[] }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return (await apiClient.uploadFiles<{ imported: number; skipped: number; errors: string[] }>(
+      '/mhr/import-excel',
+      formData,
+    )) ?? { imported: 0, skipped: 0, errors: [] };
   },
 };

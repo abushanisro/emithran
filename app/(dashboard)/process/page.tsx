@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,11 +15,12 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload } from 'lucide-react';
 import {
   useProcesses,
   useReferenceTables,
   useBulkUpdateTableRows,
+  useCreateProcess,
   type ReferenceTable,
 } from '@/lib/api/hooks/useProcesses';
 import {
@@ -28,6 +29,8 @@ import {
   useUpdateProcessCalculatorMapping,
   useDeleteProcessCalculatorMapping,
   useProcessHierarchy,
+  useImportProcessCalculatorMappings,
+  useClearAllProcessCalculatorMappings,
   type ProcessCalculatorMapping,
 } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import {
@@ -38,13 +41,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { InlineReferenceTableEditor } from '@/components/features/calculators/builder/InlineReferenceTableEditor';
@@ -79,6 +75,11 @@ export default function ProcessPage() {
   const [editingTableId, setEditingTableId] = useState<string | null>(null);
   const [editedTableData, setEditedTableData] = useState<Record<string, any[]>>({});
 
+  // Import dialog state
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<'replace' | 'append'>('append');
+
   // Calculator Mapping States
   const [isAddMappingDialogOpen, setIsAddMappingDialogOpen] = useState(false);
   const [editingMapping, setEditingMapping] = useState<ProcessCalculatorMapping | null>(null);
@@ -103,14 +104,6 @@ export default function ProcessPage() {
   const [expandedTableId, setExpandedTableId] = useState<string | null>(null);
   const [showAddTableEditor, setShowAddTableEditor] = useState(false);
 
-  // Reset process route filter when process group changes
-  const handleProcessGroupChange = (value: string) => {
-    setFilterProcessGroup(value);
-    if (value === 'all' || !value) {
-      setFilterProcessRoute('all');
-    }
-  };
-
   // Fetch processes from database
   const { data: processesData, isLoading: processesLoading, error: processesError } = useProcesses();
 
@@ -127,7 +120,7 @@ export default function ProcessPage() {
   }, [processesData, selectedProcessId]);
 
   // Fetch reference tables for selected process (from old functionality)
-  const { data: referenceTables, isLoading: loadingTables } = useReferenceTables(selectedProcessId || undefined);
+  const { data: referenceTables } = useReferenceTables(selectedProcessId || undefined);
 
   // Fetch reference tables for modal process (only if modalProcessId is a valid UUID)
   const { data: modalReferenceTables, isLoading: loadingModalTables, refetch: refetchModalTables } = useReferenceTables(
@@ -141,16 +134,22 @@ export default function ProcessPage() {
     search: searchQuery || undefined,
     limit: 1000,
   });
-  const { data: hierarchy } = useProcessHierarchy();
+  useProcessHierarchy();
 
 
   // Bulk update mutation
   const bulkUpdateMutation = useBulkUpdateTableRows();
 
+  // Process create mutation (for auto-creating process records when clicking route buttons)
+  const createProcessMutation = useCreateProcess();
+
   // Calculator mapping mutations
   const createMappingMutation = useCreateProcessCalculatorMapping();
   const updateMappingMutation = useUpdateProcessCalculatorMapping();
   const deleteMappingMutation = useDeleteProcessCalculatorMapping();
+  const importMappingMutation = useImportProcessCalculatorMappings();
+  const clearMappingMutation = useClearAllProcessCalculatorMappings();
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleEditTable = (tableId: string) => {
     setEditingTableId(tableId);
@@ -464,6 +463,53 @@ export default function ProcessPage() {
     }
   };
 
+  const handleDeleteGroup = async (group: string, mappings: ProcessCalculatorMapping[]) => {
+    if (!confirm(`Delete all ${mappings.length} mapping(s) in "${group}"? This cannot be undone.`)) return;
+    try {
+      await Promise.all(mappings.map(m => deleteMappingMutation.mutateAsync(m.id)));
+      toast.success(`Group "${group}" deleted`);
+    } catch (error) {
+      toast.error('Failed to delete group');
+    }
+  };
+
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setPendingImportFile(file);
+    setImportMode('append');
+    setIsImportDialogOpen(true);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImportFile) return;
+    setIsImportDialogOpen(false);
+    try {
+      const result = await importMappingMutation.mutateAsync({
+        file: pendingImportFile,
+        replaceExisting: importMode === 'replace',
+      });
+      toast.success(
+        `Imported ${result.imported} mapping${result.imported !== 1 ? 's' : ''}` +
+        (result.skipped > 0 ? ` · ${result.skipped} duplicate${result.skipped !== 1 ? 's' : ''} skipped` : ''),
+      );
+    } catch {
+      toast.error('Import failed. Verify the file uses the expected column layout and try again.');
+    } finally {
+      setPendingImportFile(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      const result = await clearMappingMutation.mutateAsync();
+      toast.success(`Cleared ${result.deleted} mapping${result.deleted !== 1 ? 's' : ''}`);
+    } catch {
+      toast.error('Failed to clear mappings');
+    }
+  };
 
   // Show loading spinner during auth initialization
   if (authLoading) {
@@ -512,10 +558,42 @@ export default function ProcessPage() {
                   Define which calculator is used for each process group, route, and operation combination
                 </CardDescription>
               </div>
-              <Button onClick={handleAddMapping}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Mapping
-              </Button>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleFileSelected}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => importFileInputRef.current?.click()}
+                  disabled={importMappingMutation.isPending}
+                >
+                  {importMappingMutation.isPending
+                    ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    : <Upload className="h-4 w-4 mr-2" />}
+                  Import Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearAll}
+                  disabled={clearMappingMutation.isPending}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                >
+                  {clearMappingMutation.isPending
+                    ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    : <Trash2 className="h-4 w-4 mr-2" />}
+                  Clear All
+                </Button>
+                <Button onClick={handleAddMapping}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Mapping
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -560,11 +638,20 @@ export default function ProcessPage() {
                 )
                 : allMappings;
 
+              // Group with deduplication — skip entries where same operation
+              // already exists for the same (group, route) pair
               const grouped: Record<string, Record<string, typeof allMappings>> = {};
+              const seenOps = new Set<string>();
               for (const m of filtered) {
+                const op = m.operation?.trim();
+                if (!op) continue; // skip blank operations
+                const key = `${m.processGroup}\x00${m.processRoute}\x00${op}`;
+                if (seenOps.has(key)) continue;
+                seenOps.add(key);
                 if (!grouped[m.processGroup]) grouped[m.processGroup] = {};
-                if (!grouped[m.processGroup][m.processRoute]) grouped[m.processGroup][m.processRoute] = [];
-                grouped[m.processGroup][m.processRoute].push(m);
+                const grp = grouped[m.processGroup]!;
+                if (!grp[m.processRoute]) grp[m.processRoute] = [];
+                grp[m.processRoute]!.push(m);
               }
 
               if (filtered.length === 0) {
@@ -583,9 +670,18 @@ export default function ProcessPage() {
                       {/* Process Group header */}
                       <div className="px-4 py-2.5 bg-secondary/50 border-b border-border flex items-center justify-between">
                         <h3 className="font-semibold text-sm text-foreground">{group}</h3>
-                        <Badge variant="outline" className="text-xs">
-                          {Object.values(routes).flat().length} ops · {Object.keys(routes).length} routes
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {Object.values(routes).flat().length} ops · {Object.keys(routes).length} routes
+                          </Badge>
+                          <button
+                            className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors rounded hover:bg-destructive/10"
+                            onClick={() => handleDeleteGroup(group, Object.values(routes).flat())}
+                            title={`Delete all mappings in "${group}"`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                       {/* Process Routes */}
                       <div className="divide-y divide-border/40">
@@ -595,11 +691,27 @@ export default function ProcessPage() {
                             <button
                               className="text-sm font-medium text-primary hover:underline w-44 shrink-0 text-left pt-0.5"
                               title="Click to view / edit reference tables"
-                              onClick={() => {
+                              onClick={async () => {
                                 const processes = processesData?.processes || [];
                                 let process = processes.find(p => p.processName === route);
                                 if (!process) process = processes.find(p => p.processName.toLowerCase() === route.toLowerCase());
-                                setModalProcessId(process?.id ?? null);
+
+                                let processId = process?.id ?? null;
+
+                                if (!processId) {
+                                  try {
+                                    const newProcess = await createProcessMutation.mutateAsync({
+                                      processName: route,
+                                      processCategory: group,
+                                    });
+                                    processId = newProcess.id;
+                                  } catch {
+                                    toast.error('Failed to initialize process record');
+                                    return;
+                                  }
+                                }
+
+                                setModalProcessId(processId);
                                 setModalProcessName(route);
                                 setInlineEditorTables([]);
                                 setShowAddTableEditor(false);
@@ -684,6 +796,69 @@ export default function ProcessPage() {
 
       </div>
 
+      {/* IMPORT EXCEL DIALOG */}
+      <Dialog open={isImportDialogOpen} onOpenChange={(open) => { if (!open) { setIsImportDialogOpen(false); setPendingImportFile(null); } }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Import Process Mappings
+            </DialogTitle>
+            <DialogDescription>
+              {pendingImportFile && (
+                <span className="font-medium text-foreground">{pendingImportFile.name}</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            <p className="text-sm text-muted-foreground">Choose how to handle existing mappings:</p>
+            <div className="space-y-2">
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-secondary/30 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="append"
+                  checked={importMode === 'append'}
+                  onChange={() => setImportMode('append')}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-sm font-medium">Append — skip duplicates</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Only new combinations are added. Existing entries are left unchanged.</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-secondary/30 transition-colors has-[:checked]:border-destructive has-[:checked]:bg-destructive/5">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="replace"
+                  checked={importMode === 'replace'}
+                  onChange={() => setImportMode('replace')}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-sm font-medium text-destructive">Replace — delete all existing first</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">All current mappings are removed before import. This cannot be undone.</p>
+                </div>
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsImportDialogOpen(false); setPendingImportFile(null); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmImport}
+              disabled={importMappingMutation.isPending}
+              variant={importMode === 'replace' ? 'destructive' : 'default'}
+            >
+              {importMappingMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {importMode === 'replace' ? 'Replace & Import' : 'Import'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ADD/EDIT CALCULATOR MAPPING DIALOG */}
       <Dialog open={isAddMappingDialogOpen} onOpenChange={setIsAddMappingDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
@@ -694,40 +869,72 @@ export default function ProcessPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="processGroup">Process Group</Label>
-              <Input
-                id="processGroup"
-                value={mappingFormData.processGroup}
-                onChange={(e) =>
-                  setMappingFormData({ ...mappingFormData, processGroup: e.target.value })
-                }
-                placeholder="e.g., Plastic & Rubber"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="processRoute">Process Route</Label>
-              <Input
-                id="processRoute"
-                value={mappingFormData.processRoute}
-                onChange={(e) =>
-                  setMappingFormData({ ...mappingFormData, processRoute: e.target.value })
-                }
-                placeholder="e.g., Injection Molding"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="operation">Operation</Label>
-              <Input
-                id="operation"
-                value={mappingFormData.operation}
-                onChange={(e) =>
-                  setMappingFormData({ ...mappingFormData, operation: e.target.value })
-                }
-                placeholder="e.g., Injection Molding-Cold Runner"
-              />
-            </div>
-
+            {(() => {
+              const allMappings = calculatorMappings?.mappings ?? [];
+              const availableGroups = [...new Set(allMappings.map(m => m.processGroup))].sort();
+              const availableRoutes = [...new Set(
+                allMappings.filter(m => !mappingFormData.processGroup || m.processGroup === mappingFormData.processGroup)
+                  .map(m => m.processRoute)
+              )].sort();
+              const availableOps = [...new Set(
+                allMappings.filter(m =>
+                  (!mappingFormData.processGroup || m.processGroup === mappingFormData.processGroup) &&
+                  (!mappingFormData.processRoute || m.processRoute === mappingFormData.processRoute)
+                ).map(m => m.operation)
+              )].sort();
+              return (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="processGroup">Process Group <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="processGroup"
+                      value={mappingFormData.processGroup}
+                      onChange={(e) => setMappingFormData({ ...mappingFormData, processGroup: e.target.value, processRoute: '', operation: '' })}
+                      placeholder="Type or select a process group"
+                      list="processGroups-list"
+                    />
+                    <datalist id="processGroups-list">
+                      {availableGroups.map(g => <option key={g} value={g} />)}
+                    </datalist>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="processRoute">Process Route <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="processRoute"
+                      value={mappingFormData.processRoute}
+                      onChange={(e) => setMappingFormData({ ...mappingFormData, processRoute: e.target.value, operation: '' })}
+                      placeholder="Type or select a process route"
+                      list="processRoutes-list"
+                    />
+                    <datalist id="processRoutes-list">
+                      {availableRoutes.map(r => <option key={r} value={r} />)}
+                    </datalist>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="operation">Operation <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="operation"
+                      value={mappingFormData.operation}
+                      onChange={(e) => setMappingFormData({ ...mappingFormData, operation: e.target.value })}
+                      placeholder="Type or select an operation"
+                      list="operations-list"
+                    />
+                    <datalist id="operations-list">
+                      {availableOps.map(o => <option key={o} value={o} />)}
+                    </datalist>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="calculatorName">Calculator Name <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                    <Input
+                      id="calculatorName"
+                      value={mappingFormData.calculatorName}
+                      onChange={(e) => setMappingFormData({ ...mappingFormData, calculatorName: e.target.value })}
+                      placeholder="e.g., Injection Molding Calculator"
+                    />
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddMappingDialogOpen(false)}>
@@ -866,7 +1073,7 @@ export default function ProcessPage() {
                               columnDefinitions: table.column_definitions,
                               isEditable: true,
                               displayOrder: 0
-                            });
+                            }) as { id: string };
                             if (table.rows && table.rows.length > 0) {
                               for (let i = 0; i < table.rows.length; i++) {
                                 await apiClient.post(`/processes/reference-tables/${tableResponse.id}/rows`, {

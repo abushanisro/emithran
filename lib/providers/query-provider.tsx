@@ -58,8 +58,8 @@ export function QueryProvider({ children }: { children: ReactNode }) {
  * Handle errors from React Query
  */
 function handleQueryError(error: unknown): void {
-  // Check if it's an authentication error
-  if (error instanceof ApiError && error.isUnauthorized()) {
+  // Check if it's an authentication error (401 OR network-level session expiry)
+  if (error instanceof ApiError && (error.isUnauthorized() || error.code === 'AUTH_EXPIRED')) {
     // Prevent duplicate notifications
     if (hasShownAuthError) {
       return;
@@ -68,27 +68,30 @@ function handleQueryError(error: unknown): void {
     hasShownAuthError = true;
 
     // Show user-friendly message
-    toast.error('Your session has expired. Please log in again.', {
-      duration: 5000,
+    toast.error('Session expired. Signing you out…', {
+      duration: 3000,
       id: 'auth-error',
     });
 
-    // Sign out (fire and forget)
-    if (supabase) {
-      supabase.auth.signOut().catch(() => {
-        // Ignore errors
-      });
-    }
-
-    // Hard redirect to login (prevents back button to authenticated pages)
+    // Save current path for redirect after login
     if (typeof window !== 'undefined') {
-      // Save current path for redirect after login
       const currentPath = window.location.pathname + window.location.search;
       if (currentPath !== '/auth' && currentPath !== '/') {
         sessionStorage.setItem('redirectAfterLogin', currentPath);
       }
+    }
 
-      window.location.replace('/auth');
+    // Sign out then hard redirect — await ensures session is cleared before reload
+    const doRedirect = () => {
+      if (typeof window !== 'undefined') {
+        window.location.replace('/auth');
+      }
+    };
+
+    if (supabase) {
+      supabase.auth.signOut().finally(doRedirect);
+    } else {
+      doRedirect();
     }
   }
 }

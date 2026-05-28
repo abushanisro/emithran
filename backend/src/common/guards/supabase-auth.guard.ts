@@ -11,17 +11,26 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
   private adminUserId: string | null = null;
+  private adminUserIdFetched = false; // true once we've attempted — avoids per-request retries
 
   constructor(
     private reflector: Reflector,
     private supabaseService: SupabaseService,
   ) {
-    // Get admin user ID on startup
     this.initAdminUser();
   }
 
   private async initAdminUser() {
     this.adminUserId = await this.supabaseService.getAdminUserId();
+    this.adminUserIdFetched = true;
+  }
+
+  private getAdminFallbackUser() {
+    return {
+      id: this.adminUserId ?? 'admin-fallback',
+      email: 'emuski@mithran.com',
+      role: 'admin',
+    };
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -37,19 +46,10 @@ export class SupabaseAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
-    // For fast development: if no auth header, use admin user
+    // Development fallback: no auth header → use cached admin user, never re-fetch
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      // Ensure we have admin user ID
-      if (!this.adminUserId) {
-        this.adminUserId = await this.supabaseService.getAdminUserId();
-      }
-      
-      request.user = {
-        id: this.adminUserId || 'admin-fallback',
-        email: 'emuski@mithran.com',
-        role: 'admin'
-      };
-      request.accessToken = null; // Will use admin client
+      request.user = this.getAdminFallbackUser();
+      request.accessToken = null;
       return true;
     }
 
@@ -60,17 +60,9 @@ export class SupabaseAuthGuard implements CanActivate {
       request.user = user;
       request.accessToken = token;
       return true;
-    } catch (error) {
-      // Fallback to admin for development if token verification fails
-      if (!this.adminUserId) {
-        this.adminUserId = await this.supabaseService.getAdminUserId();
-      }
-      
-      request.user = {
-        id: this.adminUserId || 'admin-fallback',
-        email: 'emuski@mithran.com', 
-        role: 'admin'
-      };
+    } catch {
+      // Token invalid → development fallback, no network call
+      request.user = this.getAdminFallbackUser();
       request.accessToken = null;
       return true;
     }

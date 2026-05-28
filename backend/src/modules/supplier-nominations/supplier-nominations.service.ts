@@ -116,12 +116,7 @@ export class SupplierNominationsService {
 
       // Create vendor evaluations if vendor IDs provided
       if (createDto.vendorIds && createDto.vendorIds.length > 0) {
-        try {
-          await this.createVendorEvaluations(nomination.id, createDto.vendorIds, accessToken);
-        } catch (vendorError) {
-          this.logger.warn(`Failed to create vendor evaluations: ${vendorError.message}`);
-          // Continue without vendor evaluations for now
-        }
+        await this.createVendorEvaluations(nomination.id, createDto.vendorIds, accessToken);
       }
 
       // Return the created nomination with basic data

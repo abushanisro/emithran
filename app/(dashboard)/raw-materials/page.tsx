@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Upload, Search, ArrowUpDown, Filter, Download, Trash2, AlertTriangle, Pencil, ArrowLeft, Container, BarChart3, FileSpreadsheet, Eye, EyeOff, Settings2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Upload, Search, ArrowUpDown, Download, Trash2, AlertTriangle, Pencil, FileSpreadsheet } from 'lucide-react';
 import {
   useRawMaterials,
   useRawMaterialFilterOptions,
@@ -23,12 +23,10 @@ import {
   useDeleteAllRawMaterials,
   RawMaterial,
 } from '@/lib/api/hooks/useRawMaterials';
-import { MaterialFilters } from '@/components/features/raw-materials/MaterialFilters';
 import { FerrousNonFerrousForm } from '@/components/features/raw-materials/FerrousNonFerrousForm';
 import { useMaterialFilters } from '@/lib/hooks/useMaterialFilters';
 import {
   CURRENCY_SYMBOLS,
-  CURRENCY_LABELS,
   COUNTRY_LABELS,
   MATERIAL_SHAPE_LABELS,
   Currency,
@@ -57,10 +55,7 @@ export default function RawMaterialsPage() {
   // Enhanced filter system
   const {
     filters,
-    appliedFiltersCount,
-    hasFilters,
     queryFilters,
-    filterSummary,
     setSearch,
     setMaterialCategory,
     setCurrency,
@@ -74,7 +69,7 @@ export default function RawMaterialsPage() {
       sortBy: 'material',
       sortOrder: 'asc',
       page: 1,
-      limit: 50
+      limit: 500
     },
     autoSyncCurrency: true
   });
@@ -87,9 +82,11 @@ export default function RawMaterialsPage() {
   const [editingMaterial, setEditingMaterial] = useState<RawMaterial | null>(null);
   const [visibleSections, setVisibleSections] = useState({
     basic: true,
-    properties: true,
-    standards: true,
+    properties: false,
+    standards: false,
   });
+  const [costRegion, setCostRegion] = useState<'india' | 'usa' | 'china' | 'france' | 'germany' | 'w_europe' | 'e_europe'>('india');
+  const [subTypeFilter, setSubTypeFilter] = useState('');
   const [newMaterial, setNewMaterial] = useState({
     materialGroup: '',
     material: '',
@@ -128,19 +125,37 @@ export default function RawMaterialsPage() {
 
   const CONFIRM_DELETE_TEXT = 'delete';
 
+  const COST_REGION_LABELS: Record<string, string> = {
+    india:    'India',
+    usa:      'USA',
+    china:    'China',
+    france:   'France',
+    germany:  'Germany',
+    w_europe: 'W. Europe',
+    e_europe: 'E. Europe',
+  };
+
   // Helper functions for display
   const renderCostDisplay = (material: RawMaterial) => {
-    const cost = material.unitCost || material.cost;
+    const costMap: Record<string, number | undefined> = {
+      india:    material.costIndia,
+      usa:      material.costUsa,
+      china:    material.costChina,
+      france:   material.costFrance,
+      germany:  material.costGermany,
+      w_europe: material.costWEurope,
+      e_europe: material.costEEurope,
+    };
+    const cost = costMap[costRegion] ?? material.unitCost ?? material.cost;
     if (!cost || cost === 0) return '-';
-    
-    const symbol = material.currency ? CURRENCY_SYMBOLS[material.currency] : '₹';
-    return `${symbol}${cost.toFixed(2)}`;
+    return `$${cost.toFixed(2)}`;
   };
 
 
   const renderShapeDisplay = (material: RawMaterial) => {
-    if (!material.shape) return '-';
-    return MATERIAL_SHAPE_LABELS[material.shape];
+    if (material.shape) return MATERIAL_SHAPE_LABELS[material.shape];
+    if (material.stockForm) return material.stockForm;
+    return '-';
   };
 
   // Combine enhanced filters with container filtering
@@ -599,126 +614,67 @@ export default function RawMaterialsPage() {
 
   const { plasticRubberCount, ferrousNonFerrousCount } = getContainerStats();
 
+  const isPlastic = activeContainer === 'plastic-rubber';
+
+  // Unique sub-types for filter dropdown
+  const subTypes = [...new Set(filteredMaterials.map(m => m.materialType).filter(Boolean))].sort() as string[];
+  const displayMaterials = subTypeFilter
+    ? filteredMaterials.filter(m => m.materialType === subTypeFilter)
+    : filteredMaterials;
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <PageHeader
-        title="Raw Materials Database"
-        description="Material properties and cost data for injection molding process"
-      >
-        <div className="flex gap-2">
-          <Button 
-            variant="destructive" 
-            onClick={() => setDeleteAllDialogOpen(true)}
-            disabled={totalCount === 0}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete All
+    <div className="flex flex-col gap-4 p-2 sm:p-4 lg:p-6 animate-fade-in min-h-0">
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Raw Materials Database</h1>
+          <p className="text-sm text-muted-foreground">Material properties &amp; regional cost data</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setUploadDialogOpen(true)}>
+            <Upload className="h-3.5 w-3.5 mr-1.5" />
+            Import Excel
           </Button>
-          <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Excel
-          </Button>
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button size="sm" onClick={() => { setCreateDialogOpen(true); resetNewMaterial(); }}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
             Add Material
           </Button>
+          <Button size="sm" variant="destructive" onClick={() => setDeleteAllDialogOpen(true)} disabled={totalCount === 0}>
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            Delete All
+          </Button>
         </div>
-      </PageHeader>
+      </div>
 
-      {/* Material Container Tabs */}
-      <Tabs value={activeContainer} onValueChange={(value) => setActiveContainer(value as MaterialContainer)}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="plastic-rubber" className="flex items-center gap-2">
-            <Container className="h-4 w-4" />
-            Plastic & Rubber ({plasticRubberCount})
+      {/* ── Stats strip ────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-3">
+        <Card className="p-3 flex-1 min-w-[100px]">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
+          <p className="text-2xl font-bold">{totalCount}</p>
+        </Card>
+        <Card className={`p-3 flex-1 min-w-[120px] border-blue-200 bg-blue-50/40 dark:bg-blue-950/20`}>
+          <p className="text-[11px] text-blue-600 uppercase tracking-wide">Plastic &amp; Rubber</p>
+          <p className="text-2xl font-bold text-blue-700">{plasticRubberCount}</p>
+        </Card>
+        <Card className={`p-3 flex-1 min-w-[140px] border-orange-200 bg-orange-50/40 dark:bg-orange-950/20`}>
+          <p className="text-[11px] text-orange-600 uppercase tracking-wide">Ferrous &amp; Non-Ferrous</p>
+          <p className="text-2xl font-bold text-orange-700">{ferrousNonFerrousCount}</p>
+        </Card>
+      </div>
+
+      {/* ── Container tabs ─────────────────────────────────────── */}
+      <Tabs value={activeContainer} onValueChange={(v) => { setActiveContainer(v as MaterialContainer); setSubTypeFilter(''); }}>
+        <TabsList className="w-full grid grid-cols-2">
+          <TabsTrigger value="plastic-rubber" className="gap-1.5 text-xs sm:text-sm">
+            Plastic &amp; Rubber
+            <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 h-4">{plasticRubberCount}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="ferrous-non-ferrous" className="flex items-center gap-2">
-            <Container className="h-4 w-4" />
-            Ferrous & Non-Ferrous ({ferrousNonFerrousCount})
+          <TabsTrigger value="ferrous-non-ferrous" className="gap-1.5 text-xs sm:text-sm">
+            Ferrous &amp; Non-Ferrous
+            <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 h-4">{ferrousNonFerrousCount}</Badge>
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="plastic-rubber" className="space-y-6">
-          <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Container className="h-5 w-5 text-blue-600" />
-                Plastic & Rubber Materials Container
-              </CardTitle>
-              <CardDescription>
-                Specialized container for thermoplastic and rubber-based materials including polymers, elastomers, and composites.
-                Optimized for injection molding process parameters.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{plasticRubberCount}</div>
-                  <div className="text-xs text-muted-foreground">Materials</div>
-                </div>
-                <div className="text-center">
-                  <Button variant="outline" size="sm" onClick={() => downloadTemplate('plastic-rubber')}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Template
-                  </Button>
-                </div>
-                <div className="text-center">
-                  <Button variant="outline" size="sm" onClick={() => { setCreateDialogOpen(true); resetNewMaterial(); }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Material
-                  </Button>
-                </div>
-                <div className="text-center">
-                  <Button variant="outline" size="sm" onClick={() => setUploadDialogOpen(true)}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import Excel
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="ferrous-non-ferrous" className="space-y-6">
-          <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 dark:border-orange-900">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Container className="h-5 w-5 text-orange-600" />
-                Ferrous & Non-Ferrous Materials Container
-              </CardTitle>
-              <CardDescription>
-                Specialized container for all metallic materials including iron-based materials (steel, cast iron, ferrous alloys) and non-iron metals (aluminum, copper, titanium, and their alloys).
-                Supports import from existing Excel databases.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{ferrousNonFerrousCount}</div>
-                  <div className="text-xs text-muted-foreground">Materials</div>
-                </div>
-                <div className="text-center">
-                  <Button variant="outline" size="sm" onClick={() => downloadTemplate('ferrous-non-ferrous')}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Template
-                  </Button>
-                </div>
-                <div className="text-center">
-                  <Button variant="outline" size="sm" onClick={() => { setCreateDialogOpen(true); resetNewMaterial(); }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Material
-                  </Button>
-                </div>
-                <div className="text-center">
-                  <Button variant="outline" size="sm" onClick={() => setUploadDialogOpen(true)}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import Excel
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* Upload Dialog */}
@@ -1217,130 +1173,88 @@ export default function RawMaterialsPage() {
       </Dialog>
 
 
-      {/* Enhanced Material Filters */}
-      <MaterialFilters
-        search={filters.search}
-        materialCategory={filters.materialCategory}
-        country={filters.country}
-        currency={filters.currency}
-        shape={filters.shape}
-        minCost={filters.minCost}
-        maxCost={filters.maxCost}
-        location={filters.location}
-        availableLocations={filterOptions?.countries || []}
-        costRange={filterOptions?.costRange || { min: 0, max: 10000 }}
-        onSearchChange={setSearch}
-        onMaterialCategoryChange={setMaterialCategory}
-        onCurrencyChange={setCurrency}
-        onShapeChange={setShape}
-        onCostRangeChange={setCostRange}
-        onLocationChange={setLocation}
-        onClearFilters={clearFilters}
-        showAdvanced={true}
-      />
+      {/* ── Toolbar ────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        {/* Search */}
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search materials…"
+            value={filters.search || ''}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
 
-      {/* Filter Summary */}
-      {hasFilters && (
-        <Card className="p-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                {appliedFiltersCount} filter{appliedFiltersCount > 1 ? 's' : ''} applied
-              </Badge>
-              <div className="text-sm text-blue-800 dark:text-blue-200">
-                Enhanced filtering active
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {filterSummary.slice(0, 2).map((summary, index) => (
-                <Badge key={index} variant="outline" className="text-xs border-blue-300 text-blue-700">
-                  {summary}
-                </Badge>
-              ))}
-              {filterSummary.length > 2 && (
-                <Badge variant="outline" className="text-xs border-blue-300 text-blue-700">
-                  +{filterSummary.length - 2} more
-                </Badge>
-              )}
-            </div>
+        {/* Sub-type / Group filter */}
+        <Select value={subTypeFilter || 'all'} onValueChange={(v) => setSubTypeFilter(v === 'all' ? '' : v)}>
+          <SelectTrigger className="h-9 w-full sm:w-[160px] text-sm">
+            <SelectValue placeholder="All groups" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All groups</SelectItem>
+            {subTypes.map(t => (
+              <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Column visibility (ferrous only) */}
+        {activeContainer === 'ferrous-non-ferrous' && (
+          <div className="flex gap-1">
+            {(['basic', 'properties', 'standards'] as const).map(s => (
+              <Button key={s} variant={visibleSections[s] ? 'default' : 'outline'} size="sm"
+                className="h-9 text-xs px-2"
+                onClick={() => setVisibleSections(prev => ({ ...prev, [s]: !prev[s] }))}>
+                {s === 'basic' ? 'Info' : s === 'properties' ? 'Props' : 'Std'}
+              </Button>
+            ))}
           </div>
-        </Card>
-      )}
+        )}
 
-      {/* Results Summary */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Showing {rawMaterials.length} of {totalCount} materials
-          {hasFilters && (
-            <span className="ml-1 text-blue-600 dark:text-blue-400">
-              (filtered)
-            </span>
-          )}
-          {activeContainer !== 'all' && (
-            <span className="ml-1">
-              in {activeContainer === 'plastic-rubber' ? 'Plastic & Rubber' : 'Ferrous & Non-Ferrous'} container
-            </span>
-          )}
-        </p>
+        {/* Cost region selector */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Cost region:</span>
+          <Select value={costRegion} onValueChange={(v) => setCostRegion(v as any)}>
+            <SelectTrigger className="h-9 w-[110px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(COST_REGION_LABELS).map(([k, label]) => (
+                <SelectItem key={k} value={k} className="text-xs">{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Table Controls for Ferrous & Non-Ferrous */}
-      {activeContainer === 'ferrous-non-ferrous' && (
-        <Card className="p-4 mb-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Settings2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Column Visibility:</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={visibleSections.basic ? "default" : "outline"}
-                size="sm"
-                onClick={() => setVisibleSections(prev => ({ ...prev, basic: !prev.basic }))}
-                className="text-xs"
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                Basic Info
-              </Button>
-              <Button
-                variant={visibleSections.properties ? "default" : "outline"}
-                size="sm"
-                onClick={() => setVisibleSections(prev => ({ ...prev, properties: !prev.properties }))}
-                className="text-xs"
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                Properties
-              </Button>
-              <Button
-                variant={visibleSections.standards ? "default" : "outline"}
-                size="sm"
-                onClick={() => setVisibleSections(prev => ({ ...prev, standards: !prev.standards }))}
-                className="text-xs"
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                Standards
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
+      {/* Results count */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
+        <span>
+          Showing <strong>{displayMaterials.length}</strong> of <strong>{totalCount}</strong> materials
+          {subTypeFilter && <span className="ml-1">· group: <strong>{subTypeFilter}</strong></span>}
+        </span>
+        {(filters.search || subTypeFilter) && (
+          <Button variant="ghost" size="sm" className="h-6 text-xs px-2"
+            onClick={() => { clearFilters(); setSubTypeFilter(''); }}>
+            Clear filters
+          </Button>
+        )}
+      </div>
 
-      {/* Data Table */}
-      <Card className="overflow-hidden">
-        <div className="relative">
-          <div className="overflow-x-auto max-w-full">
-            <div className="min-w-fit">
-              <Table className="relative">
-                <TableHeader>
+      {/* ── Data Table ─────────────────────────────────────────── */}
+      <Card>
+        <Table wrapperClassName="overflow-x-auto overflow-y-auto max-h-[calc(100vh-380px)]" className="relative min-w-0 w-full">
+                <TableHeader className="sticky top-0 z-30">
                   <TableRow className="bg-card hover:bg-card border-b-2 border-border">
                     {/* Always Visible - Sticky Basic Info */}
-                    <TableHead className="cursor-pointer h-11 px-3 text-xs sticky left-0 bg-card z-20 min-w-[120px] border-r-2 border-border shadow-lg" onClick={() => toggleSort('material_group')}>
+                    <TableHead className="cursor-pointer h-10 px-2 text-xs sticky left-0 bg-card z-20 min-w-[72px] w-[72px] border-r-2 border-border shadow-lg" onClick={() => toggleSort('material_group')}>
                       <div className="flex items-center font-semibold">
                         Group
                         <SortIcon column="material_group" />
                       </div>
                     </TableHead>
-                    <TableHead className="cursor-pointer h-11 px-3 text-xs sticky left-[120px] bg-card z-20 min-w-[150px] border-r-2 border-border shadow-lg" onClick={() => toggleSort('material')}>
+                    <TableHead className="cursor-pointer h-10 px-2 text-xs sticky left-[72px] bg-card z-20 min-w-[90px] w-[90px] max-w-[90px] border-r-2 border-border shadow-lg" onClick={() => toggleSort('material')}>
                       <div className="flex items-center font-semibold">
                         Material
                         <SortIcon column="material" />
@@ -1348,45 +1262,38 @@ export default function RawMaterialsPage() {
                     </TableHead>
 
                     {/* Conditional Basic Info Columns */}
-                    {(activeContainer !== 'ferrous-non-ferrous' || visibleSections.basic) && (
+                    {activeContainer === 'ferrous-non-ferrous' && visibleSections.basic && (
                       <>
-                        {activeContainer === 'ferrous-non-ferrous' && (
-                          <>
-                            <TableHead className="h-11 px-2 text-xs min-w-[100px]">Type</TableHead>
-                            <TableHead className="h-11 px-2 text-xs min-w-[150px]">Description</TableHead>
-                            <TableHead className="h-11 px-2 text-xs min-w-[100px]">Shape</TableHead>
-                            <TableHead className="h-11 px-2 text-xs min-w-[100px]">Grade</TableHead>
-                          </>
-                        )}
-                        <TableHead className="h-11 px-2 text-xs min-w-[100px]">Country</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[52px] w-[52px] max-w-[52px]">Type</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[56px] w-[56px] max-w-[56px]">Form</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px] max-w-[48px]">Grade</TableHead>
                       </>
                     )}
 
                     {activeContainer === 'ferrous-non-ferrous' && visibleSections.properties && (
                       <>
-                        <TableHead className="h-11 px-1 text-xs text-center border-l-4 border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 min-w-[80px]">
-                          <div className="space-y-1">
-                            <div className="text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">PROPERTIES</div>
-                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold">Density</div>
-                            <div className="text-[9px] text-gray-600 dark:text-gray-400">g/cm³</div>
+                        <TableHead className="h-10 px-1 text-xs text-center border-l-4 border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 min-w-[46px] w-[46px]">
+                          <div className="leading-tight">
+                            <div className="text-indigo-700 dark:text-indigo-300 font-bold text-[9px]">PROPS</div>
+                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">Den.</div>
                           </div>
                         </TableHead>
-                        <TableHead className="h-11 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[80px]">
-                          <div className="space-y-1">
-                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold">UTS</div>
-                            <div className="text-[9px] text-gray-600 dark:text-gray-400">MPa</div>
+                        <TableHead className="h-10 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[42px] w-[42px]">
+                          <div className="leading-tight">
+                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">UTS</div>
+                            <div className="text-[9px] text-muted-foreground">MPa</div>
                           </div>
                         </TableHead>
-                        <TableHead className="h-11 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[80px]">
-                          <div className="space-y-1">
-                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold">YTS</div>
-                            <div className="text-[9px] text-gray-600 dark:text-gray-400">MPa</div>
+                        <TableHead className="h-10 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[42px] w-[42px]">
+                          <div className="leading-tight">
+                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">YTS</div>
+                            <div className="text-[9px] text-muted-foreground">MPa</div>
                           </div>
                         </TableHead>
-                        <TableHead className="h-11 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[80px]">
-                          <div className="space-y-1">
-                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold">Shear</div>
-                            <div className="text-[9px] text-gray-600 dark:text-gray-400">MPa</div>
+                        <TableHead className="h-10 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[42px] w-[42px]">
+                          <div className="leading-tight">
+                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">Shear</div>
+                            <div className="text-[9px] text-muted-foreground">MPa</div>
                           </div>
                         </TableHead>
                       </>
@@ -1394,245 +1301,206 @@ export default function RawMaterialsPage() {
 
                     {activeContainer === 'ferrous-non-ferrous' && visibleSections.standards && (
                       <>
-                        <TableHead className="h-11 px-1 text-xs text-center border-l-4 border-violet-400 bg-violet-50 dark:bg-violet-950/30 min-w-[100px]">
-                          <div className="space-y-1">
-                            <div className="text-violet-700 dark:text-violet-300 font-bold text-[10px]">STANDARDS</div>
-                            <div className="text-violet-600 dark:text-violet-400 font-semibold">ASTM</div>
+                        <TableHead className="h-10 px-1 text-xs text-center border-l-4 border-violet-400 bg-violet-50 dark:bg-violet-950/30 min-w-[52px] w-[52px]">
+                          <div className="leading-tight">
+                            <div className="text-violet-700 dark:text-violet-300 font-bold text-[9px]">STD</div>
+                            <div className="text-violet-600 dark:text-violet-400 font-semibold text-[10px]">ASTM</div>
                           </div>
                         </TableHead>
-                        <TableHead className="h-11 px-1 text-xs text-center bg-violet-50 dark:bg-violet-950/20 min-w-[100px]">
-                          <div className="space-y-1">
-                            <div className="text-violet-600 dark:text-violet-400 font-semibold">DIN</div>
-                          </div>
+                        <TableHead className="h-10 px-1 text-xs text-center bg-violet-50 dark:bg-violet-950/20 min-w-[46px] w-[46px]">
+                          <div className="text-violet-600 dark:text-violet-400 font-semibold text-[10px]">DIN</div>
                         </TableHead>
-                        <TableHead className="h-11 px-1 text-xs text-center bg-violet-50 dark:bg-violet-950/20 min-w-[100px]">
-                          <div className="space-y-1">
-                            <div className="text-violet-600 dark:text-violet-400 font-semibold">EN</div>
-                          </div>
+                        <TableHead className="h-10 px-1 text-xs text-center bg-violet-50 dark:bg-violet-950/20 min-w-[42px] w-[42px]">
+                          <div className="text-violet-600 dark:text-violet-400 font-semibold text-[10px]">EN</div>
                         </TableHead>
-                        <TableHead className="h-11 px-1 text-xs text-center bg-violet-50 dark:bg-violet-950/20 min-w-[100px]">
-                          <div className="space-y-1">
-                            <div className="text-violet-600 dark:text-violet-400 font-semibold">JIS</div>
-                          </div>
+                        <TableHead className="h-10 px-1 text-xs text-center bg-violet-50 dark:bg-violet-950/20 min-w-[42px] w-[42px]">
+                          <div className="text-violet-600 dark:text-violet-400 font-semibold text-[10px]">JIS</div>
                         </TableHead>
                       </>
                     )}
 
                     {activeContainer === 'plastic-rubber' && (
                       <>
-                        <TableHead className="h-11 px-2 text-xs min-w-[80px]">Shape</TableHead>
-                        <TableHead className="h-11 px-2 text-xs min-w-[80px]">Regrinding</TableHead>
-                        <TableHead className="h-11 px-2 text-xs min-w-[80px]">Regrind %</TableHead>
-                        <TableHead className="h-11 px-2 text-xs min-w-[100px]">Clamping Pressure (MPa)</TableHead>
-                        <TableHead className="h-11 px-2 text-xs min-w-[100px]">Eject Deflection Temp (°C)</TableHead>
-                        <TableHead className="h-11 px-2 text-xs min-w-[100px]">Melting Temp (°C)</TableHead>
-                        <TableHead className="h-11 px-2 text-xs min-w-[100px]">Mold Temp (°C)</TableHead>
-                        <TableHead className="h-11 px-2 text-xs min-w-[100px]">Density (kg/m³)</TableHead>
-                        <TableHead className="h-11 px-2 text-xs min-w-[100px]">Specific Heat (J/g·°C)</TableHead>
-                        <TableHead className="h-11 px-2 text-xs min-w-[120px]">Thermal Conductivity (W/m·°C)</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[46px] w-[46px]">Shape</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px]">Regrind</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[42px] w-[42px]">Rgrd%</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[50px] w-[50px]">Clamp</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[50px] w-[50px]">Eject°C</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px]">Melt°C</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[46px] w-[46px]">Mold°C</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px]">Density</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px]">SpHeat</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[52px] w-[52px]">ThCond.</TableHead>
                       </>
                     )}
-                    
+
                     {/* Always Visible - Right Side */}
-                    <TableHead className="text-right h-11 px-2 text-xs min-w-[80px]">Cost</TableHead>
-                    <TableHead className="w-20 h-11 px-2 text-xs sticky right-0 bg-card z-20 min-w-[100px] border-l-2 border-border shadow-lg">Actions</TableHead>
+                    <TableHead className="h-10 px-1 text-xs min-w-[62px] w-[62px] max-w-[62px] text-right">Cost</TableHead>
+                    <TableHead className="h-10 px-1 text-xs sticky right-0 bg-card z-20 min-w-[56px] w-[56px] border-l-2 border-border shadow-lg">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={20} className="text-center py-8 text-muted-foreground">
-                        Loading materials...
+                      <TableCell colSpan={20} className="text-center py-12 text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          <span className="text-sm">Loading materials…</span>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ) : rawMaterials.length === 0 ? (
+                  ) : displayMaterials.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={20} className="text-center py-8 text-muted-foreground">
-                        {activeContainer !== 'all' 
-                          ? `No materials found in ${activeContainer === 'plastic-rubber' ? 'Plastic & Rubber' : 'Ferrous & Non-Ferrous'} container. Upload an Excel file to get started.`
-                          : 'No materials found. Upload an Excel file to get started.'
-                        }
+                      <TableCell colSpan={20} className="text-center py-12 text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2">
+                          <FileSpreadsheet className="h-8 w-8 opacity-30" />
+                          <span className="text-sm">No materials found. Upload an Excel file to get started.</span>
+                          <Button size="sm" variant="outline" onClick={() => setUploadDialogOpen(true)}>
+                            <Upload className="h-3.5 w-3.5 mr-1.5" /> Import Excel
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    rawMaterials.map((material) => (
+                    displayMaterials.map((material) => (
                       <TableRow key={material.id} className="hover:bg-secondary/30 border-b border-border/50">
                         {/* Always Visible - Sticky Basic Info */}
-                        <TableCell className="font-medium px-3 py-3 text-xs sticky left-0 bg-background z-10 min-w-[120px] border-r border-border">
-                          <div className="space-y-1">
-                            <Badge 
-                              variant="outline" 
-                              className={`text-[10px] px-2 py-1 ${
-                                material.materialGroup?.toLowerCase().includes('plastic') || 
-                                material.materialGroup?.toLowerCase().includes('rubber') 
-                                  ? 'border-blue-400 text-blue-700 bg-blue-50' 
+                        <TableCell className="font-medium px-1 py-2 text-xs sticky left-0 bg-background z-10 min-w-[72px] w-[72px] max-w-[72px] overflow-hidden border-r border-border">
+                          <div className="truncate" title={material.materialType || material.materialGroup || ''}>
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] px-1 py-0 max-w-full truncate ${
+                                material.materialGroup?.toLowerCase().includes('plastic') ||
+                                material.materialGroup?.toLowerCase().includes('rubber')
+                                  ? 'border-blue-400 text-blue-700 bg-blue-50'
                                   : 'border-orange-400 text-orange-700 bg-orange-50'
                               }`}
                             >
-                              {material.materialGroup}
+                              {material.materialType || material.materialGroup}
                             </Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="font-semibold px-3 py-3 text-xs sticky left-[120px] bg-background z-10 min-w-[150px] border-r border-border">
-                          <div className="space-y-1">
-                            <div className="font-semibold truncate" title={material.material}>
-                              {material.material}
-                            </div>
+                        <TableCell className="font-semibold px-2 py-2 text-xs sticky left-[72px] bg-background z-10 min-w-[90px] w-[90px] max-w-[90px] overflow-hidden border-r border-border">
+                          <div className="truncate text-[10px] font-semibold max-w-full" title={material.material}>
+                            {material.material}
                           </div>
                         </TableCell>
 
                         {/* Conditional Basic Info Columns */}
-                        {(activeContainer !== 'ferrous-non-ferrous' || visibleSections.basic) && (
+                        {activeContainer === 'ferrous-non-ferrous' && visibleSections.basic && (
                           <>
-                            {activeContainer === 'ferrous-non-ferrous' && (
-                              <>
-                                <TableCell className="px-2 py-3 text-xs min-w-[100px]">
-                                  <div className="truncate" title={material.materialType || ''}>
-                                    {material.materialType || '-'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-2 py-3 text-xs min-w-[150px]">
-                                  <div className="truncate" title={material.materialDescription || ''}>
-                                    {material.materialDescription || '-'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-2 py-3 text-xs min-w-[100px]">
-                                  <div className="truncate" title={renderShapeDisplay(material) || ''}>
-                                    {renderShapeDisplay(material) || '-'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-2 py-3 text-xs min-w-[100px]">
-                                  <div className="truncate" title={material.materialGrade || ''}>
-                                    {material.materialGrade || '-'}
-                                  </div>
-                                </TableCell>
-                              </>
-                            )}
-                            <TableCell className="px-2 py-3 text-xs min-w-[100px]">
-                              <div className="truncate" title={material.country || ''}>
-                                {material.country || '-'}
-                              </div>
+                            <TableCell className="px-1 py-2 min-w-[52px] w-[52px] max-w-[52px] overflow-hidden">
+                              <div className="truncate text-[10px] max-w-full" title={material.materialType || ''}>{material.materialType || '-'}</div>
+                            </TableCell>
+                            <TableCell className="px-1 py-2 min-w-[56px] w-[56px] max-w-[56px] overflow-hidden">
+                              <div className="truncate text-[10px] max-w-full" title={material.stockForm || ''}>{material.stockForm || '-'}</div>
+                            </TableCell>
+                            <TableCell className="px-1 py-2 min-w-[48px] w-[48px] max-w-[48px] overflow-hidden">
+                              <div className="truncate text-[10px] max-w-full" title={material.materialGrade || ''}>{material.materialGrade || '-'}</div>
                             </TableCell>
                           </>
                         )}
 
-
                         {activeContainer === 'ferrous-non-ferrous' && visibleSections.properties && (
                           <>
-                            <TableCell className="px-1 py-3 text-xs text-center border-l-4 border-indigo-400/30 bg-indigo-50/20 min-w-[80px]">
-                              <div className="text-[10px] font-mono">
-                                {material.density ? material.density.toFixed(2) : '-'}
-                              </div>
+                            <TableCell className="px-1 py-2 text-center border-l-4 border-indigo-400/30 bg-indigo-50/20 min-w-[46px] w-[46px]">
+                              <div className="text-[10px] font-mono">{material.density ? material.density.toFixed(2) : '-'}</div>
                             </TableCell>
-                            <TableCell className="px-1 py-3 text-xs text-center bg-indigo-50/10 min-w-[80px]">
-                              <div className="text-[10px] font-mono">
-                                {material.ultimateTensileStrength ? material.ultimateTensileStrength.toFixed(0) : '-'}
-                              </div>
+                            <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[42px] w-[42px]">
+                              <div className="text-[10px] font-mono">{material.ultimateTensileStrength ? material.ultimateTensileStrength.toFixed(0) : '-'}</div>
                             </TableCell>
-                            <TableCell className="px-1 py-3 text-xs text-center bg-indigo-50/10 min-w-[80px]">
-                              <div className="text-[10px] font-mono">
-                                {material.yieldTensileStrength ? material.yieldTensileStrength.toFixed(0) : '-'}
-                              </div>
+                            <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[42px] w-[42px]">
+                              <div className="text-[10px] font-mono">{material.yieldTensileStrength ? material.yieldTensileStrength.toFixed(0) : '-'}</div>
                             </TableCell>
-                            <TableCell className="px-1 py-3 text-xs text-center bg-indigo-50/10 min-w-[80px]">
-                              <div className="text-[10px] font-mono">
-                                {material.shearingStrength ? material.shearingStrength.toFixed(0) : '-'}
-                              </div>
+                            <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[42px] w-[42px]">
+                              <div className="text-[10px] font-mono">{material.shearingStrength ? material.shearingStrength.toFixed(0) : '-'}</div>
                             </TableCell>
                           </>
                         )}
 
                         {activeContainer === 'ferrous-non-ferrous' && visibleSections.standards && (
                           <>
-                            <TableCell className="px-1 py-3 text-xs text-center border-l-4 border-violet-400/30 bg-violet-50/20 min-w-[100px]">
-                              <div className="text-[10px] truncate" title={material.astmStandard || ''}>
-                                {material.astmStandard || '-'}
-                              </div>
+                            <TableCell className="px-1 py-2 text-center border-l-4 border-violet-400/30 bg-violet-50/20 min-w-[52px] w-[52px]">
+                              <div className="text-[10px] truncate" title={material.astmStandard || ''}>{material.astmStandard || '-'}</div>
                             </TableCell>
-                            <TableCell className="px-1 py-3 text-xs text-center bg-violet-50/10 min-w-[100px]">
-                              <div className="text-[10px] truncate" title={material.dinStandard || ''}>
-                                {material.dinStandard || '-'}
-                              </div>
+                            <TableCell className="px-1 py-2 text-center bg-violet-50/10 min-w-[46px] w-[46px]">
+                              <div className="text-[10px] truncate" title={material.dinStandard || ''}>{material.dinStandard || '-'}</div>
                             </TableCell>
-                            <TableCell className="px-1 py-3 text-xs text-center bg-violet-50/10 min-w-[100px]">
-                              <div className="text-[10px] truncate" title={material.enStandard || ''}>
-                                {material.enStandard || '-'}
-                              </div>
+                            <TableCell className="px-1 py-2 text-center bg-violet-50/10 min-w-[42px] w-[42px]">
+                              <div className="text-[10px] truncate" title={material.enStandard || ''}>{material.enStandard || '-'}</div>
                             </TableCell>
-                            <TableCell className="px-1 py-3 text-xs text-center bg-violet-50/10 min-w-[100px]">
-                              <div className="text-[10px] truncate" title={material.jisStandard || ''}>
-                                {material.jisStandard || '-'}
-                              </div>
+                            <TableCell className="px-1 py-2 text-center bg-violet-50/10 min-w-[42px] w-[42px]">
+                              <div className="text-[10px] truncate" title={material.jisStandard || ''}>{material.jisStandard || '-'}</div>
                             </TableCell>
                           </>
                         )}
 
                         {activeContainer === 'plastic-rubber' && (
                           <>
-                            <TableCell className="px-2 py-3 text-xs min-w-[80px]">
+                            <TableCell className="px-1 py-2 min-w-[46px] w-[46px]">
                               {renderShapeDisplay(material)}
                             </TableCell>
-                            <TableCell className="px-2 py-3 text-xs min-w-[80px]">
+                            <TableCell className="px-1 py-2 min-w-[48px] w-[48px]">
                               {material.regrinding === 'Yes' ? (
-                                <Badge variant="default" className="bg-green-600 text-[10px] px-1 py-0 h-5">Yes</Badge>
+                                <Badge variant="default" className="bg-green-600 text-[9px] px-1 py-0 h-4">Yes</Badge>
                               ) : material.regrinding === 'No' ? (
-                                <Badge variant="secondary" className="text-[10px] px-1 py-0 h-5">No</Badge>
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">No</Badge>
                               ) : (
-                                '-'
+                                <span className="text-[10px]">-</span>
                               )}
                             </TableCell>
-                            <TableCell className="text-right px-2 py-3 text-xs min-w-[80px]">
+                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[42px] w-[42px]">
                               {material.regrindingPercentage ? `${material.regrindingPercentage.toFixed(1)}%` : '-'}
                             </TableCell>
-                            <TableCell className="text-right px-2 py-3 text-xs min-w-[100px]">
+                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[50px] w-[50px]">
                               {material.clampingPressureMpa?.toFixed(1) || '-'}
                             </TableCell>
-                            <TableCell className="text-right px-2 py-3 text-xs min-w-[100px]">
+                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[50px] w-[50px]">
                               {material.ejectDeflectionTempC?.toFixed(0) || '-'}
                             </TableCell>
-                            <TableCell className="text-right px-2 py-3 text-xs min-w-[100px]">
+                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[48px] w-[48px]">
                               {material.meltingTempC?.toFixed(0) || '-'}
                             </TableCell>
-                            <TableCell className="text-right px-2 py-3 text-xs min-w-[100px]">
+                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[46px] w-[46px]">
                               {material.moldTempC?.toFixed(0) || '-'}
                             </TableCell>
-                            <TableCell className="text-right px-2 py-3 text-xs min-w-[100px]">
+                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[48px] w-[48px]">
                               {material.densityKgM3?.toFixed(0) || '-'}
                             </TableCell>
-                            <TableCell className="text-right px-2 py-3 text-xs min-w-[100px]">
+                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[48px] w-[48px]">
                               {material.specificHeatMelt?.toFixed(2) || '-'}
                             </TableCell>
-                            <TableCell className="text-right px-2 py-3 text-xs min-w-[120px]">
+                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[52px] w-[52px]">
                               {material.thermalConductivityMelt?.toFixed(3) || '-'}
                             </TableCell>
                           </>
                         )}
 
                         {/* Always Visible - Right Side */}
-                        <TableCell className="text-right px-2 py-3 text-xs min-w-[80px]">
-                          <div className="text-[10px] font-mono font-semibold">
+                        <TableCell className="text-right px-1 py-2 min-w-[62px] w-[62px] max-w-[62px]">
+                          <div className="text-[10px] font-mono font-semibold whitespace-nowrap">
                             {renderCostDisplay(material)}
                           </div>
                         </TableCell>
-                        <TableCell className="px-2 py-3 text-xs sticky right-0 bg-background z-10 min-w-[100px] border-l border-border">
-                          <div className="flex items-center gap-1">
+                        <TableCell className="px-1 py-2 text-xs sticky right-0 bg-background z-10 min-w-[56px] w-[56px] border-l border-border">
+                          <div className="flex items-center gap-0.5">
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => handleEditMaterial(material)}
-                              className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             >
-                              <Pencil className="h-3 w-3" />
+                              <Pencil className="h-2.5 w-2.5" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => handleDeleteMaterial(material.id, material.material)}
                               disabled={deleteMutation.isPending}
-                              className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="h-6 w-6 text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-2.5 w-2.5" />
                             </Button>
                           </div>
                         </TableCell>
@@ -1641,9 +1509,6 @@ export default function RawMaterialsPage() {
                   )}
                 </TableBody>
               </Table>
-            </div>
-          </div>
-        </div>
       </Card>
 
       {/* Edit Material Dialog */}

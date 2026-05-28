@@ -85,22 +85,65 @@ export class CreateRawMaterialDto {
 
 
 
-  @ApiPropertyOptional({ example: 135.00 })
+  @ApiPropertyOptional({ example: 1.53 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   cost?: number;
 
-  @ApiPropertyOptional({ example: 135.00 })
+  @ApiPropertyOptional({ example: 1.53 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   unitCost?: number;
 
-  @ApiPropertyOptional({ enum: Currency, example: Currency.INR })
+  @ApiPropertyOptional({ enum: Currency, example: Currency.USD })
   @IsOptional()
   @IsEnum(Currency)
   currency?: Currency;
+
+  // Regional costs (USD/kg)
+  @ApiPropertyOptional({ example: 2.03 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costFrance?: number;
+
+  @ApiPropertyOptional({ example: 2.03 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costGermany?: number;
+
+  @ApiPropertyOptional({ example: 2.03 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costWEurope?: number;
+
+  @ApiPropertyOptional({ example: 3.05 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costUsa?: number;
+
+  @ApiPropertyOptional({ example: 1.53 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costIndia?: number;
+
+  @ApiPropertyOptional({ example: 2.03 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costEEurope?: number;
+
+  @ApiPropertyOptional({ example: 1.53 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costChina?: number;
 
 
   @ApiPropertyOptional({ enum: MaterialShape, example: MaterialShape.GRANULES })

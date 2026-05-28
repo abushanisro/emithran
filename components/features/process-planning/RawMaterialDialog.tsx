@@ -499,10 +499,22 @@ export function RawMaterialDialog({
       let unitCost = 0;
       
       if (selectedMaterial) {
-        unitCost = selectedMaterial.unitCost || 
-                   selectedMaterial.cost || 
-                   selectedMaterial.costPerUnit ||
-                   selectedMaterial.price ||
+        // Pick regional cost based on selected country
+        const countryLower = (country || '').toLowerCase();
+        const regionalCost =
+          countryLower.includes('france')   ? selectedMaterial.costFrance :
+          countryLower.includes('germany')  ? selectedMaterial.costGermany :
+          countryLower.includes('w. europe') || countryLower.includes('western europe') ? selectedMaterial.costWEurope :
+          countryLower.includes('usa') || countryLower.includes('united states') ? selectedMaterial.costUsa :
+          countryLower.includes('india')    ? selectedMaterial.costIndia :
+          countryLower.includes('e. europe') || countryLower.includes('eastern europe') ? selectedMaterial.costEEurope :
+          countryLower.includes('china')    ? selectedMaterial.costChina :
+          undefined;
+
+        unitCost = regionalCost ||
+                   selectedMaterial.costIndia ||
+                   selectedMaterial.unitCost ||
+                   selectedMaterial.cost ||
                    0;
       }
       
@@ -546,7 +558,7 @@ export function RawMaterialDialog({
     } else {
       setTotalCost(0);
     }
-  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, editData]);
+  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, editData, country]);
 
   // Auto-populate calculator fields when material is selected
   useEffect(() => {
@@ -699,11 +711,21 @@ export function RawMaterialDialog({
         return;
       }
       
-      // Get unit cost from material - check all possible cost fields, or use manual input
-      const materialUnitCost = selectedMaterial.unitCost || 
-                               selectedMaterial.cost || 
-                               selectedMaterial.costPerUnit ||
-                               selectedMaterial.price ||
+      // Get unit cost from material based on selected country
+      const countryLowerSubmit = (country || '').toLowerCase();
+      const regionalCostSubmit =
+        countryLowerSubmit.includes('france')   ? selectedMaterial.costFrance :
+        countryLowerSubmit.includes('germany')  ? selectedMaterial.costGermany :
+        countryLowerSubmit.includes('w. europe') || countryLowerSubmit.includes('western europe') ? selectedMaterial.costWEurope :
+        countryLowerSubmit.includes('usa') || countryLowerSubmit.includes('united states') ? selectedMaterial.costUsa :
+        countryLowerSubmit.includes('india')    ? selectedMaterial.costIndia :
+        countryLowerSubmit.includes('e. europe') || countryLowerSubmit.includes('eastern europe') ? selectedMaterial.costEEurope :
+        countryLowerSubmit.includes('china')    ? selectedMaterial.costChina :
+        undefined;
+      const materialUnitCost = regionalCostSubmit ||
+                               selectedMaterial.costIndia ||
+                               selectedMaterial.unitCost ||
+                               selectedMaterial.cost ||
                                0;
       
       if (!materialUnitCost && !manualUnitCost) {
@@ -1062,7 +1084,7 @@ export function RawMaterialDialog({
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold">
-                  Net Usage 
+                  Net Usage
                   <span className="text-muted-foreground text-xs ml-1">
                     (Unit Reference: kg)
                   </span>

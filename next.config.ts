@@ -92,6 +92,15 @@ const nextConfig: NextConfig = {
   // Disable x-powered-by header for security
   poweredByHeader: false,
 
+  async redirects() {
+    return [
+      { source: '/portal',             destination: '/settings?tab=portal',   permanent: false },
+      { source: '/portal/api-keys',    destination: '/settings?tab=api-keys', permanent: false },
+      { source: '/portal/logs',        destination: '/settings?tab=logs',     permanent: false },
+      { source: '/developer/portal',   destination: '/settings?tab=portal',   permanent: false },
+    ];
+  },
+
   async headers() {
     // Development: permissive CSP — explicitly covers worker-src because
     // Chrome does NOT inherit default-src wildcards into worker-src.

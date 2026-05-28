@@ -50,7 +50,6 @@ export default function AuthPage() {
       if (!error) {
         toast.success('Successfully signed in! Redirecting to dashboard...')
         router.push('/')
-        router.refresh()
       }
     } catch (error: any) {
       toast.error('An unexpected error occurred during sign in. Please try again.')

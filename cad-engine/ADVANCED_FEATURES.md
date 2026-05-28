@@ -341,3 +341,16 @@ Contact the development team for implementation guidance.
 **Version:** 2.1.0  
 **Last Updated:** March 2026  
 **Compatibility:** OpenCascade 7.7.2+, Python 3.8+
+
+
+  Build the image (first time / after code changes):                                                                      
+  docker build -t cad-engine .
+                                                                                                            
+  Run the container:
+  docker run -d --name cad-engine --env-file .env -p 5000:5000 cad-engine
+
+  If the container already exists and you just want to restart it:
+  docker start cad-engine
+
+  To stop it:
+  docker stop cad-engine

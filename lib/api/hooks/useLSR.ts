@@ -112,6 +112,20 @@ export const useDeleteLSR = () => {
   });
 };
 
+export const useImportLSRFromExcel = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => lsrApi.importFromExcel(file),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['lsr'] });
+      toast.success(`LHR: ${result.imported} imported, ${result.skipped} skipped`);
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, 'Failed to import LHR records from Excel'));
+    },
+  });
+};
+
 export const useBulkCreateLSR = () => {
   const queryClient = useQueryClient();
 

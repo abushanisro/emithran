@@ -8,7 +8,7 @@
  * @version 2.0.0
  */
 
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import {
@@ -156,7 +156,12 @@ export class RawMaterialCostService {
     };
 
     // Calculate costs
-    const calculationResult = this.calculationEngine.calculate(calculationInput);
+    let calculationResult: ReturnType<typeof this.calculationEngine.calculate>;
+    try {
+      calculationResult = this.calculationEngine.calculate(calculationInput);
+    } catch (err: any) {
+      throw new BadRequestException(err.message || 'Invalid raw material cost input');
+    }
 
     // Prepare database record
     const recordData = {
@@ -422,7 +427,7 @@ export class RawMaterialCostService {
     // Get all active raw material costs for this BOM item
     const { data: costs, error } = await client
       .from('raw_material_cost_records')
-      .select('total_cost_per_unit, effective_cost_per_unit')
+      .select('total_cost')
       .eq('bom_item_id', bomItemId)
       .eq('is_active', true);
 
@@ -431,13 +436,34 @@ export class RawMaterialCostService {
       throw new InternalServerErrorException('Failed to fetch raw material costs');
     }
 
-    // Sum up all effective costs (use effective_cost_per_unit if available, otherwise total_cost_per_unit)
-    const totalCost = costs?.reduce((sum, cost) => {
-      const costValue = cost.effective_cost_per_unit || cost.total_cost_per_unit || 0;
-      return sum + costValue;
-    }, 0) || 0;
+    const totalCost = costs?.reduce((sum, cost) => sum + (cost.total_cost || 0), 0) || 0;
 
     this.logger.log(`Total raw material cost for BOM item ${bomItemId}: ${totalCost}`, 'RawMaterialCostService');
     return totalCost;
+  }
+
+  async getBulkTotalCosts(
+    bomItemIds: string[],
+    accessToken?: string,
+  ): Promise<Record<string, number>> {
+    if (bomItemIds.length === 0) return {};
+
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('raw_material_cost_records')
+      .select('bom_item_id, total_cost')
+      .in('bom_item_id', bomItemIds)
+      .eq('is_active', true);
+
+    if (error) {
+      this.logger.error(`Error fetching bulk raw material costs: ${error.message}`, 'RawMaterialCostService');
+      throw new InternalServerErrorException(`Failed to fetch bulk raw material costs: ${error.message}`);
+    }
+
+    const totals: Record<string, number> = Object.fromEntries(bomItemIds.map(id => [id, 0]));
+    for (const row of data ?? []) {
+      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + (row.total_cost || 0);
+    }
+    return totals;
   }
 }

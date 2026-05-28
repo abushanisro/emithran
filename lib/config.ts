@@ -13,10 +13,10 @@ import { envValidator } from './config/env-validator';
 // Validate environment on module load
 if (typeof window !== 'undefined') {
   // Client-side validation
-  const validation = envValidator.validate();
+  envValidator.validate();
   if (process.env.NODE_ENV === 'development') {
     // Log results asynchronously (don't block module loading)
-    envValidator.logResults().catch(err => {
+    envValidator.logResults().catch(() => {
       // Environment validation logging failed
     });
   }

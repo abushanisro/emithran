@@ -40,7 +40,7 @@ export function useVendors(query?: VendorQuery, options?: { enabled?: boolean })
     queryKey: vendorKeys.list(query),
     queryFn: () => vendorsApi.getAll(query),
     staleTime: 1000 * 60 * 5,
-    enabled: options?.enabled,
+    ...(options?.enabled !== undefined && { enabled: options.enabled }),
   });
 }
 
@@ -216,15 +216,15 @@ export function useUploadVendorsCsv() {
     },
     onError: (error: ApiError) => {
       if (error.statusCode === 400) {
-        toast.error('The CSV file format is invalid. Please check the column headers and data.');
+        toast.error('Invalid file format. Please check the column headers match the expected layout.');
       } else if (error.statusCode === 413) {
-        toast.error('The CSV file is too large. Please split it into smaller files.');
+        toast.error('The file is too large. Please split it into smaller files.');
       } else if (error.statusCode === 422) {
-        toast.error('Some vendor data in the CSV is invalid. Please check the format and try again.');
+        toast.error('Some vendor data in the file is invalid. Please check the format and try again.');
       } else if (error.statusCode === 429) {
         toast.error('Too many upload requests. Please wait a moment and try again.');
       } else {
-        toast.error('Unable to upload CSV file. Please try again or contact support.');
+        toast.error('Unable to upload file. Please try again or contact support.');
       }
     },
   });

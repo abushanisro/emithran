@@ -6,6 +6,7 @@ import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult } from './dto/
 import { validate as isValidUUID } from 'uuid';
 import { MHRCalculationEngine } from './engines/mhr-calculation.engine';
 import { MHRInputValidator } from './validators/mhr-input.validator';
+import * as ExcelJS from 'exceljs';
 
 /**
  * MHR Service
@@ -266,6 +267,20 @@ export class MHRService {
         profit_margin_percentage: createMHRDto.profitMarginPercentage,
         is_manual_entry: createMHRDto.isManualEntry || false,
         manual_mhr_value: createMHRDto.manualMHRValue || null,
+        // India 2026 extended fields
+        process_group: createMHRDto.processGroup || null,
+        machine_class: createMHRDto.machineClass || null,
+        automation_level: createMHRDto.automationLevel || null,
+        operators: createMHRDto.operators || null,
+        wage_grade: createMHRDto.wageGrade || null,
+        machine_price_usd: createMHRDto.machinePriceUsd || null,
+        manufacturer_country: createMHRDto.manufacturerCountry || null,
+        setup_time_hr: createMHRDto.setupTimeHr || null,
+        lhr_inr_per_hr: createMHRDto.lhrInrPerHr || null,
+        usd_labor_rate_per_hr: createMHRDto.usdLaborRatePerHr || null,
+        usd_lhr_base: createMHRDto.usdLhrBase || null,
+        usd_lhr_burden: createMHRDto.usdLhrBurden || null,
+        usd_lhr_total: createMHRDto.usdLhrTotal || null,
         total_machine_hour_rate: calculations.totalMachineHourRate,
         total_fixed_cost_per_hour: calculations.totalFixedCostPerHour,
         total_variable_cost_per_hour: calculations.totalVariableCostPerHour,
@@ -366,6 +381,20 @@ export class MHRService {
     if (updateMHRDto.profitMarginPercentage !== undefined) updateData.profit_margin_percentage = updateMHRDto.profitMarginPercentage;
     if (updateMHRDto.isManualEntry !== undefined) updateData.is_manual_entry = updateMHRDto.isManualEntry;
     if (updateMHRDto.manualMHRValue !== undefined) updateData.manual_mhr_value = updateMHRDto.manualMHRValue;
+    // India 2026 extended fields
+    if (updateMHRDto.processGroup !== undefined) updateData.process_group = updateMHRDto.processGroup;
+    if (updateMHRDto.machineClass !== undefined) updateData.machine_class = updateMHRDto.machineClass;
+    if (updateMHRDto.automationLevel !== undefined) updateData.automation_level = updateMHRDto.automationLevel;
+    if (updateMHRDto.operators !== undefined) updateData.operators = updateMHRDto.operators;
+    if (updateMHRDto.wageGrade !== undefined) updateData.wage_grade = updateMHRDto.wageGrade;
+    if (updateMHRDto.machinePriceUsd !== undefined) updateData.machine_price_usd = updateMHRDto.machinePriceUsd;
+    if (updateMHRDto.manufacturerCountry !== undefined) updateData.manufacturer_country = updateMHRDto.manufacturerCountry;
+    if (updateMHRDto.setupTimeHr !== undefined) updateData.setup_time_hr = updateMHRDto.setupTimeHr;
+    if (updateMHRDto.lhrInrPerHr !== undefined) updateData.lhr_inr_per_hr = updateMHRDto.lhrInrPerHr;
+    if (updateMHRDto.usdLaborRatePerHr !== undefined) updateData.usd_labor_rate_per_hr = updateMHRDto.usdLaborRatePerHr;
+    if (updateMHRDto.usdLhrBase !== undefined) updateData.usd_lhr_base = updateMHRDto.usdLhrBase;
+    if (updateMHRDto.usdLhrBurden !== undefined) updateData.usd_lhr_burden = updateMHRDto.usdLhrBurden;
+    if (updateMHRDto.usdLhrTotal !== undefined) updateData.usd_lhr_total = updateMHRDto.usdLhrTotal;
 
     // Update calculated values
     updateData.total_machine_hour_rate = calculations.totalMachineHourRate;
@@ -444,6 +473,291 @@ export class MHRService {
     }
 
     return { message: 'MHR record deleted successfully' };
+  }
+
+  async importFromExcel(
+    fileBuffer: Buffer,
+    userId: string,
+    accessToken: string,
+  ): Promise<{ imported: number; skipped: number; errors: string[] }> {
+    this.logger.log(`Importing MHR records from Excel for user ${userId}`, 'MHRService');
+
+    const workbook = new ExcelJS.Workbook();
+    const arrayBuffer = fileBuffer.buffer.slice(
+      fileBuffer.byteOffset,
+      fileBuffer.byteOffset + fileBuffer.byteLength,
+    ) as ArrayBuffer;
+    await workbook.xlsx.load(arrayBuffer);
+
+    // Sheet name → commodity code for the multi-sheet aPriori format
+    const SHEET_COMMODITY: Record<string, string> = {
+      '01_machining': 'CNC Machining', '02_sheet_metal': 'Sheet Metal',
+      '03_die_casting': 'Die Casting', '04_invest_cast': 'Investment Casting',
+      '05_sand_casting': 'Sand Casting', '06_forging': 'Forging',
+      '07_additive': 'Additive Manufacturing', '08_plastic_mold': 'Plastic Molding',
+      '09_heat_treat': 'Heat Treatment', '10_pcb': 'PCB Manufacturing',
+      '11_composites': 'Composites', '12_surface_treat': 'Surface Treatment',
+      '13_powder_metal': 'Powder Metallurgy', '14_assembly': 'Assembly',
+      '15_bar_tube': 'Bar & Tube Fabrication', '16_roto_blow': 'Roto & Blow Molding',
+      '17_sheet_plastic': 'Sheet Plastic', '18_rapid_proto': 'Rapid Prototyping',
+    };
+
+    // Collect candidate sheets: explicit "MHR" names first, then numbered process sheets
+    const namedSheet = workbook.worksheets.find(ws =>
+      ['mhr', 'machine hour rate', 'machine hour rates'].includes(ws.name.toLowerCase().trim())
+    );
+    const processSheets = workbook.worksheets.filter(ws =>
+      /^\d{2}_/.test(ws.name.trim()) && ws.name.toLowerCase().trim() !== '00_index'
+    );
+    const sheetsToProcess = namedSheet ? [namedSheet] : processSheets;
+
+    if (sheetsToProcess.length === 0) {
+      this.logger.log('No MHR sheet found in Excel file — skipping MHR import', 'MHRService');
+      return { imported: 0, skipped: 0, errors: [] };
+    }
+
+    const toNum = (v: ExcelJS.CellValue, fallback: number): number => {
+      if (v == null) return fallback;
+      const n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+      return isNaN(n) ? fallback : n;
+    };
+    const toStr = (v: ExcelJS.CellValue, fallback = ''): string =>
+      v != null ? String(v).trim() : fallback;
+
+    const rows: any[] = [];
+
+    for (const sheet of sheetsToProcess) {
+      const sheetKey = sheet.name.toLowerCase().trim();
+      const commodityFromSheet = SHEET_COMMODITY[sheetKey] ?? sheetKey;
+
+      // Build header → column-number map from row 1
+      const colMap: Record<string, number> = {};
+      sheet.getRow(1).eachCell((cell, colNum) => {
+        const h = toStr(cell.value).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (h) colMap[h] = colNum;
+      });
+
+      const getCol = (...keys: string[]): number | null => {
+        for (const k of keys) if (colMap[k] !== undefined) return colMap[k];
+        return null;
+      };
+
+      // Support both standard format ("Machine Name") and aPriori multi-sheet format ("Primary ID")
+      const machineNameCol      = getCol('machine name', 'primary id', 'name');
+      if (!machineNameCol) continue;
+
+      const locationCol         = getCol('location', 'manufacturer information', 'machine manufacturer location');
+      const commodityCodeCol    = getCol('commodity code');
+      const machineDescCol      = getCol('machine description', 'other id', 'description');
+      const manufacturerCol     = getCol('manufacturer');
+      const modelCol            = getCol('model');
+      const specCol             = getCol('specification');
+      const shiftsCol           = getCol('shifts day', 'shifts per day', 'shifts_per_day');
+      const hoursCol            = getCol('hours shift', 'hours per shift', 'hours_per_shift');
+      const daysCol             = getCol('working days year', 'working days per year', 'working_days_per_year');
+      const maintHoursCol       = getCol('planned maint hours year', 'planned maintenance hours year', 'maintenance_hours_per_year');
+      const utilCol             = getCol('capacity utilization', 'capacity utilization rate', 'avg utilization', 'yields', 'capacity_utilization_pct');
+      const landedCostCol       = getCol('landed machine cost', 'landed cost', 'machine price', 'bottom up over', 'landed_machine_cost_inr');
+      const accessoriesCol      = getCol('accessories cost', 'accessories cost', 'accessories_pct');
+      const installationCol     = getCol('installation cost', 'installation cost', 'installation_pct');
+      const paybackCol          = getCol('payback period yrs', 'payback period years', 'payback period', 'payback_years');
+      const interestCol         = getCol('interest rate', 'interest rate', 'interest_rate_pct');
+      const insuranceCol        = getCol('insurance rate', 'insurance rate', 'insurance_rate_pct');
+      const footprintCol        = getCol('machine footprint sqm', 'machine footprint', 'machine_footprint_m2');
+      const rentCol             = getCol('rent sqm month', 'rent per sqm per month', 'rent_per_m2_per_month_inr');
+      const maintenanceCol      = getCol('maintenance cost', 'maintenance cost', 'maintenance_cost_pct');
+      const powerCol            = getCol('power kwh per hour', 'power kwh hr', 'spindle power kw', 'powers', 'power_kwh_per_hour');
+      const electricityCol      = getCol('electricity cost kwh', 'electricity cost per kwh', 'electricity_cost_per_kwh_inr');
+      const adminCol            = getCol('admin overhead', 'admin overhead', 'admin_overhead_pct');
+      const profitCol           = getCol('profit margin', 'profit margin', 'profit_margin_pct');
+      const mhrValueCol         = getCol('mhr hour', 'mhr', 'mhr value', 'mhr_inr_per_hour', 'accounting', 'labour rate');
+      // India 2026 extended columns
+      const processGroupCol     = getCol('process group', 'process_group');
+      const processCategoryCol  = getCol('process category', 'process_category');
+      const machineClassCol     = getCol('machine class', 'machine_class');
+      const automationLevelCol  = getCol('automation level', 'automation_level');
+      const operatorsCol        = getCol('operators');
+      const wageGradeCol        = getCol('wage grade', 'wage_grade');
+      const machinePriceUsdCol  = getCol('machine price usd', 'machine_price_usd');
+      const mfrCountryCol       = getCol('manufacturer country', 'manufacturer_country');
+      const setupTimeCol        = getCol('setup time hr', 'setup time hr', 'setup_time_hr');
+      const lhrInrCol           = getCol('lhr hr india', 'lhr inr hr', 'lhr_inr_per_hr_india', 'lhr_inr_per_hour');
+      // USD LHR columns embedded in the MHR sheet
+      const usdLaborRateCol     = getCol('labor rate usd hr', 'labor rate usd hr person', 'usd labor rate', 'labor_rate_usd_per_hr');
+      const usdLhrBaseCol       = getCol('lhr base usd hr', 'usd lhr base', 'lhr_base_usd_per_hr');
+      const usdLhrBurdenCol     = getCol('lhr burden 38 usd hr', 'usd lhr burden', 'lhr_burden_38pct_usd_per_hr');
+      const usdLhrTotalCol      = getCol('lhr total usd hr', 'usd lhr total', 'lhr_total_usd_per_hr');
+      // specs sub-columns (optional)
+      const maxCapacityCol      = getCol('max capacity', 'max_capacity');
+      const toleranceCol        = getCol('tolerance mm', 'tolerance_mm');
+      const raCol               = getCol('surface finish ra um', 'surface_finish_ra_um');
+      const materialsCol        = getCol('material compatibility', 'material_compatibility');
+      const applicationsCol     = getCol('typical applications', 'typical_applications');
+      const processNotesCol     = getCol('process notes', 'process_notes');
+
+      let isHeaderRow = true;
+      sheet.eachRow(row => {
+        if (isHeaderRow) { isHeaderRow = false; return; }
+
+        const machineName = toStr(row.getCell(machineNameCol).value);
+        if (!machineName) return;
+
+        const mhrRaw = mhrValueCol ? row.getCell(mhrValueCol).value : null;
+        const mhrNum = mhrRaw != null ? parseFloat(String(mhrRaw).replace(/[^0-9.-]/g, '')) : NaN;
+
+        // Skip sub-header rows (row 2 in aPriori sheets has labels like "Name", "Labor Rate (USD/hr)")
+        // Detected by: mhrValueCol exists but cell is a non-numeric string
+        if (mhrValueCol && typeof mhrRaw === 'string' && isNaN(mhrNum)) return;
+
+        const isManual = mhrValueCol !== null && !isNaN(mhrNum) && mhrNum > 0;
+        const landedCost = landedCostCol ? toNum(row.getCell(landedCostCol).value, 0) : 0;
+
+        // Derive utilization: aPriori stores it as 0-1 fraction, convert to percentage
+        let utilRaw = utilCol ? toNum(row.getCell(utilCol).value, 0.85) : 0.85;
+        if (utilRaw > 0 && utilRaw <= 1) utilRaw = utilRaw * 100; // 0.5 → 50%
+
+        const processGroupVal = processGroupCol ? toStr(row.getCell(processGroupCol).value) || commodityFromSheet : commodityFromSheet;
+        const specsObj: Record<string, any> = {};
+        if (maxCapacityCol)   { const v = toStr(row.getCell(maxCapacityCol).value);   if (v) specsObj.max_capacity = v; }
+        if (toleranceCol)     { const v = toNum(row.getCell(toleranceCol).value, 0);  if (v) specsObj.tolerance_mm = v; }
+        if (raCol)            { const v = toNum(row.getCell(raCol).value, 0);          if (v) specsObj.surface_finish_ra_um = v; }
+        if (materialsCol)     { const v = toStr(row.getCell(materialsCol).value);      if (v) specsObj.material_compatibility = v; }
+        if (applicationsCol)  { const v = toStr(row.getCell(applicationsCol).value);   if (v) specsObj.typical_applications = v; }
+        if (processNotesCol)  { const v = toStr(row.getCell(processNotesCol).value);   if (v) specsObj.process_notes = v; }
+
+        rows.push({
+          user_id:                            userId,
+          machine_name:                       machineName,
+          location:                           locationCol ? toStr(row.getCell(locationCol).value, 'India') || 'India' : 'India',
+          commodity_code:                     commodityCodeCol ? toStr(row.getCell(commodityCodeCol).value, processGroupVal) || processGroupVal : processGroupVal,
+          machine_description:                machineDescCol ? toStr(row.getCell(machineDescCol).value) || null : null,
+          manufacturer:                       manufacturerCol ? toStr(row.getCell(manufacturerCol).value) || null : null,
+          model:                              modelCol ? toStr(row.getCell(modelCol).value) || null : null,
+          specification:                      specCol ? toStr(row.getCell(specCol).value) || null : null,
+          shifts_per_day:                     shiftsCol ? toNum(row.getCell(shiftsCol).value, 3) : 3,
+          hours_per_shift:                    hoursCol ? toNum(row.getCell(hoursCol).value, 8) : 8,
+          working_days_per_year:              daysCol ? toNum(row.getCell(daysCol).value, 260) : 260,
+          planned_maintenance_hours_per_year: maintHoursCol ? toNum(row.getCell(maintHoursCol).value, 0) : 0,
+          capacity_utilization_rate:          Math.min(Math.max(utilRaw, 1), 100),
+          landed_machine_cost:                Math.max(landedCost, 1),
+          accessories_cost_percentage:        accessoriesCol ? toNum(row.getCell(accessoriesCol).value, 6) : 6,
+          installation_cost_percentage:       installationCol ? toNum(row.getCell(installationCol).value, 20) : 20,
+          payback_period_years:               paybackCol ? toNum(row.getCell(paybackCol).value, 10) : 10,
+          interest_rate_percentage:           interestCol ? toNum(row.getCell(interestCol).value, 8) : 8,
+          insurance_rate_percentage:          insuranceCol ? toNum(row.getCell(insuranceCol).value, 1) : 1,
+          machine_footprint_sqm:              footprintCol ? toNum(row.getCell(footprintCol).value, 0) : 0,
+          rent_per_sqm_per_month:             rentCol ? toNum(row.getCell(rentCol).value, 250) : 250,
+          maintenance_cost_percentage:        maintenanceCol ? toNum(row.getCell(maintenanceCol).value, 6) : 6,
+          power_kwh_per_hour:                 powerCol ? toNum(row.getCell(powerCol).value, 0) : 0,
+          electricity_cost_per_kwh:           electricityCol ? toNum(row.getCell(electricityCol).value, 8.36) : 8.36,
+          admin_overhead_percentage:          adminCol ? toNum(row.getCell(adminCol).value, 0) : 0,
+          profit_margin_percentage:           profitCol ? toNum(row.getCell(profitCol).value, 0) : 0,
+          is_manual_entry:                    isManual,
+          manual_mhr_value:                   isManual ? mhrNum : null,
+          total_machine_hour_rate:            null as number | null,
+          total_fixed_cost_per_hour:          null as number | null,
+          total_variable_cost_per_hour:       null as number | null,
+          total_annual_cost:                  null as number | null,
+          // India 2026 extended fields
+          process_group:        processGroupVal || null,
+          process_category:     processCategoryCol ? toStr(row.getCell(processCategoryCol).value) || null : null,
+          machine_class:        machineClassCol ? toStr(row.getCell(machineClassCol).value) || null : null,
+          automation_level:     automationLevelCol ? toStr(row.getCell(automationLevelCol).value) || null : null,
+          operators:            operatorsCol ? Math.max(1, toNum(row.getCell(operatorsCol).value, 1)) : 1,
+          wage_grade:           wageGradeCol ? toStr(row.getCell(wageGradeCol).value) || null : null,
+          machine_price_usd:    machinePriceUsdCol ? toNum(row.getCell(machinePriceUsdCol).value, 0) || null : null,
+          manufacturer_country: mfrCountryCol ? toStr(row.getCell(mfrCountryCol).value) || null : null,
+          setup_time_hr:        setupTimeCol ? toNum(row.getCell(setupTimeCol).value, 0) || null : null,
+          lhr_inr_per_hr:       lhrInrCol ? toNum(row.getCell(lhrInrCol).value, 0) || null : null,
+          usd_labor_rate_per_hr: usdLaborRateCol ? toNum(row.getCell(usdLaborRateCol).value, 0) || null : null,
+          usd_lhr_base:          usdLhrBaseCol ? toNum(row.getCell(usdLhrBaseCol).value, 0) || null : null,
+          usd_lhr_burden:        usdLhrBurdenCol ? toNum(row.getCell(usdLhrBurdenCol).value, 0) || null : null,
+          usd_lhr_total:         usdLhrTotalCol ? toNum(row.getCell(usdLhrTotalCol).value, 0) || null : null,
+          specs:                Object.keys(specsObj).length ? specsObj : null,
+        });
+      });
+    }
+
+    if (rows.length === 0) {
+      this.logger.log('No valid machine rows found across all MHR sheets', 'MHRService');
+      return { imported: 0, skipped: 0, errors: [] };
+    }
+
+    // Compute stored calculated fields
+    for (const record of rows) {
+      try {
+        if (record.is_manual_entry) {
+          const calc = this.createManualEntryCalculation(record.manual_mhr_value);
+          record.total_machine_hour_rate      = calc.totalMachineHourRate;
+          record.total_fixed_cost_per_hour    = calc.totalFixedCostPerHour;
+          record.total_variable_cost_per_hour = calc.totalVariableCostPerHour;
+          record.total_annual_cost            = calc.totalAnnualCost;
+        } else {
+          const calc = this.calculateMHR(this.mapRowToDto(record), true);
+          record.total_machine_hour_rate      = calc.totalMachineHourRate;
+          record.total_fixed_cost_per_hour    = calc.totalFixedCostPerHour;
+          record.total_variable_cost_per_hour = calc.totalVariableCostPerHour;
+          record.total_annual_cost            = calc.totalAnnualCost;
+        }
+      } catch {
+        record.total_machine_hour_rate      = 0;
+        record.total_fixed_cost_per_hour    = 0;
+        record.total_variable_cost_per_hour = 0;
+        record.total_annual_cost            = 0;
+      }
+    }
+
+    // Filter out machine names that already exist for this user (no unique constraint → manual dedup)
+    const client = this.supabaseService.getClient(accessToken);
+    const { data: existing } = await client
+      .from('mhr_records')
+      .select('machine_name')
+      .eq('user_id', userId);
+    const existingNames = new Set((existing ?? []).map((r: any) => (r.machine_name as string).toLowerCase()));
+
+    const newRows = rows.filter(r => !existingNames.has((r.machine_name as string).toLowerCase()));
+    const skipped = rows.length - newRows.length;
+
+    if (newRows.length === 0) return { imported: 0, skipped, errors: [] };
+
+    let imported = 0;
+    const errors: string[] = [];
+    const CHUNK_SIZE = 200;
+
+    for (let offset = 0; offset < newRows.length; offset += CHUNK_SIZE) {
+      const chunk = newRows.slice(offset, offset + CHUNK_SIZE);
+      const { data, error } = await client
+        .from('mhr_records')
+        .insert(chunk)
+        .select('id');
+      if (error) {
+        this.logger.error(`MHR import chunk error at offset ${offset}: ${error.message}`, 'MHRService');
+        errors.push(`Batch at offset ${offset} failed: ${error.message}`);
+      } else {
+        imported += (data ?? []).length;
+      }
+    }
+
+    this.logger.log(`MHR import complete: ${imported} imported, ${skipped} skipped`, 'MHRService');
+    return { imported, skipped, errors };
+  }
+
+  async removeAll(userId: string, accessToken: string): Promise<{ deleted: number }> {
+    this.logger.log(`Deleting all MHR records for user ${userId}`, 'MHRService');
+
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('mhr_records')
+      .delete()
+      .eq('user_id', userId)
+      .select('id');
+
+    if (error) {
+      this.logger.error(`Error deleting all MHR records: ${error.message}`, 'MHRService');
+      throw new InternalServerErrorException('Failed to delete all MHR records.');
+    }
+
+    return { deleted: (data ?? []).length };
   }
 
   private isValidUUID(id: string): boolean {

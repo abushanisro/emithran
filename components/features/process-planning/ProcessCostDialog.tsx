@@ -1084,11 +1084,11 @@ export function ProcessCostDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {isLoadingCalculators ? (
-                    <SelectItem key="loading" value="" disabled>
+                    <SelectItem key="loading" value="__loading__" disabled>
                       Loading calculators...
                     </SelectItem>
                   ) : calculatorsError ? (
-                    <SelectItem key="error" value="" disabled>
+                    <SelectItem key="error" value="__error__" disabled>
                       Error loading calculators
                     </SelectItem>
                   ) : calculatorsData?.calculators && calculatorsData.calculators.length > 0 ? (
@@ -1098,7 +1098,7 @@ export function ProcessCostDialog({
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem key="no-calc" value="" disabled>
+                    <SelectItem key="no-calc" value="__none__" disabled>
                       No calculators available
                     </SelectItem>
                   )}

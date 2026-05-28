@@ -70,7 +70,7 @@ export class RawMaterialsService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material_group, material, material_grade, shape, country');
+      .select('material_group, material, material_grade, shape');
 
     if (error) {
       this.logger.error(`Error fetching filter options: ${error.message}`, 'RawMaterialsService');
@@ -81,12 +81,11 @@ export class RawMaterialsService {
     const materialGroups = [...new Set(data.map(m => m.material_group).filter(Boolean))].sort();
     const materialTypes = [...new Set(data.map(m => m.material).filter(Boolean))].sort();
     const grades = [...new Set(data.map(m => m.material_grade).filter(Boolean))].sort();
-    const countries = [...new Set(data.map(m => m.country).filter(Boolean))].sort();
 
     return {
       materialGroups,
       materialTypes,
-      countries,
+      countries: [],
       grades,
     };
   }
@@ -134,8 +133,15 @@ export class RawMaterialsService {
         specific_heat_melt: createRawMaterialDto.specificHeatMelt,
         thermal_conductivity_melt: createRawMaterialDto.thermalConductivityMelt,
         location: createRawMaterialDto.location,
-        cost: createRawMaterialDto.cost || createRawMaterialDto.unitCost,
-        currency: createRawMaterialDto.currency,
+        cost: createRawMaterialDto.costIndia ?? createRawMaterialDto.cost ?? createRawMaterialDto.unitCost,
+        currency: createRawMaterialDto.currency || 'USD',
+        cost_france: createRawMaterialDto.costFrance,
+        cost_germany: createRawMaterialDto.costGermany,
+        cost_w_europe: createRawMaterialDto.costWEurope,
+        cost_usa: createRawMaterialDto.costUsa,
+        cost_india: createRawMaterialDto.costIndia,
+        cost_e_europe: createRawMaterialDto.costEEurope,
+        cost_china: createRawMaterialDto.costChina,
         // Additional properties
         density: createRawMaterialDto.density,
         ultimate_tensile_strength: createRawMaterialDto.ultimate_tensile_strength,
@@ -190,8 +196,15 @@ export class RawMaterialsService {
       specific_heat_melt: dto.specificHeatMelt,
       thermal_conductivity_melt: dto.thermalConductivityMelt,
       location: dto.location,
-      cost: dto.cost || dto.unitCost,
-      currency: dto.currency,
+      cost: dto.costIndia ?? dto.cost ?? dto.unitCost,
+      currency: dto.currency || 'USD',
+      cost_france: dto.costFrance,
+      cost_germany: dto.costGermany,
+      cost_w_europe: dto.costWEurope,
+      cost_usa: dto.costUsa,
+      cost_india: dto.costIndia,
+      cost_e_europe: dto.costEEurope,
+      cost_china: dto.costChina,
       // Additional properties
       density: dto.density,
       ultimate_tensile_strength: dto.ultimate_tensile_strength,

@@ -81,6 +81,20 @@ const processCalculatorMappingsApi = {
   delete: async (id: string) => {
     return apiClient.delete(`/processes/calculator-mappings/${id}`);
   },
+
+  importExcel: async (file: File, replaceExisting = false) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('replaceExisting', String(replaceExisting));
+    return apiClient.uploadFiles<{ imported: number; skipped: number }>(
+      '/processes/calculator-mappings/import-excel',
+      formData,
+    );
+  },
+
+  clearAll: async () => {
+    return apiClient.delete<{ deleted: number }>('/processes/calculator-mappings');
+  },
 };
 
 // Hooks
@@ -144,6 +158,29 @@ export function useDeleteProcessCalculatorMapping() {
 
   return useMutation({
     mutationFn: (id: string) => processCalculatorMappingsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['process-calculator-mappings'] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hierarchy() });
+    },
+  });
+}
+
+export function useImportProcessCalculatorMappings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, replaceExisting }: { file: File; replaceExisting?: boolean }) =>
+      processCalculatorMappingsApi.importExcel(file, replaceExisting),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['process-calculator-mappings'] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hierarchy() });
+    },
+  });
+}
+
+export function useClearAllProcessCalculatorMappings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => processCalculatorMappingsApi.clearAll(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['process-calculator-mappings'] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hierarchy() });

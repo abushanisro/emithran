@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { HttpModule } from '@nestjs/axios';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { ProjectsModule } from './modules/projects/projects.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
@@ -29,6 +29,11 @@ import { ProcessPlanningModule } from './modules/process-planning/process-planni
 import { QualityControlModule } from './modules/quality-control/quality-control.module';
 import { ProjectReportsModule } from './modules/project-reports/project-reports.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
+import { VaveModule } from './modules/vave/vave.module';
+import { BenchmarkSessionsModule } from './modules/benchmark-sessions/benchmark-sessions.module';
+import { DeveloperModule } from './modules/developer/developer.module';
+import { ProfileModule } from './modules/profile/profile.module';
+import { RequestLogInterceptor } from './modules/developer/interceptors/request-log.interceptor';
 import { LoggerModule } from './common/logger/logger.module';
 import { SupabaseService } from './common/supabase/supabase.service';
 import { SupabaseAuthGuard } from './common/guards/supabase-auth.guard';
@@ -89,6 +94,10 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     QualityControlModule,
     ProjectReportsModule,
     DeliveryModule,
+    VaveModule,
+    BenchmarkSessionsModule,
+    DeveloperModule,
+    ProfileModule,
   ],
   controllers: [AppController],
   providers: [
@@ -96,6 +105,10 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     {
       provide: APP_GUARD,
       useClass: SupabaseAuthGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestLogInterceptor,
     },
   ],
 })

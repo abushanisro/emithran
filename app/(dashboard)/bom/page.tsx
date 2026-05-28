@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useBOMs, useCreateBOM, useUpdateBOM, useDeleteBOM } from '@/lib/api/hooks/useBOM';
@@ -58,7 +59,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-export default function BOMManagementPage() {
+function BOMManagementContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams.get('projectId');
@@ -616,5 +617,17 @@ export default function BOMManagementPage() {
         <WorkflowNavigation currentModuleId="bom" projectId={projectId} />
       )}
     </div>
+  );
+}
+
+export default function BOMManagementPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    }>
+      <BOMManagementContent />
+    </Suspense>
   );
 }

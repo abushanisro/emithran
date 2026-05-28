@@ -177,14 +177,6 @@ export class RawMaterialCostCalculationEngine {
       throw new Error(`Gross Usage must be between ${validation.USAGE.MIN} and ${validation.USAGE.MAX}`);
     }
 
-    if (input.netUsage < validation.USAGE.MIN || input.netUsage > validation.USAGE.MAX) {
-      throw new Error(`Net Usage must be between ${validation.USAGE.MIN} and ${validation.USAGE.MAX}`);
-    }
-
-    if (input.netUsage > input.grossUsage) {
-      throw new Error('Net Usage cannot be greater than Gross Usage');
-    }
-
     if (input.scrap < validation.SCRAP.MIN || input.scrap > validation.SCRAP.MAX) {
       throw new Error(`Scrap % must be between ${validation.SCRAP.MIN} and ${validation.SCRAP.MAX}`);
     }

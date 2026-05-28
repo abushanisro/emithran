@@ -147,6 +147,23 @@ export class CreateMHRDto {
   @Min(0)
   @IsOptional()
   manualMHRValue?: number;
+
+  // India 2026 extended fields
+  @ApiPropertyOptional() @IsString() @IsOptional() processGroup?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() processCategory?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() machineClass?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() automationLevel?: string;
+  @ApiPropertyOptional() @IsNumber() @Min(1) @IsOptional() operators?: number;
+  @ApiPropertyOptional() @IsString() @IsOptional() wageGrade?: string;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() machinePriceUsd?: number;
+  @ApiPropertyOptional() @IsString() @IsOptional() manufacturerCountry?: string;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() setupTimeHr?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() lhrInrPerHr?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLaborRatePerHr?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrBase?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrBurden?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrTotal?: number;
+  @ApiPropertyOptional() @IsOptional() specs?: Record<string, any>;
 }
 
 export class UpdateMHRDto {
@@ -304,6 +321,22 @@ export class UpdateMHRDto {
   @Min(0)
   @IsOptional()
   manualMHRValue?: number;
+
+  // India 2026 extended fields
+  @ApiPropertyOptional() @IsString() @IsOptional() processGroup?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() processCategory?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() machineClass?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() automationLevel?: string;
+  @ApiPropertyOptional() @IsNumber() @Min(1) @IsOptional() operators?: number;
+  @ApiPropertyOptional() @IsString() @IsOptional() wageGrade?: string;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() machinePriceUsd?: number;
+  @ApiPropertyOptional() @IsString() @IsOptional() manufacturerCountry?: string;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() setupTimeHr?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() lhrInrPerHr?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLaborRatePerHr?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrBase?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrBurden?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrTotal?: number;
 }
 
 export class QueryMHRDto {
@@ -321,6 +354,16 @@ export class QueryMHRDto {
   @IsString()
   @IsOptional()
   commodityCode?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by process group' })
+  @IsString()
+  @IsOptional()
+  processGroup?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by wage grade' })
+  @IsString()
+  @IsOptional()
+  wageGrade?: string;
 
   @ApiPropertyOptional({ description: 'Page number', default: 1 })
   @IsOptional()

@@ -111,6 +111,20 @@ export const mhrFormSchema = z.object({
   profitMarginPercentage: z.number()
     .min(0, 'Profit margin cannot be negative')
     .max(100, 'Profit margin cannot exceed 100%'),
+
+  // India 2026 extended fields (all optional)
+  machineClass: z.string().optional().or(z.literal('')),
+  automationLevel: z.string().optional().or(z.literal('')),
+  wageGrade: z.string().optional().or(z.literal('')),
+  operators: z.number().min(0).optional(),
+  machinePriceUsd: z.number().min(0).optional(),
+  manufacturerCountry: z.string().optional().or(z.literal('')),
+  setupTimeHr: z.number().min(0).optional(),
+  lhrInrPerHr: z.number().min(0).optional(),
+  usdLaborRatePerHr: z.number().min(0).optional(),
+  usdLhrBase: z.number().min(0).optional(),
+  usdLhrBurden: z.number().min(0).optional(),
+  usdLhrTotal: z.number().min(0).optional(),
 }).refine(
   (data) => {
     // Validate that combined percentage costs don't exceed reasonable limits

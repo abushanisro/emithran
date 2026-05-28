@@ -1,13 +1,8 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import {
-  Currency,
-  Country,
-  MaterialShape,
-  MaterialCategory,
-  COUNTRY_DEFAULT_CURRENCY
-} from '@/lib/constants/materials';
+import { COUNTRY_DEFAULT_CURRENCY } from '@/lib/constants/materials';
+import type { Currency, Country, MaterialShape, MaterialCategory } from '@/lib/constants/materials';
 
 export interface MaterialFilterState {
   search: string;
@@ -49,14 +44,7 @@ export const useMaterialFilters = ({
   // Default filter state
   const defaultFilters: MaterialFilterState = {
     search: '',
-    materialCategory: undefined,
-    country: undefined,
-    currency: undefined,
-    shape: undefined,
-    minCost: undefined,
-    maxCost: undefined,
     year: new Date().getFullYear(),
-    location: undefined,
     sortBy: 'material',
     sortOrder: 'asc',
     page: 1,
@@ -115,11 +103,11 @@ export const useMaterialFilters = ({
 
   // Clear all filters
   const clearFilters = useCallback(() => {
-    const clearedFilters = {
+    const clearedFilters: MaterialFilterState = {
       ...defaultFilters,
-      year: new Date().getFullYear(), // Keep current year
-      sortBy: filters.sortBy, // Keep current sorting
-      sortOrder: filters.sortOrder
+      year: new Date().getFullYear(),
+      ...(filters.sortBy !== undefined ? { sortBy: filters.sortBy } : {}),
+      ...(filters.sortOrder !== undefined ? { sortOrder: filters.sortOrder } : {}),
     };
     setFilters(clearedFilters);
   }, [defaultFilters, filters.sortBy, filters.sortOrder]);
@@ -140,7 +128,7 @@ export const useMaterialFilters = ({
 
   const setMaterialCategory = useCallback((category?: MaterialCategory) => {
     setFilters(prev => {
-      const newFilters = { ...prev, materialCategory: category, page: 1 };
+      const newFilters: MaterialFilterState = { ...prev, ...(category !== undefined ? { materialCategory: category } : {}), page: 1 };
       
       // Clear shape if it's incompatible with new category
       if (category && prev.shape) {
@@ -154,7 +142,7 @@ export const useMaterialFilters = ({
 
   const setCountry = useCallback((country?: Country) => {
     setFilters(prev => {
-      const newFilters = { ...prev, country, page: 1 };
+      const newFilters: MaterialFilterState = { ...prev, ...(country !== undefined ? { country } : {}), page: 1 };
       
       // Auto-update currency based on country
       if (autoSyncCurrency && country) {
@@ -176,8 +164,8 @@ export const useMaterialFilters = ({
   const setCostRange = useCallback((minCost?: number, maxCost?: number) => {
     setFilters(prev => ({
       ...prev,
-      minCost: minCost !== undefined && !isNaN(minCost) ? minCost : undefined,
-      maxCost: maxCost !== undefined && !isNaN(maxCost) ? maxCost : undefined,
+      ...(minCost !== undefined && !isNaN(minCost) ? { minCost } : {}),
+      ...(maxCost !== undefined && !isNaN(maxCost) ? { maxCost } : {}),
       page: 1
     }));
   }, []);

@@ -74,7 +74,6 @@ function CallbackContent() {
             // User is authorized
             toast.success(`Welcome back! Successfully signed in as ${session.user.email}. Redirecting to your dashboard...`)
             router.push('/')
-            router.refresh()
           } catch (authCheckError) {
             // Authorization check failed
             await supabase.auth.signOut()

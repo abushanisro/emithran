@@ -1,3 +1,4 @@
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -7,7 +8,7 @@ import type { NextRequest } from 'next/server'
  * - Request tracing and rate limiting headers
  */
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const startTime = Date.now()
 
@@ -36,6 +37,26 @@ export function proxy(request: NextRequest) {
 
   // Add performance and monitoring headers
   addMonitoringHeaders(response, request, startTime)
+
+  // Refresh the Supabase session — writes updated tokens back to cookies so
+  // the browser client stays in sync and doesn't fire SIGNED_OUT on expiry.
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+  await supabase.auth.getUser()
 
   return response
 }

@@ -299,7 +299,12 @@ export class BOMItemsService {
         item_id: id
       });
 
-      if (error && error.code === '42883') {
+      if (error && (
+        error.code === '42883' ||      // PostgreSQL: undefined_function
+        error.code === 'PGRST202' ||   // PostgREST: function not in schema cache
+        error.message?.includes('Could not find the function') ||
+        error.message?.includes('schema cache')
+      )) {
         // Function doesn't exist, fall back to manual cascade delete
         this.logger.warn('Cascade delete function not available, using manual cascade delete', 'BOMItemsService');
         return await this.manualCascadeDelete(id, userId, accessToken);

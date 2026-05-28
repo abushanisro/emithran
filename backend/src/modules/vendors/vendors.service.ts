@@ -696,25 +696,48 @@ export class VendorsService {
   }
 
   // ============================================================================
-  // CSV IMPORT
+  // FILE IMPORT (CSV + XLSX)
   // ============================================================================
 
+  // Column mapping for VENDOR_DATABASE_ENTERPRISE_ENRICHED.xlsx (0-indexed, 1 header row):
+  // 0:S.No  1:Supplier Name  2:Full Address  3:Website  4:Company Phone
+  // 5:Industries Served  6:Process  7:Materials  8:Countries Served  9:Annual Turnover
+  // 10:Certifications  11:Inspection Options  12:QMS Metrics  13:QMS Procedures
+  // 14:Workshop/Facility  15:Warehouse  16:Packing  17:Logistics
+  // 18:Max Capacity  19:Avg Utilization  20:Shift Hours  21:Shifts/Day
+  // 22:Working Days/Wk  23:In-House Testing  24:Operators  25:Engineers  26:Prod. Managers
+  // 27:Contact 1  28:Title 1  29:Email 1  30:Phone 1
+  // 31:Contact 2  32:Title 2  33:Email 2  34:Phone 2
+  // 35:Company Profile  36:Machine List  37:LinkedIn URL (ignored)
+
   async importFromCsv(file: Express.Multer.File, userId: string, accessToken: string) {
-    this.logger.log('Importing vendors from CSV (Shared Database Mode)', 'VendorsService');
+    this.logger.log('Importing vendors from file (Shared Database Mode)', 'VendorsService');
 
     if (!file) {
       throw new InternalServerErrorException('No file provided');
     }
 
     try {
-      const csvContent = file.buffer.toString('utf-8');
-      const lines = csvContent.split('\n');
+      let rows: string[][];
+      const fileName = (file.originalname || '').toLowerCase();
+      const isExcel =
+        fileName.endsWith('.xlsx') ||
+        fileName.endsWith('.xls') ||
+        (file.mimetype || '').includes('spreadsheet') ||
+        (file.mimetype || '').includes('excel');
 
-      // Skip header rows (first 2 rows)
-      const dataLines = lines.slice(2).filter(line => line.trim());
+      if (isExcel) {
+        rows = await this.parseExcelBuffer(file.buffer);
+      } else {
+        rows = this.parseCsvRows(file.buffer.toString('utf-8'));
+      }
+
+      // Skip header row (row index 0 contains column names)
+      // col[0] = S.No (serial number, skip), col[1] = Supplier Name
+      const dataRows = rows.slice(1).filter(row => row[1]?.trim());
 
       const results = {
-        total: dataLines.length,
+        total: dataRows.length,
         created: 0,
         updated: 0,
         skipped: 0,
@@ -722,208 +745,172 @@ export class VendorsService {
         errors: [] as any[],
       };
 
-      for (let i = 0; i < dataLines.length; i++) {
-        let row: string[] = [];
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
         try {
-          row = this.parseCSVLine(dataLines[i]);
-          if (row.length < 10) continue; // Skip invalid rows
+          const name = row[1]?.trim();
+          if (!name) continue;
 
-          const vendorData = this.mapCSVToVendor(row, i + 3); // +3 for header rows and 1-based index
-
-          // Create vendor - handle duplicates in shared database
-          const supplierCode = `CUS-${row[0]}`;
-
-          // Check if vendor already exists in shared database (any user)
+          // Dedup check by name (case-insensitive)
           const { data: existingVendor, error: checkError } = await this.supabaseService
             .getClient(accessToken)
             .from('vendors')
-            .select('id, user_id, supplier_code, name, updated_at')
-            .eq('supplier_code', supplierCode)
+            .select('id, name')
+            .ilike('name', name)
             .maybeSingle();
 
-          // If there's an error checking, log and skip this row
           if (checkError && checkError.code !== 'PGRST116') {
-            this.logger.warn(`Error checking for existing vendor: ${checkError.message}`, 'VendorsService');
             results.failed++;
-            results.errors.push({
-              row: i + 3,
-              name: row[1],
-              error: `Database error: ${checkError.message}`,
-            });
+            results.errors.push({ row: i + 2, name, error: `Database error: ${checkError.message}` });
             continue;
           }
 
-          const isUpdate = !!existingVendor;
-
-          // Skip if vendor exists and data is identical (optimization)
-          if (existingVendor && existingVendor.name === row[1]) {
-            // Quick check - if name matches, likely a duplicate upload
+          if (existingVendor) {
             results.skipped++;
             continue;
           }
 
+          const codeBase = name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
+          const supplierCode = `VND-${codeBase}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+
+          const address = row[2]?.trim() || null;
+
           const vendorPayload = {
             supplier_code: supplierCode,
-            name: row[1],
-            addresses: row[2],
-            website: row[3],
-            company_phone: row[4],
-            major_customers: row[5] !== 'NA' ? row[5] : null,
-            countries_served: row[6] !== 'NA' ? row[6] : null,
-            company_turnover: row[7] !== 'NA' ? row[7] : null,
-            industries: this.parseArrayField(row[8]),
-            process: this.parseArrayField(row[9]),
-            materials: this.parseArrayField(row[10]),
-            certifications: this.parseArrayField(row[11]),
-            inspection_options: row[12] !== 'NA' ? row[12] : null,
-            qms_metrics: row[13] !== 'NA' ? row[13] : null,
-            qms_procedures: row[14] !== 'NA' ? row[14] : null,
-            manufacturing_workshop: row[15] !== 'NA' ? row[15] : null,
-            warehouse: this.parseBoolean(row[16]),
-            packing: this.parseBoolean(row[17]),
-            logistics_transportation: this.parseBoolean(row[18]),
-            maximum_production_capacity: row[19] !== 'NA' ? row[19] : null,
-            average_capacity_utilization: this.parseNumber(row[20]),
-            num_hours_in_shift: this.parseInteger(row[21]),
-            num_shifts_in_day: this.parseInteger(row[22]),
-            num_working_days_per_week: this.parseInteger(row[23]),
-            in_house_material_testing: this.parseBoolean(row[24]),
-            num_operators: this.parseInteger(row[25]),
-            num_engineers: this.parseInteger(row[26]),
-            num_production_managers: this.parseInteger(row[27]),
-            company_profile_url: row[36],
-            machine_list_url: row[37],
-            city: this.extractCity(row[2]),
-            state: this.extractState(row[2]),
-            country: this.extractCountry(row[2]),
+            name,
+            addresses: address,
+            website: row[3]?.trim() || null,
+            company_phone: row[4]?.trim() || null,
+            industries: this.parseArrayField(row[5]),
+            process: this.parseArrayField(row[6]),
+            materials: this.parseArrayField(row[7]),
+            countries_served: row[8]?.trim() || null,
+            company_turnover: row[9]?.trim() || null,
+            certifications: this.parseArrayField(row[10]),
+            inspection_options: row[11]?.trim() || null,
+            qms_metrics: row[12]?.trim() || null,
+            qms_procedures: row[13]?.trim() || null,
+            manufacturing_workshop: row[14]?.trim() || null,
+            warehouse: this.parseBoolean(row[15]),
+            packing: this.parseBoolean(row[16]),
+            logistics_transportation: this.parseBoolean(row[17]),
+            maximum_production_capacity: row[18]?.trim() || null,
+            average_capacity_utilization: this.parseNumber(row[19]),
+            num_hours_in_shift: this.parseInteger(row[20]),
+            num_shifts_in_day: this.parseInteger(row[21]),
+            num_working_days_per_week: this.parseInteger(row[22]),
+            in_house_material_testing: this.parseBoolean(row[23]),
+            num_operators: this.parseInteger(row[24]),
+            num_engineers: this.parseInteger(row[25]),
+            num_production_managers: this.parseInteger(row[26]),
+            company_profile_url: row[35]?.trim() || null,
+            machine_list_url: row[36]?.trim() || null,
+            city: this.extractCity(address || ''),
+            state: this.extractState(address || ''),
+            country: this.extractCountry(address || ''),
             user_id: userId,
             status: 'active',
             vendor_type: 'supplier',
           };
 
-          // Use conditional INSERT/UPDATE for shared database
-          let vendor: any;
-          let vendorError: any;
-
-          if (isUpdate) {
-            // Update existing vendor in shared database
-            // Exclude immutable fields (supplier_code shouldn't change)
-            const { supplier_code, ...updatePayload } = vendorPayload;
-            const { data, error } = await this.supabaseService
-              .getClient(accessToken)
-              .from('vendors')
-              .update(updatePayload)
-              .eq('id', existingVendor.id)
-              .select()
-              .single();
-            vendor = data;
-            vendorError = error;
-          } else {
-            // Insert new vendor to shared database
-            const { data, error } = await this.supabaseService
-              .getClient(accessToken)
-              .from('vendors')
-              .insert(vendorPayload)
-              .select()
-              .single();
-            vendor = data;
-            vendorError = error;
-          }
+          const { data: vendor, error: vendorError } = await this.supabaseService
+            .getClient(accessToken)
+            .from('vendors')
+            .insert(vendorPayload)
+            .select()
+            .single();
 
           if (vendorError) {
             results.failed++;
-            // Provide better error message for duplicate key constraint
-            let errorMessage = vendorError.message;
-            if (vendorError.message.includes('duplicate key') && vendorError.message.includes('vendors_supplier_code_key')) {
-              errorMessage = `Supplier code ${supplierCode} already exists in the system. The vendor cannot be updated (may belong to different user or access restricted).`;
-            } else if (vendorError.message.includes('violates row-level security policy')) {
-              errorMessage = `Access denied: Cannot ${isUpdate ? 'update' : 'create'} vendor due to security policy`;
-            }
-            results.errors.push({
-              row: i + 3,
-              name: row[1],
-              error: errorMessage,
-            });
+            let errorMsg = vendorError.message;
+            if (vendorError.message.includes('duplicate key')) errorMsg = `Vendor "${name}" already exists.`;
+            else if (vendorError.message.includes('violates row-level security')) errorMsg = `Access denied for "${name}".`;
+            results.errors.push({ row: i + 2, name, error: errorMsg });
             continue;
           }
 
-          // Create or update contacts if available
-          if (row[28] && row[30] && vendor?.id) {
-            // Delete existing primary contact if updating
-            if (isUpdate) {
-              await this.supabaseService
-                .getClient(accessToken)
-                .from('vendor_contacts')
-                .delete()
-                .eq('vendor_id', vendor.id)
-                .eq('is_primary', true);
-            }
-
-            await this.supabaseService
-              .getClient(accessToken)
-              .from('vendor_contacts')
-              .insert({
-                vendor_id: vendor.id,
-                name: row[28],
-                designation: row[29],
-                email: row[30],
-                phone: row[31],
-                is_primary: true,
-              });
+          // Contact 1
+          const c1Name = row[27]?.trim();
+          if (c1Name && vendor?.id) {
+            await this.supabaseService.getClient(accessToken).from('vendor_contacts').insert({
+              vendor_id: vendor.id,
+              name: c1Name,
+              designation: row[28]?.trim() || null,
+              email: row[29]?.trim() || null,
+              phone: row[30]?.trim() || null,
+              is_primary: true,
+            });
           }
 
-          if (row[32] && row[34] && vendor?.id) {
-            // Delete existing secondary contact if updating
-            if (isUpdate) {
-              await this.supabaseService
-                .getClient(accessToken)
-                .from('vendor_contacts')
-                .delete()
-                .eq('vendor_id', vendor.id)
-                .eq('is_primary', false);
-            }
-
-            await this.supabaseService
-              .getClient(accessToken)
-              .from('vendor_contacts')
-              .insert({
-                vendor_id: vendor.id,
-                name: row[32],
-                designation: row[33],
-                email: row[34],
-                phone: row[35],
-                is_primary: false,
-              });
+          // Contact 2
+          const c2Name = row[31]?.trim();
+          if (c2Name && vendor?.id) {
+            await this.supabaseService.getClient(accessToken).from('vendor_contacts').insert({
+              vendor_id: vendor.id,
+              name: c2Name,
+              designation: row[32]?.trim() || null,
+              email: row[33]?.trim() || null,
+              phone: row[34]?.trim() || null,
+              is_primary: false,
+            });
           }
 
-          if (isUpdate) {
-            results.updated++;
-          } else {
-            results.created++;
-          }
+          results.created++;
         } catch (error: any) {
           results.failed++;
-          results.errors.push({
-            row: i + 3,
-            name: row[1] || 'Unknown',
-            error: error.message,
-          });
+          results.errors.push({ row: i + 2, name: dataRows[i]?.[1] || 'Unknown', error: error.message });
         }
       }
 
       this.logger.log(
-        `CSV Import completed: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped, ${results.failed} failed`,
-        'VendorsService'
+        `File import completed: ${results.created} created, ${results.skipped} skipped, ${results.failed} failed`,
+        'VendorsService',
       );
 
       return {
-        message: `Import completed: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped (duplicates), ${results.failed} failed.`,
+        message: `Import completed: ${results.created} created, ${results.skipped} skipped (duplicates), ${results.failed} failed.`,
         ...results,
       };
     } catch (error: any) {
-      this.logger.error(`CSV import failed: ${error.message}`, 'VendorsService');
-      throw new InternalServerErrorException(`Failed to import CSV: ${error.message}`);
+      this.logger.error(`File import failed: ${error.message}`, 'VendorsService');
+      throw new InternalServerErrorException(`Failed to import file: ${error.message}`);
     }
+  }
+
+  private async parseExcelBuffer(buffer: Buffer): Promise<string[][]> {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const worksheet = workbook.worksheets[0];
+
+    const rows: string[][] = [];
+    worksheet.eachRow({ includeEmpty: false }, (row: any) => {
+      const values: string[] = [];
+      row.eachCell({ includeEmpty: true }, (cell: any) => {
+        const val = cell.value;
+        if (val === null || val === undefined) {
+          values.push('');
+        } else if (typeof val === 'object') {
+          if (val.text !== undefined) values.push(String(val.text).trim());
+          else if (val.result !== undefined) values.push(String(val.result).trim());
+          else if (val.hyperlink !== undefined) values.push(String(val.hyperlink).trim());
+          else values.push(String(val).trim());
+        } else {
+          values.push(String(val).trim());
+        }
+      });
+      rows.push(values);
+    });
+
+    return rows;
+  }
+
+  private parseCsvRows(csvContent: string): string[][] {
+    return csvContent
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => this.parseCSVLine(line));
   }
 
   // ============================================================================
@@ -950,11 +937,6 @@ export class VendorsService {
 
     result.push(current.trim());
     return result;
-  }
-
-  private mapCSVToVendor(row: string[], rowNumber: number): any {
-    // This method can be used for additional mapping if needed
-    return row;
   }
 
   private parseBoolean(value: string): boolean {

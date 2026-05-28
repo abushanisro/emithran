@@ -10,8 +10,8 @@ import { apiClient } from './client';
 // ========================================
 
 export type CalculatorType = 'single' | 'multi_step' | 'dashboard';
-export type FieldType = 'number' | 'text' | 'select' | 'database_lookup' | 'calculated' | 'multi_select' | 'const' | 'bom';
-export type DataSource = 'lhr' | 'mhr' | 'raw_materials' | 'processes' | 'manual';
+export type FieldType = 'number' | 'text' | 'select' | 'database_lookup' | 'calculated' | 'multi_select' | 'const' | 'bom' | 'table_lookup';
+export type DataSource = 'lhr' | 'mhr' | 'raw_materials' | 'processes' | 'manual' | 'sheet_metal_lookup';
 export type FormulaType = 'expression' | 'multi_step' | 'conditional';
 export type DisplayFormat = 'number' | 'currency' | 'percentage';
 
@@ -354,6 +354,11 @@ export const calculatorsApi = {
 
   getExecution: async (executionId: string): Promise<CalculatorExecution> => {
     return apiClient.get<CalculatorExecution>(`/calculators/executions/${executionId}`) as Promise<CalculatorExecution>;
+  },
+
+  // Sheet metal parameterized lookup tables
+  sheetMetalLookup: async (tableName: string, params: Record<string, any>): Promise<{ value: number | null; kerf?: number; sampleQty?: number; row?: any }> => {
+    return apiClient.post('/calculators/sheet-metal/lookup', { tableName, params }) as Promise<any>;
   },
 
   // Database lookups
