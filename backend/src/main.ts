@@ -64,12 +64,11 @@ async function bootstrap() {
         configService.get('CORS_ORIGIN', 'http://localhost:3000'),
         'http://localhost:3000',
         'http://127.0.0.1:3000',
-        'https://mithran-six.vercel.app',
-        'https://mithran-five.vercel.app',
         // Railway public domain (automatically available in production)
         process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null,
       ].filter(Boolean);
-      if (!requestOrigin || allowedOrigins.includes(requestOrigin) || allowedOrigins.some(o => requestOrigin.startsWith(o))) {
+      const isVercelApp = requestOrigin?.match(/^https:\/\/mithran(-[a-z0-9]+)?\.vercel\.app$/);
+      if (!requestOrigin || isVercelApp || allowedOrigins.includes(requestOrigin) || allowedOrigins.some(o => requestOrigin.startsWith(o))) {
         callback(null, true);
       } else {
         callback(null, false);
