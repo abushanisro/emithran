@@ -52,6 +52,17 @@ export function useMHRRecord(id: string, options?: { enabled?: boolean; retry?: 
   });
 }
 
+export function useMHRProcessGroups() {
+  return useQuery({
+    queryKey: [...mhrKeys.all, 'process-groups'],
+    queryFn: () => mhrApi.getProcessGroups(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+  });
+}
+
 export function useCreateMHR() {
   const queryClient = useQueryClient();
 

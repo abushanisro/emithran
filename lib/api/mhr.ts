@@ -166,6 +166,13 @@ export const mhrApi = {
   },
 
   /**
+   * Get distinct process groups from MHR records
+   */
+  getProcessGroups: async (): Promise<string[]> => {
+    return apiClient.get<string[]>('/mhr/process-groups', { silent: true, retry: false });
+  },
+
+  /**
    * Get MHR record by ID
    */
   getById: async (id: string): Promise<MHRRecord> => {

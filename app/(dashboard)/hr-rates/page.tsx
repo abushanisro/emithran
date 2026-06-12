@@ -566,20 +566,18 @@ export default function HRRatesPage() {
                   <TableHeader className="sticky top-0 z-20 bg-card">
                     <TableRow className="bg-card hover:bg-card border-b-2">
                       <TableHead className="h-9 px-2 text-xs sticky left-0 bg-card z-20 w-[130px] border-r border-border">Machine Name</TableHead>
+                      <TableHead className="h-9 px-2 text-xs w-[72px]">Location</TableHead>
                       <TableHead className="h-9 px-2 text-xs w-[110px]">Process Group</TableHead>
                       <TableHead className="h-9 px-2 text-xs w-[100px]">Machine Class</TableHead>
                       <TableHead className="h-9 px-2 text-xs w-[90px]">Automation</TableHead>
                       <TableHead className="h-9 px-2 text-xs w-[70px]">Wage Grade</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-center w-[48px]">Ops</TableHead>
-                      <TableHead className="h-9 px-2 text-xs w-[72px]">Location</TableHead>
                       <TableHead className="h-9 px-2 text-xs w-[72px]">Mfr Cntry</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-center w-[46px]">Shfts</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-center w-[48px]">Hrs/Sh</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-center w-[52px]">Dys/Yr</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[80px]">Px (USD)</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[76px] text-primary font-semibold">MHR ₹/hr</TableHead>
-                      <TableHead className="h-9 px-2 text-xs text-right w-[72px] text-blue-600">LHR ₹/hr</TableHead>
-                      <TableHead className="h-9 px-2 text-xs text-right w-[68px] text-green-600">USD LHR</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[84px]">Annual ₹</TableHead>
                       <TableHead className="h-9 px-2 text-xs sticky right-0 bg-card z-20 w-[82px] border-l border-border text-center">Actions</TableHead>
                     </TableRow>
@@ -588,20 +586,18 @@ export default function HRRatesPage() {
                     {mhrData.records.map(record => (
                       <TableRow key={record.id} className="hover:bg-muted/50">
                         <TableCell className="py-1 px-1.5 font-medium sticky left-0 bg-card z-10 border-r border-border">{record.machineName}</TableCell>
+                        <TableCell className="py-1.5 px-2">{record.location}</TableCell>
                         <TableCell className="py-1.5 px-2">{record.processGroup || record.commodityCode || '-'}</TableCell>
                         <TableCell className="py-1.5 px-2">{record.machineClass || '-'}</TableCell>
                         <TableCell className="py-1.5 px-2">{record.automationLevel || '-'}</TableCell>
                         <TableCell className="py-1.5 px-2">{record.wageGrade || '-'}</TableCell>
                         <TableCell className="py-1.5 px-2 text-center">{record.operators ?? '-'}</TableCell>
-                        <TableCell className="py-1.5 px-2">{record.location}</TableCell>
                         <TableCell className="py-1.5 px-2">{record.manufacturerCountry || '-'}</TableCell>
                         <TableCell className="py-1.5 px-2 text-center">{record.shiftsPerDay}</TableCell>
                         <TableCell className="py-1.5 px-2 text-center">{record.hoursPerShift}</TableCell>
                         <TableCell className="py-1.5 px-2 text-center">{record.workingDaysPerYear}</TableCell>
                         <TableCell className="py-1.5 px-2 text-right">{record.machinePriceUsd ? `$${record.machinePriceUsd.toLocaleString()}` : '-'}</TableCell>
                         <TableCell className="py-1.5 px-2 text-right font-semibold text-primary">{formatCurrency(record.calculations.totalMachineHourRate)}</TableCell>
-                        <TableCell className="py-1.5 px-2 text-right text-blue-600">{record.lhrInrPerHr ? formatCurrency(record.lhrInrPerHr) : '-'}</TableCell>
-                        <TableCell className="py-1.5 px-2 text-right text-green-600">{record.usdLhrTotal ? `$${record.usdLhrTotal.toFixed(2)}` : '-'}</TableCell>
                         <TableCell className="py-1.5 px-2 text-right">{formatCurrency(record.calculations.totalAnnualCost)}</TableCell>
                         <TableCell className="py-1.5 px-2 sticky right-0 bg-card z-10 border-l border-border">
                           <div className="flex justify-center gap-1">

@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 
 interface Props { projectId: string }
 
-type AnalysisView = 'pareto' | 'waterfall' | 'supplier' | 'affinity' | 'qfd';
+type AnalysisView = 'all' | 'pareto' | 'waterfall' | 'supplier' | 'affinity' | 'qfd';
 
 const ANALYSIS_OPTIONS: { value: AnalysisView; label: string; description: string; ai: boolean }[] = [
   { value: 'pareto',    label: 'Pareto Analysis (80/20)',       description: 'Top cost drivers by annual spend',          ai: false },
@@ -385,7 +385,7 @@ function Legend3() {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function CostAnalysis({ projectId }: Props) {
-  const [activeView, setActiveView] = useState<AnalysisView>('pareto');
+  const [activeView, setActiveView] = useState<AnalysisView>('all');
   const [aiResult, setAiResult] = useState<CostAnalysisResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [calculatingAll, setCalculatingAll] = useState(false);
@@ -399,7 +399,7 @@ export function CostAnalysis({ projectId }: Props) {
   const costs = (shouldCosts as any[]) ?? [];
   const shouldCostMap = new Map(costs.map((c) => [c.partNumber, c]));
 
-  const currentOption = ANALYSIS_OPTIONS.find((o) => o.value === activeView)!;
+  const currentOption = ANALYSIS_OPTIONS.find((o) => o.value === activeView) ?? ANALYSIS_OPTIONS[0]!;
 
   const handleRunAI = async () => {
     if (!items.length) { toast.error('Add BOM items first'); return; }
@@ -461,60 +461,172 @@ export function CostAnalysis({ projectId }: Props) {
   return (
     <div className="space-y-6">
 
-      {/* ── Analysis selector + action button ── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 min-w-[230px] justify-between">
-                    <span className="font-medium">{currentOption.label}</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64">
-                  {ANALYSIS_OPTIONS.map((opt) => (
-                    <DropdownMenuItem
-                      key={opt.value}
-                      onClick={() => setActiveView(opt.value)}
-                      className="flex flex-col items-start gap-0.5 py-2.5"
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <span className="font-medium text-sm">{opt.label}</span>
-                        {opt.ai && (
-                          <Badge variant="secondary" className="text-[9px] ml-auto">AI</Badge>
-                        )}
-                        {activeView === opt.value && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-primary ml-auto" />
-                        )}
-                      </div>
-                      <span className="text-[11px] text-muted-foreground">{opt.description}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <CardDescription className="text-xs hidden sm:block">{currentOption.description}</CardDescription>
-            </div>
-
-            {currentOption.ai ? (
-              <Button size="sm" onClick={handleRunAI} disabled={aiLoading || !items.length}>
-                {aiLoading
-                  ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Analyzing…</>
-                  : <><Sparkles className="h-3.5 w-3.5 mr-1.5" />{aiResult ? 'Re-run AI' : 'Run AI Analysis'}</>}
+      {/* ── Filter dropdown + AI button ── */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 min-w-[230px] justify-between">
+                <span className="font-medium">
+                  {activeView === 'all' ? 'All Analyses' : currentOption.label}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
-            ) : null}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuItem
+                onClick={() => setActiveView('all' as AnalysisView)}
+                className="flex flex-col items-start gap-0.5 py-2.5"
+              >
+                <div className="flex items-center gap-2 w-full">
+                  <span className="font-medium text-sm">All Analyses</span>
+                  {activeView === ('all' as AnalysisView) && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary ml-auto" />
+                  )}
+                </div>
+                <span className="text-[11px] text-muted-foreground">Show all views side by side</span>
+              </DropdownMenuItem>
+              {ANALYSIS_OPTIONS.map((opt) => (
+                <DropdownMenuItem
+                  key={opt.value}
+                  onClick={() => setActiveView(opt.value)}
+                  className="flex flex-col items-start gap-0.5 py-2.5"
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    <span className="font-medium text-sm">{opt.label}</span>
+                    {opt.ai && (
+                      <Badge variant="secondary" className="text-[9px] ml-auto">AI</Badge>
+                    )}
+                    {activeView === opt.value && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary ml-auto" />
+                    )}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">{opt.description}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {activeView !== ('all' as AnalysisView) && (
+            <span className="text-xs text-muted-foreground hidden sm:block">{currentOption.description}</span>
+          )}
+        </div>
+
+        <Button size="sm" onClick={handleRunAI} disabled={aiLoading || !items.length}>
+          {aiLoading
+            ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Analyzing…</>
+            : <><Sparkles className="h-3.5 w-3.5 mr-1.5" />{aiResult ? 'Re-run AI' : 'Run AI Analysis'}</>}
+        </Button>
+      </div>
+
+      {/* ── Analysis views ── */}
+      {activeView === ('all' as AnalysisView) ? (
+        <div className="space-y-4">
+          {/* Row 1: Pareto full width */}
+          <Card id="section-pareto">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Pareto Analysis (80/20)</CardTitle>
+              <CardDescription className="text-xs">Top cost drivers by annual spend</CardDescription>
+            </CardHeader>
+            <CardContent><ParetoView items={items} /></CardContent>
+          </Card>
+
+          {/* Row 2: Waterfall + Supplier side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card id="section-waterfall">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Cost Waterfall by Subsystem</CardTitle>
+                <CardDescription className="text-xs">Spend breakdown by BOM level / assembly</CardDescription>
+              </CardHeader>
+              <CardContent><WaterfallView items={items} /></CardContent>
+            </Card>
+            <Card id="section-supplier">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Supplier Spend Analysis</CardTitle>
+                <CardDescription className="text-xs">Spend ranking, tail-spend &amp; consolidation</CardDescription>
+              </CardHeader>
+              <CardContent><SupplierView items={items} /></CardContent>
+            </Card>
           </div>
-        </CardHeader>
-        <CardContent>
-          {activeView === 'pareto'    && <ParetoView items={items} />}
-          {activeView === 'waterfall' && <WaterfallView items={items} />}
-          {activeView === 'supplier'  && <SupplierView items={items} />}
-          {activeView === 'affinity'  && <AffinityView result={aiResult} />}
-          {activeView === 'qfd'       && <QFDView result={aiResult} />}
-        </CardContent>
-      </Card>
+
+          {/* Row 3: Affinity + QFD side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card id="section-affinity">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  Affinity Mapping
+                  <Badge variant="secondary" className="text-[9px]">AI</Badge>
+                </CardTitle>
+                <CardDescription className="text-xs">AI-clustered functional groups</CardDescription>
+              </CardHeader>
+              <CardContent><AffinityView result={aiResult} /></CardContent>
+            </Card>
+            <Card id="section-qfd">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  QFD Matrix
+                  <Badge variant="secondary" className="text-[9px]">AI</Badge>
+                </CardTitle>
+                <CardDescription className="text-xs">Customer needs vs. part functions</CardDescription>
+              </CardHeader>
+              <CardContent><QFDView result={aiResult} /></CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : (
+        <>
+          {activeView === 'pareto' && (
+            <Card id="section-pareto">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Pareto Analysis (80/20)</CardTitle>
+                <CardDescription className="text-xs">Top cost drivers by annual spend</CardDescription>
+              </CardHeader>
+              <CardContent><ParetoView items={items} /></CardContent>
+            </Card>
+          )}
+          {activeView === 'waterfall' && (
+            <Card id="section-waterfall">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Cost Waterfall by Subsystem</CardTitle>
+                <CardDescription className="text-xs">Spend breakdown by BOM level / assembly</CardDescription>
+              </CardHeader>
+              <CardContent><WaterfallView items={items} /></CardContent>
+            </Card>
+          )}
+          {activeView === 'supplier' && (
+            <Card id="section-supplier">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Supplier Spend Analysis</CardTitle>
+                <CardDescription className="text-xs">Spend ranking, tail-spend &amp; consolidation</CardDescription>
+              </CardHeader>
+              <CardContent><SupplierView items={items} /></CardContent>
+            </Card>
+          )}
+          {activeView === 'affinity' && (
+            <Card id="section-affinity">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  Affinity Mapping
+                  <Badge variant="secondary" className="text-[9px]">AI</Badge>
+                </CardTitle>
+                <CardDescription className="text-xs">AI-clustered functional groups</CardDescription>
+              </CardHeader>
+              <CardContent><AffinityView result={aiResult} /></CardContent>
+            </Card>
+          )}
+          {activeView === 'qfd' && (
+            <Card id="section-qfd">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  QFD Matrix
+                  <Badge variant="secondary" className="text-[9px]">AI</Badge>
+                </CardTitle>
+                <CardDescription className="text-xs">Customer needs vs. part functions</CardDescription>
+              </CardHeader>
+              <CardContent><QFDView result={aiResult} /></CardContent>
+            </Card>
+          )}
+        </>
+      )}
 
       {/* ── Should Cost Gap — always visible ── */}
       <Card>

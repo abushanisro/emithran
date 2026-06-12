@@ -460,8 +460,26 @@ export default function DeliveryTracking({
         </CardContent>
       </Card>
 
+      {/* Map - full width */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Navigation className="h-5 w-5" />
+            Live Map Tracking
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DeliveryMap
+            deliveries={filteredDeliveries}
+            selectedDelivery={selectedDelivery}
+            onLocationUpdate={updateDeliveryLocation}
+            onDeliverySelect={setSelectedDelivery}
+          />
+        </CardContent>
+      </Card>
+
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Delivery List */}
         <div className="space-y-4">
           <Card>
@@ -481,10 +499,10 @@ export default function DeliveryTracking({
                       key={delivery.orderId}
                       data-order-id={delivery.orderId}
                       className={`p-4 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-                        selectedDelivery?.orderId === delivery.orderId 
-                          ? delivery.orderId === defaultOrderId 
-                            ? 'bg-primary/10 border-primary/50' 
-                            : 'bg-muted' 
+                        selectedDelivery?.orderId === delivery.orderId
+                          ? delivery.orderId === defaultOrderId
+                            ? 'bg-primary/10 border-primary/50'
+                            : 'bg-muted'
                           : ''
                       }`}
                       onClick={() => setSelectedDelivery(delivery)}
@@ -495,14 +513,14 @@ export default function DeliveryTracking({
                           {delivery.priority}
                         </Badge>
                       </div>
-                      
+
                       <div className="flex items-center gap-2 mb-2">
                         <div className={`w-2 h-2 rounded-full ${getStatusColor(delivery.status)}`} />
                         <span className="text-sm capitalize text-muted-foreground">
                           {delivery.status.replace('_', ' ')}
                         </span>
                       </div>
-                      
+
                       <div className="text-sm text-muted-foreground space-y-1">
                         <div className="flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
@@ -525,27 +543,8 @@ export default function DeliveryTracking({
           </Card>
         </div>
 
-        {/* Map and Details */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Map */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Navigation className="h-5 w-5" />
-                Live Map Tracking
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DeliveryMap
-                deliveries={filteredDeliveries}
-                selectedDelivery={selectedDelivery}
-                onLocationUpdate={updateDeliveryLocation}
-                onDeliverySelect={setSelectedDelivery}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Delivery Details */}
+        {/* Delivery Details */}
+        <div className="space-y-4">
           {selectedDelivery && (
             <Card>
               <CardHeader>

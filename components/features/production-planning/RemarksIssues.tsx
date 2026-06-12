@@ -180,6 +180,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
     description: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [savingRemark, setSavingRemark] = useState(false);
   const [processes, setProcesses] = useState<ProcessOption[]>([]);
   const [loadingProcesses, setLoadingProcesses] = useState(false);
   const [selectedProcess, setSelectedProcess] = useState<ProcessOption | null>(null);
@@ -604,7 +605,27 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
 
   const handleEditRemark = (remark: Remark) => {
     // TODO: Implement edit functionality
-    // TODO: Implement edit functionality
+  };
+
+  const handleUpdateRemark = async () => {
+    if (!selectedRemark) return;
+    try {
+      setSavingRemark(true);
+      await RemarksApi.updateRemark(selectedRemark.id, {
+        status: selectedRemark.status as any,
+        priority: selectedRemark.priority as any,
+      });
+      setRemarks(prev => prev.map(r =>
+        r.id === selectedRemark.id
+          ? { ...r, status: selectedRemark.status, priority: selectedRemark.priority }
+          : r
+      ));
+      toast.success('Remark updated');
+    } catch (error) {
+      toast.error('Failed to update remark');
+    } finally {
+      setSavingRemark(false);
+    }
   };
 
 
@@ -1296,9 +1317,10 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="open">Open</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="resolved">Resolved</SelectItem>
+                      <SelectItem value="OPEN">Open</SelectItem>
+                      <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                      <SelectItem value="RESOLVED">Resolved</SelectItem>
+                      <SelectItem value="CLOSED">Closed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1309,10 +1331,10 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
+                      <SelectItem value="LOW">Low</SelectItem>
+                      <SelectItem value="MEDIUM">Medium</SelectItem>
+                      <SelectItem value="HIGH">High</SelectItem>
+                      <SelectItem value="CRITICAL">Critical</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1388,6 +1410,9 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
             <DialogFooter>
               <Button variant="outline" onClick={() => setSelectedRemark(null)}>
                 Close
+              </Button>
+              <Button onClick={handleUpdateRemark} disabled={savingRemark}>
+                {savingRemark ? 'Saving...' : 'Save Changes'}
               </Button>
             </DialogFooter>
           </DialogContent>

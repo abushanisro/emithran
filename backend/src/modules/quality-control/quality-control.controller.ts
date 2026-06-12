@@ -12,6 +12,7 @@ import {
   ParseUUIDPipe,
   Logger,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
@@ -45,6 +46,10 @@ export class QualityControlController {
 
   private getUserId(user: any): string {
     return user?.id || '';
+  }
+
+  private getUserEmail(user: any): string {
+    return user?.email || user?.id || '';
   }
 
   // ============================================================================
@@ -236,6 +241,7 @@ export class QualityControlController {
       id,
       approvalData,
       this.getUserId(user),
+      this.getUserEmail(user),
     );
     return createResponse(result);
   }
@@ -251,6 +257,21 @@ export class QualityControlController {
     const result = await this.qualityInspectionService.rejectInspection(
       id,
       rejectionData,
+      this.getUserId(user),
+      this.getUserEmail(user),
+    );
+    return createResponse(result);
+  }
+
+  @Post('inspections/:id/reset')
+  @ApiOperation({ summary: 'Reset inspection status (undo approve/reject)' })
+  @ApiResponse({ status: 200, description: 'Inspection status reset successfully' })
+  async resetInspectionStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
+    const result = await this.qualityInspectionService.resetInspectionStatus(
+      id,
       this.getUserId(user),
     );
     return createResponse(result);
@@ -394,19 +415,24 @@ export class QualityControlController {
   @Get('inspections/:id/detailed-report')
   @ApiOperation({ summary: 'Get detailed inspection report' })
   @ApiResponse({ status: 200, description: 'Report retrieved successfully', type: DetailedInspectionReportResponseDto })
+  @ApiResponse({ status: 404, description: 'No detailed report created yet for this inspection' })
   async getDetailedInspectionReport(
     @Param('id', ParseUUIDPipe) inspectionId: string,
     @CurrentUser() user: User,
-  ): Promise<CustomApiResponse<DetailedInspectionReportResponseDto>> {
+  ): Promise<CustomApiResponse<DetailedInspectionReportResponseDto> | null> {
     try {
-      this.logger.log(`Fetching detailed inspection report for inspection ${inspectionId}`);
       const result = await this.qualityInspectionService.getDetailedInspectionReport(
         inspectionId,
         this.getUserId(user),
       );
+      if (result === null) {
+        throw new NotFoundException('Detailed inspection report not found');
+      }
       return createResponse(result);
     } catch (error) {
-      this.logger.error(`Failed to fetch detailed inspection report for ${inspectionId}: ${error.message}`, error.stack);
+      if (!(error instanceof NotFoundException)) {
+        this.logger.error(`Failed to fetch detailed inspection report for ${inspectionId}: ${error.message}`, error.stack);
+      }
       throw error;
     }
   }

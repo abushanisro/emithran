@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -81,42 +82,65 @@ export const ScheduleView = ({ lotId }: ScheduleViewProps) => {
   const [bomFormData, setBomFormData] = useState<any>({});
   const [taskFormData, setTaskFormData] = useState<any>({});
   const [showBOMView, setShowBOMView] = useState(true);
-  const [loading, setLoading] = useState(true);
-  
-  // Use state for process data
+  const [isExporting, setIsExporting] = useState(false);
+  const queryClient = useQueryClient();
+
+  // React Query with staleTime so tab switches don't trigger a re-fetch
+  const { data: rawProcessResponse, isLoading } = useQuery({
+    queryKey: ['schedule-processes', lotId],
+    queryFn: () => productionPlanningApi.getProcessesByLot(lotId),
+    enabled: !!lotId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const loading = isLoading || isExporting;
+
+  // Use state for process data (kept for optimistic updates during editing)
   const [processesData, setProcessesData] = useState<ProcessStep[]>([]);
   const processesState = {
     data: processesData,
     setData: setProcessesData
   };
 
-  // Fetch real processes data and organize them by sections
+  // Transform raw API response into UI ProcessStep objects
   useEffect(() => {
-    const fetchProcesses = async () => {
-      if (!lotId) return;
-      
-      try {
-        setLoading(true);
-        const response = await productionPlanningApi.getProcessesByLot(lotId);
-        
-        console.log(`🔍 ScheduleView - Raw API response for lot ${lotId}:`, {
-          responseExists: !!response,
-          responseLength: Array.isArray(response) ? response.length : 0,
-          responseType: typeof response,
-          sampleProcess: Array.isArray(response) && response[0] ? {
-            id: response[0].id,
-            processName: response[0].process_name || response[0].processName,
-            subtasksCount: (response[0].subtasks || []).length,
-            sampleSubtask: response[0].subtasks?.[0] ? {
-              id: response[0].subtasks[0].id,
-              taskName: response[0].subtasks[0].task_name || response[0].subtasks[0].taskName,
-              bomRequirementsCount: (response[0].subtasks[0].bom_requirements || response[0].subtasks[0].bomRequirements || []).length
-            } : null
-          } : null
-        });
+    const transformProcesses = () => {
+      if (!rawProcessResponse) return;
 
-// Transform API data to match UI expectations
-        const processesArray = Array.isArray(response) ? response : [];
+      try {
+        const response = rawProcessResponse;
+
+        // apiClient returns the ApiResponse object: { data: [...], error, timestamp }
+        const rawArray: any[] = Array.isArray(response)
+          ? response
+          : Array.isArray((response as any)?.data)
+            ? (response as any).data
+            : [];
+
+        // Deduplicate by process_sequence — merge subtasks from all duplicate records,
+        // then deduplicate subtasks by task name (keeps first occurrence)
+        const bySeq = new Map<number, any>();
+        rawArray.forEach(p => {
+          const seq = p.process_sequence ?? p.processSequence ?? 0;
+          const pSubs: any[] = p.subtasks || p.subTasks || [];
+          if (!bySeq.has(seq)) {
+            bySeq.set(seq, { ...p, subtasks: [...pSubs] });
+          } else {
+            const canonical = bySeq.get(seq)!;
+            const seenNames = new Set(
+              (canonical.subtasks as any[]).map((s: any) => (s.task_name || s.taskName || '').toLowerCase())
+            );
+            pSubs.forEach(s => {
+              const name = (s.task_name || s.taskName || '').toLowerCase();
+              if (!seenNames.has(name)) {
+                seenNames.add(name);
+                canonical.subtasks.push(s);
+              }
+            });
+          }
+        });
+        const processesArray = Array.from(bySeq.values())
+          .sort((a, b) => (a.process_sequence ?? a.processSequence ?? 0) - (b.process_sequence ?? b.processSequence ?? 0));
         const transformedProcesses = processesArray.map((process: any) => {
           // Calculate estimated duration from process data or use default
           const estimatedHours = process.estimated_hours || process.estimatedHours || process.estimatedDuration || 
@@ -192,16 +216,10 @@ return {
                 ),
                 startTime: subtask.planned_start_date || subtask.startTime,
                 endTime: subtask.planned_end_date || subtask.endTime,
+                operatorName: subtask.assigned_operator || subtask.assignedOperator || subtask.responsiblePerson || '',
                 responsiblePersonName: subtask.assigned_operator || subtask.assignedOperator || subtask.responsiblePerson || 'Unassigned',
                 bomRequirements: (() => {
                   const rawBomReqs = subtask.bom_requirements || subtask.bomRequirements || [];
-                  console.log(`🔍 ScheduleView - Processing BOM for subtask "${subtask.task_name || subtask.taskName}":`, {
-                    subtaskId: subtask.id,
-                    rawBomReqsCount: rawBomReqs.length,
-                    rawBomReqs: rawBomReqs.slice(0, 3),
-                    hasRequirements: rawBomReqs.length > 0
-                  });
-                  
                   return rawBomReqs.map((bomReq: any, index: number) => ({
                     id: bomReq.id || bomReq.bom_item_id || `bom-${index}`,
                     partId: bomReq.bomItemId || bomReq.bom_item_id || bomReq.id,
@@ -221,15 +239,12 @@ return {
         
         processesState.setData(transformedProcesses);
       } catch (error) {
-        // Set empty array on error - the UI will show the empty state
         processesState.setData([]);
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchProcesses();
-  }, [lotId]);
+    transformProcesses();
+  }, [rawProcessResponse]);
 
   const processes = processesState.data;
   
@@ -254,17 +269,6 @@ return {
     processes.forEach(process => {
       const processSection = process.sectionName || 'Process';
       
-      console.log(`🔍 ScheduleView - Grouping process "${process.name}" (Section: ${processSection}):`, {
-        processId: process.id,
-        subTasksCount: process.subTasks?.length || 0,
-        subTasks: (process.subTasks || []).map(st => ({
-          id: st.id,
-          name: st.name,
-          taskName: st.name,
-          bomReqCount: st.bomRequirements?.length || 0
-        }))
-      });
-      
       // Separate subtasks by intended section
       const subtasksBySection: Record<string, any[]> = {};
       sectionOrder.forEach(section => {
@@ -278,17 +282,6 @@ return {
         const taskName = subtask.name || '';
         const sectionMatch = taskName.match(/^\[([^\]]+)\]/);
         const intendedSection = sectionMatch ? sectionMatch[1] : processSection;
-        
-        console.log(`🔍 ScheduleView - Processing subtask "${taskName}":`, {
-          subtaskId: subtask.id,
-          originalSection: processSection,
-          intendedSection: intendedSection,
-          bomRequirementsCount: subtask.bomRequirements?.length || 0,
-          bomRequirements: subtask.bomRequirements?.map(b => ({
-            partNumber: b.partNumber,
-            partName: b.partName
-          })) || []
-        });
         
         if (intendedSection && subtasksBySection[intendedSection]) {
           // Clean the task name by removing section prefix
@@ -566,88 +559,19 @@ return {
     }
   };
 
-  // Function to fetch latest data for export
+  // Force a fresh fetch (used by PDF export)
   const fetchLatestData = async () => {
     if (!lotId) return;
-    
-    try {
-      const response = await productionPlanningApi.getProcessesByLot(lotId);
-      
-      // Transform API data to match UI expectations (same as in useEffect)
-      const responseArray = Array.isArray(response) ? response : [];
-      const transformedProcesses = responseArray.map((process: any) => {
-        const estimatedHours = process.estimated_hours || process.estimatedHours || process.estimatedDuration || 
-                             (process.planned_start_date && process.planned_end_date ? 
-                               Math.round((new Date(process.planned_end_date).getTime() - new Date(process.planned_start_date).getTime()) / (1000 * 60 * 60)) : 
-                               (process.startDate && process.endDate ? 
-                                Math.round((new Date(process.endDate).getTime() - new Date(process.startDate).getTime()) / (1000 * 60 * 60)) : 
-                                72));
-        
-        return {
-          id: process.id,
-          name: process.process_name || process.processName || 'Unnamed Process',
-          status: process.status?.toUpperCase() || 'PLANNED',
-          estimatedDuration: estimatedHours,
-          actualDuration: calculateActualHours(
-            process.planned_start_date || process.startDate || process.createdAt,
-            process.planned_end_date || process.endDate || process.completedAt,
-            estimatedHours,
-            process.status?.toUpperCase() || 'PLANNED'
-          ),
-          sequence: process.process_sequence || process.processSequence || 0,
-          startDate: process.planned_start_date || process.startDate,
-          endDate: process.planned_end_date || process.endDate,
-          bomRequirements: [],
-          subTasks: (process.subtasks || []).map((subtask: any) => {
-            const subEstimatedHours = subtask.estimated_hours || subtask.estimatedHours || subtask.estimatedDuration || 
-                                    (subtask.planned_start_date && subtask.planned_end_date ? 
-                                     Math.round((new Date(subtask.planned_end_date).getTime() - new Date(subtask.planned_start_date).getTime()) / (1000 * 60 * 60)) : 
-                                     (subtask.startTime && subtask.endTime ? 
-                                      Math.round((new Date(subtask.endTime).getTime() - new Date(subtask.startTime).getTime()) / (1000 * 60 * 60)) : 
-                                      24));
-            
-            return {
-              id: subtask.id,
-              name: subtask.task_name || subtask.taskName || 'Unnamed Subtask',
-              status: subtask.status?.toUpperCase() || 'PENDING',
-              estimatedDuration: subEstimatedHours,
-              actualDuration: calculateActualHours(
-                subtask.planned_start_date || subtask.startTime || subtask.createdAt,
-                subtask.planned_end_date || subtask.endTime || subtask.completedAt,
-                subEstimatedHours,
-                subtask.status?.toUpperCase() || 'PENDING'
-              ),
-              sequence: subtask.task_sequence || subtask.taskSequence || 0,
-              startTime: subtask.planned_start_date || subtask.startTime,
-              endTime: subtask.planned_end_date || subtask.endTime,
-              responsiblePersonName: subtask.assigned_operator || subtask.assignedOperator || subtask.responsible_person || 'Unassigned',
-              bomRequirements: (subtask.bom_requirements || subtask.bomRequirements || []).map((bomReq: any) => ({
-                id: bomReq.id,
-                partNumber: bomReq.part_number || bomReq.partNumber || bomReq.bom_item?.part_number || 'N/A',
-                name: bomReq.part_name || bomReq.partName || bomReq.name || bomReq.bom_item?.name || bomReq.bom_item?.part_number || 'Unnamed Part',
-                quantity: bomReq.required_quantity || bomReq.requiredQuantity || 0,
-                unit: bomReq.unit || bomReq.bom_item?.unit || 'pcs',
-                status: 'REQUIRED'
-              }))
-            };
-          }).sort((a: any, b: any) => a.sequence - b.sequence)
-        };
-      }).sort((a: any, b: any) => a.sequence - b.sequence);
-      
-      // Update the state with fresh data
-      processesState.setData(transformedProcesses);
-      
-    } catch (error) {
-    }
+    await queryClient.invalidateQueries({ queryKey: ['schedule-processes', lotId] });
   };
 
   // Export to PDF functionality
   const exportToPDF = async () => {
     try {
       // First refresh the data to ensure we have the latest information
-      setLoading(true);
+      setIsExporting(true);
       await fetchLatestData();
-      setLoading(false);
+      setIsExporting(false);
 
       // Create a new window for the PDF content
       const printWindow = window.open('', '_blank', 'width=1200,height=800');

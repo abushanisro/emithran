@@ -92,6 +92,7 @@ export class ProductionPlanningController {
     @Query('status') status?: string,
     @Query('bomId') bomId?: string,
     @Query('priority') priority?: string,
+    @Query('projectId') projectId?: string,
   ): Promise<ApiResponse<ProductionLotResponseDto[]>> {
     try {
       this.logger.log(`Fetching production lots for user ${this.getUserId(user)}`);
@@ -99,6 +100,7 @@ export class ProductionPlanningController {
         status,
         bomId,
         priority,
+        projectId,
       });
       return createResponse(result);
     } catch (error) {

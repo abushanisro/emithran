@@ -193,9 +193,9 @@ export default function VendorDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-900 border-b sticky top-0 z-10">
+      <div className="bg-card border-b sticky top-0 z-10">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -420,7 +420,7 @@ export default function VendorDetailPage() {
                         </thead>
                         <tbody>
                           {equipment.map((equip) => (
-                            <tr key={equip.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-900">
+                            <tr key={equip.id} className="border-b hover:bg-primary/5 transition-colors cursor-pointer">
                               <td className="py-3 px-4">{equip.manufacturer || '-'}</td>
                               <td className="py-3 px-4">{equip.model || '-'}</td>
                               <td className="py-3 px-4">
@@ -651,7 +651,7 @@ export default function VendorDetailPage() {
 
                   return (
                     <TabsContent key={category} value={category} className="mt-0">
-                      <div className="grid grid-cols-1 gap-2 max-h-80 overflow-y-auto p-3 border rounded-md bg-gray-50 dark:bg-gray-900">
+                      <div className="grid grid-cols-1 gap-2 max-h-80 overflow-y-auto p-3 border rounded-md bg-muted/30">
                         {categoryTypes.map((type) => (
                           <Button
                             key={type.id}

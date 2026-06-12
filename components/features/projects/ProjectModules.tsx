@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { GlareCard } from '@/components/ui/glare-card';
 import {
-  ArrowRight,
   CheckCircle2,
   Clock,
   AlertCircle,
@@ -18,6 +17,7 @@ interface ModuleCardProps {
   borderColor: string;
   status: 'active' | 'available' | 'coming-soon';
   itemCount?: number;
+  imageOutside?: boolean;
   onClick?: () => void;
 }
 
@@ -27,6 +27,7 @@ function ModuleCard({
   borderColor,
   status,
   itemCount,
+  imageOutside = false,
   onClick,
 }: ModuleCardProps) {
   const isDisabled = status === 'coming-soon';
@@ -51,6 +52,8 @@ function ModuleCard({
         return 'https://png.pngtree.com/thumb_back/fh260/background/20250415/pngtree-logistic-and-transportation-concept-showing-a-world-map-network-with-freight-image_17184384.jpg';
       case 'Benchmark Analysis':
         return 'https://thumbs.dreamstime.com/b/benchmark-businessman-hologram-concept-benchmark-businessman-hologram-concept-futuristic-177138441.jpg';
+      case 'VAVE':
+        return 'https://gidelkocal.com/wp-content/uploads/2023/10/3-value-engineering-examples-in-construction2.png';
       default:
         return null;
     }
@@ -59,9 +62,17 @@ function ModuleCard({
   const moduleImage = getModuleImage(title);
 
   return (
-    <div className="w-full">
-      <GlareCard 
-        className={`p-3 ${!isDisabled ? 'cursor-pointer hover:bg-muted/30 transition-colors' : 'cursor-not-allowed opacity-60'}`}
+    <div className="w-full flex flex-col">
+      {/* Image outside card */}
+      {moduleImage && imageOutside && (
+        <img
+          src={moduleImage}
+          alt={title}
+          className="w-full h-32 object-cover rounded-t-xl"
+        />
+      )}
+      <GlareCard
+        className={`p-3 ${imageOutside && moduleImage ? 'rounded-t-none' : ''} ${!isDisabled ? 'cursor-pointer hover:bg-muted/30 transition-colors' : 'cursor-not-allowed opacity-60'}`}
         onClick={() => {
           if (!isDisabled && onClick) {
             onClick();
@@ -76,11 +87,11 @@ function ModuleCard({
             </Badge>
           )}
 
-          {/* Module Image */}
-          {moduleImage && (
+          {/* Module Image (inside card, for non-outside images) */}
+          {moduleImage && !imageOutside && (
             <div className="rounded-md overflow-hidden h-20 bg-secondary/50">
-              <img 
-                src={moduleImage} 
+              <img
+                src={moduleImage}
                 alt={title}
                 className="w-full h-full object-cover"
               />
@@ -103,7 +114,7 @@ function ModuleCard({
           {/* Button */}
           <Button
             size="sm"
-            className="w-auto px-3 gap-1 group bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 hover:border-primary/50 h-7 text-xs mx-auto"
+            className="w-auto px-3 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 hover:border-primary/50 h-7 text-xs mx-auto"
             variant="outline"
             disabled={isDisabled}
             onClick={(e) => {
@@ -113,14 +124,7 @@ function ModuleCard({
               }
             }}
           >
-            {isDisabled ? (
-              'Coming Soon'
-            ) : (
-              <>
-                Open Module
-                <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
-              </>
-            )}
+            {isDisabled ? 'Coming Soon' : 'Open Module'}
           </Button>
         </div>
       </GlareCard>

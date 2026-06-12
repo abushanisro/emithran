@@ -50,8 +50,8 @@ CREATE TABLE raw_material_cost_records (
     overhead_cost DECIMAL(15, 4) DEFAULT 0,
     total_cost_per_unit DECIMAL(15, 4) DEFAULT 0,
     effective_cost_per_unit DECIMAL(15, 4) DEFAULT 0,
-    material_utilization_rate DECIMAL(5, 2) DEFAULT 0,
-    scrap_rate DECIMAL(5, 2) DEFAULT 0,
+    material_utilization_rate DECIMAL(15, 4) DEFAULT 0,
+    scrap_rate DECIMAL(15, 4) DEFAULT 0,
 
     -- Full calculation breakdown (JSONB for detailed breakdown)
     calculation_breakdown JSONB DEFAULT '{}'::jsonb,

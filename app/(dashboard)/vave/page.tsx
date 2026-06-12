@@ -182,9 +182,14 @@ export default function VavePage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projectList.map((project) => (
+            <div key={project.id} className="flex flex-col">
+              <img
+                src="https://gidelkocal.com/wp-content/uploads/2023/10/3-value-engineering-examples-in-construction2.png"
+                alt="Value Engineering"
+                className="w-full h-32 object-cover rounded-t-xl"
+              />
             <Card
-              key={project.id}
-              className="cursor-pointer hover:shadow-md transition-shadow group"
+              className="cursor-pointer hover:shadow-md transition-shadow group rounded-t-none border-t-0"
               onClick={() => { setSelectedProjectId(project.id); setStep('detail'); }}
             >
               <CardHeader className="pb-2">
@@ -236,6 +241,7 @@ export default function VavePage() {
                 </Button>
               </CardContent>
             </Card>
+            </div>
           ))}
         </div>
       )}

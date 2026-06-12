@@ -109,6 +109,11 @@ export class CreateQualityInspectionDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsUUID()
+  lotId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
   inspector?: string;
 

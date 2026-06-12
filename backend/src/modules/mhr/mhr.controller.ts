@@ -43,6 +43,12 @@ export class MHRController {
     }
   }
 
+  @Get('process-groups')
+  @ApiOperation({ summary: 'Get distinct process groups from MHR records' })
+  async getProcessGroups(@CurrentUser() user: User, @AccessToken() token: string): Promise<string[]> {
+    return this.mhrService.getDistinctProcessGroups(user.id, token);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get MHR record by ID' })
   @ApiResponse({ status: 200, description: 'MHR record retrieved successfully', type: MHRResponseDto })

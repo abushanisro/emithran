@@ -202,6 +202,8 @@ export default function DeliveryOrderWorkflow({
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddAddress, setShowAddAddress] = useState(false);
+  const [showAddPickupAddress, setShowAddPickupAddress] = useState(false);
+  const [addressSubmitAttempted, setAddressSubmitAttempted] = useState(false);
   const [partsPhotos, setPartsPhotos] = useState<UploadedFile[]>([]);
   const [packingPhotos, setPackingPhotos] = useState<UploadedFile[]>([]);
   const [documents, setDocuments] = useState<UploadedFile[]>([]);
@@ -422,6 +424,7 @@ export default function DeliveryOrderWorkflow({
   };
 
   const handleCreateAddress = async () => {
+    setAddressSubmitAttempted(true);
     // Enhanced validation for Indian addresses
     const requiredFields = {
       contactPerson: 'Contact person',
@@ -472,6 +475,8 @@ export default function DeliveryOrderWorkflow({
       }
 
       setShowAddAddress(false);
+      setShowAddPickupAddress(false);
+      setAddressSubmitAttempted(false);
       setNewAddress({ projectId, addressType: 'delivery', country: 'India' });
     } catch (error) {
       toast.error('Failed to create address. Please try again.');
@@ -595,7 +600,7 @@ export default function DeliveryOrderWorkflow({
   };
 
   const validatePincode = (pincode: string) => /^[1-9][0-9]{5}$/.test(pincode);
-  const validatePhone = (phone: string) => /^[6-9]\d{9}$/.test(phone.replace(/\D/g, ''));
+  const validatePhone = (phone: string) => /^[+\d][\d\s\-().]{5,19}$/.test(phone);
 
   // --- File upload helpers ---
   const readFileAsDataURL = (file: File): Promise<string> =>
@@ -906,9 +911,9 @@ export default function DeliveryOrderWorkflow({
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="fromAddress">From Address (Pickup) *</Label>
-                    <Dialog>
+                    <Dialog open={showAddPickupAddress} onOpenChange={(open) => { setShowAddPickupAddress(open); if (!open) setAddressSubmitAttempted(false); }}>
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={() => setShowAddPickupAddress(true)}>
                           <Plus className="h-4 w-4" />
                           Add Pickup Address
                         </Button>
@@ -939,7 +944,7 @@ export default function DeliveryOrderWorkflow({
                                 value={newAddress.contactPerson || ''}
                                 onChange={(e) => setNewAddress(prev => ({ ...prev, contactPerson: e.target.value }))}
                                 placeholder="Contact person name"
-                                className={!newAddress.contactPerson ? 'border-red-300 focus:border-red-500' : ''}
+                                className={addressSubmitAttempted && !newAddress.contactPerson ? 'border-red-300 focus:border-red-500' : ''}
                               />
                             </div>
                           </div>
@@ -952,7 +957,11 @@ export default function DeliveryOrderWorkflow({
                                 value={newAddress.contactPhone || ''}
                                 onChange={(e) => setNewAddress(prev => ({ ...prev, contactPhone: e.target.value }))}
                                 placeholder="+91 98765 43210"
+                                className={newAddress.contactPhone && !validatePhone(newAddress.contactPhone) ? 'border-red-300 focus:border-red-500' : ''}
                               />
+                              {newAddress.contactPhone && !validatePhone(newAddress.contactPhone) && (
+                                <p className="text-xs text-red-600 mt-1">Enter a valid phone number</p>
+                              )}
                             </div>
                             <div>
                               <Label htmlFor="fromContactEmail">Email</Label>
@@ -973,7 +982,7 @@ export default function DeliveryOrderWorkflow({
                               value={newAddress.addressLine1 || ''}
                               onChange={(e) => setNewAddress(prev => ({ ...prev, addressLine1: e.target.value }))}
                               placeholder="Building number, street name"
-                              className={!newAddress.addressLine1 ? 'border-red-300 focus:border-red-500' : ''}
+                              className={addressSubmitAttempted && !newAddress.addressLine1 ? 'border-red-300 focus:border-red-500' : ''}
                             />
                           </div>
 
@@ -995,7 +1004,7 @@ export default function DeliveryOrderWorkflow({
                                 value={newAddress.city || ''}
                                 onChange={(e) => setNewAddress(prev => ({ ...prev, city: e.target.value }))}
                                 placeholder="City name"
-                                className={!newAddress.city ? 'border-red-300 focus:border-red-500' : ''}
+                                className={addressSubmitAttempted && !newAddress.city ? 'border-red-300 focus:border-red-500' : ''}
                               />
                             </div>
                             <div>
@@ -1022,7 +1031,7 @@ export default function DeliveryOrderWorkflow({
                                 onChange={(e) => setNewAddress(prev => ({ ...prev, postalCode: e.target.value }))}
                                 placeholder="110001"
                                 maxLength={6}
-                                className={!newAddress.postalCode || !validatePincode(newAddress.postalCode) ? 'border-red-300 focus:border-red-500' : ''}
+                                className={addressSubmitAttempted && (!newAddress.postalCode || !validatePincode(newAddress.postalCode)) ? 'border-red-300 focus:border-red-500' : ''}
                               />
                               {newAddress.postalCode && !validatePincode(newAddress.postalCode) && (
                                 <p className="text-sm text-red-600 mt-1">Enter a valid 6-digit PIN code</p>
@@ -1043,9 +1052,7 @@ export default function DeliveryOrderWorkflow({
                         </div>
 
                         <div className="flex justify-end gap-2">
-                          <DialogTrigger asChild>
-                            <Button variant="outline">Cancel</Button>
-                          </DialogTrigger>
+                          <Button variant="outline" onClick={() => { setShowAddPickupAddress(false); setAddressSubmitAttempted(false); }}>Cancel</Button>
                           <Button
                             onClick={handleCreateAddress}
                             disabled={createAddressMutation.isPending}
@@ -1229,7 +1236,7 @@ export default function DeliveryOrderWorkflow({
                                 value={newAddress.contactPerson || ''}
                                 onChange={(e) => setNewAddress(prev => ({ ...prev, contactPerson: e.target.value }))}
                                 placeholder="Contact person name"
-                                className={!newAddress.contactPerson ? 'border-red-300 focus:border-red-500' : ''}
+                                className={addressSubmitAttempted && !newAddress.contactPerson ? 'border-red-300 focus:border-red-500' : ''}
                               />
                             </div>
                           </div>
@@ -1242,7 +1249,11 @@ export default function DeliveryOrderWorkflow({
                                 value={newAddress.contactPhone || ''}
                                 onChange={(e) => setNewAddress(prev => ({ ...prev, contactPhone: e.target.value }))}
                                 placeholder="+91 98765 43210"
+                                className={newAddress.contactPhone && !validatePhone(newAddress.contactPhone) ? 'border-red-300 focus:border-red-500' : ''}
                               />
+                              {newAddress.contactPhone && !validatePhone(newAddress.contactPhone) && (
+                                <p className="text-xs text-red-600 mt-1">Enter a valid phone number</p>
+                              )}
                             </div>
                             <div>
                               <Label htmlFor="contactEmail">Email</Label>
@@ -1263,7 +1274,7 @@ export default function DeliveryOrderWorkflow({
                               value={newAddress.addressLine1 || ''}
                               onChange={(e) => setNewAddress(prev => ({ ...prev, addressLine1: e.target.value }))}
                               placeholder="Building number, street name"
-                              className={!newAddress.addressLine1 ? 'border-red-300 focus:border-red-500' : ''}
+                              className={addressSubmitAttempted && !newAddress.addressLine1 ? 'border-red-300 focus:border-red-500' : ''}
                             />
                           </div>
 
@@ -1285,7 +1296,7 @@ export default function DeliveryOrderWorkflow({
                                 value={newAddress.city || ''}
                                 onChange={(e) => setNewAddress(prev => ({ ...prev, city: e.target.value }))}
                                 placeholder="City name"
-                                className={!newAddress.city ? 'border-red-300 focus:border-red-500' : ''}
+                                className={addressSubmitAttempted && !newAddress.city ? 'border-red-300 focus:border-red-500' : ''}
                               />
                             </div>
                             <div>
@@ -1312,7 +1323,7 @@ export default function DeliveryOrderWorkflow({
                                 onChange={(e) => setNewAddress(prev => ({ ...prev, postalCode: e.target.value }))}
                                 placeholder="110001"
                                 maxLength={6}
-                                className={!newAddress.postalCode || !validatePincode(newAddress.postalCode) ? 'border-red-300 focus:border-red-500' : ''}
+                                className={addressSubmitAttempted && (!newAddress.postalCode || !validatePincode(newAddress.postalCode)) ? 'border-red-300 focus:border-red-500' : ''}
                               />
                               {newAddress.postalCode && !validatePincode(newAddress.postalCode) && (
                                 <p className="text-sm text-red-600 mt-1">Enter a valid 6-digit PIN code</p>
@@ -1333,7 +1344,7 @@ export default function DeliveryOrderWorkflow({
                         </div>
 
                         <div className="flex justify-end gap-2">
-                          <Button variant="outline" onClick={() => setShowAddAddress(false)}>
+                          <Button variant="outline" onClick={() => { setShowAddAddress(false); setAddressSubmitAttempted(false); }}>
                             Cancel
                           </Button>
                           <Button

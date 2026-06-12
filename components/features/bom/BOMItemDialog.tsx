@@ -1546,12 +1546,12 @@ export function BOMItemDialog({
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {[
-                  { id: 'weight', label: 'Weight (kg)', step: '0.001' },
-                  { id: 'surfaceArea', label: 'Surface Area (mm²)', step: '0.01' },
-                  { id: 'maxLength', label: 'Max Length (mm)', step: '0.01' },
-                  { id: 'maxWidth', label: 'Max Width (mm)', step: '0.01' },
-                  { id: 'maxHeight', label: 'Max Height (mm)', step: '0.01' },
-                ].map(({ id, label, step }) => (
+                  { id: 'weight', label: 'Weight (kg)' },
+                  { id: 'surfaceArea', label: 'Surface Area (mm²)' },
+                  { id: 'maxLength', label: 'Max Length (mm)' },
+                  { id: 'maxWidth', label: 'Max Width (mm)' },
+                  { id: 'maxHeight', label: 'Max Height (mm)' },
+                ].map(({ id, label }) => (
                   <div key={id} className="grid gap-2">
                     <Label htmlFor={id} className="flex items-center">
                       {label}
@@ -1560,7 +1560,7 @@ export function BOMItemDialog({
                     <Input
                       id={id}
                       type="number"
-                      step={step}
+                      step="any"
                       min="0"
                       value={formData[id as keyof typeof formData] as number || ''}
                       onChange={(e) => {

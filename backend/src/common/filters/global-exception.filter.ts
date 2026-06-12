@@ -404,6 +404,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   }
 
   private logError(exception: unknown, context: any): void {
+    // 404s on GET requests are normal "not found yet" states — skip logging
+    if (context.httpStatus === 404 && context.method === 'GET') {
+      return;
+    }
     const logLevel = context.httpStatus >= 500 ? 'error' : 'warn';
     const logMessage = `${context.method} ${context.path} - ${context.httpStatus}`;
     

@@ -194,6 +194,9 @@ export const productionPlanningApi = {
   updateProcessSubtask: (id: string, data: any) =>
     apiClient.put(`/production-planning/subtasks/${id}`, data),
 
+  deleteProcessSubtask: (id: string) =>
+    apiClient.delete(`/production-planning/subtasks/${id}`),
+
   // Daily Production Entries
   getDailyProductionEntries: (lotId: string, filters?: { startDate?: string; endDate?: string; entryType?: string }) =>
     apiClient.get(`/production-planning/lots/${lotId}/production-entries`, { params: filters }),
@@ -250,6 +253,7 @@ export function useProductionLot(id?: string) {
     queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lot(id!),
     queryFn: () => productionPlanningApi.getProductionLotById(id!),
     enabled: !!id,
+    staleTime: 3 * 60 * 1000,
     select: (data) => data.data?.data,
   });
 }
@@ -303,6 +307,7 @@ export function useVendorAssignments(lotId?: string) {
     queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lotVendorAssignments(lotId!),
     queryFn: () => productionPlanningApi.getVendorAssignments(lotId!),
     enabled: !!lotId,
+    staleTime: 3 * 60 * 1000,
     select: (data) => data.data?.data,
   });
 }
@@ -326,7 +331,8 @@ export function useProductionProcesses(lotId?: string, filters?: { status?: stri
     queryKey: [...PRODUCTION_PLANNING_QUERY_KEYS.lotProcesses(lotId!), filters],
     queryFn: () => productionPlanningApi.getProductionProcesses(lotId!, filters),
     enabled: !!lotId,
-    select: (data) => data.data?.data,
+    staleTime: 3 * 60 * 1000,
+    select: (data: any) => (data as any)?.data ?? data,
   });
 }
 
@@ -349,6 +355,7 @@ export function useProcessSubtasks(processId?: string) {
     queryKey: PRODUCTION_PLANNING_QUERY_KEYS.processSubtasks(processId!),
     queryFn: () => productionPlanningApi.getProcessSubtasks(processId!),
     enabled: !!processId,
+    staleTime: 3 * 60 * 1000,
     select: (data) => data.data?.data,
   });
 }
@@ -367,6 +374,36 @@ export function useCreateProcessSubtask() {
   });
 }
 
+export function useUpdateProcessSubtask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, lotId, data }: { id: string; lotId: string; data: any }) =>
+      productionPlanningApi.updateProcessSubtask(id, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lotProcesses(variables.lotId),
+        exact: false,
+      });
+    },
+  });
+}
+
+export function useDeleteProcessSubtask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id }: { id: string; lotId: string }) =>
+      productionPlanningApi.deleteProcessSubtask(id),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lotProcesses(variables.lotId),
+        exact: false,
+      });
+    },
+  });
+}
+
 export function useDailyProductionEntries(
   lotId?: string,
   filters?: { startDate?: string; endDate?: string; entryType?: string }
@@ -375,6 +412,7 @@ export function useDailyProductionEntries(
     queryKey: [...PRODUCTION_PLANNING_QUERY_KEYS.lotProductionEntries(lotId!), filters],
     queryFn: () => productionPlanningApi.getDailyProductionEntries(lotId!, filters),
     enabled: !!lotId,
+    staleTime: 3 * 60 * 1000,
     select: (data) => data.data?.data,
   });
 }

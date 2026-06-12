@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Upload, Trash2, Microscope, Search, ChevronDown, Filter, Sparkles, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useVaveBom, useBulkImportVaveBom, useDeleteVaveBomItem } from '@/lib/api/hooks/useVave';
 import { useProjects, useBOMs, useBOMItems } from '@/lib/api/hooks';
+import { useProcesses } from '@/lib/api/hooks/useProcesses';
+import type { Process } from '@/lib/api/hooks/useProcesses';
 import type { VaveBomItem, DrawingAnalysisResult } from '@/lib/api/vave';
 import { toast } from 'sonner';
 import {
@@ -125,6 +127,7 @@ function AnalysisPopover({ item, analysis, analyzingId, onAnalyze }: AnalysisPop
 interface FlatRowProps {
   item: VaveBomItem;
   items: VaveBomItem[];
+  allProcesses: Process[];
   analysis: DrawingAnalysisResult | null;
   analyzingId: string | null;
   onAnalyze: (item: VaveBomItem) => void;
@@ -132,7 +135,30 @@ interface FlatRowProps {
   indentPx?: number;
 }
 
-function BomTableRow({ item, items, analysis, analyzingId, onAnalyze, onDelete, indentPx = 0 }: FlatRowProps) {
+function ProcessCell({ processValue, allProcesses }: { processValue: string | null | undefined; allProcesses: Process[] }) {
+  if (!processValue) return <span className="text-muted-foreground">—</span>;
+  const matched = allProcesses.find(
+    (p) => p.processName.toLowerCase() === processValue.toLowerCase()
+  );
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Badge
+        variant="outline"
+        className={`text-[10px] w-fit ${matched
+          ? 'bg-primary/10 border-primary/30 text-primary'
+          : 'bg-muted/40 border-border text-muted-foreground'
+        }`}
+      >
+        {processValue}
+      </Badge>
+      {matched?.processCategory && (
+        <span className="text-[9px] text-muted-foreground/70">{matched.processCategory}</span>
+      )}
+    </div>
+  );
+}
+
+function BomTableRow({ item, items, allProcesses, analysis, analyzingId, onAnalyze, onDelete, indentPx = 0 }: FlatRowProps) {
   return (
     <tr className="border-b last:border-0 hover:bg-muted/20">
       <td className="px-3 py-2 text-muted-foreground">{item.level}</td>
@@ -148,7 +174,7 @@ function BomTableRow({ item, items, analysis, analyzingId, onAnalyze, onDelete, 
         </Badge>
       </td>
       <td className="px-3 py-2 text-muted-foreground text-xs">{item.material ?? '—'}</td>
-      <td className="px-3 py-2 text-muted-foreground text-xs">{item.process ?? '—'}</td>
+      <td className="px-3 py-2 text-xs"><ProcessCell processValue={item.process} allProcesses={allProcesses} /></td>
       <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[120px]">{item.supplierName ?? '—'}</td>
       <td className="px-3 py-2">
         <div className="flex items-center gap-1 justify-end">
@@ -199,13 +225,14 @@ function BomTableHead() {
 
 interface HierarchyViewProps {
   items: VaveBomItem[];
+  allProcesses: Process[];
   analysisResults: Record<string, DrawingAnalysisResult>;
   analyzingId: string | null;
   onAnalyze: (item: VaveBomItem) => void;
   onDelete: (id: string) => void;
 }
 
-function HierarchyView({ items, analysisResults, analyzingId, onAnalyze, onDelete }: HierarchyViewProps) {
+function HierarchyView({ items, allProcesses, analysisResults, analyzingId, onAnalyze, onDelete }: HierarchyViewProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     const s = new Set<string>();
     items.forEach((i) => { if (i.level === 1 || i.level === 2) s.add(i.partNumber); });
@@ -244,8 +271,8 @@ function HierarchyView({ items, analysisResults, analyzingId, onAnalyze, onDelet
     const indentPx = depth * 16;
 
     return (
-      <>
-        <tr key={item.id} className="border-b last:border-0 hover:bg-muted/20">
+      <React.Fragment key={item.id}>
+        <tr className="border-b last:border-0 hover:bg-muted/20">
           <td className="px-3 py-2 text-muted-foreground">{item.level}</td>
           <td className="px-3 py-2 font-mono text-xs font-medium" style={{ paddingLeft: `${12 + indentPx}px` }}>
             <div className="flex items-center gap-1">
@@ -274,7 +301,7 @@ function HierarchyView({ items, analysisResults, analyzingId, onAnalyze, onDelet
             </Badge>
           </td>
           <td className="px-3 py-2 text-muted-foreground text-xs">{item.material ?? '—'}</td>
-          <td className="px-3 py-2 text-muted-foreground text-xs">{item.process ?? '—'}</td>
+          <td className="px-3 py-2 text-xs"><ProcessCell processValue={item.process} allProcesses={allProcesses} /></td>
           <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[120px]">{item.supplierName ?? '—'}</td>
           <td className="px-3 py-2">
             <div className="flex items-center gap-1 justify-end">
@@ -298,7 +325,7 @@ function HierarchyView({ items, analysisResults, analyzingId, onAnalyze, onDelet
           </td>
         </tr>
         {hasChildren && isExpanded && children.map((child) => renderRows(child, depth + 1))}
-      </>
+      </React.Fragment>
     );
   };
 
@@ -322,6 +349,7 @@ function HierarchyView({ items, analysisResults, analyzingId, onAnalyze, onDelet
                 key={item.id}
                 item={item}
                 items={items}
+                allProcesses={allProcesses}
                 analysis={analysis}
                 analyzingId={analyzingId}
                 onAnalyze={onAnalyze}
@@ -597,8 +625,11 @@ export function BOMExplorer({ projectId, sourceProjectId }: Props) {
   const [filterLevel, setFilterLevel] = useState<string>('all');
   const [filterSupplier, setFilterSupplier] = useState<string>('all');
   const [filterSpend, setFilterSpend] = useState<string>('all');
+  const [filterProcess, setFilterProcess] = useState<string>('all');
 
   const { data: bomItems, isLoading } = useVaveBom(projectId);
+  const { data: processesData } = useProcesses({ limit: 100 });
+  const allProcesses: Process[] = (processesData as any)?.processes ?? [];
   const bulkImport = useBulkImportVaveBom(projectId);
   const deleteItem = useDeleteVaveBomItem(projectId);
 
@@ -648,16 +679,22 @@ export function BOMExplorer({ projectId, sourceProjectId }: Props) {
         const threshold = filterSpend === '>$10K' ? 10_000 : filterSpend === '>$50K' ? 50_000 : 100_000;
         if (item.annualSpend <= threshold) return false;
       }
+      if (filterProcess !== 'all') {
+        const itemProc = (item.process ?? '').toLowerCase();
+        const match = filterProcess.toLowerCase();
+        if (!itemProc.includes(match)) return false;
+      }
       return true;
     });
-  }, [items, search, filterLevel, filterSupplier, filterSpend]);
+  }, [items, search, filterLevel, filterSupplier, filterSpend, filterProcess]);
 
   const currentView = VIEW_OPTIONS.find((o) => o.value === view) ?? { value: 'flat' as BomView, label: 'Flat Table' };
 
   const activeFilterCount =
     (filterLevel !== 'all' ? 1 : 0) +
     (filterSupplier !== 'all' ? 1 : 0) +
-    (filterSpend !== 'all' ? 1 : 0);
+    (filterSpend !== 'all' ? 1 : 0) +
+    (filterProcess !== 'all' ? 1 : 0);
 
   const handleImport = async () => {
     if (!sourceBomItems.length) {
@@ -861,9 +898,27 @@ export function BOMExplorer({ projectId, sourceProjectId }: Props) {
             </SelectContent>
           </Select>
 
+          {/* Process filter — populated from the Processes API */}
+          <Select value={filterProcess} onValueChange={setFilterProcess}>
+            <SelectTrigger className="h-7 w-48 text-xs">
+              <SelectValue placeholder="Process" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All processes</SelectItem>
+              <SelectItem value="make">Make</SelectItem>
+              <SelectItem value="buy">Buy</SelectItem>
+              {allProcesses.map((p) => (
+                <SelectItem key={p.id} value={p.processName}>
+                  {p.processName}
+                  {p.processCategory ? ` · ${p.processCategory}` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {activeFilterCount > 0 && (
             <button
-              onClick={() => { setFilterLevel('all'); setFilterSupplier('all'); setFilterSpend('all'); }}
+              onClick={() => { setFilterLevel('all'); setFilterSupplier('all'); setFilterSpend('all'); setFilterProcess('all'); }}
               className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
             >
               Clear all
@@ -909,6 +964,7 @@ export function BOMExplorer({ projectId, sourceProjectId }: Props) {
             ) : view === 'hierarchy' ? (
               <HierarchyView
                 items={filtered}
+                allProcesses={allProcesses}
                 analysisResults={analysisResults}
                 analyzingId={analyzingId}
                 onAnalyze={handleAnalyzeDrawing}
@@ -926,6 +982,7 @@ export function BOMExplorer({ projectId, sourceProjectId }: Props) {
                           key={item.id}
                           item={item}
                           items={items}
+                          allProcesses={allProcesses}
                           analysis={analysis}
                           analyzingId={analyzingId}
                           onAnalyze={handleAnalyzeDrawing}

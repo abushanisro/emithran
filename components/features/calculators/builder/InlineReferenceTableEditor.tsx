@@ -392,30 +392,34 @@ export function InlineReferenceTableEditor({
             <div className="text-center mb-3">
               <h4 className="font-medium text-foreground text-xs mb-1">No Reference Tables Yet</h4>
               <p className="text-xs text-muted-foreground">
-                Start with predefined tables or create custom ones
+                {processName?.toLowerCase().includes('injection molding')
+                  ? 'Start with predefined tables or create custom ones'
+                  : 'Create a custom lookup table for this process'}
               </p>
             </div>
 
-            {/* Compact Quick Select */}
-            <div className="mb-3">
-              <h5 className="text-xs font-medium mb-1.5 text-left text-muted-foreground">Quick Start - Injection Molding:</h5>
-              <div className="grid grid-cols-2 gap-1.5">
-                {predefinedTables.map((table, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    className="h-auto p-2 justify-start text-left border-border hover:border-primary/40 hover:bg-secondary"
-                    onClick={() => handleCreatePredefinedTable(table)}
-                  >
-                    <div className="flex-1">
-                      <div className="font-medium text-xs mb-0.5 text-foreground">{table.table_name}</div>
-                      <div className="text-xs text-muted-foreground leading-tight">{table.table_description}</div>
-                      <div className="text-xs text-primary mt-0.5">{table.rows?.length || 0} rows</div>
-                    </div>
-                  </Button>
-                ))}
+            {/* Quick Start — Injection Molding only */}
+            {processName?.toLowerCase().includes('injection molding') && (
+              <div className="mb-3">
+                <h5 className="text-xs font-medium mb-1.5 text-left text-muted-foreground">Quick Start - Injection Molding:</h5>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {predefinedTables.map((table, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      className="h-auto p-2 justify-start text-left border-border hover:border-primary/40 hover:bg-secondary"
+                      onClick={() => handleCreatePredefinedTable(table)}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-xs mb-0.5 text-foreground">{table.table_name}</div>
+                        <div className="text-xs text-muted-foreground leading-tight">{table.table_description}</div>
+                        <div className="text-xs text-primary mt-0.5">{table.rows?.length || 0} rows</div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Compact Custom Option */}
             <div className="border-t border-border pt-2.5">

@@ -78,7 +78,7 @@ export class DeliveryService {
             description,
             material,
             unit,
-            unit_cost_inr,
+            unit_cost,
             boms!inner (
               project_id
             )
@@ -128,7 +128,7 @@ export class DeliveryService {
           description: (item.bom_items as any)?.description || 'No description',
           material: (item.bom_items as any)?.material || 'Unknown',
           unitOfMeasure: (item.bom_items as any)?.unit || 'pcs',
-          unitCost: (item.bom_items as any)?.unit_cost_inr || 0
+          unitCost: (item.bom_items as any)?.unit_cost || 0
         },
         inspection: {
           id: 'quality-approved',
@@ -316,7 +316,7 @@ export class DeliveryService {
             description,
             material,
             unit,
-            unit_cost_inr
+            unit_cost
           ),
           quality_approved_items (
             qc_certificate_number,

@@ -11,7 +11,7 @@ import {
   Max,
   IsBoolean,
   IsEmail,
-  IsPhoneNumber,
+  Matches,
   ArrayNotEmpty,
   MinLength,
   MaxLength
@@ -74,7 +74,7 @@ export class CreateDeliveryAddressDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsPhoneNumber('IN')
+  @Matches(/^[+\d][\d\s\-().]{5,19}$/, { message: 'contactPhone must be a valid phone number' })
   contactPhone?: string;
 
   @ApiPropertyOptional()

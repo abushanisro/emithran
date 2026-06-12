@@ -1068,6 +1068,11 @@ export class CADAnalysisService {
       const sanitizedGeometry = this.sanitizeNumericData(analysisResponse.geometry_features);
       const sanitizedDfm = this.sanitizeNumericData(analysisResponse.dfm_analysis);
       const sanitizedMemory = this.sanitizeNumericData(analysisResponse.memory_optimization);
+
+      // DB column processing_time_ms is INTEGER — floor the float before storing
+      if (sanitizedMemory && typeof sanitizedMemory.processing_time_ms === 'number') {
+        sanitizedMemory.processing_time_ms = Math.floor(sanitizedMemory.processing_time_ms);
+      }
       
       this.logger.log(`Storing sanitized analysis data for BOM item: ${request.bomItemId}`);
       this.logger.log(`Sanitized geometry:`, JSON.stringify(sanitizedGeometry, null, 2));
@@ -1106,7 +1111,7 @@ export class CADAnalysisService {
             .update({
               geometry_analysis: sanitizedGeometry,
               dfm_analysis: sanitizedDfm,
-              memory_metrics: sanitizedMemory,
+              memory_optimization_metrics: sanitizedMemory,
               geometry_hash: analysisResponse.analysis_id,
               analysis_version: analysisResponse.model_version,
               optimization_strategy: request.strategy || 'balanced',

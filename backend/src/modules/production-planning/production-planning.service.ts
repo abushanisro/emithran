@@ -118,6 +118,9 @@ export class ProductionPlanningService {
         if (error.message.includes('planned_dates_valid')) {
           throw new BadRequestException('Planned end date must be after the planned start date.');
         }
+        if (error.message.includes('lot_type_check')) {
+          throw new BadRequestException('Invalid lot type. Must be one of: standard, prototype, rework, urgent.');
+        }
       }
       
       // Handle duplicate constraints
@@ -251,7 +254,7 @@ export class ProductionPlanningService {
 
   async getProductionLots(
     userId: string,
-    filters: { status?: string; bomId?: string; priority?: string },
+    filters: { status?: string; bomId?: string; priority?: string; projectId?: string },
   ): Promise<ProductionLotResponseDto[]> {
     const supabase = this.supabaseService.getClient();
 
@@ -294,6 +297,9 @@ export class ProductionPlanningService {
       if (filters.priority) {
         query = query.eq('priority', filters.priority);
       }
+      if (filters.projectId) {
+        query = query.eq('boms.project_id', filters.projectId);
+      }
 
       const result = await query;
       data = result.data;
@@ -301,14 +307,14 @@ export class ProductionPlanningService {
     } catch (relationshipError) {
       // Fallback to basic query without relationships
       this.logger.warn('Failed to fetch lots with relationships, using fallback', relationshipError);
-      
+
       let fallbackQuery = supabase
         .from('production_lots')
         .select(`
           *,
           bom:boms(
-            id, 
-            name, 
+            id,
+            name,
             version
           )
         `)
@@ -323,6 +329,9 @@ export class ProductionPlanningService {
       }
       if (filters.priority) {
         fallbackQuery = fallbackQuery.eq('priority', filters.priority);
+      }
+      if (filters.projectId) {
+        fallbackQuery = fallbackQuery.eq('boms.project_id', filters.projectId);
       }
 
       const fallbackResult = await fallbackQuery;
@@ -444,7 +453,7 @@ export class ProductionPlanningService {
         })) || [];
       }
     } catch (error) {
-      this.logger.warn(`Failed to fetch selected BOM items: ${error.message}`);
+      this.logger.warn(`Failed to fetch selected BOM items: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     // Step 5: Combine all data
@@ -499,23 +508,71 @@ export class ProductionPlanningService {
       throw new NotFoundException('Production lot not found or access denied');
     }
 
-    // Get BOM items for this lot
-    const { data, error } = await supabase
-      .from('bom_items')
-      .select(`
-        id,
-        name,
-        part_number,
-        description,
-        quantity,
-        unit,
-        item_type,
-        material,
-        material_grade,
-        unit_cost,
-        make_buy
-      `)
-      .eq('bom_id', lot.bom_id);
+    const bomItemSelect = `
+      id,
+      name,
+      part_number,
+      description,
+      quantity,
+      unit,
+      item_type,
+      material,
+      material_grade,
+      unit_cost,
+      make_buy
+    `;
+
+    let data: any[] | null = null;
+    let error: any = null;
+
+    // Priority 1: approved quality inspection for this lot → return only quality-approved items
+    const { data: approvedInspection } = await supabase
+      .from('quality_inspections')
+      .select('id')
+      .eq('lot_id', id)
+      .eq('status', 'approved')
+      .limit(1)
+      .single();
+
+    if (approvedInspection) {
+      const { data: approvedItems } = await supabase
+        .from('quality_approved_items')
+        .select('bom_item_id')
+        .eq('inspection_id', approvedInspection.id)
+        .not('bom_item_id', 'is', null);
+
+      const approvedIds = (approvedItems || []).map((r: any) => r.bom_item_id);
+      if (approvedIds.length > 0) {
+        ({ data, error } = await supabase
+          .from('bom_items')
+          .select(bomItemSelect)
+          .in('id', approvedIds));
+      }
+    }
+
+    // Priority 2: lot-specific BOM item selection
+    if (!data) {
+      const { data: selectedRaw, error: selError } = await supabase
+        .from('production_lot_bom_items')
+        .select('bom_item_id')
+        .eq('production_lot_id', id);
+
+      if (!selError && selectedRaw && selectedRaw.length > 0) {
+        const ids = selectedRaw.map((r: any) => r.bom_item_id);
+        ({ data, error } = await supabase
+          .from('bom_items')
+          .select(bomItemSelect)
+          .in('id', ids));
+      }
+    }
+
+    // Priority 3: all BOM items (fallback)
+    if (!data) {
+      ({ data, error } = await supabase
+        .from('bom_items')
+        .select(bomItemSelect)
+        .eq('bom_id', lot.bom_id));
+    }
 
     if (error) {
       this.logger.error('Failed to fetch BOM items for production lot', {
@@ -601,11 +658,12 @@ export class ProductionPlanningService {
       } catch (enrichError) {
         this.logger.warn('Failed to enrich vendor assignment', {
           assignmentId: assignment.id,
-          error: enrichError.message
+          error: enrichError instanceof Error ? enrichError.message : String(enrichError)
         });
         enrichedAssignments.push(assignment);
       }
     }
+    
 
     return enrichedAssignments;
   }
@@ -1069,64 +1127,66 @@ export class ProductionPlanningService {
     // Verify process ownership
     await this.verifyProcessOwnership(createDto.productionProcessId, userId);
 
-    // Extract and filter BOM parts
-    const rawBomParts = createDto.bomParts || [];
-    
-    // Filter out empty or invalid BOM parts
-    const bomParts = rawBomParts.filter(part => 
-      part && 
-      part.bom_item_id && 
-      typeof part.required_quantity === 'number' && 
-      part.required_quantity > 0 &&
-      part.unit
-    );
-    
+    // Calculate next sequence number if not provided
+    let taskSequence = createDto.taskSequence;
+    if (!taskSequence) {
+      const { data: existing } = await supabase
+        .from('process_subtasks')
+        .select('task_sequence')
+        .eq('production_process_id', createDto.productionProcessId)
+        .order('task_sequence', { ascending: false })
+        .limit(1);
+      taskSequence = ((existing?.[0]?.task_sequence as number) || 0) + 1;
+    }
 
-    // Use the database function for comprehensive subtask creation with BOM parts
-    const { data, error } = await supabase.rpc('create_subtask_with_bom_parts', {
-      p_production_process_id: createDto.productionProcessId,
-      p_task_name: createDto.taskName,
-      p_created_by: userId,
-      p_description: createDto.description || null,
-      p_assigned_operator: createDto.assignedOperator || null,
-      p_planned_start_date: createDto.plannedStartDate ? new Date(createDto.plannedStartDate).toISOString() : null,
-      p_planned_end_date: createDto.plannedEndDate ? new Date(createDto.plannedEndDate).toISOString() : null,
-      p_status: 'pending',
-      p_bom_parts: bomParts
-    });
+    // Insert subtask directly (avoids RPC status case mismatch)
+    const { data: subtask, error } = await supabase
+      .from('process_subtasks')
+      .insert({
+        production_process_id: createDto.productionProcessId,
+        task_name: createDto.taskName,
+        description: createDto.description || null,
+        task_sequence: taskSequence,
+        estimated_duration_hours: createDto.estimatedHours || null,
+        assigned_operator: createDto.assignedOperator || null,
+        operator_name: createDto.assignedOperator || null,
+        planned_start_date: createDto.plannedStartDate || null,
+        planned_end_date: createDto.plannedEndDate || null,
+        status: 'PENDING',
+        created_by: userId,
+      })
+      .select('*')
+      .single();
 
     if (error) {
       throw new BadRequestException(`Failed to create process subtask: ${error.message}`);
     }
 
-    if (!data || data.length === 0) {
-      throw new BadRequestException('No data returned from subtask creation');
+    // Insert BOM requirements if any
+    const bomParts = (createDto.bomParts || []).filter(
+      part => part?.bom_item_id && typeof part.required_quantity === 'number' && part.required_quantity > 0 && part.unit,
+    );
+
+    if (bomParts.length > 0) {
+      const { error: bomError } = await supabase
+        .from('subtask_bom_requirements')
+        .insert(
+          bomParts.map(part => ({
+            subtask_id: subtask.id,
+            bom_item_id: part.bom_item_id,
+            required_quantity: part.required_quantity,
+            unit: part.unit,
+            requirement_status: 'PENDING',
+            created_by: userId,
+          })),
+        );
+
+      if (bomError) {
+        this.logger.warn(`BOM requirements partially failed: ${bomError.message}`);
+      }
     }
 
-    const result = data[0];
-    if (!result.success) {
-      throw new BadRequestException(`Subtask creation failed: ${result.message}`);
-    }
-
-    // Return the subtask details by fetching the created subtask
-    const { data: subtaskData, error: fetchError } = await supabase
-      .from('process_subtasks')
-      .select('*')
-      .eq('id', result.subtask_id)
-      .single();
-
-    if (fetchError) {
-      // Subtask was created but we couldn't fetch details - return basic info
-      return {
-        id: result.subtask_id,
-        task_name: createDto.taskName,
-        success: true,
-        message: result.message,
-        bom_requirements_created: result.bom_requirements_created
-      };
-    }
-
-    return subtaskData;
+    return subtask;
   }
 
   async getProcessSubtasks(processId: string, userId: string): Promise<any[]> {
@@ -1168,9 +1228,20 @@ export class ProductionPlanningService {
 
     await this.verifyProcessOwnership(subtask.production_process_id, userId);
 
+    const updateData: Record<string, any> = {};
+    if (updateDto.taskName !== undefined)        updateData.task_name = updateDto.taskName;
+    if (updateDto.description !== undefined)     updateData.description = updateDto.description;
+    if (updateDto.taskSequence !== undefined)    updateData.task_sequence = updateDto.taskSequence;
+    if (updateDto.estimatedHours !== undefined)  updateData.estimated_duration_hours = updateDto.estimatedHours;
+    if (updateDto.actualHours !== undefined)     updateData.actual_duration_hours = updateDto.actualHours;
+    if (updateDto.assignedOperator !== undefined) updateData.assigned_operator = updateDto.assignedOperator;
+    if (updateDto.skillRequirement !== undefined) updateData.skill_requirement = updateDto.skillRequirement;
+    if (updateDto.status !== undefined)          updateData.status = updateDto.status;
+    if (updateDto.remarks !== undefined)         updateData.notes = updateDto.remarks;
+
     const { data, error } = await supabase
       .from('process_subtasks')
-      .update(updateDto)
+      .update(updateData)
       .eq('id', id)
       .select('*')
       .single();
@@ -1661,7 +1732,7 @@ export class ProductionPlanningService {
       return data || [];
     } catch (error) {
       this.logger.warn('Production processes query failed - returning empty array', {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         lotId,
         hint: 'This is likely due to missing foreign key constraints. Run migration 073.'
       });
@@ -1718,7 +1789,7 @@ export class ProductionPlanningService {
         } catch (relatedDataError) {
           this.logger.warn('Error fetching related data for vendor assignment', {
             assignmentId: assignment.id,
-            error: relatedDataError.message
+            error: relatedDataError instanceof Error ? relatedDataError.message : String(relatedDataError)
           });
         }
       }

@@ -36,10 +36,15 @@ export class LoggingInterceptor implements NestInterceptor {
         },
         error: (error) => {
           const delay = Date.now() - now;
-          this.logger.error(
-            `← ${method} ${url} ${error.status || 500} - ${delay}ms`,
-            error.stack,
-          );
+          const status = error.status || error.statusCode || 500;
+          const logMsg = `← ${method} ${url} ${status} - ${delay}ms`;
+          if (status >= 500) {
+            this.logger.error(logMsg, error.stack);
+          } else if (status === 404 && method === 'GET') {
+            // 404 on GET is normal "not found yet" — skip logging
+          } else {
+            this.logger.warn(logMsg);
+          }
         },
       }),
     );

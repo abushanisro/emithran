@@ -799,4 +799,20 @@ export class MHRService {
       manualMHRValue: row.manualMHRValue || (row.manual_mhr_value ? parseFloat(row.manual_mhr_value) : 0),
     };
   }
+
+  async getDistinctProcessGroups(userId: string, accessToken: string): Promise<string[]> {
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('mhr_records')
+      .select('process_group')
+      .eq('user_id', userId)
+      .not('process_group', 'is', null);
+
+    if (error) {
+      this.logger.error(`Error fetching distinct process groups: ${error.message}`, 'MHRService');
+      return [];
+    }
+
+    return [...new Set(data?.map((r: any) => r.process_group).filter(Boolean) as string[])].sort();
+  }
 }

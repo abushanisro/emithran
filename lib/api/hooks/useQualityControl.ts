@@ -360,6 +360,21 @@ export function useSaveDetailedInspectionReport() {
   });
 }
 
+// Helper: patch a single inspection in every cached list
+function patchInspectionInLists(queryClient: ReturnType<typeof useQueryClient>, updated: QualityInspection) {
+  queryClient.setQueriesData<any>(
+    { queryKey: ['quality-inspections'], exact: false },
+    (old: any) => {
+      if (!old) return old;
+      const list: QualityInspection[] = Array.isArray(old) ? old : old?.data ?? [];
+      const patched = list.map((item) => (item.id === updated.id ? updated : item));
+      return Array.isArray(old) ? patched : { ...old, data: patched };
+    },
+  );
+  // Also update the single-inspection cache
+  queryClient.setQueryData(QUERY_KEYS.inspection(updated.id), updated);
+}
+
 // Approve quality inspection
 export function useApproveQualityInspection() {
   const queryClient = useQueryClient();
@@ -371,24 +386,10 @@ export function useApproveQualityInspection() {
     },
     onSuccess: (updatedInspection) => {
       toast.success('Quality inspection approved successfully');
-      
-      // Update the specific inspection in cache
-      queryClient.setQueryData(
-        QUERY_KEYS.inspection(updatedInspection.id),
-        updatedInspection
-      );
-      
-      // Invalidate inspections list
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.inspections(updatedInspection.project_id),
-      });
-      
-      // Invalidate dashboard metrics
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.dashboard(updatedInspection.project_id),
-      });
+      patchInspectionInLists(queryClient, updatedInspection);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard(updatedInspection.project_id) });
     },
-    onError: (error) => {
+    onError: () => {
       toast.error('Failed to approve quality inspection');
     },
   });
@@ -400,33 +401,39 @@ export function useRejectQualityInspection() {
 
   return useMutation({
     mutationFn: async ({ inspectionId, reason }: { inspectionId: string; reason?: string }) => {
-      const response = await apiClient.post<QualityInspection>(`/quality-control/inspections/${inspectionId}/reject`, { 
-        rejectionReason: reason, 
-        correctiveAction: '' 
+      const response = await apiClient.post<QualityInspection>(`/quality-control/inspections/${inspectionId}/reject`, {
+        rejectionReason: reason,
+        correctiveAction: ''
       });
       return response;
     },
     onSuccess: (updatedInspection) => {
-      toast.success('Quality inspection rejected');
-      
-      // Update the specific inspection in cache
-      queryClient.setQueryData(
-        QUERY_KEYS.inspection(updatedInspection.id),
-        updatedInspection
-      );
-      
-      // Invalidate inspections list
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.inspections(updatedInspection.project_id),
-      });
-      
-      // Invalidate dashboard metrics
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.dashboard(updatedInspection.project_id),
-      });
+      toast.success('Quality inspection declined');
+      patchInspectionInLists(queryClient, updatedInspection);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard(updatedInspection.project_id) });
     },
-    onError: (error) => {
-      toast.error('Failed to reject quality inspection');
+    onError: () => {
+      toast.error('Failed to decline quality inspection');
+    },
+  });
+}
+
+// Reset inspection status (undo approve or reject)
+export function useResetInspectionStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (inspectionId: string) => {
+      const response = await apiClient.post<QualityInspection>(`/quality-control/inspections/${inspectionId}/reset`, {});
+      return response;
+    },
+    onSuccess: (updatedInspection) => {
+      toast.success('Inspection status reset to completed');
+      patchInspectionInLists(queryClient, updatedInspection);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard(updatedInspection.project_id) });
+    },
+    onError: () => {
+      toast.error('Failed to reset inspection status');
     },
   });
 }
@@ -468,31 +475,14 @@ export function useDeleteQualityInspection() {
 export function useDetailedInspectionReport(inspectionId: string) {
   return useQuery({
     queryKey: ['detailed-inspection-report', inspectionId],
-    queryFn: async () => {
-      
-      try {
-        const response = await apiClient.get<DetailedInspectionReport>(
-          `/quality-control/inspections/${inspectionId}/detailed-report`
-        );
-        return response;
-      } catch (error: any) {
-        
-        // If report doesn't exist (404), return null instead of throwing error
-        // Check both statusCode (from ApiError) and status (legacy/other sources)
-        if (error.statusCode === 404 || error.status === 404 || error.message?.includes('not found')) {
-          return null;
-        }
-        
-        // Re-throw other errors
-        throw error;
-      }
-    },
+    queryFn: () =>
+      apiClient.get<DetailedInspectionReport>(
+        `/quality-control/inspections/${inspectionId}/detailed-report`,
+        { silent: true },
+      ),
     enabled: !!inspectionId,
-    staleTime: 1000 * 60 * 2, // 2 minutes
-    retry: (failureCount, error: any) => {
-      // Don't retry on 404 errors - check both statusCode and status
-      if (error.statusCode === 404 || error.status === 404) return false;
-      return failureCount < 3;
-    },
+    staleTime: 1000 * 60 * 2,
+    retry: false,
+    throwOnError: false,
   });
 }

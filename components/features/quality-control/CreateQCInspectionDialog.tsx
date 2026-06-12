@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { bomApi, BOM, BOMItem } from '@/lib/api/bom';
+import { apiClient } from '@/lib/api/client';
 import { useProductionLots } from '@/lib/api/hooks/useProductionPlanning';
 import { useCreateQualityInspection } from '@/lib/api/hooks/useQualityControl';
 import Link from 'next/link';
@@ -121,19 +122,8 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
   const { data: productionLots = [], isLoading: loadingLots, error: lotsError } = useProductionLots({ projectId });
   const createInspectionMutation = useCreateQualityInspection();
 
-  // Filter production lots to only show those belonging to current project
-  const filteredProductionLots = productionLots?.filter(lot => {
-    // Check if lot has project association (either direct projectId or via BOM)
-    const hasDirectProjectId = lot.projectId === projectId;
-    const hasBomProjectId = lot.bom?.projectId === projectId;
-    const hasProjectObjectId = lot.project?.id === projectId;
-    
-    // For now, let's also check if the BOM belongs to this project by checking available BOMs
-    // This is a temporary workaround until the backend properly links lots to projects
-    const matchesBomFromProject = bomOptions.some(bom => bom.id === lot.bomId);
-    
-    return hasDirectProjectId || hasBomProjectId || hasProjectObjectId || matchesBomFromProject;
-  }) || [];
+  // Backend already filters lots by projectId — use directly
+  const filteredProductionLots = productionLots || [];
 
 
 
@@ -151,12 +141,11 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
     loadBOMs();
   }, [projectId]);
 
-  // Function to load BOM items for a selected lot
-  const loadBOMItemsForLot = async (bomId: string) => {
+  // Load only the BOM items specifically assigned to this production lot
+  const loadBOMItemsForLot = async (lotId: string) => {
     try {
-      const bomWithItems = await bomApi.getById(bomId, true);
-      const items = bomWithItems.items || bomWithItems.data?.items || bomWithItems.data || [];
-      setBomItems(items);
+      const items = await apiClient.get<any[]>(`/production-planning/lots/${lotId}/bom-items`);
+      setBomItems(items || []);
       setSelectedItems([]);
     } catch (error: any) {
       toast.error('Failed to load BOM items for the selected lot. Please try selecting a different lot.');
@@ -267,6 +256,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
         type: inspectionType,
         projectId: projectId,
         bomId: selectedBOM.id,
+        lotId: selectedLot || undefined,
         inspector: inspector || undefined,
         plannedDate: plannedDate || undefined,
         selectedItems: selectedItems,
@@ -432,20 +422,13 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
                     onValueChange={(lotId) => {
                       setSelectedLot(lotId);
                       const lot = filteredProductionLots.find(l => l.id === lotId);
-                      if (lot && lot.bom) {
-                        setSelectedBOM({
-                          id: lot.bom.id,
-                          name: lot.bom.name,
-                          version: lot.bom.version
-                        });
-                        // Use BOM items from the lot data if available
-                        if (lot.bom.items && lot.bom.items.length > 0) {
-                          setBomItems(lot.bom.items);
-                          setSelectedItems([]);
-                        } else {
-                          // Fallback to loading separately if not in lot data
-                          loadBOMItemsForLot(lot.bom.id);
-                        }
+                      if (lot) {
+                        setSelectedBOM(lot.bom
+                          ? { id: lot.bom.id, name: lot.bom.name, version: lot.bom.version }
+                          : { id: lot.bomId, name: 'Loading…', version: '' }
+                        );
+                        // Load only the items specifically assigned to this lot
+                        loadBOMItemsForLot(lotId);
                       }
                     }}
                   >
@@ -505,6 +488,11 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
 
 
               {/* Enhanced BOM Parts Selection */}
+              {selectedLot && selectedBOM && bomItems.length === 0 && (
+                <div className="p-4 border rounded-lg text-center text-sm text-muted-foreground">
+                  No BOM items found for this production lot. Add items to the lot first in Production Planning.
+                </div>
+              )}
               {selectedLot && selectedBOM && bomItems.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">

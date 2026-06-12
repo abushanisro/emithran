@@ -47,11 +47,11 @@ export interface CreateRemarkRequest {
 export interface UpdateRemarkRequest {
   title?: string;
   description?: string;
-  priority?: 'low' | 'medium' | 'high' | 'critical';
-  status?: 'open' | 'in_progress' | 'resolved' | 'closed';
-  assigned_to?: string | null;
-  due_date?: string | null;
-  resolution?: string | null;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+  assignedTo?: string | null;
+  dueDate?: string | null;
+  resolutionNotes?: string | null;
 }
 
 export interface RemarkResponseDto {

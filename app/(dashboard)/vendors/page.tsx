@@ -417,7 +417,7 @@ export default function VendorsPage() {
               <div className="w-full space-y-3 border-t pt-4">
                 {/* Progress Bar */}
                 {totalAllVendors > 0 && (
-                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-1000 ease-out"
                       style={{
@@ -428,7 +428,7 @@ export default function VendorsPage() {
                 )}
 
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm group hover:bg-green-50/50 p-1 rounded transition-colors">
+                  <div className="flex justify-between items-center text-sm group hover:bg-green-500/10 p-1 rounded transition-colors">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                       <span className="text-muted-foreground">Active</span>
@@ -442,7 +442,7 @@ export default function VendorsPage() {
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex justify-between items-center text-sm group hover:bg-gray-50 p-1 rounded transition-colors">
+                  <div className="flex justify-between items-center text-sm group hover:bg-muted/50 p-1 rounded transition-colors">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-gray-400"></div>
                       <span className="text-muted-foreground">Inactive</span>
@@ -451,7 +451,7 @@ export default function VendorsPage() {
                       <span className="text-xs text-muted-foreground">
                         {totalAllVendors > 0 ? Math.round((inactiveCount / totalAllVendors) * 100) : 0}%
                       </span>
-                      <Badge variant="secondary" className="bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all duration-300">
+                      <Badge variant="secondary" className="transition-all duration-300">
                         {animatedInactive}
                       </Badge>
                     </div>
@@ -534,7 +534,7 @@ export default function VendorsPage() {
                       <div className="flex items-center gap-2">
                         {/* Progress indicator */}
                         {totalCount > 0 && (
-                          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                             <div
                               className="h-full bg-primary transition-all duration-500"
                               style={{
@@ -870,7 +870,7 @@ export default function VendorsPage() {
                       {vendors.map(vendor => (
                         <tr
                           key={vendor.id}
-                          className="border-b hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
+                          className="border-b hover:bg-primary/5 hover:border-l-2 hover:border-l-primary/40 cursor-pointer transition-colors"
                           onClick={() => router.push(`/vendors/${vendor.id}`)}
                         >
                           <td className="py-3 px-4">

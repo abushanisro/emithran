@@ -430,33 +430,6 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
                   <Label htmlFor="model">Model</Label>
                   <Input id="model" {...register('model')} placeholder="e.g., XR-2025" />
                 </div>
-                {/* LHR Reference */}
-                <div className="space-y-2">
-                  <Label htmlFor="lhrInrPerHr">LHR Reference (₹/hr)</Label>
-                  <Input id="lhrInrPerHr" type="number" step="0.01" min="0" {...register('lhrInrPerHr', { valueAsNumber: true })} placeholder="Labour hour rate" />
-                </div>
-                {/* USD LHR Rates */}
-                <div className="col-span-2 border-t pt-3 space-y-3">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">USD LHR Rates (Optional)</p>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="usdLaborRatePerHr">Labor Rate ($/hr)</Label>
-                      <Input id="usdLaborRatePerHr" type="number" step="0.01" min="0" {...register('usdLaborRatePerHr', { valueAsNumber: true })} placeholder="e.g., 3.50" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="usdLhrBase">LHR Base ($/hr)</Label>
-                      <Input id="usdLhrBase" type="number" step="0.01" min="0" {...register('usdLhrBase', { valueAsNumber: true })} placeholder="e.g., 3.50" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="usdLhrBurden">LHR Burden ($/hr)</Label>
-                      <Input id="usdLhrBurden" type="number" step="0.01" min="0" {...register('usdLhrBurden', { valueAsNumber: true })} placeholder="e.g., 1.33" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="usdLhrTotal">LHR Total ($/hr)</Label>
-                      <Input id="usdLhrTotal" type="number" step="0.01" min="0" {...register('usdLhrTotal', { valueAsNumber: true })} placeholder="e.g., 4.83" />
-                    </div>
-                  </div>
-                </div>
                 {/* Machine Description */}
                 <div className="col-span-2 space-y-2">
                   <Label htmlFor="machineDescription">Machine Description</Label>

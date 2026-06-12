@@ -3,11 +3,30 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
-import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection } from '@/lib/api/hooks/useQualityControl';
+import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection, useResetInspectionStatus } from '@/lib/api/hooks/useQualityControl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +47,8 @@ import {
   MoreVertical,
   ArrowLeft,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  Loader2,
 } from 'lucide-react';
 import CreateQCInspectionDialog from '@/components/features/quality-control/CreateQCInspectionDialog';
 
@@ -39,6 +59,11 @@ export default function QualityControlPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [authInitialized, setAuthInitialized] = useState(false);
+  const [approveTarget, setApproveTarget] = useState<any>(null);
+  const [rejectTarget, setRejectTarget] = useState<any>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [resetTarget, setResetTarget] = useState<any>(null);
 
   // Wait for auth to initialize before making API calls
   useEffect(() => {
@@ -55,6 +80,7 @@ export default function QualityControlPage() {
   const deleteInspection = useDeleteQualityInspection();
   const approveInspection = useApproveQualityInspection();
   const rejectInspection = useRejectQualityInspection();
+  const resetInspection = useResetInspectionStatus();
 
   // Handle the API response format
   const qualityInspections = Array.isArray(qualityInspectionsResponse)
@@ -78,31 +104,48 @@ export default function QualityControlPage() {
     router.push(`/projects/${projectId}/quality-control/${inspection.id}`);
   };
 
-  const handleDeleteInspection = async (inspection: any) => {
-    if (window.confirm(`Are you sure you want to delete "${inspection.name}"? This action cannot be undone.`)) {
-      try {
-        await deleteInspection.mutateAsync(inspection.id);
-      } catch (error) {
-      }
+  const handleDeleteInspection = (inspection: any) => setDeleteTarget(inspection);
+  const handleApproveInspection = (inspection: any) => setApproveTarget(inspection);
+  const handleRejectInspection = (inspection: any) => { setRejectTarget(inspection); setRejectReason(''); };
+
+  const confirmApprove = async () => {
+    if (!approveTarget) return;
+    try {
+      await approveInspection.mutateAsync(approveTarget.id);
+      refetchInspections();
+    } finally {
+      setApproveTarget(null);
     }
   };
 
-  const handleApproveInspection = async (inspection: any) => {
-    if (window.confirm(`Are you sure you want to approve "${inspection.name}"? This will make the items available for delivery.`)) {
-      try {
-        await approveInspection.mutateAsync(inspection.id);
-      } catch (error) {
-      }
+  const confirmReject = async () => {
+    if (!rejectTarget) return;
+    try {
+      await rejectInspection.mutateAsync({ inspectionId: rejectTarget.id, reason: rejectReason });
+      refetchInspections();
+    } finally {
+      setRejectTarget(null);
+      setRejectReason('');
     }
   };
 
-  const handleRejectInspection = async (inspection: any) => {
-    const reason = window.prompt(`Please provide a reason for rejecting "${inspection.name}":`);
-    if (reason !== null) { // null means user cancelled
-      try {
-        await rejectInspection.mutateAsync({ inspectionId: inspection.id, reason });
-      } catch (error) {
-      }
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteInspection.mutateAsync(deleteTarget.id);
+      refetchInspections();
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  const confirmReset = async () => {
+    if (!resetTarget) return;
+    try {
+      await resetInspection.mutateAsync(resetTarget.id);
+      refetchInspections();
+    } finally {
+      setResetTarget(null);
     }
   };
 
@@ -281,28 +324,51 @@ export default function QualityControlPage() {
                         <span className="xs:hidden">Report</span>
                       </Button>
                       
-                      {/* Approve/Reject buttons - only show for completed inspections that aren't already approved/rejected */}
-                      {inspection.status === 'completed' && inspection.status !== 'approved' && inspection.status !== 'rejected' && (
+                      {/* Undo button - only for approved/rejected */}
+                      {(inspection.status === 'approved' || inspection.status === 'rejected') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setResetTarget(inspection)}
+                          className="flex items-center gap-1 text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700 text-xs sm:text-sm"
+                          disabled={resetInspection.isPending && resetTarget?.id === inspection.id}
+                        >
+                          {resetInspection.isPending && resetTarget?.id === inspection.id
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <span className="text-sm">↩</span>
+                          }
+                          <span className="hidden sm:inline">Undo</span>
+                        </Button>
+                      )}
+
+                      {/* Approve/Reject buttons - show for any inspection not already approved/rejected */}
+                      {inspection.status !== 'approved' && inspection.status !== 'rejected' && (
                         <>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleApproveInspection(inspection)}
-                            className="flex items-center gap-1 text-green-600 border-green-200 hover:bg-green-50 text-xs sm:text-sm"
-                            disabled={approveInspection.isPending}
+                            className="flex items-center gap-1 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 text-xs sm:text-sm"
+                            disabled={approveInspection.isPending && approveTarget?.id === inspection.id}
                           >
-                            <ThumbsUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                            {approveInspection.isPending && approveTarget?.id === inspection.id
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <ThumbsUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                            }
                             <span className="hidden sm:inline">Approve</span>
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleRejectInspection(inspection)}
-                            className="flex items-center gap-1 text-red-600 border-red-200 hover:bg-red-50 text-xs sm:text-sm"
-                            disabled={rejectInspection.isPending}
+                            className="flex items-center gap-1 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 text-xs sm:text-sm"
+                            disabled={rejectInspection.isPending && rejectTarget?.id === inspection.id}
                           >
-                            <ThumbsDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span className="hidden sm:inline">Reject</span>
+                            {rejectInspection.isPending && rejectTarget?.id === inspection.id
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <ThumbsDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                            }
+                            <span className="hidden sm:inline">Decline</span>
                           </Button>
                         </>
                       )}
@@ -362,18 +428,20 @@ export default function QualityControlPage() {
                     )}
 
                     {/* Rejection Reason */}
-                    {inspection.status === 'rejected' && inspection.rejection_reason && (
+                    {inspection.status === 'rejected' && (
                       <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                         <div className="flex items-start gap-2">
                           <ThumbsDown className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-red-800 mb-1">Rejection Reason:</p>
-                            <p className="text-sm text-red-700">{inspection.rejection_reason}</p>
-                            {inspection.rejected_by && (
+                            <p className="text-sm font-medium text-red-800 mb-1">Declined</p>
+                            {(inspection.rejectionReason || inspection.rejection_reason) && (
+                              <p className="text-sm text-red-700">{inspection.rejectionReason || inspection.rejection_reason}</p>
+                            )}
+                            {(inspection.rejectedBy || inspection.rejected_by) && (
                               <p className="text-xs text-red-600 mt-1">
-                                Rejected by: {inspection.rejected_by}
-                                {inspection.rejected_at && (
-                                  <span className="ml-1">on {new Date(inspection.rejected_at).toLocaleString()}</span>
+                                By: {inspection.rejectedBy || inspection.rejected_by}
+                                {(inspection.rejectedAt || inspection.rejected_at) && (
+                                  <span className="ml-1">on {new Date(inspection.rejectedAt || inspection.rejected_at).toLocaleString()}</span>
                                 )}
                               </p>
                             )}
@@ -383,18 +451,20 @@ export default function QualityControlPage() {
                     )}
 
                     {/* Approval Info */}
-                    {inspection.status === 'approved' && inspection.approved_by && (
+                    {inspection.status === 'approved' && (
                       <div className="p-3 bg-green-50 border border-green-200 rounded-md">
                         <div className="flex items-start gap-2">
                           <ThumbsUp className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-green-800 mb-1">Approved</p>
-                            <p className="text-xs text-green-600">
-                              Approved by: {inspection.approved_by}
-                              {inspection.approved_at && (
-                                <span className="ml-1">on {new Date(inspection.approved_at).toLocaleString()}</span>
-                              )}
-                            </p>
+                            {(inspection.approvedBy || inspection.approved_by) && (
+                              <p className="text-xs text-green-600">
+                                By: {inspection.approvedBy || inspection.approved_by}
+                                {(inspection.approvedAt || inspection.approved_at) && (
+                                  <span className="ml-1">on {new Date(inspection.approvedAt || inspection.approved_at).toLocaleString()}</span>
+                                )}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -414,6 +484,133 @@ export default function QualityControlPage() {
           </div>
         )}
       </div>
+
+      {/* Approve confirmation dialog */}
+      <AlertDialog open={!!approveTarget} onOpenChange={(open) => !open && setApproveTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ThumbsUp className="h-5 w-5 text-green-600" />
+              Approve Inspection
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to approve <span className="font-semibold text-foreground">"{approveTarget?.name}"</span>?
+              Approved items will become available for delivery.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={approveInspection.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmApprove}
+              disabled={approveInspection.isPending}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {approveInspection.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Approving...</>
+              ) : 'Approve'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reject dialog with reason input */}
+      <Dialog open={!!rejectTarget} onOpenChange={(open) => !open && setRejectTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ThumbsDown className="h-5 w-5 text-red-600" />
+              Decline Inspection
+            </DialogTitle>
+            <DialogDescription>
+              Provide a reason for declining <span className="font-semibold text-foreground">"{rejectTarget?.name}"</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              placeholder="Reason for declining (optional)"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectTarget(null)} disabled={rejectInspection.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmReject}
+              disabled={rejectInspection.isPending}
+            >
+              {rejectInspection.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Declining...</>
+              ) : 'Decline'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Undo (reset) confirmation dialog */}
+      <AlertDialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span className="text-lg">↩</span>
+              Undo {resetTarget?.status === 'approved' ? 'Approval' : 'Decline'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reset <span className="font-semibold text-foreground">"{resetTarget?.name}"</span> back to{' '}
+              <span className="font-semibold">Completed</span> status.
+              {resetTarget?.status === 'approved' && (
+                <span className="block mt-1 text-orange-700">
+                  The quality-approved items created for delivery will also be removed.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetInspection.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmReset}
+              disabled={resetInspection.isPending}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {resetInspection.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Resetting...</>
+              ) : 'Undo'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Delete Inspection
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-semibold text-foreground">"{deleteTarget?.name}"</span>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteInspection.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteInspection.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleteInspection.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Deleting...</>
+              ) : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

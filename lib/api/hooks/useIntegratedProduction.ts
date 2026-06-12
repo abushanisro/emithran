@@ -60,7 +60,7 @@ export const useIntegratedDashboard = (lotId: string) => {
     queryKey: ['integrated-dashboard', lotId],
     queryFn: () => getIntegratedDashboardData(lotId),
     enabled: !!lotId,
-    refetchInterval: 30000, // Refresh every 30 seconds for real-time data
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -69,7 +69,7 @@ export const useProductionMonitoring = (lotId: string) => {
     queryKey: ['production-monitoring', lotId],
     queryFn: () => getProductionMonitoring(lotId),
     enabled: !!lotId,
-    refetchInterval: 15000, // Refresh every 15 seconds for monitoring
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -78,7 +78,7 @@ export const useLotMaterials = (lotId: string) => {
     queryKey: ['lot-materials', lotId],
     queryFn: () => getLotMaterials(lotId),
     enabled: !!lotId,
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -87,7 +87,7 @@ export const useProductionAlerts = (lotId: string) => {
     queryKey: ['production-alerts', lotId],
     queryFn: () => getProductionAlerts(lotId),
     enabled: !!lotId,
-    refetchInterval: 10000, // Refresh every 10 seconds for alerts
+    staleTime: 5 * 60 * 1000,
   });
 };
 

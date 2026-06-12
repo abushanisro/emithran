@@ -165,9 +165,11 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
     queryKey: ['processes', lotId],
     queryFn: async () => {
       const result = await productionPlanningApi.getProcessesByLot(lotId);
-      return result as any[];
+      // apiClient returns ApiResponse { data: [...] }; unwrap if not already an array
+      return (Array.isArray(result) ? result : (result as any)?.data) ?? [];
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    enabled: !!lotId,
+    staleTime: 3 * 60 * 1000,
   });
 
   // Transform real processes data to timeline format
@@ -215,6 +217,7 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
     queryKey: ['lot', lotId],
     queryFn: () => productionPlanningApi.getProductionLotById(lotId),
     enabled: !!lotId,
+    staleTime: 3 * 60 * 1000,
   });
 
   // Get BOM items directly if lot has a BOM but no items
