@@ -133,6 +133,7 @@ const nextConfig: NextConfig = {
       "https://*.railway.app",
       "https://mithran-production.up.railway.app",
       "https://mithran-production-dc9d.up.railway.app",
+      "https://handsome-celebration-production-20e1.up.railway.app",
       "https://router.project-osrm.org",
     ].join(' ');
 
