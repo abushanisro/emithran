@@ -65,7 +65,7 @@ class AppConfig:
             rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "10")),
             linear_deflection=linear_deflection,
             angular_deflection=angular_deflection,
-            temp_dir=os.getenv("TMPDIR", "/tmp/cad-files"),
+            temp_dir=os.getenv("TEMP_DIR", os.getenv("TMPDIR", "/tmp/cad-files")),
             log_level=os.getenv("LOG_LEVEL", "info").upper()
         )
     

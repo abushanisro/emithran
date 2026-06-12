@@ -699,7 +699,7 @@ if __name__ == "__main__":
         "main:app",
         host=config.host,
         port=config.port,
-        reload=(config.environment == "production"),
+        reload=False,
         log_level=config.log_level.lower(),
         access_log=True
     )
