@@ -22,7 +22,7 @@ import {
 import { Edit2, Trash2, Plus, ChevronDown, ChevronUp, FileText, Box, GripVertical } from 'lucide-react';
 // ✅ Fix 6133: Removed unused imports: ArrowRight, Move
 import { toast } from 'sonner';
-import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useQueryClient } from '@tanstack/react-query';
 import { BOMItemType } from '@/lib/types/bom.types';
 

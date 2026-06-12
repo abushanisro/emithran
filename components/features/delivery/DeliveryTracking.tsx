@@ -25,8 +25,6 @@ import {
   Package,
   CheckCircle,
   AlertCircle,
-  Calendar,
-  Route,
   Bell,
   Download,
   Filter,
@@ -34,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { carrierTrackingService } from '@/lib/services/carrier-tracking';
+import { supabase } from '@/lib/supabase/client';
 
 // Dynamic import for Map component to avoid SSR issues
 const DeliveryMap = dynamic(() => import('./DeliveryMap'), {
@@ -168,64 +167,58 @@ export default function DeliveryTracking({
     }
   }, [defaultOrderId, deliveries]);
 
-  // Real-time updates
+  // Supabase Realtime subscription for live tracking
   useEffect(() => {
-    if (!isLiveTracking) return;
+    if (!isLiveTracking || !selectedDelivery?.orderId || !supabase) return;
 
-    const interval = setInterval(() => {
-      fetchDeliveries();
-    }, 30000); // Update every 30 seconds
+    const channel = supabase
+      .channel(`delivery-tracking-${selectedDelivery.orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'delivery_tracking',
+          filter: `delivery_order_id=eq.${selectedDelivery.orderId}`,
+        },
+        (payload) => {
+          const ev = payload.new as any;
+          if (!ev.latitude || !ev.longitude) return;
 
-    return () => clearInterval(interval);
-  }, [isLiveTracking, fetchDeliveries]);
+          const newLocation = {
+            lat: Number(ev.latitude),
+            lng: Number(ev.longitude),
+            timestamp: ev.event_timestamp || new Date().toISOString(),
+          };
 
-  // Individual order location updates when selected
-  useEffect(() => {
-    if (!selectedDelivery || !isLiveTracking) return;
+          const newHistoryEntry: TrackingLocation = {
+            lat: newLocation.lat,
+            lng: newLocation.lng,
+            timestamp: newLocation.timestamp,
+            address: ev.location_address || 'Unknown location',
+            status: ev.event_type || 'location_update',
+            notes: ev.internal_notes,
+          };
 
-    const fetchLatestLocation = async () => {
-      try {
-        const response = await fetch(`/api/delivery/tracking/${selectedDelivery.orderId}/location`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data.currentLocation) {
-            // Update the selected delivery with latest location
-            setSelectedDelivery(prev => prev ? {
-              ...prev,
-              currentLocation: {
-                lat: data.data.currentLocation.latitude,
-                lng: data.data.currentLocation.longitude,
-                timestamp: data.data.currentLocation.timestamp
-              },
-              trackingHistory: data.data.trackingHistory || prev.trackingHistory
-            } : null);
-            
-            // Update the delivery in the main list too
-            setDeliveries(prev => prev.map(d => 
-              d.orderId === selectedDelivery.orderId 
-                ? {
-                    ...d,
-                    currentLocation: {
-                      lat: data.data.currentLocation.latitude,
-                      lng: data.data.currentLocation.longitude,
-                      timestamp: data.data.currentLocation.timestamp
-                    },
-                    trackingHistory: data.data.trackingHistory || d.trackingHistory
-                  }
+          setSelectedDelivery(prev =>
+            prev
+              ? { ...prev, currentLocation: newLocation, trackingHistory: [newHistoryEntry, ...prev.trackingHistory] }
+              : null
+          );
+          setDeliveries(prev =>
+            prev.map(d =>
+              d.orderId === selectedDelivery.orderId
+                ? { ...d, currentLocation: newLocation }
                 : d
-            ));
-          }
+            )
+          );
+          setLastUpdate(new Date().toISOString());
         }
-      } catch (error) {
-        console.error('Failed to fetch latest location:', error);
-      }
-    };
+      )
+      .subscribe();
 
-    const locationInterval = setInterval(fetchLatestLocation, 10000); // Update every 10 seconds for selected delivery
-    fetchLatestLocation(); // Fetch immediately
-
-    return () => clearInterval(locationInterval);
-  }, [selectedDelivery?.orderId, isLiveTracking]);
+    return () => { supabase.removeChannel(channel); };
+  }, [isLiveTracking, selectedDelivery?.orderId]);
 
   // Filter deliveries
   const filteredDeliveries = deliveries.filter(delivery => {

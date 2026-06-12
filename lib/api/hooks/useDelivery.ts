@@ -571,7 +571,7 @@ export function useDeleteDeliveryAddress() {
     },
     onError: (error: any) => {
       console.error('Failed to delete delivery address:', error);
-      toast.error(error?.response?.data?.message || 'Failed to delete address');
+      toast.error(error?.message || 'Failed to delete address');
     },
   });
 }

@@ -21,18 +21,15 @@ import {
   Trash2, 
   Package, 
   Plus, 
-  AlertTriangle, 
-  XCircle, 
-  RefreshCw, 
+  AlertTriangle,
+  XCircle,
+  RefreshCw,
   Loader2,
-  AlertCircle,
   Info,
-  CheckCircle,
-  Clock,
   Network
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useBOMItems, deleteBOMItem, BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItems, useDeleteBOMItem, type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { BOMItemType } from '@/lib/types/bom.types';
 
 // Enhanced error handling for BOM operations
@@ -126,10 +123,11 @@ interface TreeNode extends BOMItem {
 
 export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTableProps) {
   const { data, isLoading, refetch, error } = useBOMItems(bomId);
+  const deleteBOMItemMutation = useDeleteBOMItem();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<BOMItem | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [operationInProgress, setOperationInProgress] = useState<string | null>(null);
+  const [operationInProgress] = useState<string | null>(null);
 
   const bomItems = data?.items || [];
   
@@ -275,86 +273,31 @@ export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTab
 
   const handleDeleteConfirm = async () => {
     if (!itemToDelete) return;
-    
     setDeleteLoading(true);
-
     try {
-      await deleteBOMItem(itemToDelete.id);
-      await refetch(); // Refresh the data
-      
-      // Success feedback with context
+      await deleteBOMItemMutation.mutateAsync(itemToDelete.id);
       toast.success(`"${itemToDelete.name}" deleted successfully`, {
-        description: 'The BOM has been updated and dependencies are maintained.',
-        duration: 4000
+        description: 'The BOM has been updated.',
+        duration: 4000,
       });
-      
-      // Reset states
       setRetryCount(0);
     } catch (error: any) {
       const errorInfo = categorizeBOMOperationError(error);
-      setRetryCount(prev => prev + 1);
-      
-      // Enhanced error handling with retry logic
+      setRetryCount((prev) => prev + 1);
       const isRecoverable = errorInfo.recoverable && retryCount < 2;
-      
       const toastOptions: any = {
         description: errorInfo.suggestion,
-        duration: errorInfo.severity === 'critical' ? 10000 : 7000
+        duration: errorInfo.severity === 'critical' ? 10000 : 7000,
+        ...(isRecoverable && { action: { label: `Retry (${retryCount + 1}/3)`, onClick: () => handleDeleteConfirm() } }),
       };
-      
-      if (isRecoverable) {
-        toastOptions.action = {
-          label: `Retry (${retryCount + 1}/3)`,
-          onClick: () => handleDeleteConfirm()
-        };
+      if (errorInfo.category === 'dependency') {
+        toast.error(`${errorInfo.userMessage}`, {
+          ...toastOptions,
+          action: { label: 'Show Dependencies', onClick: () => toast.info('Check the BOM tree view to see which items depend on this component.') },
+        });
+      } else {
+        toast.error(`${errorInfo.userMessage}`, toastOptions);
       }
-      
-      // Show categorized error
-      switch (errorInfo.category) {
-        case 'dependency':
-          toast.error(`🔗 ${errorInfo.userMessage}`, {
-            ...toastOptions,
-            action: {
-              label: 'Show Dependencies',
-              onClick: () => {
-                // Could implement dependency viewer
-                toast.info('Check the BOM tree view to see which items depend on this component.');
-              }
-            }
-          });
-          break;
-          
-        case 'permission':
-          toast.error(`🔒 ${errorInfo.userMessage}`, toastOptions);
-          break;
-          
-        case 'network':
-          toast.error(`🌐 ${errorInfo.userMessage}`, toastOptions);
-          break;
-          
-        case 'data':
-          toast.warning(`${errorInfo.userMessage}`, {
-            ...toastOptions,
-            action: {
-              label: 'Refresh BOM',
-              onClick: () => refetch()
-            }
-          });
-          break;
-          
-        default:
-          toast.error(`${errorInfo.userMessage}`, toastOptions);
-      }
-      
-      // Log for debugging
-      console.error('BOM Item Deletion Error:', {
-        itemId: itemToDelete.id,
-        itemName: itemToDelete.name,
-        category: errorInfo.category,
-        severity: errorInfo.severity,
-        attempt: retryCount + 1,
-        error
-      });
     } finally {
       setDeleteLoading(false);
       setDeleteDialogOpen(false);

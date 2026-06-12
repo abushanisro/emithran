@@ -148,11 +148,22 @@ export function useDeleteVaveBomItem(projectId: string) {
 
   return useMutation({
     mutationFn: (itemId: string) => vaveApi.deleteBomItem(projectId, itemId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: vaveKeys.bom(projectId) });
+    onMutate: async (itemId) => {
+      await queryClient.cancelQueries({ queryKey: vaveKeys.bom(projectId) });
+      const prev = queryClient.getQueryData(vaveKeys.bom(projectId));
+      queryClient.setQueryData(vaveKeys.bom(projectId), (old: any) =>
+        Array.isArray(old) ? old.filter((item: any) => item.id !== itemId) : old,
+      );
+      return { prev };
     },
-    onError: () => {
+    onError: (_, __, context) => {
+      if (context?.prev !== undefined) {
+        queryClient.setQueryData(vaveKeys.bom(projectId), context.prev);
+      }
       toast.error('Failed to delete BOM item');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: vaveKeys.bom(projectId) });
     },
   });
 }

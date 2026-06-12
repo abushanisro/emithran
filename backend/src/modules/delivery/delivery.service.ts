@@ -40,16 +40,19 @@ export class DeliveryService {
               status
             )
           `)
-          .not('quality_approved_item_id', 'is', null)
-          .not('delivery_orders.status', 'in', '("delivered","cancelled")');
+          .not('quality_approved_item_id', 'is', null);
 
         if (usedError) {
           this.logger.error(`Database error fetching used items: ${usedError.message}`, usedError);
-          // For demo purposes, continue without filtering
           this.logger.warn('Continuing without filtering used items for demo purposes');
           usedItemIds = [];
         } else {
-          usedItemIds = (usedItems || []).map(item => item.quality_approved_item_id);
+          // Post-filter: exclude items in active (non-terminal) orders
+          const activeItems = (usedItems || []).filter((item: any) => {
+            const status = item.delivery_orders?.status;
+            return status && status !== 'delivered' && status !== 'cancelled';
+          });
+          usedItemIds = activeItems.map(item => item.quality_approved_item_id);
           this.logger.log(`Found ${usedItemIds.length} items in active delivery orders`);
         }
       } catch (error: any) {
@@ -91,7 +94,7 @@ export class DeliveryService {
 
       // Filter out already used items
       if (usedItemIds.length > 0) {
-        query = query.not('id', 'in', `(${usedItemIds.map(id => `"${id}"`).join(',')})`);
+        query = query.not('id', 'in', `(${usedItemIds.join(',')})`);
       }
 
       const { data: availableItems, error } = await query;
@@ -875,6 +878,12 @@ export class DeliveryService {
 
       if (error) {
         this.logger.error(`Error deleting delivery address: ${error.message}`, error);
+        // FK violation — address is still referenced by an order
+        if ((error as any).code === '23503') {
+          throw new BadRequestException(
+            'Cannot delete — this address is still referenced by one or more delivery orders'
+          );
+        }
         throw new BadRequestException('Failed to delete delivery address');
       }
 

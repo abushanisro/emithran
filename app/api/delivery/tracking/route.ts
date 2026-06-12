@@ -93,7 +93,7 @@ async function transformBackendOrderToTrackingData(order: any) {
     let currentLocation = undefined;
     if (carrierTrackingData?.events && carrierTrackingData.events.length > 0) {
       const latestEvent = carrierTrackingData.events[0];
-      if (latestEvent.coordinates) {
+      if (latestEvent?.coordinates) {
         currentLocation = {
           lat: latestEvent.coordinates.lat,
           lng: latestEvent.coordinates.lng,
@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
     
     // Transform orders with proper address handling
     const deliveries = await Promise.all(
-      ordersArray.map(order => transformBackendOrderToTrackingData(order))
+      ordersArray.map((order: any) => transformBackendOrderToTrackingData(order))
     );
     console.log('Transformed deliveries:', deliveries.length, 'items');
 

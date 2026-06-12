@@ -59,9 +59,14 @@ import { toast } from 'sonner';
 import RouteCalculator from './RouteCalculator';
 import dynamic from 'next/dynamic';
 
-const RouteMap = dynamic(() => import('./RouteMap'), { 
+const RouteMap = dynamic(() => import('./RouteMap'), {
   ssr: false,
   loading: () => <div className="h-64 bg-muted animate-pulse rounded-md" />
+});
+
+const PlacesAutocomplete = dynamic(() => import('./PlacesAutocomplete'), {
+  ssr: false,
+  loading: () => <div className="h-10 bg-muted animate-pulse rounded-md" />,
 });
 
 interface DeliveryOrderWorkflowProps {
@@ -537,7 +542,15 @@ export default function DeliveryOrderWorkflow({
         routeType: routeData?.optimizationLevel,
         routeDistanceKm: routeData?.distance,
         routeTravelTimeMinutes: routeData?.duration,
-        routeData: routeData,
+        routeData: {
+          ...routeData,
+          originLat: addresses.find(a => a.id === formData.fromAddressId)?.latitude,
+          originLng: addresses.find(a => a.id === formData.fromAddressId)?.longitude,
+          originAddress: (() => {
+            const a = addresses.find(x => x.id === formData.fromAddressId);
+            return a ? `${a.addressLine1}, ${a.city}` : undefined;
+          })(),
+        },
         // Cost breakdown from route calculation
         transportCostInr: routeData?.costBreakdown?.transportBase || 0,
         loadingCostInr: routeData?.costBreakdown?.loadingUnloading || 0,
@@ -977,12 +990,22 @@ export default function DeliveryOrderWorkflow({
 
                           <div>
                             <Label htmlFor="fromAddressLine1">Address Line 1 *</Label>
-                            <Input
+                            <PlacesAutocomplete
                               id="fromAddressLine1"
                               value={newAddress.addressLine1 || ''}
-                              onChange={(e) => setNewAddress(prev => ({ ...prev, addressLine1: e.target.value }))}
-                              placeholder="Building number, street name"
-                              className={addressSubmitAttempted && !newAddress.addressLine1 ? 'border-red-300 focus:border-red-500' : ''}
+                              onChange={(v) => setNewAddress(prev => ({ ...prev, addressLine1: v }))}
+                              onPlaceSelected={(parts) => setNewAddress(prev => ({
+                                ...prev,
+                                addressLine1: parts.addressLine1,
+                                city: parts.city || prev.city,
+                                stateProvince: parts.stateProvince || prev.stateProvince,
+                                postalCode: parts.postalCode || prev.postalCode,
+                                country: parts.country || prev.country,
+                                latitude: parts.latitude,
+                                longitude: parts.longitude,
+                              }))}
+                              placeholder="Start typing address…"
+                              hasError={addressSubmitAttempted && !newAddress.addressLine1}
                             />
                           </div>
 
@@ -1269,12 +1292,22 @@ export default function DeliveryOrderWorkflow({
 
                           <div>
                             <Label htmlFor="addressLine1">Address Line 1 *</Label>
-                            <Input
+                            <PlacesAutocomplete
                               id="addressLine1"
                               value={newAddress.addressLine1 || ''}
-                              onChange={(e) => setNewAddress(prev => ({ ...prev, addressLine1: e.target.value }))}
-                              placeholder="Building number, street name"
-                              className={addressSubmitAttempted && !newAddress.addressLine1 ? 'border-red-300 focus:border-red-500' : ''}
+                              onChange={(v) => setNewAddress(prev => ({ ...prev, addressLine1: v }))}
+                              onPlaceSelected={(parts) => setNewAddress(prev => ({
+                                ...prev,
+                                addressLine1: parts.addressLine1,
+                                city: parts.city || prev.city,
+                                stateProvince: parts.stateProvince || prev.stateProvince,
+                                postalCode: parts.postalCode || prev.postalCode,
+                                country: parts.country || prev.country,
+                                latitude: parts.latitude,
+                                longitude: parts.longitude,
+                              }))}
+                              placeholder="Start typing address…"
+                              hasError={addressSubmitAttempted && !newAddress.addressLine1}
                             />
                           </div>
 

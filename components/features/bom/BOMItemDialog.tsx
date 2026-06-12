@@ -44,7 +44,6 @@ import {
   Loader2,
   HelpCircle,
   ChevronsUpDown,
-  RefreshCw,
   Plus,
   Check,
   X,
@@ -117,12 +116,12 @@ type EnhancedBOMError = {
   category: 'validation' | 'duplication' | 'hierarchy' | 'fileupload' | 'network' | 'permission' | 'business' | 'data';
   severity: 'low' | 'medium' | 'high' | 'critical';
   userMessage: string;
-  technicalMessage?: string;
+  technicalMessage?: string | undefined;
   suggestion: string;
   actionable: boolean;
   recoverable: boolean;
-  helpUrl?: string;
-  affectedFields?: string[];
+  helpUrl?: string | undefined;
+  affectedFields?: string[] | undefined;
 };
 
 // ─── Multi-file upload types ──────────────────────────────────────────────────
@@ -395,8 +394,6 @@ export function BOMItemDialog({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState<{ file2d?: number; file3d?: number }>({});
   const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
-  const [isAnalyzing3D, setIsAnalyzing3D] = useState(false);
-
   // ── Multi-file / auto-fill state ──────────────────────────────────────────
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
@@ -407,7 +404,7 @@ export function BOMItemDialog({
     name: '',
     partNumber: '',
     description: '',
-    itemType: defaultItemType || BOMItemType.ASSEMBLY,
+    itemType: defaultItemType || ('' as BOMItemType),
     quantity: 1,
     annualVolume: 1000,
     unit: 'pcs',
@@ -416,7 +413,7 @@ export function BOMItemDialog({
     materialGrade: '',
     makeBuy: 'make' as 'make' | 'buy',
     unitCost: '',
-    bomLevel: 'L0',
+    bomLevel: '',
     weight: 0,
     maxLength: 0,
     maxWidth: 0,
@@ -522,45 +519,6 @@ export function BOMItemDialog({
     }
   }, [selectedMaterialCategory]);
 
-  const fetch3DProperties = async () => {
-    if (!item?.id) {
-      toast.warning('Save the item first', {
-        description: 'Create the BOM item first to access 3D properties',
-        duration: 3000
-      });
-      return;
-    }
-
-    setIsAnalyzing3D(true);
-    try {
-      toast.info('Loading 3D properties...', { description: 'Fetching stored physical properties', duration: 2000 });
-      const extractedProperties: Partial<typeof formData> = {};
-
-      if (item.weight && item.weight > 0) extractedProperties.weight = item.weight;
-      if (item.surfaceArea && item.surfaceArea > 0) extractedProperties.surfaceArea = item.surfaceArea;
-      if (item.maxLength && item.maxLength > 0) extractedProperties.maxLength = item.maxLength;
-      if (item.maxWidth && item.maxWidth > 0) extractedProperties.maxWidth = item.maxWidth;
-      if (item.maxHeight && item.maxHeight > 0) extractedProperties.maxHeight = item.maxHeight;
-
-      if (Object.keys(extractedProperties).length > 0) {
-        setFormData(prev => ({ ...prev, ...extractedProperties }));
-        toast.success(`Loaded ${Object.keys(extractedProperties).length} properties`, {
-          description: `Restored from saved data: ${Object.keys(extractedProperties).join(', ')}`,
-          duration: 4000
-        });
-      } else {
-        toast.info('No stored properties', {
-          description: 'No physical properties found in the saved item data',
-          duration: 3000
-        });
-      }
-    } catch (error: unknown) {
-      toast.error('Failed to load properties', { description: 'Could not load stored properties.', duration: 4000 });
-    } finally {
-      setIsAnalyzing3D(false);
-    }
-  };
-
   // ── Auto-fill helpers ─────────────────────────────────────────────────────
 
   const populateFormFromResult = useCallback((r: AutoFillResponse) => {
@@ -598,7 +556,9 @@ export function BOMItemDialog({
   }, []);
 
   const updatePendingFileStatus = useCallback((id: string, status: PendingFile['status'], error?: string) => {
-    setPendingFiles(prev => prev.map(pf => pf.id === id ? { ...pf, status, error } : pf));
+    setPendingFiles(prev => prev.map(pf =>
+      pf.id === id ? { ...pf, status, ...(error !== undefined ? { error } : {}) } : pf
+    ));
   }, []);
 
   const updatePendingFileResult = useCallback((id: string, result: AutoFillResponse) => {
@@ -677,12 +637,12 @@ export function BOMItemDialog({
       setAutoParentId(getAutoParent(formData.itemType));
     }
 
-    let bomLevel = 'L0';
+    let bomLevel = '';
     switch (formData.itemType) {
       case BOMItemType.ASSEMBLY: bomLevel = 'L0'; break;
       case BOMItemType.SUB_ASSEMBLY: bomLevel = 'L1'; break;
       case BOMItemType.CHILD_PART: bomLevel = 'L2'; break;
-      default: bomLevel = 'L0';
+      default: bomLevel = '';
     }
 
     if (formData.bomLevel !== bomLevel) {
@@ -728,7 +688,7 @@ export function BOMItemDialog({
         name: '',
         partNumber: '',
         description: '',
-        itemType: defaultItemType || BOMItemType.ASSEMBLY,
+        itemType: defaultItemType || ('' as BOMItemType),
         quantity: 1,
         annualVolume: 1000,
         unit: 'pcs',
@@ -737,7 +697,7 @@ export function BOMItemDialog({
         materialGrade: '',
         makeBuy: 'make',
         unitCost: '',
-        bomLevel: 'L0',
+        bomLevel: '',
         weight: 0,
         maxLength: 0,
         maxWidth: 0,
@@ -1025,6 +985,146 @@ export function BOMItemDialog({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4">
+            {/* 3D Models — first so geometry auto-fills the form below */}
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  3D Models (STEP, STL, IGES, OBJ)
+                  {pendingFiles.length > 0 && (
+                    <Badge variant="secondary" className="text-xs ml-1">
+                      {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </Label>
+                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Cpu className="h-3 w-3 text-cyan-500" />
+                  Upload to auto-fill BOM fields
+                </span>
+              </div>
+              <div
+                {...getRootProps()}
+                className={cn(
+                  'border-2 border-dashed rounded-lg p-4 transition-colors cursor-pointer',
+                  isDragActive
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/60 hover:bg-muted/30',
+                )}
+              >
+                <input {...getInputProps()} />
+                {pendingFiles.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground py-2">
+                    <Package className="h-7 w-7 opacity-50" />
+                    <p className="text-sm font-medium">
+                      {isDragActive ? 'Drop files here…' : 'Drop STEP / STL / IGES files, or click to browse'}
+                    </p>
+                    <p className="text-xs">Multiple files supported · 100 MB max each · Auto-fills form from geometry</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                    {pendingFiles.map((pf) => (
+                      <div
+                        key={pf.id}
+                        onClick={() => {
+                          setActiveFileId(pf.id);
+                          if (pf.result) {
+                            setAutoFilledFields(new Set());
+                            populateFormFromResult(pf.result);
+                          }
+                        }}
+                        className={cn(
+                          'flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors select-none',
+                          pf.id === activeFileId
+                            ? 'bg-primary/10 border border-primary/30'
+                            : 'hover:bg-muted',
+                        )}
+                      >
+                        {pf.status === 'analyzing' && <Loader2 className="h-3 w-3 animate-spin text-blue-500 shrink-0" />}
+                        {pf.status === 'ready'     && <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />}
+                        {pf.status === 'error'     && <XCircle className="h-3 w-3 text-red-500 shrink-0" />}
+                        {pf.status === 'pending'   && <div className="h-3 w-3 rounded-full bg-muted-foreground/30 shrink-0" />}
+                        <span className="text-sm truncate flex-1 min-w-0">{pf.file.name}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {(pf.file.size / 1024 / 1024).toFixed(1)} MB
+                        </span>
+                        {pf.result && (
+                          <>
+                            <Badge variant="secondary" className="text-xs shrink-0">{pf.result.suggestions.processType}</Badge>
+                            {pf.result.suggestions.materialGrade && (
+                              <Badge variant="outline" className="text-xs shrink-0 max-w-[80px] truncate">
+                                {pf.result.suggestions.materialGrade}
+                              </Badge>
+                            )}
+                          </>
+                        )}
+                        {pf.status === 'error' && (
+                          <span className="text-xs text-red-500 shrink-0 max-w-[100px] truncate" title={pf.error}>
+                            {pf.error}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); removePendingFile(pf.id); }}
+                          className="ml-1 shrink-0 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground pt-1 px-1">
+                      Click a file to load its properties · Drop more files to add
+                    </p>
+                  </div>
+                )}
+              </div>
+              {activeResult?.costs && (
+                <div className="rounded-md bg-muted/50 border p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="h-3 w-3 text-cyan-500" />
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Cost Preview · review before saving
+                    </p>
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 text-cyan-500 border-cyan-500/40 ml-auto">
+                      {Math.round((activeResult.confidence.overall ?? 0) * 100)}% confidence
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    {activeResult.costs.materialCostPerKg !== null && (
+                      <>
+                        <span className="text-muted-foreground">Material cost/kg</span>
+                        <span className="font-mono">₹ {activeResult.costs.materialCostPerKg?.toFixed(2)}</span>
+                      </>
+                    )}
+                    {activeResult.costs.mhrRate !== null && (
+                      <>
+                        <span className="text-muted-foreground">Machine hour rate</span>
+                        <span className="font-mono">₹ {activeResult.costs.mhrRate?.toFixed(2)}/hr</span>
+                      </>
+                    )}
+                    {activeResult.costs.lhrRate !== null && (
+                      <>
+                        <span className="text-muted-foreground">Labour hour rate</span>
+                        <span className="font-mono">₹ {activeResult.costs.lhrRate?.toFixed(2)}/hr</span>
+                      </>
+                    )}
+                    {activeResult.costs.estimatedUnitCost !== null && (
+                      <>
+                        <span className="text-muted-foreground font-medium">Est. unit cost</span>
+                        <span className="font-mono font-semibold text-primary">
+                          ₹ {activeResult.costs.estimatedUnitCost?.toFixed(2)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {!activeResult.cadEngineAvailable && (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                      ⚠ CAD engine offline — geometry from bounding-box estimate
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Name */}
             <div className="grid gap-2">
               <Label htmlFor="name" className="flex items-center">Name * <AutoBadge field="name" /></Label>
@@ -1240,6 +1340,36 @@ export function BOMItemDialog({
               </div>
             )}
 
+            {/* 2D Drawing */}
+            <div className="grid gap-2 border-t pt-4">
+              <Label className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                2D Drawing (PDF, DWG, PNG, JPG)
+              </Label>
+              <input
+                id="file2d"
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.dwg,.dxf"
+                className="hidden"
+                onChange={(e) => setFormData({ ...formData, file2d: e.target.files?.[0] || null })}
+              />
+              <label
+                htmlFor="file2d"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-dashed border-border bg-muted/30 hover:bg-muted/60 cursor-pointer text-xs text-muted-foreground transition-colors w-fit"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                {formData.file2d ? formData.file2d.name : 'Choose file…'}
+              </label>
+              {formData.file2d ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <span>{(formData.file2d.size / 1024 / 1024).toFixed(1)} MB</span>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Upload technical drawings, blueprints, or dimensional sketches</p>
+              )}
+            </div>
+
             {/* Make or Buy */}
             <div className="grid gap-3 border-t pt-4">
               <Label>Make or Buy Decision</Label>
@@ -1293,170 +1423,6 @@ export function BOMItemDialog({
               )}
             </div>
 
-            {/* File Uploads */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="file2d" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  2D Drawing (PDF, DWG, PNG, JPG)
-                </Label>
-                <Input
-                  id="file2d"
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.dwg,.dxf"
-                  onChange={(e) => setFormData({ ...formData, file2d: e.target.files?.[0] || null })}
-                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80"
-                />
-                {formData.file2d ? (
-                  <div className="flex items-center gap-2 text-xs bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded p-2">
-                    <CheckCircle className="h-3 w-3 text-green-600" />
-                    <span className="text-green-700 dark:text-green-300">Selected: {formData.file2d.name}</span>
-                    <span className="text-green-600 dark:text-green-400">({(formData.file2d.size / 1024 / 1024).toFixed(1)} MB)</span>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Upload technical drawings, blueprints, or dimensional sketches</p>
-                )}
-              </div>
-
-              {/* Multi-file 3D upload dropzone */}
-              <div className="grid gap-2">
-                <Label className="flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  3D Models (STEP, STL, IGES, OBJ)
-                  {pendingFiles.length > 0 && (
-                    <Badge variant="secondary" className="text-xs ml-1">
-                      {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''}
-                    </Badge>
-                  )}
-                </Label>
-
-                <div
-                  {...getRootProps()}
-                  className={cn(
-                    'border-2 border-dashed rounded-lg p-4 transition-colors cursor-pointer',
-                    isDragActive
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/60 hover:bg-muted/30',
-                  )}
-                >
-                  <input {...getInputProps()} />
-
-                  {pendingFiles.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground py-2">
-                      <Package className="h-7 w-7 opacity-50" />
-                      <p className="text-sm font-medium">
-                        {isDragActive ? 'Drop files here…' : 'Drop STEP / STL / IGES files, or click to browse'}
-                      </p>
-                      <p className="text-xs">Multiple files supported · 100 MB max each · Auto-fills form from geometry</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
-                      {pendingFiles.map((pf) => (
-                        <div
-                          key={pf.id}
-                          onClick={() => {
-                            setActiveFileId(pf.id);
-                            if (pf.result) {
-                              setAutoFilledFields(new Set());
-                              populateFormFromResult(pf.result);
-                            }
-                          }}
-                          className={cn(
-                            'flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors select-none',
-                            pf.id === activeFileId
-                              ? 'bg-primary/10 border border-primary/30'
-                              : 'hover:bg-muted',
-                          )}
-                        >
-                          {pf.status === 'analyzing' && <Loader2 className="h-3 w-3 animate-spin text-blue-500 shrink-0" />}
-                          {pf.status === 'ready'     && <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />}
-                          {pf.status === 'error'     && <XCircle className="h-3 w-3 text-red-500 shrink-0" />}
-                          {pf.status === 'pending'   && <div className="h-3 w-3 rounded-full bg-muted-foreground/30 shrink-0" />}
-                          <span className="text-sm truncate flex-1 min-w-0">{pf.file.name}</span>
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {(pf.file.size / 1024 / 1024).toFixed(1)} MB
-                          </span>
-                          {pf.result && (
-                            <>
-                              <Badge variant="secondary" className="text-xs shrink-0">{pf.result.suggestions.processType}</Badge>
-                              {pf.result.suggestions.materialGrade && (
-                                <Badge variant="outline" className="text-xs shrink-0 max-w-[80px] truncate">
-                                  {pf.result.suggestions.materialGrade}
-                                </Badge>
-                              )}
-                            </>
-                          )}
-                          {pf.status === 'error' && (
-                            <span className="text-xs text-red-500 shrink-0 max-w-[100px] truncate" title={pf.error}>
-                              {pf.error}
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); removePendingFile(pf.id); }}
-                            className="ml-1 shrink-0 text-muted-foreground hover:text-foreground"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                      <p className="text-xs text-muted-foreground pt-1 px-1">
-                        Click a file to load its properties · Drop more files to add
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Cost preview from active auto-fill result */}
-                {activeResult?.costs && (
-                  <div className="rounded-md bg-muted/50 border p-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Cpu className="h-3 w-3 text-cyan-500" />
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Cost Preview · review before saving
-                      </p>
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 text-cyan-500 border-cyan-500/40 ml-auto">
-                        {Math.round((activeResult.confidence.overall ?? 0) * 100)}% confidence
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                      {activeResult.costs.materialCostPerKg !== null && (
-                        <>
-                          <span className="text-muted-foreground">Material cost/kg</span>
-                          <span className="font-mono">₹ {activeResult.costs.materialCostPerKg?.toFixed(2)}</span>
-                        </>
-                      )}
-                      {activeResult.costs.mhrRate !== null && (
-                        <>
-                          <span className="text-muted-foreground">Machine hour rate</span>
-                          <span className="font-mono">₹ {activeResult.costs.mhrRate?.toFixed(2)}/hr</span>
-                        </>
-                      )}
-                      {activeResult.costs.lhrRate !== null && (
-                        <>
-                          <span className="text-muted-foreground">Labour hour rate</span>
-                          <span className="font-mono">₹ {activeResult.costs.lhrRate?.toFixed(2)}/hr</span>
-                        </>
-                      )}
-                      {activeResult.costs.estimatedUnitCost !== null && (
-                        <>
-                          <span className="text-muted-foreground font-medium">Est. unit cost</span>
-                          <span className="font-mono font-semibold text-primary">
-                            ₹ {activeResult.costs.estimatedUnitCost?.toFixed(2)}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    {!activeResult.cadEngineAvailable && (
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                        ⚠ CAD engine offline — geometry from bounding-box estimate
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Quantity & Annual Volume */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -1470,8 +1436,9 @@ export function BOMItemDialog({
                   id="quantity"
                   type="number"
                   min="1"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                  value={formData.quantity || ''}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
                   className={validationErrors.quantity ? 'border-red-500 focus:border-red-500' : ''}
                   required
                 />
@@ -1507,8 +1474,9 @@ export function BOMItemDialog({
                   id="annualVolume"
                   type="number"
                   min="1"
-                  value={formData.annualVolume}
-                  onChange={(e) => setFormData({ ...formData, annualVolume: parseInt(e.target.value) || 1 })}
+                  value={formData.annualVolume || ''}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setFormData({ ...formData, annualVolume: parseInt(e.target.value) || 0 })}
                   className={validationErrors.annualVolume ? 'border-red-500 focus:border-red-500' : ''}
                   required
                 />
@@ -1592,13 +1560,15 @@ export function BOMItemDialog({
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="itemType">Type *</Label>
-                  <Badge variant="secondary" className="text-xs">BOM Level: {formData.bomLevel}</Badge>
+                  {formData.bomLevel && (
+                    <Badge variant="secondary" className="text-xs">BOM Level: {formData.bomLevel}</Badge>
+                  )}
                 </div>
                 <Select value={formData.itemType} onValueChange={(value) => setFormData({ ...formData, itemType: value as BOMItemType })}>
                   <SelectTrigger id="itemType"><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
-                    {Object.entries(ITEM_TYPE_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    {([BOMItemType.CHILD_PART, BOMItemType.SUB_ASSEMBLY, BOMItemType.ASSEMBLY] as BOMItemType[]).map((type) => (
+                      <SelectItem key={type} value={type}>{ITEM_TYPE_LABELS[type]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

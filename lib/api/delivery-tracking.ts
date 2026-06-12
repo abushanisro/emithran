@@ -90,9 +90,9 @@ export async function getDeliveryOrdersForTracking(
           company_name,
           contact_person,
           contact_phone,
-          street,
+          address_line1,
           city,
-          state,
+          state_province,
           country,
           postal_code,
           latitude,
@@ -109,10 +109,10 @@ export async function getDeliveryOrdersForTracking(
           id,
           latitude,
           longitude,
-          address,
-          status,
-          notes,
-          timestamp,
+          location_address,
+          event_type,
+          internal_notes,
+          event_timestamp,
           created_by
         )
       `)
@@ -161,9 +161,9 @@ export async function getDeliveryOrderTracking(orderId: string): Promise<Trackin
           company_name,
           contact_person,
           contact_phone,
-          street,
+          address_line1,
           city,
-          state,
+          state_province,
           country,
           postal_code,
           latitude,
@@ -180,10 +180,10 @@ export async function getDeliveryOrderTracking(orderId: string): Promise<Trackin
           id,
           latitude,
           longitude,
-          address,
-          status,
-          notes,
-          timestamp,
+          location_address,
+          event_type,
+          internal_notes,
+          event_timestamp,
           created_by
         )
       `)
@@ -234,9 +234,9 @@ export async function updateDeliveryLocation(update: LocationUpdate): Promise<{
         delivery_order_id: update.orderId,
         latitude: update.latitude,
         longitude: update.longitude,
-        address: update.address || `${update.latitude}, ${update.longitude}`,
-        status: update.status || 'Location Update',
-        notes: update.notes,
+        location_address: update.address || `${update.latitude}, ${update.longitude}`,
+        event_type: update.status || 'location_update',
+        internal_notes: update.notes,
         event_timestamp: timestamp,
         created_by: 'system' // In production, get from auth context
       })
@@ -295,9 +295,9 @@ export async function getLatestOrderLocation(orderId: string): Promise<{
         delivery_tracking (
           latitude,
           longitude,
-          address,
-          status,
-          notes,
+          location_address,
+          event_type,
+          internal_notes,
           event_timestamp
         )
       `)
@@ -313,9 +313,9 @@ export async function getLatestOrderLocation(orderId: string): Promise<{
         lat: event.latitude,
         lng: event.longitude,
         timestamp: event.event_timestamp,
-        address: event.address || 'Unknown location',
-        status: event.status,
-        notes: event.notes
+        address: event.location_address || 'Unknown location',
+        status: event.event_type,
+        notes: event.internal_notes
       }))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -349,9 +349,9 @@ function transformOrderToTrackingData(order: any): TrackingData {
       lat: event.latitude,
       lng: event.longitude,
       timestamp: event.event_timestamp,
-      address: event.address || 'Unknown location',
-      status: event.status,
-      notes: event.notes
+      address: event.location_address || 'Unknown location',
+      status: event.event_type,
+      notes: event.internal_notes
     }))
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -376,9 +376,9 @@ function transformOrderToTrackingData(order: any): TrackingData {
       address: formatAddress(address)
     },
     origin: {
-      lat: 28.6139, // Default manufacturing location
-      lng: 77.2090,
-      address: 'Manufacturing Hub, Delhi NCR'
+      lat: order.route_data?.originLat ?? 28.6139,
+      lng: order.route_data?.originLng ?? 77.2090,
+      address: order.route_data?.originAddress ?? 'Manufacturing Hub, Delhi NCR'
     },
     destination: {
       lat: address?.latitude || 28.4595,
@@ -428,9 +428,9 @@ function formatAddress(address: any): string {
   if (!address) return 'Address not available';
   
   const parts = [
-    address.street,
+    address.address_line1,
     address.city,
-    address.state,
+    address.state_province,
     address.country,
     address.postal_code
   ].filter(Boolean);

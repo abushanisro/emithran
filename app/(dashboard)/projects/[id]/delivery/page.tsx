@@ -46,10 +46,10 @@ export default function DeliveryPage() {
           </TabsContent>
           
           <TabsContent value="tracking" className="space-y-6">
-            <DeliveryTracking 
+            <DeliveryTracking
               projectId={projectId}
               dateRange={dateRange}
-              defaultOrderId={trackingOrderId}
+              {...(trackingOrderId !== undefined && { defaultOrderId: trackingOrderId })}
             />
           </TabsContent>
         </Tabs>

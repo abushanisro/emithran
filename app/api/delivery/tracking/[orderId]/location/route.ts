@@ -81,7 +81,7 @@ export async function POST(
 
 // GET /api/delivery/tracking/[orderId]/location - Get latest location for an order
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { orderId: string } }
 ) {
   try {

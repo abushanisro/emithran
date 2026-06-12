@@ -282,7 +282,7 @@ export default function BOMDetailPage() {
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [parentItemId, setParentItemId] = useState<string | null>(null);
-  const [defaultItemType, setDefaultItemType] = useState<BOMItemType>(BOMItemType.ASSEMBLY);
+  const [defaultItemType, setDefaultItemType] = useState<BOMItemType | undefined>(undefined);
   const [viewingItem, setViewingItem] = useState<BOMItem | null>(null);
   const [preferredView, setPreferredView] = useState<'2d' | '3d'>('3d');
 
@@ -391,7 +391,7 @@ export default function BOMDetailPage() {
   const handleAddItem = () => {
     setSelectedItem(null);
     setParentItemId(null);
-    setDefaultItemType(BOMItemType.ASSEMBLY);
+    setDefaultItemType(undefined);
     setItemDialogOpen(true);
   };
 
@@ -1327,7 +1327,7 @@ export default function BOMDetailPage() {
         open={itemDialogOpen}
         onOpenChange={setItemDialogOpen}
         parentItemId={parentItemId}
-        defaultItemType={defaultItemType}
+        {...(defaultItemType !== undefined && { defaultItemType })}
         onSuccess={refetchBOMItems}
         getAutoParent={getAutoParentForType}
       />
