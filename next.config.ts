@@ -161,7 +161,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: process.env.NODE_ENV === 'development' ? devCSP : prodCSP,
+            value: process.env.VERCEL === '1' ? prodCSP : devCSP,
           },
         ],
       },

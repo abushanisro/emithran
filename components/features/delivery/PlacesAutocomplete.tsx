@@ -88,8 +88,6 @@ export default function PlacesAutocomplete({
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
     script.async = true;
-    script.defer = true;
-    // Broadcast a custom event so MapLocationPicker knows Maps is ready
     script.onload = () => window.dispatchEvent(new Event('google-maps-loaded'));
     document.head.appendChild(script);
   }, []);

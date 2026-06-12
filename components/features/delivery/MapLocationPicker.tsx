@@ -95,11 +95,8 @@ export default function MapLocationPicker({
     if (!open) return;
 
     const init = () => {
-      // Guard: Map constructor must be available (not just the namespace stub)
       if (!window.google?.maps?.Map) return;
-      // Guard: the container div must be in the DOM
       if (!mapRef.current) { setTimeout(init, 100); return; }
-      // Guard: don't re-init
       if (mapInstanceRef.current) return;
 
       try {
@@ -115,7 +112,6 @@ export default function MapLocationPicker({
         mapInstanceRef.current = map;
         map.addListener('click', (e: any) => placeMarker(e.latLng.lat(), e.latLng.lng()));
 
-        // Search autocomplete inside the dialog
         if (searchRef.current && !autocompleteRef.current) {
           const ac = new window.google.maps.places.Autocomplete(searchRef.current, {
             componentRestrictions: { country: 'in' },
@@ -138,17 +134,27 @@ export default function MapLocationPicker({
       }
     };
 
-    // Maps.Map is already callable — delay slightly so the Dialog DOM is painted
+    // Already loaded
     if (window.google?.maps?.Map) {
       setTimeout(init, 200);
       return;
     }
 
-    // Maps script not yet loaded — listen for the custom event fired by PlacesAutocomplete
+    // Inject the Maps script ourselves if nobody else has
+    if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      if (apiKey) {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+        script.async = true;
+        script.onload = () => window.dispatchEvent(new Event('google-maps-loaded'));
+        document.head.appendChild(script);
+      }
+    }
+
     const onLoaded = () => setTimeout(init, 200);
     window.addEventListener('google-maps-loaded', onLoaded, { once: true });
 
-    // Also poll as a fallback (covers the case where RouteMap loaded the script before us)
     let t: ReturnType<typeof setInterval> | null = null;
     t = setInterval(() => {
       if (window.google?.maps?.Map) { clearInterval(t!); t = null; setTimeout(init, 200); }

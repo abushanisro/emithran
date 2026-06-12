@@ -56,7 +56,6 @@ export default function RouteMap({ fromAddress, toAddress, transportMode, materi
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
     script.async = true;
-    script.defer = true;
     script.onload = () => { window.dispatchEvent(new Event('google-maps-loaded')); setMapLoaded(true); };
     script.onerror = () => setGoogleMapsFailed(true);
     document.head.appendChild(script);
