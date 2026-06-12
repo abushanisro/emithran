@@ -141,7 +141,7 @@ const nextConfig: NextConfig = {
 
     const prodCSP = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live https://maps.googleapis.com`,
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live https://maps.googleapis.com https://maps.gstatic.com`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       `connect-src ${prodConnectSrc}`,
       "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai",

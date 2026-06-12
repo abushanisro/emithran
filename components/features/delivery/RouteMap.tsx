@@ -35,46 +35,31 @@ export default function RouteMap({ fromAddress, toAddress, transportMode, materi
 
   // Load Google Maps script
   useEffect(() => {
-    const loadGoogleMaps = () => {
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) { setGoogleMapsFailed(true); return; }
 
-      if (!apiKey) {
-        console.warn('Google Maps API key not found');
-        setMapLoaded(false);
-        return;
-      }
+    // Already fully loaded
+    if (window.google?.maps?.Map) { setMapLoaded(true); return; }
 
-      if (window.google && window.google.maps) {
-        setMapLoaded(true);
-        return;
-      }
+    const onReady = () => setMapLoaded(true);
 
-      // Check if script already exists
-      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
-        return;
-      }
+    // Script injected by another component (e.g. PlacesAutocomplete) but not yet loaded
+    if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+      window.addEventListener('google-maps-loaded', onReady, { once: true });
+      const t = setInterval(() => {
+        if (window.google?.maps?.Map) { clearInterval(t); setMapLoaded(true); }
+      }, 200);
+      return () => { window.removeEventListener('google-maps-loaded', onReady); clearInterval(t); };
+    }
 
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry&loading=async`;
-      script.async = true;
-      script.defer = true;
-
-      script.onload = () => {
-        console.log('Google Maps loaded successfully');
-        setMapLoaded(true);
-      };
-
-      script.onerror = (error) => {
-        console.error('Failed to load Google Maps script:', error);
-        console.error('API Key:', apiKey ? 'Present' : 'Missing');
-        setMapLoaded(false);
-        setGoogleMapsFailed(true);
-      };
-
-      document.head.appendChild(script);
-    };
-
-    loadGoogleMaps();
+    // Inject script ourselves
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => { window.dispatchEvent(new Event('google-maps-loaded')); setMapLoaded(true); };
+    script.onerror = () => setGoogleMapsFailed(true);
+    document.head.appendChild(script);
   }, []);
 
   // Initialize map
