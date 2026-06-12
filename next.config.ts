@@ -135,15 +135,17 @@ const nextConfig: NextConfig = {
       "https://mithran-production-dc9d.up.railway.app",
       "https://handsome-celebration-production-20e1.up.railway.app",
       "https://router.project-osrm.org",
+      "https://maps.googleapis.com", "https://maps.gstatic.com",
+      "https://*.googleapis.com",
     ].join(' ');
 
     const prodCSP = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live`,
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live https://maps.googleapis.com`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       `connect-src ${prodConnectSrc}`,
       "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
-      "img-src 'self' data: blob: https: https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co",
+      "img-src 'self' data: blob: https: https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co https://maps.gstatic.com https://*.googleapis.com",
       "object-src 'self' blob: data: https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co",
       "frame-src 'self' https://vercel.live https://*.vercel.live https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co data: blob:",
       "media-src 'self' blob: data: https://*.supabase.co https://iuvtsvjpmovfymvnmqys.supabase.co",
