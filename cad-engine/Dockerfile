@@ -6,6 +6,7 @@ FROM continuumio/miniconda3:24.9.2-0
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
