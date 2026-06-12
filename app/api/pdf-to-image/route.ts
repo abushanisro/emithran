@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward to backend PDF processing service
-    const backendResponse = await fetch(`http://localhost:4000/v1/pdf-processing/validate-pdf`, {
+    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:4000'}/v1/pdf-processing/validate-pdf`, {
       method: 'POST',
       headers: {
         'Authorization': request.headers.get('Authorization') || '',
