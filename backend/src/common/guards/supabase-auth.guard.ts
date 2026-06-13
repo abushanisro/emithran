@@ -46,14 +46,21 @@ export class SupabaseAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
-    // Development fallback: no auth header → use cached admin user, never re-fetch
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Extract token from either Authorization header (normal case) OR ?token=
+    // query string (used by EventSource SSE, which can't send custom headers).
+    let token: string | null = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (typeof request.query?.token === 'string' && request.query.token) {
+      token = request.query.token as string;
+    }
+
+    // Development fallback: no token at all → use cached admin user
+    if (!token) {
       request.user = this.getAdminFallbackUser();
       request.accessToken = null;
       return true;
     }
-
-    const token = authHeader.substring(7);
 
     try {
       const user = await this.supabaseService.verifyToken(token);

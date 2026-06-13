@@ -25,11 +25,12 @@ function orgFromEmail(email: string): string {
 
 // ─── Credit weights per action ────────────────────────────────────────────────
 
-const CR_PER_SESSION  = 150;
-const CR_PER_VAVE     = 200;
-const CR_PER_PROJECT  = 50;
-const CR_PER_BOM      = 10;
-const PLAN_CREDITS    = 10_000;
+const CR_PER_SESSION    = 150;
+const CR_PER_VAVE       = 200;
+const CR_PER_PROJECT    = 50;
+const CR_PER_BOM        = 10;
+const CR_PER_GENERATION = 50;  // AI Process Plan Generator, charged at apply
+const PLAN_CREDITS      = 10_000;
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 

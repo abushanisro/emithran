@@ -26,6 +26,7 @@ if (typeof window !== 'undefined') {
   }
 }
 import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
+import { GenerateProcessPlanButton } from '@/components/features/process-planning/GenerateProcessPlanButton';
 import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
 import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
 import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
@@ -300,7 +301,7 @@ function ProcessPlanningPageContent() {
     setIsEditingPartDetails(false);
   };
 
-  // Load file URLs
+  // Load file URLs — depend on stable IDs, not the full object reference
   useEffect(() => {
     if (!selectedItem) {
       setFile3dUrl(null);
@@ -308,10 +309,14 @@ function ProcessPlanningPageContent() {
       return;
     }
 
+    const itemId = selectedItem.id;
+    const path3d = selectedItem.file3dPath;
+    const path2d = selectedItem.file2dPath;
+
     const loadFile3dUrl = async () => {
       try {
-        if (selectedItem.file3dPath) {
-          const response = await apiClient.get<{ url: string }>(`/bom-items/${selectedItem.id}/file-url/3d`);
+        if (path3d) {
+          const response = await apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/3d`);
           setFile3dUrl(response.url);
         } else {
           setFile3dUrl(null);
@@ -323,8 +328,8 @@ function ProcessPlanningPageContent() {
 
     const loadFile2dUrl = async () => {
       try {
-        if (selectedItem.file2dPath) {
-          const response = await apiClient.get<{ url: string }>(`/bom-items/${selectedItem.id}/file-url/2d`);
+        if (path2d) {
+          const response = await apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/2d`);
           setFile2dUrl(response.url);
         } else {
           setFile2dUrl(null);
@@ -336,7 +341,8 @@ function ProcessPlanningPageContent() {
 
     loadFile3dUrl();
     loadFile2dUrl();
-  }, [selectedItem]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItem?.id, selectedItem?.file3dPath, selectedItem?.file2dPath]);
 
   // Transform BOM items to match BOMSelectionCard expected format
   // Only transform the selected BOM with its items
@@ -637,35 +643,41 @@ function ProcessPlanningPageContent() {
                       <CardTitle className="text-white text-sm font-semibold">
                         Complete BOM Details & Process Planning
                       </CardTitle>
-                      {!isEditingPartDetails ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleEditPartDetails}
-                          className="h-6 px-2 text-xs text-white hover:bg-white/20"
-                        >
-                          Edit All
-                        </Button>
-                      ) : (
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
+                        <GenerateProcessPlanButton
+                          bomItemId={selectedItem?.id ?? null}
+                          hasGeometry={!!selectedItem?.file3dPath}
+                        />
+                        {!isEditingPartDetails ? (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={handleSavePartDetails}
+                            onClick={handleEditPartDetails}
                             className="h-6 px-2 text-xs text-white hover:bg-white/20"
                           >
-                            Save
+                            Edit All
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleCancelEdit}
-                            className="h-6 px-2 text-xs text-white hover:bg-white/20"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleSavePartDetails}
+                              className="h-6 px-2 text-xs text-white hover:bg-white/20"
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleCancelEdit}
+                              className="h-6 px-2 text-xs text-white hover:bg-white/20"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-3">
@@ -986,26 +998,32 @@ function ProcessPlanningPageContent() {
                 </div>
 
                 {/* 2D DRAWING VIEWER */}
-                {selectedItem.file2dPath && file2dUrl && (
+                {selectedItem.file2dPath && (
                   <div className="border border-border rounded-lg overflow-hidden shadow-md">
                     <div className="bg-muted p-3">
                       <h2 className="text-sm font-semibold">2D Drawing</h2>
                     </div>
                     <div className="bg-card p-4">
                       <div className="h-[600px] bg-secondary border border-border rounded overflow-hidden">
-                        <Viewer2D
-                          fileUrl={file2dUrl}
-                          fileName={selectedItem.file2dPath.split('/').pop() || selectedItem.name || 'drawing'}
-                          fileType={
-                            selectedItem.file2dPath.toLowerCase().endsWith('.pdf')
-                              ? 'pdf'
-                              : ['.png', '.jpg', '.jpeg', '.webp'].some((ext) =>
-                                selectedItem.file2dPath?.toLowerCase().endsWith(ext)
-                              )
-                                ? 'img'
-                                : 'other'
-                          }
-                        />
+                        {file2dUrl ? (
+                          <Viewer2D
+                            fileUrl={file2dUrl}
+                            fileName={selectedItem.file2dPath.split('/').pop() || selectedItem.name || 'drawing'}
+                            fileType={
+                              selectedItem.file2dPath.toLowerCase().endsWith('.pdf')
+                                ? 'pdf'
+                                : ['.png', '.jpg', '.jpeg', '.webp'].some((ext) =>
+                                  selectedItem.file2dPath?.toLowerCase().endsWith(ext)
+                                )
+                                  ? 'img'
+                                  : 'other'
+                            }
+                          />
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-muted-foreground">
+                            <p className="text-sm">Loading 2D drawing...</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

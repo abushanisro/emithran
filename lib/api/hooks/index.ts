@@ -21,3 +21,4 @@ export * from './useAuthEnabled';
 export * from './useCadEngine';
 export * from './useVave';
 export * from './useBenchmarkSessions';
+export * from './useProcessPlanGenerate';

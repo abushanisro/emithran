@@ -1,3 +1,7 @@
+// Load .env with override:true so .env values always win over system env vars
+import * as dotenv from 'dotenv';
+dotenv.config({ override: true });
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, VersioningType, BadRequestException, RequestMethod } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
