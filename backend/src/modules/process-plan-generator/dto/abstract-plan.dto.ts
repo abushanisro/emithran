@@ -30,33 +30,21 @@ export interface AbstractProcessLine {
   machineCandidateId: string;    // 'mc-N'
   labourCandidateId: string;     // 'lb-N'
   calculatorCandidateId?: string | null; // 'cl-N' optional
-  setupMin: number;
-  setupManning: number;
+  featureId?: string;            // 'F1', 'F2' — which ManufacturingFeature this op addresses
   batchSize: number;
   heads: number;
-  cycleSec: number;
   partsPerCycle: number;
   scrapPct: number;
   reason: string;
+  // Timing hints: optional — resolver overrides with calculator > lookup table > default
+  setupMin?: number;
+  setupManning?: number;
+  cycleSec?: number;
 }
 
 export interface AbstractToolingLine {
-  toolingType:
-    | 'cutting_tool'
-    | 'fixture'
-    | 'jig'
-    | 'gauge'
-    | 'die'
-    | 'mold'
-    | 'other';
-  description: string;
-  specifications: string;
-  unitCost: number;
-  quantity: number;
-  amortizationParts: number;
-  usagePercentage: number;
-  isCustom: boolean;
-  reason: string;
+  candidateId: string;   // 'tc-N' from tooling CandidateSet — all cost data comes from DB
+  reason: string;        // ≤ 240 chars, must cite the operation and why this tool is needed
 }
 
 export interface AbstractLogisticsLine {
@@ -97,13 +85,9 @@ export interface AbstractProposedRawMaterial {
 export interface AbstractProposedProcess {
   kind: 'process';
   proposedMasterId: string;          // 'pm-N'
-  processName: string;
-  processCategory: string;
-  machineType: string;
-  description: string;
-  setupTimeMinutes: number;
-  cycleTimeMinutes: number;
-  skillLevelRequired: 'Unskilled' | 'Semi-Skilled' | 'Skilled' | 'Highly Skilled';
+  processGroup: string;
+  processRoute: string;
+  operation: string;
   reason: string;
 }
 

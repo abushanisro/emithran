@@ -13,7 +13,7 @@ import { ExpandCandidatesTool } from './tools/expand-candidates.tool';
 
 export const REASONING_MODEL = 'claude-sonnet-4-6';
 const MAX_TOOL_CALLS = 4;
-const MAX_TOKENS_OUT = 4096;
+const MAX_TOKENS_OUT = 8192;
 const WALL_CLOCK_MS = 120_000;
 const VALIDATION_RETRIES = 1;
 
@@ -128,10 +128,13 @@ export class ReasoningService {
       const stopReason: string = resp.stop_reason;
       const content: any[] = resp.content ?? [];
 
-      // No tool use → model gave up or returned text; bail
+      // No tool use → model gave up or returned text; bail.
+      // With tool_choice:'any' this should only occur on max_tokens (output truncated).
       if (stopReason !== 'tool_use') {
-        const text = content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').slice(0, 400);
-        out.error = `Model stopped without calling save_draft (reason=${stopReason}). Text: ${text}`;
+        const text = content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').slice(0, 600);
+        out.error = stopReason === 'max_tokens'
+          ? `Model hit output token limit (${MAX_TOKENS_OUT}) before calling save_draft. Partial text: ${text.slice(0, 200)}`
+          : `Model stopped without calling save_draft (reason=${stopReason}). Text: ${text.slice(0, 400)}`;
         this.logger.warn(out.error);
         return out;
       }
@@ -261,9 +264,10 @@ export class ReasoningService {
     const body = {
       model: REASONING_MODEL,
       max_tokens: MAX_TOKENS_OUT,
+      temperature: 0,
       system: systemBlocks,
       tools: TOOLS,
-      tool_choice: { type: 'auto' },
+      tool_choice: { type: 'any' },  // 'any' forces the model to call a tool on every turn; prevents text-only "sorry I can't" responses
       messages,
     };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   Sheet,
@@ -58,6 +58,7 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
   const [removals, setRemovals] = useState<Set<string>>(new Set());
   const [masterApprovals, setMasterApprovals] = useState<Map<string, boolean>>(new Map());
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [justApplied, setJustApplied] = useState(false);
 
   const draft = generation?.draft ?? null;
 
@@ -125,7 +126,7 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
       proposedMasterApprovals: Array.from(masterApprovals.entries()).map(([proposedMasterId, approved]) => ({ proposedMasterId, approved })),
     };
     await apply.mutateAsync({ generationId: generation.id, body, bomItemId: generation.bomItemId });
-    onClose();
+    setJustApplied(true);
   };
 
   const handleDiscard = async () => {
@@ -139,6 +140,10 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
   const isOutOfScope = generation?.status === 'out_of_scope';
   const isFailed = generation?.status === 'failed';
   const isDraftReady = generation?.status === 'draft_ready';
+  const isApplied = justApplied || generation?.status === 'applied';
+
+  // Reset applied state when a new generation loads or panel closes
+  React.useEffect(() => { setJustApplied(false); }, [generation?.id, open]);
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -175,7 +180,19 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
             </div>
           )}
 
-          {isDraftReady && draft && generation && (
+          {isApplied && (
+            <div className="rounded border border-green-500/40 bg-green-500/10 p-3 text-sm flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <p className="font-medium text-green-700 dark:text-green-400">Plan applied to BOM</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Draft is kept for reference. Generate a new plan to replace it.</p>
+              </div>
+            </div>
+          )}
+
+          {(isDraftReady || isApplied) && draft && generation && (
             <>
               {/* Reasoning trail (collapsible) */}
               <button
@@ -262,15 +279,20 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
               )}
             </div>
             <div className="flex items-center gap-2">
-              {generation && generation.status !== 'applied' && (
+              {!isApplied && generation && generation.status !== 'applied' && (
                 <Button variant="ghost" size="sm" onClick={handleDiscard} disabled={discard.isPending}>
                   Discard
                 </Button>
               )}
-              {isDraftReady && (
+              {isDraftReady && !isApplied && (
                 <Button size="sm" onClick={handleApply} disabled={apply.isPending}>
                   {apply.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                   Apply All · ₹{draft?.costPreview.total.toFixed(2)}
+                </Button>
+              )}
+              {isApplied && (
+                <Button size="sm" variant="outline" onClick={onClose}>
+                  Close
                 </Button>
               )}
             </div>

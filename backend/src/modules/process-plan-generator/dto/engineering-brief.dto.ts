@@ -58,14 +58,18 @@ export interface BriefContext {
   organizationLocation: string;
   currency: 'INR';
   language: 'en';
+  exchangeRateSnapshot?: Record<string, number>; // e.g. { USD: 83.5, EUR: 89.0 }
 }
 
 import type { DrawingBrief } from './drawing-brief.dto';
+import type { ManufacturingFeatureGraph, MandatoryOp } from './manufacturing-feature.dto';
 
 export interface EngineeringBrief {
   bomItem: BriefBomItem;
   dfm: BriefDfm;
   drawing: DrawingBrief;
+  featureGraph: ManufacturingFeatureGraph;
+  mandatoryOps: MandatoryOp[];
   context: BriefContext;
   scope: PartFamilyDecision;
 }

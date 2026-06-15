@@ -110,8 +110,9 @@ export class PersistenceService {
             material_group: (pm.data as any).materialGroup,
             material: (pm.data as any).material,
             material_grade: (pm.data as any).grade,
-            density: (pm.data as any).densityKgPerM3,
-            unit_cost: (pm.data as any).unitCostInrPerKg,
+            density_kg_m3: (pm.data as any).densityKgPerM3,
+            cost: (pm.data as any).unitCostInrPerKg,
+            currency: 'INR',
             location: (pm.data as any).location ?? 'India-Bangalore',
           };
           const { data, error } = await client.from('raw_materials').insert(insertPayload).select('id').single();
@@ -120,17 +121,12 @@ export class PersistenceService {
           newMasterIdByRef.set(pm.proposedMasterId, data.id);
         } else if (pm.kind === 'process') {
           const insertPayload = {
-            user_id: userId,
-            process_name: (pm.data as any).processName,
-            process_category: (pm.data as any).processCategory,
-            machine_type: (pm.data as any).machineType,
-            description: (pm.data as any).description,
-            setup_time_minutes: (pm.data as any).setupTimeMinutes,
-            cycle_time_minutes: (pm.data as any).cycleTimeMinutes,
-            skill_level_required: (pm.data as any).skillLevelRequired,
+            process_group: (pm.data as any).processGroup,
+            process_route: (pm.data as any).processRoute,
+            operation: (pm.data as any).operation,
           };
-          const { data, error } = await client.from('processes').insert(insertPayload).select('id').single();
-          if (error) throw new Error(`processes insert failed: ${error.message}`);
+          const { data, error } = await client.from('process_calculator_mappings').insert(insertPayload).select('id').single();
+          if (error) throw new Error(`process_calculator_mappings insert failed: ${error.message}`);
           insertedMasters.processes.push(data.id);
           newMasterIdByRef.set(pm.proposedMasterId, data.id);
         }
@@ -144,15 +140,16 @@ export class PersistenceService {
             const payload = {
               bom_item_id: bomItemId,
               user_id: userId,
+              material_name: line.data.materialName,
               material_category: line.data.materialCategory,
-              material_description: line.data.materialGrade ?? line.data.materialDescription ?? null,
+              material_description: line.data.materialGrade ?? (line.data as any).materialDescription ?? null,
               unit_cost: line.data.unitCost,
               gross_usage: line.data.grossUsage,
               net_usage: line.data.netUsage,
               scrap: line.data.scrapPercentage,
               overhead: line.data.overheadPercentage,
               material_id: materialId ? String(materialId) : null,
-              uom: line.data.uom ?? 'KG',
+              uom: (line.data as any).uom ?? 'KG',
             };
             const { data, error } = await client.from('raw_material_cost_records').insert(payload).select('id').single();
             if (error) throw new Error(`raw_material_cost_records insert failed: ${error.message}`);
@@ -181,6 +178,9 @@ export class PersistenceService {
               parts_per_cycle: line.data.partsPerCycle,
               scrap: line.data.scrapPercentage,
               currency: 'INR',
+              process_group: line.data.processGroup ?? null,
+              process_route: line.data.processRoute ?? null,
+              operation: line.data.operation ?? null,
             };
             const { data, error } = await client.from('process_cost_records').insert(payload).select('id').single();
             if (error) throw new Error(`process_cost_records insert failed: ${error.message}`);
@@ -266,6 +266,11 @@ export class PersistenceService {
         newProcessMasters: insertedMasters.processes,
       };
 
+      // Snapshot the exchange rate used — read from the brief stored on the generation.
+      // This ensures the applied record is reproducible (correct cost even if rates change).
+      const storedBrief = gen.brief as any;
+      const exchangeRateSnapshot = storedBrief?.context?.exchangeRateSnapshot ?? null;
+
       await client
         .from('process_plan_generations')
         .update({
@@ -273,6 +278,8 @@ export class PersistenceService {
           applied_at: new Date().toISOString(),
           applied_line_ids: appliedLineIds,
           credit_cost: creditCost,
+          exchange_rate_snapshot: exchangeRateSnapshot,
+          costing_currency: 'INR',
         })
         .eq('id', generationId);
 

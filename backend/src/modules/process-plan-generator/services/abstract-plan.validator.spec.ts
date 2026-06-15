@@ -12,11 +12,12 @@ const candidates: CandidateSet = {
     { candidateId: 'lb-1', dbId: 'lsr-abc', labourType: 'Skilled', labourCode: 'SKL-01', lhrInrPerHour: 62, location: 'India-Bangalore', score: 0.9 },
   ],
   processes: [
-    { candidateId: 'op-1', dbId: 'proc-abc', processName: 'Turning', processCategory: 'Machining', machineType: 'Lathe', standardTimeMinutes: null, setupTimeMinutes: 20, cycleTimeMinutes: 0.5, skillLevelRequired: 'Skilled', score: 0.9 },
+    { candidateId: 'op-1', dbId: 'proc-abc', processGroup: 'CNC Machining', processRoute: 'Turning', operation: 'Turning', calculatorId: null, score: 0.9, referenceTables: [] },
   ],
   calculators: [
-    { candidateId: 'cl-1', dbId: 'calc-abc', name: 'Machining Cost', calcCategory: 'process', description: null, score: 0.7 },
+    { candidateId: 'cl-1', dbId: 'calc-abc', name: 'Machining Cost', calcCategory: 'process', description: null, score: 0.7, fields: [], formulas: [] },
   ],
+  tooling: [],
 };
 
 const validPlan = {
@@ -120,13 +121,9 @@ describe('validateAbstractPlan', () => {
       proposedMasters: [{
         kind: 'process',
         proposedMasterId: 'pm-grind',
-        processName: 'Centerless grinding',
-        processCategory: 'Machining',
-        machineType: 'Centerless Grinder',
-        description: 'For tight tolerance pins',
-        setupTimeMinutes: 20,
-        cycleTimeMinutes: 0.4,
-        skillLevelRequired: 'Skilled',
+        processGroup: 'CNC Machining',
+        processRoute: 'Grinding',
+        operation: 'Centerless Grinding',
         reason: 'IT8 tolerance + Ra 3.2 implies grinding.',
       }],
     };

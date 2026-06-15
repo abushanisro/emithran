@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 import { useQualityInspections, useDeleteQualityInspection, useApproveQualityInspection, useRejectQualityInspection, useResetInspectionStatus } from '@/lib/api/hooks/useQualityControl';
+import { usePageContext } from '@/lib/echo/PageContextProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,11 @@ import CreateQCInspectionDialog from '@/components/features/quality-control/Crea
 
 export default function QualityControlPage() {
   const params = useParams();
+  usePageContext({
+    entityType: 'project',
+    entityId: (params?.id as string) ?? '',
+    breadcrumbs: ['Project', 'Quality control'],
+  });
   const router = useRouter();
   const projectId = params.id as string;
 

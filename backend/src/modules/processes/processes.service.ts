@@ -183,10 +183,9 @@ export class ProcessesService {
    */
   async getReferenceTables(processId: string, accessToken: string): Promise<any[]> {
     this.logger.log(`Fetching reference tables for process: ${processId}`, 'ProcessesService');
+    const client = this.supabaseService.getClient(accessToken);
 
-    // Get all tables for this process
-    const { data: tables, error: tablesError } = await this.supabaseService
-      .getClient(accessToken)
+    const { data: tables, error: tablesError } = await client
       .from('process_reference_tables')
       .select('*')
       .eq('process_id', processId)
@@ -197,11 +196,46 @@ export class ProcessesService {
       throw new InternalServerErrorException(`Failed to fetch reference tables: ${tablesError.message}`);
     }
 
-    // For each table, get its rows
+    let targetTables: any[] = tables || [];
+
+    // Global fallback: if this process has no tables, find matching is_global=true
+    // processes with the same name and return their tables as the shared template.
+    if (targetTables.length === 0) {
+      const { data: proc } = await client
+        .from('processes')
+        .select('process_name')
+        .eq('id', processId)
+        .single();
+
+      if (proc?.process_name) {
+        const { data: globalProcs } = await client
+          .from('processes')
+          .select('id')
+          .ilike('process_name', proc.process_name)
+          .eq('is_global', true)
+          .limit(10);
+
+        if (globalProcs?.length) {
+          const globalIds = globalProcs.map((p: any) => p.id);
+          const { data: globalTables } = await client
+            .from('process_reference_tables')
+            .select('*')
+            .in('process_id', globalIds)
+            .order('display_order', { ascending: true });
+          targetTables = globalTables || [];
+          if (targetTables.length > 0) {
+            this.logger.log(
+              `Global fallback: returning ${targetTables.length} tables from global "${proc.process_name}" process`,
+              'ProcessesService',
+            );
+          }
+        }
+      }
+    }
+
     const tablesWithRows = await Promise.all(
-      (tables || []).map(async (table) => {
-        const { data: rows, error: rowsError } = await this.supabaseService
-          .getClient(accessToken)
+      targetTables.map(async (table) => {
+        const { data: rows, error: rowsError } = await client
           .from('process_table_rows')
           .select('*')
           .eq('table_id', table.id)

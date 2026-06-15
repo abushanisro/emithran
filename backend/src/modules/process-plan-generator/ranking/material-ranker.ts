@@ -99,11 +99,16 @@ export function rankMaterials(
     const hScore = hintFitScore(row, hint);
     const lScore = locationFitScore(row, orgLocation);
     const cScore = costSanityScore(row);
-    const score = 0.35 * fScore + 0.30 * hScore + 0.15 * lScore + 0.20 * cScore;
+    // Hint weight raised to 0.40 when a BOM material hint is present — it must drive selection.
+    // Without hint (hScore=0.5 for all) the weights collapse to family+location+cost tiebreak.
+    const score = hint
+      ? 0.20 * fScore + 0.40 * hScore + 0.25 * lScore + 0.15 * cScore
+      : 0.30 * fScore + 0.00 * hScore + 0.45 * lScore + 0.25 * cScore;
     return { row, score };
   });
 
-  scored.sort((a, b) => b.score - a.score);
+  // Secondary sort by DB id ensures identical scores sort the same way every run.
+  scored.sort((a, b) => b.score - a.score || a.row.id.localeCompare(b.row.id));
 
   return scored.slice(0, topN).map(({ row, score }, idx) => ({
     candidateId: `rm-${idx + 1}`,

@@ -12,7 +12,8 @@ interface LsrRow {
   id: string;
   labour_type: string | null;
   labour_code: string | null;
-  lhr: number | string | null;
+  lhr: number | string | null;      // raw DB value (may be USD)
+  lhr_inr?: number | null;          // pre-converted to INR by retrieval service
   location?: string | null;
 }
 
@@ -34,9 +35,11 @@ function locationFitScore(row: LsrRow, orgLocation: string): number {
 }
 
 function rateSanityScore(row: LsrRow): number {
-  const rate = toNumber(row.lhr);
+  // Prefer lhr_inr (already converted) — fall back to raw value.
+  const rate = row.lhr_inr ?? toNumber(row.lhr);
   if (rate <= 0) return 0;
-  if (rate > 5000) return 0.4;
+  // INR thresholds: ₹20–₹500/hr is typical Indian labour band range
+  if (rate > 5_000) return 0.4;
   if (rate >= 20) return 1;
   return 0.6;
 }
@@ -55,14 +58,14 @@ export function rankLabour(
     return { row, score };
   });
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score || a.row.id.localeCompare(b.row.id));
 
   return scored.slice(0, topN).map(({ row, score }, idx) => ({
     candidateId: `lb-${idx + 1}`,
     dbId: row.id,
     labourType: row.labour_type ?? '',
     labourCode: row.labour_code ?? null,
-    lhrInrPerHour: toNumber(row.lhr),
+    lhrInrPerHour: row.lhr_inr ?? toNumber(row.lhr),
     location: row.location ?? null,
     score: Number(score.toFixed(3)),
   }));

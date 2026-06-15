@@ -656,9 +656,9 @@ export class ProcessCostResponseDto {
     return {
       id: row.id,
       opNbr: row.op_nbr || 0,
-      processGroup: row.process_group,
-      processRoute: row.process_route,
-      operation: row.operation,
+      processGroup: row.process_group || '',
+      processRoute: row.process_route || '',
+      operation: row.operation || '',
       mhrId: row.mhr_id,
       lsrId: row.lsr_id,
       currency: row.currency || 'INR',

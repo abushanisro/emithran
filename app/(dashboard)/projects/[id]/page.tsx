@@ -15,11 +15,14 @@ import {
 import { useProject, useBOMs, useUpdateProject } from '@/lib/api/hooks';
 import { ProjectModules } from '@/components/features/projects/ProjectModules';
 import { ProjectDetailsCard } from '@/components/features/projects/ProjectDetailsCard';
+import { usePageContext } from '@/lib/echo/PageContextProvider';
 
 export default function ProjectDetail() {
   const params = useParams<{ id: string }>();
   const id = params?.id || '';
   const router = useRouter();
+
+  usePageContext({ entityType: 'project', entityId: id });
 
   const {
     data: project,

@@ -77,7 +77,10 @@ class AIEnhancedDFMAnalyzer:
     for enterprise-grade manufacturability insights
     """
     
-    def __init__(self, api_key: Optional[str] = None, model_name: str = "claude-3-5-sonnet-20241022"):
+    # Bumped to the platform-standard Sonnet model used by the reasoning
+    # service (claude-sonnet-4-6). Echo escalates to this model only when the
+    # user explicitly asks for a deep DFM review, since this call costs more.
+    def __init__(self, api_key: Optional[str] = None, model_name: str = "claude-sonnet-4-6"):
         """
         Initialize AI DFM Analyzer
 

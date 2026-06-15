@@ -12,11 +12,13 @@ interface CalculatorRow {
   name: string | null;
   calc_category: string | null;
   description: string | null;
+  fields?: Array<{ field_name: string; data_source: string | null; source_field: string | null; default_value: string | null }>;
+  formulas?: Array<{ formula_name: string | null; formula_expression: string; execution_order: number; is_primary_result: boolean }>;
 }
 
 const FAMILY_CALC_KEYWORDS: Record<Exclude<PartFamily, 'out_of_scope'>, string[]> = {
-  cnc_turned: ['turn', 'lathe', 'cnc', 'machining', 'process'],
-  cnc_milled: ['mill', 'machining', 'cnc', 'process'],
+  cnc_turned: ['turn', 'lathe', 'cnc', 'machining', 'process', 'drill', 'tap'],
+  cnc_milled: ['mill', 'machining', 'cnc', 'process', 'thread mill', 'drill', 'tap'],
   sheet_metal: ['sheet metal', 'laser', 'punch', 'bend', 'sheet', 'cutting'],
 };
 
@@ -44,7 +46,7 @@ export function rankCalculators(
     score: keywordScore(row, family),
   }));
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score || a.row.id.localeCompare(b.row.id));
 
   return scored.slice(0, topN).map(({ row, score }, idx) => ({
     candidateId: `cl-${idx + 1}`,
@@ -53,5 +55,19 @@ export function rankCalculators(
     calcCategory: row.calc_category ?? '',
     description: row.description ?? null,
     score: Number(score.toFixed(3)),
+    fields: (row.fields ?? []).map((f) => ({
+      fieldName: f.field_name,
+      dataSource: f.data_source ?? null,
+      sourceField: f.source_field ?? null,
+      defaultValue: f.default_value ?? null,
+    })),
+    formulas: (row.formulas ?? [])
+      .sort((a: any, b: any) => (a.execution_order ?? 0) - (b.execution_order ?? 0))
+      .map((f) => ({
+        formulaName: f.formula_name ?? null,
+        formulaExpression: f.formula_expression,
+        executionOrder: f.execution_order ?? 0,
+        isPrimaryResult: !!f.is_primary_result,
+      })),
   }));
 }

@@ -184,7 +184,7 @@ export class OrchestratorService {
     }
 
     // ── Stage 3 — resolver ────────────────────────────────────────────────
-    const draftPackage = this.resolver.resolve(reasoning.plan, reasoning.candidatesAfterExpansion);
+    const draftPackage = this.resolver.resolve(reasoning.plan, reasoning.candidatesAfterExpansion, brief);
     this.emit(stream, {
       type: 'resolver.done',
       data: {
@@ -240,7 +240,7 @@ export class OrchestratorService {
       .select('*')
       .eq('bom_item_id', bomItemId)
       .eq('user_id', userId)
-      .eq('status', 'draft_ready')
+      .in('status', ['draft_ready', 'applied'])
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -353,7 +353,7 @@ export class OrchestratorService {
    */
   private async clearStaleByIdempotencyKey(client: any, userId: string, key: string, forceRefresh = false): Promise<void> {
     const statuses = ['running', 'failed', 'discarded'];
-    if (forceRefresh) statuses.push('draft_ready', 'out_of_scope');
+    if (forceRefresh) statuses.push('draft_ready', 'out_of_scope', 'applied');
     const { error } = await client
       .from('process_plan_generations')
       .delete()

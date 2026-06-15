@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { useRawMaterials, useRawMaterialFilterOptions } from '@/lib/api/hooks/useRawMaterials';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
+import { useExchangeRates, convertToInr } from '@/lib/api/hooks/useExchangeRates';
 import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
@@ -69,6 +70,9 @@ export function RawMaterialDialog({
   const { data: calculatorsData } = useCalculators();
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
   const executeCalculator = useExecuteCalculator();
+
+  // Exchange rates for currency conversion (USD/EUR/GBP → INR)
+  const { data: exchangeRates } = useExchangeRates();
 
   // Auto-populate calculator inputs from BOM data
   const autoPopulateFromBOM = () => {
@@ -497,7 +501,8 @@ export function RawMaterialDialog({
     if ((selectedMaterial || editData) && grossUsage > 0) {
       // Get unit cost from material - check all possible cost fields, or use manual input
       let unitCost = 0;
-      
+      const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
+
       if (selectedMaterial) {
         // Pick regional cost based on selected country
         const countryLower = (country || '').toLowerCase();
@@ -511,13 +516,16 @@ export function RawMaterialDialog({
           countryLower.includes('china')    ? selectedMaterial.costChina :
           undefined;
 
-        unitCost = regionalCost ||
-                   selectedMaterial.costIndia ||
-                   selectedMaterial.unitCost ||
-                   selectedMaterial.cost ||
-                   0;
+        const rawCost = regionalCost ||
+                        selectedMaterial.costIndia ||
+                        selectedMaterial.unitCost ||
+                        selectedMaterial.cost ||
+                        0;
+
+        // Convert to INR using the exchange_rates table
+        unitCost = convertToInr(rawCost, selectedMaterial.currency, rates);
       }
-      
+
       // If no cost from material, use manual input
       const finalUnitCost = unitCost || manualUnitCost || 0;
       const grossUsageNum = typeof grossUsage === 'number' ? grossUsage : 0;
@@ -558,7 +566,7 @@ export function RawMaterialDialog({
     } else {
       setTotalCost(0);
     }
-  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, editData, country]);
+  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, editData, country, exchangeRates]);
 
   // Auto-populate calculator fields when material is selected
   useEffect(() => {
@@ -711,7 +719,8 @@ export function RawMaterialDialog({
         return;
       }
       
-      // Get unit cost from material based on selected country
+      // Get unit cost from material based on selected country, then convert to INR
+      const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
       const countryLowerSubmit = (country || '').toLowerCase();
       const regionalCostSubmit =
         countryLowerSubmit.includes('france')   ? selectedMaterial.costFrance :
@@ -722,11 +731,12 @@ export function RawMaterialDialog({
         countryLowerSubmit.includes('e. europe') || countryLowerSubmit.includes('eastern europe') ? selectedMaterial.costEEurope :
         countryLowerSubmit.includes('china')    ? selectedMaterial.costChina :
         undefined;
-      const materialUnitCost = regionalCostSubmit ||
+      const rawMaterialCost = regionalCostSubmit ||
                                selectedMaterial.costIndia ||
                                selectedMaterial.unitCost ||
                                selectedMaterial.cost ||
                                0;
+      const materialUnitCost = convertToInr(rawMaterialCost, selectedMaterial.currency, rates);
       
       if (!materialUnitCost && !manualUnitCost) {
         alert('Please enter a unit cost. The selected material has no cost data available.');
@@ -974,28 +984,33 @@ export function RawMaterialDialog({
             )}
 
             {/* Current Cost Display */}
-            {selectedMaterial && (
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Unit Cost</label>
-                <div className="p-4 border-2 border-primary/20 bg-primary/5 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Current Price:</span>
-                    <span className="text-lg font-bold text-primary">
-                      {selectedMaterial.currency && selectedMaterial.currency === 'USD' ? '$' : 
-                       selectedMaterial.currency === 'EUR' ? '€' : 
-                       selectedMaterial.currency === 'GBP' ? '£' : 
-                       '₹'}
-                      {(selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0).toFixed(2)}
-                    </span>
-                  </div>
-                  {selectedMaterial.currency && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Currency: {selectedMaterial.currency}
+            {selectedMaterial && (() => {
+              const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
+              const rawCost = selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0;
+              const inrCost = convertToInr(rawCost, selectedMaterial.currency, rates);
+              const currSymbol = selectedMaterial.currency === 'USD' ? '$'
+                : selectedMaterial.currency === 'EUR' ? '€'
+                : selectedMaterial.currency === 'GBP' ? '£'
+                : '₹';
+              const isNonInr = selectedMaterial.currency && selectedMaterial.currency !== 'INR';
+              return (
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Unit Cost</label>
+                  <div className="p-4 border-2 border-primary/20 bg-primary/5 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-primary">Price (INR):</span>
+                      <span className="text-lg font-bold text-primary">₹{inrCost.toFixed(2)}</span>
                     </div>
-                  )}
+                    {isNonInr && (
+                      <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-primary/10 pt-1">
+                        <span>Master price ({selectedMaterial.currency}):</span>
+                        <span>{currSymbol}{rawCost.toFixed(2)} × {(rates[(selectedMaterial.currency ?? '').toUpperCase()] ?? 1).toFixed(2)} = ₹{inrCost.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Manual Unit Cost Input (when material has no cost) */}
             {(selectedMaterialId || editData) && (!selectedMaterial || 

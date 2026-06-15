@@ -14,15 +14,17 @@ interface MhrRow {
   machine_name: string | null;
   machine_description: string | null;
   commodity_code: string | null;
-  total_machine_hour_rate?: number | string | null;  // canonical in mhr_records
-  final_mhr?: number | string | null;                 // legacy column name fallback
+  total_machine_hour_rate?: number | string | null;
+  final_mhr?: number | string | null;
+  rate_inr?: number | null;
   location?: string | null;
+  process_family?: string | null;  // exact family tag — beats keyword heuristic when set
 }
 
 const MACHINE_KEYWORDS_BY_FAMILY: Record<Exclude<PartFamily, 'out_of_scope'>, string[]> = {
   cnc_turned: ['lathe', 'turning', 'turn center', 'cnc lathe', 'vmc lathe', 'swiss', 'turn-mill'],
   cnc_milled: ['vmc', 'mill', 'milling', 'machining center', 'hmc', 'cnc machining', 'vertical machining', '5-axis', 'router'],
-  sheet_metal: ['laser', 'press brake', 'shear', 'punch', 'turret', 'bending', 'cnc bending', 'fiber laser'],
+  sheet_metal: ['laser', 'press brake', 'shear', 'punch', 'turret', 'bending', 'cnc bending', 'fiber laser', 'press', 'bender', 'roll', 'stamping', 'forming', 'blanking'],
 };
 
 const norm = (s: string | null | undefined): string => (s ?? '').toLowerCase().trim();
@@ -33,23 +35,50 @@ const toNumber = (v: number | string | null | undefined): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+// Machine categories needed for ALL part families regardless of machining type.
+// These must always appear in the candidate set so the AI can route deburring,
+// surface treatment, and inspection correctly instead of falling back to VMC.
+const UNIVERSAL_PROCESS_FAMILIES = new Set([
+  'bench_manual',      // deburring, cleaning, marking, packaging
+  'surface_treatment', // anodizing, plating, coating — often outsourced
+  'quality',           // inspection bench, CMM, gauging
+  'inspection',        // alt tag for the same category
+  'heat_treatment',    // furnace, oven — outsourced or in-house
+  'saw',               // band saw, cold saw — always needed for bar stock
+]);
+
 function keywordFitScore(row: MhrRow, family: Exclude<PartFamily, 'out_of_scope'>): number {
+  // Exact family tag wins — deterministic, no keyword guessing needed.
+  if (row.process_family) {
+    if (row.process_family === family) return 1;
+    // Universal categories must appear in every candidate set.
+    if (UNIVERSAL_PROCESS_FAMILIES.has(row.process_family)) return 0.65;
+    return 0.05;
+  }
+  // Legacy rows without a tag fall through to keyword heuristic.
   const keywords = MACHINE_KEYWORDS_BY_FAMILY[family];
   const haystack = `${norm(row.machine_name)} ${norm(row.machine_description)} ${norm(row.commodity_code)}`;
   for (const kw of keywords) {
     if (haystack.includes(kw)) return 1;
   }
-  // Generic CNC catch-all gives a moderate score
+  // Heuristic detection for un-tagged bench/inspection/saw machines
+  if (/\b(bench|workstation|deburr|manual.?work)/i.test(haystack)) return 0.65;
+  if (/\b(cmm|inspection|gauge|gauging|qc.?bench)/i.test(haystack)) return 0.65;
+  if (/\b(band.?saw|cold.?saw|hack.?saw|saw)/i.test(haystack)) return 0.65;
+  if (/\b(anodiz|plat|coat|heat.?treat|furnace)/i.test(haystack)) return 0.65;
   if (haystack.includes('cnc')) return 0.5;
   return 0.15;
 }
 
 function rateSanityScore(row: MhrRow): number {
-  const rate = toNumber(row.total_machine_hour_rate ?? row.final_mhr);
+  // Prefer rate_inr (already converted) — fall back to raw value.
+  const rate = row.rate_inr ?? toNumber(row.total_machine_hour_rate ?? row.final_mhr);
   if (rate <= 0) return 0;
-  if (rate > 50_000) return 0.4; // very expensive shop
-  if (rate >= 100) return 1;
-  return 0.5;
+  // All MHR data is confirmed INR. Range spans from small CNC (₹50/hr) to
+  // large capital-intensive press lines (₹1.5M+/hr) — both are legitimate.
+  // Only penalise rates that are clearly data-entry errors (< ₹10/hr).
+  if (rate < 10) return 0.3;
+  return 1;
 }
 
 function locationFitScore(row: MhrRow, orgLocation: string): number {
@@ -73,11 +102,12 @@ export function rankMachines(
     const kScore = keywordFitScore(row, family);
     const rScore = rateSanityScore(row);
     const lScore = locationFitScore(row, orgLocation);
-    const score = 0.55 * kScore + 0.30 * rScore + 0.15 * lScore;
+    // Location weight raised to 0.25 — org-location MHR rates must be preferred
+    const score = 0.50 * kScore + 0.25 * rScore + 0.25 * lScore;
     return { row, score };
   });
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score || a.row.id.localeCompare(b.row.id));
 
   return scored.slice(0, topN).map(({ row, score }, idx) => ({
     candidateId: `mc-${idx + 1}`,
@@ -85,7 +115,7 @@ export function rankMachines(
     machineName: row.machine_name ?? '',
     commodityCode: row.commodity_code ?? null,
     description: row.machine_description ?? null,
-    rateInrPerHour: toNumber(row.total_machine_hour_rate ?? row.final_mhr),
+    rateInrPerHour: row.rate_inr ?? toNumber(row.total_machine_hour_rate ?? row.final_mhr),
     location: row.location ?? null,
     score: Number(score.toFixed(3)),
   }));

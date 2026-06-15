@@ -82,8 +82,17 @@ export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
     }
   };
 
+  const computePartCost = (p: any): number => {
+    const unit     = Number(p.unitCost || 0);
+    const qty      = Number(p.quantity || 1);
+    const scrap    = Number(p.scrapPercentage || 0);
+    const overhead = Number(p.overheadPercentage || 0);
+    const base = unit * qty;
+    return base * (1 + scrap / 100 + overhead / 100);
+  };
+
   const calculateTotal = () => {
-    return procuredParts.reduce((sum, p) => sum + p.totalCost, 0).toFixed(2);
+    return procuredParts.reduce((sum, p) => sum + computePartCost(p), 0).toFixed(2);
   };
 
   if (isLoading) {
@@ -160,7 +169,7 @@ export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
                         {part.overheadPercentage}%
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                        ₹{part.totalCost.toFixed(2)}
+                        ₹{computePartCost(part).toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-2">

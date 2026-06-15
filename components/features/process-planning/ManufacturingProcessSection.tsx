@@ -145,8 +145,25 @@ export function ManufacturingProcessSection({
     }
   };
 
+  const computeProcCost = (p: any): number => {
+    const machineRate = Number(p.machineRate || 0);
+    const laborRate   = Number(p.laborRate || 0);
+    const setupMin    = Number(p.setupTime || 0);
+    const setupManning = Number(p.setupManning || 1);
+    const batch       = Math.max(Number(p.batchSize || 1), 1);
+    const cycleSec    = Number(p.cycleTime || 0);
+    const heads       = Math.max(Number(p.heads || 1), 1);
+    const ppc         = Math.max(Number(p.partsPerCycle || 1), 1);
+    const scrap       = Number(p.scrap || 0);
+
+    const setupPerPart  = ((setupMin / 60) * (machineRate + laborRate * setupManning)) / batch;
+    const cyclePerPart  = ((cycleSec / 3600) * (machineRate + laborRate * heads)) / ppc;
+    const subtotal      = setupPerPart + cyclePerPart;
+    return subtotal * (1 + scrap / 100);
+  };
+
   const calculateTotal = () => {
-    return sortedProcesses.reduce((sum, p) => sum + (p.totalCostPerPart || 0), 0).toFixed(2);
+    return sortedProcesses.reduce((sum, p) => sum + computeProcCost(p), 0).toFixed(2);
   };
 
 
@@ -239,7 +256,7 @@ export function ManufacturingProcessSection({
                         <td className="p-3 border-r border-border text-xs text-right">{process.partsPerCycle || 0}</td>
                         <td className="p-3 border-r border-border text-xs text-right">{process.scrap || 0}%</td>
                         <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                          ₹{(process.totalCostPerPart || 0).toFixed(2)}
+                          ₹{computeProcCost(process).toFixed(2)}
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1">

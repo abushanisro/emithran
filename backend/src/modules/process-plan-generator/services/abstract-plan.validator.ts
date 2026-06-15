@@ -83,6 +83,7 @@ export function validateAbstractPlan(
   const checkLb = makeCandidateChecker('lb', candidates.labour);
   const checkOp = makeCandidateChecker('op', candidates.processes);
   const checkCl = makeCandidateChecker('cl', candidates.calculators);
+  const checkTc = makeCandidateChecker('tc', candidates.tooling);
 
   // Collect proposedMasterIds so per-line references can validate against them
   const proposedMasterIds = new Set<string>();
@@ -155,11 +156,24 @@ export function validateAbstractPlan(
       if (line.calculatorCandidateId !== null && line.calculatorCandidateId !== undefined) {
         checkCl(line.calculatorCandidateId, `${p}.calculatorCandidateId`, errors);
       }
-      if (!isPositiveNumber(line.setupMin)) errors.push(`${p}.setupMin: must be >= 0`);
-      if (!isPositiveNumber(line.setupManning)) errors.push(`${p}.setupManning: must be >= 0`);
+      // featureId is optional; if provided must start with 'F'
+      if (line.featureId !== undefined && line.featureId !== null) {
+        if (typeof line.featureId !== 'string' || !(line.featureId as string).startsWith('F')) {
+          errors.push(`${p}.featureId: must start with 'F' (e.g. 'F1', 'F2')`);
+        }
+      }
+      // Timing fields are optional (resolver provides defaults) — validate only if provided
+      if (line.setupMin !== undefined && line.setupMin !== null && !isPositiveNumber(line.setupMin)) {
+        errors.push(`${p}.setupMin: must be >= 0 if provided`);
+      }
+      if (line.setupManning !== undefined && line.setupManning !== null && !isPositiveNumber(line.setupManning)) {
+        errors.push(`${p}.setupManning: must be >= 0 if provided`);
+      }
+      if (line.cycleSec !== undefined && line.cycleSec !== null && !isPositiveNumber(line.cycleSec)) {
+        errors.push(`${p}.cycleSec: must be >= 0 if provided`);
+      }
       if (typeof line.batchSize !== 'number' || line.batchSize <= 0) errors.push(`${p}.batchSize: must be > 0`);
       if (typeof line.heads !== 'number' || line.heads <= 0) errors.push(`${p}.heads: must be > 0`);
-      if (!isPositiveNumber(line.cycleSec)) errors.push(`${p}.cycleSec: must be >= 0`);
       if (typeof line.partsPerCycle !== 'number' || line.partsPerCycle <= 0) errors.push(`${p}.partsPerCycle: must be > 0`);
       if (!isPercentage(line.scrapPct)) errors.push(`${p}.scrapPct: must be 0..100`);
       if (!isNonEmptyString(line.reason)) errors.push(`${p}.reason: required`);
@@ -167,21 +181,20 @@ export function validateAbstractPlan(
     });
   }
 
-  // ── tooling[] ── (optional)
+  // ── tooling[] ── (optional — each line must reference a tc-N from CandidateSet)
   if (raw.tooling !== undefined) {
     if (!Array.isArray(raw.tooling)) errors.push('tooling must be an array if provided');
     else {
       raw.tooling.forEach((line, i) => {
         const p = `tooling[${i}]`;
         if (!isObject(line)) { errors.push(`${p}: must be an object`); return; }
-        if (!isOneOf(line.toolingType, TOOLING_TYPES)) errors.push(`${p}.toolingType: invalid`);
-        if (!isNonEmptyString(line.description)) errors.push(`${p}.description: required`);
-        if (!isPositiveNumber(line.unitCost)) errors.push(`${p}.unitCost: must be >= 0`);
-        if (typeof line.quantity !== 'number' || line.quantity <= 0) errors.push(`${p}.quantity: must be > 0`);
-        if (typeof line.amortizationParts !== 'number' || line.amortizationParts <= 0) errors.push(`${p}.amortizationParts: must be > 0`);
-        if (!isPercentage(line.usagePercentage)) errors.push(`${p}.usagePercentage: must be 0..100`);
-        if (typeof line.isCustom !== 'boolean') errors.push(`${p}.isCustom: must be boolean`);
+        // If tooling candidates exist, require a valid tc-N reference.
+        // If the tenant has no tooling records, accept empty array silently.
+        if (candidates.tooling.length > 0) {
+          checkTc(line.candidateId, `${p}.candidateId`, errors);
+        }
         if (!isNonEmptyString(line.reason)) errors.push(`${p}.reason: required`);
+        else if ((line.reason as string).length > 240) errors.push(`${p}.reason: max 240 chars`);
       });
     }
   }
@@ -244,9 +257,9 @@ export function validateAbstractPlan(
           if (!isPositiveNumber(pm.unitCostInrPerKg)) errors.push(`${p}.unitCostInrPerKg: must be >= 0`);
           if (!isPositiveNumber(pm.densityKgPerM3)) errors.push(`${p}.densityKgPerM3: must be >= 0`);
         } else if (pm.kind === 'process') {
-          if (!isNonEmptyString(pm.processName)) errors.push(`${p}.processName: required`);
-          if (!isNonEmptyString(pm.processCategory)) errors.push(`${p}.processCategory: required`);
-          if (!isOneOf(pm.skillLevelRequired, SKILL_LEVELS)) errors.push(`${p}.skillLevelRequired: invalid`);
+          if (!isNonEmptyString(pm.processGroup)) errors.push(`${p}.processGroup: required`);
+          if (!isNonEmptyString(pm.processRoute)) errors.push(`${p}.processRoute: required`);
+          if (!isNonEmptyString(pm.operation)) errors.push(`${p}.operation: required`);
         } else {
           errors.push(`${p}.kind: must be 'raw_material' or 'process'`);
         }

@@ -58,8 +58,10 @@ interface ManufacturingFeature {
       return;
     }
 
-    // Set default active tab based on available files
-    if (item.file3dPath) {
+    // Set default active tab, respecting preferredView when the file exists
+    if (preferredView === '2d' && item.file2dPath) {
+      setActiveTab('2d');
+    } else if (item.file3dPath) {
       setActiveTab('3d');
     } else if (item.file2dPath) {
       setActiveTab('2d');
@@ -91,7 +93,7 @@ interface ManufacturingFeature {
     };
 
     loadFileUrls();
-  }, [item]);
+  }, [item, preferredView]);
 
   const handleFileUpload = async () => {
     if (!item || (!selectedFile2d && !selectedFile3d)) {

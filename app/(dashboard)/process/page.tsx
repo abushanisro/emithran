@@ -97,11 +97,11 @@ export default function ProcessPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // State for per-route inline lookup tables
-  const [expandedLookupRoute, setExpandedLookupRoute] = useState<string | null>(null);
   const [modalProcessId, setModalProcessId] = useState<string | null>(null);
   const [modalProcessName, setModalProcessName] = useState<string>('');
 
   const [inlineEditorTables, setInlineEditorTables] = useState<any[]>([]);
+  const [isLookupDialogOpen, setIsLookupDialogOpen] = useState(false);
   const [expandedTableId, setExpandedTableId] = useState<string | null>(null);
   const [showAddTableEditor, setShowAddTableEditor] = useState(false);
 
@@ -631,12 +631,8 @@ export default function ProcessPage() {
               </div>
             ) : (() => {
               const allMappings = calculatorMappings?.mappings ?? [];
-              const mhrGroupSet = mhrProcessGroups && mhrProcessGroups.length > 0
-                ? new Set(mhrProcessGroups.map(g => g.toLowerCase()))
-                : null;
               const q = searchQuery.toLowerCase();
               const filtered = allMappings
-                .filter(m => !mhrGroupSet || mhrGroupSet.has(m.processGroup?.toLowerCase()))
                 .filter(m => !q || (
                   m.processGroup.toLowerCase().includes(q) ||
                   m.processRoute.toLowerCase().includes(q) ||
@@ -691,8 +687,6 @@ export default function ProcessPage() {
                       {/* Process Routes */}
                       <div className="divide-y divide-border/40">
                         {Object.entries(routes).map(([route, ops]) => {
-                          const routeKey = `${group}__${route}`;
-                          const isLookupOpen = expandedLookupRoute === routeKey;
                           return (
                           <div key={route}>
                             {/* Route row */}
@@ -738,20 +732,11 @@ export default function ProcessPage() {
                                   </div>
                                 ))}
                               </div>
-                              {/* Lookup Tables toggle */}
+                              {/* Lookup Tables button — opens dialog */}
                               <button
-                                className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors shrink-0 ${isLookupOpen ? 'bg-primary/10 border-primary/30 text-primary' : 'border-border text-muted-foreground hover:text-foreground hover:border-primary/30'}`}
-                                title="Manage lookup tables for this process"
+                                className="flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors shrink-0 border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
+                                title="View lookup tables for this process"
                                 onClick={async () => {
-                                  if (isLookupOpen) {
-                                    setExpandedLookupRoute(null);
-                                    setModalProcessId(null);
-                                    setModalProcessName('');
-                                    setExpandedTableId(null);
-                                    setShowAddTableEditor(false);
-                                    setInlineEditorTables([]);
-                                    return;
-                                  }
                                   const processes = processesData?.processes || [];
                                   let proc = processes.find(p => p.processName === route) ?? processes.find(p => p.processName.toLowerCase() === route.toLowerCase());
                                   let processId = proc?.id ?? null;
@@ -764,116 +749,18 @@ export default function ProcessPage() {
                                       return;
                                     }
                                   }
-                                  setExpandedLookupRoute(routeKey);
                                   setModalProcessId(processId);
                                   setModalProcessName(route);
                                   setExpandedTableId(null);
                                   setShowAddTableEditor(false);
                                   setInlineEditorTables([]);
+                                  setIsLookupDialogOpen(true);
                                 }}
                               >
                                 <Database className="h-3 w-3" />
-                                Lookup Table
+                                Lookup Tables
                               </button>
                             </div>
-                            {/* Inline lookup tables */}
-                            {isLookupOpen && (
-                              <div className="border-t border-border bg-secondary/5 px-4 py-3 space-y-2">
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lookup Table — {route}</p>
-                                  {!showAddTableEditor && (
-                                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs border-dashed border-primary/40 text-primary hover:bg-primary/5"
-                                      onClick={() => { setInlineEditorTables([]); setShowAddTableEditor(true); }}>
-                                      <Plus className="h-3 w-3 mr-1" />Add Lookup Table
-                                    </Button>
-                                  )}
-                                </div>
-                                {loadingModalTables ? (
-                                  <div className="flex items-center py-4">
-                                    <Loader2 className="h-4 w-4 animate-spin text-primary mr-2" />
-                                    <span className="text-xs text-muted-foreground">Loading...</span>
-                                  </div>
-                                ) : (
-                                  <>
-                                    {modalReferenceTables && modalReferenceTables.length > 0 ? (
-                                      modalReferenceTables.map((table) => (
-                                        <div key={table.id} className="border border-border rounded-lg bg-card overflow-hidden">
-                                          <div
-                                            className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-secondary/30 transition-colors"
-                                            onClick={() => setExpandedTableId(expandedTableId === table.id ? null : table.id)}
-                                          >
-                                            <div className="flex-1 min-w-0">
-                                              <h3 className="text-sm font-semibold">{table.tableName}</h3>
-                                              {table.tableDescription && <p className="text-xs text-muted-foreground truncate">{table.tableDescription}</p>}
-                                            </div>
-                                            <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                                              <Badge variant="outline" className="text-xs">{table.rows?.length ?? 0} rows</Badge>
-                                              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={(e) => { e.stopPropagation(); setExpandedTableId(expandedTableId === table.id ? null : table.id); }}>
-                                                {expandedTableId === table.id ? 'Collapse' : 'Edit'}
-                                              </Button>
-                                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                                onClick={async (e) => {
-                                                  e.stopPropagation();
-                                                  if (!confirm(`Delete "${table.tableName}"?`)) return;
-                                                  try {
-                                                    const { apiClient } = await import('@/lib/api/client');
-                                                    await apiClient.delete(`/processes/reference-tables/${table.id}`);
-                                                    toast.success(`"${table.tableName}" deleted`);
-                                                    if (expandedTableId === table.id) setExpandedTableId(null);
-                                                    refetchModalTables();
-                                                  } catch { toast.error('Failed to delete table'); }
-                                                }}>
-                                                <Trash2 className="h-3 w-3" />
-                                              </Button>
-                                            </div>
-                                          </div>
-                                          {expandedTableId === table.id && (
-                                            <div className="border-t border-border bg-background/50 p-3">
-                                              {renderEditableTable(table)}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))
-                                    ) : !showAddTableEditor ? (
-                                      <p className="text-xs text-muted-foreground py-2">No tables yet — click "Add Lookup Table" to create one.</p>
-                                    ) : null}
-                                    {showAddTableEditor && (
-                                      <div className="border border-primary/30 rounded-lg">
-                                        <InlineReferenceTableEditor
-                                          processId={modalProcessId || ''}
-                                          processName={modalProcessName}
-                                          tables={inlineEditorTables}
-                                          onTablesChange={setInlineEditorTables}
-                                          onViewTables={() => setShowAddTableEditor(false)}
-                                          onSave={async (tables) => {
-                                            try {
-                                              const { apiClient } = await import('@/lib/api/client');
-                                              for (const table of tables) {
-                                                const tableResponse = await apiClient.post(`/processes/${modalProcessId}/reference-tables`, {
-                                                  processId: modalProcessId,
-                                                  tableName: table.table_name,
-                                                  tableDescription: table.table_description,
-                                                  columnDefinitions: table.column_definitions,
-                                                  isEditable: true,
-                                                  displayOrder: 0
-                                                }) as { id: string };
-                                                if (table.rows?.length) {
-                                                  for (let i = 0; i < table.rows.length; i++) {
-                                                    await apiClient.post(`/processes/reference-tables/${tableResponse.id}/rows`, { tableId: tableResponse.id, rowData: table.rows[i], rowOrder: i });
-                                                  }
-                                                }
-                                              }
-                                              toast.success(`Saved ${tables.length} reference tables`);
-                                              refetchModalTables(); setInlineEditorTables([]); setShowAddTableEditor(false);
-                                            } catch { toast.error('Failed to save reference tables'); }
-                                          }}
-                                        />
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            )}
                           </div>
                           );
                         })}
@@ -1070,6 +957,159 @@ export default function ProcessPage() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
               {editingMapping ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* LOOKUP TABLES DIALOG */}
+      <Dialog open={isLookupDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsLookupDialogOpen(false);
+          setExpandedTableId(null);
+          setShowAddTableEditor(false);
+          setInlineEditorTables([]);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[800px] max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Lookup Tables — {modalProcessName}
+            </DialogTitle>
+            <DialogDescription>
+              View and manage reference lookup tables for this process
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-3 py-2 pr-1">
+            {loadingModalTables ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                <span className="text-sm text-muted-foreground">Loading tables...</span>
+              </div>
+            ) : (
+              <>
+                {modalReferenceTables && modalReferenceTables.length > 0 ? (
+                  modalReferenceTables.map((table) => (
+                    <div key={table.id} className="border border-border rounded-lg bg-card overflow-hidden">
+                      <div
+                        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-secondary/30 transition-colors"
+                        onClick={() => setExpandedTableId(expandedTableId === table.id ? null : table.id)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-semibold">{table.tableName}</h3>
+                          {table.tableDescription && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">{table.tableDescription}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 ml-3 shrink-0">
+                          <Badge variant="outline" className="text-xs">{table.rows?.length ?? 0} rows</Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => { e.stopPropagation(); setExpandedTableId(expandedTableId === table.id ? null : table.id); }}
+                          >
+                            {expandedTableId === table.id ? 'Collapse' : 'Edit'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm(`Delete "${table.tableName}"?`)) return;
+                              try {
+                                const { apiClient } = await import('@/lib/api/client');
+                                await apiClient.delete(`/processes/reference-tables/${table.id}`);
+                                toast.success(`"${table.tableName}" deleted`);
+                                if (expandedTableId === table.id) setExpandedTableId(null);
+                                refetchModalTables();
+                              } catch { toast.error('Failed to delete table'); }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      {expandedTableId === table.id && (
+                        <div className="border-t border-border bg-background/50 p-4">
+                          {renderEditableTable(table)}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : !showAddTableEditor ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <Database className="h-8 w-8 text-muted-foreground/40 mb-3" />
+                    <p className="text-sm text-muted-foreground">No lookup tables yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click "Add Lookup Table" to create one</p>
+                  </div>
+                ) : null}
+
+                {showAddTableEditor && (
+                  <div className="border border-primary/30 rounded-lg">
+                    <InlineReferenceTableEditor
+                      processId={modalProcessId || ''}
+                      processName={modalProcessName}
+                      tables={inlineEditorTables}
+                      onTablesChange={setInlineEditorTables}
+                      onViewTables={() => setShowAddTableEditor(false)}
+                      onSave={async (tables) => {
+                        try {
+                          const { apiClient } = await import('@/lib/api/client');
+                          for (const table of tables) {
+                            const tableResponse = await apiClient.post(`/processes/${modalProcessId}/reference-tables`, {
+                              processId: modalProcessId,
+                              tableName: table.table_name,
+                              tableDescription: table.table_description,
+                              columnDefinitions: table.column_definitions,
+                              isEditable: true,
+                              displayOrder: 0,
+                            }) as { id: string };
+                            if (table.rows?.length) {
+                              for (let i = 0; i < table.rows.length; i++) {
+                                await apiClient.post(`/processes/reference-tables/${tableResponse.id}/rows`, {
+                                  tableId: tableResponse.id,
+                                  rowData: table.rows[i],
+                                  rowOrder: i,
+                                });
+                              }
+                            }
+                          }
+                          toast.success(`Saved ${tables.length} reference tables`);
+                          refetchModalTables();
+                          setInlineEditorTables([]);
+                          setShowAddTableEditor(false);
+                        } catch { toast.error('Failed to save reference tables'); }
+                      }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="border-t pt-4 mt-2">
+            {!showAddTableEditor && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mr-auto border-dashed border-primary/40 text-primary hover:bg-primary/5"
+                onClick={() => { setInlineEditorTables([]); setShowAddTableEditor(true); }}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Lookup Table
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => {
+              setIsLookupDialogOpen(false);
+              setExpandedTableId(null);
+              setShowAddTableEditor(false);
+              setInlineEditorTables([]);
+            }}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

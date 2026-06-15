@@ -34,6 +34,10 @@ import { BenchmarkSessionsModule } from './modules/benchmark-sessions/benchmark-
 import { DeveloperModule } from './modules/developer/developer.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { ProcessPlanGeneratorModule } from './modules/process-plan-generator/process-plan-generator.module';
+import { CostEngineeringModule } from './modules/cost-engineering/cost-engineering.module';
+import { ManufacturingIntelligenceModule } from './modules/manufacturing-intelligence/manufacturing-intelligence.module';
+import { ShouldCostModule } from './modules/should-cost/should-cost.module';
+import { EchoModule } from './modules/echo/echo.module';
 import { RequestLogInterceptor } from './modules/developer/interceptors/request-log.interceptor';
 import { LoggerModule } from './common/logger/logger.module';
 import { SupabaseService } from './common/supabase/supabase.service';
@@ -100,6 +104,10 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     DeveloperModule,
     ProfileModule,
     ProcessPlanGeneratorModule,
+    CostEngineeringModule,
+    ManufacturingIntelligenceModule,
+    ShouldCostModule,
+    EchoModule,
   ],
   controllers: [AppController],
   providers: [

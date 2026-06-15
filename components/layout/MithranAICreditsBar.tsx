@@ -30,6 +30,8 @@ const CR_PER_VAVE       = 200;
 const CR_PER_PROJECT    = 50;
 const CR_PER_BOM        = 10;
 const CR_PER_GENERATION = 50;  // AI Process Plan Generator, charged at apply
+const CR_PER_ECHO_TURN  = 1;   // Echo copilot — standard chat turn (Haiku)
+const CR_PER_ECHO_DEEP  = 5;   // Echo copilot — deep turn (Sonnet escalation)
 const PLAN_CREDITS      = 10_000;
 
 // ─── Component ─────────────────────────────────────────────────────────────────

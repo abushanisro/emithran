@@ -14,9 +14,13 @@ import { rankMachines } from '../ranking/machine-ranker';
 import { rankLabour } from '../ranking/labour-ranker';
 import { rankProcesses } from '../ranking/process-ranker';
 import { rankCalculators } from '../ranking/calculator-ranker';
+import { rankTooling } from '../ranking/tooling-ranker';
 
 import { ScopeClassifierService } from './scope-classifier.service';
 import { DrawingExtractorService } from './drawing-extractor.service';
+import { ExchangeRateService } from './exchange-rate.service';
+import { FeatureGraphService } from './feature-graph.service';
+import { RuleEngineService } from './rule-engine.service';
 
 /**
  * Stage 1 — assembles the EngineeringBrief and a tenant-scoped CandidateSet.
@@ -35,15 +39,19 @@ export class RetrievalService {
 
   // Top-N caps per kind — see plan section "Stage 1 RETRIEVAL & SCOPE GATE"
   static readonly TOP_N_MATERIALS = 8;
-  static readonly TOP_N_MACHINES = 6;
+  static readonly TOP_N_MACHINES = 10;  // raised from 6: bench/inspection machines must coexist with CNC candidates
   static readonly TOP_N_LABOUR = 4;
-  static readonly TOP_N_PROCESSES = 6;
-  static readonly TOP_N_CALCULATORS = 4;
+  static readonly TOP_N_PROCESSES = 25;
+  static readonly TOP_N_CALCULATORS = 6;  // raised from 4: drilling/tapping/thread-milling calculators must coexist with generic ones
+  static readonly TOP_N_TOOLING = 8;
 
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly scopeClassifier: ScopeClassifierService,
     private readonly drawingExtractor: DrawingExtractorService,
+    private readonly fx: ExchangeRateService,
+    private readonly featureGraph: FeatureGraphService,
+    private readonly ruleEngine: RuleEngineService,
   ) {}
 
   async assemble(
@@ -51,6 +59,9 @@ export class RetrievalService {
     userId: string,
     accessToken: string | null,
   ): Promise<{ brief: EngineeringBrief; candidates: CandidateSet }> {
+    // ── Load budget exchange rates (must happen before candidate queries) ───
+    await this.fx.loadRates(accessToken);
+
     const client = this.supabaseService.getClient(accessToken ?? undefined);
 
     // ── Load BOM item ──────────────────────────────────────────────────────
@@ -108,11 +119,13 @@ export class RetrievalService {
         return { ...UNAVAILABLE_DRAWING_BRIEF };
       });
 
-    // ── Promote drawing fields into bomBrief where BOM was empty ──────────
-    // The drawing is the authoritative source for tolerance / surface
-    // finish / heat treat / hardness when present.
+    // ── Promote drawing fields — drawing is authoritative source of truth ──
     if (drawing.available) {
-      bomBrief.materialHint = bomBrief.materialHint ?? drawing.material;
+      // Material: drawing overrides BOM (BOM field is often a default placeholder)
+      if (drawing.material) {
+        bomBrief.materialHint = drawing.material;
+      }
+      // These fill gaps only (additive, not override)
       bomBrief.tolerance = bomBrief.tolerance ?? drawing.generalTolerance;
       bomBrief.heatTreatment = bomBrief.heatTreatment ?? drawing.heatTreatment;
       if (!bomBrief.hardnessHrc && drawing.hardness) {
@@ -133,14 +146,53 @@ export class RetrievalService {
       }
     }
 
+    // ── Augment DFM hole count from 2D drawing when 3D scan missed holes ──
+    if (drawing.available && drawing.holes.length > 0 && dfm.holeCount === 0) {
+      dfm.holeCount = drawing.holes.length;
+    }
+
+    // ── Correct unit weight from geometry when BOM weight is absent or wrong ──
+    // BOM weight is often 0 (not entered) or copied from an incorrect default.
+    // When DFM volume is available, compute density-based weight and override when
+    // the discrepancy is > 50 % of the geometry estimate.
+    if (dfm.volumeMm3 > 0) {
+      const densityKgPerM3 = estimateDensityKgPerM3(bomBrief.materialHint);
+      const geomWeightKg = dfm.volumeMm3 * densityKgPerM3 * 1e-9;
+      if (geomWeightKg > 0.0001) {
+        const bomWeight = bomBrief.unitWeightKg;
+        const discrepancyRatio = bomWeight > 0
+          ? Math.abs(geomWeightKg - bomWeight) / Math.max(geomWeightKg, bomWeight)
+          : 1.0;
+        if (discrepancyRatio > 0.5) {
+          this.logger.log(
+            `[assemble] Unit weight: BOM=${bomWeight.toFixed(4)}kg → geometry=${geomWeightKg.toFixed(4)}kg` +
+            ` (density=${Math.round(densityKgPerM3)}kg/m³, discrepancy=${(discrepancyRatio * 100).toFixed(0)}%)`,
+          );
+          bomBrief.unitWeightKg = geomWeightKg;
+        }
+      }
+    }
+
     // ── Run scope classifier (now with drawing-promoted fields) ────────────
     const scope = this.scopeClassifier.classify(bomBrief, dfm);
+
+    // ── Build feature graph + mandatory ops from drawing + geometry ────────
+    // Construct a partial brief first so feature-graph service can read it.
+    const partialBrief = { bomItem: bomBrief, dfm, drawing, scope,
+      context: { organizationLocation: orgLocation, currency: 'INR' as const, language: 'en' as const },
+      featureGraph: { features: [], buildSources: [] as ('drawing' | 'geometry' | 'bom')[], overallConfidence: 1 },
+      mandatoryOps: [],
+    };
+    const featureGraph = this.featureGraph.build(partialBrief as EngineeringBrief);
+    const mandatoryOps = this.ruleEngine.evaluate(featureGraph);
 
     const brief: EngineeringBrief = {
       bomItem: bomBrief,
       dfm,
       drawing,
-      context: { organizationLocation: orgLocation, currency: 'INR', language: 'en' },
+      featureGraph,
+      mandatoryOps,
+      context: { organizationLocation: orgLocation, currency: 'INR', language: 'en', exchangeRateSnapshot: this.fx.snapshot() },
       scope,
     };
 
@@ -154,6 +206,7 @@ export class RetrievalService {
           labour: [],
           processes: [],
           calculators: [],
+          tooling: [],
         },
       };
     }
@@ -161,21 +214,31 @@ export class RetrievalService {
     const family = scope.family as Exclude<typeof scope.family, 'out_of_scope'>;
 
     // ── Query masters in parallel ──────────────────────────────────────────
-    const [materialsRaw, mhrRaw, lsrRaw, processesRaw, calculatorsRaw] = await Promise.all([
+    const [materialsRaw, mhrRaw, lsrRaw, processesRaw, calculatorsRaw, toolingRaw] = await Promise.all([
       this.queryRawMaterials(client, userId, family),
       this.queryMhr(client, userId),
       this.queryLsr(client, userId),
       this.queryProcesses(client, userId, family),
       this.queryCalculators(client, userId),
+      this.queryTooling(client, userId),
     ]);
 
     // ── Rank to top-N per kind ─────────────────────────────────────────────
+    const rankedProcesses = rankProcesses(processesRaw, family, dfm, RetrievalService.TOP_N_PROCESSES);
+
+    // ── Enrich process candidates with their lookup reference tables ────────
+    // These tables contain shop-floor standard times the user has entered for
+    // each process (e.g. "Swiss CNC Turning Time Standards"). When present,
+    // Claude reads them to use real setup/cycle times instead of fallbacks.
+    await this.enrichProcessReferenceTables(client, rankedProcesses);
+
     const candidates: CandidateSet = {
       rawMaterials: rankMaterials(materialsRaw, family, bomBrief.materialHint, orgLocation, RetrievalService.TOP_N_MATERIALS),
       machines: rankMachines(mhrRaw, family, orgLocation, RetrievalService.TOP_N_MACHINES),
       labour: rankLabour(lsrRaw, orgLocation, RetrievalService.TOP_N_LABOUR),
-      processes: rankProcesses(processesRaw, family, dfm, RetrievalService.TOP_N_PROCESSES),
+      processes: rankedProcesses,
       calculators: rankCalculators(calculatorsRaw, family, RetrievalService.TOP_N_CALCULATORS),
+      tooling: rankTooling(toolingRaw, family, RetrievalService.TOP_N_TOOLING),
     };
 
     this.logger.log(
@@ -193,27 +256,32 @@ export class RetrievalService {
   // ── Per-kind queries ──────────────────────────────────────────────────────
 
   private async queryRawMaterials(client: any, userId: string, family: string) {
-    // Materials masters are typically shared — try with user_id first, then
-    // fall back to global (user_id is null) rows if the user hasn't added any.
-    const groupFilter = family === 'sheet_metal' ? ['Ferrous & Non-Ferrous'] : ['Ferrous & Non-Ferrous'];
-
     const { data, error } = await client
       .from('raw_materials')
-      .select('id, material_group, material, material_grade, density_kg_m3, cost, location, user_id')
-      .or(`material_group.ilike.%ferrous%,material_group.ilike.%non-ferrous%`)
+      .select('id, material_group, material, material_grade, density_kg_m3, cost, currency, location, user_id')
+      .or(`material_group.ilike.%ferrous%,material_group.ilike.%non-ferrous%,material_group.ilike.%plastic%,material_group.ilike.%rubber%`)
       .limit(120);
 
     if (error) {
       this.logger.warn(`raw_materials query failed: ${error.message}`);
       return [];
     }
-    return data ?? [];
+
+    // Convert each row's cost to INR using the budget rate for its declared currency.
+    // The ranker reads `cost` and maps it to `unitCostInrPerKg` — so we overwrite
+    // `cost` with the INR-converted value here, keeping the original in `cost_original`.
+    return (data ?? []).map((row: any) => ({
+      ...row,
+      cost_original: row.cost,
+      cost_original_currency: row.currency ?? 'INR',
+      cost: this.fx.convertToInr(Number(row.cost ?? 0), row.currency ?? 'INR'),
+    }));
   }
 
   private async queryMhr(client: any, userId: string) {
     const { data, error } = await client
       .from('mhr_records')
-      .select('id, machine_name, machine_description, commodity_code, total_machine_hour_rate, location')
+      .select('id, machine_name, machine_description, commodity_code, total_machine_hour_rate, currency_code, location, process_family')
       .not('total_machine_hour_rate', 'is', null)
       .order('created_at', { ascending: false })
       .limit(80);
@@ -221,13 +289,19 @@ export class RetrievalService {
       this.logger.warn(`mhr_records query failed: ${error.message}`);
       return [];
     }
-    return data ?? [];
+
+    // Convert to INR using the row's declared currency (defaults to INR for existing rows).
+    // Today all rows are INR → passthrough. Future: Germany EUR, China CNY will convert correctly.
+    return (data ?? []).map((row: any) => ({
+      ...row,
+      rate_inr: this.fx.convertToInr(Number(row.total_machine_hour_rate ?? 0), row.currency_code ?? 'INR'),
+    }));
   }
 
   private async queryLsr(client: any, userId: string) {
     const { data, error } = await client
       .from('lsr_records')
-      .select('id, labour_type, labour_code, lhr, location')
+      .select('id, labour_type, labour_code, lhr, currency_code, location')
       .not('lhr', 'is', null)
       .order('lhr', { ascending: true })
       .limit(40);
@@ -235,49 +309,117 @@ export class RetrievalService {
       this.logger.warn(`lsr_records query failed: ${error.message}`);
       return [];
     }
-    return data ?? [];
+
+    // Convert to INR using the row's declared currency (defaults to INR for existing rows).
+    return (data ?? []).map((row: any) => ({
+      ...row,
+      lhr_inr: this.fx.convertToInr(Number(row.lhr ?? 0), row.currency_code ?? 'INR'),
+    }));
   }
 
   private async queryProcesses(client: any, userId: string, family: string) {
-    const familyKeywords: Record<string, string[]> = {
-      cnc_turned: ['turn', 'lathe', 'drill', 'tap', 'deburr', 'grind'],
-      cnc_milled: ['mill', 'machin', 'drill', 'tap', 'deburr', 'grind'],
-      sheet_metal: ['laser', 'punch', 'bend', 'form', 'shear', 'deburr'],
-    };
-
-    const keywords = familyKeywords[family] ?? ['mill'];
-    const orFilter = keywords.map((k) => `process_name.ilike.%${k}%`).join(',');
-
-    // We deliberately don't select machine_type — it's optional and some deployments
-    // don't have that column. Ranker tolerates null machine_type.
+    // Query process_calculator_mappings — the user's configured hierarchy
+    // (group → route → operation). These are the only valid process choices
+    // in the cost dialog, so the AI must select from here exclusively.
     const { data, error } = await client
-      .from('processes')
-      .select('id, process_name, process_category, description, standard_time_minutes, setup_time_minutes, cycle_time_minutes, skill_level_required')
-      .or(orFilter)
-      .limit(80);
+      .from('process_calculator_mappings')
+      .select('id, process_group, process_route, operation, calculator_id')
+      .eq('is_active', true)
+      .limit(200);
     if (error) {
-      this.logger.warn(`processes query failed: ${error.message}`);
-      const { data: anyRows } = await client.from('processes').select('id, process_name, process_category, description').limit(60);
-      return anyRows ?? [];
+      this.logger.warn(`process_calculator_mappings query failed: ${error.message}`);
+      return [];
     }
     return data ?? [];
   }
 
+  private async queryTooling(client: any, userId: string) {
+    // Prefer template records (no bom_item_id) first, then fall back to all active records.
+    const cols = 'id, tooling_type, description, specifications, unit_cost, quantity, amortization_parts, usage_percentage, total_cost, is_custom, supplier, is_active, user_id';
+    const { data: templates } = await client
+      .from('tooling_cost_records')
+      .select(cols)
+      .eq('user_id', userId)
+      .is('bom_item_id', null)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(80);
+
+    if (templates && templates.length >= 4) return templates;
+
+    // Fallback: any active records for this user (de-duplication happens in ranker)
+    const { data: all } = await client
+      .from('tooling_cost_records')
+      .select(cols)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(80);
+
+    return all ?? [];
+  }
+
   private async queryCalculators(client: any, userId: string) {
+    const selectExpr = `
+      id, name, calc_category, description, user_id, is_global,
+      fields:calculator_fields(field_name, data_source, source_field, default_value),
+      formulas:calculator_formulas(formula_name, formula_expression, execution_order, is_primary_result)
+    `;
+    // Return user-owned calculators + global/shared calculators in one query.
     const { data, error } = await client
       .from('calculators')
-      .select('id, name, calc_category, description, user_id')
-      .eq('user_id', userId)
+      .select(selectExpr)
+      .or(`user_id.eq.${userId},is_global.eq.true`)
       .limit(40);
     if (error || !data || data.length === 0) {
-      // Fallback: any calculators (e.g. shared/default ones)
-      const { data: any } = await client
+      const { data: fallback } = await client
         .from('calculators')
-        .select('id, name, calc_category, description')
+        .select(selectExpr)
         .limit(40);
-      return any ?? [];
+      return fallback ?? [];
     }
     return data;
+  }
+
+  // ── Process reference table enrichment ───────────────────────────────────
+
+  private async enrichProcessReferenceTables(client: any, processes: any[]): Promise<void> {
+    if (processes.length === 0) return;
+    const processIds = processes.map((p) => p.dbId);
+
+    const { data: tables, error } = await client
+      .from('process_reference_tables')
+      .select('id, process_id, table_name, column_definitions')
+      .in('process_id', processIds);
+
+    if (error || !tables || tables.length === 0) return;
+
+    const tableIds = tables.map((t: any) => t.id);
+    const { data: allRows } = await client
+      .from('process_table_rows')
+      .select('table_id, row_data')
+      .in('table_id', tableIds)
+      .order('row_order', { ascending: true });
+
+    const rowsByTable = new Map<string, any[]>();
+    for (const row of (allRows ?? [])) {
+      if (!rowsByTable.has(row.table_id)) rowsByTable.set(row.table_id, []);
+      rowsByTable.get(row.table_id)!.push(row.row_data);
+    }
+
+    const tablesByProcess = new Map<string, any[]>();
+    for (const tbl of tables) {
+      if (!tablesByProcess.has(tbl.process_id)) tablesByProcess.set(tbl.process_id, []);
+      tablesByProcess.get(tbl.process_id)!.push({
+        tableName: tbl.table_name,
+        columnDefinitions: tbl.column_definitions ?? [],
+        rows: rowsByTable.get(tbl.id) ?? [],
+      });
+    }
+
+    for (const proc of processes) {
+      proc.referenceTables = tablesByProcess.get(proc.dbId) ?? [];
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -289,14 +431,46 @@ export class RetrievalService {
     const fromCadEngine = !!(ga && Object.keys(ga).length > 0);
     const bbox = ga?.bounding_box ?? {};
 
+    const lengthMm = numberOr(bbox.length ?? bbox.x, numberOr(bomRow.max_length ?? bomRow.length, 0));
+    const widthMm  = numberOr(bbox.width  ?? bbox.y, numberOr(bomRow.max_width  ?? bomRow.width,  0));
+    const heightMm = numberOr(bbox.height ?? bbox.z, numberOr(bomRow.max_height ?? bomRow.height, 0));
+
+    const rawVolume = numberOr(ga.estimated_volume_mm3 ?? ga.volume_mm3, 0);
+    const bboxVol   = lengthMm * widthMm * heightMm;
+
+    // Sanity check: CAD engines occasionally emit near-zero artifact volumes (<1% of bounding box).
+    // When detected, estimate from bounding box geometry instead.
+    let volumeMm3: number;
+    if (rawVolume > 0 && bboxVol > 0 && rawVolume < bboxVol * 0.01) {
+      // Heuristic: if two shortest dims are within 20% of each other → cylindrical part
+      const dims = [lengthMm, widthMm, heightMm].sort((a, b) => a - b);
+      if (dims[1] / Math.max(dims[0], 1) < 1.2) {
+        const avgDiam = (dims[0] + dims[1]) / 2;
+        volumeMm3 = (Math.PI / 4) * avgDiam * avgDiam * dims[2];
+      } else {
+        volumeMm3 = bboxVol * 0.5; // box-like part, ~50% fill
+      }
+      this.logger.warn(
+        `[extractDfm] Volume artifact: ${rawVolume.toFixed(1)}mm³ < 1% of bbox ${bboxVol.toFixed(0)}mm³ → estimated ${volumeMm3.toFixed(0)}mm³`,
+      );
+    } else if (rawVolume > 0) {
+      volumeMm3 = rawVolume;
+    } else if (bboxVol > 0) {
+      // No 3D scan — apply a conservative fill factor rather than using full bounding box.
+      // 0.45 is appropriate for milled parts with slots/pockets/holes; turned parts would be
+      // closer to 0.65 but we don't know family here, so err on the side of under-estimation.
+      volumeMm3 = bboxVol * 0.45;
+      this.logger.log(
+        `[extractDfm] No CAD volume — estimated from bbox ${bboxVol.toFixed(0)}mm³ × 0.45 fill factor = ${volumeMm3.toFixed(0)}mm³`,
+      );
+    } else {
+      volumeMm3 = 0;
+    }
+
     return {
-      volumeMm3: numberOr(ga.estimated_volume_mm3 ?? ga.volume_mm3, numberOr(bomRow.weight, 0) * 1000),
+      volumeMm3,
       surfaceAreaMm2: numberOr(ga.surface_area_mm2 ?? ga.surface_area_estimation, 0),
-      boundingBox: {
-        lengthMm: numberOr(bbox.length ?? bbox.x, numberOr(bomRow.max_length ?? bomRow.length, 0)),
-        widthMm: numberOr(bbox.width ?? bbox.y, numberOr(bomRow.max_width ?? bomRow.width, 0)),
-        heightMm: numberOr(bbox.height ?? bbox.z, numberOr(bomRow.max_height ?? bomRow.height, 0)),
-      },
+      boundingBox: { lengthMm, widthMm, heightMm },
       holeCount: numberOr(da?.holes?.count ?? ga?.feature_detection?.holes_detected, 0),
       pocketCount: numberOr(da?.pockets?.count, 0),
       thinWallCount: (da?.thin_walls ?? 0) > 0 || ga?.feature_detection?.thin_walls ? 1 : 0,
@@ -338,4 +512,20 @@ function numberOr(v: unknown, fallback: number | null): number | null {
   if (v == null) return fallback;
   const n = typeof v === 'number' ? v : parseFloat(String(v));
   return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Returns approximate material density in kg/m³ based on a free-text material hint.
+ * Used to convert DFM volume → estimated unit weight when BOM weight is missing or incorrect.
+ */
+function estimateDensityKgPerM3(materialHint: string | null): number {
+  const h = (materialHint ?? '').toLowerCase();
+  if (/alumin|al\s*6|7050|7075|6061|6082|2024/i.test(h)) return 2700;
+  if (/titan|ti-6|ti6al/i.test(h)) return 4500;
+  if (/copper|brass|bronze|cu\s*\d/i.test(h)) return 8500;
+  if (/stainless|ss\s*3|ss\s*4|316|304|17-4|inconel|hastelloy/i.test(h)) return 7900;
+  if (/cast.?iron|grey.?iron|sg.?iron|ductile.?iron/i.test(h)) return 7200;
+  if (/nylon|peek|abs|pom|pp\b|pe\b|ptfe|plastic|polymer/i.test(h)) return 1200;
+  if (/rubber|elastomer/i.test(h)) return 1500;
+  return 7850; // default: mild/alloy steel (EN8, EN24, EN36, H13, P20, ...)
 }

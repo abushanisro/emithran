@@ -19,8 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useMHRRecords } from '@/lib/api/hooks/useMHR';
-import { useLSR } from '@/lib/api/hooks/useLSR';
+import { useMHRRecords, useMHRRecord } from '@/lib/api/hooks/useMHR';
+import { useLSR, useLSRById } from '@/lib/api/hooks/useLSR';
 import { useProcessHierarchy, useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
@@ -92,7 +92,12 @@ export function ProcessCostDialog({
     { enabled: open && !!selectedGroup && !!selectedRoute && !!selectedOperation }
   );
 
-  const { data: mhrData, isLoading: isLoadingMHR, error: mhrError } = useMHRRecords();
+  const { data: mhrData, isLoading: isLoadingMHR, error: mhrError } = useMHRRecords({ limit: 100 });
+  // When editing, fetch the specific saved MHR/LSR so they always appear in their lists
+  const savedMHRId = editData?.mhrId || editData?.machineId || '';
+  const savedLSRId = editData?.lsrId ? String(editData.lsrId) : '';
+  const { data: savedMHRRecord } = useMHRRecord(savedMHRId, { enabled: !!savedMHRId && open });
+  const { data: savedLSRRecord } = useLSRById(savedLSRId);
   const { data: lsrData, isLoading: isLoadingLSR, error: lsrError } = useLSR();
   const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators();
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
@@ -161,12 +166,15 @@ export function ProcessCostDialog({
     return Array.from(locs).sort();
   }, [mhrData, lsrData]);
 
-  // Filter MHR by location
+  // Filter MHR by location — always include the saved record so it shows when editing
   const filteredMHR = useMemo(() => {
-    if (!mhrData?.records) return [];
-    if (!location) return mhrData.records;
-    return mhrData.records.filter(r => r.location === location);
-  }, [mhrData, location]);
+    const base = mhrData?.records ?? [];
+    const filtered = !location ? base : base.filter(r => r.location === location);
+    if (savedMHRRecord && !filtered.some(r => r.id === savedMHRRecord.id)) {
+      return [savedMHRRecord, ...filtered];
+    }
+    return filtered;
+  }, [mhrData, location, savedMHRRecord]);
 
   // Filter LSR by location
   const filteredLSR = useMemo(() => {
@@ -478,12 +486,16 @@ export function ProcessCostDialog({
     const scrapNum = parseFloat(scrap as string) || 0;
     
     if (cycleTimeNum > 0 && batchSizeNum > 0 && partsPerCycleNum > 0) {
-      // Get rates - use selected rates if available, otherwise use defaults
-      const machineRate = selectedMHR ? selectedMHR.calculations.totalMachineHourRate : 113.10;
-      const labourRate = selectedLSR ? selectedLSR.lhr : 327.89;
+      // Get rates - prefer live selection, then stored editData rates, then 0
+      const machineRate = selectedMHR
+        ? selectedMHR.calculations.totalMachineHourRate
+        : (editData?.machineRate || 0);
+      const labourRate = selectedLSR
+        ? selectedLSR.lhr
+        : (editData?.laborRate || 0);
 
-      // Setup cost (labour cost for setup time)
-      const setupCostPerPart = (setupManningNum * setupTimeNum * labourRate) / (60 * batchSizeNum);
+      // Setup cost: both machine + labour amortised over batch (matches section formula)
+      const setupCostPerPart = ((setupTimeNum / 60) * (machineRate + labourRate * setupManningNum)) / Math.max(batchSizeNum, 1);
 
       // Cycle cost
       const cycleTimeHours = cycleTimeNum / 3600; // Convert seconds to hours
@@ -533,8 +545,8 @@ export function ProcessCostDialog({
       machineName: selectedMHR?.machineName || '',
       operationName: selectedOperation || '',
       processRouteName: selectedRoute || '',
-      machineRate: selectedMHR?.calculations.totalMachineHourRate || 113.10,
-      laborRate: selectedLSR?.lhr || 327.89,
+      machineRate: selectedMHR?.calculations.totalMachineHourRate || editData?.machineRate || 0,
+      laborRate: selectedLSR?.lhr || editData?.laborRate || 0,
       setupManning: parseFloat(setupManning as string) || 0,
       setupTime: parseFloat(setupTime as string) || 0,
       batchSize: parseFloat(batchSize as string) || 0,
@@ -612,34 +624,36 @@ export function ProcessCostDialog({
 
               {!hasErrors && !isLoadingMHR && !isLoadingLSR && !isLoadingHierarchy && !isLoadingCalculators && (
                 <>
-                  {/* Info Banner - Show when process groups exist but no routes */}
-                  {processGroups.length > 0 && selectedGroup && processRoutes.length === 0 && !hierarchyError && (
-                    <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-                      <CardContent className="pt-4 pb-4">
-                        <div className="flex gap-3">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                          </svg>
-                          <div className="flex-1">
-                            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                              No Process Routes Available
-                            </h4>
-                            <p className="text-xs text-blue-700 dark:text-blue-300">
-                              There are no process routes defined for the "{selectedGroup}" group yet.
-                              Please navigate to the <strong>Process Planning</strong> page to create process routes and add steps before using them here.
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
                   {/* HIERARCHICAL SECTION */}
                   <Card className="border-primary/50 bg-primary/5">
                     <CardHeader>
                       <CardTitle className="text-md">Process Selection (Hierarchical)</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {/* When editing a record with saved hierarchy values that don't exist in
+                          calculator mappings, show them as read-only text to avoid confusing
+                          "no routes" errors. The user can clear all three to re-pick. */}
+                      {editData && (selectedGroup || selectedRoute || selectedOperation) &&
+                        (!processGroups.includes(selectedGroup) || processRoutes.length === 0) && (
+                        <div className="rounded-md bg-muted/60 border p-3 space-y-2">
+                          <p className="text-xs text-muted-foreground font-medium">Saved process (from AI plan)</p>
+                          {selectedGroup && <div className="text-sm"><span className="text-muted-foreground">Group: </span><span className="font-medium">{selectedGroup}</span></div>}
+                          {selectedRoute && <div className="text-sm"><span className="text-muted-foreground">Route: </span><span className="font-medium">{selectedRoute}</span></div>}
+                          {selectedOperation && <div className="text-sm"><span className="text-muted-foreground">Operation: </span><span className="font-medium">{selectedOperation}</span></div>}
+                          <button
+                            type="button"
+                            className="text-xs text-primary underline"
+                            onClick={() => { setSelectedGroup(''); setSelectedRoute(''); setSelectedOperation(''); setSelectedProcessCalculatorId(''); }}
+                          >
+                            Re-select from hierarchy
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Show full pickers only when creating, or when user clears to re-select */}
+                      {(!editData || (!selectedGroup && !selectedRoute && !selectedOperation) ||
+                        (processGroups.includes(selectedGroup) && processRoutes.length > 0)) && (
+                        <>
                       {/* 1. Group Selection */}
                       <div className="space-y-2">
                         <Label className="font-semibold">1. Group</Label>
@@ -765,6 +779,8 @@ export function ProcessCostDialog({
                           </p>
                         )}
                       </div>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
 

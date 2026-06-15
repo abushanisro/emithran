@@ -11,7 +11,10 @@ import { ResolverService } from './services/resolver.service';
 import { PersistenceService } from './services/persistence.service';
 import { CreditMeterService } from './services/credit-meter.service';
 import { DrawingExtractorService } from './services/drawing-extractor.service';
+import { ExchangeRateService } from './services/exchange-rate.service';
 import { ExpandCandidatesTool } from './services/tools/expand-candidates.tool';
+import { FeatureGraphService } from './services/feature-graph.service';
+import { RuleEngineService } from './services/rule-engine.service';
 
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 import { LoggerModule } from '../../common/logger/logger.module';
@@ -29,7 +32,10 @@ import { BOMItemsModule } from '../bom-items/bom-items.module';
     PersistenceService,
     CreditMeterService,
     DrawingExtractorService,
+    ExchangeRateService,
     ExpandCandidatesTool,
+    FeatureGraphService,
+    RuleEngineService,
   ],
   exports: [OrchestratorService],
 })

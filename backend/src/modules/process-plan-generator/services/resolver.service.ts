@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import type { AbstractPlan } from '../dto/abstract-plan.dto';
 import type { CandidateSet } from '../dto/candidate-set.dto';
+import type { EngineeringBrief } from '../dto/engineering-brief.dto';
 import type {
   DraftLine,
   DraftPackage,
@@ -9,6 +10,7 @@ import type {
   CandidateConsidered,
   ProposedMaster,
 } from '../dto/draft-line.dto';
+import { executeCalculator, type BriefGeometry } from './calculator-executor';
 
 /**
  * Stage 3 — resolves the LLM's AbstractPlan to a DraftPackage.
@@ -29,7 +31,16 @@ import type {
 export class ResolverService {
   private readonly logger = new Logger(ResolverService.name);
 
-  resolve(plan: AbstractPlan, candidates: CandidateSet): DraftPackage {
+  resolve(plan: AbstractPlan, candidates: CandidateSet, brief?: EngineeringBrief): DraftPackage {
+    const briefGeometry: BriefGeometry | undefined = brief ? {
+      volumeMm3:      brief.dfm.volumeMm3,
+      lengthMm:       brief.dfm.boundingBox.lengthMm,
+      widthMm:        brief.dfm.boundingBox.widthMm,
+      heightMm:       brief.dfm.boundingBox.heightMm,
+      holeCount:      brief.dfm.holeCount,
+      holes:          brief.drawing?.holes ?? [],
+      surfaceAreaMm2: brief.dfm.surfaceAreaMm2,
+    } : undefined;
     const errors: string[] = [];
 
     // ── Index candidates by symbolic id for O(1) lookup
@@ -38,6 +49,7 @@ export class ResolverService {
     const labIx = new Map(candidates.labour.map((c) => [c.candidateId, c]));
     const opIx = new Map(candidates.processes.map((c) => [c.candidateId, c]));
     const clIx = new Map(candidates.calculators.map((c) => [c.candidateId, c]));
+    const tcIx = new Map(candidates.tooling.map((c) => [c.candidateId, c]));
 
     const proposedMasters: ProposedMaster[] = plan.proposedMasters.map((pm) => ({
       proposedMasterId: pm.proposedMasterId,
@@ -74,7 +86,8 @@ export class ResolverService {
           materialId: candidate?.dbId ?? null,
           newMasterRef: newRef,
           materialCategory: candidate?.materialGroup?.toLowerCase().includes('plastic') ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS',
-          materialGrade: candidate?.grade ?? candidate?.material ?? extractProposedString(proposedMasters, newRef, 'grade', ''),
+          materialName: candidate?.material || extractProposedString(proposedMasters, newRef, 'material', ''),
+          materialGrade: candidate?.grade || candidate?.material || extractProposedString(proposedMasters, newRef, 'grade', ''),
           unitCost,
           grossUsage: line.grossUsageKg,
           netUsage: line.netUsageKg,
@@ -110,23 +123,73 @@ export class ResolverService {
 
       const refs: DraftLineReferences = {
         candidatesConsidered: [
-          ...buildCandidatesList(candidates.processes, line.candidateId, (c) => c.processName),
+          ...buildCandidatesList(candidates.processes, line.candidateId, (c) => c.operation),
           ...buildCandidatesList(candidates.machines, line.machineCandidateId, (c) => c.machineName).map((c) => ({ ...c, candidateId: `[m]${c.candidateId}` })),
         ],
         newMasterRefs: newRef ? [newRef] : [],
       };
 
-      const estimatedCost = computeProcessCost({
-        setupMin: line.setupMin,
-        setupManning: line.setupManning,
-        cycleSec: line.cycleSec,
-        partsPerCycle: line.partsPerCycle,
-        batchSize: line.batchSize,
-        heads: line.heads,
+      // Timing resolution priority: calculator > AI hint > geometry estimate > conservative default
+      const aiSetupMin = (line.setupMin != null && line.setupMin > 0) ? line.setupMin : null;
+      const aiCycleSec = (line.cycleSec != null && line.cycleSec > 0) ? line.cycleSec : null;
+      const resolvedSetupManning = line.setupManning ?? 1;
+
+      // Build full operation context for geometry estimate gating
+      const opName = opCand?.operation ?? extractProposedString(proposedMasters, newRef, 'operation', '');
+      const processGroup = opCand?.processGroup ?? extractProposedString(proposedMasters, newRef, 'processGroup', '');
+      const processRoute = opCand?.processRoute ?? extractProposedString(proposedMasters, newRef, 'processRoute', '');
+      const opFullContext = `${processGroup} ${processRoute} ${opName} ${line.reason}`;
+
+      // Skip geometry estimate for bench/manual ops (deburr, inspect, surface treat, heat treat)
+      // even when the AI incorrectly assigns a CNC machine candidate.
+      const linkedMandatoryOp = brief?.mandatoryOps.find((op) => op.featureId === line.featureId);
+      const isBenchOp =
+        linkedMandatoryOp?.machineCategoryHint === 'bench_manual' ||
+        linkedMandatoryOp?.machineCategoryHint === 'inspection_bench' ||
+        linkedMandatoryOp?.machineCategoryHint === 'surface_treatment' ||
+        linkedMandatoryOp?.machineCategoryHint === 'heat_treatment';
+
+      const geoCycleSec = !isBenchOp && briefGeometry ? estimateCycleSec(opFullContext, briefGeometry) : null;
+
+      // Per-category defaults: bench/inspect/saw ops don't need CNC-level setup time
+      const categoryHint = linkedMandatoryOp?.machineCategoryHint ?? 'any';
+      const defaultSetupMin =
+        categoryHint === 'bench_manual'      ? 2  :
+        categoryHint === 'inspection_bench'  ? 5  :
+        categoryHint === 'saw'               ? 5  :
+        categoryHint === 'surface_treatment' ? 10 :
+        categoryHint === 'heat_treatment'    ? 10 :
+        15;
+      const defaultCycleSec =
+        categoryHint === 'bench_manual'      ? 120 :
+        categoryHint === 'inspection_bench'  ? 300 :
+        categoryHint === 'saw'               ? 30  :
+        60;
+
+      const resolvedSetupMin = aiSetupMin ?? defaultSetupMin;
+      const resolvedCycleSec = aiCycleSec ?? geoCycleSec ?? defaultCycleSec;
+
+      const calcParams = {
         machineRate: macCand.rateInrPerHour,
         labourRate: labCand.lhrInrPerHour,
+        setupMin: resolvedSetupMin,
+        cycleSec: resolvedCycleSec,
+        batchSize: line.batchSize,
+        heads: line.heads,
+        setupManning: resolvedSetupManning,
+        partsPerCycle: line.partsPerCycle,
         scrapPct: line.scrapPct,
-      });
+      };
+      const calcResult = clCand ? executeCalculator(clCand, calcParams, briefGeometry) : null;
+      const estimatedCost = calcResult !== null
+        ? calcResult * (1 + line.scrapPct / 100)
+        : computeProcessCost(calcParams);
+
+      const timingSource: 'calculator' | 'geometry_estimate' | 'ai_hint' | 'default' =
+        calcResult !== null ? 'calculator' :
+        (aiCycleSec !== null || aiSetupMin !== null) ? 'ai_hint' :
+        geoCycleSec !== null ? 'geometry_estimate' :
+        'default';
 
       // process_cost_records requires a non-null direct_rate. We compute it
       // as machine + labour-per-head (the same combined rate the existing
@@ -148,20 +211,24 @@ export class ResolverService {
           labourRate: labCand.lhrInrPerHour,
           directRate,
           opNbr: line.opNbr,
-          setupManning: line.setupManning,
-          setupTimeMinutes: line.setupMin,
+          setupManning: resolvedSetupManning,
+          setupTimeMinutes: resolvedSetupMin,
           batchSize: line.batchSize,
           heads: line.heads,
-          cycleTimeSeconds: line.cycleSec,
+          cycleTimeSeconds: resolvedCycleSec,
           partsPerCycle: line.partsPerCycle,
           scrapPercentage: line.scrapPct,
+          processGroup: opCand?.processGroup ?? extractProposedString(proposedMasters, newRef, 'processGroup', ''),
+          processRoute: opCand?.processRoute ?? extractProposedString(proposedMasters, newRef, 'processRoute', ''),
+          operation: opCand?.operation ?? extractProposedString(proposedMasters, newRef, 'operation', ''),
+          calculatorName: clCand?.name ?? null,
+          timingSource,
         },
         references: refs,
         reason: line.reason,
         estimatedCost,
       });
-      // Track calculator candidate considered (logged but not persisted —
-      // process_cost_records has no calculator_id column).
+      // Track calculator candidate in candidatesConsidered trail
       if (clCand) {
         refs.candidatesConsidered.push({
           candidateId: `[c]${clCand.candidateId}`,
@@ -172,25 +239,35 @@ export class ResolverService {
       }
     });
 
-    // ── Tooling ───────────────────────────────────────────────────────────
+    // ── Tooling — all values from DB record via tc-N candidateId ─────────
     plan.tooling.forEach((line, idx) => {
-      const estimatedCost = (line.unitCost * line.quantity * (line.usagePercentage / 100)) / Math.max(line.amortizationParts, 1);
+      const tc = tcIx.get(line.candidateId);
+      if (!tc) {
+        errors.push(`tooling[${idx}]: candidateId ${line.candidateId} not found in tooling CandidateSet`);
+        return;
+      }
       draftLines.push({
         kind: 'tooling',
         index: idx,
         data: {
-          toolingType: line.toolingType,
-          description: line.description,
-          specifications: line.specifications,
-          unitCost: line.unitCost,
-          quantity: line.quantity,
-          amortizationParts: line.amortizationParts,
-          usagePercentage: line.usagePercentage,
-          isCustom: line.isCustom,
+          toolingType: tc.toolingType,
+          description: tc.description,
+          specifications: tc.specifications ?? '',
+          unitCost: tc.unitCostInr,
+          quantity: tc.quantity,
+          amortizationParts: tc.amortizationParts,
+          usagePercentage: tc.usagePercentage,
+          isCustom: tc.isCustom,
+          supplier: tc.supplier,
+          costPerPart: tc.costPerPart,
+          dbRecordId: tc.dbId,
         },
-        references: { candidatesConsidered: [], newMasterRefs: [] },
+        references: {
+          candidatesConsidered: buildCandidatesList(candidates.tooling, line.candidateId, (c) => c.description),
+          newMasterRefs: [],
+        },
         reason: line.reason,
-        estimatedCost,
+        estimatedCost: tc.costPerPart,
       });
     });
 
@@ -297,6 +374,51 @@ function extractProposedString(
   const pm = proposedMasters.find((p) => p.proposedMasterId === ref);
   const v = (pm?.data as any)?.[key];
   return typeof v === 'string' ? v : fallback;
+}
+
+/**
+ * Estimates CNC cycle time (seconds) from part geometry using conservative cutting physics.
+ * Returns null for manual bench ops (deburr, inspect) where CNC physics don't apply.
+ *
+ * Parameters: 120 m/min cutting speed, 0.2 mm/rev feed — conservative defaults valid for
+ * steel, aluminium, and copper alloys at finish-turning conditions.
+ *
+ * Priority: fills the gap between "calculator returned null" and the flat 60 s default.
+ * The estimate will be replaced by a real calculator result once one is configured.
+ */
+function estimateCycleSec(opContext: string, geo: BriefGeometry): number | null {
+  // Return null for any manual/bench/non-machining operations so they fall through to the 60 s default.
+  // opContext includes processGroup + processRoute + operation + AI reason — cast a wide net.
+  if (/deburr|inspect|clean|mark|packag|label|post.?process|quality|bench|visual|assembl|surface.?treat|anodiz|plat|heat.?treat|paint|coat/i.test(opContext)) return null;
+
+  const opName = opContext; // kept for cutting-length selection below
+
+  const { widthMm, heightMm, lengthMm } = geo;
+  if (!widthMm || !heightMm || !lengthMm) return null;
+
+  const diameter = (widthMm + heightMm) / 2;
+  if (diameter <= 0) return null;
+
+  const cuttingSpeedMpm = 120;  // conservative for steel/Cu/Al
+  const feedMmRev = 0.2;
+  const rpm = (cuttingSpeedMpm * 1000) / (Math.PI * diameter);
+  const feedRateMmMin = Math.max(rpm * feedMmRev, 1);
+
+  // Cutting length by operation type
+  let cuttingLengthMm: number;
+  if (/face|facing/i.test(opName)) {
+    cuttingLengthMm = diameter / 2;                              // radial inward cut
+  } else if (/saw|cut.?off|part.?off|parting/i.test(opName)) {
+    cuttingLengthMm = diameter / 2;                              // grooves through radius
+  } else if (/drill|bore/i.test(opName)) {
+    cuttingLengthMm = Math.max(lengthMm, widthMm, heightMm);    // axial through depth
+  } else {
+    cuttingLengthMm = Math.max(lengthMm, widthMm, heightMm);    // OD turn, mill: longest axis
+  }
+
+  // Add 6 s overhead (rapid traverse, tool change, approach, dwell)
+  const cuttingMin = (cuttingLengthMm * 1.1) / feedRateMmMin;
+  return Math.max((cuttingMin + 0.1) * 60, 3);
 }
 
 function computeRawMaterialCost(grossKg: number, unitCostPerKg: number, scrapPct: number, overheadPct: number): number {

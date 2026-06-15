@@ -90,7 +90,27 @@ export class RawMaterialCostService {
       throw new InternalServerErrorException(`Failed to fetch raw material costs: ${error.message}`);
     }
 
-    const records = (data || []).map((row) => RawMaterialCostResponseDto.fromDatabase(row));
+    // Back-fill material_name for old AI-applied records that stored only material_id
+    const rows = data || [];
+    const missingIds = [...new Set(
+      rows.filter(r => !r.material_name && r.material_id).map(r => String(r.material_id))
+    )];
+    const materialMap = new Map<string, string>();
+    if (missingIds.length > 0) {
+      const { data: mats } = await this.supabaseService
+        .getClient(accessToken)
+        .from('raw_materials')
+        .select('id, material')
+        .in('id', missingIds);
+      (mats || []).forEach(m => materialMap.set(String(m.id), m.material));
+    }
+    const enriched = rows.map(r =>
+      !r.material_name && r.material_id && materialMap.has(String(r.material_id))
+        ? { ...r, material_name: materialMap.get(String(r.material_id)) }
+        : r
+    );
+
+    const records = enriched.map((row) => RawMaterialCostResponseDto.fromDatabase(row));
     const total = count || 0;
     const totalPages = Math.ceil(total / limit);
 
@@ -122,8 +142,20 @@ export class RawMaterialCostService {
       throw new NotFoundException(`Raw material cost with ID ${id} not found`);
     }
 
+    // Back-fill material_name from master if missing
+    let row = data;
+    if (!row.material_name && row.material_id) {
+      const { data: mat } = await this.supabaseService
+        .getClient(accessToken)
+        .from('raw_materials')
+        .select('material')
+        .eq('id', String(row.material_id))
+        .single();
+      if (mat?.material) row = { ...row, material_name: mat.material };
+    }
+
     // Recalculate to ensure fresh values
-    const recalculatedData = this.recalculateRecord(data);
+    const recalculatedData = this.recalculateRecord(row);
 
     return RawMaterialCostResponseDto.fromDatabase(recalculatedData);
   }

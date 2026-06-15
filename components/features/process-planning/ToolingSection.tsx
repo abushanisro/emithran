@@ -155,8 +155,17 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
   };
 
 
+  const computeToolCost = (item: any): number => {
+    const unit  = Number(item.unitCost || 0);
+    const qty   = Number(item.quantity || 1);
+    const usage = Number(item.usagePercentage || 100);
+    const amort = Math.max(Number(item.amortizationParts || 1), 1);
+    const computed = (unit * qty * (usage / 100)) / amort;
+    return item.totalCost || computed;
+  };
+
   const calculateTotal = () => {
-    return tooling.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+    return tooling.reduce((sum, item) => sum + computeToolCost(item), 0);
   };
 
 
@@ -283,7 +292,7 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
                                   {item.usagePercentage}%
                                 </td>
                                 <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                                  ₹{item.totalCost.toFixed(2)}
+                                  ₹{computeToolCost(item).toFixed(2)}
                                 </td>
                                 <td className="p-3 text-center">
                                   <div className="flex items-center justify-center gap-2">

@@ -45,7 +45,7 @@ export class CalculatorsServiceV2 {
 
     const client = this.supabaseService.getClient(accessToken);
 
-    // Build query with MANDATORY user_id filter for tenant isolation
+    // Build query: user's own calculators + all global/library calculators
     let queryBuilder = client
       .from('calculators')
       .select(
@@ -56,7 +56,7 @@ export class CalculatorsServiceV2 {
       `,
         { count: 'exact' },
       )
-      .eq('user_id', userId) // SECURITY: Tenant isolation enforced at query level
+      .or(`user_id.eq.${userId},is_global.eq.true`)
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -116,7 +116,7 @@ export class CalculatorsServiceV2 {
       `,
       )
       .eq('id', id)
-      .eq('user_id', userId) // SECURITY: Ownership verification - user can only access their own calculators
+      .or(`user_id.eq.${userId},is_global.eq.true`)
       .single();
 
     if (error || !data) {

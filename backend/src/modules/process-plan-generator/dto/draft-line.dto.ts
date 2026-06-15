@@ -42,7 +42,8 @@ export interface DraftRawMaterialPayload {
   materialId: string | null;
   newMasterRef: string | null;
   materialCategory: string;          // 'FERROUS_NON_FERROUS' | 'PLASTIC_RUBBER' | ...
-  materialGrade: string;
+  materialName: string;              // e.g. "Aluminium 6061"
+  materialGrade: string;             // e.g. "6061-T6"
   unitCost: number;                  // INR/kg
   grossUsage: number;                // kg (includes scrap)
   netUsage: number;                  // kg
@@ -68,6 +69,11 @@ export interface DraftProcessPayload {
   cycleTimeSeconds: number;      // → cycle_time
   partsPerCycle: number;
   scrapPercentage: number;       // → scrap
+  processGroup: string | null;   // → process_group (from processCategory)
+  processRoute: string | null;   // → process_route (machine type)
+  operation: string | null;      // → operation (from processName)
+  calculatorName: string | null; // name of calculator used, null if formula fallback
+  timingSource: 'calculator' | 'geometry_estimate' | 'ai_hint' | 'default'; // where setup/cycle time came from
 }
 
 export interface DraftToolingPayload {
@@ -79,6 +85,9 @@ export interface DraftToolingPayload {
   amortizationParts: number;
   usagePercentage: number;
   isCustom: boolean;
+  supplier: string | null;
+  costPerPart: number;
+  dbRecordId: string;
 }
 
 export interface DraftLogisticsPayload {

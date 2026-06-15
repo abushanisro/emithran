@@ -51,6 +51,7 @@ export enum DataSource {
   PROCESSES = 'processes',
   MANUAL = 'manual',
   SHEET_METAL_LOOKUP = 'sheet_metal_lookup',
+  ENGINEERING_BRIEF = 'engineering_brief', // part geometry: volume_mm3, length_mm, width_mm, height_mm, hole_count, surface_area_mm2
 }
 
 export enum FormulaType {

@@ -1,3 +1,4 @@
+
 import { ResolverService } from './resolver.service';
 import type { CandidateSet } from '../dto/candidate-set.dto';
 import type { AbstractPlan } from '../dto/abstract-plan.dto';
@@ -14,11 +15,12 @@ const candidates: CandidateSet = {
     { candidateId: 'lb-1', dbId: 'lsr-1', labourType: 'Skilled', labourCode: 'SKL', lhrInrPerHour: 62, location: 'India-Bangalore', score: 0.9 },
   ],
   processes: [
-    { candidateId: 'op-1', dbId: 'proc-1', processName: 'Turning', processCategory: 'Machining', machineType: 'Lathe', standardTimeMinutes: null, setupTimeMinutes: 20, cycleTimeMinutes: 0.5, skillLevelRequired: 'Skilled', score: 0.9 },
+    { candidateId: 'op-1', dbId: 'proc-1', processGroup: 'CNC Machining', processRoute: 'Turning', operation: 'Turning', calculatorId: null, score: 0.9, referenceTables: [] },
   ],
   calculators: [
-    { candidateId: 'cl-1', dbId: 'calc-1', name: 'Machining', calcCategory: 'process', description: null, score: 0.7 },
+    { candidateId: 'cl-1', dbId: 'calc-1', name: 'Machining', calcCategory: 'process', description: null, score: 0.7, fields: [], formulas: [] },
   ],
+  tooling: [],
 };
 
 const plan: AbstractPlan = {
@@ -99,13 +101,9 @@ describe('ResolverService', () => {
       proposedMasters: [{
         kind: 'process',
         proposedMasterId: 'pm-1',
-        processName: 'Grinding',
-        processCategory: 'Machining',
-        machineType: 'Grinder',
-        description: 'Test',
-        setupTimeMinutes: 20,
-        cycleTimeMinutes: 0.4,
-        skillLevelRequired: 'Skilled',
+        processGroup: 'CNC Machining',
+        processRoute: 'Grinding',
+        operation: 'Centerless Grinding',
         reason: 'IT8 needs grind.',
       }],
     };

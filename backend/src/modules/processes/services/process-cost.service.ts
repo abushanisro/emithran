@@ -80,21 +80,44 @@ export class ProcessCostService {
 
     if (error) {
       this.logger.error(`Error fetching process costs: ${error.message}`, 'ProcessCostService');
-      
-      // Handle access permissions
+
       if (error.message.includes('row-level security policy')) {
         throw new ForbiddenException('You do not have permission to access these process cost records.');
       }
-      
-      // Handle invalid filter values
       if (error.message.includes('invalid input syntax for type uuid')) {
         throw new BadRequestException('One or more filter values have invalid format. Please check your process ID, BOM item ID filters.');
       }
-      
       throw new InternalServerErrorException('Unable to retrieve process cost records. Please try again later.');
     }
 
-    const records = (data || []).map((row) => ProcessCostResponseDto.fromDatabase(row));
+    // Back-fill process hierarchy for old AI-applied records that stored only process_id
+    const rows = data || [];
+    const missingIds = [...new Set(
+      rows.filter(r => (!r.process_group || !r.operation) && r.process_id).map(r => String(r.process_id))
+    )];
+    const processMap = new Map<string, { process_name: string; process_category: string }>();
+    if (missingIds.length > 0) {
+      // Note: machine_type column is optional — only select guaranteed columns
+      const { data: procs } = await this.supabaseService
+        .getClient(accessToken)
+        .from('processes')
+        .select('id, process_name, process_category')
+        .in('id', missingIds);
+      (procs || []).forEach(p => processMap.set(String(p.id), p));
+    }
+    const enriched = rows.map(r => {
+      if ((!r.process_group || !r.operation) && r.process_id) {
+        const p = processMap.get(String(r.process_id));
+        if (p) return {
+          ...r,
+          process_group: r.process_group || p.process_category,
+          operation: r.operation || p.process_name,
+        };
+      }
+      return r;
+    });
+
+    const records = enriched.map((row) => ProcessCostResponseDto.fromDatabase(row));
     const total = count || 0;
     const totalPages = Math.ceil(total / limit);
 
@@ -140,8 +163,24 @@ export class ProcessCostService {
       throw new NotFoundException(`Process cost record with ID ${id} was not found or you do not have access to it.`);
     }
 
+    // Back-fill process hierarchy from master if missing
+    let row = data;
+    if ((!row.process_group || !row.operation) && row.process_id) {
+      const { data: proc } = await this.supabaseService
+        .getClient(accessToken)
+        .from('processes')
+        .select('process_name, process_category')
+        .eq('id', String(row.process_id))
+        .single();
+      if (proc) row = {
+        ...row,
+        process_group: row.process_group || proc.process_category,
+        operation: row.operation || proc.process_name,
+      };
+    }
+
     // Recalculate to ensure fresh values
-    const recalculatedData = this.recalculateRecord(data);
+    const recalculatedData = this.recalculateRecord(row);
 
     return ProcessCostResponseDto.fromDatabase(recalculatedData);
   }

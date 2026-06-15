@@ -108,8 +108,20 @@ export function RawMaterialsSection({ bomItemId, bomItem }: RawMaterialsSectionP
     }
   };
 
+  const fmtUsage = (v: any): string => {
+    const n = Number(v || 0);
+    return n > 0 && n < 0.01 ? n.toFixed(4) : n.toFixed(2);
+  };
+
+  const computeMatCost = (m: any): number => {
+    const gross = Number(m.grossUsage || 0);
+    const unit = Number(m.unitCost || 0);
+    const overhead = Number(m.overhead || 0);
+    return gross * unit * (1 + overhead / 100);
+  };
+
   const calculateTotal = () => {
-    return materials.reduce((sum, m) => sum + (m.totalCost || 0), 0).toFixed(2);
+    return materials.reduce((sum, m) => sum + computeMatCost(m), 0).toFixed(2);
   };
 
   // Show message if no BOM item selected
@@ -193,10 +205,10 @@ export function RawMaterialsSection({ bomItemId, bomItem }: RawMaterialsSectionP
                             ₹{(material.unitCost || 0).toFixed(2)}
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right">
-                            {(material.grossUsage || 0).toFixed(2)}
+                            {fmtUsage(material.grossUsage)}
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right">
-                            {(material.netUsage || 0).toFixed(2)}
+                            {fmtUsage(material.netUsage)}
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right">
                             {material.scrap || 0}%
@@ -205,7 +217,7 @@ export function RawMaterialsSection({ bomItemId, bomItem }: RawMaterialsSectionP
                             {material.overhead || 0}%
                           </td>
                           <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                            ₹{(material.totalCost || 0).toFixed(2)}
+                            ₹{computeMatCost(material).toFixed(2)}
                           </td>
                           <td className="p-3 text-center">
                             <div className="flex items-center justify-center gap-2">

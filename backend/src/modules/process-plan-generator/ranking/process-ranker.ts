@@ -2,64 +2,56 @@ import type { PartFamily, BriefDfm } from '../dto/engineering-brief.dto';
 import type { ProcessCandidate } from '../dto/candidate-set.dto';
 
 /**
- * Scores process_catalog rows for fit against the family + DFM features.
+ * Scores process_calculator_mappings rows for fit against the family + DFM.
  *
- * The process master is hierarchical (group → route → operations). For
- * this stage we flatten and rank by family-name match + DFM-feature
- * relevance (drilling ops boost when holes are present, milling ops boost
- * when pockets, T-slot/EDM when undercuts).
+ * The mappings table IS the user's configured process hierarchy
+ * (group → route → operation), so every row here is already a valid
+ * selectable process. Ranking just pushes the most-relevant ones to
+ * the top so the LLM prompt stays concise.
  */
 
 interface ProcessRow {
   id: string;
-  process_name: string | null;
-  process_category: string | null;
-  machine_type?: string | null;             // optional — some deployments don't have it
-  description: string | null;
-  standard_time_minutes?: number | string | null;
-  setup_time_minutes?: number | string | null;
-  cycle_time_minutes?: number | string | null;
-  skill_level_required?: string | null;
+  process_group: string | null;
+  process_route: string | null;
+  operation: string | null;
+  calculator_id?: string | null;
 }
 
-const FAMILY_PROCESS_KEYWORDS: Record<Exclude<PartFamily, 'out_of_scope'>, string[]> = {
-  cnc_turned: ['turn', 'lathe', 'face', 'thread', 'chamfer', 'parting', 'groove'],
-  cnc_milled: ['mill', 'machin', 'face mill', 'pocket', 'profile', 'slot'],
-  sheet_metal: ['laser', 'punch', 'bend', 'form', 'shear', 'deburr'],
+// Keywords checked against the full "group route operation" haystack
+const FAMILY_KEYWORDS: Record<Exclude<PartFamily, 'out_of_scope'>, string[]> = {
+  cnc_turned: ['turn', 'lathe', 'face', 'thread', 'chamfer', 'parting', 'groove', 'bore', 'tap', 'drill'],
+  cnc_milled: ['mill', 'machin', 'pocket', 'profile', 'slot', 'contour', 'tap', 'drill'],
+  sheet_metal: ['sheet', 'metal', 'laser', 'punch', 'bend', 'form', 'shear', 'cut', 'press'],
 };
+
+// Groups that are almost always relevant (assembly, finishing, inspection)
+const UNIVERSAL_KEYWORDS = ['assem', 'weld', 'deburr', 'clean', 'inspect', 'pack'];
 
 const norm = (s: string | null | undefined): string => (s ?? '').toLowerCase().trim();
 
-const toNumber = (v: number | string | null | undefined): number => {
-  if (v == null) return 0;
-  const n = typeof v === 'number' ? v : parseFloat(v);
-  return Number.isFinite(n) ? n : 0;
-};
-
 function familyKeywordScore(row: ProcessRow, family: Exclude<PartFamily, 'out_of_scope'>): number {
-  const keywords = FAMILY_PROCESS_KEYWORDS[family];
-  const haystack = `${norm(row.process_name)} ${norm(row.process_category)} ${norm(row.machine_type)} ${norm(row.description)}`;
+  const haystack = `${norm(row.process_group)} ${norm(row.process_route)} ${norm(row.operation)}`;
+  const keywords = FAMILY_KEYWORDS[family];
   let score = 0;
   for (const kw of keywords) {
-    if (haystack.includes(kw)) score = Math.max(score, 1);
+    if (haystack.includes(kw)) { score = 1; break; }
   }
-  // Secondary processes useful across families
-  if (haystack.includes('drill') || haystack.includes('tap') || haystack.includes('deburr')) {
-    score = Math.max(score, 0.7);
+  if (score === 0) {
+    for (const kw of UNIVERSAL_KEYWORDS) {
+      if (haystack.includes(kw)) { score = 0.6; break; }
+    }
   }
-  if (haystack.includes('heat treat') || haystack.includes('hardening') || haystack.includes('grind')) {
-    score = Math.max(score, 0.5);
-  }
+  if (score === 0) score = 0.3; // non-zero base — all user-configured ops are valid
   return score;
 }
 
 function dfmRelevanceScore(row: ProcessRow, dfm: BriefDfm): number {
-  const name = norm(row.process_name);
+  const op = norm(row.operation);
   let s = 0.4;
-  if (dfm.holeCount > 0 && (name.includes('drill') || name.includes('tap'))) s = Math.max(s, 1);
-  if (dfm.pocketCount > 0 && (name.includes('mill') || name.includes('pocket'))) s = Math.max(s, 0.95);
-  if (dfm.thinWallCount > 0 && (name.includes('precision') || name.includes('finish'))) s = Math.max(s, 0.7);
-  if (dfm.undercutCount > 0 && (name.includes('edm') || name.includes('t-slot') || name.includes('undercut'))) s = Math.max(s, 1);
+  if (dfm.holeCount > 0 && (op.includes('drill') || op.includes('tap'))) s = Math.max(s, 1);
+  if (dfm.pocketCount > 0 && op.includes('mill')) s = Math.max(s, 0.95);
+  if (dfm.undercutCount > 0 && (op.includes('edm') || op.includes('t-slot'))) s = Math.max(s, 1);
   return s;
 }
 
@@ -78,18 +70,16 @@ export function rankProcesses(
     return { row, score };
   });
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score || a.row.id.localeCompare(b.row.id));
 
   return scored.slice(0, topN).map(({ row, score }, idx) => ({
     candidateId: `op-${idx + 1}`,
     dbId: row.id,
-    processName: row.process_name ?? '',
-    processCategory: row.process_category ?? '',
-    machineType: row.machine_type ?? null,
-    standardTimeMinutes: toNumber(row.standard_time_minutes) || null,
-    setupTimeMinutes: toNumber(row.setup_time_minutes) || null,
-    cycleTimeMinutes: toNumber(row.cycle_time_minutes) || null,
-    skillLevelRequired: row.skill_level_required ?? null,
+    processGroup: row.process_group ?? '',
+    processRoute: row.process_route ?? '',
+    operation: row.operation ?? '',
+    calculatorId: row.calculator_id ?? null,
     score: Number(score.toFixed(3)),
+    referenceTables: [],
   }));
 }

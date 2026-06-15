@@ -6,10 +6,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import DeliveryOrderWorkflow from '@/components/features/delivery/DeliveryOrderWorkflow';
 import DeliveryTracking from '@/components/features/delivery/DeliveryTracking';
+import { usePageContext } from '@/lib/echo/PageContextProvider';
 
 export default function DeliveryPage() {
   const params = useParams();
   const projectId = params.id as string;
+
+  usePageContext({ entityType: 'project', entityId: projectId, breadcrumbs: ['Project', 'Delivery'] });
   const [activeTab, setActiveTab] = useState('create-order');
   const [trackingOrderId, setTrackingOrderId] = useState<string | undefined>();
   

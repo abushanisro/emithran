@@ -6,12 +6,15 @@ import { SupplierNominationsDashboard } from '@/components/features/supplier-nom
 import { SupplierNominationPage } from '@/components/features/supplier-nominations/SupplierNominationPage';
 import { DetailedEvaluationView } from '@/components/features/supplier-nominations/DetailedEvaluationView';
 import { useSupplierNomination } from '@/lib/api/hooks/useSupplierNominations';
+import { usePageContext } from '@/lib/echo/PageContextProvider';
 
 export default function SupplierNominationMainPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
   const projectId = params.id as string;
+
+  usePageContext({ entityType: 'project', entityId: projectId, breadcrumbs: ['Project', 'Supplier nomination'] });
   
   // Use URL as single source of truth - no local state
   const currentView = (searchParams.get('view') || 'dashboard') as 'dashboard' | 'nomination' | 'evaluation';

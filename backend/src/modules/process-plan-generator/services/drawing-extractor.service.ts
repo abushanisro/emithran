@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import { fromBuffer } from 'pdf2pic';
 
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import type { DrawingBrief } from '../dto/drawing-brief.dto';
@@ -18,15 +17,14 @@ const SIGNED_URL_TTL_SEC = 300;
  *
  * Strategy:
  *   1. If bom_items.drawing_extraction already cached, return it (no cost).
- *   2. If file_2d_path is missing, return UNAVAILABLE_DRAWING_BRIEF (the
- *      orchestrator will just generate from 3D+BOM only).
- *   3. Otherwise: download PDF from Supabase Storage → convert first page
- *      to PNG via pdf2pic → send PNG to Claude vision with a structured
- *      extraction prompt → validate the JSON shape → cache on the BOM item.
+ *   2. If file_2d_path is missing, return UNAVAILABLE_DRAWING_BRIEF.
+ *   3. Otherwise: download PDF from Supabase Storage → base64-encode →
+ *      send directly to Claude as a PDF document (no pdf2pic / GraphicsMagick
+ *      required — Claude natively understands PDFs via the document content block).
  *
- * We use Claude vision (not the QC module's tesseract path) because tesseract
- * misses GD&T symbols, surface-finish triangles, thread callouts, and
- * datum references — exactly the content that drives process choice.
+ * Using Claude's native PDF support instead of pdf2pic eliminates the
+ * GraphicsMagick/ImageMagick system dependency that caused silent extraction
+ * failures in cloud environments.
  */
 @Injectable()
 export class DrawingExtractorService {
@@ -67,12 +65,12 @@ export class DrawingExtractorService {
 
     // ── 3) Fresh extraction ────────────────────────────────────────────────
     try {
-      const pngBase64 = await this.fetchAndRasterise(bomRow.file_2d_path, accessToken);
-      if (!pngBase64) {
+      const pdfBase64 = await this.fetchPdfBase64(bomRow.file_2d_path, accessToken);
+      if (!pdfBase64) {
         return { ...UNAVAILABLE_DRAWING_BRIEF };
       }
 
-      const brief = await this.callClaudeVision(pngBase64, bomRow.file_2d_path);
+      const brief = await this.callClaudeWithPdf(pdfBase64, bomRow.file_2d_path);
       const finalBrief: DrawingBrief = {
         ...brief,
         source: 'fresh',
@@ -84,7 +82,10 @@ export class DrawingExtractorService {
       // Cache on bom_items so subsequent generates are free
       await this.cacheOnBomItem(bomItemId, finalBrief, accessToken);
       this.logger.log(
-        `Drawing brief for ${bomItemId}: extracted ${finalBrief.dimensions.length} dims, ${finalBrief.gdt.length} GD&T, ${finalBrief.surfaceFinishes.length} surface-finishes, ${finalBrief.holes.length} holes`,
+        `Drawing brief for ${bomItemId}: extracted ${finalBrief.dimensions.length} dims, ` +
+        `${finalBrief.gdt.length} GD&T, ${finalBrief.surfaceFinishes.length} surface-finishes, ` +
+        `${finalBrief.holes.length} holes, material=${finalBrief.material ?? 'none'}, ` +
+        `treatment=${finalBrief.surfaceTreatment ?? 'none'}`,
       );
       return finalBrief;
     } catch (e: any) {
@@ -93,9 +94,10 @@ export class DrawingExtractorService {
     }
   }
 
-  // ── Storage → PNG ────────────────────────────────────────────────────────
+  // ── Storage → PDF base64 ─────────────────────────────────────────────────
+  // No rasterisation — we send the PDF bytes directly to Claude.
 
-  private async fetchAndRasterise(storagePath: string, accessToken: string | null): Promise<string | null> {
+  private async fetchPdfBase64(storagePath: string, accessToken: string | null): Promise<string | null> {
     const client = this.supabaseService.getClient(accessToken ?? undefined);
     const { data, error } = await client
       .storage
@@ -111,37 +113,14 @@ export class DrawingExtractorService {
       timeout: 30_000,
       maxContentLength: 50 * 1024 * 1024,
     });
-    const pdfBuffer = Buffer.from(res.data);
-
-    // Render first page at 200 DPI. Engineering drawings need detail; we cap
-    // to 1800px width to keep vision-token cost bounded.
-    const converter = fromBuffer(pdfBuffer, {
-      density: 200,
-      format: 'png',
-      width: 1800,
-      preserveAspectRatio: true,
-      saveFilename: 'page',
-    });
-
-    let pageResult: any;
-    try {
-      pageResult = await converter(1, { responseType: 'base64' });
-    } catch (e: any) {
-      this.logger.warn(`pdf2pic rasterise failed: ${e.message}`);
-      return null;
-    }
-
-    const base64 = pageResult?.base64 ?? pageResult?.data;
-    if (!base64 || typeof base64 !== 'string') {
-      this.logger.warn('pdf2pic returned no base64 data');
-      return null;
-    }
+    const base64 = Buffer.from(res.data).toString('base64');
+    this.logger.log(`PDF downloaded for ${storagePath}: ${(res.data.byteLength / 1024).toFixed(1)} KB`);
     return base64;
   }
 
-  // ── Claude vision ────────────────────────────────────────────────────────
+  // ── Claude PDF extraction ────────────────────────────────────────────────
 
-  private async callClaudeVision(pngBase64: string, sourcePath: string): Promise<DrawingBrief> {
+  private async callClaudeWithPdf(pdfBase64: string, sourcePath: string): Promise<DrawingBrief> {
     const systemPrompt = `You are a senior manufacturing engineer reading an Indian-shop 2D engineering drawing.
 Your job is to extract a structured JSON description of every callout that drives process planning.
 
@@ -203,6 +182,8 @@ Rules:
 - For toleranceClass, accept ISO fits (h7, H8, k6, etc.) AND IT grades.
 - For GD&T, "tolerance" is the numeric tolerance zone (e.g., 0.05 for ⌖0.05).
 - Heat treatment example: "Carburise, 58-62 HRC, case 0.6-0.8mm".
+- Surface treatment: capture the full callout, e.g. "Type III Hardcoat Anodize", "Zinc Plate 8-12μm".
+- For holes: if the view shows a cross (transverse) hole, set feature to "cross hole" or "transverse hole".
 - If the drawing is unreadable in part, add a short note to extractionWarnings and continue.
 - Do NOT invent values. If unsure, omit the entry.`;
 
@@ -217,11 +198,11 @@ Rules:
           role: 'user',
           content: [
             {
-              type: 'image',
+              type: 'document',
               source: {
                 type: 'base64',
-                media_type: 'image/png',
-                data: pngBase64,
+                media_type: 'application/pdf',
+                data: pdfBase64,
               },
             },
             { type: 'text', text: userPrompt },
@@ -236,6 +217,7 @@ Rules:
         'Content-Type': 'application/json',
         'x-api-key': this.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'pdfs-2024-09-25',
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(VISION_TIMEOUT_MS),
@@ -243,7 +225,7 @@ Rules:
 
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`Vision API ${resp.status}: ${errText.slice(0, 300)}`);
+      throw new Error(`Claude PDF API ${resp.status}: ${errText.slice(0, 300)}`);
     }
     const data = await resp.json() as any;
     const text = data.content?.[0]?.text ?? '';
@@ -263,7 +245,7 @@ Rules:
       if (m) {
         try { return JSON.parse(m[0]); } catch { /* fall through */ }
       }
-      throw new Error('Vision response was not valid JSON');
+      throw new Error('Claude response was not valid JSON');
     }
   }
 
