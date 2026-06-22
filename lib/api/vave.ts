@@ -73,15 +73,51 @@ export interface VaveShouldCost {
   createdAt: string;
 }
 
+export interface DrawingThread {
+  size: string;    // e.g. "M4"
+  pitch: number;   // e.g. 0.7
+  count: number;   // e.g. 12
+  extractionConfidence?: number;  // 0.0–1.0; absent on legacy records
+  extractionSource?: 'drawing_ai' | 'drawing_confirmed' | 'engineer_verified';
+}
+
+export interface DrawingGdtCallout {
+  type: string;           // e.g. "Position", "Flatness", "Parallelism"
+  tolerance: number;      // value in mm, e.g. 0.05
+  datum: string;          // e.g. "A|B|C" or "" if no datum
+  confidence?: number;    // 0–1: 1.0 = clearly legible FCF box, 0.5 = partially legible, 0.3 = inferred
+}
+
+export interface ClearanceHole {
+  diameterMm: number;
+  count: number;
+  tolerancePlus?: number;   // e.g. 0.05 from "+0.05"
+  toleranceMinus?: number;  // e.g. 0.00 from "-0.00"
+}
+
 export interface DrawingAnalysisResult {
   material: string;
+  material_confidence: number;
   process: string;
   dimensions_mm: { L: number; W: number; H: number };
   tightest_tolerance_mm: number;
+  tolerance_confidence: number;
   surface_finish_ra: number;
+  surface_finish_confidence: number;
+  sheet_thickness_mm: number;
+  sheet_thickness_confidence: number;
+  bend_count: number;
   heat_treatment: string;
   coating: string;
   complexity: 'simple' | 'medium' | 'complex';
+  threads: DrawingThread[];
+  gdt_callouts: DrawingGdtCallout[];
+  clearanceHoles: ClearanceHole[];
+  general_tolerances: string;
+  drawing_revision: string;
+  drawing_notes: string;
+  drawing_intelligence_confidence: number;
+  analyzedAt?: string;  // ISO timestamp set by route.ts at extraction time
 }
 
 export interface CreateVaveProject {

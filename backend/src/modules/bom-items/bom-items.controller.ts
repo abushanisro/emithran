@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Res,
   UploadedFiles,
   UploadedFile,
   UseInterceptors,
@@ -14,6 +15,9 @@ import {
   Logger,
   Patch,
 } from '@nestjs/common';
+import type { Response } from 'express';
+import { gunzip } from 'zlib';
+import { promisify } from 'util';
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import * as path from 'path';
@@ -22,12 +26,15 @@ import { BOMItemsService } from './bom-items.service';
 import { CreateBOMItemDto, UpdateBOMItemDto, QueryBOMItemsDto, BOMItemType } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import { AutoFillResponseDto } from './dto/auto-fill.dto';
+import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { FileStorageService } from './services/file-storage.service';
 import { StepConverterService } from './services/step-converter.service';
 import { CADAnalysisService } from './services/cad-analysis.service';
 import { AutoFillService } from './services/auto-fill.service';
+import { DFMScoringService } from './services/dfm-scoring.service';
+import { MaterialIntelligenceService, type MaterialCandidate } from './services/material-intelligence.service';
 import axios from 'axios';
 
 // Define User type if not available
@@ -49,6 +56,8 @@ export class BOMItemsController {
     private readonly stepConverterService: StepConverterService,
     private readonly cadAnalysisService: CADAnalysisService,
     private readonly autoFillService: AutoFillService,
+    private readonly dfmScoringService: DFMScoringService,
+    private readonly materialIntelligenceService: MaterialIntelligenceService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -100,12 +109,121 @@ export class BOMItemsController {
     }
   }
 
+  @Get('material-density')
+  @ApiOperation({ summary: 'Look up density for a material grade from the reference table' })
+  @ApiResponse({ status: 200, description: 'Density result' })
+  async getMaterialDensity(
+    @Query('grade') grade: string,
+    @AccessToken() token: string,
+  ): Promise<{ density_g_cm3: number | null; material_name: string | null; material_grade: string | null }> {
+    if (!grade?.trim()) {
+      return { density_g_cm3: null, material_name: null, material_grade: null };
+    }
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+      const g = grade.trim();
+
+      // 1. Exact match in curated lookup table
+      let { data } = await client
+        .from('material_density_lookup')
+        .select('material_name, material_grade, density_g_cm3')
+        .ilike('material_grade', g)
+        .limit(1)
+        .maybeSingle();
+
+      // 2. Partial match in lookup table
+      if (!data) {
+        ({ data } = await client
+          .from('material_density_lookup')
+          .select('material_name, material_grade, density_g_cm3')
+          .or(`material_grade.ilike.%${g}%,material_name.ilike.%${g}%`)
+          .limit(1)
+          .maybeSingle());
+      }
+
+      // 3. Fallback to raw_materials (user's own data, density in g/cm³)
+      if (!data) {
+        const rm = await client
+          .from('raw_materials')
+          .select('material, material_grade, density')
+          .or(`material_grade.ilike.%${g}%,material.ilike.%${g}%`)
+          .not('density', 'is', null)
+          .limit(1)
+          .maybeSingle();
+        if (rm.data) {
+          const d = parseFloat(rm.data.density);
+          // Reject implausible densities — real engineering materials are 0.5–22 g/cm³
+          if (isFinite(d) && d >= 0.5 && d <= 22) {
+            return { density_g_cm3: d, material_name: rm.data.material, material_grade: rm.data.material_grade };
+          }
+        }
+      }
+
+      if (!data) return { density_g_cm3: null, material_name: null, material_grade: null };
+      return {
+        density_g_cm3: parseFloat(data.density_g_cm3),
+        material_name: data.material_name,
+        material_grade: data.material_grade,
+      };
+    } catch {
+      return { density_g_cm3: null, material_name: null, material_grade: null };
+    }
+  }
+
+  @Get('analysis-version')
+  @ApiOperation({ summary: 'Return the current feature graph version the backend produces' })
+  @ApiResponse({ status: 200, description: 'Current analysis version' })
+  getAnalysisVersion(): { version: number; cad_engine_version: string } {
+    return {
+      version: parseInt(process.env.FEATURE_GRAPH_VERSION ?? '4', 10),
+      cad_engine_version: process.env.CAD_ENGINE_VERSION ?? 'geo_v5',
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get BOM item by ID' })
   @ApiResponse({ status: 200, description: 'BOM item retrieved successfully', type: BOMItemResponseDto })
   @ApiResponse({ status: 404, description: 'BOM item not found' })
   async findOne(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMItemResponseDto> {
     return this.bomItemsService.findOne(id, user.id, token);
+  }
+
+  @Get(':id/material-intelligence')
+  @ApiOperation({ summary: 'Return top-3 material candidates scored against geometry and family' })
+  @ApiResponse({ status: 200, description: 'Material candidates returned' })
+  async getMaterialIntelligence(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<MaterialCandidate[]> {
+    const item = await this.bomItemsService.findOne(id, user.id, token);
+    const hint = `${item.materialGrade ?? ''} ${item.material ?? ''}`.trim() || null;
+    return this.materialIntelligenceService.getCandidates(
+      token,
+      item.familyClassification ?? 'sheet_metal',
+      item.sheetThicknessMm ?? 0,
+      item.holeCount ?? 0,
+      item.bendCount ?? 0,
+      null,   // surfaceFinish not yet in BOMItemResponseDto; wire up once DTO exposes it
+      hint,
+    );
+  }
+
+  @Get(':id/dfm-scores')
+  @ApiOperation({ summary: 'Compute per-occurrence DFM risk scores from stored feature_graph_v2 metrics' })
+  @ApiResponse({ status: 200, description: 'DFM scores returned' })
+  async getDFMScores(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    const item = await this.bomItemsService.findOne(id, user.id, token);
+    const fg = item.featureGraph as any;
+    const v2features: any[] = fg?.feature_graph_v2?.features ?? [];
+    const t: number = (item as any).sheetThicknessMm ?? 1;
+    return {
+      bomItemId: id,
+      sheetThicknessMm: t,
+      features: this.dfmScoringService.score(v2features, t),
+      scoredAt: new Date().toISOString(),
+    };
   }
 
   @Post()
@@ -130,6 +248,67 @@ export class BOMItemsController {
     return this.bomItemsService.update(id, updateBOMItemDto, user.id, token);
   }
 
+  @Post(':id/reanalyze')
+  @ApiOperation({ summary: 'Re-run CAD analysis on the stored 3D file and update featureGraph in DB' })
+  @ApiResponse({ status: 200, description: 'Re-analysis complete', type: BOMItemResponseDto })
+  @ApiResponse({ status: 400, description: 'No 3D file found for this item' })
+  async reanalyze(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<BOMItemResponseDto> {
+    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
+
+    if (!bomItem.file3dPath && !bomItem.fileStepPath) {
+      throw new BadRequestException('No 3D file found for this item — upload a STEP/STL file first');
+    }
+
+    // Prefer the original STEP (full OCC topology) over the browser-viewable STL
+    const analysisPath = bomItem.fileStepPath ?? bomItem.file3dPath!;
+    const signedUrl = await this.fileStorageService.getSignedUrl(analysisPath, 3600);
+
+    let fileBuffer: Buffer;
+    try {
+      const response = await axios.get(signedUrl, {
+        responseType: 'arraybuffer',
+        timeout: 60000,
+        maxContentLength: 100 * 1024 * 1024,
+      });
+      fileBuffer = Buffer.from(response.data);
+    } catch (err) {
+      this.logger.error(`[reanalyze] Failed to download file: ${err.message}`);
+      throw new BadRequestException('Failed to download 3D file from storage');
+    }
+
+    const fileName = analysisPath.split('/').pop() ?? 'model.stp';
+    const result = await this.autoFillService.analyzeAndSuggest(fileBuffer, fileName, user.id, token);
+
+    const geo = result.geometry;
+    const sug = result.suggestions;
+
+    // Sync all geometry + classification fields, not just featureGraph.
+    // material / materialGrade are intentionally excluded — those come from 2D drawing analysis and user input.
+    const updateData: UpdateBOMItemDto = {
+      featureGraph: result.featureGraph as object,
+      holeCount: geo.holeCount,
+      bendCount: geo.bendCount,
+      cutLengthMm: geo.cutLengthMm,
+      sheetThicknessMm: geo.sheetThicknessMm,
+      pierceCount: geo.pierceCount,
+      flatPatternAreaMm2: geo.flatPatternAreaMm2,
+      ...(geo.weight > 0 && { weight: geo.weight }),
+      ...(geo.volume > 0 && { volume: geo.volume }),
+      ...(geo.surfaceArea > 0 && { surfaceArea: geo.surfaceArea }),
+      ...(geo.boundingBox.length > 0 && { maxLength: geo.boundingBox.length }),
+      ...(geo.boundingBox.width > 0 && { maxWidth: geo.boundingBox.width }),
+      ...(geo.boundingBox.height > 0 && { maxHeight: geo.boundingBox.height }),
+      ...(sug.familyClassification && { familyClassification: sug.familyClassification }),
+      ...(sug.familyConfidence != null && { familyConfidence: sug.familyConfidence }),
+    };
+
+    return this.bomItemsService.update(id, updateData, user.id, token);
+  }
+
   @Get(':id/dependencies')
   @ApiOperation({ summary: 'Check BOM item delete dependencies' })
   @ApiResponse({ status: 200, description: 'Dependencies checked successfully' })
@@ -151,6 +330,17 @@ export class BOMItemsController {
   @ApiResponse({ status: 400, description: 'Cannot delete - item has dependencies' })
   async remove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
     return this.bomItemsService.remove(id, user.id, token);
+  }
+
+  @Patch(':id/thumbnail')
+  @ApiOperation({ summary: 'Persist thumbnail URL for a BOM item (captured from 3D viewer)' })
+  @ApiResponse({ status: 200, description: 'Thumbnail URL saved' })
+  async updateThumbnail(
+    @Param('id') id: string,
+    @Body() body: { thumbnailUrl: string },
+    @AccessToken() token: string,
+  ): Promise<{ ok: boolean }> {
+    return this.bomItemsService.updateThumbnailUrl(id, body.thumbnailUrl, token);
   }
 
   @Patch('reorder')
@@ -187,23 +377,30 @@ export class BOMItemsController {
   }
 
   @Post(':id/upload-files')
-  @ApiOperation({ summary: 'Upload 2D/3D files for BOM item' })
+  @ApiOperation({ summary: 'Upload 2D/3D/DXF files for BOM item' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Files uploaded successfully', type: BOMItemResponseDto })
   @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'file2d', maxCount: 1 },
-      { name: 'file3d', maxCount: 1 },
-    ]),
+    FileFieldsInterceptor(
+      [
+        { name: 'file2d', maxCount: 1 },
+        { name: 'file3d', maxCount: 1 },
+        { name: 'fileDxf', maxCount: 1 },
+      ],
+      {
+        storage: memoryStorage(),
+        limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+      },
+    ),
   )
   async uploadFiles(
     @Param('id') id: string,
-    @UploadedFiles() files: { file2d?: any[]; file3d?: any[] },
+    @UploadedFiles() files: { file2d?: any[]; file3d?: any[]; fileDxf?: any[] },
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<BOMItemResponseDto> {
     // Validate files are provided before processing
-    if (!files?.file2d?.[0] && !files?.file3d?.[0]) {
+    if (!files?.file2d?.[0] && !files?.file3d?.[0] && !files?.fileDxf?.[0]) {
       throw new BadRequestException('No files provided');
     }
 
@@ -281,12 +478,14 @@ export class BOMItemsController {
             id,
           );
 
-          // Store the converted STL path for viewing
+          // STL for browser viewing; preserve original STEP for reanalysis
           updateData.file3dPath = stlUploadResult.storagePath;
+          updateData.fileStepPath = uploadResult.storagePath;
         } catch (error) {
-          // Conversion failed - keep original STEP file for manual conversion later
+          // Conversion failed — keep original STEP as the viewable file; it's also the analysis source
           this.logger.warn(`Auto-conversion failed for ${file3d.originalname}, keeping original file`);
           updateData.file3dPath = uploadResult.storagePath;
+          updateData.fileStepPath = uploadResult.storagePath;
         }
       } else {
         // Not a STEP file - use original upload
@@ -294,11 +493,113 @@ export class BOMItemsController {
       }
     }
 
+    // Upload DXF/DWG file if provided (stored in fileDxfPath, independent of file2dPath)
+    if (files.fileDxf?.[0]) {
+      const fileDxf = files.fileDxf[0];
+      const uploadResult = await this.fileStorageService.uploadFile(
+        {
+          fieldname: fileDxf.fieldname,
+          originalname: fileDxf.originalname,
+          encoding: fileDxf.encoding,
+          mimetype: fileDxf.mimetype,
+          size: fileDxf.size,
+          buffer: fileDxf.buffer,
+        },
+        'dxf',
+        user.id,
+        projectId,
+        id,
+      );
+      updateData.fileDxfPath = uploadResult.storagePath;
+    }
+
     // Update BOM item with file paths
     return this.bomItemsService.update(id, updateData, user.id, token);
   }
 
+  @Get(':id/file-url/dxf')
+  @ApiOperation({ summary: 'Get signed URL for BOM item DXF drawing' })
+  @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
+  async getDxfFileUrl(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<{ url: string }> {
+    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
+    if (!bomItem.fileDxfPath) {
+      throw new BadRequestException('No DXF file found for this item');
+    }
+    const signedUrl = await this.fileStorageService.getSignedUrl(bomItem.fileDxfPath, 3600);
+    return { url: signedUrl };
+  }
 
+  @Get(':id/dxf-content')
+  @ApiOperation({ summary: 'Download decompressed DXF content for browser rendering' })
+  @ApiResponse({ status: 200, description: 'Raw DXF content' })
+  async getDxfContent(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
+    if (!bomItem.fileDxfPath) {
+      throw new BadRequestException('No DXF file found for this item');
+    }
+
+    const signedUrl = await this.fileStorageService.getSignedUrl(bomItem.fileDxfPath, 3600);
+
+    const response = await axios.get(signedUrl, {
+      responseType: 'arraybuffer',
+      timeout: 120000,
+      maxContentLength: 200 * 1024 * 1024,
+    });
+
+    const rawBuffer = Buffer.from(response.data);
+    const isGzipped = bomItem.fileDxfPath.endsWith('.gz');
+    const content = isGzipped
+      ? await promisify(gunzip)(rawBuffer)
+      : rawBuffer;
+
+    const filename = (bomItem.fileDxfPath.split('/').pop() ?? 'drawing.dxf').replace(/\.gz$/, '');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', content.length);
+    res.send(content);
+  }
+
+  @Get(':id/dxf-content-legacy')
+  @ApiOperation({ summary: 'Download decompressed DXF from legacy file2dPath (migration helper)' })
+  @ApiResponse({ status: 200, description: 'Raw DXF content' })
+  async getDxfContentLegacy(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
+    const filePath = bomItem.file2dPath;
+    if (!filePath) {
+      throw new BadRequestException('No 2D file found for this item');
+    }
+
+    const signedUrl = await this.fileStorageService.getSignedUrl(filePath, 3600);
+    const response = await axios.get(signedUrl, {
+      responseType: 'arraybuffer',
+      timeout: 120000,
+      maxContentLength: 200 * 1024 * 1024,
+    });
+
+    const rawBuffer = Buffer.from(response.data);
+    const isGzipped = filePath.endsWith('.gz');
+    const content = isGzipped ? await promisify(gunzip)(rawBuffer) : rawBuffer;
+
+    const filename = (filePath.split('/').pop() ?? 'drawing.dxf').replace(/\.gz$/, '');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', content.length);
+    res.send(content);
+  }
 
   @Post(':id/convert-step')
   @ApiOperation({ summary: 'Manually convert STEP file to STL for 3D viewing' })
@@ -1499,4 +1800,70 @@ export class BOMItemsController {
   }
 
   // Legacy createBOMItemsFromAnalysis method removed - replaced by createIntelligentHierarchy
+
+  @Get(':id/manufacturing-implications')
+  @ApiOperation({ summary: 'Get deterministic manufacturing implications from drawing intelligence' })
+  @ApiResponse({ status: 200, description: 'Implications derived from drawing-confirmed data' })
+  async getManufacturingImplications(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    const item = await this.bomItemsService.findOne(id, user.id, token);
+    const implications = deriveImplications({
+      tightestToleranceMm: item.tightestToleranceMm ?? null,
+      coating: item.coating ?? null,
+      sheetThicknessMm: item.sheetThicknessMm ?? null,
+      drawingMaterial: (item.drawingIntelligence as any)?.material ?? null,
+      partName: item.name ?? null,
+      drawingIntelligence: item.drawingIntelligence as any,
+    });
+    return { bomItemId: id, implications };
+  }
+
+  @Get(':id/cost-summary')
+  @ApiOperation({ summary: 'Deterministic cost breakdown — material + process lines, no LLM' })
+  @ApiResponse({ status: 200, description: 'Cost summary returned' })
+  async getCostSummary(
+    @Param('id') id: string,
+    @Query('batchSize') batchSize: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    return this.bomItemsService.getCostSummary(
+      id,
+      user.id,
+      token,
+      batchSize ? parseInt(batchSize, 10) : 1,
+    );
+  }
+
+  @Get(':id/route-comparison')
+  @ApiOperation({
+    summary: 'Compare Fiber Laser vs Turret Punch vs Waterjet routes with real cost numbers',
+  })
+  @ApiResponse({ status: 200, description: 'Route comparison returned' })
+  async getRouteComparison(
+    @Param('id') id: string,
+    @Query('batchSize') batchSize: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    return this.bomItemsService.getRouteComparison(
+      id,
+      user.id,
+      token,
+      batchSize ? parseInt(batchSize, 10) : 1,
+    );
+  }
+
+  @Get(':id/gdt-analysis')
+  @ApiOperation({ summary: 'GD&T severity analysis derived from drawing intelligence' })
+  @ApiResponse({ status: 200, description: 'GD&T analysis returned' })
+  async getGdtAnalysis(
+    @Param('id') id: string,
+    @AccessToken() token: string,
+  ) {
+    return this.bomItemsService.getGdtAnalysis(id, token);
+  }
 }

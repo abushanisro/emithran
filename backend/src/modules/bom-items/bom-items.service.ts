@@ -2,6 +2,26 @@ import { Injectable, Logger, NotFoundException, InternalServerErrorException, Ba
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
+import { computeCostSummary } from './costing/cost-engine';
+import type { MHRRateInput } from './costing/cost-engine';
+import {
+  MATERIAL_DEFAULTS, MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL,
+  LASER_SETUP_MIN, LASER_SPEED_MM_PER_MIN, LASER_PIERCE_SEC,
+  PRESS_BRAKE_SETUP_MIN, PRESS_BRAKE_SEC_PER_BEND,
+  DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
+  TAPPING_SETUP_MIN, TAP_CYCLE_SEC,
+  MACHINE_REGISTRY,
+} from './costing/default-rates';
+import type { MachineClass } from './costing/default-rates';
+import { computeTurretPunchCost } from './costing/turret-punch-engine';
+import { computeWaterjetCost } from './costing/waterjet-engine';
+import { checkMachineCapability } from './costing/machine-capability';
+import type { PartGeometryForCapability } from './costing/machine-capability';
+import type { CostSummaryDto, ProcessLineCost } from './dto/cost-breakdown.dto';
+import type { RouteComparisonDto, RouteResultDto, RouteId, RouteCapability } from './dto/route-comparison.dto';
+import { deriveGdtSeverity, SEVERITY_RANK } from './costing/gdt-severity';
+import type { GdtSeverity, InspectionMethod } from './costing/gdt-severity';
+import type { GdtAnalysisDto, GdtFeatureDto } from './dto/gdt-analysis.dto';
 
 @Injectable()
 export class BOMItemsService {
@@ -19,13 +39,37 @@ export class BOMItemsService {
     unitCost: 'unit_cost',
     sortOrder: 'sort_order',
     file3dPath: 'file_3d_path',
+    fileStepPath: 'file_step_path',
     file2dPath: 'file_2d_path',
+    fileDxfPath: 'file_dxf_path',
     materialId: 'material_id',
     weight: 'weight',
     maxLength: 'max_length',
     maxWidth: 'max_width',
     maxHeight: 'max_height',
     surfaceArea: 'surface_area',
+    volume: 'volume',
+    manufacturingFamilyOverride: 'manufacturing_family_override',
+    materialSource:     'material_source',
+    materialConfidence: 'material_confidence',
+    sheetThicknessMm:     'sheet_thickness_mm',
+    cutLengthMm:          'cut_length_mm',
+    bendCount:            'bend_count',
+    holeCount:            'hole_count',
+    pierceCount:          'pierce_count',
+    flatPatternAreaMm2:   'flat_pattern_area_mm2',
+    featureGraph:           'feature_graph',
+    familyClassification:   'family_classification',
+    familyConfidence:       'family_confidence',
+    surfaceFinishRa:        'surface_finish_ra',
+    surfaceFinishConfidence:'surface_finish_confidence',
+    heatTreatment:          'heat_treatment',
+    coating:                'coating',
+    coatingConfidence:      'coating_confidence',
+    complexity:             'complexity',
+    tightestToleranceMm:    'tightest_tolerance_mm',
+    toleranceConfidence:    'tolerance_confidence',
+    drawingIntelligence:    'drawing_intelligence',
   });
 
   constructor(private readonly supabaseService: SupabaseService) { }
@@ -43,6 +87,14 @@ export class BOMItemsService {
         const dbKey = BOMItemsService.FIELD_MAPPING[key] ?? key;
         transformed[dbKey] = value;
       }
+    }
+
+    // Denormalise family classification from featureGraph so it is queryable
+    // without jsonb extraction. Only writes if not already explicitly provided.
+    if (transformed.feature_graph && transformed.family_classification === undefined) {
+      const cls = (transformed.feature_graph as any)?.classification;
+      if (cls?.family) transformed.family_classification = cls.family;
+      if (cls?.confidence != null) transformed.family_confidence = Number(cls.confidence);
     }
 
     return transformed;
@@ -215,6 +267,24 @@ export class BOMItemsService {
     }
 
     return BOMItemResponseDto.fromDatabase(data);
+  }
+
+  async updateThumbnailUrl(
+    id: string,
+    thumbnailUrl: string,
+    accessToken?: string,
+  ): Promise<{ ok: boolean }> {
+    this.logger.log(`Updating thumbnail for BOM item: ${id}`, 'BOMItemsService');
+    const { error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('bom_items')
+      .update({ thumbnail_url: thumbnailUrl, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      this.logger.error(`Error updating thumbnail: ${error.message}`, 'BOMItemsService');
+      // Not fatal — log and continue
+    }
+    return { ok: !error };
   }
 
   async updateSortOrder(
@@ -745,5 +815,559 @@ export class BOMItemsService {
     }
 
     return data.project_id;
+  }
+
+  private async resolveMHRRates(accessToken: string): Promise<{
+    laser: MHRRateInput;
+    pressBrake: MHRRateInput;
+    deburring: MHRRateInput;
+    tapping: MHRRateInput;
+    turret: MHRRateInput;
+    waterjet: MHRRateInput;
+  }> {
+    const makeDefault = (cls: MachineClass): MHRRateInput => ({
+      rate: MACHINE_REGISTRY[cls].defaultRate,
+      source: 'default_rate',
+      machineClass: cls,
+      machineName: null,
+      commodityCode: null,
+    });
+
+    try {
+      // Single query — exact commodity_code match, no keyword scanning
+      const allCodes = (Object.values(MACHINE_REGISTRY) as { defaultRate: number; commodityCodes: readonly string[] }[])
+        .flatMap((e) => [...e.commodityCodes]);
+
+      const { data, error } = await this.supabaseService
+        .getClient(accessToken)
+        .from('mhr_records')
+        .select('machine_name, commodity_code, total_machine_hour_rate')
+        .in('commodity_code', allCodes)
+        .gt('total_machine_hour_rate', 0);
+
+      if (error || !data?.length) {
+        return {
+          laser:      makeDefault('fiber_laser'),
+          pressBrake: makeDefault('press_brake'),
+          deburring:  makeDefault('deburring'),
+          tapping:    makeDefault('tapping'),
+          turret:     makeDefault('turret_punch'),
+          waterjet:   makeDefault('waterjet'),
+        };
+      }
+
+      // Index DB rows by commodity_code for O(1) lookup
+      const dbIndex = new Map<string, { rate: number; machineName: string }>();
+      for (const row of data) {
+        const rate = Number(row.total_machine_hour_rate);
+        if (rate > 0) dbIndex.set(row.commodity_code, { rate, machineName: row.machine_name });
+      }
+
+      // For each class: collect all DB records that belong to it, pick lowest rate.
+      // Lowest rate is deterministic and conservative (Capability Engine will override
+      // this with the correct machine based on part geometry in a future sprint).
+      const resolve = (cls: MachineClass): MHRRateInput => {
+        type Candidate = { code: string; hit: { rate: number; machineName: string } };
+        const candidates = (MACHINE_REGISTRY[cls].commodityCodes as readonly string[])
+          .map((code) => ({ code, hit: dbIndex.get(code) }))
+          .filter((c): c is Candidate => c.hit != null);
+
+        if (candidates.length === 0) return makeDefault(cls);
+
+        const best = candidates.reduce((a, b) => (a.hit.rate <= b.hit.rate ? a : b));
+        return {
+          rate: best.hit.rate,
+          source: 'mhr_database',
+          machineClass: cls,
+          machineName: best.hit.machineName,
+          commodityCode: best.code,
+        };
+      };
+
+      return {
+        laser:      resolve('fiber_laser'),
+        pressBrake: resolve('press_brake'),
+        deburring:  resolve('deburring'),
+        tapping:    resolve('tapping'),
+        turret:     resolve('turret_punch'),
+        waterjet:   resolve('waterjet'),
+      };
+    } catch {
+      return {
+        laser:      makeDefault('fiber_laser'),
+        pressBrake: makeDefault('press_brake'),
+        deburring:  makeDefault('deburring'),
+        tapping:    makeDefault('tapping'),
+        turret:     makeDefault('turret_punch'),
+        waterjet:   makeDefault('waterjet'),
+      };
+    }
+  }
+
+  async getCostSummary(
+    id: string,
+    userId: string,
+    accessToken: string,
+    batchSize = 1,
+  ): Promise<CostSummaryDto> {
+    const item = await this.findOne(id, userId, accessToken);
+
+    const fg = item.featureGraph as any;
+    const summary = fg?.summary ?? {};
+
+    const sheetThicknessMm = (summary.sheetThicknessMm ?? item.sheetThicknessMm ?? 0) as number;
+    const family = fg?.classification?.family ?? (sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown');
+    const cutLengthMm = (summary.cutLengthMm ?? item.cutLengthMm ?? 0) as number;
+    const pierceCount = (summary.pierceCount ?? item.pierceCount ?? 0) as number;
+    const bendCount = (summary.bendCount ?? item.bendCount ?? 0) as number;
+    const flatPatternAreaMm2 = (summary.flatPatternAreaMm2 ?? item.flatPatternAreaMm2 ?? 0) as number;
+    const holeCount = (summary.holeCount ?? item.holeCount ?? 0) as number;
+    const threads = ((item.drawingIntelligence as any)?.threads ?? []) as Array<{ size: string; count: number }>;
+
+    const grade = item.materialGrade ?? item.material ?? null;
+    let materialCostPerKg = MATERIAL_DEFAULTS.__default__.costPerKg;
+    let materialDensityKgM3 = MATERIAL_DEFAULTS.__default__.densityKgM3;
+    let materialSource: 'db' | 'default' = 'default';
+
+    if (grade) {
+      try {
+        const client = this.supabaseService.getClient(accessToken);
+        const g = grade.trim();
+        const { data } = await client
+          .from('raw_materials')
+          .select('cost_india, cost, density, density_kg_m3')
+          .or(`material_grade.ilike.%${g}%,material.ilike.%${g}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          const costPerKg: number | null = (data as any).cost_india ?? (data as any).cost ?? null;
+          const densityGCm3: number | null = (data as any).density ?? null;
+          const densityKgM3: number | null = (data as any).density_kg_m3 ?? (densityGCm3 != null ? densityGCm3 * 1000 : null);
+          if (costPerKg != null && costPerKg > 0 && densityKgM3 != null && densityKgM3 > 0) {
+            materialCostPerKg = costPerKg;
+            materialDensityKgM3 = densityKgM3;
+            materialSource = 'db';
+          }
+        }
+      } catch {
+        // fall through to named defaults below
+      }
+    }
+
+    if (materialSource === 'default') {
+      const gradeUpper = (grade ?? '').toUpperCase();
+      const fallbackKey =
+        Object.keys(MATERIAL_DEFAULTS).find((k) => k !== '__default__' && gradeUpper.includes(k)) ??
+        '__default__';
+      const fallback = MATERIAL_DEFAULTS[fallbackKey];
+      materialCostPerKg = fallback.costPerKg;
+      materialDensityKgM3 = fallback.densityKgM3;
+    }
+
+    const mhrRates = await this.resolveMHRRates(accessToken);
+
+    return computeCostSummary({
+      sheetThicknessMm,
+      cutLengthMm,
+      pierceCount,
+      bendCount,
+      flatPatternAreaMm2,
+      holeCount,
+      threads,
+      materialGrade: grade,
+      materialCostPerKg,
+      materialDensityKgM3,
+      materialSource,
+      batchSize,
+      family,
+      mhrRates,
+    });
+  }
+
+  async getRouteComparison(
+    id: string,
+    userId: string,
+    accessToken: string,
+    batchSize = 1,
+  ): Promise<RouteComparisonDto> {
+    const item = await this.findOne(id, userId, accessToken);
+
+    const fg = item.featureGraph as any;
+    const summary = fg?.summary ?? {};
+
+    const sheetThicknessMm = (summary.sheetThicknessMm ?? item.sheetThicknessMm ?? 0) as number;
+    const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;
+    const pierceCount     = (summary.pierceCount       ?? item.pierceCount      ?? 0) as number;
+    const bendCount       = (summary.bendCount         ?? item.bendCount        ?? 0) as number;
+    const flatPatternAreaMm2 = (summary.flatPatternAreaMm2 ?? item.flatPatternAreaMm2 ?? 0) as number;
+    const holeCount       = (summary.holeCount         ?? item.holeCount        ?? 0) as number;
+    const threads = ((item.drawingIntelligence as any)?.threads ?? []) as Array<{ size: string; count: number }>;
+    const grade = item.materialGrade ?? item.material ?? null;
+
+    // Flat pattern dimensions — from bom_items.max_length / max_width (set by CAD pipeline).
+    // Access both camelCase and snake_case to handle FIELD_MAPPING variations safely.
+    const flatPatternLengthMm = ((item as any).maxLength ?? (item as any).max_length ?? null) as number | null;
+    const flatPatternWidthMm  = ((item as any).maxWidth  ?? (item as any).max_width  ?? null) as number | null;
+
+    const capabilityGeometry: PartGeometryForCapability = {
+      sheetThicknessMm,
+      flatPatternLengthMm,
+      flatPatternWidthMm,
+    };
+
+    // ── Shared warnings ────────────────────────────────────────────────────────
+    const comparisonWarnings: string[] = [];
+    if (!grade) comparisonWarnings.push('Material grade not set — default mild steel rates applied');
+    if (flatPatternAreaMm2 === 0) comparisonWarnings.push('Flat pattern area is 0 — material cost may be inaccurate');
+    if (sheetThicknessMm === 0) comparisonWarnings.push('Sheet thickness is 0 — cutting speed lookup defaulting to 2.0 mm');
+
+    // ── Material cost (same pattern as getCostSummary) ─────────────────────────
+    let materialCostPerKg = MATERIAL_DEFAULTS.__default__.costPerKg;
+    let materialDensityKgM3 = MATERIAL_DEFAULTS.__default__.densityKgM3;
+    let materialSource: 'db' | 'default' = 'default';
+
+    if (grade) {
+      try {
+        const client = this.supabaseService.getClient(accessToken);
+        const g = grade.trim();
+        const { data } = await client
+          .from('raw_materials')
+          .select('cost_india, cost, density, density_kg_m3')
+          .or(`material_grade.ilike.%${g}%,material.ilike.%${g}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          const costPerKg: number | null = (data as any).cost_india ?? (data as any).cost ?? null;
+          const densityGCm3: number | null = (data as any).density ?? null;
+          const densityKgM3: number | null =
+            (data as any).density_kg_m3 ?? (densityGCm3 != null ? densityGCm3 * 1000 : null);
+          if (costPerKg != null && costPerKg > 0 && densityKgM3 != null && densityKgM3 > 0) {
+            materialCostPerKg = costPerKg;
+            materialDensityKgM3 = densityKgM3;
+            materialSource = 'db';
+          }
+        }
+      } catch {
+        // fall through to named defaults
+      }
+    }
+
+    if (materialSource === 'default') {
+      const gradeUpper = (grade ?? '').toUpperCase();
+      const fallbackKey =
+        Object.keys(MATERIAL_DEFAULTS).find((k) => k !== '__default__' && gradeUpper.includes(k)) ??
+        '__default__';
+      const fallback = MATERIAL_DEFAULTS[fallbackKey];
+      materialCostPerKg = fallback.costPerKg;
+      materialDensityKgM3 = fallback.densityKgM3;
+    }
+
+    const thk = sheetThicknessMm > 0 ? sheetThicknessMm : 2.0;
+    const volumeMm3 = flatPatternAreaMm2 * thk;
+    const netWeightKg = (volumeMm3 / 1e9) * materialDensityKgM3;
+    const grossWeightKg = netWeightKg * (1 + MATERIAL_OVERHEAD_PCT / 100);
+    const materialCost = this.r2(grossWeightKg * materialCostPerKg);
+
+    // ── MHR rates ──────────────────────────────────────────────────────────────
+    const mhrRates = await this.resolveMHRRates(accessToken);
+
+    // ── Capability checks ──────────────────────────────────────────────────────
+    const pbCapability       = checkMachineCapability(mhrRates.pressBrake.machineClass, mhrRates.pressBrake.commodityCode, capabilityGeometry);
+    const laserCapability    = checkMachineCapability(mhrRates.laser.machineClass,      mhrRates.laser.commodityCode,      capabilityGeometry);
+    const turretCapability   = checkMachineCapability(mhrRates.turret.machineClass,     mhrRates.turret.commodityCode,     capabilityGeometry);
+    const waterjetCapability = checkMachineCapability(mhrRates.waterjet.machineClass,   mhrRates.waterjet.commodityCode,   capabilityGeometry);
+
+    const CONF_RANK = { high: 2, medium: 1, low: 0 } as const;
+    const minConf = (a: "high" | "medium" | "low", b: "high" | "medium" | "low"): "high" | "medium" | "low" =>
+      CONF_RANK[a] <= CONF_RANK[b] ? a : b;
+
+    const laserRouteCapability: RouteCapability = {
+      cuttingCapable:    laserCapability.capable,
+      pressBrakeCapable: pbCapability.capable,
+      overallCapable:    laserCapability.capable && pbCapability.capable,
+      confidence:        minConf(laserCapability.confidence, pbCapability.confidence),
+      estimatedTonnage:  pbCapability.estimatedTonnage,
+      reasonCodes:       [...laserCapability.reasonCodes, ...pbCapability.reasonCodes],
+      warnings:          [...laserCapability.reasons, ...pbCapability.reasons],
+    };
+    const turretRouteCapability: RouteCapability = {
+      cuttingCapable:    turretCapability.capable,
+      pressBrakeCapable: pbCapability.capable,
+      overallCapable:    turretCapability.capable && pbCapability.capable,
+      confidence:        minConf(turretCapability.confidence, pbCapability.confidence),
+      estimatedTonnage:  pbCapability.estimatedTonnage,
+      reasonCodes:       [...turretCapability.reasonCodes, ...pbCapability.reasonCodes],
+      warnings:          [...turretCapability.reasons, ...pbCapability.reasons],
+    };
+    const waterjetRouteCapability: RouteCapability = {
+      cuttingCapable:    waterjetCapability.capable,
+      pressBrakeCapable: pbCapability.capable,
+      overallCapable:    waterjetCapability.capable && pbCapability.capable,
+      confidence:        minConf(waterjetCapability.confidence, pbCapability.confidence),
+      estimatedTonnage:  pbCapability.estimatedTonnage,
+      reasonCodes:       [...waterjetCapability.reasonCodes, ...pbCapability.reasonCodes],
+      warnings:          [...waterjetCapability.reasons, ...pbCapability.reasons],
+    };
+
+    // ── Shared process lines (computed once, reused across all three routes) ───
+
+    const pbLines: ProcessLineCost[] = [];
+    let pressBrakeMin = 0;
+    if (bendCount > 0) {
+      const secPerBend = PRESS_BRAKE_SEC_PER_BEND[this.nearestKey(thk, PRESS_BRAKE_SEC_PER_BEND)] ?? 15;
+      const totalPBSec = bendCount * secPerBend;
+      pressBrakeMin = totalPBSec / 60;
+      const pbRate = mhrRates.pressBrake;
+      const setupCost = this.r2((PRESS_BRAKE_SETUP_MIN / 60) * pbRate.rate / Math.max(batchSize, 1));
+      const runCost   = this.r2((totalPBSec / 3600) * pbRate.rate);
+      pbLines.push({
+        process: 'Press Brake',
+        setupCost, runCost, totalCost: this.r2(setupCost + runCost),
+        cycleTimeMin: this.r2(pressBrakeMin),
+        hourlyRate: pbRate.rate, rateSource: pbRate.source,
+        machineClass: pbRate.machineClass, machineName: pbRate.machineName, commodityCode: pbRate.commodityCode,
+      });
+    }
+
+    const deburrLines: ProcessLineCost[] = [];
+    let deburrMin = 0;
+    if (cutLengthMm > 0) {
+      const deburrSec = (cutLengthMm / 1000) * DEBURR_SEC_PER_METRE + pierceCount * DEBURR_SEC_PER_PIERCE;
+      deburrMin = deburrSec / 60;
+      const deburrRate = mhrRates.deburring;
+      const runCost = this.r2((deburrSec / 3600) * deburrRate.rate);
+      deburrLines.push({
+        process: 'Deburring',
+        setupCost: 0, runCost, totalCost: runCost,
+        cycleTimeMin: this.r2(deburrMin),
+        hourlyRate: deburrRate.rate, rateSource: deburrRate.source,
+        machineClass: deburrRate.machineClass, machineName: deburrRate.machineName, commodityCode: deburrRate.commodityCode,
+      });
+    }
+
+    const tappingLines: ProcessLineCost[] = [];
+    let tappingMin = 0;
+    if (threads.length > 0) {
+      const totalSec = threads.reduce((s, t) => s + t.count * (TAP_CYCLE_SEC[t.size] ?? 10), 0);
+      tappingMin = totalSec / 60;
+      const tappingRate = mhrRates.tapping;
+      const setupCost = this.r2((TAPPING_SETUP_MIN / 60) * tappingRate.rate / Math.max(batchSize, 1));
+      const runCost   = this.r2((totalSec / 3600) * tappingRate.rate);
+      tappingLines.push({
+        process: 'Tapping',
+        setupCost, runCost, totalCost: this.r2(setupCost + runCost),
+        cycleTimeMin: this.r2(tappingMin),
+        hourlyRate: tappingRate.rate, rateSource: tappingRate.source,
+        machineClass: tappingRate.machineClass, machineName: tappingRate.machineName, commodityCode: tappingRate.commodityCode,
+      });
+    }
+
+    // ── Cutting lines per route ────────────────────────────────────────────────
+
+    // Laser — inline replication of cost-engine.ts laser block
+    const laserLines: ProcessLineCost[] = [];
+    let laserCuttingMin = 0;
+    const laserWarnings: string[] = [];
+    if (cutLengthMm > 0 || pierceCount > 0) {
+      const speedKey    = this.nearestKey(thk, LASER_SPEED_MM_PER_MIN);
+      const pierceKey   = this.nearestKey(thk, LASER_PIERCE_SEC);
+      const speedMmPerMin = LASER_SPEED_MM_PER_MIN[speedKey] ?? 3000;
+      const pierceSec   = LASER_PIERCE_SEC[pierceKey] ?? 1.5;
+      const cuttingSec  = cutLengthMm > 0 ? (cutLengthMm / speedMmPerMin) * 60 : 0;
+      const piercingTotalSec = pierceCount * pierceSec;
+      const totalLaserSec = cuttingSec + piercingTotalSec;
+      laserCuttingMin = totalLaserSec / 60;
+      const laserRate = mhrRates.laser;
+      const setupCost = this.r2((LASER_SETUP_MIN / 60) * laserRate.rate / Math.max(batchSize, 1));
+      const runCost   = this.r2((totalLaserSec / 3600) * laserRate.rate);
+      laserLines.push({
+        process: 'Laser Cutting',
+        setupCost, runCost, totalCost: this.r2(setupCost + runCost),
+        cycleTimeMin: this.r2(laserCuttingMin),
+        hourlyRate: laserRate.rate, rateSource: laserRate.source,
+        machineClass: laserRate.machineClass, machineName: laserRate.machineName, commodityCode: laserRate.commodityCode,
+      });
+    }
+
+    // Turret punch
+    const turretResult = computeTurretPunchCost({
+      sheetThicknessMm, pierceCount, holeCount, cutLengthMm, batchSize,
+      turretRate: mhrRates.turret,
+    });
+
+    // Waterjet
+    const waterjetResult = computeWaterjetCost({
+      sheetThicknessMm, cutLengthMm, pierceCount, batchSize,
+      waterjetRate: mhrRates.waterjet,
+    });
+
+    // ── Assemble RouteResultDto ────────────────────────────────────────────────
+    const assembleRoute = (
+      routeId: RouteId,
+      routeLabel: string,
+      cuttingLines: ProcessLineCost[],
+      cuttingMin: number,
+      abrasiveCost: number,
+      routeWarnings: string[],
+      capability: RouteCapability,
+    ): RouteResultDto => {
+      const allLines = [...cuttingLines, ...pbLines, ...deburrLines, ...tappingLines];
+      const totalProcessCost = this.r2(allLines.reduce((s, l) => s + l.totalCost, 0) + abrasiveCost);
+      const totalCost = this.r2(materialCost + totalProcessCost);
+      return {
+        routeId, routeLabel,
+        processLines: allLines,
+        materialCost, abrasiveCost, totalProcessCost, totalCost,
+        cycleTimes: {
+          cuttingMin: this.r2(cuttingMin),
+          pressBrakeMin: this.r2(pressBrakeMin),
+          tappingMin: this.r2(tappingMin),
+          deburrMin: this.r2(deburrMin),
+          totalMin: this.r2(cuttingMin + pressBrakeMin + deburrMin + tappingMin),
+        },
+        badges: { lowestCost: false, fastest: false, bestQuality: false },
+        capability,
+        warnings: routeWarnings,
+        ratesSource: RATES_SOURCE_LABEL,
+      };
+    };
+
+    const routes: RouteResultDto[] = [
+      assembleRoute('sm-laser',   'Fiber Laser + Press Brake',
+        laserLines,               laserCuttingMin,             0,                           laserWarnings,         laserRouteCapability),
+      assembleRoute('sm-turret',  'Turret Punch + Press Brake',
+        turretResult.processLines, turretResult.cuttingMin,    0,                           turretResult.warnings, turretRouteCapability),
+      assembleRoute('sm-waterjet','Waterjet + Press Brake',
+        waterjetResult.processLines, waterjetResult.cuttingMin, waterjetResult.abrasiveCost, waterjetResult.warnings, waterjetRouteCapability),
+    ];
+
+    // ── Badges — only assigned among capable routes ────────────────────────────
+    const capableRoutes = routes.filter((r) => r.capability.overallCapable);
+
+    if (capableRoutes.length > 0) {
+      const minCost = Math.min(...capableRoutes.map((r) => r.totalCost));
+      routes.forEach((r) => {
+        r.badges.lowestCost = r.capability.overallCapable && r.totalCost === minCost;
+      });
+
+      const minTime = Math.min(...capableRoutes.map((r) => r.cycleTimes.totalMin));
+      routes.forEach((r) => {
+        r.badges.fastest = r.capability.overallCapable && r.cycleTimes.totalMin === minTime;
+      });
+
+      const gUpper = (grade ?? "").toUpperCase();
+      const heatSensitive = ["STAINLESS", "SS3", "SS4", "INCONEL", "TITANIUM", "SPRING", "HARDENED", "HARDOX"]
+        .some((m) => gUpper.includes(m));
+      const bestQualityId: RouteId = heatSensitive || thk > 8 ? "sm-waterjet" : "sm-laser";
+      routes.forEach((r) => {
+        r.badges.bestQuality = r.routeId === bestQualityId && r.capability.overallCapable;
+      });
+    }
+    // If capableRoutes is empty — all badges remain false (suppressed)
+
+    return {
+      bomItemId: id,
+      batchSize,
+      materialCost,
+      materialGrade: grade ?? 'Unknown',
+      grossWeightKg: Math.round(grossWeightKg * 1000) / 1000,
+      materialCostPerKg,
+      materialSource,
+      routes,
+      comparisonWarnings,
+    };
+  }
+
+  async getGdtAnalysis(id: string, accessToken: string): Promise<GdtAnalysisDto> {
+    const client = this.supabaseService.getClient(accessToken);
+    const { data: item, error } = await client
+      .from("bom_items")
+      .select("id, drawing_intelligence")
+      .eq("id", id)
+      .single();
+    if (error || !item) throw new NotFoundException(`BOM item ${id} not found`);
+
+    const di = (item as any).drawing_intelligence as Record<string, any> | null;
+    const rawCallouts: any[] = di?.gdt_callouts ?? [];
+    const generalTolerance: string | null = di?.general_tolerances ?? null;
+
+    const INSPECTION_PRIORITY: InspectionMethod[] = ["cmm", "height_gauge", "caliper", "visual"];
+
+    if (rawCallouts.length === 0) {
+      return {
+        bomItemId: id,
+        source: "no_data",
+        features: [],
+        overallSeverity: null,
+        maxCostImpactPercent: 0,
+        maxCostImpactRange: "none",
+        inspectionMethods: [],
+        recommendedInspectionMethod: null,
+        totalInspectionTimeMin: 0,
+        analysisConfidence: 0,
+        generalTolerance,
+      };
+    }
+
+    const features: GdtFeatureDto[] = rawCallouts.map((c) => {
+      const derived = deriveGdtSeverity(c.type ?? "", c.tolerance ?? 0);
+      return {
+        type: (c.type ?? "unknown").trim().toLowerCase(),
+        toleranceMm: c.tolerance ?? 0,
+        datum: c.datum ?? "",
+        confidence: typeof c.confidence === "number" ? c.confidence : null,
+        ...derived,
+      };
+    });
+
+    const overallSeverity = features.reduce<GdtSeverity>(
+      (best, f) => SEVERITY_RANK[f.severity] > SEVERITY_RANK[best] ? f.severity : best,
+      "low",
+    );
+
+    const maxFeature = features.reduce((a, b) =>
+      a.costImpactPercent >= b.costImpactPercent ? a : b,
+    );
+
+    const methodSet = new Set(features.map((f) => f.inspectionMethod));
+    const inspectionMethods = INSPECTION_PRIORITY.filter((m) => methodSet.has(m));
+    const recommendedInspectionMethod = inspectionMethods[0] ?? null;
+
+    const totalInspectionTimeMin = features.reduce((s, f) => s + f.inspectionTimeMin, 0);
+
+    const withConfidence = features.filter((f) => f.confidence !== null);
+    const analysisConfidence =
+      withConfidence.length > 0
+        ? withConfidence.reduce((s, f) => s + (f.confidence as number), 0) / withConfidence.length
+        : 0;
+
+    return {
+      bomItemId: id,
+      source: "drawing_intelligence",
+      features,
+      overallSeverity,
+      maxCostImpactPercent: maxFeature.costImpactPercent,
+      maxCostImpactRange: maxFeature.costImpactRange,
+      inspectionMethods,
+      recommendedInspectionMethod,
+      totalInspectionTimeMin,
+      analysisConfidence: Math.round(analysisConfidence * 100) / 100,
+      generalTolerance,
+    };
+  }
+
+  private nearestKey(mm: number, table: Record<number, number>): number {
+    const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
+    let best = keys[0];
+    for (const k of keys) {
+      if (Math.abs(k - mm) < Math.abs(best - mm)) best = k;
+    }
+    return best;
+  }
+
+  private r2(n: number): number {
+    return Math.round(n * 100) / 100;
   }
 }

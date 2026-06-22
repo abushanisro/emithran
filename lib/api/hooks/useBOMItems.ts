@@ -2,6 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
+import type { FeatureGraph, DFMScoresResponse, OccurrenceScore } from '@/lib/types/manufacturing';
+
+export type { OccurrenceScore };
 
 export interface BOMItem {
   id: string;
@@ -23,6 +26,7 @@ export interface BOMItem {
   sortOrder: number;
   file3dPath?: string;
   file2dPath?: string;
+  fileDxfPath?: string;
   createdAt: string;
   updatedAt: string;
   weight?: number;
@@ -43,6 +47,52 @@ export interface BOMItem {
   qualityStandard?: string;
   inspectionLevel?: string;
   volume?: number;
+  thumbnailUrl?: string;
+  partName?: string;
+  // Manufacturing feature graph (Phase 1: summary + process recommendations)
+  featureGraph?: FeatureGraph;
+  // Denormalised from featureGraph.classification for display + filtering
+  familyClassification?: string;
+  familyConfidence?: number;
+  // Phase 1 sheet metal extracted fields
+  sheetThicknessMm?: number;
+  cutLengthMm?: number;
+  bendCount?: number;
+  holeCount?: number;
+  pierceCount?: number;
+  flatPatternAreaMm2?: number;
+  // Drawing intelligence — persisted from 2D drawing analysis
+  materialSource?: string;
+  materialConfidence?: number;
+  surfaceFinishRa?: number;
+  surfaceFinishConfidence?: number;
+  coating?: string;
+  coatingConfidence?: number;
+  complexity?: string;
+  tightestToleranceMm?: number;
+  toleranceConfidence?: number;
+  drawingIntelligence?: import('@/lib/api/vave').DrawingAnalysisResult;
+}
+
+export interface MaterialCandidate {
+  material: string;
+  materialGrade: string | null;
+  confidence: number;
+  densityKgM3: number | null;
+  costPerKg: number | null;
+  reasons: string[];
+  scoreFactors: string[];
+  processCompatibility: Array<{ process: string; suitability: string }>;
+}
+
+export function useMaterialIntelligence(itemId: string | undefined) {
+  return useQuery({
+    queryKey: ['material-intelligence', itemId],
+    queryFn: () => apiClient.get<MaterialCandidate[]>(`/bom-items/${itemId}/material-intelligence`),
+    enabled: useAuthEnabledWith(!!itemId),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
 }
 
 export interface CreateBOMItemDto {
@@ -99,6 +149,7 @@ const bomItemKeys = {
   list: (bomId?: string) => [...bomItemKeys.lists(), bomId] as const,
   details: () => [...bomItemKeys.all, 'detail'] as const,
   detail: (id: string) => [...bomItemKeys.details(), id] as const,
+  analysisVersion: () => [...bomItemKeys.all, 'analysis-version'] as const,
 };
 
 /**
@@ -261,6 +312,13 @@ export interface AutoFillGeometry {
   pocketCount: number;
   thinWallCount: number;
   weight: number;
+  bendCount: number;
+  cutLengthMm: number;
+  sheetThicknessMm: number;
+  pierceCount: number;
+  flatPatternAreaMm2: number;
+  holeDiameters: number[];
+  bendRadii: number[];
 }
 
 export interface AutoFillSuggestions {
@@ -271,6 +329,8 @@ export interface AutoFillSuggestions {
   materialId: string | null;
   density: number | null;
   processType: string;
+  familyClassification: string | null;
+  familyConfidence: number | null;
   makeBuy: 'make' | 'buy';
   itemType: 'assembly' | 'sub_assembly' | 'child_part';
 }
@@ -291,6 +351,7 @@ export interface AutoFillResponse {
   costs: AutoFillCosts;
   confidence: { overall: number; geometry: number; material: number; process: number; cost: number };
   cadEngineAvailable: boolean;
+  featureGraph?: FeatureGraph;
 }
 
 // ── Auto-fill standalone function ─────────────────────────────────────────────
@@ -306,6 +367,183 @@ export async function analyzeForAutoFill(file: File): Promise<AutoFillResponse> 
 export function useAnalyzeForAutoFill() {
   return useMutation({
     mutationFn: (file: File) => analyzeForAutoFill(file),
+  });
+}
+
+export function useAnalysisVersion() {
+  return useQuery({
+    queryKey: bomItemKeys.analysisVersion(),
+    queryFn: async () => {
+      const data = await apiClient.get<{ version: number; cad_engine_version: string }>('/bom-items/analysis-version');
+      return data ?? { version: 4, cad_engine_version: 'unknown' };
+    },
+    staleTime: 5 * 60 * 1000, // version rarely changes; cache for 5 min
+  });
+}
+
+export function useDFMScores(bomItemId?: string) {
+  return useQuery({
+    queryKey: ['bom-items', bomItemId, 'dfm-scores'],
+    queryFn: async () => apiClient.get<DFMScoresResponse>(`/bom-items/${bomItemId}/dfm-scores`),
+    enabled: useAuthEnabledWith(!!bomItemId),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ── Cost Summary ──────────────────────────────────────────────────────────────
+
+export interface ProcessLineCost {
+  process: string;
+  setupCost: number;
+  runCost: number;
+  totalCost: number;
+  cycleTimeMin: number;
+  hourlyRate: number;
+  rateSource: 'mhr_database' | 'default_rate';
+  machineClass: string;
+  machineName: string | null;
+  commodityCode: string | null;
+}
+
+export interface CostSummaryDto {
+  materialCost: number;
+  materialGrade: string;
+  grossWeightKg: number;
+  materialCostPerKg: number;
+  materialSource: 'db' | 'default';
+  processLines: ProcessLineCost[];
+  totalProcessCost: number;
+  totalCost: number;
+  cycleTimes: {
+    laserMin: number;
+    pressBrakeMin: number;
+    tappingMin: number;
+    deburrMin: number;
+    totalMin: number;
+  };
+  batchSize: number;
+  family: string;
+  warnings: string[];
+  ratesSource: string;
+}
+
+export function useCostSummary(itemId: string | undefined, batchSize: number = 1) {
+  return useQuery({
+    queryKey: ['bom-items', itemId, 'cost-summary', batchSize],
+    queryFn: () =>
+      apiClient.get<CostSummaryDto>(`/bom-items/${itemId}/cost-summary?batchSize=${batchSize}`),
+    enabled: useAuthEnabledWith(!!itemId),
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+export type RouteId = "sm-laser" | "sm-turret" | "sm-waterjet";
+
+export type CapabilityReasonCode =
+  | "DIMENSIONS_UNAVAILABLE"
+  | "NO_MACHINE_SELECTED"
+  | "SPEC_NOT_ON_FILE"
+  | "CLASS_THICKNESS_LIMIT"
+  | "THICKNESS_EXCEEDED"
+  | "BED_LENGTH_EXCEEDED"
+  | "BED_WIDTH_EXCEEDED";
+
+export interface RouteCapability {
+  cuttingCapable: boolean;
+  pressBrakeCapable: boolean;
+  overallCapable: boolean;
+  confidence: "high" | "medium" | "low";
+  estimatedTonnage: number | null;
+  reasonCodes: CapabilityReasonCode[];
+  warnings: string[];
+}
+
+export interface RouteResultDto {
+  routeId: RouteId;
+  routeLabel: string;
+  processLines: ProcessLineCost[];
+  materialCost: number;
+  abrasiveCost: number;
+  totalProcessCost: number;
+  totalCost: number;
+  cycleTimes: {
+    cuttingMin: number;
+    pressBrakeMin: number;
+    tappingMin: number;
+    deburrMin: number;
+    totalMin: number;
+  };
+  badges: { lowestCost: boolean; fastest: boolean; bestQuality: boolean };
+  capability: RouteCapability;
+  warnings: string[];
+  ratesSource: string;
+}
+
+export interface RouteComparisonDto {
+  bomItemId: string;
+  batchSize: number;
+  materialCost: number;
+  materialGrade: string;
+  grossWeightKg: number;
+  materialCostPerKg: number;
+  materialSource: "db" | "default";
+  routes: RouteResultDto[];
+  comparisonWarnings: string[];
+}
+
+export function useRouteComparison(itemId: string | undefined, batchSize: number = 1) {
+  return useQuery({
+    queryKey: ["bom-items", itemId, "route-comparison", batchSize],
+    queryFn: () =>
+      apiClient.get<RouteComparisonDto>(
+        `/bom-items/${itemId}/route-comparison?batchSize=${batchSize}`,
+      ),
+    enabled: useAuthEnabledWith(!!itemId),
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export type GdtSeverity = "low" | "medium" | "high";
+export type InspectionMethod = "visual" | "caliper" | "height_gauge" | "cmm";
+
+export interface GdtFeatureDto {
+  type: string;
+  toleranceMm: number;
+  datum: string;
+  confidence: number | null;
+  severity: GdtSeverity;
+  inspectionMethod: InspectionMethod;
+  inspectionTimeMin: number;
+  costImpactPercent: number;
+  costImpactRange: string;
+  reasonCodes: string[];
+  manufacturingActions: string[];
+}
+
+export interface GdtAnalysisDto {
+  bomItemId: string;
+  source: "drawing_intelligence" | "no_data";
+  features: GdtFeatureDto[];
+  overallSeverity: GdtSeverity | null;
+  maxCostImpactPercent: number;
+  maxCostImpactRange: string;
+  inspectionMethods: InspectionMethod[];
+  recommendedInspectionMethod: InspectionMethod | null;
+  totalInspectionTimeMin: number;
+  analysisConfidence: number;
+  generalTolerance: string | null;
+}
+
+export function useGdtAnalysis(itemId: string | undefined) {
+  return useQuery({
+    queryKey: ["bom-items", itemId, "gdt-analysis"],
+    queryFn: () =>
+      apiClient.get<GdtAnalysisDto>(`/bom-items/${itemId}/gdt-analysis`),
+    enabled: useAuthEnabledWith(!!itemId),
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
   });
 }
 
