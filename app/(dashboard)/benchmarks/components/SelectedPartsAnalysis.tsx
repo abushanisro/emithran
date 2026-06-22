@@ -12,13 +12,8 @@ import {
   Bar,
   CartesianGrid,
   Cell,
-  ComposedChart,
-  Legend,
-  Line,
   PieChart,
   Pie,
-  RadialBar,
-  RadialBarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -26,6 +21,8 @@ import {
 } from "recharts";
 import type { BOMMetricEntry, EnrichedBOMItem, HighCostPart } from "../types";
 import { itemCost, itemWeight, safeNum, formatPrice } from "../utils";
+
+type ResolvedBOMMetricEntry = Omit<BOMMetricEntry, 'items'> & { items: EnrichedBOMItem[] };
 
 interface Props {
   bomMetrics: BOMMetricEntry[];
@@ -35,7 +32,7 @@ interface Props {
 
 export function SelectedPartsAnalysis({ bomMetrics, selectedParts, onBack }: Props) {
   // Filter BOM metrics to only selected parts
-  const filteredBomMetrics = bomMetrics.map((bd) => ({
+  const filteredBomMetrics: ResolvedBOMMetricEntry[] = bomMetrics.map((bd) => ({
     ...bd,
     items: (bd.items ?? []).filter((item) => {
       const key = item.partNumber ?? item.name ?? `item-${item.id}`;
@@ -101,7 +98,7 @@ export function SelectedPartsAnalysis({ bomMetrics, selectedParts, onBack }: Pro
 
 // ─── Cost & Weight content ────────────────────────────────────────────────────
 
-function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: BOMMetricEntry[] }) {
+function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: ResolvedBOMMetricEntry[] }) {
   return (
     <>
       {/* Cost analysis table */}
@@ -374,14 +371,14 @@ function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: BOMMetr
 
 // ─── Part details table ───────────────────────────────────────────────────────
 
-function PartDetailsTable({ filteredBomMetrics }: { filteredBomMetrics: BOMMetricEntry[] }) {
+function PartDetailsTable({ filteredBomMetrics }: { filteredBomMetrics: ResolvedBOMMetricEntry[] }) {
   const allParts = new Map<
     string,
     {
       name: string;
-      partNumber?: string;
-      material?: string;
-      makeBuy?: string;
+      partNumber?: string | undefined;
+      material?: string | undefined;
+      makeBuy?: string | undefined;
       bomData: (EnrichedBOMItem | null)[];
     }
   >();
@@ -484,7 +481,7 @@ function PartDetailsTable({ filteredBomMetrics }: { filteredBomMetrics: BOMMetri
 
 // ─── Materials content ────────────────────────────────────────────────────────
 
-function MaterialsContent({ filteredBomMetrics }: { filteredBomMetrics: BOMMetricEntry[] }) {
+function MaterialsContent({ filteredBomMetrics }: { filteredBomMetrics: ResolvedBOMMetricEntry[] }) {
   const inferProcess = (item: EnrichedBOMItem): string => {
     if (item.makeBuy === "buy") return "Procurement";
     const mat = (item.material ?? "").toLowerCase();
@@ -641,7 +638,7 @@ function MaterialsContent({ filteredBomMetrics }: { filteredBomMetrics: BOMMetri
 
 // ─── Assembly content ─────────────────────────────────────────────────────────
 
-function AssemblyContent({ filteredBomMetrics }: { filteredBomMetrics: BOMMetricEntry[] }) {
+function AssemblyContent({ filteredBomMetrics }: { filteredBomMetrics: ResolvedBOMMetricEntry[] }) {
   return (
     <Card>
       <CardHeader>
@@ -786,7 +783,7 @@ function AssemblyContent({ filteredBomMetrics }: { filteredBomMetrics: BOMMetric
 
 // ─── VAVE content ─────────────────────────────────────────────────────────────
 
-function VAVEContent({ filteredBomMetrics }: { filteredBomMetrics: BOMMetricEntry[] }) {
+function VAVEContent({ filteredBomMetrics }: { filteredBomMetrics: ResolvedBOMMetricEntry[] }) {
   const opportunities: React.ReactNode[] = [];
 
   // High cost parts

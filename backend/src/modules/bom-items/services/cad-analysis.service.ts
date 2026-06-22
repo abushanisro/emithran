@@ -697,6 +697,9 @@ export class CADAnalysisService {
     let zmin = Infinity, zmax = -Infinity;
     let triangleCount = 0;
 
+    let volumeAcc = 0;
+    let surfaceAreaAcc = 0;
+
     try {
       const isBinarySTL = fileBuffer.length > 84 && !fileBuffer.subarray(0, 5).toString('ascii').toLowerCase().startsWith('solid ');
       if (isBinarySTL) {
@@ -705,22 +708,41 @@ export class CADAnalysisService {
         for (let i = 0; i < maxTriangles; i++) {
           const base = 84 + i * 50 + 12; // skip 80 header + 4 count + 12-byte normal
           if (base + 36 > fileBuffer.length) break;
-          for (let v = 0; v < 3; v++) {
-            const vb = base + v * 12;
-            const x = fileBuffer.readFloatLE(vb);
-            const y = fileBuffer.readFloatLE(vb + 4);
-            const z = fileBuffer.readFloatLE(vb + 8);
-            if (isFinite(x) && isFinite(y) && isFinite(z)) {
-              if (x < xmin) xmin = x; if (x > xmax) xmax = x;
-              if (y < ymin) ymin = y; if (y > ymax) ymax = y;
-              if (z < zmin) zmin = z; if (z > zmax) zmax = z;
-            }
-          }
+          const x0 = fileBuffer.readFloatLE(base),      y0 = fileBuffer.readFloatLE(base + 4),  z0 = fileBuffer.readFloatLE(base + 8);
+          const x1 = fileBuffer.readFloatLE(base + 12), y1 = fileBuffer.readFloatLE(base + 16), z1 = fileBuffer.readFloatLE(base + 20);
+          const x2 = fileBuffer.readFloatLE(base + 24), y2 = fileBuffer.readFloatLE(base + 28), z2 = fileBuffer.readFloatLE(base + 32);
+          if (!isFinite(x0) || !isFinite(y0) || !isFinite(z0)) continue;
+
+          // Bounding box
+          if (x0 < xmin) xmin = x0; if (x0 > xmax) xmax = x0;
+          if (x1 < xmin) xmin = x1; if (x1 > xmax) xmax = x1;
+          if (x2 < xmin) xmin = x2; if (x2 > xmax) xmax = x2;
+          if (y0 < ymin) ymin = y0; if (y0 > ymax) ymax = y0;
+          if (y1 < ymin) ymin = y1; if (y1 > ymax) ymax = y1;
+          if (y2 < ymin) ymin = y2; if (y2 > ymax) ymax = y2;
+          if (z0 < zmin) zmin = z0; if (z0 > zmax) zmax = z0;
+          if (z1 < zmin) zmin = z1; if (z1 > zmax) zmax = z1;
+          if (z2 < zmin) zmin = z2; if (z2 > zmax) zmax = z2;
+
+          // Signed-tetrahedron volume (divergence theorem on closed mesh)
+          volumeAcc += x0 * (y1 * z2 - y2 * z1)
+                     + x1 * (y2 * z0 - y0 * z2)
+                     + x2 * (y0 * z1 - y1 * z0);
+
+          // Triangle surface area (half cross-product magnitude)
+          const ex = x1 - x0, ey = y1 - y0, ez = z1 - z0;
+          const fx = x2 - x0, fy = y2 - y0, fz = z2 - z0;
+          surfaceAreaAcc += 0.5 * Math.sqrt(
+            (ey * fz - ez * fy) ** 2 + (ez * fx - ex * fz) ** 2 + (ex * fy - ey * fx) ** 2,
+          );
         }
       }
     } catch (e) {
       this.logger.warn(`STL vertex parse error: ${e.message}`);
     }
+
+    const computedVolumeMm3 = Math.abs(volumeAcc) / 6;
+    const computedSurfaceAreaMm2 = surfaceAreaAcc;
 
     // Fallback if parse failed or ASCII STL
     if (!isFinite(xmin)) { xmin = 0; xmax = 20; ymin = 0; ymax = 40; zmin = 0; zmax = 5; }
@@ -800,8 +822,8 @@ export class CADAnalysisService {
       geometry_features: {
         file_size_bytes: fileSize,
         triangle_count: safeTriangleCount,
-        estimated_volume_mm3: Math.min(dx * dy * dz * 0.4, 9999),
-        surface_area_estimation: Math.min(safeTriangleCount * 0.001, 9.99),
+        estimated_volume_mm3: computedVolumeMm3 > 0 ? computedVolumeMm3 : dx * dy * dz * 0.4,
+        surface_area_estimation: computedSurfaceAreaMm2 > 0 ? computedSurfaceAreaMm2 : 2 * (dx * dy + dy * dz + dx * dz),
         complexity_score: Math.min(safeTriangleCount / 1000, 9.99),
         bounding_box: {
           length: parseFloat(dx.toFixed(2)),

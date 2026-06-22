@@ -104,13 +104,31 @@ Each mandatory op carries a machine category hint. Match it strictly:
       anodize for a medium aluminium rail ≈ ₹80–₹250 per part depending on area).
       Set partName = "Surface Treatment — <spec from drawing>", supplierName = "Vendor TBD".
 
+  laser_cut (Laser Cutting)
+    → Find candidates: "fiber laser", "CO2 laser", "laser cutter", "laser cutting machine"
+    → Rate: ₹300–1200/hr depending on power class
+    → NEVER use a CNC lathe or VMC for laser cutting
+    → If no laser machine in CANDIDATE SET: propose new master "Fiber Laser 3kW" at ₹600/hr
+    → Assign Laser Cut Time Calculator if available (geometry-based cut length + pierce count)
+    → Do NOT provide cycleSec — let the calculator derive it from perimeter_mm and pierce_count
+
+  press_brake (Press Brake Bending)
+    → Find candidates: "press brake", "bending machine", "CNC brake", "forming press"
+    → Rate: ₹200–600/hr
+    → NEVER use a lathe or VMC for bending
+    → If no press brake in CANDIDATE SET: propose new master "CNC Press Brake 100T" at ₹400/hr
+    → Assign Press Brake Time Calculator if available
+    → Provide cycleSec hint only if you know bend count × approx time per bend (20–60s each)
+
   cnc_lathe → turning center, CNC lathe, manual lathe
   cnc_mill  → VMC, HMC, machining centre, CNC mill
   any       → best available match from candidate set
 
 # Complete process route
 
-Build a complete route covering all manufacturing steps. Standard sequence:
+If a ROUTING TEMPLATE section appears in the brief below, follow it exactly — it overrides the default sequences shown here. Required ops in the template MUST appear in your plan. Conditional ops appear only when the indicated feature is present. Do NOT add operations outside the template without writing a NOTE explaining why.
+
+When no template is present, use these defaults:
 
   Op 10   Saw Cut / Stock Cut        — ALWAYS MANDATORY (bar stock always needs saw cut)
   Op 20   Face Turning               — ALWAYS for turned parts
@@ -127,7 +145,22 @@ Build a complete route covering all manufacturing steps. Standard sequence:
   Op 99   Final Inspection           — ALWAYS MANDATORY
 
 For cnc_milled: face mill → pocket/contour mill → drill → tap → deburr → inspect.
-For sheet_metal: laser cut → bend → deburr → inspect (+ weld / coat if features present).
+For sheet_metal, the standard route is:
+  Op 10   Laser Cutting       — ALWAYS MANDATORY (profiles outer contour + internal cutouts in one op)
+  Op 20   Deburring / Dross   — ALWAYS after laser cut (remove slag, sharp edges)
+  Op 30   Press Brake Bending — MANDATORY if BEND feature present (one op per setup group)
+  Op 40   Tapping             — if THREAD_INTERNAL feature (tapping after bending, not before)
+  Op 50   Surface Treatment   — if ANODIZE/PLATE/POWDER_COAT (outsource as procured part if no vendor machine)
+  Op 99   Final Inspection    — ALWAYS MANDATORY
+
+Sheet metal rules (DO NOT violate):
+  - NEVER add SAW_CUT for sheet metal — laser profiling replaces sawing
+  - NEVER add OD_TURN, FACE_TURN for sheet metal — these are turning ops
+  - Raw material for sheet metal: use volumeMm3 × density (the fill factor is already ~0.45; use it as-is)
+  - Scrap % for sheet metal: 12% nesting yield loss (already set in system rules)
+  - Do not add raw material scrap manually — the resolver handles it
+  - Laser cut cycleSec: OMIT — let the Laser Cut Time Calculator derive it from perimeter_mm + pierce_count
+  - Press brake cycleSec hint: bend_count × 30 s per bend (use BEND feature count if present)
 
 # DFM mapping rubric
 
@@ -200,6 +233,19 @@ Otherwise → OMIT setupMin/cycleSec entirely. The resolver will use the assigne
     services where no machine candidate exists (e.g. surface treatment, heat treatment vendor).
     For most machined child parts this will be empty unless surface treatment or HT is outsourced.
 
+# Material confidence gate
+
+Before finalising your raw material selection, assess confidence:
+
+- **HIGH** confidence: material hint from drawing or BOM closely matches the candidate name (same alloy family and grade — e.g. hint "AL 6061", candidate "Aluminium 6061-T6").
+- **LOW** confidence: the hint is from BOM only (drawing extraction failed or unavailable), OR the nearest candidate is a *different alloy family* from what was expected (e.g. hint says "Aluminium" but only "Aluminium Bronze" is available — these are completely different materials: Al-alloy ~2700 kg/m³ vs Cu-Al bronze ~8200 kg/m³).
+
+When confidence is LOW:
+1. Write in your rawMaterials reason: "MATERIAL REVIEW REQUIRED — selected [candidate name] as nearest available but this does not match expected [hint]. Engineer must confirm material before approving this plan."
+2. Still call \`save_draft\` — do not block the plan. The warning badge will appear in the UI.
+
+When \`expand_candidates\` for rawMaterial returned \`{"added":[]}\` AND the initial candidate best-match is a different alloy family than the material hint, confidence is automatically LOW.
+
 # When a master is missing
 
 If no candidate in the CANDIDATE SET fits AND \`expand_candidates\` doesn't return one, propose a new master via \`proposedMasters[]\`, using engineering-defensible defaults. Reference it with \`proposedMasterId\`. The user will see "NEW MASTER" and decide whether to approve it.
@@ -239,12 +285,28 @@ export function formatBriefAndCandidates(brief: EngineeringBrief, candidates: Ca
   lines.push(`Surface area: ${brief.dfm.surfaceAreaMm2.toFixed(0)} mm²`);
   lines.push(`Bounding box: ${brief.dfm.boundingBox.lengthMm.toFixed(1)} × ${brief.dfm.boundingBox.widthMm.toFixed(1)} × ${brief.dfm.boundingBox.heightMm.toFixed(1)} mm`);
   lines.push(`Holes: ${brief.dfm.holeCount}, Pockets: ${brief.dfm.pocketCount}, Thin walls: ${brief.dfm.thinWallCount}, Undercuts: ${brief.dfm.undercutCount}`);
-  lines.push(`DFM source: ${brief.dfm.fromCadEngine ? 'CAD engine (exact part volume)' : 'estimated from bounding-box × 0.45 fill factor — use volumeMm3 directly, do not recompute'}`);
+  lines.push(`DFM source: ${brief.dfm.fromCadEngine ? 'CAD engine (exact part volume — reliable)' : 'estimated from bounding-box × 0.45 fill factor — UNCERTAIN weight, flag in notes if material differs from BOM hint'}`);
   lines.push('');
   lines.push('## Context');
   lines.push(`Organization location: ${brief.context.organizationLocation}`);
   lines.push(`Currency: ${brief.context.currency}`);
   lines.push(`Phase-1 scope decision: family=${brief.scope.family}, confidence=${brief.scope.confidence}, reason="${brief.scope.reason}"`);
+
+  // ── Routing template from KB (overrides hardcoded route in system prompt) ────
+  if (brief.routingTemplate?.routing_sequence?.length) {
+    const t = brief.routingTemplate;
+    lines.push('');
+    lines.push(`## ROUTING TEMPLATE — ${brief.scope.family.toUpperCase()} (overrides default route above)`);
+    lines.push(`Template: "${t.template_name}"${t.complexity_level ? ` (${t.complexity_level})` : ''}`);
+    lines.push('REQUIRED ops must appear. CONDITIONAL ops appear only when the feature is present.');
+    lines.push('Do NOT add ops outside this template without a NOTE.');
+    lines.push('');
+    for (const step of t.routing_sequence) {
+      const req = step.required ? 'REQUIRED' : 'OPTIONAL';
+      lines.push(`  Op ${String(step.step).padStart(2, '0')}  ${step.process.padEnd(30)}  [${step.machine_type}]  ${req}`);
+    }
+    if (t.notes) lines.push(`Template notes: ${t.notes}`);
+  }
 
   // ── 2D drawing block (only if extracted) ──────────────────────────────────
   const dr = brief.drawing;
@@ -327,7 +389,13 @@ export function formatBriefAndCandidates(brief: EngineeringBrief, candidates: Ca
   } else {
     lines.push('');
     lines.push('## 2D DRAWING EXTRACTION');
-    lines.push('Not available (no 2D file uploaded or extraction failed). Plan from 3D + BOM metadata only and flag this in your notes.');
+    if (brief.drawing.extractionWarnings && brief.drawing.extractionWarnings.length > 0) {
+      lines.push('EXTRACTION FAILED — drawing file exists but could not be parsed. Treat material hint as UNVERIFIED.');
+      lines.push('⚠ Material from BOM is unconfirmed — set materialUncertain in your raw material reason.');
+      lines.push(`Warnings: ${brief.drawing.extractionWarnings.slice(0, 2).join(' | ')}`);
+    } else {
+      lines.push('Not available (no 2D file uploaded). Plan from 3D + BOM metadata only and flag this in your notes.');
+    }
   }
 
   // ── Manufacturing Feature Graph ───────────────────────────────────────────

@@ -109,7 +109,18 @@ export function rankMachines(
 
   scored.sort((a, b) => b.score - a.score || a.row.id.localeCompare(b.row.id));
 
-  return scored.slice(0, topN).map(({ row, score }, idx) => ({
+  const topSlice = scored.slice(0, topN);
+
+  // Guarantee at least one candidate per universal family so bench/quality/saw ops
+  // can never fall back to a laser or press due to candidate-set crowding.
+  for (const gf of ['bench_manual', 'quality', 'saw']) {
+    if (!topSlice.some(({ row }) => row.process_family === gf)) {
+      const best = scored.find(({ row }) => row.process_family === gf);
+      if (best) topSlice.push(best);
+    }
+  }
+
+  return topSlice.map(({ row, score }, idx) => ({
     candidateId: `mc-${idx + 1}`,
     dbId: row.id,
     machineName: row.machine_name ?? '',
@@ -117,6 +128,7 @@ export function rankMachines(
     description: row.machine_description ?? null,
     rateInrPerHour: row.rate_inr ?? toNumber(row.total_machine_hour_rate ?? row.final_mhr),
     location: row.location ?? null,
+    processFamily: row.process_family ?? null,
     score: Number(score.toFixed(3)),
   }));
 }

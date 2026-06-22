@@ -281,8 +281,8 @@ async def convert_step_to_stl(
         
         # Convert STEP to STL
         try:
-            output_path = conversion_service.convert(step_path, stl_path)
-            logger.info(f"Conversion successful: {file.filename} → STL")
+            output_path, stl_tri_count = conversion_service.convert(step_path, stl_path)
+            logger.info(f"Conversion successful: {file.filename} → STL ({stl_tri_count} triangles)")
         except ConversionError as e:
             cleanup_files(step_path, stl_path)
             logger.error(f"Conversion failed: {str(e)}")
@@ -290,11 +290,12 @@ async def convert_step_to_stl(
                 status_code=422,
                 detail=f"Conversion failed: {str(e)}"
             )
-        
+
         # Schedule cleanup after response is sent
         background_tasks.add_task(cleanup_files, step_path, stl_path)
-        
-        # Return STL file
+
+        # Return STL file — X-STL-Triangle-Count header used for face_map ordering verification:
+        # compare this value to face_map_tri_total logged by /analyze/geometry.
         return FileResponse(
             output_path,
             media_type="application/octet-stream",
@@ -303,7 +304,8 @@ async def convert_step_to_stl(
                 "X-Original-Filename": file.filename,
                 "X-Conversion-Engine": "OpenCascade",
                 "X-File-Size": str(os.path.getsize(output_path)),
-                "X-Mesh-Quality": f"linear={config.linear_deflection},angular={config.angular_deflection}"
+                "X-Mesh-Quality": f"linear={config.linear_deflection},angular={config.angular_deflection}",
+                "X-STL-Triangle-Count": str(stl_tri_count),
             }
         )
     
@@ -370,23 +372,24 @@ async def convert_step_to_stl_base64(
         
         # Convert
         try:
-            output_path = conversion_service.convert(step_path, stl_path)
+            output_path, stl_tri_count = conversion_service.convert(step_path, stl_path)
         except ConversionError as e:
             cleanup_files(step_path, stl_path)
             raise HTTPException(status_code=422, detail=f"Conversion failed: {str(e)}")
-        
+
         # Read STL and encode to base64
         with open(output_path, 'rb') as f:
             stl_data = f.read()
-        
+
         stl_base64 = base64.b64encode(stl_data).decode('utf-8')
-        
+
         return {
             "success": True,
             "original_filename": file.filename,
             "stl_filename": Path(file.filename).stem + ".stl",
             "stl_size": len(stl_data),
             "stl_base64": stl_base64,
+            "stl_tri_count": stl_tri_count,
             "mesh_quality": {
                 "linear_deflection": config.linear_deflection,
                 "angular_deflection": config.angular_deflection

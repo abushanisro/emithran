@@ -137,12 +137,8 @@ class EnvironmentValidator {
     if (typeof window === 'undefined') return;
     if (process.env.NODE_ENV === 'production') return; // No logging in production
 
-    const result = this.getValidationResult();
-    const config = this.getConfig();
-
-    const apiReachable = await this.checkApiReachability();
-
     // Validation completed - results available through getValidationResult()
+    await this.checkApiReachability();
   }
 
   private getApiUrl(): string {

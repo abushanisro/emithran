@@ -69,89 +69,44 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
         };
       }
 
-      // Fetch cost components from backend services
-      const [rawMaterialCost, processCost, toolingCost, packagingCost, procuredPartsCost] = await Promise.allSettled([
-        fetchRawMaterialCost(bomItem.id),
-        fetchProcessCost(bomItem.id),
-        fetchToolingCost(bomItem.id),
-        fetchPackagingCost(bomItem.id),
-        fetchProcuredPartsCost(bomItem.id),
-      ]);
+      // Single authoritative endpoint — replaces 5 parallel calls.
+      // Computes all cost categories from source fields on the backend.
+      const costAnalysis = await apiClient.get<any>(`/cost-analysis/bom-item/${bomItem.id}`).catch(() => null);
 
-      // Extract values or default to 0
-      const rawMaterials = rawMaterialCost.status === 'fulfilled' ? rawMaterialCost.value : 0;
-      const processTotal = processCost.status === 'fulfilled' ? processCost.value : 0;
-      const toolingTotal = toolingCost.status === 'fulfilled' ? toolingCost.value : 0;
-      const packaging = packagingCost.status === 'fulfilled' ? packagingCost.value : 0;
-      const procuredParts = procuredPartsCost.status === 'fulfilled' ? procuredPartsCost.value : 0;
-      
+      const rawMaterials   = costAnalysis?.rawMaterialCost  || 0;
+      const processTotal   = costAnalysis?.processCost       || 0;
+      const toolingTotal   = costAnalysis?.toolingCost       || 0;
+      const packaging      = costAnalysis?.packagingCost     || 0;
+      const procuredParts  = costAnalysis?.procuredPartCost  || 0;
+      const totalCost      = costAnalysis?.manufacturingCost || (rawMaterials + processTotal + toolingTotal + packaging + procuredParts);
 
-      // Calculate using the cost engine with actual data
-      const costInput = {
+      return {
         itemId: bomItem.id,
-        itemType: bomItem.itemType,
-        quantity: bomItem.quantity,
-        materials: [
-          {
-            materialType: bomItem.material || 'unknown',
-            unitCost: rawMaterials / bomItem.quantity || 50, // Default unit cost
-            quantity: bomItem.quantity,
-            wastagePercentage: 5,
-            totalCost: rawMaterials,
-          }
-        ],
-        processes: [
-          {
-            stepName: 'primary_process',
-            machineTime: 30, // Default values
-            laborTime: 20,
-            machineRate: 8.5,
-            laborRate: 4.2,
-            setupCost: processTotal * 0.1,
-            toolingCost: toolingTotal, // Use actual fetched tooling cost
-            totalCost: processTotal,
-          }
-        ],
-        packagingCost: packaging * 0.5,
-        logisticsCost: packaging * 0.5,
-        procuredPartsCost: procuredParts,
+        breakdown: {
+          rawMaterialCost:       rawMaterials,
+          processCost:           processTotal,
+          toolingCost:           toolingTotal,
+          packagingLogisticsCost: packaging,
+          procuredPartsCost:     procuredParts,
+          overheadCost:          totalCost * 0.15,
+          directCost:            totalCost,
+          sgaCost:               costAnalysis?.sgaCost    || totalCost * 0.125,
+          profitAmount:          costAnalysis?.profitCost || totalCost * 0.08,
+          totalCost:             totalCost,
+          sellingPrice:          costAnalysis?.sellingPrice || totalCost * 1.205,
+        },
+        margins: {
+          grossMarginAmount:      (costAnalysis?.sellingPrice || totalCost * 1.205) - totalCost,
+          grossMarginPercentage:  (((costAnalysis?.sellingPrice || totalCost * 1.205) - totalCost) / (costAnalysis?.sellingPrice || totalCost * 1.205)) * 100,
+          netMarginAmount:        costAnalysis?.profitCost || totalCost * 0.08,
+          netMarginPercentage:    ((costAnalysis?.profitCost || totalCost * 0.08) / (costAnalysis?.sellingPrice || totalCost * 1.205)) * 100,
+        },
+        efficiency: {
+          materialEfficiency:  85,
+          processEfficiency:   80,
+          overallEfficiency:   82.5,
+        },
       };
-
-      
-      try {
-        const result = costEngine.calculateItemCost(costInput);
-        return result;
-      } catch (engineError) {
-        // Return a basic cost structure with the actual values
-        const totalCost = rawMaterials + processTotal + toolingTotal + packaging + procuredParts;
-        return {
-          itemId: bomItem.id,
-          breakdown: {
-            rawMaterialCost: rawMaterials,
-            processCost: processTotal,
-            toolingCost: toolingTotal,
-            packagingLogisticsCost: packaging,
-            procuredPartsCost: procuredParts,
-            overheadCost: totalCost * 0.15,
-            directCost: totalCost,
-            sgaCost: totalCost * 0.125,
-            profitAmount: totalCost * 0.08,
-            totalCost: totalCost,
-            sellingPrice: totalCost * 1.205,
-          },
-          margins: {
-            grossMarginAmount: totalCost * 1.205 - totalCost,
-            grossMarginPercentage: ((totalCost * 1.205 - totalCost) / (totalCost * 1.205)) * 100,
-            netMarginAmount: totalCost * 0.08,
-            netMarginPercentage: (totalCost * 0.08 / (totalCost * 1.205)) * 100,
-          },
-          efficiency: {
-            materialEfficiency: 85,
-            processEfficiency: 80,
-            overallEfficiency: 82.5,
-          },
-        };
-      }
     } catch (error) {
       // Return fallback calculation using available item data
       return costEngine.generateSampleCostData(bomItem.itemType);
@@ -159,99 +114,20 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
   };
 
   /**
-   * Fetch raw material cost from backend
-   */
-  const fetchRawMaterialCost = async (bomItemId: string): Promise<number> => {
-    try {
-      const response = await apiClient.get(`/raw-material-costs/bom-item/${bomItemId}/total`) as any;
-      return response.totalCost || response.data?.totalCost || 0;
-    } catch (error) {
-      return 0; // Default if no data available
-    }
-  };
-
-  /**
-   * Fetch process cost from backend
-   */
-  const fetchProcessCost = async (bomItemId: string): Promise<number> => {
-    try {
-      const response = await apiClient.get(`/process-costs/bom-item/${bomItemId}/total`) as any;
-      return response.totalCost || response.data?.totalCost || 0;
-    } catch (error) {
-      return 0; // Default if no data available
-    }
-  };
-
-  /**
-   * Fetch tooling cost from backend
-   */
-  const fetchToolingCost = async (bomItemId: string): Promise<number> => {
-    try {
-      const response = await apiClient.get(`/tooling-costs/bom-item/${bomItemId}/total`) as any;
-      console.log(`Tooling cost response for ${bomItemId}:`, response);
-      const cost = response.totalCost || response.data?.totalCost || 0;
-      console.log(`Extracted tooling cost for ${bomItemId}: ${cost}`);
-      return cost;
-    } catch (error) {
-      console.error(`Error fetching tooling cost for BOM item ${bomItemId}:`, error);
-      return 0; // Default if no data available
-    }
-  };
-
-  /**
-   * Fetch packaging & logistics cost from backend
-   */
-  const fetchPackagingCost = async (bomItemId: string): Promise<number> => {
-    try {
-      const response = await apiClient.get(`/packaging-logistics-costs/bom-item/${bomItemId}/total`) as any;
-      const cost = response.totalCost || response.data?.totalCost || 0;
-      return cost;
-    } catch (error) {
-      return 0; // Default if no data available
-    }
-  };
-
-  /**
-   * Fetch procured parts cost from backend
-   */
-  const fetchProcuredPartsCost = async (bomItemId: string): Promise<number> => {
-    try {
-      const response = await apiClient.get(`/procured-parts-costs/bom-item/${bomItemId}/total`) as any;
-      const cost = response.totalCost || response.data?.totalCost || 0;
-      return cost;
-    } catch (error) {
-      return 0; // Default if no data available
-    }
-  };
-
-  /**
-   * Fetch all cost data for multiple BOM items in batch (optimized)
+   * Fetch aggregated cost data for all BOM items in parallel via the
+   * single authoritative /cost-analysis/bom-item/:id endpoint.
    */
   const fetchBulkCostData = async (bomItems: BOMItem[]) => {
-    const itemIds = bomItems.map(item => item.id);
-
     try {
-      const [rawMaterials, processes, tooling, packaging, procuredParts] = await Promise.all([
-        apiClient.post('/raw-material-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null),
-        apiClient.post('/process-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null),
-        apiClient.post('/tooling-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null),
-        apiClient.post('/packaging-logistics-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null),
-        apiClient.post('/procured-parts-costs/bulk-total', { bomItemIds: itemIds }).catch(() => null)
-      ]);
-
-      // If all bulk endpoints failed (don't exist yet), fall back to individual calls
-      if (!rawMaterials && !processes && !tooling && !packaging && !procuredParts) {
-        return null;
-      }
-
-      return {
-        rawMaterials: (rawMaterials as any) || {},
-        processes: (processes as any) || {},
-        tooling: (tooling as any) || {},
-        packaging: (packaging as any) || {},
-        procuredParts: (procuredParts as any) || {},
-      };
-    } catch (error) {
+      const results = await Promise.all(
+        bomItems.map(item =>
+          apiClient.get<any>(`/cost-analysis/bom-item/${item.id}`).catch(() => null)
+        )
+      );
+      const map: Record<string, any> = {};
+      bomItems.forEach((item, i) => { map[item.id] = results[i]; });
+      return map;
+    } catch {
       return null;
     }
   };
@@ -281,30 +157,21 @@ export const CostDataProvider: React.FC<CostDataProviderProps> = ({ children }) 
         return;
       }
       
-      // Try bulk fetch first for better performance
+      // Fetch all item cost analyses in parallel via the new aggregated endpoint
       const bulkCostData = await fetchBulkCostData(bomItems);
-      
-      // Process all items in parallel instead of sequentially
+
       const itemCostPromises = bomItems.map(async (bomItem) => {
-        if (bulkCostData) {
-          // Use bulk data if available
-          const rawMaterialCost = bulkCostData.rawMaterials[bomItem.id] || 0;
-          const processCost = bulkCostData.processes[bomItem.id] || 0;
-          const toolingCost = bulkCostData.tooling[bomItem.id] || 0;
-          const packagingCost = bulkCostData.packaging[bomItem.id] || 0;
-          const procuredPartsCost = bulkCostData.procuredParts[bomItem.id] || 0;
-          
+        const analysis = bulkCostData?.[bomItem.id];
+        if (analysis) {
           return await calculateItemCostWithData(bomItem, {
-            rawMaterialCost,
-            processCost,
-            toolingCost,
-            packagingCost,
-            procuredPartsCost
+            rawMaterialCost:  analysis.rawMaterialCost  || 0,
+            processCost:      analysis.processCost       || 0,
+            toolingCost:      analysis.toolingCost       || 0,
+            packagingCost:    analysis.packagingCost     || 0,
+            procuredPartsCost: analysis.procuredPartCost || 0,
           });
-        } else {
-          // Fallback to individual calculation
-          return await calculateRealItemCost(bomItem);
         }
+        return await calculateRealItemCost(bomItem);
       });
       
       // Wait for all parallel calculations to complete

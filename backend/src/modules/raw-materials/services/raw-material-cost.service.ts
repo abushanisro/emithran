@@ -456,10 +456,12 @@ export class RawMaterialCostService {
 
     const client = this.supabaseService.getClient(accessToken);
 
-    // Get all active raw material costs for this BOM item
+    // Get all active raw material costs for this BOM item — compute from source fields
+    // Formula: gross_usage × unit_cost × (1 + overhead/100)
+    // We never read stored total_cost which may be null for AI-applied records.
     const { data: costs, error } = await client
       .from('raw_material_cost_records')
-      .select('total_cost')
+      .select('gross_usage, unit_cost, overhead')
       .eq('bom_item_id', bomItemId)
       .eq('is_active', true);
 
@@ -468,7 +470,10 @@ export class RawMaterialCostService {
       throw new InternalServerErrorException('Failed to fetch raw material costs');
     }
 
-    const totalCost = costs?.reduce((sum, cost) => sum + (cost.total_cost || 0), 0) || 0;
+    const totalCost = costs?.reduce((sum, r) => {
+      const computed = (parseFloat(r.gross_usage) || 0) * (parseFloat(r.unit_cost) || 0) * (1 + (parseFloat(r.overhead) || 0) / 100);
+      return sum + computed;
+    }, 0) || 0;
 
     this.logger.log(`Total raw material cost for BOM item ${bomItemId}: ${totalCost}`, 'RawMaterialCostService');
     return totalCost;
@@ -483,7 +488,7 @@ export class RawMaterialCostService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_material_cost_records')
-      .select('bom_item_id, total_cost')
+      .select('bom_item_id, gross_usage, unit_cost, overhead')
       .in('bom_item_id', bomItemIds)
       .eq('is_active', true);
 
@@ -494,7 +499,8 @@ export class RawMaterialCostService {
 
     const totals: Record<string, number> = Object.fromEntries(bomItemIds.map(id => [id, 0]));
     for (const row of data ?? []) {
-      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + (row.total_cost || 0);
+      const computed = (parseFloat(row.gross_usage) || 0) * (parseFloat(row.unit_cost) || 0) * (1 + (parseFloat(row.overhead) || 0) / 100);
+      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + computed;
     }
     return totals;
   }

@@ -37,6 +37,8 @@ export interface BriefBomItem {
   heatTreatment: string | null;
   hardnessHrc: number | null;
   materialHint: string | null;
+  coating: string | null;             // from bom_items.coating (drawing-confirmed)
+  tightestToleranceMm: number | null; // from bom_items.tightest_tolerance_mm
 }
 
 export interface BriefDfm {
@@ -52,6 +54,11 @@ export interface BriefDfm {
   thinWallCount: number;
   undercutCount: number;
   fromCadEngine: boolean;
+  // From Python manufacturing_intelligence (sheet_metal family)
+  bendCount: number;
+  slotCount: number;
+  cutLengthMm: number;
+  sheetThicknessMm: number;
 }
 
 export interface BriefContext {
@@ -63,6 +70,7 @@ export interface BriefContext {
 
 import type { DrawingBrief } from './drawing-brief.dto';
 import type { ManufacturingFeatureGraph, MandatoryOp } from './manufacturing-feature.dto';
+import type { PartFamilyRoutingTemplate } from '../../../modules/manufacturing-knowledge/dto/kb.dto';
 
 export interface EngineeringBrief {
   bomItem: BriefBomItem;
@@ -72,4 +80,5 @@ export interface EngineeringBrief {
   mandatoryOps: MandatoryOp[];
   context: BriefContext;
   scope: PartFamilyDecision;
+  routingTemplate?: PartFamilyRoutingTemplate | null;
 }

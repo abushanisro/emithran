@@ -114,9 +114,10 @@ export class ExpandCandidatesTool {
   // ── Processes ─────────────────────────────────────────────────────────────
   private async expandProcesses(client: any, q: string, args: any) {
     const { data, error } = await client
-      .from('processes')
-      .select('id, process_name, process_category, description, standard_time_minutes, setup_time_minutes, cycle_time_minutes, skill_level_required')
-      .or(`process_name.ilike.%${q}%,process_category.ilike.%${q}%,description.ilike.%${q}%`)
+      .from('process_calculator_mappings')
+      .select('id, process_group, process_route, operation, calculator_id')
+      .or(`process_group.ilike.%${q}%,process_route.ilike.%${q}%,operation.ilike.%${q}%`)
+      .eq('is_active', true)
       .limit(40);
     if (error) {
       this.logger.warn(`expand processes failed: ${error.message}`);

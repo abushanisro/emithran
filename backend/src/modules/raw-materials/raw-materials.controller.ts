@@ -36,21 +36,23 @@ export class RawMaterialsController {
   @ApiOperation({ summary: 'Get enhanced raw materials with comprehensive properties' })
   @ApiResponse({ status: 200, description: 'Enhanced materials retrieved successfully' })
   async getEnhancedMaterials(
-    @CurrentUser() user: User, 
+    @CurrentUser() user: User,
     @AccessToken() token: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('category') category?: string,
-    @Query('search') search?: string
+    @Query('search') search?: string,
+    @Query('partFamily') partFamily?: string,
   ) {
     const pageNum = page ? parseInt(page) : 1;
     const limitNum = limit ? parseInt(limit) : 50;
-    
+
     return this.rawMaterialsService.getEnhancedMaterials({
       page: pageNum,
       limit: limitNum,
       category,
-      search
+      search,
+      partFamily,
     }, user.id, token);
   }
 

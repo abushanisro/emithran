@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
 import { apiConfig } from '@/lib/api/config';
+import { computeHeatmap } from '@/lib/heatmap/engine';
+import { MANUFACTURING_RISK_RAMP } from '@/lib/heatmap/ramps';
+import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
 import {
   Home,
   Download,
@@ -37,6 +40,13 @@ import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, Meas
 import { getResultColors } from './measurement-overlay';
 import { MeasurementPanel } from './measurement-panel';
 
+const RISK_HIGHLIGHT_COLORS: Record<string, string> = {
+  low: '#22c55e',
+  medium: '#eab308',
+  high: '#f97316',
+  critical: '#ef4444',
+};
+
 // Manufacturing Feature Interface
 interface ManufacturingFeature {
   id: string;
@@ -48,6 +58,26 @@ interface ManufacturingFeature {
   tooling: string[];
   warnings: string[];
   aiRecommendations: string[];
+}
+
+// Feature Graph v2 occurrence highlight types
+interface FaceMapEntry {
+  face_id: number;    // OCC face ordinal from TopExp_Explorer walk
+  tri_start: number;  // index of first STL triangle for this face
+  tri_count: number;  // number of STL triangles belonging to this face
+}
+interface FeatureOccurrenceHL {
+  centroid: [number, number, number]; // Three.js-centered coords: abs − part_bbox_center
+  face_ids: number[];                 // OCC face indices — always an array; empty if pre-face_map
+}
+interface FeatureNodeV2HL {
+  id: string;
+  feature_type: string;
+  occurrences: FeatureOccurrenceHL[];
+  bbox_centered?: { x_min: number; x_max: number; y_min: number; y_max: number };
+  diameter_mm?: number;
+  radius_mm?: number;
+  normal?: [number, number, number];
 }
 
 interface EDrawingsViewerProps {
@@ -70,6 +100,25 @@ interface EDrawingsViewerProps {
   hoveredBOMItem?: any;
   onPartsDetected?: (parts: any[]) => void;
   dfmAnalysisData?: any;
+  cameraPreset?: 'top' | 'front' | 'right' | 'isometric' | null;
+  onScreenshotReady?: (dataUrl: string) => void;
+  // Feature Graph v2 occurrence highlighting
+  highlightOccurrences?: FeatureNodeV2HL | null;
+  selectedOccurrenceIndex?: number | null;
+  onOccurrenceSelect?: (index: number | null) => void;
+  /** face_map from feature_graph_v2.metadata — enables exact face highlighting */
+  faceMap?: FaceMapEntry[] | null;
+  /** Sheet thickness in mm — sizes HAZ ring (holes) and influence zone (bends) */
+  sheetThickness?: number;
+  /** Per-occurrence DFM risk scores — drives highlight color when provided */
+  dfmOccurrenceScores?: Array<{ occurrenceIndex: number; riskLevel: string }>;
+  /** Heatmap sources — when non-empty, vertex color heatmap replaces flat feature highlights */
+  heatmapSources?: import('@/lib/heatmap/types').HeatmapSource[];
+  heatmapNormalization?: import('@/lib/heatmap/types').HeatmapNormalization;
+  /** Called when user clicks the model surface while heatmap is active */
+  onHeatmapInspect?: (worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void;
+  /** Override the amber group-face highlight color — used for operation-specific visualization */
+  highlightColor?: string;
 }
 
 // Helper: safely get BufferAttribute from geometry
@@ -719,34 +768,214 @@ function DFMColorMesh({
 
 // ─── Measurement Highlight Components ────────────────────────────────────────
 
+/** Build a BufferGeometry from a subset of STL triangles.  expand > 0 offsets vertices
+ *  outward along each triangle's face normal by that distance (mm) — used for glow outlines. */
+function useSubsetGeometry(
+  triangleIndices: number[],
+  geometry: THREE.BufferGeometry,
+  expand: number,
+): THREE.BufferGeometry | null {
+  const geo = useMemo(() => {
+    const posAttr = getBufferAttribute(geometry, 'position');
+    if (!posAttr || triangleIndices.length === 0) return null;
+    const verts = new Float32Array(triangleIndices.length * 9);
+    triangleIndices.forEach((ti, i) => {
+      const ax = posAttr.getX(ti*3),   ay = posAttr.getY(ti*3),   az = posAttr.getZ(ti*3);
+      const bx = posAttr.getX(ti*3+1), by = posAttr.getY(ti*3+1), bz = posAttr.getZ(ti*3+1);
+      const cx = posAttr.getX(ti*3+2), cy = posAttr.getY(ti*3+2), cz = posAttr.getZ(ti*3+2);
+      let dx = 0, dy = 0, dz = 0;
+      if (expand !== 0) {
+        const ex = bx-ax, ey = by-ay, ez = bz-az;
+        const fx = cx-ax, fy = cy-ay, fz = cz-az;
+        const nx = ey*fz - ez*fy, ny = ez*fx - ex*fz, nz = ex*fy - ey*fx;
+        const len = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
+        dx = (nx/len)*expand; dy = (ny/len)*expand; dz = (nz/len)*expand;
+      }
+      verts[i*9+0]=ax+dx; verts[i*9+1]=ay+dy; verts[i*9+2]=az+dz;
+      verts[i*9+3]=bx+dx; verts[i*9+4]=by+dy; verts[i*9+5]=bz+dz;
+      verts[i*9+6]=cx+dx; verts[i*9+7]=cy+dy; verts[i*9+8]=cz+dz;
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    return g;
+  }, [triangleIndices, geometry, expand]);
+  useEffect(() => () => { geo?.dispose(); }, [geo]);
+  return geo;
+}
+
 function FaceHighlight({ triangleIndices, geometry, color, opacity = 0.45 }: {
   triangleIndices: number[];
   geometry: THREE.BufferGeometry;
   color: string;
   opacity?: number;
 }) {
-  const geo = useMemo(() => {
-    const posAttr = getBufferAttribute(geometry, 'position');
-    if (!posAttr || triangleIndices.length === 0) return null;
-    const verts = new Float32Array(triangleIndices.length * 9);
-    triangleIndices.forEach((ti, i) => {
-      for (let vi = 0; vi < 3; vi++) {
-        const idx = ti * 3 + vi;
-        verts[i * 9 + vi * 3]     = posAttr.getX(idx);
-        verts[i * 9 + vi * 3 + 1] = posAttr.getY(idx);
-        verts[i * 9 + vi * 3 + 2] = posAttr.getZ(idx);
-      }
-    });
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-    return g;
-  }, [triangleIndices, geometry]);
-  useEffect(() => () => { geo?.dispose(); }, [geo]);
+  const geo = useSubsetGeometry(triangleIndices, geometry, 0);
   if (!geo) return null;
   return (
     <mesh geometry={geo} renderOrder={100}>
       <meshBasicMaterial color={color} transparent opacity={opacity} depthTest={false} side={THREE.DoubleSide} />
     </mesh>
+  );
+}
+
+/** Selected-occurrence highlight: solid orange fill + BackSide glow ring from normal-expanded geometry. */
+function SelectedFaceHighlight({
+  triangleIndices,
+  geometry,
+  color = '#f97316',
+}: {
+  triangleIndices: number[];
+  geometry: THREE.BufferGeometry;
+  color?: string;
+}) {
+  const fillGeo = useSubsetGeometry(triangleIndices, geometry, 0);
+  const glowGeo = useSubsetGeometry(triangleIndices, geometry, 0.3);
+  if (!fillGeo) return null;
+  return (
+    <group>
+      {glowGeo && (
+        <mesh geometry={glowGeo} renderOrder={99}>
+          <meshBasicMaterial color={color} side={THREE.BackSide} transparent opacity={0.85} depthTest={false} />
+        </mesh>
+      )}
+      <mesh geometry={fillGeo} renderOrder={100}>
+        <meshBasicMaterial color={color} transparent opacity={0.95} depthTest={false} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
+// Context used to pass featureType + sheetThickness from EDrawingsViewer into the Canvas
+// tree without touching STLModel/Scene prop types (avoids exactOptionalPropertyTypes cascade).
+const FeatureOverlayCtx = React.createContext<{ featureType: string; sheetThickness: number }>({
+  featureType: '',
+  sheetThickness: 2,
+});
+
+/**
+ * Synthetic disc overlay for laser-cut holes: solid orange fill + yellow HAZ ring.
+ * HAZ width = sheet_thickness × 1.0 (laser heat affected zone).
+ * Positioned just above the model surface using the feature normal.
+ * Uses depthTest=true/depthWrite=false so it renders on the model surface, not floating.
+ */
+function HoleDiscOverlay({
+  centroid,
+  diameter_mm,
+  normal = [0, 0, 1],
+  sheetThickness = 2.0,
+}: {
+  centroid: [number, number, number];
+  diameter_mm: number;
+  normal?: [number, number, number];
+  sheetThickness?: number;
+}) {
+  const quaternion = useMemo(() => {
+    const n = new THREE.Vector3(...normal).normalize();
+    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+  }, [normal]);
+
+  const r = diameter_mm / 2;
+  const hazR = r + sheetThickness * 1.0;
+  // Offset disc to just above the model surface (normal direction × half-thickness + small gap)
+  const offset = sheetThickness / 2 + 0.3;
+  const pos: [number, number, number] = [
+    centroid[0] + normal[0] * offset,
+    centroid[1] + normal[1] * offset,
+    centroid[2] + normal[2] * offset,
+  ];
+
+  return (
+    <group position={pos} quaternion={quaternion}>
+      {/* HAZ ring — yellow disc at hazR, orange fill covers center leaving visible yellow ring */}
+      <mesh renderOrder={101}>
+        <circleGeometry args={[hazR, 48]} />
+        <meshBasicMaterial
+          color="#fbbf24" transparent opacity={0.40}
+          depthTest={true} depthWrite={false}
+          polygonOffset={true} polygonOffsetFactor={-2} polygonOffsetUnits={-2}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Solid orange fill */}
+      <mesh renderOrder={102}>
+        <circleGeometry args={[r, 48]} />
+        <meshBasicMaterial
+          color="#f97316" transparent opacity={0.88}
+          depthTest={true} depthWrite={false}
+          polygonOffset={true} polygonOffsetFactor={-4} polygonOffsetUnits={-4}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+/**
+ * Yellow influence zone around a selected press-brake bend.
+ * Influence distance = bend_radius + sheet_thickness × 2 from bend axis.
+ * Reuses useSubsetGeometry to expand bend face triangles outward by sheetThickness × 2.
+ */
+function BendInfluenceGlow({
+  triangleIndices,
+  geometry,
+  sheetThickness = 2.0,
+}: {
+  triangleIndices: number[];
+  geometry: THREE.BufferGeometry;
+  sheetThickness?: number;
+}) {
+  const expand = sheetThickness * 2;
+  const influenceGeo = useSubsetGeometry(triangleIndices, geometry, expand);
+  if (!influenceGeo) return null;
+  return (
+    <mesh geometry={influenceGeo} renderOrder={98}>
+      <meshBasicMaterial
+        color="#fbbf24" transparent opacity={0.28}
+        depthTest={true} depthWrite={false}
+        side={THREE.BackSide}
+      />
+    </mesh>
+  );
+}
+
+// Context-aware wrapper — reads featureType/sheetThickness from FeatureOverlayCtx
+// so STLModel and Scene don't need useContext in their bodies.
+function ContextBendInfluenceGlow({
+  occurrenceFaceIndices,
+  geometry,
+}: {
+  occurrenceFaceIndices: number[] | undefined;
+  geometry: THREE.BufferGeometry;
+}) {
+  const { featureType, sheetThickness } = React.useContext(FeatureOverlayCtx);
+  if (featureType !== 'bend' || !occurrenceFaceIndices?.length) return null;
+  return (
+    <BendInfluenceGlow
+      triangleIndices={occurrenceFaceIndices}
+      geometry={geometry}
+      sheetThickness={sheetThickness}
+    />
+  );
+}
+
+function ContextHoleDiscOverlay({
+  highlightOccurrences,
+  selectedOccurrenceIndex,
+}: {
+  highlightOccurrences: FeatureNodeV2HL | null | undefined;
+  selectedOccurrenceIndex: number | null;
+}) {
+  const { featureType, sheetThickness } = React.useContext(FeatureOverlayCtx);
+  if (featureType !== 'hole' || selectedOccurrenceIndex === null) return null;
+  const occ = highlightOccurrences?.occurrences[selectedOccurrenceIndex];
+  if (!occ) return null;
+  return (
+    <HoleDiscOverlay
+      centroid={occ.centroid}
+      diameter_mm={highlightOccurrences!.diameter_mm ?? 5}
+      {...(highlightOccurrences!.normal ? { normal: highlightOccurrences!.normal } : {})}
+      sheetThickness={sheetThickness}
+    />
   );
 }
 
@@ -775,6 +1004,42 @@ function VertexHighlight({ point, color, size }: {
       <meshBasicMaterial color={color} depthTest={false} transparent opacity={0.9} />
     </mesh>
   );
+}
+
+
+// triggerKey encodes what's selected (featureId + occurrence index) so the effect re-fires
+// whenever the selection changes, not just when the feature type changes.
+// cx/cy/viewSpan are read from refs at fire time to avoid stale closures.
+function FeatureZoomEffect({
+  triggerKey,
+  cx,
+  cy,
+  viewSpan,
+}: {
+  triggerKey: string | undefined;
+  cx: number;
+  cy: number;
+  viewSpan: number;
+}) {
+  const { camera, controls } = useThree();
+  const cxRef = React.useRef(cx);
+  const cyRef = React.useRef(cy);
+  const spanRef = React.useRef(viewSpan);
+  cxRef.current = cx;
+  cyRef.current = cy;
+  spanRef.current = viewSpan;
+
+  useEffect(() => {
+    if (!triggerKey || !controls || !('target' in controls)) return;
+    const span = Math.max(spanRef.current, 8);
+    const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
+    const dist = (span / (2 * Math.tan(fov / 2))) * 1.8;
+    (controls as any).target.set(cxRef.current, cyRef.current, 0);
+    camera.position.set(cxRef.current, cyRef.current, dist);
+    (controls as any).update();
+  }, [triggerKey, camera, controls]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return null;
 }
 
 // Detect cylindrical surface (hole/boss) from a hit triangle
@@ -1059,6 +1324,17 @@ function STLModel({
   projectedFaceIndices,
   projectedHighlightColor,
   showProjectedHighlight,
+  occurrenceFaceIndices,
+  isDimmed,
+  groupFaceIndices,
+  riskGroups = [],
+  selectedOccurrenceColor = '#f97316',
+  groupHighlightColor,
+  heatmapActive = false,
+  heatmapSources,
+  heatmapNormalization,
+  heatmapRiskValuesRef,
+  onHeatmapInspect,
 }: {
   url: string;
   color: string;
@@ -1088,6 +1364,27 @@ function STLModel({
   projectedFaceIndices?: number[] | null;
   projectedHighlightColor?: string;
   showProjectedHighlight?: boolean;
+  occurrenceFaceIndices?: number[];
+  /** Dim the main mesh when face highlights are active */
+  isDimmed?: boolean;
+  /** Triangle indices for all occurrences of the selected feature (group highlight, fallback amber) */
+  groupFaceIndices?: number[];
+  /** Risk-level-bucketed triangle indices — replaces amber group when scores are available */
+  riskGroups: Array<{ level: string; indices: number[] }>;
+  /** Color for selected occurrence highlight — risk color when scores available, else orange */
+  selectedOccurrenceColor: string;
+  /** Override the fallback amber (#d97706) group-face color — used for operation-specific visualization */
+  groupHighlightColor?: string;
+  /** When true, vertex color heatmap is active — material uses vertexColors */
+  heatmapActive?: boolean;
+  /** Heatmap sources — when provided, STLModel computes and applies vertex colors */
+  heatmapSources?: HeatmapSource[];
+  /** Normalization mode for heatmap engine */
+  heatmapNormalization?: HeatmapNormalization;
+  /** Ref holding per-triangle risk values (0–1) from heatmap engine — for inspector */
+  heatmapRiskValuesRef?: React.RefObject<Float32Array | null>;
+  /** Called when user clicks model surface while heatmap is active */
+  onHeatmapInspect?: ((worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void) | undefined;
 }) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [explodedParts, setExplodedParts] = useState<ExplodedPart[]>([]);
@@ -1100,6 +1397,7 @@ function STLModel({
 
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
+  const materialRef = useRef<THREE.MeshStandardMaterial | null>(null);
 
   // ─── Measurement classification refs ─────────────────────────────────────
   const normalsRef = useRef<THREE.Vector3[]>([]);
@@ -1938,6 +2236,52 @@ function STLModel({
     adjRef.current = buildTriangleAdjacency(pos, triCount);
   }, [geometry]);
 
+  // ─── Heatmap vertex colour computation ────────────────────────────────────
+  // Runs inside STLModel so we have access to both geometry AND materialRef.
+  // After setting the colour attribute we MUST call material.needsUpdate = true;
+  // otherwise Three.js uses the already-compiled shader that omitted USE_COLOR
+  // because the attribute did not exist at first compile time.
+  useEffect(() => {
+    if (!geometry) return;
+    const posAttr = geometry.attributes.position as THREE.BufferAttribute | undefined;
+    if (!posAttr) return;
+
+    if (!heatmapSources?.length) {
+      if (geometry.hasAttribute('color')) {
+        geometry.deleteAttribute('color');
+        if (materialRef.current) materialRef.current.needsUpdate = true;
+      }
+      return;
+    }
+
+    const positions = posAttr.array as Float32Array;
+    geometry.computeBoundingBox();
+    const bboxCenter = new THREE.Vector3();
+    geometry.boundingBox?.getCenter(bboxCenter);
+
+    const offsetSources = heatmapSources.map((s) => ({
+      ...s,
+      centroid: [
+        s.centroid[0] + bboxCenter.x,
+        s.centroid[1] + bboxCenter.y,
+        s.centroid[2] + bboxCenter.z,
+      ] as [number, number, number],
+    }));
+
+    const { colors, riskValues } = computeHeatmap({
+      positions,
+      sources: offsetSources,
+      colorRamp: MANUFACTURING_RISK_RAMP,
+      normalization: heatmapNormalization ?? 'relative',
+    });
+
+    if (heatmapRiskValuesRef) heatmapRiskValuesRef.current = riskValues;
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.attributes.color!.needsUpdate = true;
+    if (materialRef.current) materialRef.current.needsUpdate = true;
+    console.log('[STLModel] heatmap applied: triCount=', riskValues.length, 'materialNeedsUpdate set');
+  }, [heatmapSources, heatmapNormalization, geometry, heatmapRiskValuesRef]);
+
   // ─── Measurements ────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -2119,6 +2463,16 @@ function STLModel({
           receiveShadow
           visible={!isExploded || explodedParts.length === 0}
           onClick={(e) => {
+            // Heatmap inspector — fires when heatmap is active (takes priority over measurement)
+            if (heatmapActive && onHeatmapInspect && e.intersections.length > 0) {
+              e.stopPropagation();
+              const hit = e.intersections[0]!;
+              const triIndex = hit.faceIndex ?? 0;
+              const riskValue = heatmapRiskValuesRef?.current?.[triIndex] ?? 0;
+              const wp = hit.point;
+              onHeatmapInspect([wp.x, wp.y, wp.z], triIndex, riskValue);
+              return;
+            }
             const isMeasuring = measureMode === 'PICKING_A' || measureMode === 'PICKING_B';
             if (isMeasuring && e.intersections.length > 0) {
               e.stopPropagation();
@@ -2144,18 +2498,20 @@ function STLModel({
           }}
         >
           <meshStandardMaterial
-            color={showFeatures ? '#8899aa' : color}
+            ref={materialRef}
+            vertexColors={heatmapActive}
+            color={heatmapActive ? 'white' : isDimmed ? '#1a3050' : showFeatures ? '#8899aa' : color}
             metalness={0.2}
             roughness={0.45}
             side={THREE.DoubleSide}
-            transparent={isTransparent || !!showFeatures}
-            opacity={isTransparent ? 0.3 : showFeatures ? 0.22 : 1}
+            transparent={!heatmapActive && (isDimmed || isTransparent || !!showFeatures)}
+            opacity={heatmapActive ? 1 : isDimmed ? 0.50 : isTransparent ? 0.3 : showFeatures ? 0.22 : 1}
             wireframe={isWireframe}
           />
         </mesh>
       )}
 
-      {showFeatures && manufacturingFeatures && manufacturingFeatures.length > 0 && !isExploded && (
+      {(showFeatures || (selectedFeature != null && !(selectedFeature as any)._surfaceOverlay)) && manufacturingFeatures && manufacturingFeatures.length > 0 && !isExploded && (
         <DFMColorMesh
           geometry={geometry}
           features={manufacturingFeatures}
@@ -2284,6 +2640,32 @@ function STLModel({
           opacity={0.42}
         />
       )}
+
+      {/* Group highlights — suppressed when heatmap is active (heatmap encodes risk spatially) */}
+      {!heatmapActive && riskGroups.length > 0 && geometry && riskGroups.map(({ level, indices }) =>
+        indices.length > 0 && (
+          <FaceHighlight key={`risk-${level}`} triangleIndices={indices} geometry={geometry}
+            color={RISK_HIGHLIGHT_COLORS[level] ?? '#d97706'} opacity={0.60}
+          />
+        )
+      )}
+      {!heatmapActive && riskGroups.length === 0 && groupFaceIndices && groupFaceIndices.length > 0 && geometry && (
+        <FaceHighlight triangleIndices={groupFaceIndices} geometry={geometry} color={groupHighlightColor ?? '#d97706'} opacity={0.65} />
+      )}
+
+      {/* Selected occurrence — risk-colored fill + glow ring */}
+      {occurrenceFaceIndices && occurrenceFaceIndices.length > 0 && geometry && (
+        <SelectedFaceHighlight
+          triangleIndices={occurrenceFaceIndices}
+          geometry={geometry}
+          color={selectedOccurrenceColor}
+        />
+      )}
+
+      {/* Bend influence zone — context-aware, reads featureType+sheetThickness from FeatureOverlayCtx */}
+      {occurrenceFaceIndices && occurrenceFaceIndices.length > 0 && geometry && (
+        <ContextBendInfluenceGlow occurrenceFaceIndices={occurrenceFaceIndices} geometry={geometry} />
+      )}
     </group>
   );
 }
@@ -2314,6 +2696,11 @@ function Scene({
   onGeometryLoad,
   measureMode, measureSubMode, measureSelA, measureResults, selectedResultId, onMeshMeasureClick, onMeshMeasureHover,
   projectedFaceIndices, projectedHighlightColor, showProjectedHighlight,
+  highlightOccurrences,
+  selectedOccurrenceIndex,
+  occurrenceFaceIndices, groupFaceIndices,
+  riskGroups, selectedOccurrenceColor, groupHighlightColor,
+  heatmapActive, heatmapSources, heatmapNormalization, heatmapRiskValuesRef, onHeatmapInspect,
 }: {
   fileUrl: string; modelColor: string; showGrid: boolean;
   viewPosition: [number, number, number]; autoFit: boolean;
@@ -2337,9 +2724,21 @@ function Scene({
   projectedFaceIndices: number[];
   projectedHighlightColor: string;
   showProjectedHighlight: boolean;
+  highlightOccurrences?: FeatureNodeV2HL | null;
+  selectedOccurrenceIndex: number | null;
+  occurrenceFaceIndices: number[];
+  groupFaceIndices: number[];
+  riskGroups: Array<{ level: string; indices: number[] }>;
+  selectedOccurrenceColor: string;
+  groupHighlightColor?: string;
+  heatmapActive?: boolean;
+  heatmapSources?: HeatmapSource[];
+  heatmapNormalization?: HeatmapNormalization;
+  heatmapRiskValuesRef?: React.RefObject<Float32Array | null>;
+  onHeatmapInspect?: ((worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void) | undefined;
 }) {
   return (
-    <>
+<>
       <PerspectiveCamera makeDefault position={viewPosition} fov={50} />
       <CameraController viewPosition={viewPosition} autoFit={autoFit} />
       {autoFit && <CameraFitter onFit={onFit} resetKey={fileUrl} />}
@@ -2366,6 +2765,39 @@ function Scene({
         />
       )}
 
+      {/* Zoom camera to selected occurrence centroid, or all-occurrences bbox if none selected */}
+      {highlightOccurrences && (() => {
+        const selOcc = selectedOccurrenceIndex !== null
+          ? highlightOccurrences.occurrences[selectedOccurrenceIndex]
+          : null;
+        let cx = 0, cy = 0, viewSpan = 80;
+        let triggerKey: string;
+        if (selOcc) {
+          cx = selOcc.centroid[0];
+          cy = selOcc.centroid[1];
+          const d = highlightOccurrences.diameter_mm;
+          const r = highlightOccurrences.radius_mm;
+          const sizeHint = d ? d * 4 : r ? r * Math.PI * 3 : 40;
+          viewSpan = Math.max(sizeHint, 30);
+          triggerKey = `${highlightOccurrences.id}#${selectedOccurrenceIndex}`;
+        } else {
+          const b = highlightOccurrences.bbox_centered;
+          if (b) {
+            cx = (b.x_min + b.x_max) / 2;
+            cy = (b.y_min + b.y_max) / 2;
+            viewSpan = Math.max(b.x_max - b.x_min, b.y_max - b.y_min, 8);
+          }
+          triggerKey = `${highlightOccurrences.id}#all`;
+        }
+        return <FeatureZoomEffect triggerKey={triggerKey} cx={cx} cy={cy} viewSpan={viewSpan} />;
+      })()}
+
+      {/* Hole disc fill + HAZ ring — context-aware, reads featureType+sheetThickness from FeatureOverlayCtx */}
+      <ContextHoleDiscOverlay
+        highlightOccurrences={highlightOccurrences}
+        selectedOccurrenceIndex={selectedOccurrenceIndex}
+      />
+
       <Suspense fallback={null}>
         <Center>
           <STLModel
@@ -2387,6 +2819,17 @@ function Scene({
             projectedFaceIndices={projectedFaceIndices}
             projectedHighlightColor={projectedHighlightColor}
             showProjectedHighlight={showProjectedHighlight}
+            occurrenceFaceIndices={occurrenceFaceIndices}
+            isDimmed={!!highlightOccurrences}
+            groupFaceIndices={groupFaceIndices}
+            riskGroups={riskGroups}
+            selectedOccurrenceColor={selectedOccurrenceColor}
+            groupHighlightColor={groupHighlightColor}
+            heatmapActive={heatmapActive}
+            {...(heatmapSources !== undefined ? { heatmapSources } : {})}
+            {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
+            heatmapRiskValuesRef={heatmapRiskValuesRef}
+            onHeatmapInspect={onHeatmapInspect}
           />
         </Center>
       </Suspense>
@@ -2410,9 +2853,17 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   fileUrl, fileName, isExploded = false, explodeDistance = 50,
   onMeasurements, manufacturingFeatures, selectedFeature, onFeatureSelect, showFeatures,
   selectedBOMItems, showOnlySelected = false, hoveredBOMItem, onPartsDetected, dfmAnalysisData,
+  cameraPreset, onScreenshotReady,
+  highlightOccurrences, selectedOccurrenceIndex = null,
+  faceMap, sheetThickness,
+  dfmOccurrenceScores,
+  heatmapSources,
+  heatmapNormalization = 'absolute',
+  onHeatmapInspect,
+  highlightColor,
 }: EDrawingsViewerProps) {
   const [loading, setLoading] = useState(true);
-  const [modelColor] = useState('#aaaaaa');
+  const [modelColor] = useState('#3d7ab5');
   const [showGrid, setShowGrid] = useState(true);
   const [currentView, setCurrentView] = useState<string>('home');
   const [autoFit, setAutoFit] = useState(true);
@@ -2476,6 +2927,86 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     const diag = Math.sqrt(size.x ** 2 + size.y ** 2 + size.z ** 2);
     return Math.min(Math.max(diag * 0.008, 0.05), 5);
   }, [currentGeometry]);
+
+
+  // face_id → FaceMapEntry lookup for O(1) triangle range access
+  const faceMapIndex = useMemo((): Map<number, FaceMapEntry> => {
+    if (!faceMap?.length) return new Map();
+    return new Map(faceMap.map((e) => [e.face_id, e]));
+  }, [faceMap]);
+
+  // ─── Heatmap Engine ───────────────────────────────────────────────────────────
+  const heatmapActive = !!heatmapSources?.length;
+  const heatmapRiskValuesRef = useRef<Float32Array | null>(null);
+
+  // Computation and colour attribute are now managed inside STLModel (where materialRef lives).
+  // EDrawingsViewer only needs to reset the ref when heatmap is off.
+
+  // Group highlight: all occurrences EXCEPT the selected one (amber — secondary, fallback)
+  const groupFaceIndices = useMemo((): number[] => {
+    if (!highlightOccurrences || !faceMapIndex.size) return [];
+    const result: number[] = [];
+    for (let i = 0; i < highlightOccurrences.occurrences.length; i++) {
+      if (i === selectedOccurrenceIndex) continue;  // selected gets SelectedFaceHighlight
+      const occ = highlightOccurrences.occurrences[i];
+      if (!occ) continue;
+      for (const fid of (occ.face_ids ?? [])) {
+        const entry = faceMapIndex.get(fid);
+        if (entry && entry.tri_count > 0) {
+          for (let t = entry.tri_start; t < entry.tri_start + entry.tri_count; t++) {
+            result.push(t);
+          }
+        }
+      }
+    }
+    return result;
+  }, [highlightOccurrences, faceMapIndex, selectedOccurrenceIndex]);
+
+  // Risk-colored group highlights — one bucket per risk level, replaces amber group when scores available
+  const riskGroups = useMemo((): Array<{ level: string; indices: number[] }> => {
+    if (!dfmOccurrenceScores?.length || !highlightOccurrences || !faceMapIndex.size) return [];
+    const map = new Map<string, number[]>();
+    for (let i = 0; i < highlightOccurrences.occurrences.length; i++) {
+      if (i === selectedOccurrenceIndex) continue;
+      const scored = dfmOccurrenceScores.find((s) => s.occurrenceIndex === i);
+      const level = scored?.riskLevel ?? 'low';
+      const occ = highlightOccurrences.occurrences[i];
+      if (!occ) continue;
+      const arr = map.get(level) ?? [];
+      for (const fid of (occ.face_ids ?? [])) {
+        const entry = faceMapIndex.get(fid);
+        if (entry && entry.tri_count > 0) {
+          for (let t = entry.tri_start; t < entry.tri_start + entry.tri_count; t++) arr.push(t);
+        }
+      }
+      map.set(level, arr);
+    }
+    return Array.from(map.entries()).map(([level, indices]) => ({ level, indices }));
+  }, [dfmOccurrenceScores, highlightOccurrences, faceMapIndex, selectedOccurrenceIndex]);
+
+  // Color for the selected occurrence — risk color when scores available, orange otherwise
+  const selectedOccurrenceColor = useMemo((): string => {
+    if (!dfmOccurrenceScores?.length || selectedOccurrenceIndex === null) return '#f97316';
+    const scored = dfmOccurrenceScores.find((s) => s.occurrenceIndex === selectedOccurrenceIndex);
+    return RISK_HIGHLIGHT_COLORS[scored?.riskLevel ?? 'high'] ?? '#f97316';
+  }, [dfmOccurrenceScores, selectedOccurrenceIndex]);
+
+  // Selected-occurrence highlight: triangle indices for one specific occurrence's face_ids
+  const occurrenceFaceIndices = useMemo((): number[] => {
+    if (selectedOccurrenceIndex === null || !highlightOccurrences || !faceMapIndex.size) return [];
+    const occ = highlightOccurrences.occurrences[selectedOccurrenceIndex];
+    if (!occ) return [];
+    const result: number[] = [];
+    for (const fid of (occ.face_ids ?? [])) {
+      const entry = faceMapIndex.get(fid);
+      if (entry && entry.tri_count > 0) {
+        for (let i = entry.tri_start; i < entry.tri_start + entry.tri_count; i++) {
+          result.push(i);
+        }
+      }
+    }
+    return result;
+  }, [selectedOccurrenceIndex, highlightOccurrences, faceMapIndex]);
 
   // Cursor crosshair when measurement mode is active
   useEffect(() => {
@@ -2816,7 +3347,40 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     onMeasurements?.(measurementsWithProjection);
   }, [onMeasurements, calculateProjectedAreaFromMesh, calculateProjectedAreaFallback, currentView, currentGeometry]);
 
-  const handleModelLoad = useCallback(() => setLoading(false), []);
+  const screenshotCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const screenshotFiredRef  = useRef(false);
+
+  // Reset the fired flag whenever the file changes so each new part gets captured
+  useEffect(() => {
+    screenshotFiredRef.current = false;
+  }, [fileUrl]);
+
+  const handleModelLoad = useCallback(() => {
+    setLoading(false);
+    if (onScreenshotReady && !screenshotFiredRef.current) {
+      // Wait 600 ms so Three.js has time to render at least a few frames
+      setTimeout(() => {
+        const source = screenshotCanvasRef.current;
+        if (!source) return;
+        try {
+          // Composite onto an opaque dark background (WebGL canvas has alpha:true)
+          const offscreen = document.createElement('canvas');
+          offscreen.width  = source.width;
+          offscreen.height = source.height;
+          const ctx = offscreen.getContext('2d');
+          if (!ctx) return;
+          ctx.fillStyle = '#2d2d2d';
+          ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+          ctx.drawImage(source, 0, 0);
+          const dataUrl = offscreen.toDataURL('image/png');
+          if (dataUrl && dataUrl !== 'data:,') {
+            screenshotFiredRef.current = true;
+            onScreenshotReady(dataUrl);
+          }
+        } catch { /* cross-origin or context lost */ }
+      }, 600);
+    }
+  }, [onScreenshotReady]);
   
   const handleGeometryLoad = useCallback((geometry: THREE.BufferGeometry) => {
     setCurrentGeometry(geometry);
@@ -2848,6 +3412,17 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     setViewPosition([distance, distance, distance]);
     setAutoFit(false);
   };
+
+  useEffect(() => {
+    if (!cameraPreset) return;
+    const d = fittedDistanceRef.current;
+    const views = getCADViews(d);
+    const viewConfig = views[cameraPreset as keyof typeof views];
+    if (viewConfig) {
+      setViewPosition(viewConfig.position);
+      setAutoFit(false);
+    }
+  }, [cameraPreset]);
 
   const handleViewChange = (view: string) => {
     setCurrentView(view);
@@ -2990,16 +3565,20 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       <div className="flex-1 flex relative">
         {/* 3D Viewport */}
         <div ref={canvasContainerRef} className="flex-1 relative bg-gradient-to-b from-[#4a4a4a] to-[#2d2d2d]">
+          <FeatureOverlayCtx.Provider value={{ featureType: highlightOccurrences?.feature_type ?? '', sheetThickness: sheetThickness ?? 2 }}>
           <Canvas
             shadows
             dpr={[1, 2]}
             gl={{
               antialias: true, alpha: true, powerPreference: 'high-performance',
-              localClippingEnabled: true, preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false,
+              localClippingEnabled: true,
+              preserveDrawingBuffer: !!onScreenshotReady,
+              failIfMajorPerformanceCaveat: false,
             }}
             onCreated={(state) => {
               state.gl.localClippingEnabled = true;
               const canvas = state.gl.domElement;
+              screenshotCanvasRef.current = canvas;
               const onLost = (e: Event) => { e.preventDefault(); setLoading(true); };
               const onRestored = () => setLoading(false);
               canvas.addEventListener('webglcontextlost', onLost);
@@ -3033,6 +3612,18 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               projectedFaceIndices={projectedFaceIndices}
               projectedHighlightColor={VIEW_COLORS[currentView] ?? '#06b6d4'}
               showProjectedHighlight={showProjectedAreaHighlight}
+              highlightOccurrences={highlightOccurrences}
+              selectedOccurrenceIndex={selectedOccurrenceIndex}
+              occurrenceFaceIndices={occurrenceFaceIndices}
+              groupFaceIndices={groupFaceIndices}
+              riskGroups={riskGroups}
+              selectedOccurrenceColor={selectedOccurrenceColor}
+              groupHighlightColor={highlightColor}
+              heatmapActive={heatmapActive}
+              heatmapSources={heatmapSources}
+              heatmapNormalization={heatmapNormalization}
+              heatmapRiskValuesRef={heatmapRiskValuesRef}
+              {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
             />
             {measureMode !== 'IDLE' && (
               <MeasurementOverlay
@@ -3045,6 +3636,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               />
             )}
           </Canvas>
+          </FeatureOverlayCtx.Provider>
 
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-[#2d2d2d]">
@@ -3086,6 +3678,23 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
           <div className="absolute top-4 left-4 bg-[#3f3f3f]/90 backdrop-blur-sm border border-[#555555] rounded-lg px-2 py-1">
             <p className="text-[10px] text-white font-medium">{fileName}</p>
           </div>
+
+          {highlightOccurrences && (
+            <div className="absolute top-12 left-4 z-10 bg-black/70 backdrop-blur border border-white/20 rounded px-2.5 py-1 text-xs flex items-center gap-2 pointer-events-none">
+              <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+              <span className="font-medium text-white">
+                {highlightOccurrences.feature_type === 'hole'
+                  ? `Ø${highlightOccurrences.diameter_mm?.toFixed(1) ?? '?'}mm`
+                  : `R${highlightOccurrences.radius_mm?.toFixed(1) ?? '?'}mm bend`}
+              </span>
+              <span className="text-white/60">
+                {highlightOccurrences.occurrences.length} instances
+              </span>
+              {selectedOccurrenceIndex !== null && (
+                <span className="text-orange-400">· #{selectedOccurrenceIndex + 1} selected</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Sidebar — absolutely positioned so it overlays the canvas without shrinking it */}
@@ -3176,11 +3785,11 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                       <span className="text-gray-400 font-medium">Process:</span>
                       <div className="text-white mt-0.5">{currentSelectedFeature.manufacturingProcess}</div>
                     </div>
-                    {Object.keys(currentSelectedFeature.dimensions).length > 0 && (
+                    {Object.keys(currentSelectedFeature.dimensions ?? {}).length > 0 && (
                       <div>
                         <span className="text-gray-400 font-medium">Dimensions:</span>
                         <div className="text-white mt-0.5 space-y-0.5">
-                          {Object.entries(currentSelectedFeature.dimensions)
+                          {Object.entries(currentSelectedFeature.dimensions ?? {})
                             .filter(([, value]) => value)
                             .map(([key, value]) => (
                               <div key={key} className="flex justify-between">
@@ -3195,29 +3804,29 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                       <span className="text-gray-400">Cycle Time:</span>
                       <span className="text-white">{currentSelectedFeature.cycleTime}min</span>
                     </div>
-                    {currentSelectedFeature.warnings.length > 0 && (
+                    {(currentSelectedFeature.warnings ?? []).length > 0 && (
                       <div>
                         <span className="text-amber-400 font-medium flex items-center gap-1">
                           <AlertTriangle className="h-2 w-2" /> Warnings:
                         </span>
-                        {currentSelectedFeature.warnings.map((w, i) => (
+                        {(currentSelectedFeature.warnings ?? []).map((w: string, i: number) => (
                           <div key={i} className="text-amber-400 text-[8px] leading-tight">• {w}</div>
                         ))}
                       </div>
                     )}
-                    {currentSelectedFeature.aiRecommendations.length > 0 && (
+                    {(currentSelectedFeature.aiRecommendations ?? []).length > 0 && (
                       <div>
                         <span className="text-green-400 font-medium">Recommendations:</span>
-                        {currentSelectedFeature.aiRecommendations.map((r, i) => (
+                        {(currentSelectedFeature.aiRecommendations ?? []).map((r: string, i: number) => (
                           <div key={i} className="text-green-400 text-[8px] leading-tight">• {r}</div>
                         ))}
                       </div>
                     )}
-                    {currentSelectedFeature.tooling.length > 0 && (
+                    {(currentSelectedFeature.tooling ?? []).length > 0 && (
                       <div>
                         <span className="text-purple-400 font-medium">Required Tools:</span>
                         <div className="mt-1 flex flex-wrap gap-1">
-                          {currentSelectedFeature.tooling.map((t, i) => (
+                          {(currentSelectedFeature.tooling ?? []).map((t: string, i: number) => (
                             <span key={i} className="bg-purple-900/30 text-purple-300 px-1 py-0.5 rounded text-[7px]">{t}</span>
                           ))}
                         </div>

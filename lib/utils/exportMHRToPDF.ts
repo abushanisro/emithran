@@ -5,7 +5,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { MHRRecord } from '@/lib/api/mhr';
+import type { MHRRecord } from '@/lib/api/mhr';
 import { getCommodityLabel } from '@/lib/constants/commodityPresets';
 
 type ExportOptions = {

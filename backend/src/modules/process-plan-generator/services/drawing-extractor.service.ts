@@ -7,7 +7,7 @@ import type { DrawingBrief } from '../dto/drawing-brief.dto';
 import { UNAVAILABLE_DRAWING_BRIEF } from '../dto/drawing-brief.dto';
 
 const EXTRACTION_MODEL = 'claude-sonnet-4-6';
-const EXTRACTION_MAX_TOKENS = 4096;
+const EXTRACTION_MAX_TOKENS = 8192;
 const VISION_TIMEOUT_MS = 60_000;
 const STORAGE_BUCKET = process.env.SUPABASE_BUCKET_BOM_FILES || 'bom-files';
 const SIGNED_URL_TTL_SEC = 300;
@@ -235,18 +235,20 @@ Rules:
   }
 
   private parseExtraction(raw: string): any {
-    // Strip code fences if the model wrapped despite instructions
-    const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-    try {
-      return JSON.parse(stripped);
-    } catch {
-      // Try to find the first {...} block
-      const m = stripped.match(/\{[\s\S]*\}/);
-      if (m) {
-        try { return JSON.parse(m[0]); } catch { /* fall through */ }
-      }
-      throw new Error('Claude response was not valid JSON');
+    // Strategy 1: direct parse (model obeyed instructions)
+    try { return JSON.parse(raw.trim()); } catch {}
+
+    // Strategy 2: strip code fences (```json ... ```)
+    const stripped = raw.replace(/^```(?:json)?\s*/im, '').replace(/```\s*$/im, '').trim();
+    try { return JSON.parse(stripped); } catch {}
+
+    // Strategy 3: extract first {...} block (model added prose before/after JSON)
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (m) {
+      try { return JSON.parse(m[0]); } catch {}
     }
+
+    throw new Error(`Claude response was not valid JSON. First 200 chars: ${raw.slice(0, 200)}`);
   }
 
   private normaliseBrief(raw: any): DrawingBrief {

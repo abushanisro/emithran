@@ -1,560 +1,430 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  DollarSign,
-  TrendingUp,
-  Package,
-  Cog,
-  Target,
-  Calculator,
-  FileDown,
+  FileText,
   RefreshCw,
-  Zap,
-  Wrench,
-  Box
+  AlertCircle,
+  TrendingUp,
 } from 'lucide-react';
+import { useBomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
 import { useCostData } from '@/lib/providers/cost-data-provider';
-import { exportService } from '@/lib/services/export-service';
-import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
-import { bomItemsApi } from '@/lib/api/bom-items';
+import { useEffect } from 'react';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const fmt = (v: number) => `₹${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const pct = (v: number) => `${v.toFixed(1)}%`;
+
+const COLORS = {
+  process:       '#3b82f6',
+  raw_material:  '#f97316',
+  tooling:       '#f59e0b',
+  procured_part: '#8b5cf6',
+  packaging:     '#10b981',
+};
+
+// ─── Compact pie chart ────────────────────────────────────────────────────────
+
+const MiniPie = ({ data }: { data: Array<{ label: string; value: number; color: string }> }) => {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) return null;
+  let angle = 0;
+  return (
+    <svg width="120" height="120" className="-rotate-90">
+      {data.filter(d => d.value > 0).map((d, i) => {
+        const pctVal = d.value / total;
+        const sweep  = pctVal * 360;
+        const start  = angle;
+        const end    = angle + sweep;
+        angle += sweep;
+        const r = 52;
+        const cx = 60; const cy = 60;
+        const x1 = cx + r * Math.cos((start - 90) * Math.PI / 180);
+        const y1 = cy + r * Math.sin((start - 90) * Math.PI / 180);
+        const x2 = cx + r * Math.cos((end   - 90) * Math.PI / 180);
+        const y2 = cy + r * Math.sin((end   - 90) * Math.PI / 180);
+        const large = sweep > 180 ? 1 : 0;
+        return (
+          <path
+            key={i}
+            d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`}
+            fill={d.color}
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
+// ─── Props ───────────────────────────────────────────────────────────────────
 
 interface CostAnalysisEngineProps {
   bomId: string;
   bomName?: string;
   itemCount?: number;
+  bomItemId?: string;
+  thumbnailUrl?: string;
+  partNumber?: string;
+  partName?: string;
+  material?: string;
 }
 
-const CustomPieChart = ({ data, colors }: { data: any[], colors: string[] }) => {
-  // Filter out invalid data and ensure values are numbers
-  const validData = data.filter(item => item && typeof item.value === 'number' && !isNaN(item.value) && item.value > 0);
-  const total = validData.reduce((sum, item) => sum + item.value, 0);
-  let currentAngle = 0;
-  
-  // Don't render if no valid data
-  if (validData.length === 0 || total === 0) {
-    return (
-      <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
-        <div className="text-center text-muted-foreground">
-          <p className="text-sm">No data to display</p>
-        </div>
-      </div>
-    );
-  }
-  
-  return (
-    <div className="relative w-48 h-48 mx-auto">
-      <svg width="192" height="192" className="transform -rotate-90">
-        {validData.map((item, index) => {
-          const percentage = item.value / total;
-          const angle = percentage * 360;
-          const startAngle = currentAngle;
-          const endAngle = currentAngle + angle;
-          
-          const startX = 96 + 80 * Math.cos((startAngle - 90) * Math.PI / 180);
-          const startY = 96 + 80 * Math.sin((startAngle - 90) * Math.PI / 180);
-          const endX = 96 + 80 * Math.cos((endAngle - 90) * Math.PI / 180);
-          const endY = 96 + 80 * Math.sin((endAngle - 90) * Math.PI / 180);
-          
-          const largeArcFlag = angle > 180 ? 1 : 0;
-          
-          const pathData = [
-            `M 96 96`,
-            `L ${startX} ${startY}`,
-            `A 80 80 0 ${largeArcFlag} 1 ${endX} ${endY}`,
-            'Z'
-          ].join(' ');
-          
-          currentAngle += angle;
-          
-          return (
-            <path
-              key={index}
-              d={pathData}
-              fill={colors[index % colors.length]}
-              className="hover:opacity-80 transition-opacity"
-            />
-          );
-        })}
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg font-bold">₹{(total || 0).toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground">Total</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const CustomBarChart = ({ data, colors }: { data: any[], colors: string[] }) => {
-  // Filter out invalid data and ensure values are numbers
-  const validData = data.filter(item => item && typeof item.value === 'number' && !isNaN(item.value) && item.value >= 0);
-  const maxValue = validData.length > 0 ? Math.max(...validData.map(item => item.value)) : 1;
-  
-  if (validData.length === 0) {
-    return (
-      <div className="flex items-center justify-center p-8 text-muted-foreground">
-        <p className="text-sm">No data to display</p>
-      </div>
-    );
-  }
-  
-  return (
-    <div className="space-y-3">
-      {validData.map((item, index) => (
-        <div key={index} className="flex items-center gap-3">
-          <div className="w-24 text-xs font-medium truncate">{item.name}</div>
-          <div className="flex-1 relative">
-            <div className="bg-muted rounded-full h-6 relative overflow-hidden">
-              <div 
-                className="h-full rounded-full transition-all duration-300 flex items-center justify-end pr-2"
-                style={{ 
-                  width: `${(item.value / maxValue) * 100}%`,
-                  backgroundColor: colors[index % colors.length]
-                }}
-              >
-                <span className="text-xs font-medium text-white">
-                  ₹{(item.value || 0).toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="w-16 text-xs text-right">
-            {(((item.value || 0) / (maxValue || 1)) * 100).toFixed(1)}%
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
   bomId,
-  bomName = "Assembly",
-  itemCount = 2
+  bomName = 'Assembly',
+  itemCount = 0,
+  bomItemId,
+  thumbnailUrl,
+  partNumber,
+  partName,
+  material,
 }) => {
-  const { calculateBomCosts, getCostData, getAggregatedData, isCalculating } = useCostData();
-  const [modelImageUrl, setModelImageUrl] = useState<string | null>(null);
-  const [modelFileName, setModelFileName] = useState<string>('');
-  const [imageLoading, setImageLoading] = useState(false);
-
-  // Fetch BOM items to find one with an uploaded file
-  const { data: bomItemsData } = useBOMItems(bomId);
-
-  // Auto-fetch signed URL from the first BOM item that has a file
-  useEffect(() => {
-    const items = bomItemsData?.items || bomItemsData || [];
-    const itemArray = Array.isArray(items) ? items : [];
-    const itemWithFile = itemArray.find((item: any) => item.file3dPath || item.file2dPath);
-    if (!itemWithFile) return;
-
-    const fileType = itemWithFile.file3dPath ? '3d' : '2d';
-    const filePath: string = itemWithFile.file3dPath || itemWithFile.file2dPath || '';
-    const fileName = filePath.split('/').pop() || '';
-
-    setImageLoading(true);
-    bomItemsApi.getFileUrl(itemWithFile.id, fileType)
-      .then((res) => {
-        if (res?.url) {
-          setModelImageUrl(res.url);
-          setModelFileName(fileName);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setImageLoading(false));
-  }, [bomItemsData]);
-
+  const { calculateBomCosts, getCostData, isCalculating } = useCostData();
   const costData = getCostData(bomId);
-  const aggregated = getAggregatedData(bomId);
 
-  // Trigger calculation only once when BOM is first loaded and no data exists
   useEffect(() => {
     if (bomId && !costData && !isCalculating) {
       calculateBomCosts(bomId, itemCount);
     }
   }, [bomId, costData, isCalculating, calculateBomCosts, itemCount]);
 
-  const handleRecalculate = () => {
-    calculateBomCosts(bomId, itemCount);
-  };
+  const { data: analysis, isLoading, error, refetch } = useBomItemCostAnalysis(bomItemId);
 
-  const handleExport = async () => {
-    if (!aggregated || !costData) {
-      return;
-    }
+  // ── No item selected ──────────────────────────────────────────────────────
 
-    try {
-      const format = await exportService.showExportDialog();
-      if (format) {
-        const exportData = exportService.prepareExportData(
-          bomId,
-          bomName,
-          aggregated,
-          costData
-        );
-        await exportService.exportCostAnalysis(exportData, format);
-      }
-    } catch (error) {
-      console.error('Export failed:', error);
-      }
-  };
-
-  const formatCurrency = (value: number | undefined | null) => 
-    value !== undefined && value !== null ? `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '₹0.00';
-  const formatPercentage = (value: number | undefined | null) => 
-    value !== undefined && value !== null ? `${value.toFixed(1)}%` : '0.0%';
-
-  if (isCalculating) {
+  if (!bomItemId) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <Card>
-          <CardContent className="py-8">
-            <div className="text-center max-w-md mx-auto">
-              <div className="relative">
-                <RefreshCw className="w-12 h-12 mx-auto text-primary mb-4 animate-spin" />
-                <div className="absolute inset-0 w-12 h-12 mx-auto border-2 border-primary/20 rounded-full animate-pulse" />
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-3">Cost Analysis in Progress</h3>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Processing {bomName}</p>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div className="bg-primary h-2 rounded-full animate-pulse" style={{width: '60%'}} />
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                  <span>Fetching cost data</span>
-                  <span>Optimized processing</span>
-                </div>
-              </div>
-            </div>
+          <CardContent className="py-12 text-center">
+            <FileText className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-foreground mb-1">Select a BOM item</p>
+            <p className="text-xs text-muted-foreground">
+              Choose an item from the left panel to view its a-priori cost estimate
+            </p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  if (!aggregated || !costData) {
+  // ── Loading ───────────────────────────────────────────────────────────────
+
+  if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <Calculator className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">No Cost Data Available</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Click the button below to calculate comprehensive cost analysis
-              </p>
-              <Button onClick={handleRecalculate} className="mx-auto">
-                <Zap className="w-4 h-4 mr-2" />
-                Calculate Costs
-              </Button>
-            </div>
+          <CardContent className="py-10 text-center">
+            <RefreshCw className="w-8 h-8 mx-auto text-primary animate-spin mb-3" />
+            <p className="text-sm text-muted-foreground">Computing cost estimate…</p>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  // ── Error ─────────────────────────────────────────────────────────────────
+
+  if (error || !analysis) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardContent className="py-10 text-center">
+            <AlertCircle className="w-8 h-8 mx-auto text-destructive mb-3" />
+            <p className="text-sm font-medium text-foreground mb-1">Cost data unavailable</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              No cost records found for this item. Apply a process plan first.
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="text-xs text-primary underline underline-offset-2"
+            >
+              Retry
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const mfg = analysis.manufacturingCost;
 
   const chartData = [
-    { name: 'Raw Materials', value: aggregated.totalRawMaterials || 0 },
-    { name: 'Process Costs', value: aggregated.totalProcessCosts || 0 },
-    { name: 'Tooling Costs', value: aggregated.totalToolingCosts || 0 },
-    { name: 'Packaging & Logistics', value: aggregated.totalPackagingLogistics || 0 },
-    { name: 'Procured Parts', value: aggregated.totalProcuredParts || 0 }
-  ];
+    { label: 'Process',        value: analysis.processCost,      color: COLORS.process },
+    { label: 'Raw Material',   value: analysis.rawMaterialCost,  color: COLORS.raw_material },
+    { label: 'Procured Parts', value: analysis.procuredPartCost, color: COLORS.procured_part },
+    { label: 'Tooling',        value: analysis.toolingCost,       color: COLORS.tooling },
+    { label: 'Packaging',      value: analysis.packagingCost,     color: COLORS.packaging },
+  ].filter(d => d.value > 0);
+
+  const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
   return (
-    <div className="space-y-6">
-      {/* 3D Model Preview */}
-      {(modelImageUrl || imageLoading) && (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            {imageLoading ? (
-              <div className="h-56 flex items-center justify-center bg-muted/30">
-                <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+    <div id="cost-engine-part-report" className="space-y-4">
+
+      {/* ── 1. Part Header ──────────────────────────────────────────────── */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-start gap-4">
+            {/* Thumbnail */}
+            {thumbnailUrl ? (
+              <img
+                src={thumbnailUrl}
+                alt="Part thumbnail"
+                className="w-24 h-24 object-contain rounded border border-border bg-muted/20 shrink-0"
+              />
+            ) : (
+              <div className="w-24 h-24 rounded border border-border bg-muted/20 flex items-center justify-center shrink-0">
+                <FileText className="w-8 h-8 text-muted-foreground" />
               </div>
-            ) : modelImageUrl ? (
-              <div className="relative">
-                <img
-                  src={modelImageUrl}
-                  alt="3D Model"
-                  className="w-full h-64 object-contain bg-muted/20"
-                  onError={() => setModelImageUrl(null)}
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Box className="w-4 h-4 text-white/80" />
-                    <span className="text-white text-sm font-medium">{bomName}</span>
-                    {modelFileName && (
-                      <span className="text-white/60 text-xs ml-1">· {modelFileName}</span>
-                    )}
-                  </div>
+            )}
+
+            {/* Part metadata */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <Badge variant="secondary" className="text-[10px] py-0 font-semibold tracking-wide">
+                  <svg className="w-2.5 h-2.5 mr-1" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <text x="0" y="13" fontSize="13" fontWeight="700" fill="currentColor" fontFamily="sans-serif">e</text>
+                  </svg>
+                  EMithran Report
+                </Badge>
+                <span className="text-[10px] text-muted-foreground">{today}</span>
+              </div>
+              <h3 className="text-base font-semibold text-foreground leading-tight truncate">
+                {partName || bomName}
+              </h3>
+              {partNumber && (
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">{partNumber}</p>
+              )}
+              {material && (
+                <p className="text-xs text-muted-foreground mt-0.5">{material}</p>
+              )}
+              <div className="flex gap-4 mt-2">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Mfg Cost</p>
+                  <p className="text-sm font-bold text-primary">{fmt(mfg)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Selling Price</p>
+                  <p className="text-sm font-bold text-green-600">{fmt(analysis.sellingPrice)}</p>
                 </div>
               </div>
-            ) : null}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── 2 & 3. Cost Summary + Cost Drivers side-by-side ─────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Cost Summary Table */}
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm">Cost Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-1.5 text-muted-foreground font-medium">Cost Element</th>
+                  <th className="text-right py-1.5 text-muted-foreground font-medium">₹ / Part</th>
+                  <th className="text-right py-1.5 text-muted-foreground font-medium w-16">%</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {[
+                  { label: 'Raw Materials',         value: analysis.rawMaterialCost,  color: COLORS.raw_material },
+                  { label: 'Process Costs',          value: analysis.processCost,      color: COLORS.process },
+                  { label: 'Tooling & Fixtures',     value: analysis.toolingCost,       color: COLORS.tooling },
+                  { label: 'Packaging & Logistics',  value: analysis.packagingCost,     color: COLORS.packaging },
+                  { label: 'Procured Parts',         value: analysis.procuredPartCost, color: COLORS.procured_part },
+                ].map(row => (
+                  <tr key={row.label}>
+                    <td className="py-1.5 flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: row.color }} />
+                      {row.label}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums font-mono">{fmt(row.value)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-muted-foreground">
+                      {mfg > 0 ? pct((row.value / mfg) * 100) : '—'}
+                    </td>
+                  </tr>
+                ))}
+
+                {/* Subtotal */}
+                <tr className="border-t-2 border-border font-semibold">
+                  <td className="py-1.5">Total Mfg Cost</td>
+                  <td className="py-1.5 text-right tabular-nums font-mono">{fmt(mfg)}</td>
+                  <td className="py-1.5 text-right text-muted-foreground">100%</td>
+                </tr>
+                <tr>
+                  <td className="py-1 text-muted-foreground">SGA (12.5%)</td>
+                  <td className="py-1 text-right tabular-nums font-mono text-muted-foreground">{fmt(analysis.sgaCost)}</td>
+                  <td />
+                </tr>
+                <tr>
+                  <td className="py-1 text-muted-foreground">Profit (8%)</td>
+                  <td className="py-1 text-right tabular-nums font-mono text-muted-foreground">{fmt(analysis.profitCost)}</td>
+                  <td />
+                </tr>
+                <tr className="border-t border-border font-bold text-primary">
+                  <td className="py-2">Selling Price</td>
+                  <td className="py-2 text-right tabular-nums font-mono">{fmt(analysis.sellingPrice)}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+
+        {/* Top Cost Drivers + Pie */}
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" />
+              Top Cost Drivers
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            {analysis.costDrivers.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">No cost records</p>
+            ) : (
+              <>
+                <div className="flex gap-4 items-start">
+                  {/* Pie */}
+                  <div className="shrink-0">
+                    <MiniPie data={chartData} />
+                  </div>
+                  {/* Legend */}
+                  <div className="flex-1 min-w-0 space-y-1 pt-1">
+                    {chartData.map(d => (
+                      <div key={d.label} className="flex items-center gap-1.5 text-[10px]">
+                        <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: d.color }} />
+                        <span className="text-muted-foreground truncate">{d.label}</span>
+                        <span className="ml-auto font-mono font-medium tabular-nums">
+                          {mfg > 0 ? pct((d.value / mfg) * 100) : '—'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+                  {analysis.costDrivers.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground w-4 text-right shrink-0">{i + 1}.</span>
+                      <span className="flex-1 text-[11px] truncate" title={d.label}>{d.label}</span>
+                      <span className="text-[11px] tabular-nums font-mono font-medium shrink-0">{fmt(d.costPerPart)}</span>
+                      <span className="text-[10px] text-muted-foreground w-10 text-right shrink-0">{pct(d.pctOfMfgCost)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── 5. Process Cost Breakdown (per-op) ──────────────────────────── */}
+      {analysis.processLines.length > 0 && (
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm">Process Cost Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="text-left py-2 px-4 font-medium text-muted-foreground">Op#</th>
+                    <th className="text-left py-2 px-2 font-medium text-muted-foreground">Operation</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">Cycle (s)</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">MHR</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">LHR</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">Setup/part</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">Cycle/part</th>
+                    <th className="text-right py-2 px-4 font-medium text-muted-foreground">Total/part</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {analysis.processLines.map((pl, i) => (
+                    <tr key={i} className="hover:bg-muted/20">
+                      <td className="py-1.5 px-4 tabular-nums">{pl.opNbr}</td>
+                      <td className="py-1.5 px-2">
+                        <div className="max-w-[180px]">
+                          <p className="truncate font-medium">{pl.operation || '—'}</p>
+                          {pl.processGroup && (
+                            <p className="truncate text-muted-foreground text-[10px]">{pl.processGroup}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-1.5 px-2 text-right tabular-nums">{pl.cycleTimeSec.toFixed(0)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums">₹{pl.machineRate.toFixed(0)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums">₹{pl.laborRate.toFixed(0)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">₹{pl.setupCostPerPart.toFixed(4)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">₹{pl.cycleCostPerPart.toFixed(4)}</td>
+                      <td className="py-1.5 px-4 text-right tabular-nums font-mono font-semibold">₹{pl.totalCostPerPart.toFixed(4)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-border bg-muted/20 font-semibold">
+                    <td colSpan={7} className="py-2 px-4 text-right text-muted-foreground">Total Process Cost</td>
+                    <td className="py-2 px-4 text-right tabular-nums font-mono text-primary">{fmt(analysis.processCost)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Header Controls */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Cost Analysis Engine</h2>
-          <p className="text-sm text-muted-foreground">AI-powered cost calculation for {bomName}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <Zap className="w-3 h-3" />
-            Engine Active
-          </Badge>
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <FileDown className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-        </div>
-      </div>
-
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <Card className="border-l-4 border-l-primary">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Total Cost</p>
-                <p className="text-lg font-bold text-primary">{formatCurrency(aggregated.totalCost)}</p>
-              </div>
-              <DollarSign className="w-6 h-6 text-primary opacity-60" />
+      {/* ── 6. Raw Material Breakdown ────────────────────────────────────── */}
+      {analysis.materialLines.length > 0 && (
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm">Raw Material Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="text-left py-2 px-4 font-medium text-muted-foreground">Material</th>
+                    <th className="text-left py-2 px-2 font-medium text-muted-foreground">Grade / Spec</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">Net (kg)</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">Gross (kg)</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">Scrap %</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">₹/kg</th>
+                    <th className="text-right py-2 px-4 font-medium text-muted-foreground">Total/part</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {analysis.materialLines.map((ml, i) => (
+                    <tr key={i} className="hover:bg-muted/20">
+                      <td className="py-1.5 px-4 font-medium">{ml.materialName}</td>
+                      <td className="py-1.5 px-2 text-muted-foreground">{ml.materialDescription || '—'}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">{ml.netUsage.toFixed(4)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">{ml.grossUsage.toFixed(4)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums">{ml.scrap}%</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">₹{ml.unitCost.toFixed(2)}</td>
+                      <td className="py-1.5 px-4 text-right tabular-nums font-mono font-semibold">₹{ml.totalCost.toFixed(4)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-border bg-muted/20 font-semibold">
+                    <td colSpan={6} className="py-2 px-4 text-right text-muted-foreground">Total Material Cost</td>
+                    <td className="py-2 px-4 text-right tabular-nums font-mono text-primary">{fmt(analysis.rawMaterialCost)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Selling Price</p>
-                <p className="text-lg font-bold text-green-600">{formatCurrency(aggregated.totalSellingPrice)}</p>
-              </div>
-              <Target className="w-6 h-6 text-green-500 opacity-60" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-orange-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Raw Materials</p>
-                <p className="text-sm font-semibold">{formatCurrency(aggregated.totalRawMaterials)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatPercentage((aggregated.totalRawMaterials / aggregated.totalCost) * 100)}
-                </p>
-              </div>
-              <Package className="w-6 h-6 text-orange-500 opacity-60" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Process Costs</p>
-                <p className="text-sm font-semibold">{formatCurrency(aggregated.totalProcessCosts)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatPercentage((aggregated.totalProcessCosts / aggregated.totalCost) * 100)}
-                </p>
-              </div>
-              <Cog className="w-6 h-6 text-blue-500 opacity-60" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-amber-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Tooling Costs</p>
-                <p className="text-sm font-semibold">{formatCurrency(aggregated.totalToolingCosts || 0)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatPercentage(((aggregated.totalToolingCosts || 0) / (aggregated.totalCost || 1)) * 100)}
-                </p>
-              </div>
-              <Wrench className="w-6 h-6 text-amber-500 opacity-60" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Total Margin</p>
-                <p className="text-sm font-semibold">{formatCurrency(aggregated.totalMargin)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatPercentage((aggregated.totalMargin / aggregated.totalSellingPrice) * 100)}
-                </p>
-              </div>
-              <TrendingUp className="w-6 h-6 text-purple-500 opacity-60" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-yellow-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">SGA Average</p>
-                <p className="text-sm font-semibold">{formatPercentage(aggregated.averageSgaPercentage)}</p>
-                <p className="text-xs text-muted-foreground">{formatCurrency(aggregated.totalSgaCost)}</p>
-              </div>
-              <Calculator className="w-6 h-6 text-yellow-500 opacity-60" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Comprehensive Cost Analysis - All in One View */}
-      <div className="space-y-6">
-        {/* Cost Visualizations Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Cost Distribution Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Cost Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CustomPieChart 
-                data={chartData}
-                colors={['#f97316', '#3b82f6', '#f59e0b', '#eab308', '#ef4444']}
-              />
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                {chartData.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded"
-                      style={{ backgroundColor: ['#f97316', '#3b82f6', '#eab308', '#ef4444'][index] }}
-                    ></div>
-                    <span className="text-xs">
-                      {item.name} ({formatPercentage((item.value / aggregated.totalCost) * 100)})
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Cost Category Breakdown Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Cost Category Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CustomBarChart
-                data={chartData}
-                colors={['#f97316', '#3b82f6', '#f59e0b', '#eab308', '#ef4444']}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Performance Metrics and Trends Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Performance Metrics */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Performance Metrics</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-xs font-medium text-muted-foreground">Average SGA</p>
-                  <p className="text-lg font-bold">{formatPercentage(aggregated.averageSgaPercentage)}</p>
-                </div>
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-xs font-medium text-muted-foreground">Average Profit</p>
-                  <p className="text-lg font-bold text-green-600">{formatPercentage(aggregated.averageProfitPercentage)}</p>
-                </div>
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-xs font-medium text-muted-foreground">Material %</p>
-                  <p className="text-lg font-bold text-orange-600">
-                    {formatPercentage((aggregated.totalRawMaterials / aggregated.totalCost) * 100)}
-                  </p>
-                </div>
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-xs font-medium text-muted-foreground">Processing %</p>
-                  <p className="text-lg font-bold text-blue-600">
-                    {formatPercentage((aggregated.totalProcessCosts / aggregated.totalCost) * 100)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Cost Efficiency Indicators */}
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Material Efficiency</span>
-                    <span>{formatPercentage((aggregated.totalRawMaterials / aggregated.totalCost) * 100)}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-orange-500 h-2 rounded-full" 
-                      style={{ width: `${(aggregated.totalRawMaterials / aggregated.totalCost) * 100}%` }} 
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Process Efficiency</span>
-                    <span>{formatPercentage((aggregated.totalProcessCosts / aggregated.totalCost) * 100)}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-500 h-2 rounded-full" 
-                      style={{ width: `${(aggregated.totalProcessCosts / aggregated.totalCost) * 100}%` }} 
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Detailed Breakdown Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Cost Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                  <span className="text-sm font-medium">Total Manufacturing Cost</span>
-                  <span className="font-bold">{formatCurrency(aggregated.totalCost)}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                  <span className="text-sm font-medium">Total SGA Cost</span>
-                  <span className="font-bold text-yellow-600">{formatCurrency(aggregated.totalSgaCost)}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                  <span className="text-sm font-medium">Total Profit</span>
-                  <span className="font-bold text-green-600">{formatCurrency(aggregated.totalProfitAmount)}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-primary text-primary-foreground rounded-lg">
-                  <span className="text-sm font-semibold">Total Selling Price</span>
-                  <span className="text-lg font-bold">{formatCurrency(aggregated.totalSellingPrice)}</span>
-                </div>
-                <div className="text-center pt-2">
-                  <p className="text-xs text-muted-foreground">
-                    Calculated for {aggregated.itemCount} BOM items
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
     </div>
   );
 };

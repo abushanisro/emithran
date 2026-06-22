@@ -1,7 +1,7 @@
 'use client';
 
-// Updated: Fixed functional navigation and Quick Actions - Version 3.0
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import { Viewer2D } from '@/components/ui/viewer-2d';
 import { apiClient } from '@/lib/api/client';
 import { bomItemsApi } from '@/lib/api/bom-items';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, DollarSign } from 'lucide-react';
+import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon } from 'lucide-react';
 
 // Reset circuit breaker on page load if it's stuck
 if (typeof window !== 'undefined') {
@@ -36,15 +36,34 @@ import { ProcuredPartsSection } from '@/components/features/process-planning/Pro
 import { CostDataProvider } from '@/lib/providers/cost-data-provider';
 import { CostAnalysisEngine } from '@/components/features/cost-analysis/CostAnalysisEngine';
 import { BomCostReportWrapper } from '@/components/features/cost-analysis/BomCostReportWrapper';
+import { useBomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
+import { generateEMithranPdf } from '@/lib/utils/generate-emithran-pdf';
+import { generateEMithranImage } from '@/lib/utils/generate-emithran-image';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
+import { toViewerFeature, FEATURE_GROUP_META } from '@/lib/utils/feature-colors';
+import type { FeatureGroup } from '@/lib/utils/feature-colors';
 
-
+function getMaterialDensityGcm3(material: string): number {
+  const m = material.toLowerCase();
+  if (m.includes('stainless') || m.includes('ss ') || /\b(304|316|202|410|430)\b/.test(m)) return 7.93;
+  if (m.includes('cast iron') || m.includes('grey iron') || m.includes('ductile iron') || /\bci\b/.test(m)) return 7.2;
+  if (m.includes('alumin') || /\b(6061|7075|2024|5052|6082)\b/.test(m)) return 2.70;
+  if (m.includes('titanium') || m.includes('ti-6') || m.includes('grade 5')) return 4.51;
+  if (m.includes('brass')) return 8.50;
+  if (m.includes('copper') || /\bcu\b/.test(m)) return 8.96;
+  if (m.includes('plastic') || m.includes('nylon') || m.includes('pom') || m.includes('abs') || m.includes('peek') || m.includes('ptfe') || m.includes('polymer')) return 1.20;
+  // steel (mild, EN8, EN24, EN31, alloy) — default
+  return 7.85;
+}
 
 function ProcessPlanningPageContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = params.id as string;
+  const queryClient = useQueryClient();
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   usePageContext({
     entityType: 'project',
@@ -84,12 +103,45 @@ function ProcessPlanningPageContent() {
     surfaceFinish: 'Ra 3.2 μm',
     heatTreatment: 'As Required',
     hardness: '',
+    manufacturingFamilyOverride: '' as string,
   });
 
+  const modelViewerRef = useRef<HTMLDivElement>(null);
+  const [cadVolumeMm3, setCadVolumeMm3] = useState<number | null>(null);
   const [manufacturingFeatures, setManufacturingFeatures] = useState<any[]>([]);
   const [selectedFeature, setSelectedFeature] = useState<any | null>(null);
 
-  const handleModelMeasurements = (_data: any) => {};
+  // Feature highlight state — hover is temporary, locked persists until toggled
+  const [highlightFeature, setHighlightFeature] = useState<any | null>(null);
+  const [highlightGroup, setHighlightGroup] = useState<FeatureGroup | null>(null);
+  const [lockedFeature, setLockedFeature] = useState<any | null>(null);
+  const [lockedGroup, setLockedGroup] = useState<FeatureGroup | null>(null);
+
+  const handleFeatureHighlight = (feat: any | null, group: FeatureGroup | null) => {
+    setHighlightFeature(feat);
+    setHighlightGroup(group);
+  };
+
+  const handleFeatureFocus = (feat: any | null, group: FeatureGroup | null) => {
+    const isUnlocking = lockedFeature?.type === feat?.type && lockedGroup === group;
+    setLockedFeature(isUnlocking ? null : feat);
+    setLockedGroup(isUnlocking ? null : group);
+    if (!isUnlocking && feat) {
+      modelViewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Active viewer feature: hover takes priority over lock
+  const activeRawFeature = highlightFeature ?? lockedFeature;
+  const activeGroup = highlightGroup ?? lockedGroup;
+  const activeViewerFeat = toViewerFeature(activeRawFeature);
+  const activeCameraPreset = activeGroup ? (FEATURE_GROUP_META[activeGroup]?.cameraPreset ?? null) : null;
+
+  const handleModelMeasurements = (data: any) => {
+    if (data?.volume && data.volume > 0) {
+      setCadVolumeMm3(data.volume);
+    }
+  };
 
   // Fetch data with loading and error states - force fresh data with higher limit
   const { data: bomsData, isLoading: bomsLoading, error: bomsError, refetch: refetchBOMs } = useBOMs({
@@ -108,8 +160,9 @@ function ProcessPlanningPageContent() {
 
   // Auto-select first BOM when BOMs are loaded and no BOM is selected
   useEffect(() => {
-    if (boms.length > 0 && !selectedBomId) {
-      setSelectedBomId(boms[0].id);
+    const firstBom = boms[0];
+    if (firstBom && !selectedBomId) {
+      setSelectedBomId(firstBom.id);
     }
   }, [boms, selectedBomId]);
 
@@ -138,6 +191,71 @@ function ProcessPlanningPageContent() {
   const { data: bomItemsData, isLoading: bomItemsLoading, error: bomItemsError } = useBOMItems(selectedBomId);
   const bomItems = bomItemsData?.items || [];
   const selectedItem = bomItems.find((item) => item.partNumber === selectedPartNumber);
+  const { data: exportAnalysis } = useBomItemCostAnalysis(selectedItem?.id);
+
+  const handleScreenshotReady = useCallback(async (dataUrl: string) => {
+    const itemId = selectedItem?.id;
+    if (!itemId) return;
+    if (selectedItem?.thumbnailUrl && selectedItem.thumbnailUrl.length > 100) return;
+
+    try {
+      // Resize to 256×256 JPEG to keep the stored value compact
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
+      const thumb = document.createElement('canvas');
+      thumb.width = 256; thumb.height = 256;
+      const ctx = thumb.getContext('2d');
+      if (!ctx) return;
+      ctx.fillStyle = '#2d2d2d';
+      ctx.fillRect(0, 0, 256, 256);
+      const aspect = img.width / img.height;
+      const dw = aspect > 1 ? 256 : 256 * aspect;
+      const dh = aspect > 1 ? 256 / aspect : 256;
+      ctx.drawImage(img, (256 - dw) / 2, (256 - dh) / 2, dw, dh);
+      const jpegUrl = thumb.toDataURL('image/jpeg', 0.8);
+
+      await apiClient.patch(`/bom-items/${itemId}/thumbnail`, { thumbnailUrl: jpegUrl });
+      queryClient.invalidateQueries({ queryKey: ['bom-items'], exact: false });
+    } catch {
+      // Non-fatal — thumbnail capture is best-effort
+    }
+  }, [selectedItem?.id, selectedItem?.thumbnailUrl, queryClient]);
+
+  const exportReport = useCallback(async (
+    _scope: 'part' | 'full',
+    format: 'pdf' | 'image',
+  ) => {
+    setExportMenuOpen(false);
+    if (isExporting) return;
+    setIsExporting(true);
+
+    const partInfo = {
+      partNumber:   selectedItem?.partNumber ?? undefined,
+      partName:     selectedItem?.partName   ?? selectedItem?.name ?? undefined,
+      material:     selectedItem?.material   ?? undefined,
+      thumbnailUrl: selectedItem?.thumbnailUrl ?? undefined,
+    };
+
+    try {
+      if (!exportAnalysis) { setIsExporting(false); return; }
+
+      if (format === 'pdf') {
+        await generateEMithranPdf(exportAnalysis, partInfo);
+        return;
+      }
+
+      // Image: build a clean off-screen white HTML report, then capture it
+      await generateEMithranImage(exportAnalysis, partInfo);
+    } catch (e) {
+      console.error('Export failed', e);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [isExporting, exportAnalysis, selectedItem]);
 
   // DFM features — always seed with all detectable types when a 3D file is present.
   // DFMColorMesh detects features from geometry itself; this list just enables each type.
@@ -152,6 +270,7 @@ function ProcessPlanningPageContent() {
     if (!selectedItem?.id || !selectedItem.file3dPath) {
       setManufacturingFeatures([]);
       setSelectedFeature(null);
+      setCadVolumeMm3(null);
       return;
     }
     // Seed immediately so the DFM button appears while analysis loads
@@ -197,6 +316,7 @@ function ProcessPlanningPageContent() {
         surfaceFinish: String(processSpecs?.surfaceFinish || 'Ra 3.2 μm'),
         heatTreatment: String(processSpecs?.heatTreatment || 'As Required'),
         hardness: String(processSpecs?.hardness || ''),
+        manufacturingFamilyOverride: String((selectedItem as any).manufacturingFamilyOverride || ''),
       });
     } else {
       // Initialize with default values if no item is selected
@@ -218,9 +338,31 @@ function ProcessPlanningPageContent() {
         surfaceFinish: 'Ra 3.2 μm',
         heatTreatment: 'As Required',
         hardness: '',
+        manufacturingFamilyOverride: '',
       });
     }
   }, [selectedItem?.id, processSpecs]);
+
+  // CAD-derived weight from STL volume (mm³ → cm³ → g → kg)
+  const cadDerivedWeightKg = cadVolumeMm3 != null && editablePartData.material
+    ? (cadVolumeMm3 / 1_000_000) * getMaterialDensityGcm3(editablePartData.material)
+    : null;
+
+  // Auto-fill unit weight from CAD when BOM has no weight set
+  useEffect(() => {
+    if (cadDerivedWeightKg == null) return;
+    const w = parseFloat(editablePartData.unitWeight);
+    if (!editablePartData.unitWeight || isNaN(w) || w <= 0) {
+      setEditablePartData(prev => ({ ...prev, unitWeight: cadDerivedWeightKg.toFixed(4) }));
+    }
+  }, [cadDerivedWeightKg]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Weight mismatch badge — warn when BOM weight differs from CAD estimate by >30%
+  const bomWeightKg = parseFloat(editablePartData.unitWeight);
+  const cadWeightDiffPct = cadDerivedWeightKg != null && cadDerivedWeightKg > 0 && !isNaN(bomWeightKg) && bomWeightKg > 0
+    ? Math.round(Math.abs(bomWeightKg - cadDerivedWeightKg) / cadDerivedWeightKg * 100)
+    : null;
+  const cadWeightMismatch = cadWeightDiffPct != null && cadWeightDiffPct > 30;
 
   const handleBomChange = (bomId: string) => {
     setSelectedBomId(bomId);
@@ -303,6 +445,7 @@ function ProcessPlanningPageContent() {
         surfaceFinish: String(processSpecs?.surfaceFinish || 'Ra 3.2 μm'),
         heatTreatment: String(processSpecs?.heatTreatment || 'As Required'),
         hardness: String(processSpecs?.hardness || ''),
+        manufacturingFamilyOverride: String((selectedItem as any).manufacturingFamilyOverride || ''),
       });
     }
     setIsEditingPartDetails(false);
@@ -654,6 +797,8 @@ function ProcessPlanningPageContent() {
                         <GenerateProcessPlanButton
                           bomItemId={selectedItem?.id ?? null}
                           hasGeometry={!!selectedItem?.file3dPath}
+                          onFeatureHighlight={handleFeatureHighlight}
+                          onFeatureFocus={handleFeatureFocus}
                         />
                         {!isEditingPartDetails ? (
                           <Button
@@ -793,13 +938,46 @@ function ProcessPlanningPageContent() {
                         <div>
                           <label className="text-xs text-muted-foreground">Unit Weight (kg)</label>
                           {isEditingPartDetails ? (
-                            <Input
-                              value={editablePartData.unitWeight}
-                              onChange={(e) => setEditablePartData(prev => ({ ...prev, unitWeight: e.target.value }))}
-                              className="h-7 text-xs"
-                            />
+                            <div className="space-y-1">
+                              <Input
+                                value={editablePartData.unitWeight}
+                                onChange={(e) => setEditablePartData(prev => ({ ...prev, unitWeight: e.target.value }))}
+                                className="h-7 text-xs"
+                              />
+                              {cadDerivedWeightKg != null && (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="text-xs text-amber-600">CAD est: {cadDerivedWeightKg.toFixed(4)} kg</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditablePartData(prev => ({ ...prev, unitWeight: cadDerivedWeightKg.toFixed(4) }))}
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    Use CAD
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           ) : (
-                            <p className="text-xs font-medium">{editablePartData.unitWeight || '—'}</p>
+                            <div>
+                              <p className="text-xs font-medium">{editablePartData.unitWeight || '—'}</p>
+                              {cadWeightMismatch && cadDerivedWeightKg != null && (
+                                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                  <span className="text-xs bg-amber-100 text-amber-700 px-1 py-0.5 rounded">
+                                    ⚠ CAD: {cadDerivedWeightKg.toFixed(4)} kg ({cadWeightDiffPct}% diff)
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditablePartData(prev => ({ ...prev, unitWeight: cadDerivedWeightKg.toFixed(4) }));
+                                      setIsEditingPartDetails(true);
+                                    }}
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    Use CAD Weight
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -975,7 +1153,7 @@ function ProcessPlanningPageContent() {
                 </Card>
 
                 {/* 3D MODEL VIEWER — full height with all tools */}
-                <div className="border border-border rounded-lg overflow-hidden shadow-md">
+                <div ref={modelViewerRef} className="border border-border rounded-lg overflow-hidden shadow-md">
                   <div className="bg-primary p-3 flex items-center justify-between">
                     <h2 className="text-sm font-semibold text-primary-foreground">3D Model Viewer</h2>
                     {selectedItem.file3dPath && (
@@ -992,9 +1170,11 @@ function ProcessPlanningPageContent() {
                         fileType={selectedItem.file3dPath.split('.').pop() || 'step'}
                         bomItemId={selectedItem.id}
                         onMeasurements={handleModelMeasurements}
+                        onScreenshotReady={handleScreenshotReady}
                         manufacturingFeatures={manufacturingFeatures}
-                        selectedFeature={selectedFeature}
+                        selectedFeature={activeViewerFeat ?? selectedFeature}
                         onFeatureSelect={setSelectedFeature}
+                        cameraPreset={activeCameraPreset}
                       />
                     ) : (
                       <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -1040,7 +1220,12 @@ function ProcessPlanningPageContent() {
                 <RawMaterialsSection bomItemId={selectedItem.id} bomItem={selectedItem} />
 
                 {/* Manufacturing Process Section */}
-                <ManufacturingProcessSection bomItemId={selectedItem.id} bomItem={selectedItem} />
+                <ManufacturingProcessSection
+                  bomItemId={selectedItem.id}
+                  bomItem={selectedItem}
+                  onFeatureHighlight={handleFeatureHighlight}
+                  onFeatureFocus={handleFeatureFocus}
+                />
 
                 {/* Packaging & Logistics Section */}
                 <PackagingLogisticsSection bomItemId={selectedItem.id} />
@@ -1063,6 +1248,46 @@ function ProcessPlanningPageContent() {
 
           {/* TAB 3: COST ANALYSIS - For Cost Engineers */}
           <TabsContent value="costing" className="space-y-6">
+
+            {/* ── Export button ── */}
+            <div className="flex justify-end">
+              <div className="relative">
+                <button
+                  onClick={() => setExportMenuOpen(v => !v)}
+                  disabled={isExporting}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50"
+                >
+                  {isExporting
+                    ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    : <Download className="w-3.5 h-3.5" />}
+                  {isExporting ? 'Exporting…' : 'Export'}
+                </button>
+
+                {exportMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setExportMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-56 rounded-md border border-border bg-popover shadow-lg z-50 py-1">
+                    <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Selected Part</p>
+                    <button onClick={() => exportReport('part', 'pdf')}   className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-left">
+                      <FileTextIcon className="w-3.5 h-3.5 text-muted-foreground" /> Download PDF
+                    </button>
+                    <button onClick={() => exportReport('part', 'image')} className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-left">
+                      <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" /> Download Image
+                    </button>
+                    <div className="my-1 border-t border-border" />
+                    <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Full Report</p>
+                    <button onClick={() => exportReport('full', 'pdf')}   className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-left">
+                      <FileTextIcon className="w-3.5 h-3.5 text-muted-foreground" /> Download PDF
+                    </button>
+                    <button onClick={() => exportReport('full', 'image')} className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-left">
+                      <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" /> Download Image
+                    </button>
+                  </div>
+                  </>
+                )}
+              </div>
+            </div>
+
             {boms.length > 0 ? (
               <div className="space-y-6">
                 {/* Show cost analysis for all BOMs or the selected one */}
@@ -1070,17 +1295,22 @@ function ProcessPlanningPageContent() {
                   // Only show selected BOM if one is selected, otherwise show first BOM
                   const targetBom = selectedBomId ? (bom.id === selectedBomId ? bom : null) : (index === 0 ? bom : null);
                   if (!targetBom) return null;
-                  
+
                   // Get items for this BOM
                   const currentBomItems = targetBom.id === selectedBomId ? bomItems : [];
-                  
+
                   return (
-                    <div key={targetBom.id} className="space-y-6">
-                      {/* Cost Analysis Engine - Overview and Charts */}
+                    <div key={targetBom.id} id="cost-analysis-full-report" className="space-y-6">
+                      {/* Cost Analysis Engine - A-Priori Report */}
                       <CostAnalysisEngine
                         bomId={targetBom.id}
                         bomName={targetBom.name || "Assembly"}
                         itemCount={currentBomItems.length || 2}
+                        {...(selectedItem?.id ? { bomItemId: selectedItem.id } : {})}
+                        {...(selectedItem?.thumbnailUrl ? { thumbnailUrl: selectedItem.thumbnailUrl } : {})}
+                        {...(selectedItem?.partNumber ? { partNumber: String(selectedItem.partNumber) } : {})}
+                        {...((selectedItem?.partName ?? selectedItem?.partNumber) ? { partName: String(selectedItem?.partName ?? selectedItem?.partNumber) } : {})}
+                        {...(selectedItem?.material ? { material: selectedItem.material } : {})}
                       />
 
                       {/* Detailed BOM Cost Report - Part-by-Part Breakdown */}

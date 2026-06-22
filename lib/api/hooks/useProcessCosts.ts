@@ -81,6 +81,9 @@ export interface ProcessCostRecord {
   bomItemId?: string;
   processId?: string;
   processRouteId?: string;
+  featureId?: string | null;
+  featureType?: string | null;
+  featureGroup?: string | null;
   isActive: boolean;
   notes?: string;
   userId: string;

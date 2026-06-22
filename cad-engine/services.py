@@ -161,39 +161,56 @@ class StlWriter:
         self.ascii_mode = ascii_mode
         logger.info(f"StlWriter initialized (ASCII mode: {ascii_mode})")
     
-    def write(self, shape: TopoDS_Shape, stl_file_path: str) -> str:
+    def write(self, shape: TopoDS_Shape, stl_file_path: str):
         """
-        Write shape to STL file
-        
-        Args:
-            shape: TopoDS_Shape to export
-            stl_file_path: Output STL file path
-            
+        Write shape to binary STL file.
+
         Returns:
-            Path to written STL file
-            
+            Tuple (stl_file_path, stl_tri_count) — the triangle count from the STL header
+            is used to verify face_map ordering (compare with face_map_tri_total from
+            /analyze/geometry).  If the two counts match, StlAPI_Writer uses the same
+            TopExp_Explorer face order as our walk in memory_optimizer.py.
+
         Raises:
             StlWriteError: If writing fails
         """
+        import struct as _struct
+
         try:
             logger.info(f"Writing STL file: {stl_file_path}")
-            
+
             # Create STL writer
             stl_writer = StlAPI_Writer()
             stl_writer.SetASCIIMode(self.ascii_mode)
-            
+
             # Write to file
             stl_writer.Write(shape, stl_file_path)
-            
+
             # Verify file was created
             if not os.path.exists(stl_file_path):
                 raise StlWriteError("STL file was not created")
-            
+
             file_size = os.path.getsize(stl_file_path)
-            logger.info(f"STL file written successfully ({file_size} bytes)")
-            
-            return stl_file_path
-        
+
+            # Read triangle count from binary STL header for ordering verification.
+            # Binary STL: 80-byte header + uint32 triangle count + 50 bytes per triangle.
+            # Compare this value to face_map_tri_total from /analyze/geometry:
+            #   equal  → StlAPI_Writer uses same TopExp_Explorer order → face_map is valid
+            #   unequal → implement write_with_face_map() deterministic export instead
+            stl_tri_count: int = 0
+            try:
+                with open(stl_file_path, 'rb') as _f:
+                    _f.seek(80)
+                    stl_tri_count = _struct.unpack('<I', _f.read(4))[0]
+                logger.info(
+                    f"STL written: {file_size} bytes, {stl_tri_count} triangles "
+                    f"[compare with face_map_tri_total from /analyze/geometry to verify ordering]"
+                )
+            except Exception as _e:
+                logger.warning(f"Could not read STL header triangle count: {_e}")
+
+            return stl_file_path, stl_tri_count
+
         except StlWriteError:
             raise
         except Exception as e:
@@ -227,7 +244,7 @@ class ConversionService:
         self.stl_writer = stl_writer
         logger.info("ConversionService initialized")
     
-    def convert(self, step_file_path: str, stl_file_path: str) -> str:
+    def convert(self, step_file_path: str, stl_file_path: str):
         """
         Complete conversion pipeline: STEP → STL
         
@@ -250,11 +267,11 @@ class ConversionService:
             # Step 2: Mesh the shape
             meshed_shape = self.shape_mesher.mesh(shape)
             
-            # Step 3: Write STL file
-            output_path = self.stl_writer.write(meshed_shape, stl_file_path)
-            
-            logger.info("Conversion completed successfully")
-            return output_path
+            # Step 3: Write STL file (returns (path, stl_tri_count) tuple)
+            output_path, stl_tri_count = self.stl_writer.write(meshed_shape, stl_file_path)
+
+            logger.info(f"Conversion completed successfully (STL triangles: {stl_tri_count})")
+            return output_path, stl_tri_count
         
         except (StepReadError, MeshingError, StlWriteError) as e:
             logger.error(f"Conversion failed: {str(e)}")

@@ -6,6 +6,13 @@ export class AutoFillGeometryDto {
   pocketCount: number;
   thinWallCount: number;
   weight: number;
+  bendCount: number;
+  cutLengthMm: number;
+  sheetThicknessMm: number;
+  pierceCount: number;
+  flatPatternAreaMm2: number;
+  holeDiameters: number[];
+  bendRadii: number[];
 }
 
 export class AutoFillSuggestionsDto {
@@ -16,6 +23,8 @@ export class AutoFillSuggestionsDto {
   materialId: string | null;
   density: number | null;
   processType: string;
+  familyClassification: string | null;     // detected part family (sheet_metal, cnc_milled, etc.)
+  familyConfidence: number | null;         // 0–1 confidence from CAD engine
   makeBuy: 'make' | 'buy';
   itemType: 'assembly' | 'sub_assembly' | 'child_part';
 }
@@ -44,4 +53,5 @@ export class AutoFillResponseDto {
   costs: AutoFillCostsDto;
   confidence: AutoFillConfidenceDto;
   cadEngineAvailable: boolean;
+  featureGraph: object;
 }

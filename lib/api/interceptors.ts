@@ -4,7 +4,7 @@
  * Request and response interceptors for logging, monitoring, and analytics
  */
 
-import { isDevelopment } from '../config';
+
 import { createSecureLogger } from '../utils/secure-logger';
 import { correlationManager, generateCorrelationContext } from '../utils/tracing';
 

@@ -124,6 +124,7 @@ export class PersistenceService {
             process_group: (pm.data as any).processGroup,
             process_route: (pm.data as any).processRoute,
             operation: (pm.data as any).operation,
+            is_active: true,
           };
           const { data, error } = await client.from('process_calculator_mappings').insert(insertPayload).select('id').single();
           if (error) throw new Error(`process_calculator_mappings insert failed: ${error.message}`);
@@ -150,6 +151,7 @@ export class PersistenceService {
               overhead: line.data.overheadPercentage,
               material_id: materialId ? String(materialId) : null,
               uom: (line.data as any).uom ?? 'KG',
+              is_active: true,
             };
             const { data, error } = await client.from('raw_material_cost_records').insert(payload).select('id').single();
             if (error) throw new Error(`raw_material_cost_records insert failed: ${error.message}`);
@@ -178,9 +180,13 @@ export class PersistenceService {
               parts_per_cycle: line.data.partsPerCycle,
               scrap: line.data.scrapPercentage,
               currency: 'INR',
+              is_active: true,
               process_group: line.data.processGroup ?? null,
               process_route: line.data.processRoute ?? null,
               operation: line.data.operation ?? null,
+              feature_id:    line.data.featureId    ?? null,
+              feature_type:  line.data.featureType  ?? null,
+              feature_group: line.data.featureGroup ?? null,
             };
             const { data, error } = await client.from('process_cost_records').insert(payload).select('id').single();
             if (error) throw new Error(`process_cost_records insert failed: ${error.message}`);
@@ -298,6 +304,47 @@ export class PersistenceService {
         .eq('id', generationId);
       throw new BadRequestException(`Apply failed: ${err.message}`);
     }
+  }
+
+  async selectRoute(
+    generationId: string,
+    routeId: string,
+    userId: string,
+    accessToken: string | null,
+  ): Promise<void> {
+    const client = this.supabaseService.getClient(accessToken ?? undefined);
+
+    const { data: gen, error: genErr } = await client
+      .from('process_plan_generations')
+      .select('*')
+      .eq('id', generationId)
+      .single();
+
+    if (genErr || !gen) throw new NotFoundException(`Generation ${generationId} not found`);
+    if (gen.user_id !== userId) throw new ForbiddenException('Generation does not belong to this user');
+    if (gen.status !== 'draft_ready') {
+      throw new BadRequestException(`Cannot select route on status '${gen.status}'`);
+    }
+
+    const draft = gen.draft_lines as DraftPackage;
+    const alternative = (draft.alternatives ?? []).find((a: any) => a.routeId === routeId);
+    if (!alternative) throw new BadRequestException(`Route '${routeId}' not found in alternatives`);
+
+    const updated: DraftPackage = {
+      ...draft,
+      draftLines: (alternative as any).draft.draftLines,
+      proposedMasters: (alternative as any).draft.proposedMasters ?? draft.proposedMasters,
+      costPreview: alternative.costPreview,
+      templateUsed: (alternative as any).templateName ?? draft.templateUsed,
+      selectedRouteId: routeId,
+    };
+
+    const { error } = await client
+      .from('process_plan_generations')
+      .update({ draft_lines: updated })
+      .eq('id', generationId);
+
+    if (error) throw new BadRequestException(`Failed to select route: ${error.message}`);
   }
 
   async recordLineEdit(

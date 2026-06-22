@@ -314,6 +314,7 @@ export function VAVETab({ bomMetrics }: Props) {
       });
     }
 
+    const entryAiInsights = aiInsights.get(bd.bom.id);
     return {
       bom: bd.bom,
       opportunities,
@@ -325,7 +326,7 @@ export function VAVETab({ bomMetrics }: Props) {
         highCostItems: highCostItems.length,
         makeVsBuyRatio: makeItems.length / (buyItems.length || 1),
       },
-      aiInsights: aiInsights.get(bd.bom.id),
+      ...(entryAiInsights !== undefined && { aiInsights: entryAiInsights }),
     };
   });
 

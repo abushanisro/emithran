@@ -23,6 +23,10 @@ export interface BriefGeometry {
   holeCount: number;
   holes: Array<{ diameter: number; depth: number | null }>;
   surfaceAreaMm2: number;
+  // Sheet-metal derived fields (always set; 0 for non-sheet-metal parts)
+  thicknessMm: number;     // min(L,W,H) — material sheet thickness
+  perimeterMm: number;     // 2×(L+W) outer cut perimeter estimate (no DXF available)
+  pierceCount: number;     // holeCount + 1 (outer profile start pierce)
 }
 
 export function executeCalculator(
@@ -76,12 +80,15 @@ export function executeCalculator(
       //   hole_count, surface_area_mm2
       const sfKey = (field.sourceField ?? '').toLowerCase().replace(/[\s.\-]/g, '_');
       const briefMap: Record<string, number> = {
-        volume_mm3:      briefGeometry.volumeMm3,
-        length_mm:       briefGeometry.lengthMm,
-        width_mm:        briefGeometry.widthMm,
-        height_mm:       briefGeometry.heightMm,
-        hole_count:      briefGeometry.holeCount,
+        volume_mm3:       briefGeometry.volumeMm3,
+        length_mm:        briefGeometry.lengthMm,
+        width_mm:         briefGeometry.widthMm,
+        height_mm:        briefGeometry.heightMm,
+        hole_count:       briefGeometry.holeCount,
         surface_area_mm2: briefGeometry.surfaceAreaMm2,
+        thickness_mm:     briefGeometry.thicknessMm,
+        perimeter_mm:     briefGeometry.perimeterMm,
+        pierce_count:     briefGeometry.pierceCount,
       };
       scope[key] = briefMap[sfKey] ?? parseFloatSafe(field.defaultValue);
     } else {
@@ -102,6 +109,15 @@ export function executeCalculator(
   scope['setup_manning'] = scope['setup_manning'] ?? params.setupManning;
   scope['parts_per_cycle'] = scope['parts_per_cycle'] ?? params.partsPerCycle;
   scope['scrap_pct'] = scope['scrap_pct'] ?? params.scrapPct;
+
+  // Sheet-metal geometry aliases — always override const/0 defaults with real
+  // geometry so laser and press-brake calculators work without needing the
+  // 'engineering_brief' data_source (which requires a DB constraint extension).
+  if (briefGeometry) {
+    if (briefGeometry.perimeterMm > 0) scope['perimeter_mm'] = briefGeometry.perimeterMm;
+    if (briefGeometry.pierceCount > 0) scope['pierce_count'] = briefGeometry.pierceCount;
+    if (briefGeometry.thicknessMm > 0) scope['thickness_mm'] = briefGeometry.thicknessMm;
+  }
 
   // Custom functions to match the calculators service's IF/LN/LOG support
   (scope as any)['IF'] = (cond: boolean, t: number, f: number) => (cond ? t : f);

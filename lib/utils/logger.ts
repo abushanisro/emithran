@@ -130,9 +130,9 @@ class Logger {
       timestamp: new Date().toISOString(),
       level,
       message,
-      context,
-      data,
-      stack,
+      ...(context !== undefined ? { context } : {}),
+      ...(data    !== undefined ? { data }    : {}),
+      ...(stack   !== undefined ? { stack }   : {}),
     };
 
     // Call all handlers
@@ -176,8 +176,8 @@ class Logger {
    * Create structured monitoring event (for external systems)
    */
   static createMonitoringEvent(
-    eventName: string,
-    properties?: Record<string, any>,
+    _eventName: string,
+    _properties?: Record<string, any>,
   ): void {
     // This can be extended to send to external monitoring services
     // like Sentry, DataDog, New Relic, etc.

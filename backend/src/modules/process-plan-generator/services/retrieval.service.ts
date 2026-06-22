@@ -21,6 +21,8 @@ import { DrawingExtractorService } from './drawing-extractor.service';
 import { ExchangeRateService } from './exchange-rate.service';
 import { FeatureGraphService } from './feature-graph.service';
 import { RuleEngineService } from './rule-engine.service';
+import { ManufacturingKnowledgeService } from '../../../modules/manufacturing-knowledge/manufacturing-knowledge.service';
+import { CADAnalysisService } from '../../bom-items/services/cad-analysis.service';
 
 /**
  * Stage 1 — assembles the EngineeringBrief and a tenant-scoped CandidateSet.
@@ -52,6 +54,8 @@ export class RetrievalService {
     private readonly fx: ExchangeRateService,
     private readonly featureGraph: FeatureGraphService,
     private readonly ruleEngine: RuleEngineService,
+    private readonly knowledgeService: ManufacturingKnowledgeService,
+    private readonly cadAnalysis: CADAnalysisService,
   ) {}
 
   async assemble(
@@ -103,7 +107,40 @@ export class RetrievalService {
       heatTreatment: bomRow.heat_treatment ?? null,
       hardnessHrc: numberOr(bomRow.hardness, null),
       materialHint: bomRow.material ?? bomRow.material_grade ?? null,
+      coating: bomRow.coating ?? null,
+      tightestToleranceMm: bomRow.tightest_tolerance_mm != null
+        ? parseFloat(bomRow.tightest_tolerance_mm)
+        : null,
     };
+
+    // ── On-demand STL analysis when geometry_analysis is absent ──────────────
+    // geometry_analysis is normally populated when the user clicks "Analyse"
+    // on the BOM item page. When that step was skipped, run it now so the
+    // real mesh volume feeds into weight/cost instead of the bbox fill estimate.
+    const hasGeometry = !!(bomRow.geometry_analysis && Object.keys(bomRow.geometry_analysis).length > 0);
+    if (!hasGeometry && bomRow.file_3d_path && accessToken) {
+      try {
+        this.logger.log(`[assemble] geometry_analysis absent — triggering on-demand CAD analysis for ${bomItemId}`);
+        const cadResult = await this.cadAnalysis.analyzeBOMItem({
+          bomItemId,
+          filePath: bomRow.file_3d_path,
+          strategy: 'balanced',
+          forceReanalysis: false,
+          userId,
+          accessToken,
+        });
+        if (cadResult?.geometryFeatures) {
+          bomRow.geometry_analysis = cadResult.geometryFeatures;
+          this.logger.log(
+            `[assemble] On-demand CAD analysis done — ` +
+            `volume=${cadResult.geometryFeatures.estimated_volume_mm3?.toFixed(0) ?? '?'}mm³, ` +
+            `triangles=${cadResult.geometryFeatures.triangle_count ?? '?'}`,
+          );
+        }
+      } catch (e: any) {
+        this.logger.warn(`[assemble] On-demand CAD analysis failed (${e.message}) — falling back to bbox estimate`);
+      }
+    }
 
     // ── Pull DFM features from cached geometry_analysis / dfm_analysis ────
     const dfm = this.extractDfm(bomRow);
@@ -146,6 +183,13 @@ export class RetrievalService {
       }
     }
 
+    // Tolerance fallthrough: if the BOM tolerance field is empty but drawing_intelligence
+    // recorded a tightest tolerance, synthesise a ±x mm string so the planner prompt
+    // can apply its "tolerance ≤ 0.02 → add finish op" rules.
+    if (!bomBrief.tolerance && bomBrief.tightestToleranceMm != null && bomBrief.tightestToleranceMm > 0) {
+      bomBrief.tolerance = `±${bomBrief.tightestToleranceMm} mm`;
+    }
+
     // ── Augment DFM hole count from 2D drawing when 3D scan missed holes ──
     if (drawing.available && drawing.holes.length > 0 && dfm.holeCount === 0) {
       dfm.holeCount = drawing.holes.length;
@@ -166,15 +210,62 @@ export class RetrievalService {
         if (discrepancyRatio > 0.5) {
           this.logger.log(
             `[assemble] Unit weight: BOM=${bomWeight.toFixed(4)}kg → geometry=${geomWeightKg.toFixed(4)}kg` +
-            ` (density=${Math.round(densityKgPerM3)}kg/m³, discrepancy=${(discrepancyRatio * 100).toFixed(0)}%)`,
+            ` (density=${Math.round(densityKgPerM3)}kg/m³, material="${bomBrief.materialHint ?? 'unknown'}", discrepancy=${(discrepancyRatio * 100).toFixed(0)}%)`,
           );
           bomBrief.unitWeightKg = geomWeightKg;
         }
       }
     }
 
+    // ── Log drawing extraction status for traceability ─────────────────────
+    if (!drawing.available && bomRow.file_2d_path) {
+      this.logger.warn(
+        `[assemble] Drawing at ${bomRow.file_2d_path} exists but extraction failed — ` +
+        `plan will use BOM data only. Material: "${bomBrief.materialHint ?? 'unknown'}" (from BOM, not verified by drawing)`,
+      );
+    }
+
     // ── Run scope classifier (now with drawing-promoted fields) ────────────
-    const scope = this.scopeClassifier.classify(bomBrief, dfm);
+    // If the user has pinned a manufacturing family, skip the classifier entirely.
+    const familyOverride = bomRow.manufacturing_family_override as string | null | undefined;
+    const scope = familyOverride
+      ? (() => {
+          this.logger.log(`[assemble] Manual family override "${familyOverride}" for ${bomItemId} — skipping classifier`);
+          return { family: familyOverride as any, inScope: true, reason: `Manual override: user set family to "${familyOverride}"`, confidence: 1.0 };
+        })()
+      : this.scopeClassifier.classify(bomBrief, dfm);
+
+    // ── Sheet metal volume correction ─────────────────────────────────────────
+    // When no CAD volume exists, extractDfm uses 0.45 fill (calibrated for milled
+    // blocks). Sheet metal frames/panels are mostly open air — 0.05 fill is more
+    // accurate for a perimeter frame with cutouts. Correcting here (after scope is
+    // known) keeps the 0.45 estimate available for the classifier above.
+    if (scope.family === 'sheet_metal' && !dfm.fromCadEngine && dfm.volumeMm3 > 0) {
+      const bboxVol =
+        (dfm.boundingBox.lengthMm || 1) *
+        (dfm.boundingBox.widthMm  || 1) *
+        (dfm.boundingBox.heightMm || 1);
+      if (bboxVol > 0) {
+        const revised = bboxVol * 0.05;
+        this.logger.log(
+          `[assemble] Sheet metal fill correction: ${dfm.volumeMm3.toFixed(0)}mm³ (0.45 fill) → ${revised.toFixed(0)}mm³ (0.05 fill)`,
+        );
+        dfm.volumeMm3 = revised;
+        const densityKgPerM3 = estimateDensityKgPerM3(bomBrief.materialHint);
+        bomBrief.unitWeightKg = revised * densityKgPerM3 * 1e-9;
+      }
+    }
+
+    // ── Load routing template from KB (null-safe: falls back to prompt defaults) ──
+    let routingTemplate = null;
+    if (scope.inScope) {
+      routingTemplate = await this.knowledgeService
+        .getTemplate(accessToken ?? '', scope.family)
+        .catch(() => null);
+      if (routingTemplate) {
+        this.logger.log(`[assemble] Routing template: "${routingTemplate.template_name}" (${routingTemplate.routing_sequence.length} steps)`);
+      }
+    }
 
     // ── Build feature graph + mandatory ops from drawing + geometry ────────
     // Construct a partial brief first so feature-graph service can read it.
@@ -184,7 +275,11 @@ export class RetrievalService {
       mandatoryOps: [],
     };
     const featureGraph = this.featureGraph.build(partialBrief as EngineeringBrief);
-    const mandatoryOps = this.ruleEngine.evaluate(featureGraph);
+    const drawingNotes =
+      typeof bomRow.drawing_intelligence === 'object' && bomRow.drawing_intelligence !== null
+        ? String((bomRow.drawing_intelligence as any).drawing_notes ?? '')
+        : '';
+    const mandatoryOps = this.ruleEngine.evaluate(featureGraph, bomBrief, drawingNotes);
 
     const brief: EngineeringBrief = {
       bomItem: bomBrief,
@@ -194,6 +289,7 @@ export class RetrievalService {
       mandatoryOps,
       context: { organizationLocation: orgLocation, currency: 'INR', language: 'en', exchangeRateSnapshot: this.fx.snapshot() },
       scope,
+      routingTemplate,
     };
 
     // ── If out of scope, skip candidate retrieval ─────────────────────────
@@ -233,7 +329,12 @@ export class RetrievalService {
     await this.enrichProcessReferenceTables(client, rankedProcesses);
 
     const candidates: CandidateSet = {
-      rawMaterials: rankMaterials(materialsRaw, family, bomBrief.materialHint, orgLocation, RetrievalService.TOP_N_MATERIALS),
+      rawMaterials: rankMaterials(materialsRaw, family, bomBrief.materialHint, orgLocation, RetrievalService.TOP_N_MATERIALS, {
+        sheetThicknessMm: dfm.sheetThicknessMm,
+        holeCount: dfm.holeCount,
+        bendCount: dfm.bendCount,
+        coating: bomBrief.coating ?? null,
+      }),
       machines: rankMachines(mhrRaw, family, orgLocation, RetrievalService.TOP_N_MACHINES),
       labour: rankLabour(lsrRaw, orgLocation, RetrievalService.TOP_N_LABOUR),
       processes: rankedProcesses,
@@ -258,7 +359,7 @@ export class RetrievalService {
   private async queryRawMaterials(client: any, userId: string, family: string) {
     const { data, error } = await client
       .from('raw_materials')
-      .select('id, material_group, material, material_grade, density_kg_m3, cost, currency, location, user_id')
+      .select('id, material_group, material, material_grade, density_kg_m3, cost, currency, location, user_id, material_form, material_family')
       .or(`material_group.ilike.%ferrous%,material_group.ilike.%non-ferrous%,material_group.ilike.%plastic%,material_group.ilike.%rubber%`)
       .limit(120);
 
@@ -467,6 +568,8 @@ export class RetrievalService {
       volumeMm3 = 0;
     }
 
+    const mi = ga?.manufacturing_features?.manufacturing_intelligence?.features ?? {};
+
     return {
       volumeMm3,
       surfaceAreaMm2: numberOr(ga.surface_area_mm2 ?? ga.surface_area_estimation, 0),
@@ -476,6 +579,10 @@ export class RetrievalService {
       thinWallCount: (da?.thin_walls ?? 0) > 0 || ga?.feature_detection?.thin_walls ? 1 : 0,
       undercutCount: numberOr(da?.undercuts?.count, 0),
       fromCadEngine,
+      bendCount:        numberOr(mi.bend_count, 0),
+      slotCount:        numberOr(mi.slot_count, 0),
+      cutLengthMm:      numberOr(mi.cut_length_mm, 0),
+      sheetThicknessMm: numberOr(mi.sheet_thickness_mm, 0),
     };
   }
 
@@ -520,12 +627,19 @@ function numberOr(v: unknown, fallback: number | null): number | null {
  */
 function estimateDensityKgPerM3(materialHint: string | null): number {
   const h = (materialHint ?? '').toLowerCase();
-  if (/alumin|al\s*6|7050|7075|6061|6082|2024/i.test(h)) return 2700;
+  // Specific alloys FIRST — most specific patterns before broad ones to prevent mis-matches
+  // (e.g. "Aluminium Bronze" must not match the "alumin" rule → would give wrong density)
+  if (/alumin[iu]+m?.?bronze|al.?bronze|aluminum.?bronze|albc/i.test(h)) return 8200; // Cu-Al alloy
+  if (/phosphor.?bronze|phos.?bronze|tin.?bronze/.test(h)) return 8800;
+  if (/leaded.?bronze|gunmetal/.test(h)) return 8700;
+  if (/brass|cu.?zn/.test(h)) return 8500;
+  if (/copper|cu\s*\d/.test(h)) return 8900;
   if (/titan|ti-6|ti6al/i.test(h)) return 4500;
-  if (/copper|brass|bronze|cu\s*\d/i.test(h)) return 8500;
   if (/stainless|ss\s*3|ss\s*4|316|304|17-4|inconel|hastelloy/i.test(h)) return 7900;
   if (/cast.?iron|grey.?iron|sg.?iron|ductile.?iron/i.test(h)) return 7200;
   if (/nylon|peek|abs|pom|pp\b|pe\b|ptfe|plastic|polymer/i.test(h)) return 1200;
   if (/rubber|elastomer/i.test(h)) return 1500;
+  // Pure aluminium alloys — only after all copper/bronze variants are excluded above
+  if (/alumin|al\s*6|al\s*7|7050|7075|6061|6082|2024|5083|5052/i.test(h)) return 2700;
   return 7850; // default: mild/alloy steel (EN8, EN24, EN36, H13, P20, ...)
 }

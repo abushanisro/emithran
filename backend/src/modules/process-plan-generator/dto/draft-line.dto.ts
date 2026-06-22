@@ -1,3 +1,7 @@
+import type { RouteIssue } from '../../manufacturing-knowledge/dto/kb.dto';
+export type { RouteIssue };
+import type { AlternativeRoute } from './alternative-route.dto';
+
 /**
  * DraftLine — Stage 3 output. AbstractPlan lines resolved against real DB IDs
  * and validated against the existing CreateXxxCostDto shapes.
@@ -73,7 +77,12 @@ export interface DraftProcessPayload {
   processRoute: string | null;   // → process_route (machine type)
   operation: string | null;      // → operation (from processName)
   calculatorName: string | null; // name of calculator used, null if formula fallback
-  timingSource: 'calculator' | 'geometry_estimate' | 'ai_hint' | 'default'; // where setup/cycle time came from
+  timingSource: 'calculator' | 'geometry_estimate' | 'ai_hint' | 'feature_geometry' | 'default'; // where setup/cycle time came from
+  featureId?:    string | null;  // "F4" — AI's feature reference
+  featureType?:  string | null;  // "CROSS_HOLE" — stable type vocabulary
+  featureGroup?: string | null;  // "HOLE" — stable routing key for 3D highlight
+  featureKey?:   string | null;  // links to part_features.feature_key for 3D highlighting
+  featureQty?:   number;         // e.g. 6 holes → drilling ×6
 }
 
 export interface DraftToolingPayload {
@@ -128,10 +137,17 @@ export interface ProposedMaster {
   approved: boolean;       // updated by user via /apply payload
 }
 
+import type { ManufacturingImplication } from './manufacturing-implication.dto';
+
 export interface DraftPackage {
   draftLines: DraftLine[];
   proposedMasters: ProposedMaster[];
   validationErrors: string[];
+  routeValidationIssues?: RouteIssue[];
+  hasValidationErrors?: boolean;
+  partFamily?: string;
+  templateUsed?: string | null;
+  implications?: ManufacturingImplication[];
   costPreview: {
     rawMaterial: number;
     process: number;
@@ -140,4 +156,6 @@ export interface DraftPackage {
     procuredPart: number;
     total: number;
   };
+  alternatives?: AlternativeRoute[];
+  selectedRouteId?: string | null;
 }

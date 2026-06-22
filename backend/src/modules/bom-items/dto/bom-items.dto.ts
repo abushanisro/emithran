@@ -124,6 +124,11 @@ export class CreateBOMItemDto {
   @IsNumber()
   surfaceArea?: number;
 
+  @ApiPropertyOptional({ example: 12500.0, description: 'Part volume in mm³' })
+  @IsOptional()
+  @IsNumber()
+  volume?: number;
+
   @ApiPropertyOptional({ example: 0 })
   @IsOptional()
   @IsNumber()
@@ -135,15 +140,128 @@ export class CreateBOMItemDto {
   @IsString()
   file3dPath?: string;
 
+  @ApiPropertyOptional({ example: 'file-path-original.stp', description: 'Original STEP/IGES path before STL conversion — used by reanalyze for full OCC topology' })
+  @IsOptional()
+  @IsString()
+  fileStepPath?: string;
+
   @ApiPropertyOptional({ example: 'file-path-2d.pdf' })
   @IsOptional()
   @IsString()
   file2dPath?: string;
 
+  @ApiPropertyOptional({ example: 'file-path-drawing.dxf.gz' })
+  @IsOptional()
+  @IsString()
+  fileDxfPath?: string;
+
   @ApiPropertyOptional({ example: 'material-uuid', description: 'Link to material from materials database' })
   @IsOptional()
   @IsUUID()
   materialId?: string;
+
+  @ApiPropertyOptional({ example: 'sheet_metal', enum: ['sheet_metal', 'cnc_turned', 'cnc_milled'], description: 'Override the auto-detected manufacturing family. Null = auto-detect.' })
+  @IsOptional()
+  @IsIn(['sheet_metal', 'cnc_turned', 'cnc_milled'])
+  manufacturingFamilyOverride?: string | null;
+
+  @ApiPropertyOptional({ example: 'drawing', description: 'Provenance of the material identification: cad | drawing | manual | estimate' })
+  @IsOptional()
+  @IsString()
+  materialSource?: string;
+
+  @ApiPropertyOptional({ example: 0.75, description: 'Confidence score 0–1 for the material identification' })
+  @IsOptional()
+  @IsNumber()
+  materialConfidence?: number;
+
+  @ApiPropertyOptional({ example: 2.0, description: 'Sheet metal material thickness in mm' })
+  @IsOptional()
+  @IsNumber()
+  sheetThicknessMm?: number;
+
+  @ApiPropertyOptional({ example: 1250.0, description: 'Total laser/plasma cut perimeter in mm (sheet metal)' })
+  @IsOptional()
+  @IsNumber()
+  cutLengthMm?: number;
+
+  @ApiPropertyOptional({ example: 8, description: 'Number of bends / form operations (sheet metal)' })
+  @IsOptional()
+  @IsNumber()
+  bendCount?: number;
+
+  @ApiPropertyOptional({ example: 6, description: 'Number of holes detected (sheet metal)' })
+  @IsOptional()
+  @IsNumber()
+  holeCount?: number;
+
+  @ApiPropertyOptional({ example: 9, description: 'Total laser pierce points (holes + slots + 1)' })
+  @IsOptional()
+  @IsNumber()
+  pierceCount?: number;
+
+  @ApiPropertyOptional({ example: 45320.0, description: 'Flat pattern area in mm² (dominant sheet face)' })
+  @IsOptional()
+  @IsNumber()
+  flatPatternAreaMm2?: number;
+
+  @ApiPropertyOptional({ description: 'Manufacturing Feature Graph — family classification, individual feature instances, process recommendations' })
+  @IsOptional()
+  featureGraph?: object;
+
+  @ApiPropertyOptional({ example: 'sheet_metal', description: 'Denormalised family; auto-populated from featureGraph by service if omitted' })
+  @IsOptional()
+  @IsString()
+  familyClassification?: string;
+
+  @ApiPropertyOptional({ example: 0.94, description: 'Denormalised confidence; auto-populated from featureGraph by service if omitted' })
+  @IsOptional()
+  @IsNumber()
+  familyConfidence?: number;
+
+  @ApiPropertyOptional({ example: 1.6, description: 'Surface finish Ra in µm — from drawing analysis' })
+  @IsOptional()
+  @IsNumber()
+  surfaceFinishRa?: number;
+
+  @ApiPropertyOptional({ example: 0.8 })
+  @IsOptional()
+  @IsNumber()
+  surfaceFinishConfidence?: number;
+
+  @ApiPropertyOptional({ example: 'None', description: 'Heat treatment specification from drawing' })
+  @IsOptional()
+  @IsString()
+  heatTreatment?: string;
+
+  @ApiPropertyOptional({ example: 'RAL9005 Powder Coat', description: 'Coating specification from drawing' })
+  @IsOptional()
+  @IsString()
+  coating?: string;
+
+  @ApiPropertyOptional({ example: 0.9 })
+  @IsOptional()
+  @IsNumber()
+  coatingConfidence?: number;
+
+  @ApiPropertyOptional({ example: 'medium', enum: ['simple', 'medium', 'complex'] })
+  @IsOptional()
+  @IsIn(['simple', 'medium', 'complex'])
+  complexity?: string;
+
+  @ApiPropertyOptional({ example: 0.05, description: 'Tightest tolerance in mm from drawing' })
+  @IsOptional()
+  @IsNumber()
+  tightestToleranceMm?: number;
+
+  @ApiPropertyOptional({ example: 0.85 })
+  @IsOptional()
+  @IsNumber()
+  toleranceConfidence?: number;
+
+  @ApiPropertyOptional({ description: 'Full drawing intelligence JSON — threads, GD&T callouts, tolerances, revision, notes' })
+  @IsOptional()
+  drawingIntelligence?: Record<string, any>;
 }
 
 export class UpdateBOMItemDto extends PartialType(CreateBOMItemDto) { }

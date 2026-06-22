@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import type { ManufacturingFeatureGraph, MandatoryOp } from '../dto/manufacturing-feature.dto';
+import type { BriefBomItem } from '../dto/engineering-brief.dto';
 
 /**
  * Rule Engine — converts a ManufacturingFeatureGraph into a MandatoryOp list.
@@ -17,7 +18,11 @@ import type { ManufacturingFeatureGraph, MandatoryOp } from '../dto/manufacturin
  */
 @Injectable()
 export class RuleEngineService {
-  evaluate(graph: ManufacturingFeatureGraph): MandatoryOp[] {
+  evaluate(
+    graph: ManufacturingFeatureGraph,
+    bomItem?: Pick<BriefBomItem, 'tightestToleranceMm' | 'coating'>,
+    drawingNotes?: string,
+  ): MandatoryOp[] {
     const mandatory: MandatoryOp[] = [];
 
     for (const f of graph.features) {
@@ -161,6 +166,39 @@ export class RuleEngineService {
           });
           break;
 
+        case 'LASER_CUT':
+          mandatory.push({
+            featureId: f.id,
+            suggestedOpNbr: 10,
+            operationHint: 'Laser Cutting (profile + internal cutouts)',
+            reason: 'Sheet metal outer profile and internal cutouts require laser cutting as Op 10',
+            confidence: f.confidence,
+            machineCategoryHint: 'laser_cut',
+          });
+          break;
+
+        case 'BEND':
+          mandatory.push({
+            featureId: f.id,
+            suggestedOpNbr: 30,
+            operationHint: `Press Brake Bending${f.count != null ? ` (×${f.count} bend${f.count !== 1 ? 's' : ''})` : ''}`,
+            reason: `Part has ${f.count ?? '?'} bend(s) — press brake required after laser cutting`,
+            confidence: f.confidence,
+            machineCategoryHint: 'press_brake',
+          });
+          break;
+
+        case 'FORM':
+          mandatory.push({
+            featureId: f.id,
+            suggestedOpNbr: 35,
+            operationHint: 'Forming / Deep Drawing',
+            reason: 'FORM feature requires dedicated forming or deep-drawing operation',
+            confidence: f.confidence,
+            machineCategoryHint: 'press_brake',
+          });
+          break;
+
         // Features that generate planning context for the AI but not their own mandatory op
         case 'OD_TURN':
         case 'FACE_TURN':
@@ -169,13 +207,58 @@ export class RuleEngineService {
         case 'POCKET':
         case 'SLOT':
         case 'FLAT_FACE':
-        case 'BEND':
-        case 'LASER_CUT':
-        case 'FORM':
         case 'HONE':
         case 'LAPP':
           break;
       }
+    }
+
+    // ── Drawing-intelligence-driven rules (from bom_items promoted columns) ──────
+    // These fire independently of the feature graph — they use Gemini-extracted
+    // fields persisted on the BOM item, not Claude DrawingBrief features.
+
+    // Tight tolerance → CMM Inspection
+    const tol = bomItem?.tightestToleranceMm;
+    if (tol != null && tol > 0 && tol <= 0.10) {
+      mandatory.push({
+        featureId: 'tol_cmm',
+        suggestedOpNbr: 90,
+        operationHint: `CMM Inspection (±${tol}mm)`,
+        reason: `Tightest tolerance ±${tol}mm ≤ 0.10mm threshold — CMM required`,
+        confidence: 0.90,
+        machineCategoryHint: 'cmm',
+        trigger: 'drawing_tolerance',
+      } as MandatoryOp & { trigger: string });
+    }
+
+    // Coating present → Surface Treatment (only if feature graph didn't already add one)
+    const alreadyHasSurfaceTreatment = mandatory.some(
+      (op) => op.machineCategoryHint === 'surface_treatment',
+    );
+    if (!alreadyHasSurfaceTreatment && bomItem?.coating && bomItem.coating !== 'None') {
+      mandatory.push({
+        featureId: 'surface_treatment_drawing',
+        suggestedOpNbr: 80,
+        operationHint: `Surface Treatment: ${bomItem.coating}`,
+        reason: `Drawing-confirmed coating "${bomItem.coating}" requires surface treatment op`,
+        confidence: 0.88,
+        machineCategoryHint: 'surface_treatment',
+        trigger: 'drawing_coating',
+      } as MandatoryOp & { trigger: string });
+    }
+
+    // Bending dimensions critical in notes → First Article Inspection
+    const notesLower = (drawingNotes ?? '').toLowerCase();
+    if (notesLower.includes('bending') && notesLower.includes('critical')) {
+      mandatory.push({
+        featureId: 'bend_critical_fai',
+        suggestedOpNbr: 95,
+        operationHint: 'First Article Inspection — bend dimensions critical',
+        reason: 'Drawing note specifies bending dimensions are critical — FAI required',
+        confidence: 0.85,
+        machineCategoryHint: 'inspection',
+        trigger: 'drawing_note_critical',
+      } as MandatoryOp & { trigger: string });
     }
 
     return mandatory.sort((a, b) => a.suggestedOpNbr - b.suggestedOpNbr);

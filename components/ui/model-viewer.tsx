@@ -7,6 +7,9 @@ import { Loader2, Download, RotateCcw, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
+import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
+
+export type { HeatmapSource, HeatmapNormalization, HeatmapLayerType } from '@/lib/heatmap/types';
 
 /**
  * Production-Ready 3D Model Viewer
@@ -79,6 +82,25 @@ interface ManufacturingFeature {
   aiRecommendations: string[];
 }
 
+// Feature Graph v2 occurrence highlighting
+interface FaceMapEntry {
+  face_id: number;
+  tri_start: number;
+  tri_count: number;
+}
+interface FeatureOccurrenceHL {
+  centroid: [number, number, number];
+  face_ids: number[];
+}
+interface FeatureNodeV2HL {
+  id: string;
+  feature_type: string;
+  occurrences: FeatureOccurrenceHL[];
+  bbox_centered?: { x_min: number; x_max: number; y_min: number; y_max: number };
+  diameter_mm?: number;
+  radius_mm?: number;
+}
+
 interface ModelViewerProps {
   fileUrl: string;
   fileName: string;
@@ -101,13 +123,26 @@ interface ModelViewerProps {
   hoveredBOMItem?: any; // Hovered BOM item for highlighting
   onPartsDetected?: (parts: any[]) => void; // Callback when parts are detected from CAD analysis
   dfmAnalysisData?: any; // DFM analysis data for showing recommendations in Properties panel
+  cameraPreset?: 'top' | 'front' | 'right' | 'isometric' | null;
+  onScreenshotReady?: (dataUrl: string) => void;
+  highlightOccurrences?: FeatureNodeV2HL | null;
+  selectedOccurrenceIndex?: number | null;
+  onOccurrenceSelect?: (index: number | null) => void;
+  faceMap?: FaceMapEntry[] | null;
+  sheetThickness?: number;
+  dfmOccurrenceScores?: Array<{ occurrenceIndex: number; riskLevel: string }>;
+  heatmapSources?: HeatmapSource[];
+  heatmapNormalization?: HeatmapNormalization;
+  onHeatmapInspect?: (worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void;
+  /** Override the amber group-face highlight color — used for operation-specific visualization */
+  highlightColor?: string;
 }
 
-export function ModelViewer({ 
-  fileUrl, 
-  fileName, 
-  fileType, 
-  bomItemId, 
+export function ModelViewer({
+  fileUrl,
+  fileName,
+  fileType,
+  bomItemId,
   isExploded = false,
   explodeDistance = 50,
   onMeasurements,
@@ -119,7 +154,19 @@ export function ModelViewer({
   showOnlySelected = false,
   hoveredBOMItem,
   onPartsDetected,
-  dfmAnalysisData
+  dfmAnalysisData,
+  cameraPreset,
+  onScreenshotReady,
+  highlightOccurrences,
+  selectedOccurrenceIndex,
+  onOccurrenceSelect,
+  faceMap,
+  sheetThickness,
+  dfmOccurrenceScores,
+  heatmapSources,
+  heatmapNormalization,
+  onHeatmapInspect,
+  highlightColor,
 }: ModelViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
@@ -215,6 +262,18 @@ export function ModelViewer({
               {...(hoveredBOMItem !== undefined ? { hoveredBOMItem } : {})}
               {...(onPartsDetected ? { onPartsDetected } : {})}
               {...(dfmAnalysisData !== undefined ? { dfmAnalysisData } : {})}
+              {...(cameraPreset !== undefined ? { cameraPreset } : {})}
+              {...(onScreenshotReady ? { onScreenshotReady } : {})}
+              {...(highlightOccurrences !== undefined ? { highlightOccurrences } : {})}
+              {...(selectedOccurrenceIndex !== undefined ? { selectedOccurrenceIndex } : {})}
+              {...(onOccurrenceSelect ? { onOccurrenceSelect } : {})}
+              {...(faceMap !== undefined ? { faceMap } : {})}
+              {...(sheetThickness !== undefined ? { sheetThickness } : {})}
+              {...(dfmOccurrenceScores !== undefined ? { dfmOccurrenceScores } : {})}
+              {...(heatmapSources !== undefined ? { heatmapSources } : {})}
+              {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
+              {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
+              {...(highlightColor !== undefined ? { highlightColor } : {})}
             />
           </ErrorBoundary>
         </Suspense>
@@ -337,6 +396,18 @@ export function ModelViewer({
               {...(hoveredBOMItem !== undefined ? { hoveredBOMItem } : {})}
               {...(onPartsDetected ? { onPartsDetected } : {})}
               {...(dfmAnalysisData !== undefined ? { dfmAnalysisData } : {})}
+              {...(cameraPreset !== undefined ? { cameraPreset } : {})}
+              {...(onScreenshotReady ? { onScreenshotReady } : {})}
+              {...(highlightOccurrences !== undefined ? { highlightOccurrences } : {})}
+              {...(selectedOccurrenceIndex !== undefined ? { selectedOccurrenceIndex } : {})}
+              {...(onOccurrenceSelect ? { onOccurrenceSelect } : {})}
+              {...(faceMap !== undefined ? { faceMap } : {})}
+              {...(sheetThickness !== undefined ? { sheetThickness } : {})}
+              {...(dfmOccurrenceScores !== undefined ? { dfmOccurrenceScores } : {})}
+              {...(heatmapSources !== undefined ? { heatmapSources } : {})}
+              {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
+              {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
+              {...(highlightColor !== undefined ? { highlightColor } : {})}
             />
           </ErrorBoundary>
         </Suspense>

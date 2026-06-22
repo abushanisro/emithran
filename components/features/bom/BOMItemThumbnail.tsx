@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { Box } from 'lucide-react';
+import { Box, Maximize2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiClient } from '@/lib/api/client';
@@ -301,9 +301,22 @@ export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
 
       {/* 3D badge */}
       {phase === 'done' && is3d && (
-        <Badge className="absolute bottom-1 right-1 h-4 px-1 text-[9px] bg-primary/80 text-primary-foreground pointer-events-none">
+        <Badge className="absolute bottom-1 left-1 h-4 px-1 text-[9px] bg-primary/80 text-primary-foreground pointer-events-none">
           3D
         </Badge>
+      )}
+
+      {/* Fit / expand button — appears on hover */}
+      {phase === 'done' && (
+        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={onClick}
+            title="Fit to view"
+            className="h-6 w-6 flex items-center justify-center rounded bg-black/60 hover:bg-black/80 text-white transition-colors"
+          >
+            <Maximize2 className="h-3 w-3" />
+          </button>
+        </div>
       )}
     </div>
   );

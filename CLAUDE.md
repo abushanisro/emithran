@@ -1,172 +1,173 @@
-# Principal Engineer Code Review Guidelines
+# CLAUDE.md
 
-## Review Philosophy
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Code reviews are opportunities for knowledge sharing, quality assurance, and team growth. Approach reviews as a collaborative effort to improve the codebase and mentor engineers.
+---
 
-## Pre-Review Checklist
+## Engineering Standards (Non-Negotiable)
 
-### Author Responsibilities
-- [ ] Code is self-tested and passes all existing tests
-- [ ] PR description explains the WHY, not just the WHAT
-- [ ] Code follows established patterns and conventions
-- [ ] Dependencies are justified and necessary
-- [ ] Breaking changes are clearly documented
-- [ ] Performance impact is considered and documented
+Think and act as a Principal Engineer. One careless change in a shared service, a DTO, or a database migration can corrupt cost calculations across every BOM in production. Hold every change to this bar:
 
-## Review Criteria
+### Before writing any code, ask:
+- **What breaks if this is wrong?** — Cost figures, process routes, and material weights are used for quoting. Wrong data = wrong quotes = financial damage.
+- **What is the blast radius?** — A change to `BOMItem` entity, `AutoFillService`, or `ProcessPlanGeneratorModule` touches every part in every project. A change to a UI component is local. Scope awareness is mandatory.
+- **Is this the right layer?** — Business logic belongs in NestJS services, not Next.js API routes. Formatting belongs in the UI, not the API. Calculation formulas belong in the backend, not the frontend.
 
-### 1. Correctness
-- [ ] Logic is sound and handles edge cases
-- [ ] Error handling is comprehensive
-- [ ] Input validation is appropriate
-- [ ] Race conditions and concurrency issues are addressed
-- [ ] Security vulnerabilities are avoided
+### Code quality rules:
+- **No `any` types without a comment explaining why.** Untyped data flows are how bugs reach production silently.
+- **Validate at every boundary.** DTOs validate API input. TypeScript guards validate inter-service data. Never trust data from the CAD engine or Claude AI without checking for null/undefined/nonsense values (e.g. density < 0.5 g/cm³ is physically impossible — reject it).
+- **No silent failures in cost-critical paths.** If `populateFormFromResult`, the live weight calculation, or any process cost step fails, it must log and surface a recoverable error — not return 0 quietly. Wrong zeros are worse than visible errors.
+- **Database migrations are irreversible in production.** Never drop a column or rename a field without a multi-step migration strategy. Always add columns as nullable first.
+- **No hardcoded constants for physics values.** Laser speeds, material densities, pierce times, and MHR rates are data — they belong in the database or in a clearly named lookup table/constant file, not embedded in calculation logic.
 
-### 2. Design & Architecture
-- [ ] Code follows SOLID principles
-- [ ] Abstractions are appropriate and not over-engineered
-- [ ] Separation of concerns is clear
-- [ ] Dependencies point in the right direction
-- [ ] Interface design is clean and intuitive
+### What NOT to do:
+- Do not add abstractions for hypothetical future use. Three direct calls are better than a premature factory.
+- Do not add new npm packages without checking if an existing dependency already covers it (e.g. date-fns is already installed; don't add moment).
+- Do not replicate backend logic in the frontend. The backend is the single source of truth for all cost, material, and process calculations.
+- Do not bypass the `SupabaseAuthGuard` with `@Public()` unless the endpoint genuinely needs to be unauthenticated.
+- Do not write a migration that rewrites existing rows without a tested rollback path.
 
-### 3. Performance
-- [ ] No obvious performance bottlenecks
-- [ ] Database queries are optimized
-- [ ] Memory usage is reasonable
-- [ ] Caching strategy is appropriate
-- [ ] Async operations are handled correctly
+---
 
-### 4. Readability & Maintainability
-- [ ] Code is self-documenting
-- [ ] Variable and function names are clear
-- [ ] Comments explain WHY, not WHAT
-- [ ] Code structure follows team conventions
-- [ ] Complex logic is well-documented
+## Architecture Overview
 
-### 5. Testing
-- [ ] Unit tests cover critical paths
-- [ ] Integration tests verify system behavior
-- [ ] Edge cases are tested
-- [ ] Test names clearly describe scenarios
-- [ ] Tests are maintainable and fast
+Mithran is a **three-service monorepo** for manufacturing cost engineering:
 
-### 6. Security
-- [ ] Input sanitization is performed
-- [ ] Authentication and authorization are correct
-- [ ] Sensitive data is handled properly
-- [ ] SQL injection and XSS are prevented
-- [ ] Secrets are not hardcoded
+| Service | Stack | Port | Purpose |
+|---|---|---|---|
+| **Frontend** | Next.js 16 (App Router), React 19 | 3000 | UI, Next.js API routes, Supabase auth |
+| **Backend** | NestJS 11, TypeORM, PostgreSQL | 4000 | Business logic, all REST APIs |
+| **CAD Engine** | Python FastAPI | 5000 | STEP/STL geometry extraction, DFM analysis |
 
-### 7. Observability
-- [ ] Logging is appropriate and structured
-- [ ] Metrics are added for key operations
-- [ ] Error tracking is implemented
-- [ ] Debugging information is available
-- [ ] Performance monitoring is considered
+All three run independently. The frontend calls the backend directly via `NEXT_PUBLIC_API_URL`. The backend calls the CAD engine via `CAD_ENGINE_URL`. Supabase (hosted) handles auth and file storage; PostgreSQL (Railway in prod, local in dev) stores all application data.
 
-## Review Process
+---
 
-### 1. First Pass - High Level
-- Understand the problem being solved
-- Review the overall approach and architecture
-- Identify any fundamental design issues
+## Commands
 
-### 2. Second Pass - Implementation Details
-- Check logic correctness
-- Review error handling
-- Verify test coverage
-- Examine performance implications
-
-### 3. Third Pass - Code Quality
-- Review naming and readability
-- Check documentation and comments
-- Verify adherence to conventions
-- Consider maintainability
-
-## Feedback Guidelines
-
-### Effective Feedback
-- Be specific and actionable
-- Explain the reasoning behind suggestions
-- Distinguish between must-fix and nice-to-have
-- Offer solutions, not just problems
-- Ask questions to understand context
-
-### Feedback Categories
-- **Blocking**: Must be fixed before merge
-- **Important**: Should be addressed
-- **Suggestion**: Consider for improvement
-- **Question**: Seeking clarification
-- **Praise**: Acknowledge good practices
-
-### Example Comments
-```
-This function doesn't handle null inputs, which could cause NPE in production.
-Suggestion: Add null checks or use Optional<T>.
-
-Consider using a builder pattern here for better readability when creating 
-complex objects with many parameters.
-
-Why did you choose this algorithm over the standard library implementation?
-Is there a specific performance requirement?
-
-Excellent error handling here - clear messages and proper exception types.
+### Frontend (root)
+```bash
+npm run dev          # Development with .env.development
+npm run dev:prod     # Development with .env.production
+npm run build        # Production build
+npm run lint         # ESLint check
+npm run lint:fix     # ESLint auto-fix
+npm run type-check   # tsc --noEmit
 ```
 
-## Common Anti-Patterns to Flag
+### Backend (`cd backend/`)
+```bash
+npm run start:dev    # NestJS with watch mode (TLS disabled for local Supabase)
+npm run build        # Compile TypeScript to dist/
+npm run start:prod   # Run compiled dist/main
+npm run test         # Jest unit tests
+npm run test:e2e     # End-to-end tests
+npm run typecheck    # tsc --noEmit
+npm run db:migrate   # Run pending migrations
+npm run db:migrate:reset  # Reset + re-run all migrations
+```
 
-### Code Smells
-- Functions longer than 50 lines
-- Classes with too many responsibilities
-- Deep nesting (>3 levels)
-- Duplicated code
-- Magic numbers and strings
-- Long parameter lists
+### CAD Engine (`cd cad-engine/`)
+```bash
+pip install -r requirements.txt
+uvicorn main:app --reload --port 5000
+```
 
-### Architecture Issues
-- Circular dependencies
-- Tight coupling
-- Inappropriate abstraction layers
-- Missing error boundaries
-- Synchronous calls to external services
+---
 
-### Performance Issues
-- N+1 query problems
-- Unnecessary object creation in loops
-- Blocking operations on main thread
-- Memory leaks
-- Inefficient algorithms
+## Key Conventions
 
-## Special Considerations
+### Environment Switching
+The frontend uses `copy .env.development .env` / `copy .env.production .env` to switch configs. Never commit `.env` — only `.env.development` and `.env.production`. The `.env` file is gitignored and runtime-only.
 
-### Legacy Code Integration
-- Ensure new code doesn't worsen existing technical debt
-- Document any workarounds for legacy constraints
-- Plan incremental improvements where possible
+### API Client Pattern
+All frontend→backend calls go through `lib/api/client.ts` (`apiClient`). React Query hooks in `lib/api/hooks/` wrap these with caching and invalidation. Do not call `fetch` directly from components — use the hook layer.
 
-### Breaking Changes
-- Require explicit approval from team leads
-- Document migration path
-- Consider backward compatibility options
-- Plan rollout strategy
+### Authentication
+`SupabaseAuthGuard` is the `APP_GUARD` on the NestJS backend — every endpoint is protected unless decorated with `@Public()`. The frontend uses Supabase SSR (`@supabase/ssr`) with cookie-based sessions. The JWT token is forwarded as `Authorization: Bearer` to the backend.
 
-### Security-Critical Code
-- Require additional security-focused reviewers
-- Perform threat modeling if needed
-- Document security assumptions
-- Consider penetration testing
+### Backend Module Structure
+Each feature follows NestJS convention: `module → controller → service → entity/DTO`. Entities use TypeORM decorators. DTOs use class-validator with `@IsOptional()` / `@IsString()` etc. The global `ValidationPipe` with `transform: true` handles DTO transformation automatically.
 
-## Post-Review Actions
+### Supabase vs PostgreSQL
+- **Supabase** = auth, file storage (drawings, 3D models), and the Supabase JS client for auth checks
+- **PostgreSQL** (TypeORM) = all application data (BOMs, costs, projects, materials, etc.)
+- Don't store application records in Supabase tables; don't use TypeORM for auth.
 
-### After Approval
-- Monitor deployment metrics
-- Watch for error rates and performance regressions
-- Follow up on any production issues
-- Document lessons learned
+### Path Aliases
+- Frontend: `@/` → project root (configured in `tsconfig.json`)
+- Backend: `@/` → `backend/src/` (configured in `backend/tsconfig.json`)
 
-### Continuous Improvement
-- Track review metrics (time to review, defect rates)
-- Retrospect on review effectiveness
-- Update guidelines based on team learning
-- Share knowledge from reviews across the team
+### Code Style
+Prettier is enforced: `semi: true`, `singleQuote: false`, `trailingComma: "all"`, `printWidth: 90`, `tabWidth: 2`, `endOfLine: "lf"`.
+
+---
+
+## Data Flow: BOM Auto-Fill Pipeline
+
+The most complex feature — understanding this unlocks most of the codebase:
+
+1. **File drop** in `components/features/bom/BOMItemDialog.tsx` → `analyzeForAutoFill(file)` in `lib/api/hooks/useBOMItems.ts`
+2. **Backend** `POST /bom-items/analyze-for-autofill` → `AutoFillService` → calls CAD Engine `POST /analyze`
+3. **CAD Engine** extracts geometry (volume, surface area, bounding box, hole count, bend count, cut length, weight) and returns `AutoFillResponse`
+4. **`populateFormFromResult()`** in `BOMItemDialog.tsx` patches form fields and writes `fieldLineage` (`'cad' | 'drawing' | 'derived'`) for each filled field
+5. **2D Drawing upload** (`file2d`) triggers `POST /api/vave/drawing-analysis` Next.js route → Claude AI vision API → extracts material, dimensions, sheet thickness, bend count, coating from PDF/image
+6. Drawing values **always override CAD** for material; CAD is authoritative for geometry
+7. **Live weight recalculation** fires when `volume` or `materialGrade` changes → `GET /bom-items/material-density?grade=...` → `weight = (volume_mm3 / 1e6) * density_g_cm3`
+
+The `AutoBadge` component in `BOMItemDialog.tsx` reads `fieldLineage[field].source` to render **CAD** (cyan) / **DRAWING** (blue) / **DERIVED** (purple) badges.
+
+---
+
+## Process Plan Generator
+
+Located at `backend/src/modules/process-plan-generator/`. Takes a BOM item and generates a manufacturing process route with cost estimates:
+
+- `services/` — orchestration, cost calculation, material/machine lookup
+- `ranking/` — `machine-ranker.ts`, `material-ranker.ts` for scoring candidates
+- `prompts/system.prompt.ts` — LLM system prompt for process reasoning
+- `dto/` — typed DTOs for every stage (engineering brief → candidate set → draft lines → generation response)
+
+Uses MHR (Machine Hour Rate) and LSR (Labour Standard Rate) data from their respective modules.
+
+---
+
+## Key Backend Modules
+
+| Module | Path | Notes |
+|---|---|---|
+| `BOMItemsModule` | `modules/bom-items/` | Auto-fill, CAD analysis, file upload |
+| `ProcessPlanGeneratorModule` | `modules/process-plan-generator/` | AI-driven process routing + costing |
+| `RawMaterialsModule` | `modules/raw-materials/` | Material DB with density, cost, `partFamily` ranking |
+| `MHRModule` | `modules/mhr/` | Machine hour rates |
+| `LSRModule` | `modules/lsr/` | Labour standard rates |
+| `VaveModule` | `modules/vave/` | Value analysis / value engineering |
+| `BenchmarkSessionsModule` | `modules/benchmark-sessions/` | Competitive benchmarking |
+
+---
+
+## Frontend Structure
+
+- `app/(dashboard)/` — all authenticated pages, grouped by feature
+- `app/api/` — Next.js API routes (thin proxies or AI calls needing server-side secrets)
+- `components/features/` — complex feature components (e.g. `bom/BOMItemDialog.tsx`)
+- `components/ui/` — shadcn/ui primitives (Button, Dialog, Input, etc.)
+- `lib/api/hooks/` — React Query hooks, one file per backend resource
+- `lib/api/client.ts` — base `apiClient` with auth header injection
+- `lib/api/vave.ts` — types for VAVE/drawing analysis responses
+
+---
+
+## Drawing Analysis Route
+
+`app/api/vave/drawing-analysis/route.ts` — server-side Next.js route that calls the Anthropic Claude API directly (uses `ANTHROPIC_API_KEY`). Accepts PDF or image (base64), sends to `claude-sonnet-4-6` vision, returns structured JSON with material, dimensions, tolerance, surface finish, sheet thickness, bend count, heat treatment, coating, and per-field confidence scores (0–1). PDFs use `type: 'document'`; images use `type: 'image'` in the Claude API message payload.
+
+---
+
+## Deployment
+
+- **Frontend** → Vercel (auto-deploy from main). Env vars set in Vercel dashboard.
+- **Backend** → Railway. `railway.json` configures build/start commands.
+- **CAD Engine** → Railway. Separate service with its own `Dockerfile`.
+- Database migrations run via `npm run db:migrate` in the backend before each deploy.
+- CSP headers are toggled by the `VERCEL` env var: permissive on localhost, strict in production.

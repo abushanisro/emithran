@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { vendorRatingsApi, CreateVendorRatingData, VendorRating, VendorRatingAggregate } from '../vendor-ratings';
+import { vendorRatingsApi } from '../vendor-ratings';
+import type { CreateVendorRatingData } from '../vendor-ratings';
 import { toast } from '@/components/ui/sonner';
 
 // Query keys for caching
@@ -115,7 +116,7 @@ export function useCreateVendorRating() {
 
   return useMutation({
     mutationFn: (data: CreateVendorRatingData) => vendorRatingsApi.createRating(data),
-    onSuccess: (result, variables) => {
+    onSuccess: (_result, variables) => {
       // Invalidate and refetch related queries
       queryClient.invalidateQueries({ queryKey: VENDOR_RATING_KEYS.detail(variables.vendorId) });
       queryClient.invalidateQueries({ queryKey: VENDOR_RATING_KEYS.aggregate(variables.vendorId) });
@@ -139,7 +140,7 @@ export function useUpdateVendorRating() {
   return useMutation({
     mutationFn: ({ ratingId, data }: { ratingId: string; data: Partial<CreateVendorRatingData> }) =>
       vendorRatingsApi.updateRating(ratingId, data),
-    onSuccess: (result, variables) => {
+    onSuccess: (_result, variables) => {
       // Invalidate related queries
       if (variables.data.vendorId) {
         queryClient.invalidateQueries({ queryKey: VENDOR_RATING_KEYS.detail(variables.data.vendorId) });

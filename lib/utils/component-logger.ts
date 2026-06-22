@@ -18,7 +18,7 @@ import { isDevelopment } from '../config';
 export class ComponentLogger {
   private secureLogger: ReturnType<typeof createSecureLogger>;
 
-  constructor(private context: string) {
+  constructor(context: string) {
     this.secureLogger = createSecureLogger(context);
   }
 

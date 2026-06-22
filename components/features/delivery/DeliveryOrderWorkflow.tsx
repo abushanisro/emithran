@@ -27,7 +27,6 @@ import {
   Truck,
   CheckCircle,
   Plus,
-  Building,
   Phone,
   Mail,
   Calendar,
@@ -42,18 +41,16 @@ import {
   ChevronRight,
   Trash2,
 } from 'lucide-react';
+import type { QualityApprovedItem, DeliveryAddress } from '@/lib/api/hooks/useDelivery';
 import {
-  QualityApprovedItem,
   useAvailableItemsForDelivery,
   useCreateDeliveryOrder,
   useDeliveryAddresses,
   useCarriers,
   useCreateDeliveryAddress,
   useDeliveryOrders,
-  DeliveryOrder,
   useDeleteDeliveryAddress,
   useDeleteDeliveryOrder,
-  DeliveryAddress,
 } from '@/lib/api/hooks/useDelivery';
 import { toast } from 'sonner';
 import RouteCalculator from './RouteCalculator';
@@ -143,25 +140,6 @@ const INDIAN_STATES = [
   'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh'
 ];
 
-// Transport modes configuration
-const TRANSPORT_MODES = [
-  {
-    value: 'road',
-    label: 'Road Transport',
-    description: 'Trucks, delivery vans, surface transport'
-  },
-  {
-    value: 'air',
-    label: 'Air Transport',
-    description: 'Air cargo, express air delivery'
-  },
-  {
-    value: 'ship',
-    label: 'Sea/Ship Transport',
-    description: 'Ocean freight, port-to-port delivery'
-  }
-];
-
 // Material types available for each transport mode
 const MATERIAL_TYPES_BY_TRANSPORT = {
   road: [
@@ -227,6 +205,9 @@ export default function DeliveryOrderWorkflow({
   const [showOrderDetail, setShowOrderDetail] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
+  // Route info state (used to clear route info when address is deleted)
+  const [_routeInfo, setRouteInfo] = useState<Record<string, unknown> | null>(null);
+
   // Route calculation state
   const [routeData, setRouteData] = useState<{
     distance?: number;
@@ -269,8 +250,8 @@ export default function DeliveryOrderWorkflow({
 
   // API Hooks
   const { data: availableItems = [], isLoading: itemsLoading, error: itemsError } = useAvailableItemsForDelivery(projectId);
-  const { data: addresses = [], isLoading: addressesLoading, refetch: refetchAddresses } = useDeliveryAddresses(projectId);
-  const { data: carriers = [], isLoading: carriersLoading } = useCarriers();
+  const { data: addresses = [], isLoading: _addressesLoading, refetch: refetchAddresses } = useDeliveryAddresses(projectId);
+  const { data: carriers = [], isLoading: _carriersLoading } = useCarriers();
   const createOrderMutation = useCreateDeliveryOrder();
   const createAddressMutation = useCreateDeliveryAddress();
   const deleteAddressMutation = useDeleteDeliveryAddress();
@@ -323,7 +304,7 @@ export default function DeliveryOrderWorkflow({
   }, [showPreviewModal, currentImageIndex, currentImageCollection]);
 
   // Get available material types for selected transport mode
-  const getAvailableMaterialTypes = () => {
+  const _getAvailableMaterialTypes = () => {
     if (!formData.transportMode) return [];
     return MATERIAL_TYPES_BY_TRANSPORT[formData.transportMode as keyof typeof MATERIAL_TYPES_BY_TRANSPORT] || [];
   };
@@ -332,7 +313,7 @@ export default function DeliveryOrderWorkflow({
   const getAvailableCarriers = () => {
     if (!formData.transportMode || !formData.materialType) return [];
 
-    const carrierCodes = CARRIER_CONFIG[formData.transportMode as keyof typeof CARRIER_CONFIG]?.[formData.materialType as keyof typeof CARRIER_CONFIG.road] || [];
+    const carrierCodes = (CARRIER_CONFIG[formData.transportMode as keyof typeof CARRIER_CONFIG] as any)?.[formData.materialType] || [];
 
     return carriers.filter(carrier => {
       if (!carrier.name) return false;
@@ -341,7 +322,7 @@ export default function DeliveryOrderWorkflow({
       const carrierCode = carrier.code?.toLowerCase() || '';
 
       // Check if carrier matches the configuration
-      return carrierCodes.some(configCode =>
+      return carrierCodes.some((configCode: any) =>
         carrierName.includes(configCode.replace('_', ' ')) ||
         carrierCode.includes(configCode) ||
         carrierName.includes(configCode)
@@ -440,7 +421,7 @@ export default function DeliveryOrderWorkflow({
     };
 
     const missingFields = Object.entries(requiredFields).filter(
-      ([field, label]) => !newAddress[field as keyof DeliveryAddress]
+      ([field, _label]) => !newAddress[field as keyof DeliveryAddress]
     );
 
     if (missingFields.length > 0) {
@@ -512,29 +493,30 @@ export default function DeliveryOrderWorkflow({
       const orderData = {
         projectId,
         deliveryAddressId: formData.deliveryAddressId,
-        carrierId: formData.carrierId || undefined,
+        ...(formData.carrierId ? { carrierId: formData.carrierId } : {}),
         priority: formData.priority,
-        requestedDeliveryDate: formData.requestedDate ? `${formData.requestedDate}T${formData.requestedTime || '00:00'}:00.000Z` : undefined,
-        deliveryWindowStart: formData.requestedTime || undefined,
-        deliveryWindowEnd: formData.requestedTime ? 
-          (() => {
+        ...(formData.requestedDate ? { requestedDeliveryDate: `${formData.requestedDate}T${formData.requestedTime || '00:00'}:00.000Z` } : {}),
+        ...(formData.requestedTime ? { deliveryWindowStart: formData.requestedTime } : {}),
+        ...(formData.requestedTime ? {
+          deliveryWindowEnd: (() => {
             // Add 2 hours to the start time for the end window
             const [hours, minutes] = formData.requestedTime.split(':').map(Number);
-            const endHours = (hours + 2) % 24;
-            return `${endHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          })() : undefined,
-        specialHandlingRequirements: formData.specialHandling || undefined,
-        deliveryInstructions: formData.deliveryInstructions || undefined,
+            const endHours = ((hours ?? 0) + 2) % 24;
+            return `${endHours.toString().padStart(2, '0')}:${(minutes ?? 0).toString().padStart(2, '0')}`;
+          })()
+        } : {}),
+        ...(formData.specialHandling ? { specialHandlingRequirements: formData.specialHandling } : {}),
+        ...(formData.deliveryInstructions ? { deliveryInstructions: formData.deliveryInstructions } : {}),
         deliveryCostInr: formData.estimatedCost || 0,
         totalDeliveryCostInr: formData.estimatedCost || 0,
         packageCount: selectedItems.reduce((sum, item) => sum + (item.deliveryQuantity || 0), 0),
-        notes: formData.notes || undefined,
+        ...(formData.notes ? { notes: formData.notes } : {}),
         items: selectedItems.map(item => ({
           qualityApprovedItemId: item.id,
           bomItemId: item.bomItemId,
           approvedQuantity: item.approvedQuantity,
           deliveryQuantity: item.deliveryQuantity,
-          qcCertificateNumber: item.qcCertificateNumber || undefined,
+          ...(item.qcCertificateNumber ? { qcCertificateNumber: item.qcCertificateNumber } : {}),
         })),
         // Route and transport data
         transportMode: formData.transportMode,
@@ -590,6 +572,7 @@ export default function DeliveryOrderWorkflow({
         requestedDate: '',
         requestedTime: '',
         deliveryAddressId: '',
+        fromAddressId: '',
         carrierId: '',
         transportMode: '',
         materialType: '',
@@ -626,14 +609,14 @@ export default function DeliveryOrderWorkflow({
   const handleAddFiles = async (
     files: FileList | null,
     setter: React.Dispatch<React.SetStateAction<UploadedFile[]>>,
-    imageOnly = false
+    _imageOnly = false
   ) => {
     if (!files) return;
     const toAdd: UploadedFile[] = [];
     for (const file of Array.from(files)) {
       const isImage = file.type.startsWith('image/');
       const preview = isImage ? await readFileAsDataURL(file) : undefined;
-      toAdd.push({ id: `${Date.now()}-${Math.random()}`, file, preview });
+      toAdd.push({ id: `${Date.now()}-${Math.random()}`, file, ...(preview !== undefined ? { preview } : {}) });
     }
     setter(prev => [...prev, ...toAdd]);
   };
@@ -671,7 +654,7 @@ export default function DeliveryOrderWorkflow({
     if (currentImageCollection.length > 1) {
       const nextIndex = (currentImageIndex + 1) % currentImageCollection.length;
       setCurrentImageIndex(nextIndex);
-      setPreviewFile(currentImageCollection[nextIndex]);
+      setPreviewFile(currentImageCollection[nextIndex] ?? null);
     }
   };
 
@@ -679,7 +662,7 @@ export default function DeliveryOrderWorkflow({
     if (currentImageCollection.length > 1) {
       const prevIndex = currentImageIndex === 0 ? currentImageCollection.length - 1 : currentImageIndex - 1;
       setCurrentImageIndex(prevIndex);
-      setPreviewFile(currentImageCollection[prevIndex]);
+      setPreviewFile(currentImageCollection[prevIndex] ?? null);
     }
   };
 
@@ -752,10 +735,10 @@ export default function DeliveryOrderWorkflow({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            {WORKFLOW_STEPS[currentStep - 1].title}
+            {WORKFLOW_STEPS[currentStep - 1]?.title}
           </CardTitle>
           <p className="text-muted-foreground">
-            {WORKFLOW_STEPS[currentStep - 1].description}
+            {WORKFLOW_STEPS[currentStep - 1]?.description}
           </p>
         </CardHeader>
 

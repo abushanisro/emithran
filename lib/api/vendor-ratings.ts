@@ -170,9 +170,8 @@ export const vendorRatingsApi = {
       ratingCounts: number[];
     };
   }> {
-    const response = await apiClient.get(`/vendor-ratings/vendor/${vendorId}/trends`, { 
-      params: { months } 
-    });
+    type R = { success: boolean; data: { labels: string[]; avgRatings: number[]; ratingCounts: number[] } };
+    const response = await apiClient.get<{ data: R }>(`/vendor-ratings/vendor/${vendorId}/trends`, { params: { months } });
     return response.data;
   },
 
@@ -181,9 +180,8 @@ export const vendorRatingsApi = {
     success: boolean;
     data: VendorRatingAggregate[];
   }> {
-    const response = await apiClient.get('/vendor-ratings/top-performers', {
-      params: { limit }
-    });
+    type R = { success: boolean; data: VendorRatingAggregate[] };
+    const response = await apiClient.get<{ data: R }>('/vendor-ratings/top-performers', { params: { limit } });
     return response.data;
   },
 
@@ -193,7 +191,8 @@ export const vendorRatingsApi = {
     message: string;
     data: VendorRating;
   }> {
-    const response = await apiClient.patch(`/vendor-ratings/${ratingId}`, data);
+    type R = { success: boolean; message: string; data: VendorRating };
+    const response = await apiClient.patch<{ data: R }>(`/vendor-ratings/${ratingId}`, data);
     return response.data;
   },
 
@@ -202,7 +201,8 @@ export const vendorRatingsApi = {
     success: boolean;
     message: string;
   }> {
-    const response = await apiClient.delete(`/vendor-ratings/${ratingId}`);
+    type R = { success: boolean; message: string };
+    const response = await apiClient.delete<{ data: R }>(`/vendor-ratings/${ratingId}`);
     return response.data;
   },
 
@@ -211,7 +211,8 @@ export const vendorRatingsApi = {
     success: boolean;
     message: string;
   }> {
-    const response = await apiClient.post('/vendor-ratings/refresh-aggregates');
+    type R = { success: boolean; message: string };
+    const response = await apiClient.post<{ data: R }>('/vendor-ratings/refresh-aggregates');
     return response.data;
   }
 };

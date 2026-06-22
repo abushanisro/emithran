@@ -132,8 +132,56 @@ export class FeatureGraphService {
       });
     }
 
+    // ── Sheet-metal specific features ─────────────────────────────────────
+    const isSheetMetal = brief.scope?.family === 'sheet_metal';
+    if (isSheetMetal) {
+      // LASER_CUT always Op 10 — attach cut_length for cycle time formula downstream
+      features.push({
+        id: `F${seq++}`, type: 'LASER_CUT', source: 'geometry', confidence: 0.90,
+        cutLengthMm: brief.dfm.cutLengthMm > 0 ? brief.dfm.cutLengthMm : undefined,
+      });
+
+      // BEND — geometry is primary source; drawing presence upgrades confidence
+      const geomBends  = brief.dfm.bendCount;
+      const drawingBends = dr.dimensions.filter((d) => d.type === 'angular').length;
+      const hasBendNote  = dr.notes.some((n) => /\bbend\b|\bfold\b|\bpress.?brake\b|\bform/i.test(n));
+
+      if (geomBends > 0) {
+        const confidence = (hasBendNote || drawingBends > 0) ? 0.92 : 0.85;
+        features.push({
+          id: `F${seq++}`, type: 'BEND',
+          source: confidence >= 0.92 ? 'drawing' : 'geometry', confidence,
+          count: drawingBends > 0 ? drawingBends : geomBends,
+        });
+      } else if (hasBendNote || drawingBends > 0) {
+        // Drawing-only detection (no STEP geometry available or flat part with no bends in 3D)
+        features.push({
+          id: `F${seq++}`, type: 'BEND',
+          source: hasBendNote ? 'drawing' : 'geometry',
+          confidence: hasBendNote ? 0.92 : 0.88,
+          count: drawingBends || 1,
+        });
+      } else if (/sheet|bracket|plate|enclosure|panel/i.test(
+        brief.bomItem.partName + ' ' + (brief.bomItem.materialHint ?? ''),
+      )) {
+        // Part-name hint only — low confidence, conditional on geometry not contradicting
+        features.push({ id: `F${seq++}`, type: 'BEND', source: 'geometry', confidence: 0.70, count: 1 });
+      }
+
+      // SLOT — geometry-detected elongated cutouts
+      if (brief.dfm.slotCount > 0) {
+        features.push({
+          id: `F${seq++}`, type: 'SLOT', source: 'geometry', confidence: 0.75,
+          count: brief.dfm.slotCount,
+        });
+      }
+    }
+
     // ── Always-present manufacturing constants (confidence 0.99) ────────────
-    features.push({ id: `F${seq++}`, type: 'SAW_CUT', source: 'bom', confidence: 0.99 });
+    // SAW_CUT only for machined parts — sheet metal is profiled by laser, not saw
+    if (!isSheetMetal) {
+      features.push({ id: `F${seq++}`, type: 'SAW_CUT', source: 'bom', confidence: 0.99 });
+    }
     features.push({ id: `F${seq++}`, type: 'DEBURR',  source: 'bom', confidence: 0.99 });
     features.push({ id: `F${seq++}`, type: 'INSPECT', source: 'bom', confidence: 0.99 });
 

@@ -30,6 +30,7 @@ export interface MachineCandidate {
   description: string | null;
   rateInrPerHour: number;
   location: string | null;
+  processFamily: string | null;
   score: number;
 }
 

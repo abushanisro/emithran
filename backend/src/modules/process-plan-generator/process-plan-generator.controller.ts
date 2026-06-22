@@ -175,6 +175,27 @@ export class ProcessPlanGeneratorController {
   }
 
   /**
+   * POST /generations/:id/select-route
+   *
+   * Switches the active route within a draft that has alternatives. Updates
+   * draft_lines.draftLines + costPreview to the selected alternative's values
+   * so the existing apply() path always commits the currently selected route.
+   */
+  @Post('generations/:id/select-route')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Select an alternative route from a multi-route draft' })
+  async selectRoute(
+    @Param('id') id: string,
+    @Body() body: { routeId: string },
+    @CurrentUser() user: AuthUser,
+    @AccessToken() token: string,
+  ): Promise<void> {
+    if (!user?.id) throw new BadRequestException('User authentication required');
+    if (!body?.routeId) throw new BadRequestException('routeId is required');
+    await this.persistence.selectRoute(id, body.routeId, user.id, token);
+  }
+
+  /**
    * POST /generations/:id/edits
    *
    * Captures a single user edit on a draft line. The frontend posts one of

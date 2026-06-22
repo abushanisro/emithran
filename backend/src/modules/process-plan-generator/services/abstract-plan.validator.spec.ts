@@ -6,7 +6,7 @@ const candidates: CandidateSet = {
     { candidateId: 'rm-1', dbId: 'mat-abc', materialGroup: 'Ferrous & Non-Ferrous', material: 'Aluminium 6061', grade: '6061-T6', densityKgPerM3: 2700, unitCostInrPerKg: 342, location: 'India-Bangalore', score: 0.9 },
   ],
   machines: [
-    { candidateId: 'mc-1', dbId: 'mhr-abc', machineName: 'ASC Lathe 320', commodityCode: 'LATHE', description: 'CNC Lathe', rateInrPerHour: 540, location: 'India-Bangalore', score: 0.9 },
+    { candidateId: 'mc-1', dbId: 'mhr-abc', machineName: 'ASC Lathe 320', commodityCode: 'LATHE', description: 'CNC Lathe', rateInrPerHour: 540, location: 'India-Bangalore', processFamily: 'cnc_turned', score: 0.9 },
   ],
   labour: [
     { candidateId: 'lb-1', dbId: 'lsr-abc', labourType: 'Skilled', labourCode: 'SKL-01', lhrInrPerHour: 62, location: 'India-Bangalore', score: 0.9 },

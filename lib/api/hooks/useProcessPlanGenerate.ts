@@ -53,10 +53,21 @@ export interface ProposedMaster {
   approved: boolean;
 }
 
-export interface DraftPackage {
-  draftLines: DraftLine[];
-  proposedMasters: ProposedMaster[];
-  validationErrors: string[];
+export interface RouteIssue {
+  ruleId: string;
+  ruleName: string;
+  severity: 'error' | 'warning';
+  message: string;
+  affectedProcesses: string[];
+  suggestedFix?: string;
+}
+
+export interface AlternativeRoute {
+  routeId: string;
+  routeLabel: string;
+  complexityLevel: string;
+  templateName: string;
+  draft: Omit<DraftPackage, 'alternatives' | 'selectedRouteId'>;
   costPreview: {
     rawMaterial: number;
     process: number;
@@ -65,6 +76,31 @@ export interface DraftPackage {
     procuredPart: number;
     total: number;
   };
+  estimatedLeadTimeHours: number;
+  riskScore: number;
+  compositeRank: number;
+  isRecommended: boolean;
+  rationale: string;
+}
+
+export interface DraftPackage {
+  draftLines: DraftLine[];
+  proposedMasters: ProposedMaster[];
+  validationErrors: string[];
+  routeValidationIssues?: RouteIssue[];
+  hasValidationErrors?: boolean;
+  partFamily?: string;
+  templateUsed?: string | null;
+  costPreview: {
+    rawMaterial: number;
+    process: number;
+    tooling: number;
+    logistics: number;
+    procuredPart: number;
+    total: number;
+  };
+  alternatives?: AlternativeRoute[];
+  selectedRouteId?: string | null;
 }
 
 export interface ToolCallLogEntry {
@@ -98,6 +134,10 @@ export interface GenerationResponse {
   creditCost: number;
   errorMessage: string | null;
   errorStage: string | null;
+  routeValidationIssues?: RouteIssue[];
+  hasValidationErrors?: boolean;
+  partFamily?: string;
+  templateUsed?: string | null;
   startedAt: string;
   completedAt: string | null;
   appliedAt: string | null;
@@ -181,7 +221,7 @@ export function useGenerateProcessPlan() {
 export function useApplyGeneration() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ generationId, body, bomItemId }: { generationId: string; body: ApplyRequest; bomItemId?: string }) => {
+    mutationFn: async ({ generationId, body }: { generationId: string; body: ApplyRequest; bomItemId?: string }) => {
       return apiClient.post<ApplyResult>(`${BASE}/generations/${generationId}/apply`, body);
     },
     onSuccess: (_data, variables) => {
@@ -224,6 +264,22 @@ export function useRecordLineEdit() {
       return apiClient.post<{ id: string }>(`${BASE}/generations/${generationId}/edits`, edit);
     },
     // Silent — these fire on every field change; don't toast.
+  });
+}
+
+export function useSelectRoute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ generationId, routeId }: { generationId: string; routeId: string }) => {
+      return apiClient.post(`${BASE}/generations/${generationId}/select-route`, { routeId });
+    },
+    onSuccess: (_data, { generationId }) => {
+      queryClient.invalidateQueries({ queryKey: ['process-plan-draft'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['process-plan-generation', generationId] });
+    },
+    onError: () => {
+      toast.error('Failed to select route. Please try again.');
+    },
   });
 }
 

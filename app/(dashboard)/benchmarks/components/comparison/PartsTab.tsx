@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,9 +36,9 @@ export function PartsTab({
       string,
       {
         name: string;
-        partNumber?: string;
-        material?: string;
-        itemType?: string;
+        partNumber?: string | undefined;
+        material?: string | undefined;
+        itemType?: string | undefined;
         bomData: (EnrichedBOMItem | null)[];
       }
     >();
@@ -331,7 +330,7 @@ export function PartsTab({
 function HighVarianceCard({ bomMetrics }: { bomMetrics: BOMMetricEntry[] }) {
   const map = new Map<
     string,
-    { name: string; partNumber?: string; bomData: (EnrichedBOMItem | null)[] }
+    { name: string; partNumber?: string | undefined; bomData: (EnrichedBOMItem | null)[] }
   >();
   bomMetrics.forEach((bd, bIdx) =>
     bd.items?.forEach((item) => {
@@ -447,7 +446,7 @@ function StandardizationCard({ bomMetrics }: { bomMetrics: BOMMetricEntry[] }) {
 }
 
 function MissingPartsCard({ bomMetrics }: { bomMetrics: BOMMetricEntry[] }) {
-  const map = new Map<string, { name: string; partNumber?: string; bomIndices: number[] }>();
+  const map = new Map<string, { name: string; partNumber?: string | undefined; bomIndices: number[] }>();
   bomMetrics.forEach((bd, bIdx) =>
     bd.items?.forEach((item) => {
       const k = item.partNumber ?? item.name ?? "";
@@ -501,7 +500,7 @@ function MissingPartsCard({ bomMetrics }: { bomMetrics: BOMMetricEntry[] }) {
 }
 
 function CostOptimizationCard({ bomMetrics }: { bomMetrics: BOMMetricEntry[] }) {
-  const map = new Map<string, { name: string; partNumber?: string; totalCost: number; count: number }>();
+  const map = new Map<string, { name: string; partNumber?: string | undefined; totalCost: number; count: number }>();
   bomMetrics.forEach((bd) =>
     bd.items?.forEach((item) => {
       const k = item.partNumber ?? item.name ?? "";

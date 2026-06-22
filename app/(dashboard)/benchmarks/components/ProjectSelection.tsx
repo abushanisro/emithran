@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { GitCompare, Search, FolderOpen } from "lucide-react";
 import type { SelectedProject } from "../types";
-import { formatPrice, formatDate, safeNum } from "../utils";
+import { formatPrice, formatDate } from "../utils";
 
 interface Props {
   projects: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any

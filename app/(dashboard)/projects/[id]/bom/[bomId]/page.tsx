@@ -290,7 +290,7 @@ export default function BOMDetailPage() {
   const [parentItemId, setParentItemId] = useState<string | null>(null);
   const [defaultItemType, setDefaultItemType] = useState<BOMItemType | undefined>(undefined);
   const [viewingItem, setViewingItem] = useState<BOMItem | null>(null);
-  const [preferredView, setPreferredView] = useState<'2d' | '3d'>('3d');
+  const [preferredView, setPreferredView] = useState<'2d' | '3d' | 'intelligence'>('3d');
 
   // Echo: when the user is actively viewing a BOM item, register it as the
   // focused entity so Echo can pull DFM, cost, and supplier data for it
@@ -437,7 +437,11 @@ export default function BOMDetailPage() {
     setItemDialogOpen(true);
   };
 
-  const handleViewItem = (item: BOMItem, viewType?: '2d' | '3d') => {
+  const handleViewItem = (item: BOMItem, viewType?: '2d' | '3d' | 'intelligence') => {
+    if (viewType === 'intelligence') {
+      router.push(`/projects/${projectId}/bom/${bomId}/items/${item.id}/manufacturing-intelligence`);
+      return;
+    }
     setViewingItem(item);
     setPreferredView(viewType ?? '3d');
   };
@@ -1356,6 +1360,8 @@ export default function BOMDetailPage() {
         onClose={() => setViewingItem(null)}
         onUpdate={refetchBOMItems}
         preferredView={preferredView}
+        projectId={projectId}
+        bomId={bomId}
       />
 
       {/* Import summary dialog */}

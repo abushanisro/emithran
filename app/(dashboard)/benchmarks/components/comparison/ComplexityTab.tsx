@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
 import type { BOMMetricEntry } from "../../types";
-import { itemCost, itemWeight, safeNum } from "../../utils";
+import { safeNum } from "../../utils";
 
 interface Props {
   bomMetrics: BOMMetricEntry[];

@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Edit2, Trash2, Plus, ChevronDown, ChevronUp, FileText, Box, GripVertical } from 'lucide-react';
+import { Edit2, Trash2, Plus, ChevronDown, ChevronUp, FileText, Box, GripVertical, Cpu } from 'lucide-react';
 // ✅ Fix 6133: Removed unused imports: ArrowRight, Move
 import { toast } from 'sonner';
 import { useBOMItems, deleteBOMItem, updateBOMItem, updateBOMItemsSortOrder, type BOMItem } from '@/lib/api/hooks/useBOMItems';
@@ -33,7 +33,7 @@ import { BOMItemType } from '@/lib/types/bom.types';
 interface BOMItemsFlatProps {
   bomId: string;
   onEditItem: (item: BOMItem) => void;
-  onViewItem?: (item: BOMItem, viewType?: '2d' | '3d') => void;
+  onViewItem?: (item: BOMItem, viewType?: '2d' | '3d' | 'intelligence') => void;
   onAddChildItem?: (parentId: string, childType: BOMItemType) => void;
 }
 
@@ -552,15 +552,31 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
               {/* Right: action buttons */}
               <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end mt-4 md:mt-0">
                 {item.file2dPath && (
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '2d')} title="View 2D Drawing">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onViewItem?.(item, '2d')}
+                    title="View 2D Drawing"
+                  >
                     <FileText className="h-4 w-4" />
                   </Button>
                 )}
+
                 {item.file3dPath && (
                   <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onViewItem?.(item, '3d')} title="View 3D Model">
                     <Box className="h-4 w-4" />
                   </Button>
                 )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => { e.stopPropagation(); onViewItem?.(item, 'intelligence'); }}
+                  title="Manufacturing Intelligence"
+                >
+                  <Cpu className="h-4 w-4 text-violet-500" />
+                </Button>
                 {childType && (
                   <Button variant="default" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAddChild(item)} title="Add Component">
                     <Plus className="h-4 w-4" />

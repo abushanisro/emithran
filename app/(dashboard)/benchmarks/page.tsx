@@ -78,7 +78,7 @@ export default function BenchmarkPage() {
     try {
       const created = await createSession.mutateAsync({
         name: form.name.trim(),
-        description: form.description.trim() || undefined,
+        ...(form.description.trim() ? { description: form.description.trim() } : {}),
       });
       setCreateOpen(false);
       setForm({ name: '', description: '' });

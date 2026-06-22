@@ -21,8 +21,10 @@ import { authTokenManager } from '../auth/token-manager';
 
 import { CircuitBreaker, CircuitBreakerError } from './circuit-breaker';
 import { requestMetrics } from './request-metrics';
-import { traceManager, getTraceHeaders, Span } from './distributed-tracing';
-import { idempotencyManager, createIdempotencyMiddleware, IdempotencyOptions } from './idempotency';
+import { traceManager, getTraceHeaders } from './distributed-tracing';
+import type { Span } from './distributed-tracing';
+import { idempotencyManager, createIdempotencyMiddleware } from './idempotency';
+import type { IdempotencyOptions } from './idempotency';
 import { createRateLimitMiddleware } from './rate-limit';
 import { healthCheckManager, ServiceStatus } from './health-check';
 import { envValidator } from '../config/env-validator';
@@ -1030,42 +1032,62 @@ class ApiClient {
 
   // Public API with precise overloads to avoid null types leaking into common usage
   // GET
-  get<T>(endpoint: string): Promise<T>;
-  get<T>(endpoint: string, options: Omit<RequestOptions, 'method' | 'body'> & { silent: true }): Promise<T | null>;
-  get<T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'> & { silent?: false }): Promise<T>;
-  get<T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>): Promise<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get<T = any>(endpoint: string): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get<T = any>(endpoint: string, options: Omit<RequestOptions, 'method' | 'body'> & { silent: true }): Promise<T | null>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get<T = any>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'> & { silent?: false }): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get<T = any>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>): Promise<T> {
     return this.request<T>(endpoint, { ...(options || {}), method: 'GET' }) as Promise<T>;
   }
 
   // POST
-  post<T>(endpoint: string, body?: any): Promise<T>;
-  post<T>(endpoint: string, body: any, options: Omit<RequestOptions, 'method'> & { silent: true }): Promise<T | null>;
-  post<T>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'> & { silent?: false }): Promise<T>;
-  post<T>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'>): Promise<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  post<T = any>(endpoint: string, body?: any): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  post<T = any>(endpoint: string, body: any, options: Omit<RequestOptions, 'method'> & { silent: true }): Promise<T | null>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  post<T = any>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'> & { silent?: false }): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  post<T = any>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'>): Promise<T> {
     return this.request<T>(endpoint, { ...(options || {}), method: 'POST', body }) as Promise<T>;
   }
 
   // PUT
-  put<T>(endpoint: string, body?: any): Promise<T>;
-  put<T>(endpoint: string, body: any, options: Omit<RequestOptions, 'method'> & { silent: true }): Promise<T | null>;
-  put<T>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'> & { silent?: false }): Promise<T>;
-  put<T>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'>): Promise<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  put<T = any>(endpoint: string, body?: any): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  put<T = any>(endpoint: string, body: any, options: Omit<RequestOptions, 'method'> & { silent: true }): Promise<T | null>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  put<T = any>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'> & { silent?: false }): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  put<T = any>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'>): Promise<T> {
     return this.request<T>(endpoint, { ...(options || {}), method: 'PUT', body }) as Promise<T>;
   }
 
   // PATCH
-  patch<T>(endpoint: string, body?: any): Promise<T>;
-  patch<T>(endpoint: string, body: any, options: Omit<RequestOptions, 'method'> & { silent: true }): Promise<T | null>;
-  patch<T>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'> & { silent?: false }): Promise<T>;
-  patch<T>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'>): Promise<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  patch<T = any>(endpoint: string, body?: any): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  patch<T = any>(endpoint: string, body: any, options: Omit<RequestOptions, 'method'> & { silent: true }): Promise<T | null>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  patch<T = any>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'> & { silent?: false }): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  patch<T = any>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'method'>): Promise<T> {
     return this.request<T>(endpoint, { ...(options || {}), method: 'PATCH', body }) as Promise<T>;
   }
 
   // DELETE
-  delete<T>(endpoint: string): Promise<T>;
-  delete<T>(endpoint: string, options: Omit<RequestOptions, 'method' | 'body'> & { silent: true }): Promise<T | null>;
-  delete<T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'> & { silent?: false }): Promise<T>;
-  delete<T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>): Promise<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete<T = any>(endpoint: string): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete<T = any>(endpoint: string, options: Omit<RequestOptions, 'method' | 'body'> & { silent: true }): Promise<T | null>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete<T = any>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'> & { silent?: false }): Promise<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete<T = any>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>): Promise<T> {
     return this.request<T>(endpoint, { ...(options || {}), method: 'DELETE' }) as Promise<T>;
   }
 
@@ -1237,6 +1259,9 @@ export class ApiError extends Error {
   public readonly timestamp: string;
   public readonly isRetryable: boolean;
 
+  /** Alias for statusCode — used by hook onError handlers */
+  get status(): number { return this.statusCode; }
+
   constructor(
     message: string,
     public statusCode: number,
@@ -1400,7 +1425,7 @@ export class ApiError extends Error {
   /**
    * Format error for console output
    */
-  toString(): string {
+  override toString(): string {
     return `${this.name} [${this.statusCode}${this.code ? ` - ${this.code}` : ''}]: ${this.message}`;
   }
 }

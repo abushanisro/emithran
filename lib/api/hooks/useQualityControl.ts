@@ -154,7 +154,7 @@ export function useCreateQualityInspection() {
       const response = await apiClient.post<QualityInspection>('/quality-control/inspections', data);
       return response;
     },
-    onSuccess: (newInspection, variables) => {
+    onSuccess: (_newInspection, variables) => {
       toast.success('Quality inspection created successfully');
       
       // Invalidate and refetch inspections list
@@ -167,7 +167,7 @@ export function useCreateQualityInspection() {
         queryKey: QUERY_KEYS.dashboard(variables.project_id),
       });
     },
-    onError: (error) => {
+    onError: (_error) => {
       toast.error('Failed to create quality inspection');
     },
   });
@@ -196,7 +196,7 @@ export function useUpdateQualityInspection() {
         queryKey: QUERY_KEYS.inspections(updatedInspection.project_id),
       });
     },
-    onError: (error) => {
+    onError: (_error) => {
       toast.error('Failed to update quality inspection');
     },
   });
@@ -233,7 +233,7 @@ export function useSubmitInspectionResults() {
         });
       }
     },
-    onError: (error) => {
+    onError: (_error) => {
       toast.error('Failed to submit inspection results');
     },
   });
@@ -255,7 +255,7 @@ export function useStartInspection() {
         queryKey: QUERY_KEYS.inspections(updatedInspection.project_id),
       });
     },
-    onError: (error) => {
+    onError: (_error) => {
       toast.error('Failed to start inspection');
     },
   });
@@ -289,7 +289,7 @@ export function useCompleteInspection() {
         queryKey: QUERY_KEYS.dashboard(updatedInspection.project_id),
       });
     },
-    onError: (error) => {
+    onError: (_error) => {
       toast.error('Failed to complete inspection');
     },
   });
@@ -354,7 +354,7 @@ export function useSaveDetailedInspectionReport() {
         queryKey: ['quality-inspections'],
       });
     },
-    onError: (error) => {
+    onError: (_error) => {
       toast.error('Failed to save inspection report');
     },
   });
@@ -465,7 +465,7 @@ export function useDeleteQualityInspection() {
         queryKey: ['quality-inspection', inspectionId],
       });
     },
-    onError: (error) => {
+    onError: (_error) => {
       toast.error('Failed to delete quality inspection');
     },
   });

@@ -7,13 +7,16 @@ import { StepConverterService } from './services/step-converter.service';
 import { BomItemCostService } from './services/bom-item-cost.service';
 import { CADAnalysisService } from './services/cad-analysis.service';
 import { AutoFillService } from './services/auto-fill.service';
+import { SheetMetalFeatureExtractorService } from './services/sheet-metal-feature-extractor.service';
+import { DFMScoringService } from './services/dfm-scoring.service';
+import { MaterialIntelligenceService } from './services/material-intelligence.service';
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
   imports: [SupabaseModule, LoggerModule, ConfigModule],
   controllers: [BOMItemsController],
-  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService],
+  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalFeatureExtractorService, DFMScoringService, MaterialIntelligenceService],
   exports: [BOMItemsService, BomItemCostService, CADAnalysisService, AutoFillService],
 })
 export class BOMItemsModule {}

@@ -42,6 +42,35 @@ export class ScopeClassifierService {
       }
     }
 
+    // 2b. Material-keyword family hints — drawing material is already promoted
+    //     into bom.materialHint before classify() is called (retrieval.service.ts).
+    //     These override geometry heuristics because material evidence is more reliable.
+    if (/\b(sheet|plate|cold.?rolled|\bcr\b|\bhr\b|strip|shim|coil|flat\s*bar)\b/.test(materialHint)) {
+      return this.inScope(
+        'sheet_metal',
+        `Material "${bom.materialHint}" matches sheet/plate keywords`,
+        0.92,
+      );
+    }
+    if (/\b(bar\s*stock|round\s*bar|hex\s*bar|\brod\b|\bbillet\b)/.test(materialHint)) {
+      return this.inScope(
+        'cnc_turned',
+        `Material "${bom.materialHint}" matches bar/rod stock keywords`,
+        0.90,
+      );
+    }
+
+    // 2c. Part name keywords — many sheet metal parts are named as brackets/panels/covers
+    //     even when the material field is generic "Steel" or blank.
+    const partName = (bom.partName ?? '').toLowerCase();
+    if (/\b(bracket|panel|cover|enclosure|clip|chassis|shroud|shield|flange|duct|gusset|tray|housing\s*cover)\b|frame\b/.test(partName)) {
+      return this.inScope(
+        'sheet_metal',
+        `Part name "${bom.partName}" matches sheet metal indicator keyword`,
+        0.82,
+      );
+    }
+
     // 3. Pull dimensions (prefer DFM bbox if it exists, fall back to BOM dims)
     const lengthMm = dfm.boundingBox.lengthMm || bom.dimensions.lengthMm || 1;
     const widthMm = dfm.boundingBox.widthMm || bom.dimensions.widthMm || 1;
@@ -61,13 +90,47 @@ export class ScopeClassifierService {
       );
     }
 
-    // 5. Sheet metal — one dim very thin + flat profile
-    if (minDim < 4 && aspectRatio > 6) {
+    // 5. Sheet metal — one dim thin + flat profile.
+    //    Threshold raised from 4mm to 12mm: catches 6mm aluminium/steel sheet
+    //    (e.g. 200×150×6 → aspectRatio 33) while excluding solid prismatic blocks.
+    if (minDim < 12 && aspectRatio > 4) {
       return this.inScope(
         'sheet_metal',
-        `Flat profile (min dim ${minDim.toFixed(1)}mm) + aspect ratio ${aspectRatio.toFixed(1)} = sheet metal`,
+        `Flat profile (min dim ${minDim.toFixed(1)}mm, aspect ${aspectRatio.toFixed(1)}) → sheet metal`,
         0.85,
       );
+    }
+
+    // 5b. Low volume fill-fraction: perforated/cut-out sheet with holes uses much less
+    //     volume than the bounding box predicts.
+    const bboxVol = lengthMm * widthMm * heightMm;
+    if (bboxVol > 0 && dfm.volumeMm3 > 0 && (dfm.volumeMm3 / bboxVol) < 0.10 && minDim < 60) {
+      return this.inScope(
+        'sheet_metal',
+        `Low volume fill (${((dfm.volumeMm3 / bboxVol) * 100).toFixed(0)}%) with min dim ${minDim.toFixed(1)}mm → sheet metal frame`,
+        0.78,
+      );
+    }
+    if (dfm.thinWallCount > 0 && minDim < 60) {
+      return this.inScope(
+        'sheet_metal',
+        `Thin-wall feature detected + min dim ${minDim.toFixed(1)}mm → sheet metal`,
+        0.80,
+      );
+    }
+
+    // 5c. SA/Vol ratio: solid machined parts ~0.1–0.4 mm⁻¹; open frames/panels >0.8.
+    //     bboxVol > 100_000 skips small solid parts (pins/shafts) that also have high
+    //     SA/Vol simply because they are tiny — those are caught by the cylinder rule below.
+    if (dfm.surfaceAreaMm2 > 0 && dfm.volumeMm3 > 0 && bboxVol > 100_000) {
+      const saVol = dfm.surfaceAreaMm2 / dfm.volumeMm3;
+      if (saVol > 0.8 && minDim < 100) {
+        return this.inScope(
+          'sheet_metal',
+          `High SA/Vol ratio (${saVol.toFixed(2)} mm⁻¹) with min dim ${minDim.toFixed(1)}mm → sheet metal frame/panel`,
+          0.82,
+        );
+      }
     }
 
     // 6. CNC turned — cylindrical/rotational symmetry

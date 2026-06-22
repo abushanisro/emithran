@@ -2,6 +2,8 @@ import { EngineeringBrief } from './engineering-brief.dto';
 import { CandidateSet } from './candidate-set.dto';
 import { AbstractPlan } from './abstract-plan.dto';
 import { DraftPackage } from './draft-line.dto';
+import type { RouteIssue } from '../../manufacturing-knowledge/dto/kb.dto';
+import type { ManufacturingImplication } from './manufacturing-implication.dto';
 
 export type GenerationStatus =
   | 'running'
@@ -43,6 +45,12 @@ export interface GenerationResponse {
 
   errorMessage: string | null;
   errorStage: string | null;
+
+  routeValidationIssues?: RouteIssue[];
+  hasValidationErrors?: boolean;
+  partFamily?: string;
+  templateUsed?: string | null;
+  implications?: ManufacturingImplication[];
 
   startedAt: string;
   completedAt: string | null;

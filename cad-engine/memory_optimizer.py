@@ -5,7 +5,6 @@ Production-quality implementation exceeding Apriori's capabilities
 Integrates with existing OpenCascade CAD engine for enterprise-grade memory optimization,
 geometry analysis, and DFM insights
 """
-
 import os
 import gc
 import hashlib
@@ -29,13 +28,14 @@ except ImportError:
 
 from OCC.Core.TopoDS import TopoDS_Shape  # type: ignore
 from OCC.Core.GProp import GProp_GProps  # type: ignore
-from OCC.Core.BRepGProp import brepgprop_LinearProperties, brepgprop_SurfaceProperties, brepgprop_VolumeProperties  # type: ignore
+from OCC.Core.BRepGProp import brepgprop, brepgprop_LinearProperties, brepgprop_VolumeProperties  # type: ignore
 from OCC.Core.Bnd import Bnd_Box  # type: ignore
 from OCC.Core.BRepBndLib import brepbndlib_Add  # type: ignore
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh  # type: ignore
 from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
 from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX  # type: ignore
 from OCC.Core.BRep import BRep_Tool  # type: ignore
+from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
 from OCC.Core.TopoDS import topods  # type: ignore
 from OCC.Core.gp import gp_Pnt  # type: ignore
 from OCC.Core.BRepTools import breptools_UVBounds  # type: ignore
@@ -107,7 +107,8 @@ class AdvancedCADMemoryOptimizer:
     - Concurrent processing of 50+ parts
     """
     
-    VERSION = "2.1.0"
+    VERSION = "2.2.0"
+    CACHE_VERSION = "geo_v7"  # bump when extraction logic changes to auto-invalidate stale cache entries
     
     # Performance constants optimized for enterprise workloads
     OPTIMIZATION_THRESHOLDS = {
@@ -188,11 +189,10 @@ class AdvancedCADMemoryOptimizer:
             Complete optimization result with geometry features, DFM analysis, and memory metrics
         """
         start_time = datetime.now()
-        
         try:
             # Generate geometry hash for caching
             geometry_hash = self._calculate_geometry_hash(shape, file_path, file_hash)
-            
+
             # Check cache first (unless forced reanalysis)
             if not force_reanalysis and geometry_hash in self.optimization_cache:
                 cached_result = self.optimization_cache[geometry_hash]
@@ -269,7 +269,7 @@ class AdvancedCADMemoryOptimizer:
         surface_props = GProp_GProps()
 
         brepgprop_VolumeProperties(shape, volume_props)
-        brepgprop_SurfaceProperties(shape, surface_props)
+        brepgprop.SurfaceProperties(shape, surface_props)
 
         volume = max(volume_props.Mass(), 0.0)
         surface_area = max(surface_props.Mass(), 0.0)
@@ -279,10 +279,17 @@ class AdvancedCADMemoryOptimizer:
         brepbndlib_Add(shape, bbox)
         xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
 
+        # Sort dimensions so length >= width >= height regardless of STEP axis orientation.
+        # A sheet-metal part lying on any axis will always have height = thinnest dim.
+        _extents = sorted([
+            round(xmax - xmin, 4),
+            round(ymax - ymin, 4),
+            round(zmax - zmin, 4),
+        ], reverse=True)
         bounding_box = {
-            'length': round(xmax - xmin, 4),
-            'width': round(ymax - ymin, 4),
-            'height': round(zmax - zmin, 4),
+            'length':   _extents[0],
+            'width':    _extents[1],
+            'height':   _extents[2],
             'diagonal': round(((xmax-xmin)**2 + (ymax-ymin)**2 + (zmax-zmin)**2)**0.5, 4)
         }
 
@@ -324,10 +331,14 @@ class AdvancedCADMemoryOptimizer:
 
     def _analyze_manufacturing_features(self, shape: TopoDS_Shape, bounding_box: dict) -> dict:
         """Real manufacturing feature analysis using OpenCASCADE topology."""
+        # Mesh the shape before any topology queries so BRep_Tool.Triangulation returns
+        # face data for face_map.  Same deflection params as ShapeMesher in services.py
+        # (0.1 linear / 0.5 angular) guarantees triangle counts match StlAPI_Writer output.
+        _mesh = BRepMesh_IncrementalMesh(shape, 0.1, False, 0.5, True)
+        _mesh.Perform()
+
         # Compute OCC bounding box min/max once — used by all detectors
         # to normalize face centroids to [-1, +1] relative to bbox centre.
-        # This mirrors Three.js geometry.center() so dots land on the right
-        # part of the model regardless of the CAD file's world origin.
         bbox_raw = Bnd_Box()
         brepbndlib_Add(shape, bbox_raw)
         xmin, ymin, zmin, xmax, ymax, zmax = bbox_raw.Get()
@@ -342,11 +353,46 @@ class AdvancedCADMemoryOptimizer:
         min_wall = self._analyze_wall_thickness_real(shape, bounding_box)
         undercuts = self._detect_undercuts_real(shape, bbox_minmax)
 
+        # ── Manufacturing intelligence: family detection + family-specific features ──
+        manufacturing_intelligence: dict = {}
+        try:
+            from feature_extractors import detect_part_family, SheetMetalFeatureExtractor  # type: ignore
+            dims_list = [bounding_box['length'], bounding_box['width'], bounding_box['height']]
+            detected_family, family_confidence = detect_part_family(
+                dims_list,
+                holes.get('count', 0),
+                pockets.get('count', 0),
+            )
+            manufacturing_intelligence = {
+                'detected_family': detected_family,
+                'family_confidence': round(family_confidence, 3),
+                'features': {},
+            }
+            if detected_family == 'sheet_metal':
+                extractor = SheetMetalFeatureExtractor()
+                # Pass raw_cylinders from the already-completed face iteration so
+                # SheetMetalFeatureExtractor skips a redundant full-topology scan.
+                manufacturing_intelligence['features'] = extractor.extract(
+                    shape, dims_list,
+                    raw_cylinders=holes.get('raw_cylinders'),
+                    raw_cylinders_full=holes.get('raw_cylinders_full'),
+                    bbox_minmax=bbox_minmax,
+                    face_map=holes.get('face_map', []),
+                    face_map_tri_total=holes.get('face_map_tri_total', 0),
+                    face_id_map=holes.get('face_id_map', {}),
+                    adjacent_face_ids=holes.get('adjacent_face_ids', {}),
+                )
+            logger.info(f"[mfg_intel] family={detected_family} confidence={family_confidence:.2f}")
+        except Exception as e:
+            logger.warning(f"[mfg_intel] extraction failed: {e}")
+            manufacturing_intelligence = {'error': str(e)}
+
         return {
+            'manufacturing_intelligence': manufacturing_intelligence,
             'holes': holes,
             'pockets': pockets,
             'thin_walls': min_wall,
-            'undercuts': undercuts
+            'undercuts': undercuts,
         }
 
     def _detect_holes_real(self, shape: TopoDS_Shape, bbox_minmax: dict) -> dict:
@@ -358,7 +404,6 @@ class AdvancedCADMemoryOptimizer:
         from OCC.Core.GeomAbs import GeomAbs_Cylinder # type: ignore
         from OCC.Core.BRepAdaptor import BRepAdaptor_Surface # type: ignore
         from OCC.Core.TopoDS import topods # type: ignore
-        from OCC.Core.BRepGProp import brepgprop_SurfaceProperties # type: ignore
         from OCC.Core.GProp import GProp_GProps # type: ignore
 
         xmid = (bbox_minmax['xmin'] + bbox_minmax['xmax']) / 2
@@ -368,8 +413,25 @@ class AdvancedCADMemoryOptimizer:
         hy   = max((bbox_minmax['ymax'] - bbox_minmax['ymin']) / 2, 0.001)
         hz   = max((bbox_minmax['zmax'] - bbox_minmax['zmin']) / 2, 0.001)
 
-        hole_radii = []
-        hole_positions = []  # normalised {nx, ny, nz} each in [-1, +1]
+        hole_radii: List[float] = []
+        hole_positions: List[dict] = []
+        # (radius_mm, abs_axis_z) — reused by SheetMetalFeatureExtractor to skip
+        # a second full face iteration for bend/hole discrimination.
+        raw_cylinders: List[Tuple[float, float]] = []
+        # Full spatial data: 9-tuple (radius, abs_axis_z, cx, cy, cz, ax, ay, az, face_index)
+        # cx/cy/cz = absolute centroid from cyl.Axis().Location() (O(1), no SurfaceProperties)
+        # ax/ay/az = axis direction unit vector
+        # face_index = OCC face ordinal from current parse session.
+        #   NOT stable across STEP regeneration — runtime reference only, never long-term identity.
+        #   Increments for ALL faces (not just cylinders) to align with future GLTF TopExp walk order.
+        raw_cylinders_full: List[Tuple] = []
+        _MAX_POSITIONS = 100  # cap expensive SurfaceProperties calls for large parts
+        face_index = 0  # counts ALL faces — aligns with future GLTF TopExp walk order
+        # face_map: face_id → {tri_start, tri_count} for exact STL triangle highlighting.
+        # Accumulated in the same TopExp_Explorer walk so ordinals match feature_graph_v2.
+        face_map: List[Dict] = []
+        face_id_map: Dict[int, int] = {}  # OCC face hash → face_index (for slot topology)
+        _tri_counter = 0
         face_explorer = TopExp_Explorer(shape, TopAbs_FACE)
 
         while face_explorer.More():
@@ -377,36 +439,163 @@ class AdvancedCADMemoryOptimizer:
                 face = topods.Face(face_explorer.Current())
                 adaptor = BRepAdaptor_Surface(face)
                 if adaptor.GetType() == GeomAbs_Cylinder:
-                    radius = adaptor.Cylinder().Radius()
+                    cyl = adaptor.Cylinder()
+                    radius = cyl.Radius()
+                    axis = cyl.Axis()
+                    axis_dir = axis.Direction()
+                    axis_loc = axis.Location()
+                    axis_z = abs(float(axis_dir.Z()))
+                    # Compute midpoint of this face's axis segment (O(1), no SurfaceProperties).
+                    # axis.Location() is the math origin of the infinite axis line — not the face
+                    # center. For horizontal bend faces the origin can be outside the part envelope.
+                    # Parameterise V to find where this face patch sits along the axis.
+                    v_start = adaptor.FirstVParameter()
+                    v_end = adaptor.LastVParameter()
+                    v_mid = (v_start + v_end) / 2
+                    v_range = abs(v_end - v_start)
+                    u_range_rad = abs(adaptor.LastUParameter() - adaptor.FirstUParameter())
+                    face_cx = float(axis_loc.X()) + v_mid * float(axis_dir.X())
+                    face_cy = float(axis_loc.Y()) + v_mid * float(axis_dir.Y())
+                    face_cz = float(axis_loc.Z()) + v_mid * float(axis_dir.Z())
+                    raw_cylinders.append((round(radius, 3), axis_z))
+                    raw_cylinders_full.append((
+                        round(radius, 3),
+                        axis_z,
+                        round(face_cx, 2),   # midpoint of axis segment — inside part envelope
+                        round(face_cy, 2),
+                        round(face_cz, 2),
+                        round(float(axis_dir.X()), 4),
+                        round(float(axis_dir.Y()), 4),
+                        round(float(axis_dir.Z()), 4),
+                        face_index,          # runtime ref — NOT stable across STEP regeneration
+                        round(v_range, 2),   # m[9]: axial patch length mm (bend_length / hole depth)
+                        round(u_range_rad, 4),  # m[10]: angular extent in radians (bend angle)
+                    ))
                     if 0.5 <= radius <= 150.0:
                         hole_radii.append(round(radius, 3))
-                        props = GProp_GProps()
-                        brepgprop_SurfaceProperties(face, props)
-                        cg = props.CentreOfMass()
-                        hole_positions.append({
-                            'nx': round(float((cg.X() - xmid) / hx), 4),  # type: ignore
-                            'ny': round(float((cg.Y() - ymid) / hy), 4),  # type: ignore
-                            'nz': round(float((cg.Z() - zmid) / hz), 4),  # type: ignore
-                        })
+                        if len(hole_positions) < _MAX_POSITIONS:
+                            props = GProp_GProps()
+                            brepgprop.SurfaceProperties(face, props)
+                            cg = props.CentreOfMass()
+                            hole_positions.append({
+                                'nx': round(float((cg.X() - xmid) / hx), 4),  # type: ignore
+                                'ny': round(float((cg.Y() - ymid) / hy), 4),  # type: ignore
+                                'nz': round(float((cg.Z() - zmid) / hz), 4),  # type: ignore
+                            })
             except Exception:
                 pass
+            # Build face_id_map (hash → index) for slot edge-topology lookup
+            try:
+                face_id_map[face.HashCode(2 ** 31 - 1)] = face_index
+            except Exception:
+                pass
+            # Count triangles for face_map: face_id → {tri_start, tri_count}
+            # Valid if StlAPI_Writer uses same TopExp order (verified by sum == STL header count).
+            try:
+                _loc = TopLoc_Location()
+                _tri = BRep_Tool.Triangulation(face, _loc)
+                _n = _tri.NbTriangles() if _tri is not None else 0
+            except Exception:
+                _n = 0
+            face_map.append({'face_id': face_index, 'tri_start': _tri_counter, 'tri_count': _n})
+            _tri_counter += _n
+            face_index += 1  # ALL faces increment, not just cylinders
             face_explorer.Next()
+
+        # Pass 2: adjacent planar faces for hole cylinders.
+        # For each vertical cylinder (hole, axis_z >= 0.5), find planar faces sharing an edge.
+        # Area filter excludes the large sheet top/bottom; keeps only the annular rim faces.
+        # Result: hole face_ids in feature_graph_v2 include the rim — visually prominent from above.
+        adjacent_face_ids: Dict[int, List[int]] = {}
+        try:
+            import math
+            from OCC.Core.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape, TopTools_IndexedMapOfShape  # type: ignore
+            from OCC.Core.TopExp import topexp  # type: ignore
+            from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+            from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
+
+            edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+            topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_face_map)  # type: ignore
+
+            # Second walk: face_index → face handle + indexed map for O(1) shape→index lookup
+            fi_to_face_shape: Dict[int, Any] = {}
+            face_shape_indexed = TopTools_IndexedMapOfShape()
+            fe2 = TopExp_Explorer(shape, TopAbs_FACE)
+            fi2 = 0
+            while fe2.More():
+                fi_to_face_shape[fi2] = topods.Face(fe2.Current())
+                face_shape_indexed.Add(fe2.Current())
+                fi2 += 1
+                fe2.Next()
+
+            # Only process hole cylinders (vertical axis)
+            hole_cyl_faces = {m[8]: m[0] for m in raw_cylinders_full if m[1] >= 0.5}
+            for cyl_fi, cyl_r in hole_cyl_faces.items():
+                cyl_face_shape = fi_to_face_shape.get(cyl_fi)
+                if cyl_face_shape is None:
+                    continue
+                area_threshold = max(500.0, math.pi * cyl_r * cyl_r * 30)
+                adj_planar: List[int] = []
+                seen_fi: set = set()
+                edge_exp2 = TopExp_Explorer(cyl_face_shape, TopAbs_EDGE)
+                while edge_exp2.More():
+                    edge_shape = topods.Edge(edge_exp2.Current())
+                    idx = edge_face_map.FindIndex(edge_shape)
+                    if idx > 0:
+                        adj_list = edge_face_map.FindFromIndex(idx)
+                        it = TopTools_ListIteratorOfListOfShape(adj_list)
+                        while it.More():
+                            adj_face = topods.Face(it.Value())
+                            it.Next()
+                            adj_fi = face_shape_indexed.FindIndex(adj_face) - 1  # 1-based → 0-based
+                            if adj_fi < 0 or adj_fi in seen_fi or adj_fi == cyl_fi:
+                                continue
+                            seen_fi.add(adj_fi)
+                            try:
+                                if BRepAdaptor_Surface(adj_face).GetType() == GeomAbs_Plane:
+                                    props = GProp_GProps()
+                                    brepgprop.SurfaceProperties(adj_face, props)
+                                    if props.Mass() <= area_threshold:
+                                        adj_planar.append(adj_fi)
+                            except Exception:
+                                pass
+                    edge_exp2.Next()
+                if adj_planar:
+                    adjacent_face_ids[cyl_fi] = adj_planar
+        except Exception as e:
+            logger.warning(f"[_detect_holes_real] adjacent_face_ids pass failed: {e}")
+            adjacent_face_ids = {}
 
         if not hole_radii:
             return {
                 'count': 0, 'min_diameter': None, 'max_diameter': None,
-                'depth_diameter_ratio': None, 'edge_distance': None, 'positions': [],
+                'depth_diameter_ratio': None, 'edge_distance': None,
+                'positions': [], 'raw_cylinders': raw_cylinders,
+                'raw_cylinders_full': raw_cylinders_full,
+                'face_map': face_map,
+                'face_map_tri_total': _tri_counter,
+                'face_id_map': face_id_map,
+                'adjacent_face_ids': adjacent_face_ids,
             }
 
         diameters = [r * 2 for r in hole_radii]
+        all_diameters = sorted(round(d, 1) for d in diameters)
+        logger.info(f"face_map built: {len(face_map)} faces, {_tri_counter} triangles total")
         return {
             'count': len(hole_radii),
             'min_diameter': round(min(diameters), 3),
             'max_diameter': round(max(diameters), 3),
-            'diameters': sorted(set(round(d, 1) for d in diameters)),
+            'diameters': sorted(set(all_diameters)),
+            'all_diameters': all_diameters,
             'depth_diameter_ratio': None,
             'edge_distance': None,
             'positions': hole_positions,
+            'raw_cylinders': raw_cylinders,
+            'raw_cylinders_full': raw_cylinders_full,
+            'face_map': face_map,
+            'face_map_tri_total': _tri_counter,
+            'face_id_map': face_id_map,
+            'adjacent_face_ids': adjacent_face_ids,
         }
 
     def _detect_pockets_real(self, shape: TopoDS_Shape, bbox_minmax: dict) -> dict:
@@ -418,7 +607,6 @@ class AdvancedCADMemoryOptimizer:
         from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
         from OCC.Core.TopoDS import topods  # type: ignore
         from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
-        from OCC.Core.BRepGProp import brepgprop_SurfaceProperties  # type: ignore
         from OCC.Core.GProp import GProp_GProps  # type: ignore
 
         xmid = (bbox_minmax['xmin'] + bbox_minmax['xmax']) / 2
@@ -447,7 +635,7 @@ class AdvancedCADMemoryOptimizer:
                     if 0.5 < depth_from_top < total_height * 0.9:
                         pocket_depths.append(round(depth_from_top, 3))
                         props = GProp_GProps()
-                        brepgprop_SurfaceProperties(face, props)
+                        brepgprop.SurfaceProperties(face, props)
                         cg = props.CentreOfMass()
                         pocket_positions.append({
                             'nx': round(float((cg.X() - xmid) / hx), 4),  # type: ignore
@@ -491,7 +679,6 @@ class AdvancedCADMemoryOptimizer:
         from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
         from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
         from OCC.Core.TopoDS import topods  # type: ignore
-        from OCC.Core.BRepGProp import brepgprop_SurfaceProperties  # type: ignore
         from OCC.Core.GProp import GProp_GProps  # type: ignore
 
         xmid = (bbox_minmax['xmin'] + bbox_minmax['xmax']) / 2
@@ -514,7 +701,7 @@ class AdvancedCADMemoryOptimizer:
                     if normal.Z() < -0.7:
                         undercut_faces = undercut_faces + 1  # type: ignore
                         props = GProp_GProps()
-                        brepgprop_SurfaceProperties(face, props)
+                        brepgprop.SurfaceProperties(face, props)
                         cg = props.CentreOfMass()
                         undercut_positions.append({
                             'nx': round(float((cg.X() - xmid) / hx), 4),  # type: ignore
@@ -812,7 +999,10 @@ class AdvancedCADMemoryOptimizer:
         # Add shape topology information
         feature_count = self._count_topological_features(shape)
         hasher.update(json.dumps(feature_count, sort_keys=True).encode())
-        
+
+        # Salt with extraction logic version so algorithm changes auto-invalidate
+        hasher.update(self.CACHE_VERSION.encode())
+
         return hasher.hexdigest()
 
     def _count_topological_features(self, shape: TopoDS_Shape) -> Dict[str, int]:

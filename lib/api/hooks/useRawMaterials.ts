@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { toast } from 'sonner';
 
-import {
+import type {
   Currency,
   Country,
   MaterialShape,
@@ -219,7 +219,7 @@ export function useUpdateRawMaterial() {
       const response = await apiClient.put<RawMaterial>(`/raw-materials/${id}`, data);
       return response;
     },
-    onSuccess: (updatedMaterial, variables) => {
+    onSuccess: (_updatedMaterial, _variables) => {
       // Force immediate cache invalidation to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['raw-materials'] });
       queryClient.invalidateQueries({ queryKey: ['raw-materials', 'filter-options'] });

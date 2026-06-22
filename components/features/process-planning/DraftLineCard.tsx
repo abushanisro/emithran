@@ -5,6 +5,9 @@ import { ChevronDown, ChevronRight, X, Database, Calculator, FlaskConical } from
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { DraftLine, DraftLineKind } from '@/lib/api/hooks/useProcessPlanGenerate';
+import { FEATURE_GROUP_META, featureGroupFromType } from '@/lib/utils/feature-colors';
+import type { FeatureGroup } from '@/lib/utils/feature-colors';
+import { FeatureExplainCard } from './FeatureExplainCard';
 
 interface Props {
   line: DraftLine;
@@ -12,6 +15,9 @@ interface Props {
   override: Record<string, any> | null;
   onFieldChange: (fieldPath: string, value: unknown) => void;
   onRemove: () => void;
+  featureGraph?: { features: any[] };
+  onFeatureHighlight?: (feature: any | null, group: FeatureGroup | null) => void;
+  onFeatureFocus?: (feature: any | null, group: FeatureGroup | null) => void;
 }
 
 const EDITABLE_FIELDS_BY_KIND: Record<DraftLineKind, Array<{ path: string; label: string; type: 'number' | 'string' }>> = {
@@ -184,10 +190,12 @@ function ProcessBreakdown({ d }: { d: Record<string, any> }) {
     timingSource === 'calculator'        ? 'Calculator (geometry)' :
     timingSource === 'geometry_estimate' ? 'Geometry estimate (physics)' :
     timingSource === 'ai_hint'          ? 'AI estimate' :
+    timingSource === 'feature_geometry' ? 'Feature geometry (physics)' :
                                           'Default fallback';
   const timingSourceIcon: 'calc' | 'db' | 'formula' =
     timingSource === 'calculator'        ? 'calc' :
     timingSource === 'geometry_estimate' ? 'formula' :
+    timingSource === 'feature_geometry' ? 'formula' :
     timingSource === 'ai_hint'          ? 'formula' : 'formula';
 
   return (
@@ -328,11 +336,19 @@ function CostBreakdownSection({ line, merged }: { line: DraftLine; merged: Recor
 
 // ─── Main card ────────────────────────────────────────────────────────────────
 
-export function DraftLineCard({ line, removed, override, onFieldChange, onRemove }: Props) {
+export function DraftLineCard({ line, removed, override, onFieldChange, onRemove, featureGraph, onFeatureHighlight, onFeatureFocus }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<'breakdown' | 'edit' | 'candidates'>('breakdown');
+  const [explainOpen, setExplainOpen] = useState(false);
   const merged = { ...line.data, ...(override ?? {}) };
   const fields = EDITABLE_FIELDS_BY_KIND[line.kind];
+
+  // Feature highlight state for process lines
+  const featureId = line.kind === 'process' ? (line.data as any).featureId : null;
+  const feat = featureId ? featureGraph?.features?.find((f: any) => f.id === featureId) : null;
+  const featureGroup = feat ? featureGroupFromType(feat.type) as FeatureGroup : null;
+  const featureMeta = featureGroup ? FEATURE_GROUP_META[featureGroup] : null;
+  const featureConf = feat?.confidence != null ? Math.round(feat.confidence * 100) : null;
 
   if (removed) {
     return (
@@ -350,12 +366,44 @@ export function DraftLineCard({ line, removed, override, onFieldChange, onRemove
           {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium truncate">{describeLine({ ...line, data: merged })}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-medium truncate flex-1">{describeLine({ ...line, data: merged })}</p>
+            {featureMeta && (
+              <div className="flex items-center gap-1 shrink-0">
+                {featureConf != null && (
+                  <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full ${
+                    featureConf >= 90 ? 'bg-emerald-500/20 text-emerald-400' :
+                    featureConf >= 70 ? 'bg-amber-500/20 text-amber-400' :
+                                       'bg-red-500/20 text-red-400'
+                  }`}>{featureConf}%</span>
+                )}
+                <button
+                  title={`${featureMeta.label}${feat?.count ? ` ×${feat.count}` : ''}${feat?.spec ? ` ${feat.spec}` : ''} — click to explain`}
+                  className="h-3.5 w-3.5 rounded-full border border-white/20 shadow-sm transition-transform hover:scale-125"
+                  style={{ backgroundColor: featureMeta.hexColor }}
+                  onMouseEnter={() => onFeatureHighlight?.(feat, featureGroup)}
+                  onMouseLeave={() => onFeatureHighlight?.(null, null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExplainOpen((v) => !v);
+                    onFeatureFocus?.(feat, featureGroup);
+                  }}
+                />
+              </div>
+            )}
+          </div>
           <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{line.reason}</p>
           {line.estimatedCost !== null && (
             <p className="text-[11px] text-primary tabular-nums mt-0.5 font-semibold">
               ₹{line.estimatedCost.toFixed(4)}/part
             </p>
+          )}
+          {explainOpen && feat && (
+            <FeatureExplainCard
+              feature={feat}
+              reason={line.reason}
+              onClose={() => setExplainOpen(false)}
+            />
           )}
         </div>
         <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={onRemove}>

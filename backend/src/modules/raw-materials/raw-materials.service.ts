@@ -38,7 +38,7 @@ export class RawMaterialsService {
     // Search across multiple fields
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
+        `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_grade.ilike.%${query.search}%`
       );
     }
 
@@ -502,6 +502,7 @@ export class RawMaterialsService {
       limit: number;
       category?: string;
       search?: string;
+      partFamily?: string;
     },
     userId?: string,
     accessToken?: string
@@ -541,12 +542,13 @@ export class RawMaterialsService {
       };
       
       const materialGroup = categoryMapping[query.category] || query.category;
-      queryBuilder = queryBuilder.eq('material_group', materialGroup);
+      const groupKeyword = materialGroup.split(' ')[0];
+      queryBuilder = queryBuilder.ilike('material_group', `%${groupKeyword}%`);
     }
 
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
+        `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_grade.ilike.%${query.search}%`
       );
     }
 
@@ -573,7 +575,7 @@ export class RawMaterialsService {
         id: item.id,
         materialName: materialName,
         materialGrade: materialGrade,
-        materialSpecification: item.application || item.material_specification || '',
+        materialSpecification: item.material_specification || '',
         manufacturer: item.manufacturer || '',
         supplier: item.supplier || '',
         categoryName: materialGroup,
@@ -610,6 +612,33 @@ export class RawMaterialsService {
         updatedAt: item.updated_at || new Date().toISOString(),
       };
     });
+
+    // Form-based ranking by manufacturing family
+    const FAMILY_PREFERRED_SHAPES: Record<string, string[]> = {
+      'sheet_metal':       ['sheets', 'coils', 'plates'],
+      'cnc_milled':        ['plates', 'blocks', 'bars', 'ingots'],
+      'cnc_turned':        ['bars', 'rods', 'tubes', 'profiles'],
+      'casting':           ['ingots'],
+      'forging':           ['bars', 'rods', 'ingots'],
+      'injection_moulded': ['granules', 'pellets'],
+      'stamping':          ['coils', 'sheets'],
+    };
+    const getShapeRank = (shape: string | undefined, family: string): number => {
+      const preferred = FAMILY_PREFERRED_SHAPES[family] ?? [];
+      if (!shape) return 99;
+      const idx = preferred.indexOf(shape.toLowerCase());
+      return idx === -1 ? 50 : idx;
+    };
+
+    if (query.partFamily) {
+      const family = query.partFamily;
+      transformedData.sort((a, b) => {
+        const rankA = getShapeRank(a.shape, family);
+        const rankB = getShapeRank(b.shape, family);
+        if (rankA !== rankB) return rankA - rankB;
+        return (a.materialName ?? '').localeCompare(b.materialName ?? '');
+      });
+    }
 
     return {
       items: transformedData,

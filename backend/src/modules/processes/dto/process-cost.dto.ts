@@ -633,6 +633,16 @@ export class ProcessCostResponseDto {
   @ApiPropertyOptional({ description: 'Process route ID' })
   processRouteId?: string;
 
+  // Feature highlight (from AI-generated process plan)
+  @ApiPropertyOptional({ description: 'Manufacturing feature ID linked to this operation', example: 'F4' })
+  featureId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Stable feature type vocabulary', example: 'CROSS_HOLE' })
+  featureType?: string | null;
+
+  @ApiPropertyOptional({ description: 'Stable feature group for 3D highlight routing', example: 'HOLE' })
+  featureGroup?: string | null;
+
   // Metadata
   @ApiProperty({ description: 'Is active' })
   isActive: boolean;
@@ -685,6 +695,9 @@ export class ProcessCostResponseDto {
       bomItemId: row.bom_item_id,
       processId: row.process_id,
       processRouteId: row.process_route_id,
+      featureId:    row.feature_id    ?? null,
+      featureType:  row.feature_type  ?? null,
+      featureGroup: row.feature_group ?? null,
       isActive: row.is_active !== false,
       notes: row.notes,
       userId: row.user_id,

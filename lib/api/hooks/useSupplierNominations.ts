@@ -5,7 +5,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useAuthEnabled, useAuthEnabledWith } from './useAuthEnabled';
+import { useAuthEnabledWith } from './useAuthEnabled';
 import {
   createSupplierNomination,
   getSupplierNominationsByProject,
@@ -26,10 +26,6 @@ import {
   type CreateCriteriaData,
   type UpdateVendorEvaluationData,
   type CreateEvaluationScoreData,
-  type VendorEvaluation,
-  type NominationCriteria,
-  type EvaluationScore,
-  type EvaluationData
 } from '../supplier-nominations';
 
 // ============================================================================
@@ -42,7 +38,7 @@ export const supplierNominationKeys = {
   list: (projectId?: string) => [...supplierNominationKeys.lists(), projectId] as const,
   details: () => [...supplierNominationKeys.all, 'detail'] as const,
   detail: (id: string) => [...supplierNominationKeys.details(), id] as const,
-  evaluationData: (evaluationId: string, section: string) => ['evaluation-data', evaluationId, section] as const,
+  evaluationData: (evaluationId: string, section: string = '') => ['evaluation-data', evaluationId, section] as const,
 };
 
 // ============================================================================
@@ -58,7 +54,7 @@ export function useSupplierNominations(projectId: string) {
     queryFn: () => getSupplierNominationsByProject(projectId),
     enabled: useAuthEnabledWith(!!projectId),
     staleTime: 1 * 60 * 1000, // 1 minute stale time
-    cacheTime: 5 * 60 * 1000, // 5 minutes cache time
+    gcTime: 5 * 60 * 1000, // 5 minutes cache time
     refetchOnWindowFocus: false, // Don't refetch on window focus
   });
 }
@@ -121,7 +117,7 @@ export function useCreateSupplierNomination() {
 
   return useMutation({
     mutationFn: (data: CreateSupplierNominationData) => createSupplierNomination(data),
-    onSuccess: (newNomination, variables) => {
+    onSuccess: (_newNomination, variables) => {
       const projectId = variables.projectId;
       
       // Simple approach: just invalidate to force fresh fetch
@@ -276,12 +272,18 @@ export function useAddVendorsToNomination(nominationId: string) {
   return useMutation({
     mutationFn: (vendorIds: string[]) => addVendorsToNomination(nominationId, vendorIds),
     onSuccess: (newEvaluations) => {
+      // Capture projectId from cache before updating
+      const existingNomination = queryClient.getQueryData<SupplierNomination>(
+        supplierNominationKeys.detail(nominationId)
+      );
+      const projectId = existingNomination?.projectId || '';
+
       // Update nomination details
       queryClient.setQueryData(
         supplierNominationKeys.detail(nominationId),
         (old: SupplierNomination | undefined) => {
           if (!old) return old;
-          
+
           return {
             ...old,
             vendorEvaluations: [...old.vendorEvaluations, ...newEvaluations],
@@ -292,11 +294,11 @@ export function useAddVendorsToNomination(nominationId: string) {
 
       // Update project list summary
       queryClient.setQueryData(
-        supplierNominationKeys.list(old?.projectId || ''),
+        supplierNominationKeys.list(projectId),
         (oldList: SupplierNominationSummary[] | undefined) => {
-          if (!oldList || !old?.projectId) return oldList;
-          
-          return oldList.map(summary => 
+          if (!oldList || !projectId) return oldList;
+
+          return oldList.map(summary =>
             summary.id === nominationId
               ? { ...summary, vendorCount: summary.vendorCount + newEvaluations.length }
               : summary
@@ -474,7 +476,7 @@ export function useStoreEvaluationData() {
 
       return { previousData };
     },
-    onError: (err, { evaluationId }, context) => {
+    onError: (_err, { evaluationId }, context) => {
       // Rollback on error
       if (context?.previousData) {
         queryClient.setQueryData(supplierNominationKeys.evaluationData(evaluationId), context.previousData);
@@ -533,7 +535,7 @@ export function useUpdateEvaluationSection() {
 
       return { previousData };
     },
-    onError: (err, { evaluationId, section }, context) => {
+    onError: (_err, { evaluationId, section }, context) => {
       // Rollback on error
       if (context?.previousData) {
         queryClient.setQueryData(supplierNominationKeys.evaluationData(evaluationId, section), context.previousData);
@@ -586,14 +588,11 @@ export function useEvaluationDataStatus(evaluationId: string | undefined, sectio
     isLoading,
     error,
     hasData,
-    completionPercentage,
-    hasCapability,
-    hasTechnical,
     completionPercentage: Math.round(completionPercentage),
-    overallScore: data?.overall_score || 0,
-    finalRank: data?.final_rank || null,
-    recommendation: data?.overview?.recommendation,
-    riskLevel: data?.overview?.risk_level,
+    overallScore: (data as any)?.overall_score || 0,
+    finalRank: (data as any)?.final_rank || null,
+    recommendation: (data as any)?.overview?.recommendation,
+    riskLevel: (data as any)?.overview?.risk_level,
   };
 }
 

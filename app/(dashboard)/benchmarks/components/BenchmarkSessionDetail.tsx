@@ -280,7 +280,7 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
       id: sessionId,
       data: {
         name: editForm.name,
-        description: editForm.description || undefined,
+        ...(editForm.description ? { description: editForm.description } : {}),
         status: editForm.status as BenchmarkSession['status'],
       },
     });

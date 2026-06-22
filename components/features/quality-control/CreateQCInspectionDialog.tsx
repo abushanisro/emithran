@@ -11,28 +11,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Separator } from '@/components/ui/separator';
 import {
   Shield,
-  Search,
   Eye,
   Layers,
   FileText,
-  AlertTriangle,
   CheckCircle,
   Clock,
-  Target,
-  Ruler,
-  Settings,
-  Camera,
-  User,
-  Calendar,
   Package,
   ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { bomApi, BOM, BOMItem } from '@/lib/api/bom';
+import { bomApi, type BOM, type BOMItem } from '@/lib/api/bom';
 import { apiClient } from '@/lib/api/client';
 import { useProductionLots } from '@/lib/api/hooks/useProductionPlanning';
 import { useCreateQualityInspection } from '@/lib/api/hooks/useQualityControl';
@@ -56,69 +46,21 @@ interface InspectionChecklistItem {
   standardReference?: string;
 }
 
-interface QualityStandard {
-  id: string;
-  name: string;
-  category: string;
-  requirements: string[];
-}
 
-const INDUSTRY_STANDARDS: QualityStandard[] = [
-  {
-    id: 'iso-9001',
-    name: 'ISO 9001:2015',
-    category: 'Quality Management',
-    requirements: ['Document Control', 'Management Review', 'Internal Audit', 'Corrective Action']
-  },
-  {
-    id: 'as-9100',
-    name: 'AS9100D',
-    category: 'Aerospace',
-    requirements: ['Configuration Management', 'Risk Management', 'First Article Inspection']
-  },
-  {
-    id: 'iso-14001',
-    name: 'ISO 14001',
-    category: 'Environmental',
-    requirements: ['Environmental Impact Assessment', 'Waste Management']
-  }
-];
-
-const INSPECTION_METHODS = [
-  { id: 'visual', name: 'Visual Inspection', tools: ['Magnifying Glass', 'Comparator'] },
-  { id: 'dimensional', name: 'Dimensional Measurement', tools: ['Caliper', 'Micrometer', 'CMM', 'Gauge'] },
-  { id: 'functional', name: 'Functional Test', tools: ['Test Equipment', 'Fixtures'] },
-  { id: 'surface', name: 'Surface Finish', tools: ['Surface Roughness Tester', 'Profilometer'] },
-  { id: 'material', name: 'Material Verification', tools: ['Spectrometer', 'Hardness Tester'] },
-  { id: 'performance', name: 'Performance Test', tools: ['Load Tester', 'Environmental Chamber'] }
-];
-
-const CRITICAL_CHARACTERISTICS = [
-  'Safety Critical',
-  'Flight Critical',
-  'Function Critical',
-  'Fit Critical',
-  'Key Characteristic',
-  'Major Characteristic',
-  'Minor Characteristic'
-];
 
 export default function CreateQCInspectionDialog({ projectId, onInspectionCreated }: CreateQCInspectionDialogProps) {
   const [open, setOpen] = useState(false);
-  const [currentTab, setCurrentTab] = useState('basic');
   const [inspectionName, setInspectionName] = useState('');
   const [inspectionDescription, setInspectionDescription] = useState('');
   const [inspectionType, setInspectionType] = useState('first-article');
   const [inspector, setInspector] = useState('');
   const [plannedDate, setPlannedDate] = useState('');
-  const [bomOptions, setBomOptions] = useState<BOM[]>([]);
   const [selectedBOM, setSelectedBOM] = useState<BOM | null>(null);
   const [selectedLot, setSelectedLot] = useState<string>('');
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedStandards, setSelectedStandards] = useState<string[]>([]);
   const [customChecklists, setCustomChecklists] = useState<InspectionChecklistItem[]>([]);
-  const [loading, setLoading] = useState(false);
   const { data: productionLots = [], isLoading: loadingLots, error: lotsError } = useProductionLots({ projectId });
   const createInspectionMutation = useCreateQualityInspection();
 
@@ -132,8 +74,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
     const loadBOMs = async () => {
       if (!projectId) return;
       try {
-        const response = await bomApi.getAll({ projectId });
-        setBomOptions(response.boms || []);
+        await bomApi.getAll({ projectId });
       } catch (error: any) {
         toast.error('Failed to load available BOMs. Please refresh the page and try again.');
       }
@@ -161,8 +102,8 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       checklist.push({
         id: `inspection-${item.id}-${index}`,
         category: 'dimensional',
-        requirement: `Quality Inspection - ${item.partNumber || item.name}`,
-        specification: `Inspection of ${item.description || item.name} per drawing requirements`,
+        requirement: `Quality Inspection - ${item.partNumber || (item as any).name}`,
+        specification: `Inspection of ${item.description || (item as any).name} per drawing requirements`,
         measurementType: 'measurement',
         criticalLevel: 'major',
         inspectionMethod: 'As Required',
@@ -190,13 +131,6 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
     } else {
       setCustomChecklists([]);
     }
-  };
-
-  const handleGenerateChecklist = () => {
-    const selectedBOMItems = bomItems.filter(item => selectedItems.includes(item.id));
-    const generatedChecklist = generateStandardChecklist(selectedBOMItems, selectedStandards);
-    setCustomChecklists(generatedChecklist);
-    setCurrentTab('checklist');
   };
 
   const handleCreateInspection = async () => {
@@ -227,36 +161,16 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
     }
 
     try {
-      // Get the actual BOM items data for the selected items
-      const selectedBOMItems = bomItems.filter(item => selectedItems.includes(item.id));
-
-      const inspectionData = {
-        name: inspectionName,
-        description: inspectionDescription,
-        type: inspectionType,
-        status: 'planned',
-        bomId: selectedBOM.id,
-        bomName: selectedBOM.name,
-        bomVersion: selectedBOM.version,
-        projectId,
-        inspector,
-        plannedDate,
-        selectedItems,
-        bomItems: selectedBOMItems, // Include actual BOM item data
-        qualityStandards: selectedStandards,
-        checklist: customChecklists,
-        createdAt: new Date().toISOString(),
-      };
-
       // Create quality inspection using real API
 
+      const lotId = selectedLot || undefined;
       const apiPayload = {
         name: inspectionName,
         description: inspectionDescription || undefined,
         type: inspectionType,
         projectId: projectId,
         bomId: selectedBOM.id,
-        lotId: selectedLot || undefined,
+        ...(lotId !== undefined ? { lotId } : {}),
         inspector: inspector || undefined,
         plannedDate: plannedDate || undefined,
         selectedItems: selectedItems,
@@ -421,11 +335,11 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
                     value={selectedLot}
                     onValueChange={(lotId) => {
                       setSelectedLot(lotId);
-                      const lot = filteredProductionLots.find(l => l.id === lotId);
+                      const lot = filteredProductionLots.find((l: any) => l.id === lotId);
                       if (lot) {
                         setSelectedBOM(lot.bom
-                          ? { id: lot.bom.id, name: lot.bom.name, version: lot.bom.version }
-                          : { id: lot.bomId, name: 'Loading…', version: '' }
+                          ? { id: lot.bom.id, name: lot.bom.name, version: lot.bom.version } as BOM
+                          : { id: lot.bomId, name: 'Loading…', version: '' } as BOM
                         );
                         // Load only the items specifically assigned to this lot
                         loadBOMItemsForLot(lotId);
@@ -461,7 +375,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
                           </Link>
                         </div>
                       ) : (
-                        filteredProductionLots.map((lot) => (
+                        filteredProductionLots.map((lot: any) => (
                           <SelectItem key={lot.id} value={lot.id}>
                             <div className="flex items-center justify-between w-full">
                               <span>{lot.lotNumber}</span>
@@ -539,18 +453,18 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
                                 <Badge variant="secondary" className="text-xs font-mono">
                                   #{index + 1}
                                 </Badge>
-                                <span className="font-semibold text-sm">{item.partNumber || item.name}</span>
+                                <span className="font-semibold text-sm">{item.partNumber || (item as any).name}</span>
                                 <Badge variant="outline" className="text-xs">
-                                  {item.itemType}
+                                  {(item as any).itemType}
                                 </Badge>
                               </div>
                               <div className="flex gap-1">
-                                {(item.file2dPath || item.drawingFile || item.cadFile2D || item.drawing2DFile) && (
+                                {((item as any).file2dPath || (item as any).drawingFile || (item as any).cadFile2D || (item as any).drawing2DFile) && (
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      const filePath = item.file2dPath || item.drawingFile || item.cadFile2D || item.drawing2DFile;
+                                      const filePath = (item as any).file2dPath || (item as any).drawingFile || (item as any).cadFile2D || (item as any).drawing2DFile;
                                       if (filePath) {
                                         window.open(`${process.env.NEXT_PUBLIC_API_URL}/files/download?path=${encodeURIComponent(filePath)}`, '_blank');
                                       }
@@ -561,12 +475,12 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
                                     2D Drawing
                                   </Button>
                                 )}
-                                {(item.file3dPath || item.cadFile || item.cadFile3D || item.model3DFile || item.stepFile) && (
+                                {((item as any).file3dPath || (item as any).cadFile || (item as any).cadFile3D || (item as any).model3DFile || (item as any).stepFile) && (
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      const filePath = item.file3dPath || item.cadFile || item.cadFile3D || item.model3DFile || item.stepFile;
+                                      const filePath = (item as any).file3dPath || (item as any).cadFile || (item as any).cadFile3D || (item as any).model3DFile || (item as any).stepFile;
                                       if (filePath) {
                                         window.open(`${process.env.NEXT_PUBLIC_API_URL}/files/download?path=${encodeURIComponent(filePath)}`, '_blank');
                                       }
@@ -589,10 +503,10 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
                                 <span className="font-medium">Qty:</span>
                                 <span>{item.quantity} {item.unitOfMeasure || 'pcs'}</span>
                               </div>
-                              {(item.materialGrade || item.material) && (
+                              {((item as any).materialGrade || (item as any).material) && (
                                 <div className="flex items-center gap-1">
                                   <span className="font-medium">Material:</span>
-                                  <span className="truncate">{item.materialGrade || item.material}</span>
+                                  <span className="truncate">{(item as any).materialGrade || (item as any).material}</span>
                                 </div>
                               )}
                               {item.unitCost && (

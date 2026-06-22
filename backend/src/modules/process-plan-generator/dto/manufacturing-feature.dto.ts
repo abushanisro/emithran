@@ -55,6 +55,7 @@ export interface ManufacturingFeature {
   spec?: string;                // thread "M6×1", treatment "Type III Hardcoat"
   raMicrons?: number;
   tightest_tol_mm?: number;
+  cutLengthMm?: number;         // LASER_CUT: total laser path length from geometry
 }
 
 export interface ManufacturingFeatureGraph {
@@ -70,9 +71,13 @@ export interface ManufacturingFeatureGraph {
 export type MachineCategoryHint =
   | 'cnc_lathe'          // turning center, CNC lathe
   | 'cnc_mill'           // VMC, HMC, machining center
+  | 'laser_cut'          // fiber/CO2 laser cutting machine
+  | 'press_brake'        // press brake, CNC bending machine
   | 'saw'                // band saw, cold saw, power hacksaw
   | 'bench_manual'       // deburring, cleaning, marking — bench or manual workstation
   | 'inspection_bench'   // QC bench, CMM, inspection station
+  | 'cmm'                // coordinate measuring machine
+  | 'inspection'         // general inspection (visual, gauge, etc.)
   | 'surface_treatment'  // anodizing, plating — usually outsourced
   | 'heat_treatment'     // furnace — usually outsourced
   | 'any';               // no preference — AI picks best match

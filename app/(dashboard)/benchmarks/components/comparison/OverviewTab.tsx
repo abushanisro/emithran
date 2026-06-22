@@ -200,7 +200,7 @@ export function OverviewTab({ bomMetrics, processes, vendors }: Props) {
                         const count = (bd.items ?? []).filter((item) => {
                           if (
                             item.manufacturingProcess &&
-                            keywords.some((kw) =>
+                            keywords.some((kw: string) =>
                               item.manufacturingProcess!.toLowerCase().includes(kw)
                             )
                           )

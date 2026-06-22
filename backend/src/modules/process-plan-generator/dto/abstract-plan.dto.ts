@@ -31,6 +31,7 @@ export interface AbstractProcessLine {
   labourCandidateId: string;     // 'lb-N'
   calculatorCandidateId?: string | null; // 'cl-N' optional
   featureId?: string;            // 'F1', 'F2' — which ManufacturingFeature this op addresses
+  machineCategoryHint?: string;  // routing template step.machine_type (e.g. 'bench_manual')
   batchSize: number;
   heads: number;
   partsPerCycle: number;

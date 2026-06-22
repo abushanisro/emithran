@@ -11,11 +11,12 @@ import {
   updateRfqTrackingStatus,
   updateVendorResponse,
   deleteRfqTracking,
+} from '../rfq-tracking';
+import type {
   CreateRfqTrackingData,
   UpdateTrackingStatusData,
   UpdateVendorResponseData,
   RfqTrackingRecord,
-  RfqTrackingStats
 } from '../rfq-tracking';
 
 // ============================================================================
@@ -311,7 +312,7 @@ export function useDeleteRfqTracking(projectId?: string) {
       
       return { previousList, previousStats };
     },
-    onError: (err, trackingId, context) => {
+    onError: (_err, _trackingId, context) => {
       // Rollback specific queries on error
       if (context?.previousList) {
         queryClient.setQueryData(rfqTrackingKeys.list(projectId), context.previousList);

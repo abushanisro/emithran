@@ -8,9 +8,12 @@ import type {
   DraftPackage,
   DraftLineReferences,
   CandidateConsidered,
+  DraftProcessPayload,
   ProposedMaster,
 } from '../dto/draft-line.dto';
+import type { RouteIssue } from '../../manufacturing-knowledge/dto/kb.dto';
 import { executeCalculator, type BriefGeometry } from './calculator-executor';
+import { featureGroupFromType } from '../utils/feature-group.util';
 
 /**
  * Stage 3 — resolves the LLM's AbstractPlan to a DraftPackage.
@@ -32,15 +35,24 @@ export class ResolverService {
   private readonly logger = new Logger(ResolverService.name);
 
   resolve(plan: AbstractPlan, candidates: CandidateSet, brief?: EngineeringBrief): DraftPackage {
-    const briefGeometry: BriefGeometry | undefined = brief ? {
-      volumeMm3:      brief.dfm.volumeMm3,
-      lengthMm:       brief.dfm.boundingBox.lengthMm,
-      widthMm:        brief.dfm.boundingBox.widthMm,
-      heightMm:       brief.dfm.boundingBox.heightMm,
-      holeCount:      brief.dfm.holeCount,
-      holes:          brief.drawing?.holes ?? [],
-      surfaceAreaMm2: brief.dfm.surfaceAreaMm2,
-    } : undefined;
+    const briefGeometry: BriefGeometry | undefined = brief ? (() => {
+      const L = brief.dfm.boundingBox.lengthMm;
+      const W = brief.dfm.boundingBox.widthMm;
+      const H = brief.dfm.boundingBox.heightMm;
+      const holeCount = brief.dfm.holeCount;
+      return {
+        volumeMm3:      brief.dfm.volumeMm3,
+        lengthMm:       L,
+        widthMm:        W,
+        heightMm:       H,
+        holeCount,
+        holes:          brief.drawing?.holes ?? [],
+        surfaceAreaMm2: brief.dfm.surfaceAreaMm2,
+        thicknessMm:    Math.min(L, W, H),
+        perimeterMm:    2 * (L + W),       // outer cut length estimate (no DXF)
+        pierceCount:    holeCount + 1,     // holes + 1 outer-profile lead-in
+      };
+    })() : undefined;
     const errors: string[] = [];
 
     // ── Index candidates by symbolic id for O(1) lookup
@@ -129,7 +141,7 @@ export class ResolverService {
         newMasterRefs: newRef ? [newRef] : [],
       };
 
-      // Timing resolution priority: calculator > AI hint > geometry estimate > conservative default
+      // Timing resolution priority: calculator > feature geometry > AI hint > bounding-box estimate > default
       const aiSetupMin = (line.setupMin != null && line.setupMin > 0) ? line.setupMin : null;
       const aiCycleSec = (line.cycleSec != null && line.cycleSec > 0) ? line.cycleSec : null;
       const resolvedSetupManning = line.setupManning ?? 1;
@@ -145,14 +157,27 @@ export class ResolverService {
       const linkedMandatoryOp = brief?.mandatoryOps.find((op) => op.featureId === line.featureId);
       const isBenchOp =
         linkedMandatoryOp?.machineCategoryHint === 'bench_manual' ||
+        line.machineCategoryHint === 'bench_manual' ||
         linkedMandatoryOp?.machineCategoryHint === 'inspection_bench' ||
+        line.machineCategoryHint === 'inspection_bench' ||
         linkedMandatoryOp?.machineCategoryHint === 'surface_treatment' ||
-        linkedMandatoryOp?.machineCategoryHint === 'heat_treatment';
+        line.machineCategoryHint === 'surface_treatment' ||
+        linkedMandatoryOp?.machineCategoryHint === 'heat_treatment' ||
+        line.machineCategoryHint === 'heat_treatment';
+
+      // Feature-specific timing: uses actual hole diameter/depth/count from the feature graph.
+      // Takes priority over AI hints because the AI frequently stamps total batch time on every
+      // sub-operation (e.g. total drilling time for 7 holes assigned to both 6-hole and 1-hole ops).
+      let featureCycleSec: number | null = null;
+      if (!isBenchOp && line.featureId && brief?.featureGraph?.features) {
+        const feat = (brief.featureGraph.features as any[]).find((f: any) => f.id === line.featureId);
+        if (feat) featureCycleSec = estimateFeatureCycleSecFromGeometry(opFullContext, feat, briefGeometry);
+      }
 
       const geoCycleSec = !isBenchOp && briefGeometry ? estimateCycleSec(opFullContext, briefGeometry) : null;
 
       // Per-category defaults: bench/inspect/saw ops don't need CNC-level setup time
-      const categoryHint = linkedMandatoryOp?.machineCategoryHint ?? 'any';
+      const categoryHint = linkedMandatoryOp?.machineCategoryHint ?? line.machineCategoryHint ?? 'any';
       const defaultSetupMin =
         categoryHint === 'bench_manual'      ? 2  :
         categoryHint === 'inspection_bench'  ? 5  :
@@ -167,10 +192,29 @@ export class ResolverService {
         60;
 
       const resolvedSetupMin = aiSetupMin ?? defaultSetupMin;
-      const resolvedCycleSec = aiCycleSec ?? geoCycleSec ?? defaultCycleSec;
+      const resolvedCycleSec = featureCycleSec ?? aiCycleSec ?? geoCycleSec ?? defaultCycleSec;
+
+      // When a bench/inspection op falls back to the wrong machine (no bench MHR in DB),
+      // zero out the machine rate so we only charge labour. A laser cutter at ₹4800/hr
+      // billing for manual deburring is physically wrong and inflates cost ×100.
+      // Once the user adds a Deburring Bench or Inspection Bench MHR record, the machine
+      // ranker will match it and its real rate will be used instead.
+      const benchCategoryHints = ['bench_manual', 'inspection_bench', 'surface_treatment', 'heat_treatment'];
+      const machineIsBench = benchCategoryHints.some((kw) =>
+        `${macCand.machineName} ${macCand.commodityCode ?? ''}`.toLowerCase().includes(kw.replace(/_/g, ' '))
+        || ['bench', 'deburr', 'workstation', 'inspection', 'cmm', 'quality', 'treatment', 'plating', 'furnace'].some(
+          (mk) => `${macCand.machineName}`.toLowerCase().includes(mk),
+        ),
+      );
+      const effectiveMachineRate = (isBenchOp && !machineIsBench) ? 0 : macCand.rateInrPerHour;
+      if (isBenchOp && !machineIsBench) {
+        this.logger?.log?.(
+          `[resolver] Op ${line.opNbr} is a bench op (${categoryHint}) but machine is "${macCand.machineName}" — zeroing MHR, charging labour only`,
+        );
+      }
 
       const calcParams = {
-        machineRate: macCand.rateInrPerHour,
+        machineRate: effectiveMachineRate,
         labourRate: labCand.lhrInrPerHour,
         setupMin: resolvedSetupMin,
         cycleSec: resolvedCycleSec,
@@ -185,8 +229,9 @@ export class ResolverService {
         ? calcResult * (1 + line.scrapPct / 100)
         : computeProcessCost(calcParams);
 
-      const timingSource: 'calculator' | 'geometry_estimate' | 'ai_hint' | 'default' =
+      const timingSource: 'calculator' | 'feature_geometry' | 'ai_hint' | 'geometry_estimate' | 'default' =
         calcResult !== null ? 'calculator' :
+        featureCycleSec !== null ? 'feature_geometry' :
         (aiCycleSec !== null || aiSetupMin !== null) ? 'ai_hint' :
         geoCycleSec !== null ? 'geometry_estimate' :
         'default';
@@ -195,7 +240,7 @@ export class ResolverService {
       // as machine + labour-per-head (the same combined rate the existing
       // ProcessCostCalculationEngine uses internally) so post-apply
       // recalculation matches the cost preview shown in the draft panel.
-      const directRate = macCand.rateInrPerHour + labCand.lhrInrPerHour * Math.max(line.heads, 1);
+      const directRate = effectiveMachineRate + labCand.lhrInrPerHour * Math.max(line.heads, 1);
 
       draftLines.push({
         kind: 'process',
@@ -207,7 +252,7 @@ export class ResolverService {
           lsrId: labCand.dbId,
           machineName: macCand.machineName,
           labourType: labCand.labourType,
-          machineRate: macCand.rateInrPerHour,
+          machineRate: effectiveMachineRate,
           labourRate: labCand.lhrInrPerHour,
           directRate,
           opNbr: line.opNbr,
@@ -223,6 +268,9 @@ export class ResolverService {
           operation: opCand?.operation ?? extractProposedString(proposedMasters, newRef, 'operation', ''),
           calculatorName: clCand?.name ?? null,
           timingSource,
+          featureId:    line.featureId ?? null,
+          featureType:  line.featureId ? (brief?.featureGraph?.features?.find((f: any) => f.id === line.featureId)?.type ?? null) : null,
+          featureGroup: line.featureId ? featureGroupFromType(brief?.featureGraph?.features?.find((f: any) => f.id === line.featureId)?.type) : null,
         },
         references: refs,
         reason: line.reason,
@@ -328,10 +376,39 @@ export class ResolverService {
       costPreview.rawMaterial + costPreview.process + costPreview.tooling +
       costPreview.logistics + costPreview.procuredPart;
 
+    // ── Template route validation ──────────────────────────────────────────
+    const routeValidationIssues: RouteIssue[] = [];
+    if (brief?.routingTemplate?.routing_sequence?.length) {
+      const resolvedOps = draftLines
+        .filter((d) => d.kind === 'process')
+        .map((d) => (d.data as DraftProcessPayload).operation?.toLowerCase().replace(/[^a-z0-9]/g, '_') ?? '');
+
+      for (const step of brief.routingTemplate.routing_sequence) {
+        if (!step.required) continue;
+        const hint = step.process.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const firstToken = hint.split('_').find((t) => t.length > 2) ?? hint;
+        const covered = resolvedOps.some((op) => op.includes(firstToken) || firstToken.includes(op.split('_')[0]));
+        if (!covered) {
+          routeValidationIssues.push({
+            ruleId: `template_required_op_${step.step}`,
+            ruleName: 'routing_template_required_op',
+            severity: 'warning',
+            message: `Required op "${step.process}" (Op ${step.step}) from routing template not found in plan`,
+            affectedProcesses: [step.process],
+            suggestedFix: `Add a "${step.process}" operation using a ${step.machine_type} machine`,
+          });
+        }
+      }
+    }
+
     return {
       draftLines,
       proposedMasters,
       validationErrors: errors,
+      routeValidationIssues: routeValidationIssues.length > 0 ? routeValidationIssues : undefined,
+      hasValidationErrors: errors.length > 0,
+      partFamily: brief?.scope?.family,
+      templateUsed: brief?.routingTemplate?.template_name ?? null,
       costPreview: roundCostPreview(costPreview),
     };
   }
@@ -377,6 +454,64 @@ function extractProposedString(
 }
 
 /**
+ * Per-feature cycle time estimate using the feature's own geometry (diameter, depth, count).
+ * More accurate than the bounding-box estimate for drilling and tapping because it scales
+ * by the number of holes/threads in THIS operation, preventing the AI from accidentally
+ * assigning the total batch time to every sub-operation.
+ *
+ * Returns null when the feature lacks usable geometry, so callers fall through to the
+ * next estimator in the priority chain.
+ */
+function estimateFeatureCycleSecFromGeometry(
+  opContext: string,
+  feat: any,
+  geo?: BriefGeometry,
+): number | null {
+  const count   = Math.max(Number(feat.count) || 1, 1);
+  const diam    = Number(feat.diameter)  || 0;
+  const depth   = Number(feat.depth)     || 0;
+  const thru    = feat.throughHole === true;
+  const lc      = opContext.toLowerCase();
+
+  // ── Drilling (AXIAL_HOLE, CROSS_HOLE, COUNTERBORE, COUNTERSINK, ID_BORE) ──
+  if (/drill|bore|countersink|counterbore/i.test(lc)) {
+    if (diam < 0.5) return null;
+    // Cutting speed: 130 m/min conservative for Al/steel HSS
+    const vc       = 130;
+    const f        = Math.min(0.03 + diam * 0.012, 0.20); // feed scales with diameter (mm/rev)
+    const rpm      = (vc * 1000) / (Math.PI * diam);
+    const feedRate = Math.max(rpm * f, 1);                 // mm/min
+    // Effective hole depth: use feature depth when known; for through-holes use min bbox dimension
+    const effectiveDepth = depth > 0 ? depth : (thru && geo ? Math.min(geo.lengthMm, geo.widthMm, geo.heightMm) : 15);
+    const holeDepthMm    = effectiveDepth + diam * 0.3;   // add lead-in (30 % of diameter)
+    const timePerHoleSec = (holeDepthMm / feedRate) * 60 + 4; // +4 s rapid / position
+    return Math.round(timePerHoleSec * count);
+  }
+
+  // ── Tapping / thread milling (THREAD_INTERNAL) ──────────────────────────
+  if (/tap|thread/i.test(lc)) {
+    if (diam < 1) return null;
+    // Extract pitch from spec string (e.g. "M4×0.7" → 0.7)
+    const pitchMatch = (String(feat.spec ?? '')).match(/[×xX]([\d.]+)/);
+    const pitch = pitchMatch
+      ? parseFloat(pitchMatch[1])
+      : (diam > 8 ? 1.25 : diam > 4 ? 0.75 : 0.70); // standard metric pitch fallback
+    if (pitch <= 0) return null;
+    // Tapping speed: 10 m/min HSS in Al (conservative; avoids tap breakage)
+    const vc        = 10;
+    const rpm       = (vc * 1000) / (Math.PI * diam);
+    const feedRate  = Math.max(rpm * pitch, 1);
+    const effectiveDepth = depth > 0 ? depth : (thru && geo ? Math.min(geo.lengthMm, geo.widthMm, geo.heightMm) : 1.5 * diam);
+    const threadDepthMm  = effectiveDepth + 3; // approach
+    // Rigid tapping: forward + reverse at same feed
+    const timePerHoleSec = (threadDepthMm / feedRate) * 60 * 2 + 5; // *2 for retract + 5 s
+    return Math.round(timePerHoleSec * count);
+  }
+
+  return null; // other op types: fall through to AI hint / bounding-box estimate
+}
+
+/**
  * Estimates CNC cycle time (seconds) from part geometry using conservative cutting physics.
  * Returns null for manual bench ops (deburr, inspect) where CNC physics don't apply.
  *
@@ -411,7 +546,13 @@ function estimateCycleSec(opContext: string, geo: BriefGeometry): number | null 
   } else if (/saw|cut.?off|part.?off|parting/i.test(opName)) {
     cuttingLengthMm = diameter / 2;                              // grooves through radius
   } else if (/drill|bore/i.test(opName)) {
-    cuttingLengthMm = Math.max(lengthMm, widthMm, heightMm);    // axial through depth
+    // Use shortest bounding-box dimension as proxy for hole depth — holes don't span
+    // the longest axis. Fall back to average known hole depth when available.
+    const minDim = Math.min(lengthMm, widthMm, heightMm);
+    const avgHoleDepth = geo.holes.length > 0
+      ? geo.holes.reduce((s, h) => s + (h.depth ?? minDim), 0) / geo.holes.length
+      : minDim;
+    cuttingLengthMm = Math.max(avgHoleDepth, 5);
   } else {
     cuttingLengthMm = Math.max(lengthMm, widthMm, heightMm);    // OD turn, mill: longest axis
   }

@@ -2,6 +2,10 @@ import { Injectable, BadRequestException, InternalServerErrorException } from '@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
+import { gzip } from 'zlib';
+import { promisify } from 'util';
+
+const gzipAsync = promisify(gzip);
 
 // File upload type definition
 interface UploadedFile {
@@ -71,9 +75,11 @@ export class FileStorageService {
    * - Verify file type against whitelist
    * - Validate file extension
    */
+  private readonly ALLOWED_DXF_EXTENSIONS = ['.dxf', '.dwg'];
+
   private validateFile(
     file: UploadedFile,
-    fileType: '3d' | '2d',
+    fileType: '3d' | '2d' | 'dxf',
   ): void {
     // Check file size
     if (file.size > this.MAX_FILE_SIZE) {
@@ -86,7 +92,9 @@ export class FileStorageService {
     const extension = '.' + file.originalname.split('.').pop()?.toLowerCase();
     const allowedExtensions = fileType === '3d'
       ? this.ALLOWED_3D_EXTENSIONS
-      : this.ALLOWED_2D_EXTENSIONS;
+      : fileType === 'dxf'
+        ? this.ALLOWED_DXF_EXTENSIONS
+        : this.ALLOWED_2D_EXTENSIONS;
 
     if (!allowedExtensions.includes(extension)) {
       throw new BadRequestException(
@@ -94,15 +102,15 @@ export class FileStorageService {
       );
     }
 
-    // Check MIME type (defense in depth - don't trust client)
+    // DXF/DWG have no standard MIME type — skip MIME check for these formats.
+    if (fileType === 'dxf') return;
+
     const allowedMimeTypes = fileType === '3d'
       ? this.ALLOWED_3D_TYPES
       : this.ALLOWED_2D_TYPES;
 
-    // For certain file types, MIME type might not be set correctly
-    // so we rely more on extension validation
-    if (file.mimetype && !allowedMimeTypes.includes(file.mimetype)) {
-      // Only warn for 3D files due to MIME type inconsistencies
+    const isNonStandardMime = ['.dxf', '.dwg'].includes(extension);
+    if (file.mimetype && !allowedMimeTypes.includes(file.mimetype) && !isNonStandardMime) {
       if (fileType === '2d') {
         throw new BadRequestException(
           `Invalid file type. Allowed types: ${allowedMimeTypes.join(', ')}`,
@@ -126,7 +134,7 @@ export class FileStorageService {
     userId: string,
     projectId: string,
     bomItemId: string,
-    fileType: '3d' | '2d',
+    fileType: '3d' | '2d' | 'dxf',
     originalName: string,
   ): string {
     const timestamp = Date.now();
@@ -143,7 +151,7 @@ export class FileStorageService {
    */
   async uploadFile(
     file: UploadedFile,
-    fileType: '3d' | '2d',
+    fileType: '3d' | '2d' | 'dxf',
     userId: string,
     projectId: string,
     bomItemId: string,
@@ -160,22 +168,30 @@ export class FileStorageService {
     // Calculate checksum for integrity
     const checksum = this.calculateChecksum(file.buffer);
 
-    // Generate storage path
+    // Compress DXF/DWG files with gzip — they're text-based and compress ~90%,
+    // keeping uploads well under Supabase's 50 MB free-tier hard cap.
+    const ext = '.' + (file.originalname.split('.').pop()?.toLowerCase() ?? '');
+    const shouldCompress = ['.dxf', '.dwg'].includes(ext);
+    const uploadBuffer = shouldCompress
+      ? await gzipAsync(file.buffer, { level: 6 })
+      : file.buffer;
+
+    // Generate storage path (append .gz so we know to decompress on download)
     const storagePath = this.generateStoragePath(
       userId,
       projectId,
       bomItemId,
       fileType,
       file.originalname,
-    );
+    ) + (shouldCompress ? '.gz' : '');
 
     try {
       // Upload to Supabase Storage
       const { data, error } = await this.supabase.storage
         .from(this.BUCKET_NAME)
-        .upload(storagePath, file.buffer, {
-          contentType: file.mimetype,
-          upsert: false, // Prevent accidental overwrites
+        .upload(storagePath, uploadBuffer, {
+          contentType: shouldCompress ? 'application/octet-stream' : file.mimetype,
+          upsert: false,
         });
 
       if (error) {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   Sheet,
@@ -8,26 +8,34 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   useApplyGeneration,
   useDiscardGeneration,
   useRecordLineEdit,
+  useSelectRoute,
 } from '@/lib/api/hooks/useProcessPlanGenerate';
 import type {
   ApplyRequest,
   DraftLine,
   DraftLineKind,
   GenerationResponse,
+  RouteIssue,
   StreamEvent,
 } from '@/lib/api/hooks/useProcessPlanGenerate';
+
+import { RouteComparisonTable } from './RouteComparisonTable';
 
 import { DraftLineCard } from './DraftLineCard';
 import { ProposedMasterCard } from './ProposedMasterCard';
 import { GenerationStreamView } from './GenerationStreamView';
 import { CostPreviewStrip } from './CostPreviewStrip';
 import { OutOfScopeNotice } from './OutOfScopeNotice';
+import { ProcessPlanFeedbackForm } from './ProcessPlanFeedbackForm';
+
+import type { FeatureGroup } from '@/lib/utils/feature-colors';
 
 interface Props {
   open: boolean;
@@ -36,6 +44,8 @@ interface Props {
   isGenerating: boolean;
   streamEvents: StreamEvent[];
   startedAt: number;
+  onFeatureHighlight?: (feature: any | null, group: FeatureGroup | null) => void;
+  onFeatureFocus?: (feature: any | null, group: FeatureGroup | null) => void;
 }
 
 const KIND_ORDER: DraftLineKind[] = ['raw_material', 'process', 'tooling', 'logistics', 'procured_part'];
@@ -48,10 +58,11 @@ const KIND_LABEL: Record<DraftLineKind, string> = {
   procured_part: 'Procured Parts',
 };
 
-export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerating, streamEvents, startedAt }: Props) {
+export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerating, streamEvents, startedAt, onFeatureHighlight, onFeatureFocus }: Props) {
   const apply = useApplyGeneration();
   const discard = useDiscardGeneration();
   const recordEdit = useRecordLineEdit();
+  const selectRoute = useSelectRoute();
 
   // Local overrides — what the user has edited or removed in-place.
   const [overrides, setOverrides] = useState<Map<string, Record<string, any>>>(new Map());
@@ -59,6 +70,7 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
   const [masterApprovals, setMasterApprovals] = useState<Map<string, boolean>>(new Map());
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const [justApplied, setJustApplied] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const draft = generation?.draft ?? null;
 
@@ -233,6 +245,48 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
                 </div>
               )}
 
+              {/* Validation issues banner */}
+              {isDraftReady && generation?.hasValidationErrors && generation.routeValidationIssues && generation.routeValidationIssues.length > 0 && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                  <p className="text-xs font-semibold text-red-400 mb-2">Route Validation Issues</p>
+                  <ul className="space-y-1">
+                    {generation.routeValidationIssues.map((issue: RouteIssue) => (
+                      <li key={issue.ruleId} className="text-xs">
+                        <span className={issue.severity === 'error' ? 'text-red-400 font-medium' : 'text-amber-400 font-medium'}>
+                          [{issue.severity.toUpperCase()}]
+                        </span>
+                        <span className="text-foreground/80 ml-1">{issue.message}</span>
+                        {issue.suggestedFix && (
+                          <span className="text-muted-foreground"> · Fix: {issue.suggestedFix}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {isDraftReady && !generation?.hasValidationErrors && generation?.routeValidationIssues !== undefined && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
+                  <p className="text-xs text-emerald-400 font-medium">Route validation passed — no sequencing issues detected</p>
+                </div>
+              )}
+
+              {/* Alternative routes comparison */}
+              {isDraftReady && draft.alternatives && draft.alternatives.length > 1 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Process Routes ({draft.alternatives.length})
+                  </h4>
+                  <RouteComparisonTable
+                    alternatives={draft.alternatives}
+                    selectedRouteId={draft.selectedRouteId ?? null}
+                    onSelectRoute={(routeId) =>
+                      selectRoute.mutate({ generationId: generation.id, routeId })
+                    }
+                    isSelecting={selectRoute.isPending}
+                  />
+                </div>
+              )}
+
               {/* Sections */}
               {KIND_ORDER.map((kind) => {
                 const lines = linesByKind[kind] ?? [];
@@ -253,6 +307,9 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
                         override={overrides.get(lineKey(line)) ?? null}
                         onFieldChange={(field, value) => handleFieldChange(line, field, value)}
                         onRemove={() => handleRemove(line)}
+                        featureGraph={generation?.brief?.featureGraph as any}
+                        onFeatureHighlight={onFeatureHighlight}
+                        onFeatureFocus={onFeatureFocus}
                       />
                     ))}
                   </div>
@@ -264,8 +321,34 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
 
         {/* Footer */}
         <div className="border-t bg-card px-4 py-3 space-y-3">
-          {isDraftReady && draft && (
-            <CostPreviewStrip costPreview={draft.costPreview} removedCount={removals.size} />
+          {isDraftReady && draft && (() => {
+            const featureGraph = generation?.brief?.featureGraph as any;
+            const totalFeatures = featureGraph?.features?.length ?? 0;
+            const linkedIds = new Set(
+              draft.draftLines
+                .filter((l) => l.kind === 'process' && (l.data as any).featureId)
+                .map((l) => (l.data as any).featureId)
+            );
+            const covered = linkedIds.size;
+            const pct = totalFeatures > 0 ? Math.round(covered / totalFeatures * 100) : null;
+            return (
+              <>
+                <CostPreviewStrip costPreview={draft.costPreview} removedCount={removals.size} />
+                {pct !== null && (
+                  <div className="flex items-center justify-between text-xs border-t pt-2">
+                    <span className="text-muted-foreground">
+                      Feature coverage: <span className="font-medium text-foreground">{covered}/{totalFeatures}</span>
+                    </span>
+                    <span className={pct >= 80 ? 'text-emerald-400 font-semibold' : pct >= 60 ? 'text-amber-400 font-semibold' : 'text-red-400 font-semibold'}>
+                      {pct}%{totalFeatures - covered > 0 ? ` · ${totalFeatures - covered} unlinked` : ''}
+                    </span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+          {isDraftReady && !draft && (
+            <CostPreviewStrip costPreview={{ rawMaterial: 0, process: 0, tooling: 0, logistics: 0, procuredPart: 0, total: 0 }} removedCount={0} />
           )}
           <div className="flex items-center justify-between gap-2">
             <div className="text-[10px] text-muted-foreground">
@@ -284,6 +367,11 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
                   Discard
                 </Button>
               )}
+              {(isDraftReady || isApplied) && draft && (
+                <Button variant="ghost" size="sm" onClick={() => setFeedbackOpen(true)}>
+                  Submit Correction
+                </Button>
+              )}
               {isDraftReady && !isApplied && (
                 <Button size="sm" onClick={handleApply} disabled={apply.isPending}>
                   {apply.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
@@ -299,6 +387,27 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
           </div>
         </div>
       </SheetContent>
+
+      {generation && draft && (
+        <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-sm">Engineer Correction</DialogTitle>
+            </DialogHeader>
+            <ProcessPlanFeedbackForm
+              bomItemId={generation.bomItemId}
+              partFamily={generation.partFamily}
+              aiProcessSequence={
+                draft.draftLines
+                  .filter((l) => l.kind === 'process')
+                  .sort((a, b) => ((a.data as any).opNbr ?? a.index) - ((b.data as any).opNbr ?? b.index))
+                  .map((l) => (l.data as any).processName ?? (l.data as any).process ?? `step ${l.index}`)
+              }
+              onClose={() => setFeedbackOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </Sheet>
   );
 }

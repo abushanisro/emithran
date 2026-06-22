@@ -1,10 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  projectReportsApi,
-  BalloonDiagram,
-  InspectionReport,
-  CompleteProjectReport,
+import { projectReportsApi } from '../project-reports';
+import type {
   CreateBalloonDiagramRequest,
   UpdateBalloonDiagramRequest,
   DiagramAnnotationRequest,
@@ -40,7 +37,7 @@ export function useCreateBalloonDiagram() {
   return useMutation({
     mutationFn: (data: CreateBalloonDiagramRequest) =>
       projectReportsApi.createBalloonDiagram(data),
-    onSuccess: (newDiagram, variables) => {
+    onSuccess: (_newDiagram, variables) => {
       toast.success('Balloon diagram created successfully');
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.balloonDiagrams(variables.project_id),

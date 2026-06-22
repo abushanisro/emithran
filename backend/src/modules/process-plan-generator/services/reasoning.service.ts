@@ -12,9 +12,9 @@ import { validateAbstractPlan } from './abstract-plan.validator';
 import { ExpandCandidatesTool } from './tools/expand-candidates.tool';
 
 export const REASONING_MODEL = 'claude-sonnet-4-6';
-const MAX_TOOL_CALLS = 4;
+const MAX_TOOL_CALLS = 8;
 const MAX_TOKENS_OUT = 8192;
-const WALL_CLOCK_MS = 120_000;
+const WALL_CLOCK_MS = 180_000;
 const VALIDATION_RETRIES = 1;
 
 export interface ReasoningInput {
@@ -23,6 +23,7 @@ export interface ReasoningInput {
   userId: string;
   accessToken: string | null;
   emitToolCall?: (entry: ToolCallLogEntry) => void;
+  kbContext?: string; // manufacturing knowledge base context injected before user message
 }
 
 export interface ReasoningOutput {
@@ -93,6 +94,15 @@ export class ReasoningService {
         cache_control: { type: 'ephemeral' },
       },
     ];
+
+    // Inject KB context as a second cached system block (routing rules, templates, feature→process mappings)
+    if (input.kbContext) {
+      systemBlocks.push({
+        type: 'text',
+        text: input.kbContext,
+        cache_control: { type: 'ephemeral' },
+      });
+    }
 
     // First user message — the brief + candidates
     const initialUserContent = formatBriefAndCandidates(input.brief, out.candidatesAfterExpansion);

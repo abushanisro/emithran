@@ -6,7 +6,6 @@
 
 import { supabaseAdmin } from '@/lib/database/supabase-server';
 import { carrierTrackingService } from '@/lib/services/carrier-tracking';
-import type { DeliveryOrder, TrackingEvent } from './hooks/useDelivery';
 
 export interface TrackingData {
   orderId: string;
@@ -34,7 +33,7 @@ export interface TrackingData {
     lat: number;
     lng: number;
     timestamp: string;
-  };
+  } | undefined;
   carrier: {
     name: string;
     trackingNumber: string;
@@ -280,7 +279,7 @@ export async function getLatestOrderLocation(orderId: string): Promise<{
   orderId: string;
   orderNumber: string;
   status: string;
-  currentLocation?: TrackingLocationEvent;
+  currentLocation?: TrackingLocationEvent | undefined;
   trackingHistory: TrackingLocationEvent[];
   lastUpdate: string;
 } | null> {
@@ -317,7 +316,7 @@ export async function getLatestOrderLocation(orderId: string): Promise<{
         status: event.event_type,
         notes: event.internal_notes
       }))
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      .sort((a: TrackingLocationEvent, b: TrackingLocationEvent) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     const currentLocation = trackingHistory.length > 0 ? trackingHistory[0] : undefined;
 
@@ -353,9 +352,9 @@ function transformOrderToTrackingData(order: any): TrackingData {
       status: event.event_type,
       notes: event.internal_notes
     }))
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    .sort((a: TrackingLocationEvent, b: TrackingLocationEvent) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  const currentLocation = trackingHistory.length > 0 
+  const currentLocation = trackingHistory.length > 0
     ? {
         lat: trackingHistory[0].lat,
         lng: trackingHistory[0].lng,

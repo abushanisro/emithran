@@ -14,10 +14,15 @@ import { SupabaseService } from '../../../common/supabase/supabase.service';
 import type { EngineeringBrief } from '../dto/engineering-brief.dto';
 import type { CandidateSet } from '../dto/candidate-set.dto';
 import type { GenerationResponse, ToolCallLogEntry } from '../dto/generation-response.dto';
+import { deriveImplications } from '../dto/manufacturing-implication.dto';
 
 import { RetrievalService } from './retrieval.service';
 import { ReasoningService, REASONING_MODEL } from './reasoning.service';
 import { ResolverService } from './resolver.service';
+import { DeterministicPlannerService } from './deterministic-planner.service';
+import { AlternativeRoutePlannerService } from './alternative-route-planner.service';
+import { ManufacturingKnowledgeService } from '../../manufacturing-knowledge/manufacturing-knowledge.service';
+import { ProcessValidationService } from '../../manufacturing-knowledge/services/process-validation.service';
 
 interface GenerateArgs {
   bomItemId: string;
@@ -55,6 +60,10 @@ export class OrchestratorService {
     private readonly retrieval: RetrievalService,
     private readonly reasoning: ReasoningService,
     private readonly resolver: ResolverService,
+    private readonly deterministicPlanner: DeterministicPlannerService,
+    private readonly alternativeRoutePlanner: AlternativeRoutePlannerService,
+    private readonly kb: ManufacturingKnowledgeService,
+    private readonly processValidation: ProcessValidationService,
   ) {}
 
   async generate(args: GenerateArgs): Promise<GenerationResponse> {
@@ -80,6 +89,28 @@ export class OrchestratorService {
         },
       },
     });
+
+    // ── Load KB routing rules for post-plan validation ───────────────────
+    // kbContext (LLM prompt string) is no longer needed — LLM is off for routing.
+    // We still load routingRules to run ProcessValidationService after the plan.
+    const partFamily = brief.scope.family !== 'out_of_scope' ? brief.scope.family : undefined;
+    let kbRules: any[] = [];
+    let kbTemplate: any = null;
+    let kbAllTemplates: any[] = [];
+    if (partFamily && accessToken) {
+      try {
+        const [routingRules, template, allTemplates] = await Promise.all([
+          this.kb.getRoutingRules(accessToken, partFamily),
+          this.kb.getTemplate(accessToken, partFamily),
+          this.kb.getAlternativeTemplates(accessToken, partFamily),
+        ]);
+        kbRules = routingRules;
+        kbTemplate = template;
+        kbAllTemplates = allTemplates;
+      } catch (err: any) {
+        this.logger.warn(`KB rules load failed (non-fatal): ${err?.message}`);
+      }
+    }
 
     // Idempotency: stable hash of (bomItemId + brief). A second click within
     // a short window returns the existing draft.
@@ -125,13 +156,49 @@ export class OrchestratorService {
       return this.rowToResponse(row);
     }
 
+    // ── No routing template → engineering review required ─────────────────
+    // The system does not invent routes. If no manufacturing KB template exists
+    // for this part family, a human engineer must define the routing first.
+    if (!brief.routingTemplate) {
+      const reviewRow = await this.insertGenerationRow(client, {
+        bomItemId,
+        userId,
+        idempotencyKey,
+        status: 'engineering_review_required',
+        model: 'deterministic',
+        scopeDecision: brief.scope,
+        brief,
+        candidates,
+        toolCalls: [],
+        abstractPlan: null,
+        draftLines: null,
+        proposedMasters: null,
+        tokensIn: 0,
+        tokensOut: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        errorMessage: `No routing template found for family "${brief.scope.family}". Add a routing template in the Manufacturing KB before generating a process plan.`,
+        errorStage: 'routing_template',
+        completed: true,
+      });
+      this.emit(stream, {
+        type: 'out_of_scope',
+        data: {
+          reason: `No routing template for "${brief.scope.family}" — add one in Manufacturing KB`,
+          status: 'engineering_review_required',
+        },
+      });
+      this.closeStream(stream);
+      return this.rowToResponse(reviewRow);
+    }
+
     // ── Insert running row ────────────────────────────────────────────────
     const row = await this.insertGenerationRow(client, {
       bomItemId,
       userId,
       idempotencyKey,
       status: 'running',
-      model: REASONING_MODEL,
+      model: 'deterministic',
       scopeDecision: brief.scope,
       brief,
       candidates,
@@ -149,42 +216,98 @@ export class OrchestratorService {
     });
     const generationId = row.id as string;
 
-    // ── Stage 2 — reasoning ───────────────────────────────────────────────
-    this.emit(stream, { type: 'reasoning.started', data: { model: REASONING_MODEL } });
+    // ── Stage 2 — deterministic planner ──────────────────────────────────
+    // Routing template drives the plan. No LLM. No invented operations.
+    this.emit(stream, { type: 'reasoning.started', data: { model: 'deterministic' } });
 
-    const reasoning = await this.reasoning.reason({
-      brief,
-      candidates,
-      userId,
-      accessToken,
-      emitToolCall: (entry: ToolCallLogEntry) => {
-        this.emit(stream, { type: 'reasoning.tool_call', data: entry as unknown as Record<string, unknown> });
-      },
-    });
+    let abstractPlan: import('../dto/abstract-plan.dto').AbstractPlan;
+    const candidatesAfterExpansion = candidates;
+    const toolCalls: ToolCallLogEntry[] = [];
+    const tokensIn = 0, tokensOut = 0, cacheReadTokens = 0, cacheCreationTokens = 0;
 
-    if (!reasoning.plan) {
+    try {
+      abstractPlan = this.deterministicPlanner.plan(brief, candidates);
+      this.logger.log(`[orchestrator] Deterministic plan built for ${bomItemId} via "${brief.routingTemplate.template_name}"`);
+    } catch (planErr: any) {
+      // Planner throws when master data (MHR/LSR) is missing — not a routing problem.
       await client
         .from('process_plan_generations')
         .update({
           status: 'failed',
-          error_message: (reasoning.error ?? 'reasoning produced no plan').slice(0, 500),
-          error_stage: 'reasoning',
-          tool_calls: reasoning.toolCalls,
-          tokens_in: reasoning.tokensIn,
-          tokens_out: reasoning.tokensOut,
-          cache_read_tokens: reasoning.cacheReadTokens,
-          cache_creation_tokens: reasoning.cacheCreationTokens,
+          error_message: planErr.message.slice(0, 500),
+          error_stage: 'deterministic_planner',
           completed_at: new Date().toISOString(),
         })
         .eq('id', generationId);
-      this.emit(stream, { type: 'failed', data: { stage: 'reasoning', error: reasoning.error } });
+      this.emit(stream, { type: 'failed', data: { stage: 'deterministic_planner', error: planErr.message } });
       this.closeStream(stream);
-      const updated = await this.loadById(client, generationId, userId);
-      return this.rowToResponse(updated);
+      return this.rowToResponse(await this.loadById(client, generationId, userId));
     }
 
     // ── Stage 3 — resolver ────────────────────────────────────────────────
-    const draftPackage = this.resolver.resolve(reasoning.plan, reasoning.candidatesAfterExpansion, brief);
+    const draftPackage = this.resolver.resolve(abstractPlan, candidatesAfterExpansion, brief);
+
+    // ── Route validation against KB rules ────────────────────────────────
+    let kbCapabilities: any[] = [];
+    if (kbRules.length > 0 && partFamily) {
+      const processSequence = draftPackage.draftLines
+        .filter((l) => l.kind === 'process')
+        .sort((a, b) => ((a.data as any).opNbr ?? a.index) - ((b.data as any).opNbr ?? b.index))
+        .map((l) => (l.data as any).operation ?? (l.data as any).processRoute ?? '');
+      const machineAssignments: Record<string, string> = {};
+      for (const l of draftPackage.draftLines.filter((l) => l.kind === 'process')) {
+        const op = (l.data as any).operation;
+        const machine = (l.data as any).processRoute;
+        if (op && machine) machineAssignments[op] = machine;
+      }
+      try {
+        kbCapabilities = accessToken ? await this.kb.getMachineCapabilities(accessToken) : [];
+        const routeIssues = this.processValidation.validateRoute(processSequence, partFamily, kbRules);
+        const machineIssues = this.processValidation.validateMachines(processSequence, machineAssignments, kbCapabilities);
+        const allIssues = [...routeIssues, ...machineIssues];
+        draftPackage.routeValidationIssues = allIssues;
+        draftPackage.hasValidationErrors = allIssues.some((i) => i.severity === 'error');
+        draftPackage.partFamily = partFamily;
+        draftPackage.templateUsed = kbTemplate?.template_name ?? null;
+      } catch (err: any) {
+        this.logger.warn(`Route validation failed (non-fatal): ${err?.message}`);
+      }
+    }
+
+    // ── Alternative routes ─────────────────────────────────────────────────
+    // Only runs when ≥2 templates exist for this part family. Non-fatal.
+    if (partFamily && kbAllTemplates.length > 1) {
+      try {
+        const alternatives = this.alternativeRoutePlanner.planAll(
+          brief,
+          candidatesAfterExpansion,
+          kbAllTemplates,
+          kbRules,
+          kbCapabilities,
+        );
+        if (alternatives.length > 0) {
+          draftPackage.alternatives = alternatives;
+          draftPackage.selectedRouteId = alternatives[0]?.routeId ?? null;
+        }
+      } catch (err: any) {
+        this.logger.warn(`Alternative routes generation failed (non-fatal): ${err?.message}`);
+      }
+    }
+
+    // ── Manufacturing implications from drawing intelligence ──────────────
+    draftPackage.implications = deriveImplications({
+      tightestToleranceMm: brief.bomItem.tightestToleranceMm,
+      coating: brief.bomItem.coating,
+      sheetThicknessMm: brief.dfm.sheetThicknessMm,
+      drawingMaterial: (brief.bomItem as any).drawingIntelligence?.material ?? null,
+      partName: brief.bomItem.partName,
+      drawingIntelligence: {
+        threads: (brief.bomItem as any).drawingIntelligence?.threads,
+        gdt_callouts: (brief.bomItem as any).drawingIntelligence?.gdt_callouts,
+        drawing_notes: (brief.bomItem as any).drawingIntelligence?.drawing_notes,
+      },
+    });
+
     this.emit(stream, {
       type: 'resolver.done',
       data: {
@@ -192,6 +315,7 @@ export class OrchestratorService {
         proposedMasters: draftPackage.proposedMasters.length,
         costPreview: draftPackage.costPreview,
         validationErrors: draftPackage.validationErrors,
+        hasValidationErrors: draftPackage.hasValidationErrors ?? false,
       },
     });
 
@@ -200,15 +324,15 @@ export class OrchestratorService {
       .from('process_plan_generations')
       .update({
         status: 'draft_ready',
-        abstract_plan: reasoning.plan,
+        abstract_plan: abstractPlan,
         draft_lines: draftPackage,
         proposed_masters: draftPackage.proposedMasters,
-        candidates: reasoning.candidatesAfterExpansion,
-        tool_calls: reasoning.toolCalls,
-        tokens_in: reasoning.tokensIn,
-        tokens_out: reasoning.tokensOut,
-        cache_read_tokens: reasoning.cacheReadTokens,
-        cache_creation_tokens: reasoning.cacheCreationTokens,
+        candidates: candidatesAfterExpansion,
+        tool_calls: toolCalls,
+        tokens_in: tokensIn,
+        tokens_out: tokensOut,
+        cache_read_tokens: cacheReadTokens,
+        cache_creation_tokens: cacheCreationTokens,
         completed_at: new Date().toISOString(),
       })
       .eq('id', generationId);
@@ -330,12 +454,13 @@ export class OrchestratorService {
       .maybeSingle();
     if (!draftErr && draft) return this.rowToResponse(draft);
 
+    // out_of_scope and engineering_review_required: 30-min window (brief may change if user fixes data)
     const { data: oos, error: oosErr } = await client
       .from('process_plan_generations')
       .select('*')
       .eq('user_id', userId)
       .eq('idempotency_key', key)
-      .eq('status', 'out_of_scope')
+      .in('status', ['out_of_scope', 'engineering_review_required'])
       .gte('started_at', new Date(Date.now() - 30 * 60_000).toISOString())
       .order('started_at', { ascending: false })
       .limit(1)
@@ -353,7 +478,7 @@ export class OrchestratorService {
    */
   private async clearStaleByIdempotencyKey(client: any, userId: string, key: string, forceRefresh = false): Promise<void> {
     const statuses = ['running', 'failed', 'discarded'];
-    if (forceRefresh) statuses.push('draft_ready', 'out_of_scope', 'applied');
+    if (forceRefresh) statuses.push('draft_ready', 'out_of_scope', 'engineering_review_required', 'applied');
     const { error } = await client
       .from('process_plan_generations')
       .delete()
@@ -430,6 +555,7 @@ export class OrchestratorService {
   }
 
   private rowToResponse(row: any): GenerationResponse {
+    const draft = row.draft_lines;
     return {
       id: row.id,
       bomItemId: row.bom_item_id,
@@ -439,7 +565,7 @@ export class OrchestratorService {
       brief: row.brief,
       candidates: row.candidates,
       abstractPlan: row.abstract_plan,
-      draft: row.draft_lines,
+      draft,
       toolCalls: row.tool_calls ?? [],
       tokensIn: row.tokens_in ?? 0,
       tokensOut: row.tokens_out ?? 0,
@@ -448,10 +574,55 @@ export class OrchestratorService {
       creditCost: row.credit_cost ?? 0,
       errorMessage: row.error_message,
       errorStage: row.error_stage,
+      routeValidationIssues: draft?.routeValidationIssues,
+      hasValidationErrors: draft?.hasValidationErrors,
+      partFamily: draft?.partFamily,
+      templateUsed: draft?.templateUsed,
+      implications: draft?.implications ?? [],
       startedAt: row.started_at,
       completedAt: row.completed_at,
       appliedAt: row.applied_at,
     };
+  }
+
+  private formatKbContext(
+    partFamily: string,
+    featureMappings: any[],
+    routingRules: any[],
+    template: any,
+  ): string {
+    const lines: string[] = ['## Manufacturing Knowledge Base (GROUND TRUTH — MUST FOLLOW)'];
+
+    if (featureMappings.length > 0) {
+      lines.push('\n### Feature → Process Rules');
+      for (const m of featureMappings) {
+        let line = `- ${m.feature_type}: primary_process=${m.primary_process}`;
+        if (m.typical_machine_type) line += `, machine=${m.typical_machine_type}`;
+        if (m.prerequisite_process) line += `, MUST be preceded by ${m.prerequisite_process}`;
+        if (m.secondary_processes?.length) line += `, also consider: ${m.secondary_processes.join(', ')}`;
+        lines.push(line);
+      }
+    }
+
+    if (routingRules.length > 0) {
+      lines.push('\n### Process Sequencing Rules (VIOLATIONS = ERRORS)');
+      for (const r of routingRules) {
+        lines.push(`- [${r.severity.toUpperCase()}] ${r.message}${r.suggested_fix ? ` FIX: ${r.suggested_fix}` : ''}`);
+      }
+    }
+
+    if (template) {
+      lines.push(`\n### Standard Routing Template for ${partFamily.replace('_', ' ').toUpperCase()}: ${template.template_name}`);
+      lines.push('Use this sequence as the base — inject feature-specific operations at the correct positions:');
+      if (Array.isArray(template.routing_sequence)) {
+        for (const step of template.routing_sequence) {
+          lines.push(`  Op ${step.step}: ${step.process} [${step.machine_type}]${step.required ? ' (required)' : ' (conditional)'} — ${step.description}`);
+        }
+      }
+    }
+
+    lines.push('\nCRITICAL: Always follow the Feature→Process rules above. Validate your output against the sequencing rules before calling save_draft.');
+    return lines.join('\n');
   }
 }
 

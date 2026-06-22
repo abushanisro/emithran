@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Loader2, Sparkles, Zap, RefreshCw, FileText } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -21,22 +21,32 @@ import {
 } from '@/lib/api/hooks/useProcessPlanGenerate';
 import type { GenerationResponse } from '@/lib/api/hooks/useProcessPlanGenerate';
 import { GenerateProcessPlanPanel } from './GenerateProcessPlanPanel';
+import type { FeatureGroup } from '@/lib/utils/feature-colors';
 
 interface Props {
   bomItemId: string | null;
   hasGeometry: boolean;
   className?: string;
+  onFeatureHighlight?: (feature: any | null, group: FeatureGroup | null) => void;
+  onFeatureFocus?: (feature: any | null, group: FeatureGroup | null) => void;
 }
 
 const ESTIMATED_CREDITS = 50;
 
-export function GenerateProcessPlanButton({ bomItemId, hasGeometry, className }: Props) {
+export function GenerateProcessPlanButton({ bomItemId, hasGeometry, className, onFeatureHighlight, onFeatureFocus }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [generation, setGeneration] = useState<GenerationResponse | null>(null);
   const [startedAt, setStartedAt] = useState(0);
   // Use ref so handleConfirm always reads the latest value without stale closure
   const forceRefreshRef = useRef(false);
+
+  // Reset local generation state whenever the selected part changes so the
+  // previous part's draft never bleeds into the new part's UI.
+  useEffect(() => {
+    setGeneration(null);
+    setPanelOpen(false);
+  }, [bomItemId]);
 
   const queryClient = useQueryClient();
   const generate = useGenerateProcessPlan();
@@ -82,6 +92,7 @@ export function GenerateProcessPlanButton({ bomItemId, hasGeometry, className }:
 
   const handlePanelClose = () => {
     setPanelOpen(false);
+    setGeneration(null);
     refetchDraft();
   };
 
@@ -186,6 +197,8 @@ export function GenerateProcessPlanButton({ bomItemId, hasGeometry, className }:
         isGenerating={isGenerating}
         streamEvents={events}
         startedAt={startedAt}
+        onFeatureHighlight={onFeatureHighlight}
+        onFeatureFocus={onFeatureFocus}
       />
     </>
   );

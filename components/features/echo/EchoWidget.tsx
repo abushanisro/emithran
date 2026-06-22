@@ -8,13 +8,11 @@
  */
 
 import { EchoFloatingButton } from './EchoFloatingButton';
-import { EchoNudge } from './EchoNudge';
 import { EchoPanel } from './EchoPanel';
 
 export function EchoWidget() {
   return (
     <>
-      <EchoNudge />
       <EchoFloatingButton />
       <EchoPanel />
     </>

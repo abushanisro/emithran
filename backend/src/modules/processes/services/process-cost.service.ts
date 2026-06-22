@@ -614,10 +614,14 @@ export class ProcessCostService {
 
     const client = this.supabaseService.getClient(accessToken);
 
-    // Get all active process costs for this BOM item
+    // Get all active process costs for this BOM item — compute from source fields.
+    // Formula: setupPerPart = (setup_time_min/60 × (MHR + LHR×manning)) / batch_size
+    //          cyclePerPart = (cycle_time_sec/3600 × (MHR + LHR×heads)) / parts_per_cycle
+    //          totalPerPart = (setup + cycle) × (1 + scrap/100)
+    // Never reads stored total_cost_per_part which may be null for AI-applied records.
     const { data: costs, error } = await client
       .from('process_cost_records')
-      .select('total_cost_per_part, total_cost_before_scrap')
+      .select('machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
       .eq('bom_item_id', bomItemId)
       .eq('is_active', true);
 
@@ -626,10 +630,19 @@ export class ProcessCostService {
       throw new InternalServerErrorException('Failed to fetch process costs');
     }
 
-    // Sum up all costs (use total_cost_per_part or total_cost_before_scrap)
-    const totalCost = costs?.reduce((sum, cost) => {
-      const costValue = cost.total_cost_per_part || cost.total_cost_before_scrap || 0;
-      return sum + costValue;
+    const totalCost = costs?.reduce((sum, r) => {
+      const mr  = parseFloat(r.machine_rate)    || 0;
+      const lr  = parseFloat(r.labor_rate)      || 0;
+      const sm  = parseFloat(r.setup_manning)   || 0;
+      const st  = parseFloat(r.setup_time)      || 0;
+      const bs  = parseFloat(r.batch_size)      || 1;
+      const hd  = parseFloat(r.heads)           || 0;
+      const ct  = parseFloat(r.cycle_time)      || 0;
+      const ppc = parseFloat(r.parts_per_cycle) || 1;
+      const sc  = parseFloat(r.scrap)           || 0;
+      const setup = bs > 0 ? (st / 60) * (mr + lr * sm) / bs : 0;
+      const cycle = ppc > 0 ? (ct / 3600) * (mr + lr * hd) / ppc : 0;
+      return sum + (setup + cycle) * (1 + sc / 100);
     }, 0) || 0;
 
     this.logger.log(`Total process cost for BOM item ${bomItemId}: ${totalCost}`, 'ProcessCostService');
@@ -645,7 +658,7 @@ export class ProcessCostService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('process_cost_records')
-      .select('bom_item_id, total_cost_per_part, total_cost_before_scrap')
+      .select('bom_item_id, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
       .in('bom_item_id', bomItemIds)
       .eq('is_active', true);
 
@@ -656,8 +669,19 @@ export class ProcessCostService {
 
     const totals: Record<string, number> = Object.fromEntries(bomItemIds.map(id => [id, 0]));
     for (const row of data ?? []) {
-      const cost = row.total_cost_per_part || row.total_cost_before_scrap || 0;
-      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + cost;
+      const mr  = parseFloat(row.machine_rate)    || 0;
+      const lr  = parseFloat(row.labor_rate)      || 0;
+      const sm  = parseFloat(row.setup_manning)   || 0;
+      const st  = parseFloat(row.setup_time)      || 0;
+      const bs  = parseFloat(row.batch_size)      || 1;
+      const hd  = parseFloat(row.heads)           || 0;
+      const ct  = parseFloat(row.cycle_time)      || 0;
+      const ppc = parseFloat(row.parts_per_cycle) || 1;
+      const sc  = parseFloat(row.scrap)           || 0;
+      const setup = bs > 0 ? (st / 60) * (mr + lr * sm) / bs : 0;
+      const cycle = ppc > 0 ? (ct / 3600) * (mr + lr * hd) / ppc : 0;
+      const computed = (setup + cycle) * (1 + sc / 100);
+      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + computed;
     }
     return totals;
   }
