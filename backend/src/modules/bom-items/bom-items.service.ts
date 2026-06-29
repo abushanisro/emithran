@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, InternalServerErrorException, Ba
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
-import { computeCostSummary } from './costing/cost-engine';
+import { computeCostSummary, computeSustainability } from './costing/cost-engine';
 import type { MHRRateInput } from './costing/cost-engine';
 import {
   MATERIAL_DEFAULTS, MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL,
@@ -115,7 +115,7 @@ export class BOMItemsService {
 
     let query = client
       .from('bom_items')
-      .select('*, bom:bom_id(name, description)')
+      .select('*')
       .order('created_at', { ascending: false });
 
     // Apply filters
@@ -186,20 +186,21 @@ export class BOMItemsService {
 
     const { data, error } = await client
       .from('bom_items')
-      .select('*, bom:bom_id(name, description)')
+      .select('*')
       .eq('id', id)
-      .single();
+      .limit(1);
 
     if (error) {
       this.logger.error(`Error fetching BOM item: ${error.message}`, 'BOMItemsService');
       throw new InternalServerErrorException(`Failed to fetch BOM item: ${error.message}`);
     }
 
-    if (!data) {
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) {
       throw new NotFoundException(`BOM item with ID ${id} not found`);
     }
 
-    return BOMItemResponseDto.fromDatabase(data);
+    return BOMItemResponseDto.fromDatabase(row);
   }
 
   async create(
@@ -223,15 +224,17 @@ export class BOMItemsService {
         ...dbData,
         user_id: userId,
       })
-      .select('*, bom:bom_id(name, description)')
-      .single();
+      .select('*')
+      .limit(1);
 
     if (error) {
       this.logger.error(`Error creating BOM item: ${error.message}`, 'BOMItemsService');
       throw new InternalServerErrorException(`Failed to create BOM item: ${error.message}`);
     }
 
-    return BOMItemResponseDto.fromDatabase(data);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) throw new InternalServerErrorException('Failed to create BOM item: no row returned');
+    return BOMItemResponseDto.fromDatabase(row);
   }
 
   async update(
@@ -254,19 +257,20 @@ export class BOMItemsService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .select('*, bom:bom_id(name, description)')
-      .single();
+      .select('*')
+      .limit(1);
 
     if (error) {
       this.logger.error(`Error updating BOM item: ${error.message}`, 'BOMItemsService');
       throw new InternalServerErrorException(`Failed to update BOM item: ${error.message}`);
     }
 
-    if (!data) {
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) {
       throw new NotFoundException(`BOM item with ID ${id} not found`);
     }
 
-    return BOMItemResponseDto.fromDatabase(data);
+    return BOMItemResponseDto.fromDatabase(row);
   }
 
   async updateThumbnailUrl(
@@ -997,6 +1001,24 @@ export class BOMItemsService {
     const summary = fg?.summary ?? {};
 
     const sheetThicknessMm = (summary.sheetThicknessMm ?? item.sheetThicknessMm ?? 0) as number;
+    const family = (fg?.classification?.family ?? (sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown')) as string;
+
+    if (family !== 'sheet_metal') {
+      return {
+        bomItemId: id,
+        batchSize,
+        materialCost: 0,
+        materialGrade: '',
+        grossWeightKg: 0,
+        materialCostPerKg: 0,
+        materialSource: 'default' as const,
+        routes: [],
+        comparisonWarnings: [
+          'Route comparison: sheet metal only in Phase 1. CNC machining support coming next.',
+        ],
+      };
+    }
+
     const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;
     const pierceCount     = (summary.pierceCount       ?? item.pierceCount      ?? 0) as number;
     const bendCount       = (summary.bendCount         ?? item.bendCount        ?? 0) as number;
@@ -1216,6 +1238,8 @@ export class BOMItemsService {
       const allLines = [...cuttingLines, ...pbLines, ...deburrLines, ...tappingLines];
       const totalProcessCost = this.r2(allLines.reduce((s, l) => s + l.totalCost, 0) + abrasiveCost);
       const totalCost = this.r2(materialCost + totalProcessCost);
+      const { totalCo2Kg, totalProcessEnergyKwh, wasteCostInr, sustainabilityScore } =
+        computeSustainability(grade, materialCostPerKg, netWeightKg, grossWeightKg, batchSize, allLines);
       return {
         routeId, routeLabel,
         processLines: allLines,
@@ -1231,6 +1255,7 @@ export class BOMItemsService {
         capability,
         warnings: routeWarnings,
         ratesSource: RATES_SOURCE_LABEL,
+        sustainability: { totalCo2Kg, totalProcessEnergyKwh, wasteCostInr, sustainabilityScore },
       };
     };
 
@@ -1282,12 +1307,14 @@ export class BOMItemsService {
 
   async getGdtAnalysis(id: string, accessToken: string): Promise<GdtAnalysisDto> {
     const client = this.supabaseService.getClient(accessToken);
-    const { data: item, error } = await client
+    const { data: rows, error } = await client
       .from("bom_items")
       .select("id, drawing_intelligence")
       .eq("id", id)
-      .single();
-    if (error || !item) throw new NotFoundException(`BOM item ${id} not found`);
+      .limit(1);
+    if (error) throw new NotFoundException(`BOM item ${id} not found`);
+    const item = Array.isArray(rows) ? rows[0] : rows;
+    if (!item) throw new NotFoundException(`BOM item ${id} not found`);
 
     const di = (item as any).drawing_intelligence as Record<string, any> | null;
     const rawCallouts: any[] = di?.gdt_callouts ?? [];

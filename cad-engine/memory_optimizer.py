@@ -92,6 +92,49 @@ class OptimizationResult:
     model_version: str
 
 # ============================================================================
+# MODULE-LEVEL HELPERS
+# ============================================================================
+
+def _compute_cyl_signals(
+    raw_cylinders_full: list,
+    total_face_count: int,
+) -> tuple:
+    """
+    Single-pass computation of three family-classification signals:
+
+    Returns (cyl_axis_alignment, rotational_face_ratio, secondary_cyl_count)
+
+    cyl_axis_alignment   — fraction of cyl faces sharing the dominant axis (0–1).
+                           High (> 0.60) → rotationally symmetric part.
+    rotational_face_ratio — cylindrical face count / total face count (0–1).
+                           High (> 0.30) → most faces are cylindrical → turned part.
+                           Low → mostly planar/complex → milled or cast.
+    secondary_cyl_count  — number of cylindrical faces NOT on the dominant axis.
+                           Proxy for cross holes, radial features, and off-axis bores.
+    """
+    if not raw_cylinders_full or total_face_count == 0:
+        return 0.0, 0.0, 0
+
+    votes: dict = {}
+    for cyl in raw_cylinders_full:
+        if len(cyl) < 8:
+            continue
+        ax, ay, az = abs(cyl[5]), abs(cyl[6]), abs(cyl[7])
+        key = (round(ax, 2), round(ay, 2), round(az, 2))
+        votes[key] = votes.get(key, 0) + 1
+
+    if not votes:
+        return 0.0, 0.0, 0
+
+    dominant_count = max(votes.values())
+    n_cyl = len(raw_cylinders_full)
+    cyl_axis_alignment = dominant_count / n_cyl
+    rotational_face_ratio = n_cyl / total_face_count
+    secondary_cyl_count = n_cyl - dominant_count
+    return cyl_axis_alignment, rotational_face_ratio, secondary_cyl_count
+
+
+# ============================================================================
 # ENTERPRISE CAD MEMORY OPTIMIZER
 # ============================================================================
 
@@ -358,15 +401,29 @@ class AdvancedCADMemoryOptimizer:
         try:
             from feature_extractors import detect_part_family, SheetMetalFeatureExtractor  # type: ignore
             dims_list = [bounding_box['length'], bounding_box['width'], bounding_box['height']]
-            detected_family, family_confidence = detect_part_family(
+            cyl_axis_alignment, rotational_face_ratio, secondary_cyl_count = _compute_cyl_signals(
+                holes.get('raw_cylinders_full', []),
+                holes.get('total_face_count', 1),
+            )
+            pocket_count = pockets.get('count', 0)
+            secondary_features_count = secondary_cyl_count + pocket_count
+            detected_family, family_confidence, classification_reasons = detect_part_family(
                 dims_list,
                 holes.get('count', 0),
-                pockets.get('count', 0),
+                secondary_features_count,
+                cyl_axis_alignment=cyl_axis_alignment,
+                rotational_face_ratio=rotational_face_ratio,
             )
             manufacturing_intelligence = {
                 'detected_family': detected_family,
                 'family_confidence': round(family_confidence, 3),
                 'features': {},
+                'classification_signals': {
+                    'cyl_axis_alignment': round(cyl_axis_alignment, 3),
+                    'rotational_face_ratio': round(rotational_face_ratio, 3),
+                    'secondary_features_count': secondary_features_count,
+                },
+                'classification_reason': classification_reasons,
             }
             if detected_family == 'sheet_metal':
                 extractor = SheetMetalFeatureExtractor()
@@ -572,6 +629,7 @@ class AdvancedCADMemoryOptimizer:
                 'depth_diameter_ratio': None, 'edge_distance': None,
                 'positions': [], 'raw_cylinders': raw_cylinders,
                 'raw_cylinders_full': raw_cylinders_full,
+                'total_face_count': face_index,
                 'face_map': face_map,
                 'face_map_tri_total': _tri_counter,
                 'face_id_map': face_id_map,
@@ -592,6 +650,7 @@ class AdvancedCADMemoryOptimizer:
             'positions': hole_positions,
             'raw_cylinders': raw_cylinders,
             'raw_cylinders_full': raw_cylinders_full,
+            'total_face_count': face_index,
             'face_map': face_map,
             'face_map_tri_total': _tri_counter,
             'face_id_map': face_id_map,

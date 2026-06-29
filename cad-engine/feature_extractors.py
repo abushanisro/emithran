@@ -28,36 +28,79 @@ logger = logging.getLogger(__name__)
 def detect_part_family(
     bbox_dims: List[float],
     hole_count: int,
-    pocket_count: int,
-) -> Tuple[str, float]:
+    secondary_features_count: int,
+    cyl_axis_alignment: float = 0.0,
+    rotational_face_ratio: float = 0.0,
+) -> Tuple[str, float, List[str]]:
     """
-    Heuristic family classification from bounding-box geometry alone.
+    Heuristic family classification from bounding-box geometry + cylindrical face signals.
 
-    Returns (family, confidence) where family is one of:
-      'sheet_metal', 'cnc_turned', 'cnc_milled'
+    Returns (family, confidence, reasons) where:
+      family    — 'sheet_metal' | 'cnc_turned' | 'cnc_milled' | 'mill_turn'
+      confidence — 0–1 score
+      reasons   — human-readable list explaining which signals fired
 
-    Thresholds:
-      sheet_metal : flatness (min/max) < 0.15 AND no deep pockets
-      cnc_turned  : elongation (max/mid) > 2.5 AND not flat
-      cnc_milled  : default
+    secondary_features_count: cross holes (non-axial cylinders) + pocket count.
+      > 0 elevates cnc_turned → mill_turn.
+
+    cyl_axis_alignment: fraction of cyl faces sharing the dominant axis (0–1).
+      > 0.60 → rotationally symmetric (turned part regardless of elongation).
+
+    rotational_face_ratio: cylindrical face count / total face count (0–1).
+      > 0.30 → most surfaces are cylindrical → confirms turned, not milled housing.
+      Guards against mis-classifying round milled housings / pipe manifolds.
     """
     dims = sorted(d for d in bbox_dims if d > 0)
     if len(dims) < 3:
-        return "cnc_milled", 0.50
+        return "cnc_milled", 0.50, ["Insufficient bounding box data — defaulting to cnc_milled"]
 
-    flatness = dims[0] / dims[2]  # min / max
-    elongation = dims[2] / max(dims[1], 1.0)  # max / mid
+    flatness = dims[0] / dims[2]               # min / max  — low = flat
+    elongation = dims[2] / max(dims[1], 1.0)   # max / mid  — high = rod-like
+    circularity = dims[1] / max(dims[2], 1.0)  # mid / max  — high = circular cross-section
 
     if flatness < 0.15:
-        # Sheet metal: very flat aspect ratio regardless of pocket count.
-        # Formed frames and enclosures with recesses are still sheet metal.
         confidence = min(0.95, 0.60 + (0.15 - flatness) * 2.0)
-        return "sheet_metal", round(confidence, 3)
+        return "sheet_metal", round(confidence, 3), [
+            f"Very flat cross-section (flatness={flatness:.2f} < 0.15)",
+        ]
+
+    # Disc / flange / ring (lens holders, pulleys, bearing races):
+    # rotational_face_ratio > 0.30 guards against round milled housings / pipe manifolds
+    # where a few through-holes make cyl_axis_alignment look high.
+    if (circularity > 0.80
+            and cyl_axis_alignment > 0.60
+            and rotational_face_ratio > 0.30):
+        reasons = [
+            f"Circular cross-section (circularity={circularity:.2f} > 0.80)",
+            f"Most cylindrical faces share a common axis (alignment={cyl_axis_alignment:.2f} > 0.60)",
+            f"High proportion of cylindrical faces (ratio={rotational_face_ratio:.2f} > 0.30)",
+        ]
+        if secondary_features_count > 0:
+            reasons.append(
+                f"Secondary machining features detected (count={secondary_features_count})"
+            )
+            return "mill_turn", 0.75, reasons
+        return "cnc_turned", 0.80, reasons
 
     if elongation > 2.5 and flatness > 0.20:
-        return "cnc_turned", 0.75
+        reasons = [
+            f"Elongated geometry (elongation={elongation:.2f} > 2.5)",
+            f"Not flat (flatness={flatness:.2f} > 0.20)",
+        ]
+        if secondary_features_count > 0:
+            reasons.append(
+                f"Secondary machining features detected (count={secondary_features_count})"
+            )
+            return "mill_turn", 0.72, reasons
+        return "cnc_turned", 0.75, reasons
 
-    return "cnc_milled", 0.65
+    return "cnc_milled", 0.65, [
+        f"No strong rotational or sheet-metal signal "
+        f"(flatness={flatness:.2f}, elongation={elongation:.2f}, "
+        f"circularity={circularity:.2f}, "
+        f"cyl_alignment={cyl_axis_alignment:.2f}, "
+        f"rot_ratio={rotational_face_ratio:.2f})",
+    ]
 
 
 # ─────────────────────────────────────────────────────────────────────────────

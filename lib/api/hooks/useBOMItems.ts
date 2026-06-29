@@ -406,6 +406,54 @@ export interface ProcessLineCost {
   commodityCode: string | null;
 }
 
+export interface ProcessCO2 {
+  process: string;
+  machineClass: string;
+  energyKwh: number;
+  co2Kg: number;
+}
+
+export interface CO2Contributor {
+  label: string;
+  co2Kg: number;
+  pct: number;
+}
+
+export interface ScoreBreakdown {
+  materialEfficiency: number;
+  carbonIntensity: number;
+  recyclability: number;
+  processEnergy: number;
+}
+
+export interface SustainabilitySummaryDto {
+  netWeightKg: number;
+  scrapKg: number;
+  wasteCostInr: number;
+  materialUtilizationPct: number;
+  materialCo2Kg: number;
+  materialCo2PerKg: number;
+  materialCo2Source: 'lookup' | 'default';
+  processCo2Breakdown: ProcessCO2[];
+  totalProcessEnergyKwh: number;
+  totalProcessCo2Kg: number;
+  totalCo2Kg: number;
+  co2PerKgPart: number;
+  co2Contributors: CO2Contributor[];
+  recyclabilityPct: number;
+  sustainabilityScore: number;
+  scoreBreakdown: ScoreBreakdown;
+  opportunities: string[];
+  factorsSource: string;
+}
+
+export interface RouteResultSustainability {
+  totalCo2Kg: number;
+  totalProcessEnergyKwh: number;
+  wasteCostInr: number;
+  sustainabilityScore: number;
+}
+
 export interface CostSummaryDto {
   materialCost: number;
   materialGrade: string;
@@ -426,6 +474,7 @@ export interface CostSummaryDto {
   family: string;
   warnings: string[];
   ratesSource: string;
+  sustainability?: SustainabilitySummaryDto;
 }
 
 export function useCostSummary(itemId: string | undefined, batchSize: number = 1) {
@@ -478,6 +527,7 @@ export interface RouteResultDto {
   capability: RouteCapability;
   warnings: string[];
   ratesSource: string;
+  sustainability?: RouteResultSustainability;
 }
 
 export interface RouteComparisonDto {

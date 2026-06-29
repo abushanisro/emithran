@@ -1,3 +1,52 @@
+export interface ProcessCO2 {
+  process: string;       // "Laser Cutting"
+  machineClass: string;  // "fiber_laser"
+  energyKwh: number;
+  co2Kg: number;
+}
+
+export interface CO2Contributor {
+  label: string;   // "Material Production" | process name
+  co2Kg: number;
+  pct: number;     // share of totalCo2Kg, 0–100
+}
+
+export interface ScoreBreakdown {
+  materialEfficiency: number;  // 0–30
+  carbonIntensity: number;     // 0–30
+  recyclability: number;       // 0–20
+  processEnergy: number;       // 0–20
+}
+
+export interface SustainabilitySummaryDto {
+  netWeightKg: number;
+  scrapKg: number;
+  wasteCostInr: number;            // scrapKg × materialCostPerKg
+  materialUtilizationPct: number;  // 0–100
+  materialCo2Kg: number;
+  materialCo2PerKg: number;           // embodied carbon factor used (kg CO₂e / kg material)
+  materialCo2Source: 'lookup' | 'default';
+  processCo2Breakdown: ProcessCO2[];
+  totalProcessEnergyKwh: number;
+  totalProcessCo2Kg: number;
+  totalCo2Kg: number;
+  co2PerKgPart: number;
+  co2Contributors: CO2Contributor[];  // sorted descending by co2Kg
+  recyclabilityPct: number;
+  sustainabilityScore: number;        // 0–100
+  scoreBreakdown: ScoreBreakdown;
+  opportunities: string[];
+  factorsSource: string;
+}
+
+// Slim summary for RouteResultDto — enables cost + cycle time + CO₂ side-by-side display
+export interface RouteResultSustainability {
+  totalCo2Kg: number;
+  totalProcessEnergyKwh: number;
+  wasteCostInr: number;
+  sustainabilityScore: number;
+}
+
 export interface ProcessLineCost {
   process: string;       // "Laser Cutting", "Press Brake", "Tapping", "Deburring"
   setupCost: number;     // INR — amortised over batchSize
@@ -42,4 +91,7 @@ export interface CostSummaryDto {
   // Transparency
   warnings: string[];
   ratesSource: string;
+
+  // Manufacturing sustainability (computed from same inputs, zero extra DB queries)
+  sustainability: SustainabilitySummaryDto;
 }

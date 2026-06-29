@@ -8,7 +8,12 @@ import {
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
   RATES_SOURCE_LABEL,
 } from './default-rates';
-import type { CostSummaryDto, ProcessLineCost } from '../dto/cost-breakdown.dto';
+import {
+  ENERGY_KWH_PER_HR, GRID_CO2_KG_PER_KWH,
+  MATERIAL_CO2_KG_PER_KG, MATERIAL_RECYCLABILITY_PCT,
+  SUSTAINABILITY_FACTORS_LABEL,
+} from './sustainability-factors';
+import type { CostSummaryDto, ProcessLineCost, ProcessCO2, SustainabilitySummaryDto } from '../dto/cost-breakdown.dto';
 
 export interface MHRRateInput {
   rate: number;
@@ -62,6 +67,105 @@ function nearest(mm: number, table: Record<number, number>): number {
 
 function r2(n: number): number { return Math.round(n * 100) / 100; }
 function r3(n: number): number { return Math.round(n * 1000) / 1000; }
+
+// ── Sustainability calculation ─────────────────────────────────────────────────
+
+export function computeSustainability(
+  materialGrade: string | null,
+  materialCostPerKg: number,
+  netWeightKg: number,
+  grossWeightKg: number,
+  batchSize: number,
+  processLines: ProcessLineCost[],
+): SustainabilitySummaryDto {
+  const grade = (materialGrade ?? '__default__').toUpperCase();
+
+  const scrapKg = r3(grossWeightKg - netWeightKg);
+  const wasteCostInr = r2(scrapKg * materialCostPerKg);
+  const materialUtilizationPct = r2(grossWeightKg > 0 ? (netWeightKg / grossWeightKg) * 100 : 0);
+
+  const embodiedCo2PerKg = MATERIAL_CO2_KG_PER_KG[grade] ?? MATERIAL_CO2_KG_PER_KG['__default__']!;
+  const materialCo2Kg = r3(grossWeightKg * embodiedCo2PerKg);
+  const materialCo2PerKg = r3(embodiedCo2PerKg);
+  const materialCo2Source: 'lookup' | 'default' = MATERIAL_CO2_KG_PER_KG[grade] != null ? 'lookup' : 'default';
+
+  const processCo2Breakdown: ProcessCO2[] = processLines.map((l) => {
+    const kwhPerHr = ENERGY_KWH_PER_HR[l.machineClass] ?? 4.0;
+    const energyKwh = r3((l.cycleTimeMin / 60) * kwhPerHr);
+    const co2Kg = r3(energyKwh * GRID_CO2_KG_PER_KWH);
+    return { process: l.process, machineClass: l.machineClass, energyKwh, co2Kg };
+  });
+
+  const totalProcessEnergyKwh = r3(processCo2Breakdown.reduce((s, p) => s + p.energyKwh, 0));
+  const totalProcessCo2Kg = r3(processCo2Breakdown.reduce((s, p) => s + p.co2Kg, 0));
+  const totalCo2Kg = r3(materialCo2Kg + totalProcessCo2Kg);
+  const co2PerKgPart = r3(netWeightKg > 0 ? totalCo2Kg / netWeightKg : 0);
+  const recyclabilityPct = MATERIAL_RECYCLABILITY_PCT[grade] ?? MATERIAL_RECYCLABILITY_PCT['__default__']!;
+
+  // Contributor ranking — dominant driver immediately visible
+  const allContributors = [
+    { label: 'Material Production', co2Kg: materialCo2Kg },
+    ...processCo2Breakdown.map((p) => ({ label: p.process, co2Kg: p.co2Kg })),
+  ];
+  const co2Contributors = allContributors
+    .sort((a, b) => b.co2Kg - a.co2Kg)
+    .map((c) => ({
+      label: c.label,
+      co2Kg: r3(c.co2Kg),
+      pct: r2(totalCo2Kg > 0 ? (c.co2Kg / totalCo2Kg) * 100 : 0),
+    }));
+
+  // Score (0–100): material efficiency 30 + CO₂ intensity 30 + recyclability 20 + process energy 20
+  const matScore    = (materialUtilizationPct / 100) * 30;
+  const co2Score    = Math.max(0, 30 - co2PerKgPart * 3);
+  const recyclScore = (recyclabilityPct / 100) * 20;
+  const energyScore = Math.max(0, 20 - totalProcessEnergyKwh * 4);
+  const sustainabilityScore = Math.round(Math.min(100, matScore + co2Score + recyclScore + energyScore));
+  const scoreBreakdown = {
+    materialEfficiency: Math.round(matScore * 10) / 10,
+    carbonIntensity:    Math.round(co2Score * 10) / 10,
+    recyclability:      Math.round(recyclScore * 10) / 10,
+    processEnergy:      Math.round(energyScore * 10) / 10,
+  };
+
+  const opportunities: string[] = [];
+  if (materialUtilizationPct < 90) {
+    opportunities.push(`Improve nesting layout — ${(100 - materialUtilizationPct).toFixed(0)}% scrap overhead currently`);
+  }
+  if (totalCo2Kg > 0 && materialCo2Kg / totalCo2Kg > 0.60) {
+    opportunities.push(`Material production is ${Math.round((materialCo2Kg / totalCo2Kg) * 100)}% of total CO₂ — consider recycled-content steel`);
+  }
+  if (totalProcessEnergyKwh > 2.0) {
+    opportunities.push(`High process energy (${totalProcessEnergyKwh.toFixed(2)} kWh) — review process sequence for consolidation`);
+  }
+  if (batchSize < 10) {
+    opportunities.push(`Small batch (${batchSize} pcs) spreads setup energy across fewer parts — increase batch size`);
+  }
+  if (!opportunities.length) {
+    opportunities.push('No significant improvement opportunities identified at current parameters');
+  }
+
+  return {
+    netWeightKg: r3(netWeightKg),
+    scrapKg,
+    wasteCostInr,
+    materialUtilizationPct,
+    materialCo2Kg,
+    materialCo2PerKg,
+    materialCo2Source,
+    processCo2Breakdown,
+    totalProcessEnergyKwh,
+    totalProcessCo2Kg,
+    totalCo2Kg,
+    co2PerKgPart,
+    co2Contributors,
+    recyclabilityPct,
+    sustainabilityScore,
+    scoreBreakdown,
+    opportunities,
+    factorsSource: SUSTAINABILITY_FACTORS_LABEL,
+  };
+}
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
@@ -188,20 +292,31 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
   const totalProcessCost = processLines.reduce((s, l) => s + l.totalCost, 0);
   const totalCost = materialCost + totalProcessCost;
 
+  const roundedLines = processLines.map((l) => ({
+    ...l,
+    setupCost: r2(l.setupCost),
+    runCost: r2(l.runCost),
+    totalCost: r2(l.totalCost),
+    hourlyRate: r2(l.hourlyRate),
+    rateSource: l.rateSource,
+  }));
+
+  const sustainability = computeSustainability(
+    materialGrade,
+    materialCostPerKg,
+    netWeightKg,
+    grossWeightKg,
+    batchSize,
+    roundedLines,
+  );
+
   return {
     materialCost: r2(materialCost),
     materialGrade: materialGrade ?? 'Unknown',
     grossWeightKg: r3(grossWeightKg),
     materialCostPerKg,
     materialSource,
-    processLines: processLines.map((l) => ({
-      ...l,
-      setupCost: r2(l.setupCost),
-      runCost: r2(l.runCost),
-      totalCost: r2(l.totalCost),
-      hourlyRate: r2(l.hourlyRate),
-      rateSource: l.rateSource,
-    })),
+    processLines: roundedLines,
     totalProcessCost: r2(totalProcessCost),
     totalCost: r2(totalCost),
     cycleTimes: {
@@ -215,5 +330,6 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     family,
     warnings,
     ratesSource: RATES_SOURCE_LABEL,
+    sustainability,
   };
 }

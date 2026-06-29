@@ -1,4 +1,4 @@
-import type { ProcessLineCost } from "./cost-breakdown.dto";
+import type { ProcessLineCost, RouteResultSustainability } from "./cost-breakdown.dto";
 import type { CapabilityReasonCode } from "../costing/machine-capability";
 
 export type RouteId = "sm-laser" | "sm-turret" | "sm-waterjet";
@@ -32,6 +32,7 @@ export interface RouteResultDto {
   capability: RouteCapability;
   warnings: string[];
   ratesSource: string;
+  sustainability?: RouteResultSustainability;
 }
 
 export interface RouteComparisonDto {

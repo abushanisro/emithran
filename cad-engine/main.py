@@ -481,6 +481,32 @@ async def analyze_geometry_advanced(
 
             ai_enhanced_result = getattr(optimization_result.dfm_analysis, '_ai_enhanced_result', None)
 
+            # CNC feature recognition — runs only for non-sheet-metal families
+            cnc_features_result = None
+            try:
+                mfg_intel = (
+                    optimization_result.geometry_features.manufacturing_features
+                    .get("manufacturing_intelligence", {})
+                )
+                detected_family = mfg_intel.get("detected_family", "")
+                if detected_family in ("cnc_turned", "mill_turn", "cnc_milled"):
+                    from cnc_feature_recognizer import CNCFeatureRecognizer  # type: ignore
+                    cnc_features_result = CNCFeatureRecognizer().recognize(shape, detected_family).to_dict()
+                    # Embed face_map so the frontend can resolve face_ids → STL triangle ranges.
+                    # For sheet_metal this lives in feature_graph_v2.metadata.face_map; for CNC we
+                    # carry it here since the SheetMetalFeatureExtractor is never called.
+                    _holes = optimization_result.geometry_features.manufacturing_features.get('holes', {})
+                    _face_map = _holes.get('face_map', [])
+                    if _face_map:
+                        cnc_features_result['face_map'] = _face_map
+                    logger.info(
+                        f"[cnc_features] family={detected_family} "
+                        f"features={len(cnc_features_result.get('features', []))} "
+                        f"face_map_entries={len(_face_map)}"
+                    )
+            except Exception as _cnc_exc:
+                logger.warning(f"[cnc_features] extraction failed: {_cnc_exc}")
+
             response = {
                 "success": True,
                 "analysis_id": optimization_result.geometry_hash[:16],
@@ -539,6 +565,9 @@ async def analyze_geometry_advanced(
                     "recommendations": optimization_result.recommendations
                 }
             }
+
+            if cnc_features_result is not None:
+                response["cnc_features"] = cnc_features_result
 
             return response
 

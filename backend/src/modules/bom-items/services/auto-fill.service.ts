@@ -221,6 +221,7 @@ export class AutoFillService {
       ?.manufacturing_intelligence
       ?.features
       ?.feature_graph_v2 ?? null;
+    const cncFeatures: any = (cadResult as any)?.cnc_features ?? null;
 
     // STL ordering verification: compare face_map triangle total to STL header count.
     // STL header count is logged by /convert-step as X-STL-Triangle-Count.
@@ -269,6 +270,7 @@ export class AutoFillService {
       cad_engine_version:     process.env.CAD_ENGINE_VERSION ?? 'geo_v5',
       analyzed_at:            new Date().toISOString(),
       ...(cadV2 ? { feature_graph_v2: cadV2 } : {}),
+      ...(cncFeatures ? { cnc_features: cncFeatures } : {}),
     };
   }
 

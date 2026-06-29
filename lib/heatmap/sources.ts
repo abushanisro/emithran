@@ -193,8 +193,187 @@ export function buildManufacturingRiskSources(
   ];
 }
 
-export function buildToolWearSources(): HeatmapSource[] { return []; }
-export function buildThermalSources(): HeatmapSource[] { return []; }
-export function buildCostDensitySources(): HeatmapSource[] { return []; }
-export function buildToleranceSources(): HeatmapSource[] { return []; }
-export function buildSustainabilitySources(): HeatmapSource[] { return []; }
+// Tolerance tightest value (mm) from drawing intelligence — null if drawing not analysed.
+export interface ToleranceHeatmapWeights {
+  tightestToleranceMm: number | null;
+}
+
+export function buildToleranceSources(fg: FeatureGraph, weights: ToleranceHeatmapWeights): HeatmapSource[] {
+  const v2 = fg.feature_graph_v2;
+  if (!v2) return [];
+
+  // Tighter tolerance → heavier inspection burden → higher amplitude
+  const t = weights.tightestToleranceMm;
+  const baseAmp = t == null ? 0.4
+    : t <= 0.02 ? 1.0
+    : t <= 0.05 ? 0.85
+    : t <= 0.10 ? 0.65
+    : t <= 0.25 ? 0.45
+    : t <= 0.50 ? 0.25
+    : 0.15;
+
+  const holeSignals: RawSignal[] = [];
+  const bendSignals: RawSignal[] = [];
+
+  for (const feat of v2.features) {
+    for (let i = 0; i < feat.occurrences.length; i++) {
+      const occ = feat.occurrences[i];
+      if (!occ?.centroid) continue;
+      if (feat.feature_type === 'hole') {
+        // Holes < 4mm diameter more likely to carry tight position/size call-outs
+        const amp = feat.diameter_mm != null && feat.diameter_mm < 4
+          ? Math.min(baseAmp + 0.2, 1.0) : baseAmp;
+        holeSignals.push({ centroid: occ.centroid, amplitude: amp, featureId: feat.id, occurrenceIndex: i });
+      } else if (feat.feature_type === 'bend') {
+        // Bends usually carry angle tolerance only — lower amplitude
+        bendSignals.push({ centroid: occ.centroid, amplitude: baseAmp * 0.5, featureId: feat.id, occurrenceIndex: i, bendLen: occ.bend_length_mm ?? 50 });
+      }
+    }
+  }
+
+  return [
+    ...gridCluster(holeSignals, 20, 'tolerance_risk', 'hole'),
+    ...gridCluster(bendSignals, 10, 'tolerance_risk', 'bend'),
+  ];
+}
+
+// Per-operation CO₂ (kg) from the backend sustainability engine.
+export interface SustainabilityHeatmapWeights {
+  laserCo2PerPierce: number | null;
+  brakeCo2PerBend: number | null;
+}
+
+export function buildSustainabilitySources(fg: FeatureGraph, weights: SustainabilityHeatmapWeights): HeatmapSource[] {
+  const v2 = fg.feature_graph_v2;
+  if (!v2) return [];
+
+  const maxUnit = Math.max(weights.laserCo2PerPierce ?? 0, weights.brakeCo2PerBend ?? 0, 0.0001);
+  const pierceBase = weights.laserCo2PerPierce != null ? weights.laserCo2PerPierce / maxUnit : 0.5;
+  const bendBase   = weights.brakeCo2PerBend   != null ? weights.brakeCo2PerBend   / maxUnit : 0.5;
+
+  const holeSignals: RawSignal[] = [];
+  const bendSignals: RawSignal[] = [];
+
+  for (const feat of v2.features) {
+    for (let i = 0; i < feat.occurrences.length; i++) {
+      const occ = feat.occurrences[i];
+      if (!occ?.centroid) continue;
+      if (feat.feature_type === 'hole') {
+        holeSignals.push({ centroid: occ.centroid, amplitude: Math.min(pierceBase, 1.0), featureId: feat.id, occurrenceIndex: i });
+      } else if (feat.feature_type === 'bend') {
+        const len = occ.bend_length_mm ?? 50;
+        bendSignals.push({ centroid: occ.centroid, amplitude: Math.min(bendBase + Math.min(len / 200, 0.5) * 0.2, 1.0), featureId: feat.id, occurrenceIndex: i, bendLen: len });
+      }
+    }
+  }
+
+  return [
+    ...gridCluster(holeSignals, 20, 'sustainability', 'hole'),
+    ...gridCluster(bendSignals, 10, 'sustainability', 'bend'),
+  ];
+}
+
+// Thermal distortion proxy — derived from hole density and size relative to thickness.
+// Not FEA: amplitude represents estimated heat-accumulation risk from pierce sequencing.
+export function buildThermalSources(fg: FeatureGraph, sheetThicknessMm: number): HeatmapSource[] {
+  const v2 = fg.feature_graph_v2;
+  if (!v2) return [];
+
+  const t = Math.max(sheetThicknessMm, 0.5);
+  const holeSignals: RawSignal[] = [];
+
+  for (const feat of v2.features) {
+    if (feat.feature_type !== 'hole') continue;
+    for (let i = 0; i < feat.occurrences.length; i++) {
+      const occ = feat.occurrences[i];
+      if (!occ?.centroid) continue;
+      // Dense clusters accumulate heat; small holes require more laser dwell per mm
+      const densityAmp = Math.min((occ.local_feature_density ?? 1) / 10, 0.6);
+      const sizeAmp = feat.diameter_mm != null && feat.diameter_mm < 2 * t ? 0.3 : 0.1;
+      holeSignals.push({ centroid: occ.centroid, amplitude: Math.min(densityAmp + sizeAmp, 1.0), featureId: feat.id, occurrenceIndex: i });
+    }
+  }
+
+  return gridCluster(holeSignals, 20, 'thermal', 'hole');
+}
+
+// Tool wear proxy — small holes and high-density clusters wear tooling fastest.
+// Amplitude represents relative tooling fatigue, not actual tool life hours.
+export function buildToolWearSources(fg: FeatureGraph, sheetThicknessMm: number): HeatmapSource[] {
+  const v2 = fg.feature_graph_v2;
+  if (!v2) return [];
+
+  const t = Math.max(sheetThicknessMm, 0.5);
+  const holeSignals: RawSignal[] = [];
+
+  for (const feat of v2.features) {
+    if (feat.feature_type !== 'hole') continue;
+    for (let i = 0; i < feat.occurrences.length; i++) {
+      const occ = feat.occurrences[i];
+      if (!occ?.centroid) continue;
+      let amplitude = 0.35;
+      // Holes < 2t use smallest-bore / most fragile nozzle focus — highest wear
+      if (feat.diameter_mm != null && feat.diameter_mm < 2 * t) {
+        amplitude += (1 - feat.diameter_mm / (2 * t)) * 0.45;
+      }
+      // High local density = many rapid repositioning moves = faster nozzle wear
+      if ((occ.local_feature_density ?? 0) > 5) amplitude += 0.15;
+      holeSignals.push({ centroid: occ.centroid, amplitude: Math.min(amplitude, 1.0), featureId: feat.id, occurrenceIndex: i });
+    }
+  }
+
+  return gridCluster(holeSignals, 20, 'tool_wear', 'hole');
+}
+
+// Per-unit costs from the backend cost engine (INR). Null when cost summary hasn't been run.
+// Used only for normalizing heatmap amplitudes — not for reporting cost figures.
+export interface CostHeatmapWeights {
+  laserCostPerPierce: number | null;
+  brakeCostPerBend: number | null;
+}
+
+export function buildCostDensitySources(
+  fg: FeatureGraph,
+  sheetThicknessMm: number,
+  weights: CostHeatmapWeights,
+): HeatmapSource[] {
+  const v2 = fg.feature_graph_v2;
+  if (!v2) return [];
+
+  const t = Math.max(sheetThicknessMm, 0.5);
+
+  // Normalise: find the max per-unit cost to scale amplitudes 0→1.
+  // If no cost data, treat both types as equal weight (0.5 base).
+  const maxUnit = Math.max(weights.laserCostPerPierce ?? 0, weights.brakeCostPerBend ?? 0, 0.01);
+  const pierceBase = weights.laserCostPerPierce != null ? weights.laserCostPerPierce / maxUnit : 0.5;
+  const bendBase   = weights.brakeCostPerBend   != null ? weights.brakeCostPerBend   / maxUnit : 0.5;
+
+  const holeSignals: RawSignal[] = [];
+  const bendSignals: RawSignal[] = [];
+
+  for (const feat of v2.features) {
+    for (let i = 0; i < feat.occurrences.length; i++) {
+      const occ = feat.occurrences[i];
+      if (!occ?.centroid) continue;
+
+      if (feat.feature_type === 'hole') {
+        let amplitude = pierceBase;
+        // Small holes (diameter < 2t) pierce slower — geometry penalty, no constant duplication
+        if (feat.diameter_mm != null && feat.diameter_mm < 2 * t) {
+          amplitude += (1 - feat.diameter_mm / (2 * t)) * 0.3;
+        }
+        holeSignals.push({ centroid: occ.centroid, amplitude: Math.min(amplitude, 1.0), featureId: feat.id, occurrenceIndex: i });
+      } else if (feat.feature_type === 'bend') {
+        const len = occ.bend_length_mm ?? 50;
+        // Longer bends = more handling — pure geometry ratio, no constant duplication
+        const lenBonus = Math.min(len / 200, 0.5) * 0.3;
+        bendSignals.push({ centroid: occ.centroid, amplitude: Math.min(bendBase + lenBonus, 1.0), featureId: feat.id, occurrenceIndex: i, bendLen: len });
+      }
+    }
+  }
+
+  return [
+    ...gridCluster(holeSignals, 20, 'cost_density', 'hole'),
+    ...gridCluster(bendSignals, 10, 'cost_density', 'bend'),
+  ];
+}
