@@ -16,9 +16,10 @@ from pathlib import Path
 from typing import Dict, Any
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Security
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security.api_key import APIKeyHeader
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -134,6 +135,19 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ============================================================================
+# API KEY AUTHENTICATION
+# ============================================================================
+
+_CAD_API_KEY = os.getenv("CAD_ENGINE_API_KEY", "")
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def require_api_key(api_key: str = Security(_api_key_header)):
+    if not _CAD_API_KEY:
+        return  # key not configured — open (dev mode)
+    if api_key != _CAD_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+
+# ============================================================================
 # MIDDLEWARE
 # ============================================================================
 
@@ -226,7 +240,8 @@ async def health() -> Dict[str, Any]:
 async def convert_step_to_stl(
     request: Request,
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    _auth: None = Security(require_api_key)
 ) -> FileResponse:
     """
     Convert STEP file to STL with security validation
@@ -325,7 +340,8 @@ async def convert_step_to_stl(
 @limiter.limit(f"{config.rate_limit_per_minute}/minute")
 async def convert_step_to_stl_base64(
     request: Request,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    _auth: None = Security(require_api_key)
 ) -> Dict[str, Any]:
     """
     Convert STEP file to STL and return as base64
@@ -414,7 +430,8 @@ async def analyze_geometry_advanced(
     file: UploadFile = File(...),
     strategy: str = "balanced",
     force_reanalysis: bool = False,
-    user_processes: str = ""   # JSON string: array of process objects from user's process API
+    user_processes: str = "",
+    _auth: None = Security(require_api_key)
 ) -> Dict[str, Any]:
     """
     Advanced geometry analysis with DFM insights and memory optimization.

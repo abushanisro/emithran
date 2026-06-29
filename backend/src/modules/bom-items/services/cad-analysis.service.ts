@@ -40,13 +40,14 @@ interface GeometryAnalysisResponse {
 export class CADAnalysisService {
   private readonly logger = new Logger(CADAnalysisService.name);
   private readonly cadEngineUrl: string;
+  private readonly cadEngineApiKey: string;
 
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly fileStorageService: FileStorageService,
   ) {
-    // Configure CAD engine URL from environment or use default
     this.cadEngineUrl = process.env.CAD_ENGINE_URL || 'http://localhost:5000';
+    this.cadEngineApiKey = process.env.CAD_ENGINE_API_KEY || '';
     this.logger.log(`CAD Analysis Service initialized with engine URL: ${this.cadEngineUrl}`);
   }
 
@@ -590,10 +591,11 @@ export class CADAnalysisService {
       `${this.cadEngineUrl}/analyze/geometry`,
       formData,
       {
-        timeout: 300000, // 5 minutes
-        maxContentLength: 100 * 1024 * 1024, // 100MB response limit
+        timeout: 300000,
+        maxContentLength: 100 * 1024 * 1024,
         headers: {
           ...formData.getHeaders(),
+          ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
         },
       }
     );

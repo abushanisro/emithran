@@ -43,6 +43,7 @@ interface ProcessSuggestion {
 export class AutoFillService {
   private readonly logger = new Logger(AutoFillService.name);
   private readonly cadEngineUrl: string;
+  private readonly cadEngineApiKey: string;
 
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -50,6 +51,7 @@ export class AutoFillService {
     private readonly sheetMetalExtractor: SheetMetalFeatureExtractorService,
   ) {
     this.cadEngineUrl = process.env.CAD_ENGINE_URL || 'http://localhost:5000';
+    this.cadEngineApiKey = process.env.CAD_ENGINE_API_KEY || '';
   }
 
   async analyzeAndSuggest(
@@ -459,7 +461,10 @@ export class AutoFillService {
       `${this.cadEngineUrl}/analyze/geometry`,
       form,
       {
-        headers: form.getHeaders(),
+        headers: {
+          ...form.getHeaders(),
+          ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
+        },
         timeout: 120_000,
         maxContentLength: 150 * 1024 * 1024,
       },

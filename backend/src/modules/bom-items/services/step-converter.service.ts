@@ -19,15 +19,14 @@ import FormData from 'form-data';
 export class StepConverterService {
   private readonly logger = new Logger(StepConverterService.name);
   private readonly cadEngineUrl: string;
+  private readonly cadEngineApiKey: string;
   private cadEngineAvailable: boolean | null = null;
   private cadEngineLastChecked: number = 0;
-  private readonly AVAILABILITY_CACHE_TTL = 60000; // 1 minute
+  private readonly AVAILABILITY_CACHE_TTL = 60000;
 
   constructor(private configService: ConfigService) {
-    this.cadEngineUrl = this.configService.get<string>(
-      'CAD_ENGINE_URL',
-      'http://localhost:5000',
-    );
+    this.cadEngineUrl = this.configService.get<string>('CAD_ENGINE_URL', 'http://localhost:5000');
+    this.cadEngineApiKey = this.configService.get<string>('CAD_ENGINE_API_KEY', '');
     this.logger.log(`CAD Engine configured at: ${this.cadEngineUrl}`);
   }
 
@@ -103,10 +102,13 @@ export class StepConverterService {
         `${this.cadEngineUrl}/convert/step-to-stl`,
         formData,
         {
-          headers: formData.getHeaders(),
+          headers: {
+            ...formData.getHeaders(),
+            ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
+          },
           responseType: 'arraybuffer',
-          timeout: 60000, // 60 seconds for large files
-          maxContentLength: 100 * 1024 * 1024, // 100MB max
+          timeout: 60000,
+          maxContentLength: 100 * 1024 * 1024,
           maxBodyLength: 100 * 1024 * 1024,
         },
       );
