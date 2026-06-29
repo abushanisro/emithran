@@ -32,10 +32,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Environment files - Active environment file only (templates are committed)
+# Environment files - never commit real env files
 .env
-.env*.local
 .env.local
+.env.development
+.env.production
+.env*.local
 .env.test.local
 /backend/.env
 /backend/.env.local
