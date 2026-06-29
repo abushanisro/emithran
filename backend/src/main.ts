@@ -72,7 +72,8 @@ async function bootstrap() {
         process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null,
       ].filter(Boolean);
       const isVercelApp = requestOrigin?.match(/^https:\/\/mithran(-[a-z0-9]+)?\.vercel\.app$/);
-      if (!requestOrigin || isVercelApp || allowedOrigins.includes(requestOrigin) || allowedOrigins.some(o => requestOrigin.startsWith(o))) {
+      const isEmithranApp = requestOrigin?.match(/^https:\/\/([a-z0-9-]+\.)?emithran\.com$/);
+      if (!requestOrigin || isVercelApp || isEmithranApp || allowedOrigins.includes(requestOrigin) || allowedOrigins.some(o => requestOrigin.startsWith(o))) {
         callback(null, true);
       } else {
         callback(null, false);
