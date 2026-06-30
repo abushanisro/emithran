@@ -23,6 +23,10 @@ from typing import Dict, List, Literal, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Toroidal faces with minor radius below this are sub-mm blend arcs on complex STEP models,
+# not manufacturable fillets. Without this floor, a single STEP file can yield 10,000+ "fillets".
+_MIN_FILLET_RADIUS_MM = 0.5
+
 # ── Feature type registry ─────────────────────────────────────────────────────
 
 FeatureType = Literal[
@@ -676,15 +680,24 @@ class CNCFeatureRecognizer:
             surf = BRepAdaptor_Surface(face)
             if surf.GetType() == GeomAbs_Torus:
                 tor = surf.Torus()
-                is_concave = face.Orientation() != TopAbs_FORWARD
-                results.append({
-                    "major_radius": tor.MajorRadius(),
-                    "minor_radius": tor.MinorRadius(),
-                    "is_concave": is_concave,
-                    "face_indices": [face_idx],  # OCC face ordinal — matches face_map in memory_optimizer
-                })
+                minor_r = tor.MinorRadius()
+                if minor_r >= _MIN_FILLET_RADIUS_MM:
+                    is_concave = face.Orientation() != TopAbs_FORWARD
+                    results.append({
+                        "major_radius": tor.MajorRadius(),
+                        "minor_radius": minor_r,
+                        "is_concave": is_concave,
+                        "face_indices": [face_idx],  # OCC face ordinal — matches face_map in memory_optimizer
+                    })
             face_idx += 1  # increment for EVERY face, not just toroids
             exp.Next()
+
+        if len(results) > 500:
+            logger.warning(
+                f"[cnc_recognizer] {len(results)} torus faces after radius filter — "
+                f"likely STEP quality issue; suppressing all fillet/groove features"
+            )
+            return []
         return results
 
     def _collect_prismatic_pockets(self, shape, main_axis: Tuple[float, float, float]) -> List[Dict]:

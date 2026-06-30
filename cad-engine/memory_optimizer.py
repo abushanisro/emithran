@@ -401,27 +401,43 @@ class AdvancedCADMemoryOptimizer:
         try:
             from feature_extractors import detect_part_family, SheetMetalFeatureExtractor  # type: ignore
             dims_list = [bounding_box['length'], bounding_box['width'], bounding_box['height']]
+            total_face_count = holes.get('total_face_count', 1)
+            planar_face_count = holes.get('planar_face_count', 0)
+            planar_face_fraction = planar_face_count / max(total_face_count, 1)
             cyl_axis_alignment, rotational_face_ratio, secondary_cyl_count = _compute_cyl_signals(
                 holes.get('raw_cylinders_full', []),
-                holes.get('total_face_count', 1),
+                total_face_count,
             )
             pocket_count = pockets.get('count', 0)
             secondary_features_count = secondary_cyl_count + pocket_count
+            # Pre-compute flatness here so it can be surfaced in classification_signals
+            # (detect_part_family computes it internally but doesn't return it).
+            _dims_sorted = sorted(d for d in dims_list if d > 0)
+            flatness_val = round(_dims_sorted[0] / _dims_sorted[2], 3) if len(_dims_sorted) >= 3 else 0.0
             detected_family, family_confidence, classification_reasons = detect_part_family(
                 dims_list,
                 holes.get('count', 0),
                 secondary_features_count,
                 cyl_axis_alignment=cyl_axis_alignment,
                 rotational_face_ratio=rotational_face_ratio,
+                planar_face_fraction=planar_face_fraction,
+                total_face_count=total_face_count,
             )
+            _hole_density_val = round(holes.get('count', 0) / max(total_face_count, 1), 3)
             manufacturing_intelligence = {
                 'detected_family': detected_family,
                 'family_confidence': round(family_confidence, 3),
                 'features': {},
                 'classification_signals': {
-                    'cyl_axis_alignment': round(cyl_axis_alignment, 3),
-                    'rotational_face_ratio': round(rotational_face_ratio, 3),
+                    'flatness':               flatness_val,
+                    'hole_count':             holes.get('count', 0),
+                    'total_face_count':       total_face_count,
+                    'hole_density':           _hole_density_val,
+                    'planar_face_fraction':   round(planar_face_fraction, 3),
+                    'cyl_axis_alignment':     round(cyl_axis_alignment, 3),
+                    'rotational_face_ratio':  round(rotational_face_ratio, 3),
                     'secondary_features_count': secondary_features_count,
+                    'classification_version': 'v3',
                 },
                 'classification_reason': classification_reasons,
             }
@@ -439,7 +455,13 @@ class AdvancedCADMemoryOptimizer:
                     face_id_map=holes.get('face_id_map', {}),
                     adjacent_face_ids=holes.get('adjacent_face_ids', {}),
                 )
-            logger.info(f"[mfg_intel] family={detected_family} confidence={family_confidence:.2f}")
+            logger.info(
+                f"[mfg_intel] family={detected_family} conf={family_confidence:.2f} "
+                f"flatness={flatness_val} holes={holes.get('count', 0)} "
+                f"total_faces={total_face_count} hole_density={_hole_density_val} "
+                f"planar_frac={round(planar_face_fraction, 2)} "
+                f"reasons={classification_reasons}"
+            )
         except Exception as e:
             logger.warning(f"[mfg_intel] extraction failed: {e}")
             manufacturing_intelligence = {'error': str(e)}
@@ -458,7 +480,7 @@ class AdvancedCADMemoryOptimizer:
         Returns diameters AND normalised positions in [-1,+1] relative to the
         model bbox centre (matching Three.js geometry.center() behaviour).
         """
-        from OCC.Core.GeomAbs import GeomAbs_Cylinder # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane # type: ignore
         from OCC.Core.BRepAdaptor import BRepAdaptor_Surface # type: ignore
         from OCC.Core.TopoDS import topods # type: ignore
         from OCC.Core.GProp import GProp_GProps # type: ignore
@@ -482,6 +504,7 @@ class AdvancedCADMemoryOptimizer:
         #   NOT stable across STEP regeneration — runtime reference only, never long-term identity.
         #   Increments for ALL faces (not just cylinders) to align with future GLTF TopExp walk order.
         raw_cylinders_full: List[Tuple] = []
+        planar_face_count = 0  # counts GeomAbs_Plane faces; used for classification signal
         _MAX_POSITIONS = 100  # cap expensive SurfaceProperties calls for large parts
         face_index = 0  # counts ALL faces — aligns with future GLTF TopExp walk order
         # face_map: face_id → {tri_start, tri_count} for exact STL triangle highlighting.
@@ -495,7 +518,9 @@ class AdvancedCADMemoryOptimizer:
             try:
                 face = topods.Face(face_explorer.Current())
                 adaptor = BRepAdaptor_Surface(face)
-                if adaptor.GetType() == GeomAbs_Cylinder:
+                if adaptor.GetType() == GeomAbs_Plane:
+                    planar_face_count += 1
+                elif adaptor.GetType() == GeomAbs_Cylinder:
                     cyl = adaptor.Cylinder()
                     radius = cyl.Radius()
                     axis = cyl.Axis()
@@ -630,6 +655,7 @@ class AdvancedCADMemoryOptimizer:
                 'positions': [], 'raw_cylinders': raw_cylinders,
                 'raw_cylinders_full': raw_cylinders_full,
                 'total_face_count': face_index,
+                'planar_face_count': planar_face_count,
                 'face_map': face_map,
                 'face_map_tri_total': _tri_counter,
                 'face_id_map': face_id_map,
@@ -651,6 +677,7 @@ class AdvancedCADMemoryOptimizer:
             'raw_cylinders': raw_cylinders,
             'raw_cylinders_full': raw_cylinders_full,
             'total_face_count': face_index,
+            'planar_face_count': planar_face_count,
             'face_map': face_map,
             'face_map_tri_total': _tri_counter,
             'face_id_map': face_id_map,

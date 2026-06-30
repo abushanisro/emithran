@@ -31,6 +31,8 @@ def detect_part_family(
     secondary_features_count: int,
     cyl_axis_alignment: float = 0.0,
     rotational_face_ratio: float = 0.0,
+    planar_face_fraction: float = 0.0,
+    total_face_count: int = 1,
 ) -> Tuple[str, float, List[str]]:
     """
     Heuristic family classification from bounding-box geometry + cylindrical face signals.
@@ -49,6 +51,11 @@ def detect_part_family(
     rotational_face_ratio: cylindrical face count / total face count (0–1).
       > 0.30 → most surfaces are cylindrical → confirms turned, not milled housing.
       Guards against mis-classifying round milled housings / pipe manifolds.
+
+    planar_face_fraction: planar face count / total face count (0–1).
+      > 0.70 → mostly planar surfaces → sheet metal or simple block.
+
+    total_face_count: total OCC face count used to compute hole density.
     """
     dims = sorted(d for d in bbox_dims if d > 0)
     if len(dims) < 3:
@@ -62,6 +69,40 @@ def detect_part_family(
         confidence = min(0.95, 0.60 + (0.15 - flatness) * 2.0)
         return "sheet_metal", round(confidence, 3), [
             f"Very flat cross-section (flatness={flatness:.2f} < 0.15)",
+        ]
+
+    hole_density = hole_count / max(total_face_count, 1)
+
+    # Gate 1b-abs — absolute hole count + moderately flat bbox.
+    # Perforated brackets with flanges that inflate bbox height will have flatness 0.40–0.60
+    # (e.g., ZDR90 bracket: 94.6 / 182.2 = 0.52). A CNC-milled block with >20 drilled holes
+    # AND flatness < 0.60 is extremely rare; this combination is overwhelmingly sheet metal.
+    if hole_count > 20 and flatness < 0.60:
+        confidence = min(0.85, 0.70 + min(hole_count, 200) / 2000)
+        return "sheet_metal", round(confidence, 3), [
+            f"High absolute hole count ({hole_count}) with flat-ish bbox "
+            f"(flatness={flatness:.2f}) — perforated sheet metal",
+        ]
+
+    # Gate 1b — hole density + moderately flat bbox (catches cases below 20-hole threshold).
+    if hole_density > 0.20 and flatness < 0.60:
+        confidence = min(0.88, 0.68 + max(0, 0.60 - flatness) * 0.3)
+        return "sheet_metal", round(confidence, 3), [
+            f"High hole density ({hole_count}/{total_face_count} faces = {hole_density:.0%}) "
+            f"with flat-ish bbox (flatness={flatness:.2f})",
+            "Perforated sheet metal — hole-dominated topology",
+        ]
+
+    # Gate 1c — planar-dominant surface topology + moderately flat bbox.
+    # Sheet metal is almost entirely planar faces (top, bottom, flanges, webs).
+    # CNC milled and turned parts have more diverse surface types (fillets, bosses, pockets).
+    # Catches simple bent brackets and channel sections where hole count is low.
+    if planar_face_fraction > 0.70 and flatness < 0.35:
+        confidence = min(0.82, 0.62 + (0.35 - flatness) * 0.4 + planar_face_fraction * 0.1)
+        return "sheet_metal", round(confidence, 3), [
+            f"Predominantly planar surfaces ({planar_face_fraction:.0%}) "
+            f"with flat-ish bbox (flatness={flatness:.2f})",
+            "Surface topology consistent with sheet metal",
         ]
 
     # Disc / flange / ring (lens holders, pulleys, bearing races):
