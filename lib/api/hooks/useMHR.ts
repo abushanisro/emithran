@@ -63,6 +63,30 @@ export function useMHRProcessGroups() {
   });
 }
 
+export function useMHRLocations() {
+  return useQuery({
+    queryKey: [...mhrKeys.all, 'locations'],
+    queryFn: () => mhrApi.getLocations(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+    select: (data) => data ?? [],
+  });
+}
+
+export function useMHRCurrencies() {
+  return useQuery({
+    queryKey: [...mhrKeys.all, 'currencies'],
+    queryFn: () => mhrApi.getCurrencies(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+    select: (data) => data ?? [],
+  });
+}
+
 export function useCreateMHR() {
   const queryClient = useQueryClient();
 
@@ -158,7 +182,15 @@ export function useImportMHRFromExcel() {
     mutationFn: (file: File) => mhrApi.importFromExcel(file),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: mhrKeys.lists() });
-      toast.success(`MHR: ${result.imported} imported, ${result.skipped} skipped`);
+      if (result.imported > 0) {
+        toast.success(`MHR: ${result.imported} imported, ${result.skipped} skipped`);
+      } else if (result.errors?.length) {
+        toast.error(`Import failed: ${result.errors[0]}`);
+      } else if (result.skipped > 0) {
+        toast.info(`MHR: all ${result.skipped} records already exist — nothing new imported`);
+      } else {
+        toast.warning('MHR: 0 records imported — file may be empty or format not recognised');
+      }
     },
     onError: () => {
       toast.error('Failed to import MHR records from Excel');

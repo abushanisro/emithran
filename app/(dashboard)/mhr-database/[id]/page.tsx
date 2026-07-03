@@ -6,7 +6,48 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, FileDown, FileText, Printer, Edit2, Save, X } from 'lucide-react';
+import { ArrowLeft, FileDown, FileText, Printer, Edit2, Save, X, AlertTriangle } from 'lucide-react';
+
+const FX_RATES_LOCAL_PER_USD: Record<string, number> = {
+  INR: 84.5, USD: 1.0, EUR: 0.92, CNY: 7.25, MXN: 17.5, GBP: 0.79,
+  JPY: 154, TWD: 32.5, KRW: 1380, AUD: 1.56, CAD: 1.37, BRL: 5.1,
+  THB: 36, MYR: 4.75, IDR: 15700, VND: 25300, SGD: 1.35, ZAR: 19.5,
+  TRY: 34, RUB: 91, SAR: 3.75, AED: 3.67, PLN: 4.0, CZK: 23.5, HUF: 365, RON: 4.6,
+};
+
+function getCurrencyFromLocation(location: string): { currency: string; symbol: string } {
+  const loc = (location || '').toLowerCase();
+  if (!loc || loc.includes('india') || loc.includes('bangalore') || loc.includes('pune') ||
+      loc.includes('chennai') || loc.includes('mumbai') || loc.includes('delhi') ||
+      loc.includes('hyderabad')) return { currency: 'INR', symbol: '₹' };
+  if (loc.includes('china') || loc.includes('shenzhen') || loc.includes('shanghai') ||
+      loc.includes('beijing') || loc.includes('guangzhou')) return { currency: 'CNY', symbol: '¥' };
+  if (loc.includes('germany') || loc.includes('france') || loc.includes('europe') ||
+      loc.includes('spain') || loc.includes('italy') || loc.includes('netherlands') ||
+      loc.includes('austria') || loc.includes('belgium') || loc.includes('poland') ||
+      loc.includes('czech') || loc.includes('romania') || loc.includes('hungary') ||
+      loc.includes('sweden') || loc.includes('norway') || loc.includes('finland')) return { currency: 'EUR', symbol: '€' };
+  if (loc.includes('usa') || loc.includes('united states') || loc.includes('america') ||
+      loc.includes('us -')) return { currency: 'USD', symbol: '$' };
+  if (loc.includes('uk') || loc.includes('united kingdom') || loc.includes('britain')) return { currency: 'GBP', symbol: '£' };
+  if (loc.includes('japan')) return { currency: 'JPY', symbol: '¥' };
+  if (loc.includes('mexico')) return { currency: 'MXN', symbol: 'MX$' };
+  if (loc.includes('taiwan')) return { currency: 'TWD', symbol: 'NT$' };
+  if (loc.includes('korea')) return { currency: 'KRW', symbol: '₩' };
+  if (loc.includes('australia')) return { currency: 'AUD', symbol: 'A$' };
+  if (loc.includes('canada')) return { currency: 'CAD', symbol: 'CA$' };
+  if (loc.includes('brazil')) return { currency: 'BRL', symbol: 'R$' };
+  if (loc.includes('singapore')) return { currency: 'SGD', symbol: 'S$' };
+  if (loc.includes('thailand')) return { currency: 'THB', symbol: '฿' };
+  if (loc.includes('malaysia')) return { currency: 'MYR', symbol: 'RM' };
+  if (loc.includes('indonesia')) return { currency: 'IDR', symbol: 'Rp' };
+  if (loc.includes('vietnam')) return { currency: 'VND', symbol: '₫' };
+  if (loc.includes('south africa')) return { currency: 'ZAR', symbol: 'R' };
+  if (loc.includes('turkey')) return { currency: 'TRY', symbol: '₺' };
+  if (loc.includes('uae') || loc.includes('dubai')) return { currency: 'AED', symbol: 'AED' };
+  if (loc.includes('saudi')) return { currency: 'SAR', symbol: 'SR' };
+  return { currency: 'INR', symbol: '₹' };
+}
 import { useMHRRecord, useUpdateMHR } from '@/lib/api/hooks';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import { exportSingleMHRToPDF } from '@/lib/utils/exportMHRToPDF';
@@ -23,6 +64,12 @@ export default function MHRDetailPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableInputs, setEditableInputs] = useState<MHRInputs | null>(null);
   const [liveCalculations, setLiveCalculations] = useState<MHRCalculations | null>(null);
+  const [editableLhrUsd, setEditableLhrUsd] = useState<{
+    usdLaborRatePerHr: number;
+    usdLhrBase: number;
+    usdLhrBurden: number;
+    usdLhrTotal: number;
+  } | null>(null);
 
   const { data: record, isLoading, error, isError } = useMHRRecord(id);
   const updateMHR = useUpdateMHR();
@@ -51,14 +98,23 @@ export default function MHRDetailPage() {
       };
       setEditableInputs(inputs);
       setLiveCalculations(record.calculations);
+      setEditableLhrUsd({
+        usdLaborRatePerHr: record.usdLaborRatePerHr ?? 0,
+        usdLhrBase: record.usdLhrBase ?? 0,
+        usdLhrBurden: record.usdLhrBurden ?? 0,
+        usdLhrTotal: record.usdLhrTotal ?? 0,
+      });
     }
   }, [record, editableInputs]);
 
   useEffect(() => {
     if (editableInputs && isEditMode) {
-      setLiveCalculations(calculateMHR(editableInputs));
+      const isPreCalcRecord = record?.isManualEntry && !!record?.mhrUsdPerHour;
+      if (!isPreCalcRecord) {
+        setLiveCalculations(calculateMHR(editableInputs));
+      }
     }
-  }, [editableInputs, isEditMode]);
+  }, [editableInputs, isEditMode, record]);
 
   const handleInputChange = (field: keyof MHRInputs, value: number) => {
     if (!editableInputs) return;
@@ -81,16 +137,35 @@ export default function MHRDetailPage() {
       };
       setEditableInputs(inputs);
       setLiveCalculations(record.calculations);
+      setEditableLhrUsd({
+        usdLaborRatePerHr: record.usdLaborRatePerHr ?? 0,
+        usdLhrBase: record.usdLhrBase ?? 0,
+        usdLhrBurden: record.usdLhrBurden ?? 0,
+        usdLhrTotal: record.usdLhrTotal ?? 0,
+      });
     }
   };
 
   const handleSaveChanges = async () => {
     if (!editableInputs || !record) return;
     try {
-      await updateMHR.mutateAsync({ id, data: editableInputs });
+      await updateMHR.mutateAsync({ id, data: { ...editableInputs, ...(editableLhrUsd || {}) } });
       setIsEditMode(false);
     } catch (err) {
       console.error('Failed to update MHR record:', err);
+    }
+  };
+
+  const handleFixUsdToInr = async () => {
+    if (!record?.machinePriceUsd) return;
+    const { currency } = getCurrencyFromLocation(record.location);
+    const localPerUsd = FX_RATES_LOCAL_PER_USD[currency] ?? 84.5;
+    const correctedLandedCost = Math.round(record.machinePriceUsd * localPerUsd);
+    try {
+      await updateMHR.mutateAsync({ id, data: { landedMachineCost: correctedLandedCost, isManualEntry: false } });
+      setEditableInputs(prev => prev ? { ...prev, landedMachineCost: correctedLandedCost } : prev);
+    } catch (err) {
+      console.error('Failed to fix landed cost:', err);
     }
   };
 
@@ -151,6 +226,40 @@ export default function MHRDetailPage() {
   }
 
   const calc = liveCalculations || record.calculations;
+
+  // Currency-aware formatter: uses record's actual currency symbol
+  const currSym = record.currencySymbol ?? (record.currency === 'INR' ? '₹' : '$');
+  const fmtLocal = (v: number) =>
+    `${currSym}${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  const isPreCalc = record.isManualEntry && !!record.mhrUsdPerHour;
+  const machineOnlyMHR = isPreCalc ? (record.manualMHRValue ?? calc.totalMachineHourRate) : calc.totalMachineHourRate;
+  const headlineMHR = isPreCalc && record.fullyBurdenedLocalPerHr
+    ? record.fullyBurdenedLocalPerHr
+    : calc.totalMachineHourRate;
+  // LHR component added on top of machine MHR (shown explicitly in breakdown)
+  const lhrComponent = record.lhrInrPerHr && record.lhrInrPerHr > 0 && headlineMHR > machineOnlyMHR
+    ? headlineMHR - machineOnlyMHR
+    : null;
+
+  // Detect USD stored as INR: machine_price_usd > 0 but landed_machine_cost ≤ machine_price_usd × 20
+  // (legitimate INR landed cost should be ~84.5× the USD price; anything below 20× is clearly USD)
+  const { currency: locCurr, symbol: locSym } = getCurrencyFromLocation(record.location);
+  const locPerUsd = FX_RATES_LOCAL_PER_USD[locCurr] ?? 84.5;
+  const isUsdStoredAsInr = !!(
+    record.machinePriceUsd && record.machinePriceUsd > 0 &&
+    record.landedMachineCost > 0 &&
+    record.landedMachineCost < record.machinePriceUsd * 20
+  );
+  const correctedLandedCost = record.machinePriceUsd
+    ? Math.round(record.machinePriceUsd * locPerUsd) : 0;
+
+  // Detect whether the Excel provided individual cost components or only aggregated totals
+  const hasFixedBreakdown = calc.depreciationPerHour > 0 || calc.interestPerHour > 0 ||
+    calc.insurancePerHour > 0 || calc.rentPerHour > 0 || calc.maintenancePerHour > 0;
+  const hasAnnualBreakdown = calc.depreciationPerAnnum > 0 || calc.interestPerAnnum > 0 ||
+    calc.insurancePerAnnum > 0 || calc.rentPerAnnum > 0 || calc.maintenancePerAnnum > 0;
+
+
   const inputs = editableInputs || {
     shiftsPerDay: record.shiftsPerDay, hoursPerShift: record.hoursPerShift,
     workingDaysPerYear: record.workingDaysPerYear, plannedMaintenanceHoursPerYear: record.plannedMaintenanceHoursPerYear,
@@ -221,14 +330,35 @@ export default function MHRDetailPage() {
         {/* MHR */}
         <Card className="border-2 border-primary bg-gradient-to-br from-primary/5 to-primary/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-primary uppercase tracking-wide">MHR (₹/hr)</CardTitle>
+            <CardTitle className="text-xs font-semibold text-primary uppercase tracking-wide">MHR ({currSym}/hr)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-black text-primary">{formatCurrency(calc.totalMachineHourRate)}</div>
+            <div className="text-4xl font-black text-primary">{fmtLocal(headlineMHR)}</div>
             <div className="text-xs text-muted-foreground mt-1">per operating hour</div>
+            {isPreCalc && record.fullyBurdenedLocalPerHr && record.manualMHRValue != null && (
+              <div className="text-xs text-muted-foreground">Machine only: {fmtLocal(record.manualMHRValue)}</div>
+            )}
             <div className="mt-3 text-sm space-y-0.5">
-              <div className="flex justify-between"><span className="text-muted-foreground">Fixed</span><span className="font-medium">{formatCurrency(calc.totalFixedCostPerHour)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Variable</span><span className="font-medium">{formatCurrency(calc.totalVariableCostPerHour)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Fixed</span><span className="font-medium">{fmtLocal(calc.totalFixedCostPerHour)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Variable</span><span className="font-medium">{fmtLocal(calc.totalVariableCostPerHour)}</span></div>
+              {(record.fullyBurdenedUsdPerHr || (record.mhrUsdPerHour && record.manualMHRValue && record.fullyBurdenedLocalPerHr) || record.mhrUsdPerHour) && (
+                <div className="flex justify-between border-t pt-1 mt-1">
+                  <span className="text-muted-foreground">MHR USD</span>
+                  <span className="font-medium text-green-600">
+                    {(() => {
+                      if (record.fullyBurdenedUsdPerHr) return `$${record.fullyBurdenedUsdPerHr.toFixed(2)}`;
+                      if (record.mhrUsdPerHour && record.manualMHRValue && record.fullyBurdenedLocalPerHr) {
+                        const fxRate = record.mhrUsdPerHour / record.manualMHRValue;
+                        return `$${(record.fullyBurdenedLocalPerHr * fxRate).toFixed(2)}`;
+                      }
+                      return `$${record.mhrUsdPerHour!.toFixed(2)}`;
+                    })()}
+                  </span>
+                </div>
+              )}
+              {record.fullyBurdenedLocalPerHr && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Fully Burdened</span><span className="font-medium">{fmtLocal(record.fullyBurdenedLocalPerHr)}</span></div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -240,23 +370,65 @@ export default function MHRDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-black text-blue-700 dark:text-blue-400">
-              {record.lhrInrPerHr ? formatCurrency(record.lhrInrPerHr) : '—'}
+              {record.lhrInrPerHr ? fmtLocal(record.lhrInrPerHr) : '—'}
             </div>
-            <div className="text-xs text-muted-foreground mt-1">₹ per hour (India)</div>
-            {(record.usdLhrBase || record.usdLhrTotal) && (
+            <div className="text-xs text-muted-foreground mt-1">{currSym} per hour ({record.location})</div>
+            {(record.usdLhrBase || record.usdLhrTotal || isEditMode) && editableLhrUsd && (
               <div className="mt-3 text-sm space-y-0.5">
-                {record.usdLaborRatePerHr && <div className="flex justify-between"><span className="text-muted-foreground">Labor Rate</span><span className="font-medium">${record.usdLaborRatePerHr.toFixed(2)}</span></div>}
-                {record.usdLhrBase && <div className="flex justify-between"><span className="text-muted-foreground">LHR Base</span><span className="font-medium">${record.usdLhrBase.toFixed(2)}</span></div>}
-                {record.usdLhrBurden && <div className="flex justify-between"><span className="text-muted-foreground">Burden @38%</span><span className="font-medium">${record.usdLhrBurden.toFixed(2)}</span></div>}
-                {record.usdLhrTotal && <div className="flex justify-between font-semibold text-blue-700 dark:text-blue-400"><span>Total USD</span><span>${record.usdLhrTotal.toFixed(2)}</span></div>}
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Labor Rate</span>
+                  <EditableValue value={editableLhrUsd.usdLaborRatePerHr} onChange={v => setEditableLhrUsd(p => ({ ...p!, usdLaborRatePerHr: v }))} isEditable={isEditMode} formatDisplay={(v: number) => `$${v.toFixed(2)}`} className="font-medium" min={0} step={0.01} />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">LHR Base</span>
+                  <EditableValue value={editableLhrUsd.usdLhrBase} onChange={v => setEditableLhrUsd(p => ({ ...p!, usdLhrBase: v }))} isEditable={isEditMode} formatDisplay={(v: number) => `$${v.toFixed(2)}`} className="font-medium" min={0} step={0.01} />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Burden @38%</span>
+                  <EditableValue value={editableLhrUsd.usdLhrBurden} onChange={v => setEditableLhrUsd(p => ({ ...p!, usdLhrBurden: v }))} isEditable={isEditMode} formatDisplay={(v: number) => `$${v.toFixed(2)}`} className="font-medium" min={0} step={0.01} />
+                </div>
+                <div className="flex justify-between items-center font-semibold text-blue-700 dark:text-blue-400">
+                  <span>Total USD</span>
+                  <EditableValue value={editableLhrUsd.usdLhrTotal} onChange={v => setEditableLhrUsd(p => ({ ...p!, usdLhrTotal: v }))} isEditable={isEditMode} formatDisplay={(v: number) => `$${v.toFixed(2)}`} className="font-semibold" min={0} step={0.01} />
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
+      {/* USD-stored-as-INR warning banner */}
+      {isUsdStoredAsInr && !isEditMode && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg print:hidden">
+          <div className="flex items-center gap-2 text-sm text-amber-800">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+            <span>
+              <span className="font-semibold">Landed cost is stored in USD, not {locCurr}.</span>
+              {' '}Machine price ${record.machinePriceUsd?.toLocaleString()} USD → correct landed cost: {locSym}{correctedLandedCost.toLocaleString()} {locCurr}. MHR is being computed from the wrong base.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0 border-amber-400 text-amber-800 hover:bg-amber-100"
+            onClick={handleFixUsdToInr}
+            disabled={updateMHR.isPending}
+          >
+            {updateMHR.isPending ? 'Fixing...' : `Fix: ×${locPerUsd} → ${locCurr}`}
+          </Button>
+        </div>
+      )}
+
+      {/* Pre-calc edit banner */}
+      {isEditMode && isPreCalc && (
+        <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 print:hidden">
+          Pre-calculated import — MHR and Fully Burdened rates are sourced from the Excel file.
+          The input parameters below are stored for reference only and do not affect the MHR.
+        </div>
+      )}
+
       {/* Input Parameters (edit mode) */}
-      <Card className={isEditMode ? 'border-2 border-primary print:hidden' : 'print:hidden'}>
+      {!isPreCalc && <Card className={isEditMode ? 'border-2 border-primary print:hidden' : 'print:hidden'}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-bold">
             Input Parameters {isEditMode && <span className="text-xs font-normal text-muted-foreground ml-2">(Click values to edit)</span>}
@@ -290,7 +462,7 @@ export default function MHRDetailPage() {
               <h4 className="font-bold text-xs text-primary uppercase tracking-wide">Capital & Financial</h4>
               <div className="space-y-1.5 text-sm">
                 {([
-                  ['Landed Machine Cost', 'landedMachineCost', formatCurrency, 0],
+                  ['Landed Machine Cost', 'landedMachineCost', fmtLocal, 0],
                   ['Accessories %', 'accessoriesCostPercentage', (v: number) => `${formatNumber(v)}%`, 0, 100],
                   ['Installation %', 'installationCostPercentage', (v: number) => `${formatNumber(v)}%`, 0, 100],
                   ['Payback Period', 'paybackPeriodYears', (v: number) => `${formatNumber(v)} yrs`, 1],
@@ -314,9 +486,9 @@ export default function MHRDetailPage() {
               <div className="space-y-1.5 text-sm">
                 {([
                   ['Machine Footprint', 'machineFootprintSqm', (v: number) => `${formatNumber(v)} m²`, 0],
-                  ['Rent per m²/month', 'rentPerSqmPerMonth', formatCurrency, 0],
+                  ['Rent per m²/month', 'rentPerSqmPerMonth', fmtLocal, 0],
                   ['Power KWH/hr', 'powerKwhPerHour', formatNumber, 0],
-                  ['Electricity Cost/KWH', 'electricityCostPerKwh', formatCurrency, 0],
+                  ['Electricity Cost/KWH', 'electricityCostPerKwh', fmtLocal, 0],
                   ['Admin Overhead', 'adminOverheadPercentage', (v: number) => `${formatNumber(v)}%`, 0, 100],
                   ['Profit Margin', 'profitMarginPercentage', (v: number) => `${formatNumber(v)}%`, 0, 100],
                 ] as const).map(([label, field, fmt, min, max]) => (
@@ -331,7 +503,7 @@ export default function MHRDetailPage() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Cost Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -362,31 +534,33 @@ export default function MHRDetailPage() {
                 </div>
               ))}
               <div className="flex justify-between items-center bg-primary px-3 py-2 rounded-lg">
-                <span className="font-bold text-white">Effective Hours</span>
-                <span className="font-black text-lg text-white">{formatNumber(calc.effectiveHoursPerYear)} hrs</span>
+                <span className="font-bold text-primary-foreground">Effective Hours</span>
+                <span className="font-black text-lg text-primary-foreground">{formatNumber(calc.effectiveHoursPerYear)} hrs</span>
               </div>
             </CardContent>
           </Card>
 
+          {!isPreCalc && (
           <Card className="border-l-4 border-l-purple-500">
             <CardHeader className="pb-2"><CardTitle className="text-base font-bold">Capital Investment</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
-              <div className="flex justify-between"><span>Landed Machine Cost</span><span className="font-bold">{formatCurrency(inputs.landedMachineCost)}</span></div>
-              <div className="flex justify-between"><span>Accessories ({formatNumber(inputs.accessoriesCostPercentage)}%)</span><span className="font-bold">+{formatCurrency(calc.accessoriesCost)}</span></div>
-              <div className="flex justify-between"><span>Installation ({formatNumber(inputs.installationCostPercentage)}%)</span><span className="font-bold">+{formatCurrency(calc.installationCost)}</span></div>
+              <div className="flex justify-between"><span>Landed Machine Cost</span><span className="font-bold">{fmtLocal(inputs.landedMachineCost)}</span></div>
+              <div className="flex justify-between"><span>Accessories ({formatNumber(inputs.accessoriesCostPercentage)}%)</span><span className="font-bold">+{fmtLocal(calc.accessoriesCost)}</span></div>
+              <div className="flex justify-between"><span>Installation ({formatNumber(inputs.installationCostPercentage)}%)</span><span className="font-bold">+{fmtLocal(calc.installationCost)}</span></div>
               <div className="flex justify-between items-center bg-primary px-3 py-2 rounded-lg mt-1">
-                <span className="font-bold text-white">Total Capital</span>
-                <span className="font-black text-xl text-white">{formatCurrency(calc.totalCapitalInvestment)}</span>
+                <span className="font-bold text-primary-foreground">Total Capital</span>
+                <span className="font-black text-xl text-primary-foreground">{fmtLocal(calc.totalCapitalInvestment)}</span>
               </div>
               <div className="border-t pt-2 space-y-0.5">
                 <div className="flex justify-between"><span>Payback Period</span><span className="font-bold">{formatNumber(inputs.paybackPeriodYears)} yrs</span></div>
                 <div className="flex justify-between bg-slate-100 dark:bg-slate-800 px-2 py-1.5 rounded">
                   <span className="font-semibold">Annual Depreciation</span>
-                  <span className="font-black">{formatCurrency(calc.depreciationPerAnnum)}</span>
+                  <span className="font-black">{fmtLocal(calc.depreciationPerAnnum)}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
 
         {/* Hourly Cost + Final MHR */}
@@ -395,27 +569,38 @@ export default function MHRDetailPage() {
             <CardHeader className="pb-2"><CardTitle className="text-base font-bold">Hourly Cost Components</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
               <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">Fixed Costs</div>
-              {[
-                ['Depreciation', calc.depreciationPerHour],
-                ['Interest', calc.interestPerHour],
-                ['Insurance', calc.insurancePerHour],
-                ['Rent', calc.rentPerHour],
-                ['Maintenance', calc.maintenancePerHour],
-              ].map(([label, val]) => (
-                <div key={label as string} className="flex justify-between"><span>{label as string}</span><span className="font-semibold">{formatCurrency(val as number)}</span></div>
-              ))}
+              {hasFixedBreakdown ? (
+                [
+                  ['Depreciation', calc.depreciationPerHour],
+                  ['Interest', calc.interestPerHour],
+                  ['Insurance', calc.insurancePerHour],
+                  ['Rent', calc.rentPerHour],
+                  ['Maintenance', calc.maintenancePerHour],
+                ].map(([label, val]) => (
+                  <div key={label as string} className="flex justify-between"><span>{label as string}</span><span className="font-semibold">{fmtLocal(val as number)}</span></div>
+                ))
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cost of Ownership</span>
+                  <span className="font-semibold">{fmtLocal(calc.totalFixedCostPerHour)}</span>
+                </div>
+              )}
               <div className="flex justify-between bg-blue-50 dark:bg-blue-950 px-2 py-1.5 rounded font-bold text-blue-700 dark:text-blue-300">
-                <span>Total Fixed</span><span>{formatCurrency(calc.totalFixedCostPerHour)}</span>
+                <span>Total Fixed</span><span>{fmtLocal(calc.totalFixedCostPerHour)}</span>
               </div>
               <div className="border-t pt-1">
                 <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">Variable Costs</div>
-                <div className="flex justify-between"><span>Electricity</span><span className="font-semibold">{formatCurrency(calc.electricityPerHour)}</span></div>
+                {calc.electricityPerHour > 0 ? (
+                  <div className="flex justify-between"><span>Electricity</span><span className="font-semibold">{fmtLocal(calc.electricityPerHour)}</span></div>
+                ) : calc.totalVariableCostPerHour > 0 ? (
+                  <div className="flex justify-between"><span className="text-muted-foreground">MRO & Utilities</span><span className="font-semibold">{fmtLocal(calc.totalVariableCostPerHour)}</span></div>
+                ) : null}
                 <div className="flex justify-between bg-orange-50 dark:bg-orange-950 px-2 py-1.5 rounded font-bold text-orange-700 dark:text-orange-300">
-                  <span>Total Variable</span><span>{formatCurrency(calc.totalVariableCostPerHour)}</span>
+                  <span>Total Variable</span><span>{fmtLocal(calc.totalVariableCostPerHour)}</span>
                 </div>
               </div>
               <div className="flex justify-between bg-green-600 px-3 py-2 rounded-lg font-bold text-white">
-                <span>Operating Cost</span><span className="text-lg font-black">{formatCurrency(calc.totalOperatingCostPerHour)}</span>
+                <span>Operating Cost</span><span className="text-lg font-black">{fmtLocal(calc.totalOperatingCostPerHour)}</span>
               </div>
             </CardContent>
           </Card>
@@ -423,22 +608,28 @@ export default function MHRDetailPage() {
           <Card className="border-2 border-primary bg-gradient-to-br from-primary/5 to-primary/10">
             <CardHeader className="pb-2 bg-primary/10"><CardTitle className="text-base font-bold">Final MHR Calculation</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
-              <div className="flex justify-between"><span>Operating Cost</span><span className="font-semibold">{formatCurrency(calc.totalOperatingCostPerHour)}</span></div>
-              <div className="flex justify-between"><span>Admin Overhead ({formatNumber(inputs.adminOverheadPercentage)}%)</span><span className="font-semibold text-purple-600">+{formatCurrency(calc.adminOverheadPerHour)}</span></div>
+              <div className="flex justify-between"><span>Machine Operating Cost</span><span className="font-semibold">{fmtLocal(calc.totalOperatingCostPerHour)}</span></div>
+              <div className="flex justify-between"><span>Admin Overhead ({formatNumber(inputs.adminOverheadPercentage)}%)</span><span className="font-semibold text-purple-600">+{fmtLocal(calc.adminOverheadPerHour)}</span></div>
               <div className="flex justify-between bg-slate-100 dark:bg-slate-800 px-2 py-1.5 rounded font-bold">
-                <span>Subtotal</span><span>{formatCurrency(calc.totalOperatingCostPerHour + calc.adminOverheadPerHour)}</span>
+                <span>Subtotal</span><span>{fmtLocal(calc.totalOperatingCostPerHour + calc.adminOverheadPerHour)}</span>
               </div>
-              <div className="flex justify-between"><span>Profit Margin ({formatNumber(inputs.profitMarginPercentage)}%)</span><span className="font-semibold text-emerald-600">+{formatCurrency(calc.profitMarginPerHour)}</span></div>
+              <div className="flex justify-between"><span>Profit Margin ({formatNumber(inputs.profitMarginPercentage)}%)</span><span className="font-semibold text-emerald-600">+{fmtLocal(calc.profitMarginPerHour)}</span></div>
+              {lhrComponent != null && (
+                <div className="flex justify-between border-t pt-1">
+                  <span className="text-blue-700 dark:text-blue-400">Labour (LHR)</span>
+                  <span className="font-semibold text-blue-700 dark:text-blue-400">+{fmtLocal(lhrComponent)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center bg-primary px-4 py-3 rounded-lg border-2 border-primary/50 mt-1">
-                <span className="font-black text-white">MHR per Hour</span>
-                <span className="text-3xl font-black text-white">{formatCurrency(calc.totalMachineHourRate)}</span>
+                <span className="font-black text-primary-foreground">{lhrComponent != null ? 'MHR + LHR / Hour' : 'MHR per Hour'}</span>
+                <span className="text-3xl font-black text-primary-foreground">{fmtLocal(headlineMHR)}</span>
               </div>
               <div className="border-t pt-2">
                 <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">Annual Projection</div>
                 <div className="flex justify-between"><span>Effective Hours/Year</span><span className="font-semibold">{formatNumber(calc.effectiveHoursPerYear)} hrs</span></div>
                 <div className="flex justify-between bg-primary/20 px-3 py-2 rounded-lg font-black text-primary">
                   <span>Annual Revenue Potential</span>
-                  <span>{formatCurrency(calc.totalMachineHourRate * calc.effectiveHoursPerYear)}</span>
+                  <span>{fmtLocal(headlineMHR * calc.effectiveHoursPerYear)}</span>
                 </div>
               </div>
             </CardContent>
@@ -453,28 +644,41 @@ export default function MHRDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="space-y-1">
               <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">Annual Fixed Costs</div>
-              {[['Depreciation', calc.depreciationPerAnnum], ['Interest', calc.interestPerAnnum], ['Insurance', calc.insurancePerAnnum], ['Rent', calc.rentPerAnnum], ['Maintenance', calc.maintenancePerAnnum]].map(([l, v]) => (
-                <div key={l as string} className="flex justify-between"><span>{l as string}</span><span className="font-semibold">{formatCurrency(v as number)}</span></div>
-              ))}
+              {hasAnnualBreakdown ? (
+                [['Depreciation', calc.depreciationPerAnnum], ['Interest', calc.interestPerAnnum], ['Insurance', calc.insurancePerAnnum], ['Rent', calc.rentPerAnnum], ['Maintenance', calc.maintenancePerAnnum]].map(([l, v]) => (
+                  <div key={l as string} className="flex justify-between"><span>{l as string}</span><span className="font-semibold">{fmtLocal(v as number)}</span></div>
+                ))
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cost of Ownership</span>
+                  <span className="font-semibold">{fmtLocal(calc.totalFixedCostPerHour * calc.effectiveHoursPerYear)}</span>
+                </div>
+              )}
               <div className="flex justify-between bg-blue-50 dark:bg-blue-950 px-2 py-1.5 rounded font-bold text-blue-700 dark:text-blue-300">
-                <span>Total Fixed</span><span>{formatCurrency(calc.totalFixedCostPerAnnum)}</span>
+                <span>Total Fixed</span>
+                <span>{fmtLocal(hasAnnualBreakdown ? calc.totalFixedCostPerAnnum : calc.totalFixedCostPerHour * calc.effectiveHoursPerYear)}</span>
               </div>
             </div>
             <div className="space-y-1">
               <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">Annual Variable Costs</div>
-              <div className="flex justify-between"><span>Electricity</span><span className="font-semibold">{formatCurrency(calc.electricityPerAnnum)}</span></div>
+              {calc.electricityPerAnnum > 0 ? (
+                <div className="flex justify-between"><span>Electricity</span><span className="font-semibold">{fmtLocal(calc.electricityPerAnnum)}</span></div>
+              ) : calc.totalVariableCostPerHour > 0 ? (
+                <div className="flex justify-between"><span className="text-muted-foreground">MRO & Utilities</span><span className="font-semibold">{fmtLocal(calc.totalVariableCostPerHour * calc.effectiveHoursPerYear)}</span></div>
+              ) : null}
               <div className="flex justify-between bg-orange-50 dark:bg-orange-950 px-2 py-1.5 rounded font-bold text-orange-700 dark:text-orange-300">
-                <span>Total Variable</span><span>{formatCurrency(calc.totalVariableCostPerAnnum)}</span>
+                <span>Total Variable</span>
+                <span>{fmtLocal(calc.totalVariableCostPerAnnum > 0 ? calc.totalVariableCostPerAnnum : calc.totalVariableCostPerHour * calc.effectiveHoursPerYear)}</span>
               </div>
             </div>
             <div className="space-y-1">
               <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase">Total Annual Impact</div>
-              <div className="flex justify-between"><span>Operating Cost</span><span className="font-semibold">{formatCurrency(calc.totalAnnualCost)}</span></div>
-              <div className="flex justify-between"><span>Admin Overhead</span><span className="font-semibold">{formatCurrency(calc.adminOverheadPerHour * calc.effectiveHoursPerYear)}</span></div>
-              <div className="flex justify-between"><span>Profit Margin</span><span className="font-semibold">{formatCurrency(calc.profitMarginPerHour * calc.effectiveHoursPerYear)}</span></div>
-              <div className="flex justify-between bg-primary px-3 py-2 rounded-lg font-black text-white">
+              <div className="flex justify-between"><span>Operating Cost</span><span className="font-semibold">{fmtLocal(calc.totalAnnualCost)}</span></div>
+              <div className="flex justify-between"><span>Admin Overhead</span><span className="font-semibold">{fmtLocal(calc.adminOverheadPerHour * calc.effectiveHoursPerYear)}</span></div>
+              <div className="flex justify-between"><span>Profit Margin</span><span className="font-semibold">{fmtLocal(calc.profitMarginPerHour * calc.effectiveHoursPerYear)}</span></div>
+              <div className="flex justify-between bg-primary px-3 py-2 rounded-lg font-black text-primary-foreground">
                 <span>Total Annual Value</span>
-                <span className="text-lg">{formatCurrency(calc.totalMachineHourRate * calc.effectiveHoursPerYear)}</span>
+                <span className="text-lg">{fmtLocal(headlineMHR * calc.effectiveHoursPerYear)}</span>
               </div>
             </div>
           </div>

@@ -142,7 +142,7 @@ export class ProcuredPartsCostService {
         duty_cost: dto.dutyCost || 0,
         moq: dto.moq,
         lead_time_days: dto.leadTimeDays,
-        currency: dto.currency || 'INR',
+        currency: dto.currency || 'USD',
         cost_breakdown: dto.costBreakdown || {},
         notes: dto.notes,
         is_active: dto.isActive !== undefined ? dto.isActive : true,

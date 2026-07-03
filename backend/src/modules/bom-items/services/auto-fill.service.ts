@@ -82,11 +82,14 @@ export class AutoFillService {
     // 2. Classify process + item type
     const processSuggestion = this.classifyProcess(rawGeometry);
 
-    // 2b. TypeScript geometry rules are authoritative over Python family when structure signals sheet metal.
+    // 2b. TypeScript geometry rules are authoritative over Python family when structure signals sheet metal,
+    // but only when Python classification is uncertain (< 70% confidence).
+    // High-confidence CNC/mill_turn classifications must not be overridden by heuristic process type.
     let effectiveFamily = cadFamilyClassification;
     if (
       processSuggestion.processType.startsWith('Sheet Metal') &&
-      cadFamilyClassification.family !== 'sheet_metal'
+      cadFamilyClassification.family !== 'sheet_metal' &&
+      (cadFamilyClassification.confidence ?? 0) < 0.70
     ) {
       effectiveFamily = { family: 'sheet_metal', confidence: processSuggestion.processConfidence };
       this.logger.debug(
@@ -95,7 +98,9 @@ export class AutoFillService {
     }
 
     // 3. Lookup material
-    const materialResult = await this.suggestMaterial(rawGeometry, processSuggestion.processType, userId, accessToken);
+    const materialResult = await this.suggestMaterial(
+      rawGeometry, processSuggestion.processType, effectiveFamily.family ?? '', userId, accessToken,
+    );
 
     // 4. Calculate weight (volume mm³ → cm³ × density g/cm³ → kg)
     const density = materialResult?.density ?? 2.7; // default aluminium density
@@ -217,12 +222,11 @@ export class AutoFillService {
 
     const isSheetMetal = family.family === 'sheet_metal' || proc.processType.includes('Sheet Metal');
 
-    const cadV2: any = cadResult
-      ?.geometry_features
-      ?.manufacturing_features
-      ?.manufacturing_intelligence
-      ?.features
-      ?.feature_graph_v2 ?? null;
+    const cadV2: any =
+      cadResult?.geometry_features?.manufacturing_features
+        ?.manufacturing_intelligence?.features?.feature_graph_v2
+      ?? (cadResult as any)?.cnc_features?.feature_graph_v2
+      ?? null;
     const cncFeatures: any = (cadResult as any)?.cnc_features ?? null;
 
     // STL ordering verification: compare face_map triangle total to STL header count.
@@ -238,12 +242,15 @@ export class AutoFillService {
       );
     }
 
+    const cadMI = cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence;
     return {
       extractedAt: new Date().toISOString(),
       classification: {
         family: family.family ?? 'cnc_milled',
         confidence: family.confidence ?? 0.65,
         signals,
+        classificationSignals: cadMI?.classification_signals ?? undefined,
+        classificationReasons: cadMI?.classification_reason ?? undefined,
       },
       features: isSheetMetal ? this.sheetMetalExtractor.extract(geo) : [],
       processRecommendations,
@@ -317,20 +324,6 @@ export class AutoFillService {
   private buildDFMWarnings(geo: RawGeometry, _proc: ProcessSuggestion, cadResult?: any): object[] {
     const warnings: object[] = [];
     let id = 0;
-
-    const dfmAI = cadResult?.dfm_analysis?.ai_insights?.dfm_warnings
-      ?? cadResult?.geometry_features?.dfm_analysis?.ai_insights?.dfm_warnings;
-    if (Array.isArray(dfmAI)) {
-      for (const w of dfmAI) {
-        warnings.push({
-          id: `dfm_ai_${id++}`,
-          severity: this.mapSeverity(w.severity),
-          category: 'general',
-          message: String(w.message ?? w.warning ?? w),
-          recommendation: String(w.recommendation ?? 'Review this feature before production.'),
-        });
-      }
-    }
 
     if (geo.sheetThicknessMm > 0 && geo.sheetThicknessMm < 1.0) {
       warnings.push({
@@ -708,20 +701,34 @@ export class AutoFillService {
   private async suggestMaterial(
     geo: RawGeometry,
     processType: string,
+    familyHint: string,
     userId: string,
     accessToken: string,
   ): Promise<{ id: string; grade: string; density: number; unitCost: number; category: string } | null> {
     try {
       const client = this.supabaseService.getClient(accessToken);
       const isPlastic = processType === 'Injection Molding';
+      const isCNCFamily = ['mill_turn', 'cnc_milled', 'cnc_turned'].includes(familyHint);
 
-      const { data, error } = await client
+      let query = client
         .from('raw_materials')
         .select('id, material, material_grade, density, cost, material_group')
         .ilike('material_group', isPlastic ? '%Plastic%' : '%Ferrous%')
         .not('density', 'is', null)
         .order('density', { ascending: true })
         .limit(10);
+
+      // CNC machined parts use bar/billet stock — exclude sheet/plate materials
+      // so the suggestion reflects what the machinist actually buys.
+      if (isCNCFamily) {
+        query = (query as any)
+          .not('material_grade', 'ilike', '%Sheet%')
+          .not('material_grade', 'ilike', '%Plate%')
+          .not('material', 'ilike', '%Sheet%')
+          .not('material', 'ilike', '%Plate%');
+      }
+
+      const { data, error } = await query;
 
       if (error || !data?.length) return null;
 

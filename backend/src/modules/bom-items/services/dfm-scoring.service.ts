@@ -7,6 +7,10 @@ interface FeatureOccurrence {
   local_feature_density?: number | null;
   bend_angle_deg?: number | null;
   edge_to_bend_distance_mm?: number | null;
+  // CNC fields
+  ld_ratio?: number | null;
+  tapped?: boolean | null;
+  spec?: string | null;
 }
 
 interface RiskFactor {
@@ -18,14 +22,14 @@ export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
 export interface OccurrenceScore {
   occurrenceIndex: number;
-  risk_score: number;
-  risk_level: RiskLevel;
-  risk_factors: RiskFactor[];
+  riskScore: number;
+  riskLevel: RiskLevel;
+  riskFactors: RiskFactor[];
 }
 
 export interface FeatureDFMScores {
-  feature_id: string;
-  feature_type: string;
+  featureId: string;
+  featureType: string;
   occurrences: OccurrenceScore[];
 }
 
@@ -33,18 +37,58 @@ export interface FeatureDFMScores {
 export class DFMScoringService {
   score(features: any[], sheetThicknessMm: number): FeatureDFMScores[] {
     const t = sheetThicknessMm > 0 ? sheetThicknessMm : 1;
+    const isCNC = sheetThicknessMm === 0;
     return features.map((f) => ({
-      feature_id: f.id as string,
-      feature_type: f.feature_type as string,
+      featureId: f.id as string,
+      featureType: f.feature_type as string,
       occurrences: ((f.occurrences ?? []) as FeatureOccurrence[]).map((occ, i) => {
-        if (f.feature_type === 'hole') return this.scoreHole(occ, i, (f.diameter_mm as number) ?? 5, t);
+        if (f.feature_type === 'hole') {
+          return isCNC
+            ? this.scoreCNCHole(occ, i, (f.diameter_mm as number) ?? 5)
+            : this.scoreSheetMetalHole(occ, i, (f.diameter_mm as number) ?? 5, t);
+        }
         if (f.feature_type === 'bend') return this.scoreBend(occ, i, (f.radius_mm as number) ?? t, t);
-        return { occurrenceIndex: i, risk_score: 0, risk_level: 'low' as RiskLevel, risk_factors: [] };
+        return { occurrenceIndex: i, riskScore: 0, riskLevel: 'low' as RiskLevel, riskFactors: [] };
       }),
     }));
   }
 
-  private scoreHole(occ: FeatureOccurrence, i: number, diameter: number, t: number): OccurrenceScore {
+  private scoreCNCHole(occ: FeatureOccurrence, i: number, diameter: number): OccurrenceScore {
+    let score = 0;
+    const factors: RiskFactor[] = [];
+
+    const ldRatio = occ.ld_ratio ?? null;
+    if (ldRatio != null) {
+      if (ldRatio > 8) {
+        score += 75;
+        factors.push({ code: 'LD_CRITICAL', label: `L/D ${ldRatio.toFixed(1)} > 8 — very deep, chip evacuation critical` });
+      } else if (ldRatio > 5) {
+        score += 55;
+        factors.push({ code: 'LD_HIGH', label: `L/D ${ldRatio.toFixed(1)} > 5 — deep hole, peck drilling required` });
+      } else if (ldRatio > 3) {
+        score += 35;
+        factors.push({ code: 'LD_MEDIUM', label: `L/D ${ldRatio.toFixed(1)} > 3 — moderate depth` });
+      } else {
+        score += 10;
+      }
+    }
+
+    if (occ.tapped) {
+      score += 20;
+      const spec = occ.spec ? ` (${occ.spec})` : '';
+      factors.push({ code: 'TAPPED', label: `Tapped hole${spec} — tap breakage risk increases with L/D` });
+    }
+
+    if (diameter < 3) {
+      score += 15;
+      factors.push({ code: 'SMALL_BORE', label: `Ø${diameter.toFixed(1)} mm — fragile drill, slow feed required` });
+    }
+
+    score = Math.min(100, score);
+    return { occurrenceIndex: i, riskScore: score, riskLevel: this.toLevel(score), riskFactors: factors };
+  }
+
+  private scoreSheetMetalHole(occ: FeatureOccurrence, i: number, diameter: number, t: number): OccurrenceScore {
     let score = 0;
     const factors: RiskFactor[] = [];
 
@@ -79,7 +123,7 @@ export class DFMScoringService {
     }
 
     score = Math.min(100, score);
-    return { occurrenceIndex: i, risk_score: score, risk_level: this.toLevel(score), risk_factors: factors };
+    return { occurrenceIndex: i, riskScore: score, riskLevel: this.toLevel(score), riskFactors: factors };
   }
 
   private scoreBend(occ: FeatureOccurrence, i: number, radius: number, t: number): OccurrenceScore {
@@ -107,7 +151,7 @@ export class DFMScoringService {
     }
 
     score = Math.min(100, score);
-    return { occurrenceIndex: i, risk_score: score, risk_level: this.toLevel(score), risk_factors: factors };
+    return { occurrenceIndex: i, riskScore: score, riskLevel: this.toLevel(score), riskFactors: factors };
   }
 
   private toLevel(score: number): RiskLevel {

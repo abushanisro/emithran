@@ -33,6 +33,7 @@ def detect_part_family(
     rotational_face_ratio: float = 0.0,
     planar_face_fraction: float = 0.0,
     total_face_count: int = 1,
+    large_cyl_count: int = 0,
 ) -> Tuple[str, float, List[str]]:
     """
     Heuristic family classification from bounding-box geometry + cylindrical face signals.
@@ -56,6 +57,10 @@ def detect_part_family(
       > 0.70 → mostly planar surfaces → sheet metal or simple block.
 
     total_face_count: total OCC face count used to compute hole density.
+
+    large_cyl_count: number of cylindrical faces with radius > 15% of max bbox dimension.
+      These represent external OD surfaces (turned diameters, large bores) — not sheet holes.
+      > 3 → hard veto on sheet_metal gates (a genuine sheet metal part has only small holes).
     """
     dims = sorted(d for d in bbox_dims if d > 0)
     if len(dims) < 3:
@@ -73,11 +78,17 @@ def detect_part_family(
 
     hole_density = hole_count / max(total_face_count, 1)
 
+    # Hard veto: parts with multiple large-radius cylinders (external OD surfaces) cannot
+    # be sheet metal. A lens holder / flange / shaft has external diameters >> hole radii;
+    # a perforated sheet has only small holes. Threshold: > 3 large cylinders detected.
+    sheet_metal_veto = large_cyl_count > 3
+
     # Gate 1b-abs — absolute hole count + moderately flat bbox.
     # Perforated brackets with flanges that inflate bbox height will have flatness 0.40–0.60
     # (e.g., ZDR90 bracket: 94.6 / 182.2 = 0.52). A CNC-milled block with >20 drilled holes
     # AND flatness < 0.60 is extremely rare; this combination is overwhelmingly sheet metal.
-    if hole_count > 20 and flatness < 0.60:
+    # NOT applied when external OD cylinders are detected (sheet_metal_veto).
+    if not sheet_metal_veto and hole_count > 20 and flatness < 0.60:
         confidence = min(0.85, 0.70 + min(hole_count, 200) / 2000)
         return "sheet_metal", round(confidence, 3), [
             f"High absolute hole count ({hole_count}) with flat-ish bbox "
@@ -85,7 +96,7 @@ def detect_part_family(
         ]
 
     # Gate 1b — hole density + moderately flat bbox (catches cases below 20-hole threshold).
-    if hole_density > 0.20 and flatness < 0.60:
+    if not sheet_metal_veto and hole_density > 0.20 and flatness < 0.60:
         confidence = min(0.88, 0.68 + max(0, 0.60 - flatness) * 0.3)
         return "sheet_metal", round(confidence, 3), [
             f"High hole density ({hole_count}/{total_face_count} faces = {hole_density:.0%}) "
@@ -97,7 +108,7 @@ def detect_part_family(
     # Sheet metal is almost entirely planar faces (top, bottom, flanges, webs).
     # CNC milled and turned parts have more diverse surface types (fillets, bosses, pockets).
     # Catches simple bent brackets and channel sections where hole count is low.
-    if planar_face_fraction > 0.70 and flatness < 0.35:
+    if not sheet_metal_veto and planar_face_fraction > 0.70 and flatness < 0.35:
         confidence = min(0.82, 0.62 + (0.35 - flatness) * 0.4 + planar_face_fraction * 0.1)
         return "sheet_metal", round(confidence, 3), [
             f"Predominantly planar surfaces ({planar_face_fraction:.0%}) "

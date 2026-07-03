@@ -54,6 +54,9 @@ export class CreateLSRDto {
   @IsOptional() @IsNumber() @Min(0) usdLhrBase?: number;
   @IsOptional() @IsNumber() @Min(0) usdLhrBurden?: number;
   @IsOptional() @IsNumber() @Min(0) usdLhrTotal?: number;
+  @IsOptional() @IsNumber() @Min(0) lhrUsdEffective?: number;
+  @IsOptional() @IsString() currency?: string;
+  @IsOptional() @IsString() currencySymbol?: string;
 }
 
 export class UpdateLSRDto {
@@ -83,4 +86,7 @@ export class UpdateLSRDto {
   @IsOptional() @IsNumber() @Min(0) usdLhrBase?: number;
   @IsOptional() @IsNumber() @Min(0) usdLhrBurden?: number;
   @IsOptional() @IsNumber() @Min(0) usdLhrTotal?: number;
+  @IsOptional() @IsNumber() @Min(0) lhrUsdEffective?: number;
+  @IsOptional() @IsString() currency?: string;
+  @IsOptional() @IsString() currencySymbol?: string;
 }

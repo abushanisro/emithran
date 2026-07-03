@@ -2864,7 +2864,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
 }: EDrawingsViewerProps) {
   const [loading, setLoading] = useState(true);
   const [modelColor] = useState('#3d7ab5');
-  const [showGrid, setShowGrid] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
   const [currentView, setCurrentView] = useState<string>('home');
   const [autoFit, setAutoFit] = useState(true);
   const [viewPosition, setViewPosition] = useState<[number, number, number]>([5, 5, 5]);
@@ -3471,8 +3471,8 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
   return (
     <div className="h-full w-full flex flex-col bg-[#2d2d2d]">
       {/* Top Toolbar */}
-      <div className="bg-[#3f3f3f] border-b border-[#555555] px-3 py-1.5">
-        <div className="flex items-center justify-between">
+      <div className="bg-[#3f3f3f] border-b border-[#555555] px-3 py-1.5 shrink-0 overflow-x-auto">
+        <div className="flex items-center justify-between min-w-max">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={toggleTransparent}
               className={`gap-1.5 font-medium text-xs ${isTransparent ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
@@ -3562,13 +3562,14 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex relative">
+      <div className="flex-1 flex relative min-h-0 overflow-hidden">
         {/* 3D Viewport */}
         <div ref={canvasContainerRef} className="flex-1 relative bg-gradient-to-b from-[#4a4a4a] to-[#2d2d2d]">
           <FeatureOverlayCtx.Provider value={{ featureType: highlightOccurrences?.feature_type ?? '', sheetThickness: sheetThickness ?? 2 }}>
           <Canvas
             shadows
             dpr={[1, 2]}
+            resize={{ debounce: 0 }}
             gl={{
               antialias: true, alpha: true, powerPreference: 'high-performance',
               localClippingEnabled: true,

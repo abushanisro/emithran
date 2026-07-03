@@ -160,7 +160,7 @@ export function ProcessCostDialog({
     mhrData?.records?.forEach(record => {
       if (record.location) locs.add(record.location);
     });
-    lsrData?.forEach((record: any) => {
+    lsrData?.records?.forEach((record: any) => {
       if (record.location) locs.add(record.location);
     });
     return Array.from(locs).sort();
@@ -178,9 +178,9 @@ export function ProcessCostDialog({
 
   // Filter LSR by location
   const filteredLSR = useMemo(() => {
-    if (!lsrData) return [];
-    if (!location) return lsrData;
-    return lsrData.filter((r: any) => r.location === location);
+    const records = lsrData?.records ?? [];
+    if (!location) return records;
+    return records.filter((r: any) => r.location === location);
   }, [lsrData, location]);
 
   // Get selected MHR and LSR

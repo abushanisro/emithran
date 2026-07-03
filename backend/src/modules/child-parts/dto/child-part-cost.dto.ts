@@ -174,8 +174,8 @@ export class CreateChildPartCostDto {
   // Currency
   @ApiPropertyOptional({
     description: 'Currency code',
-    example: 'INR',
-    default: 'INR',
+    example: 'USD',
+    default: 'USD',
   })
   @IsOptional()
   @IsString()
@@ -368,7 +368,7 @@ export class ChildPartCostResponseDto {
       partNumber: record.part_number || '',
       partName: record.part_name || '',
       makeBuy: record.make_buy,
-      currency: record.currency || 'INR',
+      currency: record.currency || 'USD',
       baseCost: parseFloat(record.base_cost) || 0,
       freightCost: parseFloat(record.freight_cost) || 0,
       dutyCost: parseFloat(record.duty_cost) || 0,
@@ -507,7 +507,7 @@ export class CalculateChildPartCostDto {
   @Min(0)
   leadTimeDays?: number;
 
-  @ApiPropertyOptional({ description: 'Currency code', default: 'INR' })
+  @ApiPropertyOptional({ description: 'Currency code', default: 'USD' })
   @IsOptional()
   @IsString()
   currency?: string;

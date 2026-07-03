@@ -63,6 +63,8 @@ export type MHRRecord = {
   electricityCostPerKwh: number;
   adminOverheadPercentage: number;
   profitMarginPercentage: number;
+  isManualEntry: boolean;
+  manualMHRValue?: number;
   // India 2026 extended fields
   processGroup?: string;
   processCategory?: string;
@@ -78,7 +80,16 @@ export type MHRRecord = {
   usdLhrBase?: number;
   usdLhrBurden?: number;
   usdLhrTotal?: number;
+  // Multi-currency fields
+  currency?: string;
+  currencySymbol?: string;
+  mhrUsdPerHour?: number;
+  fullyBurdenedLocalPerHr?: number;
+  fullyBurdenedUsdPerHr?: number;
+  lhrUsdEffective?: number;
   specs?: Record<string, any>;
+  directOverheadRate?: number;
+  indirectOverheadRate?: number;
   calculations: MHRCalculationResult;
   createdAt: string;
   updatedAt: string;
@@ -110,7 +121,10 @@ export type CreateMHRData = {
   electricityCostPerKwh: number;
   adminOverheadPercentage: number;
   profitMarginPercentage: number;
+  isManualEntry?: boolean;
+  manualMHRValue?: number;
   // India 2026 extended fields
+  processGroup?: string;
   machineClass?: string;
   automationLevel?: string;
   wageGrade?: string;
@@ -123,6 +137,8 @@ export type CreateMHRData = {
   usdLhrBase?: number;
   usdLhrBurden?: number;
   usdLhrTotal?: number;
+  directOverheadRate?: number;
+  indirectOverheadRate?: number;
 };
 
 export type UpdateMHRData = Partial<CreateMHRData>;
@@ -130,6 +146,7 @@ export type UpdateMHRData = Partial<CreateMHRData>;
 export type MHRQuery = {
   search?: string;
   location?: string;
+  currency?: string;
   commodityCode?: string;
   page?: number;
   limit?: number;
@@ -169,7 +186,21 @@ export const mhrApi = {
    * Get distinct process groups from MHR records
    */
   getProcessGroups: async (): Promise<string[]> => {
-    return apiClient.get<string[]>('/mhr/process-groups', { silent: true, retry: false });
+    return (await apiClient.get<string[]>('/mhr/process-groups', { silent: true, retry: false })) ?? [];
+  },
+
+  /**
+   * Get distinct locations from MHR records
+   */
+  getLocations: async (): Promise<string[]> => {
+    return (await apiClient.get<string[]>('/mhr/locations', { silent: true, retry: false })) ?? [];
+  },
+
+  /**
+   * Get distinct currencies from MHR records
+   */
+  getCurrencies: async (): Promise<string[]> => {
+    return (await apiClient.get<string[]>('/mhr/currencies', { silent: true, retry: false })) ?? [];
   },
 
   /**

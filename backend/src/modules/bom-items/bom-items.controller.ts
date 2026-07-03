@@ -1827,6 +1827,7 @@ export class BOMItemsController {
   async getCostSummary(
     @Param('id') id: string,
     @Query('batchSize') batchSize: string,
+    @Query('location') location: string,
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
@@ -1835,6 +1836,7 @@ export class BOMItemsController {
       user.id,
       token,
       batchSize ? parseInt(batchSize, 10) : 1,
+      location || 'India',
     );
   }
 

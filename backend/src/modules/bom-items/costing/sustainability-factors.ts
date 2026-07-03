@@ -6,6 +6,14 @@ export const ENERGY_KWH_PER_HR: Record<string, number> = {
   press_brake:   4.5,   // hydraulic servo press brake
   tapping:       1.5,   // CNC tapping centre
   deburring:     0.75,  // rotary brush / bench grinder
+  // CNC machining
+  cnc_3ax_vmc:   7.5,   // 3-axis VMC: spindle + coolant + control
+  cnc_4ax_vmc:   9.0,   // 4-axis: higher torque for rotary axis
+  cnc_5ax_mc:   12.0,   // 5-axis: multiple servo axes + coolant
+  cnc_lathe:     5.5,   // CNC lathe: spindle + coolant
+  cnc_lathe_live: 7.0,  // live tooling: additional spindle power
+  cnc_mill_turn: 10.0,  // full mill-turn: two spindles
+  inspection:    0.5,   // CMM / bench gauge: minimal draw
 };
 
 // India grid CO₂ intensity — CEA 2023 Annual Report (kg CO₂e per kWh consumed)

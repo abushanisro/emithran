@@ -90,6 +90,13 @@ export class LSRController {
     return this.lsrService.update(id, updateLSRDto, user.id, token);
   }
 
+  @Delete()
+  @ApiOperation({ summary: 'Delete all LSR records for the current user' })
+  @ApiResponse({ status: 200, description: 'All LSR records deleted' })
+  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
+    return this.lsrService.removeAll(user.id, token);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete LSR record' })

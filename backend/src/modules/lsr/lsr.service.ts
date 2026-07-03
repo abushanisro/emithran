@@ -4,6 +4,7 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateLSRDto, UpdateLSRDto } from './lsr.dto';
 import { validate as isValidUUID } from 'uuid';
 import * as ExcelJS from 'exceljs';
+import { getCurrencyForLocation, getUsdPerLocal } from '../mhr/constants/mhr-calculation.constants';
 
 @Injectable()
 export class LSRService {
@@ -11,6 +12,24 @@ export class LSRService {
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
   ) { }
+
+  /**
+   * Derives currency from location and computes lhr_usd_effective.
+   * Works for all countries: lhr is always in local currency, conversion uses FX table.
+   */
+  private computeLhrCurrencyFields(lhr: number, location: string | undefined | null): {
+    currency: string;
+    currencySymbol: string;
+    lhrUsdEffective: number;
+  } {
+    const { currency, symbol } = getCurrencyForLocation(location ?? '');
+    const usdPerLocal = getUsdPerLocal(currency);
+    return {
+      currency,
+      currencySymbol: symbol,
+      lhrUsdEffective: parseFloat((lhr * usdPerLocal).toFixed(4)),
+    };
+  }
 
   async create(createLSRDto: CreateLSRDto, userId: string, accessToken: string) {
     this.logger.log(`Creating LSR record for user: ${userId}`, 'LSRService');
@@ -26,6 +45,8 @@ export class LSRService {
     if (existing) {
       throw new ConflictException(`Labour code ${createLSRDto.labourCode} already exists`);
     }
+
+    const lhrCurrency = this.computeLhrCurrencyFields(createLSRDto.lhr, createLSRDto.location);
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
@@ -57,6 +78,10 @@ export class LSRService {
         usd_lhr_base: createLSRDto.usdLhrBase || null,
         usd_lhr_burden: createLSRDto.usdLhrBurden || null,
         usd_lhr_total: createLSRDto.usdLhrTotal || null,
+        // Derived from location — always recomputed, never trusted from client
+        currency:          lhrCurrency.currency,
+        currency_symbol:   lhrCurrency.currencySymbol,
+        lhr_usd_effective: lhrCurrency.lhrUsdEffective,
       })
       .select()
       .single();
@@ -75,21 +100,23 @@ export class LSRService {
     let queryBuilder = this.supabaseService
       .getClient(accessToken)
       .from('lsr_records')
-      .select('*')
-      .order('labour_code', { ascending: true });
+      .select('*', { count: 'exact' })
+      .order('labour_code', { ascending: true })
+      .limit(20000); // Override Supabase's default 1000-row cap
 
     if (search) {
       queryBuilder = queryBuilder.or(`labour_code.ilike.%${search}%,labour_type.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
-    const { data, error } = await queryBuilder;
+    const { data, error, count } = await queryBuilder;
 
     if (error) {
       this.logger.error(`Error fetching LSR records: ${error.message}`, 'LSRService');
       throw new InternalServerErrorException(`Failed to fetch LSR records: ${error.message}`);
     }
 
-    return (data || []).map(row => this.mapDatabaseToResponse(row));
+    const records = (data || []).map(row => this.mapDatabaseToResponse(row));
+    return { records, total: count ?? records.length };
   }
 
   async findOne(id: string, userId: string, accessToken: string) {
@@ -138,8 +165,8 @@ export class LSRService {
       throw new BadRequestException('Invalid LSR record ID format');
     }
 
-    // Verify record exists
-    await this.findOne(id, userId, accessToken);
+    // Verify record exists and capture current values for derivation
+    const existingRecord = await this.findOne(id, userId, accessToken);
 
     // Check for duplicate labour code if updating
     if (updateLSRDto.labourCode) {
@@ -183,6 +210,14 @@ export class LSRService {
     if (updateLSRDto.usdLhrBurden !== undefined) updateData.usd_lhr_burden = updateLSRDto.usdLhrBurden;
     if (updateLSRDto.usdLhrTotal !== undefined) updateData.usd_lhr_total = updateLSRDto.usdLhrTotal;
 
+    // Always recompute currency and lhr_usd_effective from the effective lhr + location
+    const effectiveLhr      = updateLSRDto.lhr      ?? existingRecord.lhr;
+    const effectiveLocation = updateLSRDto.location  ?? existingRecord.location;
+    const lhrCurrency = this.computeLhrCurrencyFields(effectiveLhr, effectiveLocation);
+    updateData.currency          = lhrCurrency.currency;
+    updateData.currency_symbol   = lhrCurrency.currencySymbol;
+    updateData.lhr_usd_effective = lhrCurrency.lhrUsdEffective;
+
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('lsr_records')
@@ -223,37 +258,63 @@ export class LSRService {
     return { message: 'LSR record deleted successfully' };
   }
 
+  async removeAll(userId: string, accessToken: string): Promise<{ deleted: number }> {
+    this.logger.log(`Deleting all LSR records`, 'LSRService');
+
+    // Use the service-role admin client to bypass RLS — the endpoint is already protected
+    // by SupabaseAuthGuard, so only authenticated users can reach this method.
+    const { data, error } = await this.supabaseService
+      .getAdminClient()
+      .from('lsr_records')
+      .delete()
+      .not('id', 'is', null)
+      .select('id');
+
+    if (error) {
+      this.logger.error(`Error deleting all LSR records: ${error.message}`, 'LSRService');
+      throw new InternalServerErrorException('Failed to delete all LSR records.');
+    }
+
+    return { deleted: (data ?? []).length };
+  }
+
   async bulkCreate(data: CreateLSRDto[], userId: string, accessToken: string) {
     this.logger.log(`Bulk creating ${data.length} LSR records`, 'LSRService');
 
-    const records = data.map(dto => ({
-      user_id: userId,
-      labour_code: dto.labourCode,
-      labour_type: dto.labourType,
-      description: dto.description,
-      minimum_wage_per_day: dto.minimumWagePerDay,
-      minimum_wage_per_month: dto.minimumWagePerMonth,
-      dearness_allowance: dto.dearnessAllowance,
-      perks_percentage: dto.perksPercentage,
-      lhr: dto.lhr,
-      reference: dto.reference || null,
-      location: dto.location || null,
-      process_group: dto.processGroup || null,
-      machine_name: dto.machineName || null,
-      machine_description: dto.machineDescription || null,
-      manufacturer: dto.manufacturer || null,
-      manufacturer_country: dto.manufacturerCountry || null,
-      wage_grade: dto.wageGrade || null,
-      operators: dto.operators || null,
-      shifts_per_day: dto.shiftsPerDay || null,
-      hours_per_shift: dto.hoursPerShift || null,
-      working_days_per_year: dto.workingDaysPerYear || null,
-      total_hrs_per_year: dto.totalHrsPerYear || null,
-      usd_labor_rate_per_hr: dto.usdLaborRatePerHr || null,
-      usd_lhr_base: dto.usdLhrBase || null,
-      usd_lhr_burden: dto.usdLhrBurden || null,
-      usd_lhr_total: dto.usdLhrTotal || null,
-    }));
+    const records = data.map(dto => {
+      const lhrCurrency = this.computeLhrCurrencyFields(dto.lhr, dto.location);
+      return {
+        user_id: userId,
+        labour_code: dto.labourCode,
+        labour_type: dto.labourType,
+        description: dto.description,
+        minimum_wage_per_day: dto.minimumWagePerDay,
+        minimum_wage_per_month: dto.minimumWagePerMonth,
+        dearness_allowance: dto.dearnessAllowance,
+        perks_percentage: dto.perksPercentage,
+        lhr: dto.lhr,
+        reference: dto.reference || null,
+        location: dto.location || null,
+        process_group: dto.processGroup || null,
+        machine_name: dto.machineName || null,
+        machine_description: dto.machineDescription || null,
+        manufacturer: dto.manufacturer || null,
+        manufacturer_country: dto.manufacturerCountry || null,
+        wage_grade: dto.wageGrade || null,
+        operators: dto.operators || null,
+        shifts_per_day: dto.shiftsPerDay || null,
+        hours_per_shift: dto.hoursPerShift || null,
+        working_days_per_year: dto.workingDaysPerYear || null,
+        total_hrs_per_year: dto.totalHrsPerYear || null,
+        usd_labor_rate_per_hr: dto.usdLaborRatePerHr || null,
+        usd_lhr_base: dto.usdLhrBase || null,
+        usd_lhr_burden: dto.usdLhrBurden || null,
+        usd_lhr_total: dto.usdLhrTotal || null,
+        currency:          lhrCurrency.currency,
+        currency_symbol:   lhrCurrency.currencySymbol,
+        lhr_usd_effective: lhrCurrency.lhrUsdEffective,
+      };
+    });
 
     const { data: inserted, error } = await this.supabaseService
       .getClient(accessToken)
@@ -383,7 +444,7 @@ export class LSRService {
       const wageMonthCol        = getCol('min wage month', 'minimum wage month', 'min_wage_inr_per_month');
       const daCol               = getCol('da', 'dearness allowance', 'd a');
       const perksCol            = getCol('perks', 'perks_pct');
-      const lhrCol              = getCol('lhr hour', 'lhr', 'lhr_inr_per_hour', 'lhr inr hr');
+      const lhrCol              = getCol('lhr local hour', 'lhr local hr', 'lhr hour', 'lhr', 'lhr_inr_per_hour', 'lhr inr hr');
       const locationCol         = getCol('location');
       const referenceCol        = getCol('reference');
       // India 2026 extended columns
@@ -402,6 +463,11 @@ export class LSRService {
       const usdBaseCol          = getCol('lhr base usd hr', 'usd lhr base', 'lhr_base_usd_per_hr');
       const usdBurdenCol        = getCol('lhr burden 38 usd hr', 'usd lhr burden', 'lhr_burden_38pct_usd_per_hr');
       const usdTotalCol         = getCol('lhr total usd hr', 'usd lhr total', 'lhr_total_usd_per_hr');
+      // Multi-currency fields (new combined format)
+      const currencyCol2            = getCol('currency');
+      const currencySymbolCol2      = getCol('currency symbol');
+      const lhrUsdEffectiveCol2     = getCol('lhr usd hour', 'lhr usd hr');
+      const employerBurdenCol       = getCol('employer burden social costs reference', 'employer burden');
 
       let isHeaderRow = true;
       let currentLocation = 'India';
@@ -409,21 +475,34 @@ export class LSRService {
       sheet.eachRow(row => {
         if (isHeaderRow) { isHeaderRow = false; return; }
 
+        // Determine whether this is a machine-based LHR sheet (no labour code, no wage columns)
+        const isMachineLhr = !labourCodeCol && !wageDayCol && !wageMonthCol && machineNameCol2 !== null;
+
+        const locationVal = locationCol ? toStr(row.getCell(locationCol).value, currentLocation) || currentLocation : currentLocation;
+        const processGroupVal = processGroupCol ? toStr(row.getCell(processGroupCol).value) || null : null;
+        const machineNameVal = machineNameCol2 ? toStr(row.getCell(machineNameCol2).value) || null : null;
+
         let labourCodeVal: string;
         if (labourCodeCol) {
           const col1Val = toStr(row.getCell(1).value);
           labourCodeVal = toStr(row.getCell(labourCodeCol).value);
           if (col1Val && !labourCodeVal) { currentLocation = col1Val; return; }
           if (!labourCodeVal) return;
+        } else if (isMachineLhr && slNoCol) {
+          // Machine-based LHR: generate code from location prefix + serial number
+          const slRaw = toStr(row.getCell(slNoCol).value);
+          const slNum = parseInt(slRaw, 10);
+          if (!slRaw || isNaN(slNum)) return;
+          const locPrefix = locationVal.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
+          labourCodeVal = `LHR-${locPrefix}-${String(slNum).padStart(5, '0')}`;
         } else if (slNoCol) {
           const slRaw = toStr(row.getCell(slNoCol).value);
           const slNum = parseInt(slRaw, 10);
-          if (!slRaw || isNaN(slNum)) return; // skip empty rows / sub-headers
+          if (!slRaw || isNaN(slNum)) return;
           labourCodeVal = `LHR-${String(slNum).padStart(4, '0')}`;
         } else {
-          const machName = machineNameCol2 ? toStr(row.getCell(machineNameCol2).value) : '';
-          if (!machName) return;
-          labourCodeVal = machName.substring(0, 50);
+          if (!machineNameVal) return;
+          labourCodeVal = machineNameVal.substring(0, 50);
         }
 
         const monthWage = wageMonthCol ? toNum(row.getCell(wageMonthCol).value, 0) : 0;
@@ -436,23 +515,49 @@ export class LSRService {
         const lhr = lhrStored > 0 ? lhrStored : calcLHR(monthWage, da, perks);
         const wageGradeVal = wageGradeCol2 ? toStr(row.getCell(wageGradeCol2).value) : '';
 
+        // Reconcile USD LHR: prefer computed base+burden sum over raw column
+        const rawLsrUsdBase   = usdBaseCol   ? toNum(row.getCell(usdBaseCol).value,   0) || null : null;
+        const rawLsrUsdBurden = usdBurdenCol ? toNum(row.getCell(usdBurdenCol).value, 0) || null : null;
+        const rawLsrUsdTotal  = usdTotalCol  ? toNum(row.getCell(usdTotalCol).value,  0) || null : null;
+        const computedLsrLhrTotal = (rawLsrUsdBase && rawLsrUsdBurden) ? rawLsrUsdBase + rawLsrUsdBurden : null;
+        const reconciledLsrLhrTotal = computedLsrLhrTotal ?? rawLsrUsdTotal;
+        const rawLsrLhrUsdEffective = lhrUsdEffectiveCol2 ? toNum(row.getCell(lhrUsdEffectiveCol2).value, 0) || null : null;
+        if (rawLsrLhrUsdEffective && reconciledLsrLhrTotal && Math.abs(rawLsrLhrUsdEffective - reconciledLsrLhrTotal) / reconciledLsrLhrTotal > 0.15) {
+          this.logger.warn(
+            `LSR ${labourCodeVal} (${locationVal}): lhr_usd_effective=${rawLsrLhrUsdEffective} vs base+burden=${reconciledLsrLhrTotal.toFixed(2)} — using base+burden`,
+            'LSRService.importFromExcel',
+          );
+        }
+        const finalLsrLhrUsdEffective = reconciledLsrLhrTotal ?? rawLsrLhrUsdEffective;
+
+        const currencyLsrVal = currencyCol2 ? toStr(row.getCell(currencyCol2).value) || null : null;
+        const nonCnyLocs = ['usa', 'united states', 'uk', 'united kingdom', 'germany', 'france',
+          'mexico', 'japan', 'taiwan', 'korea', 'australia', 'canada', 'spain', 'italy', 'sweden'];
+        if (currencyLsrVal === 'CNY' && nonCnyLocs.some(l => locationVal.toLowerCase().includes(l))) {
+          this.logger.warn(
+            `LSR ${labourCodeVal}: currency=CNY but location="${locationVal}" — verify currency`,
+            'LSRService.importFromExcel',
+          );
+        }
+
         rows.push({
           user_id:                userId,
           labour_code:            labourCodeVal,
           labour_type:            labourTypeCol
-            ? toStr(row.getCell(labourTypeCol).value) || wageGradeToType(wageGradeVal)
-            : wageGradeToType(wageGradeVal),
-          description:            descCol ? toStr(row.getCell(descCol).value) || null : null,
+            ? toStr(row.getCell(labourTypeCol).value) || processGroupVal || wageGradeToType(wageGradeVal)
+            : processGroupVal || wageGradeToType(wageGradeVal),
+          description:            descCol ? toStr(row.getCell(descCol).value) || null
+                                          : machineDescCol2 ? toStr(row.getCell(machineDescCol2).value) || null : null,
           minimum_wage_per_day:   wageDayCol ? toNum(row.getCell(wageDayCol).value, 0) : 0,
           minimum_wage_per_month: monthWage,
           dearness_allowance:     da,
           perks_percentage:       perks,
           lhr,
-          location:               locationCol ? toStr(row.getCell(locationCol).value, currentLocation) || currentLocation : currentLocation,
+          location:               locationVal,
           reference:              referenceCol ? toStr(row.getCell(referenceCol).value) || null : null,
           // India 2026 extended fields
-          process_group:          processGroupCol ? toStr(row.getCell(processGroupCol).value) || null : null,
-          machine_name:           machineNameCol2 ? toStr(row.getCell(machineNameCol2).value) || null : null,
+          process_group:          processGroupVal,
+          machine_name:           machineNameVal,
           machine_description:    machineDescCol2 ? toStr(row.getCell(machineDescCol2).value) || null : null,
           manufacturer:           manufacturerCol2 ? toStr(row.getCell(manufacturerCol2).value) || null : null,
           manufacturer_country:   mfrCountryCol2 ? toStr(row.getCell(mfrCountryCol2).value) || null : null,
@@ -463,9 +568,14 @@ export class LSRService {
           working_days_per_year:  daysCol2 ? toNum(row.getCell(daysCol2).value, 0) || null : null,
           total_hrs_per_year:     totalHrsCol2 ? toNum(row.getCell(totalHrsCol2).value, 0) || null : null,
           usd_labor_rate_per_hr:  usdRateCol ? toNum(row.getCell(usdRateCol).value, 0) || null : null,
-          usd_lhr_base:           usdBaseCol ? toNum(row.getCell(usdBaseCol).value, 0) || null : null,
-          usd_lhr_burden:         usdBurdenCol ? toNum(row.getCell(usdBurdenCol).value, 0) || null : null,
-          usd_lhr_total:          usdTotalCol ? toNum(row.getCell(usdTotalCol).value, 0) || null : null,
+          usd_lhr_base:           rawLsrUsdBase,
+          usd_lhr_burden:         rawLsrUsdBurden,
+          usd_lhr_total:          reconciledLsrLhrTotal,
+          // Multi-currency fields
+          currency:                    currencyLsrVal,
+          currency_symbol:             currencySymbolCol2 ? toStr(row.getCell(currencySymbolCol2).value) || null : null,
+          lhr_usd_effective:           finalLsrLhrUsdEffective,
+          employer_burden_percentage:  employerBurdenCol ? toNum(row.getCell(employerBurdenCol).value, 0) || null : null,
         });
       });
     }
@@ -481,7 +591,8 @@ export class LSRService {
     const { data: existing } = await client
       .from('lsr_records')
       .select('labour_code')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .limit(20000);
     const existingCodes = new Set((existing ?? []).map((r: any) => r.labour_code as string));
 
     const newRows = rows.filter(r => !existingCodes.has(r.labour_code as string));
@@ -492,23 +603,27 @@ export class LSRService {
       return { imported: 0, skipped, errors: [] };
     }
 
+    const CHUNK_SIZE = 500;
+    const chunks: any[][] = [];
+    for (let offset = 0; offset < newRows.length; offset += CHUNK_SIZE) {
+      chunks.push(newRows.slice(offset, offset + CHUNK_SIZE));
+    }
+
+    // Parallel insert — all chunks fire simultaneously to stay within HTTP timeout
+    const results = await Promise.all(
+      chunks.map(chunk => client.from('lsr_records').insert(chunk).select('id'))
+    );
+
     let imported = 0;
     const errors: string[] = [];
-    const CHUNK_SIZE = 200;
-
-    for (let offset = 0; offset < newRows.length; offset += CHUNK_SIZE) {
-      const chunk = newRows.slice(offset, offset + CHUNK_SIZE);
-      const { data, error } = await client
-        .from('lsr_records')
-        .insert(chunk)
-        .select('id');
+    results.forEach(({ data, error }, i) => {
       if (error) {
-        this.logger.error(`LSR import chunk error at offset ${offset}: ${error.message}`, 'LSRService');
-        errors.push(`Batch at offset ${offset} failed: ${error.message}`);
+        this.logger.error(`LSR import chunk ${i} error: ${error.message}`, 'LSRService');
+        errors.push(`Batch ${i} failed: ${error.message}`);
       } else {
         imported += (data ?? []).length;
       }
-    }
+    });
 
     this.logger.log(`LHR import complete: ${imported} imported, ${skipped} skipped`, 'LSRService');
     return { imported, skipped, errors };
@@ -551,6 +666,10 @@ export class LSRService {
       usdLhrBase: row.usd_lhr_base ? parseFloat(row.usd_lhr_base) : undefined,
       usdLhrBurden: row.usd_lhr_burden ? parseFloat(row.usd_lhr_burden) : undefined,
       usdLhrTotal: row.usd_lhr_total ? parseFloat(row.usd_lhr_total) : undefined,
+      currency: row.currency ?? undefined,
+      currencySymbol: row.currency_symbol ?? undefined,
+      lhrUsdEffective: row.lhr_usd_effective ? parseFloat(row.lhr_usd_effective) : undefined,
+      employerBurdenPercentage: row.employer_burden_percentage ? parseFloat(row.employer_burden_percentage) : undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

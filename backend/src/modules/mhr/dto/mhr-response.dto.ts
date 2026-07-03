@@ -197,7 +197,16 @@ export class MHRResponseDto {
   @ApiProperty({ nullable: true }) usdLhrBase?: number;
   @ApiProperty({ nullable: true }) usdLhrBurden?: number;
   @ApiProperty({ nullable: true }) usdLhrTotal?: number;
+  // Multi-currency fields
+  @ApiProperty({ nullable: true }) currency?: string;
+  @ApiProperty({ nullable: true }) currencySymbol?: string;
+  @ApiProperty({ nullable: true }) mhrUsdPerHour?: number;
+  @ApiProperty({ nullable: true }) fullyBurdenedLocalPerHr?: number;
+  @ApiProperty({ nullable: true }) fullyBurdenedUsdPerHr?: number;
+  @ApiProperty({ nullable: true }) lhrUsdEffective?: number;
   @ApiProperty({ nullable: true }) specs?: Record<string, any>;
+  @ApiProperty({ nullable: true }) directOverheadRate?: number;
+  @ApiProperty({ nullable: true }) indirectOverheadRate?: number;
 
   // Calculated Results
   @ApiProperty()
@@ -254,7 +263,15 @@ export class MHRResponseDto {
       usdLhrBase: row.usd_lhr_base ? parseFloat(row.usd_lhr_base) : undefined,
       usdLhrBurden: row.usd_lhr_burden ? parseFloat(row.usd_lhr_burden) : undefined,
       usdLhrTotal: row.usd_lhr_total ? parseFloat(row.usd_lhr_total) : undefined,
+      currency: row.currency ?? undefined,
+      currencySymbol: row.currency_symbol ?? undefined,
+      mhrUsdPerHour: row.mhr_usd_per_hour ? parseFloat(row.mhr_usd_per_hour) : undefined,
+      fullyBurdenedLocalPerHr: row.fully_burdened_local_per_hr ? parseFloat(row.fully_burdened_local_per_hr) : undefined,
+      fullyBurdenedUsdPerHr: row.fully_burdened_usd_per_hr ? parseFloat(row.fully_burdened_usd_per_hr) : undefined,
+      lhrUsdEffective: row.lhr_usd_effective ? parseFloat(row.lhr_usd_effective) : undefined,
       specs: row.specs ?? undefined,
+      directOverheadRate: row.direct_overhead_rate ? parseFloat(row.direct_overhead_rate) : undefined,
+      indirectOverheadRate: row.indirect_overhead_rate ? parseFloat(row.indirect_overhead_rate) : undefined,
       calculations: JSON.parse(row.calculations || '{}'),
       createdAt: row.created_at,
       updatedAt: row.updated_at,

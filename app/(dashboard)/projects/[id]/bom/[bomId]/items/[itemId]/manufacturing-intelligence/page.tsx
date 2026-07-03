@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment, type ReactNode } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import {
-  ArrowLeft, Cpu, Maximize2, Minimize2, ChevronDown, ChevronRight,
-  AlertCircle, GripVertical, GripHorizontal, RefreshCw, AlertTriangle,
-  Calculator, ShieldCheck, GitCompare, Flame, Crosshair, Loader2,
+  ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight,
+  AlertCircle, GripVertical, GripHorizontal, RefreshCw,
+  Calculator, ShieldCheck, Flame, Crosshair, Loader2,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useSidebar } from '@/components/ui/sidebar';
 import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/components/ui/model-viewer';
 import {
   buildManufacturingRiskSources, buildCostDensitySources, type CostHeatmapWeights,
@@ -22,7 +23,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useUpdateBOMItem, useCostSummary, useRouteComparison, useGdtAnalysis } from '@/lib/api/hooks/useBOMItems';
-import type { MaterialCandidate, GdtSeverity, CostSummaryDto } from '@/lib/api/hooks/useBOMItems';
+import type { MaterialCandidate, GdtSeverity, CostSummaryDto, RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
 import type { RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
@@ -418,6 +419,7 @@ const RIGHT_TABS = [
   { key: 'sustainability', label: 'Sustainability' },
   { key: 'cost', label: 'Cost Summary' },
   { key: 'detail', label: 'Part Detail' },
+  { key: 'investment', label: 'Investment' },
 ] as const;
 type RightTabKey = (typeof RIGHT_TABS)[number]['key'];
 
@@ -1072,175 +1074,554 @@ function PanelHeader({
 
 // ── Section ────────────────────────────────────────────────────────────────────
 
-function CostSummaryTab({ item, batchSize }: { item: BOMItem; batchSize: number }) {
-  const { data: cost, isLoading } = useCostSummary(item.id, batchSize);
+// ── Inline-editable value cell (aPriori-style) ────────────────────────────────
 
-  if (isLoading) {
-    return <div className="p-3 text-xs text-muted-foreground animate-pulse">Calculating…</div>;
-  }
-  if (!cost) {
-    return <div className="p-3 text-xs text-muted-foreground">Run Auto-Fill to generate cost estimate.</div>;
-  }
-  if (cost.family !== 'sheet_metal') {
+function EditCell({
+  value, prefix = '', suffix = '', decimals = 2, fieldKey, editingKey,
+  onStartEdit, onCommit, onDismiss, onReset, isOverridden,
+}: {
+  value: number; prefix?: string; suffix?: string; decimals?: number;
+  fieldKey: string; editingKey: string | null;
+  onStartEdit: (key: string, currentValue: number) => void;
+  onCommit: (key: string, newValue: number) => void;
+  onDismiss: () => void;
+  onReset: (key: string) => void;
+  isOverridden: boolean;
+}) {
+  const isEditing = editingKey === fieldKey;
+  const [draft, setDraft] = useState('');
+
+  const handleStartEdit = () => { setDraft(value.toFixed(decimals)); onStartEdit(fieldKey, value); };
+  const handleBlur = () => {
+    const n = parseFloat(draft);
+    if (!isNaN(n) && n > 0) onCommit(fieldKey, n);
+    else onDismiss();
+  };
+
+  if (isEditing) {
     return (
-      <Section title="Cost Summary">
-        <p className="text-[11px] text-muted-foreground py-1">
-          Cost engine: sheet metal only in Phase 1. CNC machining support coming next.
-        </p>
-      </Section>
+      <input
+        autoFocus
+        type="number"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { const n = parseFloat(draft); if (!isNaN(n) && n > 0) onCommit(fieldKey, n); else onDismiss(); }
+          if (e.key === 'Escape') onDismiss();
+        }}
+        className="w-24 text-right text-[11px] tabular-nums bg-background border border-violet-500 rounded px-1 py-0 focus:outline-none text-violet-300"
+      />
     );
   }
 
   return (
-    <div>
-      <Section title="Cost Breakdown">
-        <div className="flex items-baseline justify-between py-0.5">
-          <div className="min-w-0">
-            <span className="text-xs font-medium">Material</span>
-            <span className="ml-1.5 text-[10px] text-muted-foreground">{cost.materialGrade} · {fmt(cost.grossWeightKg, 3)} kg</span>
-            {cost.materialSource === 'default' && (
-              <span className="ml-1 text-[9px] text-amber-500 border border-amber-500/30 rounded px-0.5">est.</span>
+    <span className="inline-flex items-center gap-0.5 group/edit cursor-pointer" onClick={handleStartEdit}>
+      <span className={cn('text-[11px] tabular-nums', isOverridden ? 'text-amber-400' : '')}>
+        {prefix}{fmt(value, decimals)}{suffix}
+      </span>
+      {isOverridden && (
+        <button onClick={(e) => { e.stopPropagation(); onReset(fieldKey); }}
+          className="opacity-60 hover:opacity-100 text-[9px] text-amber-400 leading-none ml-0.5" title="Reset to calculated">↩</button>
+      )}
+      {!isOverridden && (
+        <span className="opacity-0 group-hover/edit:opacity-60 text-[9px] text-muted-foreground ml-0.5">✏</span>
+      )}
+    </span>
+  );
+}
+
+// ── CostSummaryTab — aPriori-style with inline editing ─────────────────────
+
+function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'India' }: { item: BOMItem; batchSize: number; appliedRouteId?: string | null; factory?: string }) {
+  const { data: cost, isLoading } = useCostSummary(item.id, batchSize, factory);
+  const { data: comparison } = useRouteComparison(item.id, batchSize);
+  const appliedRoute: RouteResultDto | null = appliedRouteId
+    ? (comparison?.routes.find((r) => r.routeId === appliedRouteId) ?? null)
+    : null;
+
+  // Override state: materialRate + per-process rate / cycleTime
+  const [matRateOverride, setMatRateOverride] = useState<number | null>(null);
+  const [procOverrides, setProcOverrides] = useState<Record<string, { rate?: number; cycleMin?: number }>>({});
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  // Clear overrides when the applied route changes so stale rates don't bleed across routes
+  useEffect(() => { setProcOverrides({}); setMatRateOverride(null); }, [appliedRouteId]);
+
+  const handleStartEdit = (key: string) => setEditingKey(key);
+
+  const handleCommit = (key: string, val: number) => {
+    setEditingKey(null);
+    if (key === 'mat_rate') { setMatRateOverride(val); return; }
+    const [proc, field] = key.split('::');
+    if (!proc || !field) return;
+    setProcOverrides((prev) => ({ ...prev, [proc]: { ...prev[proc], [field === 'rate' ? 'rate' : 'cycleMin']: val } }));
+  };
+
+  const handleReset = (key: string) => {
+    if (key === 'mat_rate') { setMatRateOverride(null); return; }
+    const [proc, field] = key.split('::');
+    if (!proc || !field) return;
+    setProcOverrides((prev) => {
+      const next = { ...prev, [proc]: { ...prev[proc] } };
+      if (field === 'rate') delete next[proc]!.rate;
+      else delete next[proc]!.cycleMin;
+      return next;
+    });
+  };
+
+  const hasAnyOverride = matRateOverride !== null || Object.keys(procOverrides).length > 0;
+
+  // Compute effective figures (uses applied route's process lines when a route is selected)
+  const eff = useMemo(() => {
+    if (!cost) return null;
+    const matRate = matRateOverride ?? cost.materialCostPerKg;
+    const matCost = matRate * cost.grossWeightKg;
+    const scrapLoss = cost.materialRemoval
+      ? matRate * (cost.materialRemoval.billetWeightKg - cost.materialRemoval.finishedWeightKg)
+      : 0;
+
+    const baseLines = appliedRoute?.processLines ?? cost.processLines;
+    const lines = baseLines.map((line) => {
+      const ov = procOverrides[line.process] ?? {};
+      const rate = ov.rate ?? line.hourlyRate;
+      const cycleMin = ov.cycleMin ?? line.cycleTimeMin;
+      const runCost = (rate / 60) * cycleMin;
+      const setupCost = line.setupCost;
+      return { ...line, rate, cycleMin, runCost, setupCost, totalCost: runCost + setupCost };
+    });
+
+    const totalProcess = lines.reduce((s, l) => s + l.totalCost, 0);
+    const totalCost = matCost + scrapLoss + totalProcess;
+    const pct = (v: number) => totalCost > 0 ? (v / totalCost) * 100 : 0;
+    return { matRate, matCost, scrapLoss, lines, totalProcess, totalCost, pct };
+  }, [cost, appliedRoute, matRateOverride, procOverrides]);
+
+  const [expandedProcs, setExpandedProcs] = useState<Set<string>>(new Set());
+  const toggleProc = (key: string) =>
+    setExpandedProcs((prev) => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+
+  if (isLoading) return (
+    <div className="py-10 text-center text-sm text-muted-foreground">Calculating cost…</div>
+  );
+  if (!cost || !eff) return (
+    <div className="py-10 px-4 text-center text-sm text-muted-foreground">
+      Run Auto-Fill to generate cost estimate.
+    </div>
+  );
+
+  const sym = cost.currencySymbol ?? '₹';
+  const showUsd = (cost.currency ?? 'INR') !== 'USD';
+  const toUsd = cost.toUsdRate ?? (1 / 83.5);
+  const fmtL = (v: number, d = 2) =>
+    `${sym}${v.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d })}`;
+  const fmtUsd = (v: number) =>
+    `$${(v * toUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const cellProps = { editingKey, onStartEdit: handleStartEdit, onCommit: handleCommit, onDismiss: () => setEditingKey(null), onReset: handleReset };
+  const totalMatCost = eff.matCost + eff.scrapLoss;
+
+  /* ── reusable row components ── */
+  const Row = ({ label, sub, value, pct, indent = 0 }: {
+    label: React.ReactNode; sub?: React.ReactNode;
+    value?: number; pct?: number; indent?: number;
+  }) => (
+    <div className={cn('flex items-baseline justify-between py-2 border-b border-border/20 last:border-0', indent === 1 && 'pl-5', indent === 2 && 'pl-9')}>
+      <div className="flex-1 min-w-0 pr-4">
+        <span className="text-sm text-foreground">{label}</span>
+        {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+      </div>
+      {value !== undefined && (
+        <div className="shrink-0 text-right">
+          <span className="text-sm tabular-nums text-foreground">{fmtL(value)}</span>
+          {pct !== undefined && <span className="text-xs text-muted-foreground tabular-nums ml-2">{pct.toFixed(1)}%</span>}
+        </div>
+      )}
+    </div>
+  );
+
+  const SectionHeader = ({ label }: { label: string }) => (
+    <div className="px-0 pt-4 pb-1">
+      <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
+    </div>
+  );
+
+  const TotalRow = ({ label, value, pct }: { label: string; value: number; pct: number }) => (
+    <div className="flex items-baseline justify-between py-2.5 border-t border-border mt-1">
+      <span className="text-sm font-bold text-foreground">{label}</span>
+      <div className="shrink-0 text-right">
+        <span className="text-sm font-bold tabular-nums text-foreground">{fmtL(value)}</span>
+        <span className="text-xs text-muted-foreground tabular-nums ml-2">{pct.toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="px-4 pb-4">
+
+      {/* ── Applied route label ── */}
+      {appliedRoute && (
+        <div className="pt-3 pb-1 text-xs text-muted-foreground">
+          Route: <span className="font-semibold text-foreground">{appliedRoute.routeLabel}</span>
+        </div>
+      )}
+
+      {/* ── Grand total header ── */}
+      <div className="flex items-start justify-between pt-3 pb-2 border-b-2 border-border">
+        <div>
+          <p className="text-sm font-bold text-foreground">Total Manufacturing Cost</p>
+          <p className="text-xs text-muted-foreground mt-0.5">1 pc · batch {cost.batchSize}</p>
+        </div>
+        <div className="text-right shrink-0 ml-4">
+          <p className={cn('text-2xl font-bold tabular-nums leading-tight', hasAnyOverride ? 'text-amber-500' : 'text-foreground')}>
+            {fmtL(eff.totalCost)}
+          </p>
+          {showUsd && <p className="text-sm text-muted-foreground tabular-nums mt-0.5">{fmtUsd(eff.totalCost)}</p>}
+        </div>
+      </div>
+
+      {/* ── DIRECT MATERIAL ── */}
+      <SectionHeader label="Direct Material Costs" />
+
+      <Row
+        indent={1}
+        label={
+          <span className="flex items-center gap-2">
+            {item.materialGrade ?? cost.materialGrade}
+            {cost.materialSource === 'default' && !matRateOverride && (
+              <span className="text-xs text-amber-500">(est.)</span>
+            )}
+          </span>
+        }
+        sub={
+          <span className="flex items-center gap-1">
+            {fmt(cost.grossWeightKg, 3)} kg &times;{' '}
+            <EditCell value={eff.matRate} prefix={sym} suffix="/kg" decimals={2}
+              fieldKey="mat_rate" isOverridden={matRateOverride !== null} {...cellProps} />
+          </span>
+        }
+        value={eff.matCost}
+        pct={eff.pct(eff.matCost)}
+      />
+
+      {eff.scrapLoss > 0 && cost.materialRemoval && (
+        <Row
+          indent={1}
+          label="Chip Scrap / Yield Loss"
+          sub={`${fmt(cost.materialRemoval.chipScrapPct, 1)}% of billet  ·  util. ${fmt(cost.materialRemoval.utilizationPct, 1)}%`}
+          value={eff.scrapLoss}
+          pct={eff.pct(eff.scrapLoss)}
+        />
+      )}
+
+      <TotalRow label="Total Direct Material" value={totalMatCost} pct={eff.pct(totalMatCost)} />
+
+      {/* ── DIRECT PROCESS ── */}
+      <SectionHeader label="Direct Process Costs" />
+
+      {eff.lines.map((line) => {
+        const procOv = procOverrides[line.process] ?? {};
+        const isExpanded = expandedProcs.has(line.process);
+        return (
+          <div key={line.process}>
+            <button
+              type="button"
+              onClick={() => toggleProc(line.process)}
+              className="w-full flex items-baseline justify-between py-2 border-b border-border/20 hover:bg-muted/10 transition-colors text-left pl-5"
+            >
+              <div className="flex-1 min-w-0 pr-4">
+                <span className="text-sm text-foreground">
+                  {isExpanded ? '▾' : '▸'} {line.process}
+                </span>
+                <span className="text-xs text-muted-foreground ml-2">
+                  {line.rateSource === 'mhr_database' ? 'MHR DB' : 'est.'}
+                  {line.machineName ? `  ·  ${line.machineName}` : ''}
+                  {(procOv.rate || procOv.cycleMin) ? '  ·  overridden' : ''}
+                </span>
+              </div>
+              <div className="shrink-0 text-right">
+                <span className="text-sm tabular-nums text-foreground">{fmtL(line.totalCost)}</span>
+                <span className="text-xs text-muted-foreground tabular-nums ml-2">{eff.pct(line.totalCost).toFixed(1)}%</span>
+              </div>
+            </button>
+
+            {isExpanded && (
+              <div className="pl-9 pr-0 py-1.5 bg-muted/10 border-b border-border/20 space-y-1.5">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-muted-foreground">Rate</span>
+                  <EditCell value={line.rate} prefix={sym} suffix="/hr" decimals={0}
+                    fieldKey={`${line.process}::rate`} isOverridden={!!procOv.rate} {...cellProps} />
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-muted-foreground">Cycle Time</span>
+                  <EditCell value={line.cycleMin} suffix=" min" decimals={1}
+                    fieldKey={`${line.process}::cycleMin`} isOverridden={!!procOv.cycleMin} {...cellProps} />
+                </div>
+                <div className="flex items-baseline justify-between border-t border-border/20 pt-1">
+                  <span className="text-xs text-muted-foreground">Setup (÷{cost.batchSize})</span>
+                  <span className="text-xs tabular-nums text-foreground">{fmtL(line.setupCost)}</span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-muted-foreground">Run</span>
+                  <span className="text-xs tabular-nums text-foreground">{fmtL(line.runCost)}</span>
+                </div>
+              </div>
             )}
           </div>
-          <span className="text-xs font-medium tabular-nums shrink-0">₹{fmt(cost.materialCost, 2)}</span>
-        </div>
-        {cost.processLines.map((line) => (
-          <div key={line.process} className="flex items-baseline justify-between py-0.5">
-            <div className="min-w-0">
-              <span className="text-xs">{line.process}</span>
-              {line.rateSource === 'mhr_database' ? (
-                <span className="ml-1 text-[9px] text-emerald-600 border border-emerald-500/30 rounded px-0.5" title={line.machineName ?? undefined}>MHR DB</span>
-              ) : (
-                <span className="ml-1 text-[9px] text-amber-500 border border-amber-500/30 rounded px-0.5">est.</span>
-              )}
-              {line.machineName && (
-                <span className="ml-1 text-[9px] text-muted-foreground/50 truncate max-w-[120px] inline-block align-bottom">{line.machineName}</span>
-              )}
-              {line.cycleTimeMin > 0 && (
-                <span className="ml-1.5 text-[10px] text-muted-foreground">{fmt(line.cycleTimeMin, 1)} min</span>
-              )}
-            </div>
-            <span className="text-xs tabular-nums shrink-0">₹{fmt(line.totalCost, 2)}</span>
-          </div>
-        ))}
-        <div className="flex items-baseline justify-between pt-1.5 mt-1 border-t border-border/40">
-          <span className="text-xs font-semibold">Total (1 pc, batch {cost.batchSize})</span>
-          <span className="text-xs font-semibold tabular-nums">₹{fmt(cost.totalCost, 2)}</span>
-        </div>
-      </Section>
+        );
+      })}
 
-      <Section title="Setup / Run Split" defaultOpen={false}>
-        {cost.processLines.map((line) => (
-          <div key={line.process} className="py-0.5">
-            <div className="flex justify-between text-[11px] font-medium">{line.process}</div>
-            <div className="flex justify-between text-[10px] text-muted-foreground pl-2">
-              <span>Rate</span><span>₹{fmt(line.hourlyRate, 0)}/hr</span>
-            </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground pl-2">
-              <span>Setup (÷{cost.batchSize})</span><span>₹{fmt(line.setupCost, 2)}</span>
-            </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground pl-2">
-              <span>Run</span><span>₹{fmt(line.runCost, 2)}</span>
-            </div>
-          </div>
-        ))}
-      </Section>
+      <TotalRow label="Total Direct Process" value={eff.totalProcess} pct={eff.pct(eff.totalProcess)} />
 
+      {/* ── Grand total footer ── */}
+      <div className="flex items-baseline justify-between pt-3 mt-1 border-t-2 border-border">
+        <span className="text-base font-bold text-foreground">Total Manufacturing Cost</span>
+        <div className="text-right shrink-0 ml-4">
+          <span className={cn('text-xl font-bold tabular-nums', hasAnyOverride ? 'text-amber-500' : 'text-foreground')}>
+            {fmtL(eff.totalCost)}
+          </span>
+          {showUsd && <span className="text-sm text-muted-foreground tabular-nums ml-2">{fmtUsd(eff.totalCost)}</span>}
+        </div>
+      </div>
+
+      {/* override reset */}
+      {hasAnyOverride && (
+        <div className="mt-2 flex justify-end">
+          <button onClick={() => { setMatRateOverride(null); setProcOverrides({}); }}
+            className="text-xs text-amber-500 hover:text-amber-400 underline underline-offset-2 transition-colors">
+            Reset all overrides
+          </button>
+        </div>
+      )}
+
+      {/* warnings */}
       {cost.warnings.length > 0 && (
-        <div className="px-3 py-2 space-y-0.5">
+        <div className="mt-3 space-y-1">
           {cost.warnings.map((w, i) => (
-            <p key={i} className="text-[9px] text-amber-500/80 leading-tight">⚠ {w}</p>
+            <p key={i} className="text-xs text-amber-600 leading-snug">⚠ {w}</p>
           ))}
         </div>
       )}
-      <div className="px-3 py-1">
-        <p className="text-[9px] text-muted-foreground/40">{cost.ratesSource}</p>
-      </div>
     </div>
   );
 }
 
-function RouteComparisonCard({ item, batchSize }: { item: BOMItem; batchSize: number }) {
+function RouteComparisonCard({
+  item, batchSize, appliedRouteId, onAppliedRouteChange,
+}: {
+  item: BOMItem; batchSize: number;
+  appliedRouteId: string | null;
+  onAppliedRouteChange: (id: string | null) => void;
+}) {
   const { data: comparison, isLoading } = useRouteComparison(item.id, batchSize);
-
-  if (item.familyClassification && item.familyClassification !== 'sheet_metal') {
-    return (
-      <Section title={<><GitCompare className="h-3 w-3 inline mr-1" />Route Comparison</>}>
-        <p className="text-[11px] text-muted-foreground py-1">
-          Sheet metal routes only in Phase 1. CNC route comparison coming next.
-        </p>
-      </Section>
-    );
-  }
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
 
   if (isLoading) return (
-    <div className="p-3 text-xs text-muted-foreground animate-pulse">Comparing routes…</div>
+    <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+      <div className="h-4 w-4 rounded-full border-2 border-violet-500/40 border-t-violet-500 animate-spin" />
+      <span className="text-xs">Comparing routes…</span>
+    </div>
   );
   if (!comparison?.routes?.length) return null;
 
+  const appliedRoute = comparison.routes.find((r) => r.routeId === appliedRouteId) ?? null;
+  const minCost = Math.min(...comparison.routes.map((r) => r.totalCost));
+  const maxCost = Math.max(...comparison.routes.map((r) => r.totalCost));
+
   return (
-    <Section title={<><GitCompare className="h-3 w-3 inline mr-1" />Route Comparison</>} defaultOpen>
-      <div className="space-y-2 pt-1">
-        {comparison.routes.map((route) => (
-          <div
-            key={route.routeId}
-            className={`border rounded-md p-2 space-y-1 ${route.capability?.overallCapable === false ? "border-red-200/60 bg-red-50/20" : "border-border/50"}`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold">{route.routeLabel}</span>
-              <div className="flex gap-1">
-                {route.badges.lowestCost && (
-                  <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Lowest Cost</span>
-                )}
-                {route.badges.fastest && (
-                  <span className="text-[9px] px-1 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Fastest</span>
-                )}
-                {route.badges.bestQuality && (
-                  <span className="text-[9px] px-1 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Best Quality</span>
+    <Section title="Route Comparison" defaultOpen>
+      <div className="space-y-2.5 pt-1">
+        {comparison.routes.map((route) => {
+          const isSelected = selectedRouteId === route.routeId;
+          const isApplied = appliedRouteId === route.routeId;
+          const incapable = route.capability?.overallCapable === false;
+          const costBarPct = maxCost > 0 ? (route.totalCost / maxCost) * 100 : 0;
+          const savings = route.totalCost - minCost;
+
+          return (
+            <div
+              key={route.routeId}
+              onClick={() => !incapable && setSelectedRouteId(isSelected ? null : route.routeId)}
+              className={cn(
+                'rounded-lg border transition-all cursor-pointer overflow-hidden',
+                incapable ? 'border-red-200/40 opacity-60 cursor-default' :
+                isApplied ? 'border-violet-500/60 ring-1 ring-violet-500/20' :
+                isSelected ? 'border-violet-400/50' :
+                'border-border/50 hover:border-border',
+              )}
+            >
+              {/* Route header */}
+              <div className={cn('px-3 py-2.5', isApplied ? 'bg-violet-500/8' : 'bg-muted/10')}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-foreground">{route.routeLabel}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {route.badges.lowestCost && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-medium">↓ Lowest Cost</span>
+                      )}
+                      {route.badges.fastest && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 border border-blue-500/20 font-medium">⚡ Fastest</span>
+                      )}
+                      {route.badges.bestQuality && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-700 border border-violet-500/20 font-medium">★ Best Quality</span>
+                      )}
+                      {isApplied && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-600 border border-violet-500/30 font-semibold">✓ Applied</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={cn('text-sm font-bold tabular-nums', incapable ? 'line-through text-muted-foreground/40' : 'text-foreground')}>
+                      ₹{fmt(route.totalCost, 2)}
+                    </p>
+                    {savings > 0.01 && !incapable && (
+                      <p className="text-[10px] text-muted-foreground tabular-nums">+₹{fmt(savings, 2)}</p>
+                    )}
+                    {route.badges.lowestCost && (
+                      <p className="text-[10px] text-emerald-600 font-medium">Lowest</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Cost bar */}
+                {!incapable && (
+                  <div className="mt-2.5 h-1.5 w-full bg-border/30 rounded-full overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full transition-all', isApplied ? 'bg-violet-500' : 'bg-border')}
+                      style={{ width: `${costBarPct}%` }}
+                    />
+                  </div>
                 )}
               </div>
-            </div>
-            {route.capability && !route.capability.overallCapable && (
-              <div className="flex items-start gap-1 py-0.5">
-                <AlertTriangle className="h-3 w-3 text-red-500 shrink-0 mt-0.5" />
-                <div className="space-y-0.5">
+
+              {/* Metrics row */}
+              {!incapable && (
+                <div className="px-3 py-2 border-t border-border/30 grid grid-cols-3 gap-2 bg-background">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Cycle</p>
+                    <p className="text-xs font-medium tabular-nums text-foreground">{fmt(route.cycleTimes.totalMin, 1)} min</p>
+                  </div>
+                  {route.sustainability && (
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">CO₂</p>
+                      <p className="text-xs font-medium tabular-nums text-foreground">{route.sustainability.totalCo2Kg} kg</p>
+                    </div>
+                  )}
+                  {route.abrasiveCost > 0 && (
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Abrasive</p>
+                      <p className="text-xs font-medium tabular-nums text-foreground">₹{fmt(route.abrasiveCost, 2)}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Warnings */}
+              {incapable && (
+                <div className="px-3 py-2 border-t border-red-200/30 bg-red-50/10 space-y-0.5">
                   {route.capability.warnings.map((w, i) => (
-                    <p key={i} className="text-[9px] text-red-500 leading-tight">{w}</p>
+                    <p key={i} className="text-[11px] text-red-500 flex items-start gap-1.5">
+                      <span className="shrink-0">⚠</span>{w}
+                    </p>
                   ))}
                 </div>
-              </div>
-            )}
-            {route.capability?.overallCapable && route.capability.confidence === "low" && route.capability.warnings[0] && (
-              <p className="text-[9px] text-muted-foreground/50">{route.capability.warnings[0]}</p>
-            )}
-            <div className="flex justify-between text-[11px]">
-              <span className="text-muted-foreground">Total (1 pc, batch {comparison.batchSize})</span>
-              <span className={`font-semibold tabular-nums ${route.capability?.overallCapable === false ? "text-muted-foreground/50 line-through" : ""}`}>₹{fmt(route.totalCost, 2)}</span>
+              )}
+              {!incapable && route.machineCapabilityWarnings?.length > 0 && (
+                <div className="px-3 py-1.5 border-t border-amber-400/20 bg-amber-500/5 flex flex-wrap gap-1">
+                  {route.machineCapabilityWarnings.map((w, i) => (
+                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-400/20">⚠ {w}</span>
+                  ))}
+                </div>
+              )}
+
+              {/* Apply button — shown when selected but not yet applied */}
+              {isSelected && !isApplied && !incapable && (
+                <div className="px-3 py-2 border-t border-violet-500/20 bg-violet-500/5 flex justify-end">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onAppliedRouteChange(route.routeId); setSelectedRouteId(null); }}
+                    className="text-xs px-3 py-1.5 rounded-md bg-violet-600 text-white hover:bg-violet-700 font-medium transition-colors"
+                  >
+                    Apply Route
+                  </button>
+                </div>
+              )}
+              {isApplied && (
+                <div className="px-3 py-2 border-t border-violet-500/20 bg-violet-500/5 flex justify-end">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onAppliedRouteChange(null); }}
+                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>Cycle time</span>
-              <span className="tabular-nums">{fmt(route.cycleTimes.totalMin, 1)} min</span>
-            </div>
-            {route.sustainability && (
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>CO₂</span>
-                <span className="tabular-nums">{route.sustainability.totalCo2Kg} kg CO₂e</span>
-              </div>
-            )}
-            {route.abrasiveCost > 0 && (
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>Abrasive</span>
-                <span className="tabular-nums">₹{fmt(route.abrasiveCost, 2)}</span>
-              </div>
-            )}
-            {route.warnings.map((w, i) => (
-              <p key={i} className="text-[9px] text-amber-500/80">⚠ {w}</p>
-            ))}
-          </div>
-        ))}
+          );
+        })}
+
         {comparison.comparisonWarnings.map((w, i) => (
-          <p key={i} className="text-[9px] text-amber-500/80 mt-1">⚠ {w}</p>
+          <p key={i} className="text-[11px] text-amber-500/80 flex items-start gap-1.5 px-1">
+            <span className="shrink-0">⚠</span>{w}
+          </p>
         ))}
+
+        {/* ── Applied route cost breakdown ── */}
+        {appliedRoute && (
+          <div className="rounded-lg border border-violet-500/30 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2.5 bg-violet-500/8 border-b border-violet-500/20">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-500">Cost Breakdown</p>
+                <p className="text-xs font-medium text-violet-700 mt-0.5">{appliedRoute.routeLabel}</p>
+              </div>
+              <button onClick={() => onAppliedRouteChange(null)}
+                className="text-xs text-muted-foreground hover:text-foreground w-6 h-6 flex items-center justify-center rounded hover:bg-muted/40 transition-colors">
+                ✕
+              </button>
+            </div>
+            <div className="divide-y divide-border/30">
+              <div className="flex items-center justify-between px-3 py-2.5">
+                <div>
+                  <p className="text-xs font-medium text-foreground">{item.materialGrade ?? comparison.materialGrade}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {fmt(comparison.grossWeightKg, 3)} kg × ₹{fmt(comparison.materialCostPerKg, 0)}/kg
+                  </p>
+                </div>
+                <span className="text-xs font-semibold tabular-nums shrink-0 ml-2">₹{fmt(comparison.materialCost, 2)}</span>
+              </div>
+              {appliedRoute.processLines.map((line) => (
+                <div key={line.process} className="px-3 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-foreground">{line.process}</p>
+                    <span className="text-xs font-semibold tabular-nums shrink-0 ml-2">₹{fmt(line.totalCost, 2)}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground mt-1">
+                    {line.machineName && <span>{line.machineName}</span>}
+                    <span className="tabular-nums">{fmt(line.cycleTimeMin, 1)} min</span>
+                    <span className="tabular-nums">₹{fmt(line.hourlyRate, 0)}/hr</span>
+                    <span className={line.rateSource === 'mhr_database' ? 'text-emerald-600' : 'text-amber-600'}>
+                      {line.rateSource === 'mhr_database' ? 'MHR DB' : 'est.'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between px-3 py-3 bg-muted/20">
+                <div>
+                  <p className="text-xs font-bold text-foreground">Total</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    1 pc · batch {comparison.batchSize} · {fmt(appliedRoute.cycleTimes.totalMin, 1)} min
+                  </p>
+                </div>
+                <span className="text-sm font-bold tabular-nums shrink-0 ml-2">₹{fmt(appliedRoute.totalCost, 2)}</span>
+              </div>
+              {appliedRoute.sustainability && (
+                <div className="flex items-center justify-between px-3 py-2 text-[11px] text-muted-foreground">
+                  <span>CO₂ footprint</span>
+                  <span className="tabular-nums">{appliedRoute.sustainability.totalCo2Kg} kg CO₂e</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </Section>
   );
@@ -2604,7 +2985,6 @@ function CostGuidePanel({
   item, fg, summary, batchSize, setBatchSize, productionLife, setProductionLife,
   processRouting, setProcessRouting, factory, setFactory,
   onManualClick, selectedManualRoute,
-  selectedAutoRouteId, setSelectedAutoRouteId,
 }: {
   item: BOMItem; fg: FeatureGraph | null; summary: FeatureGraphSummary | null;
   batchSize: number; setBatchSize: (v: number) => void;
@@ -2613,13 +2993,12 @@ function CostGuidePanel({
   factory: string; setFactory: (v: string) => void;
   onManualClick: () => void;
   selectedManualRoute: ManualRouteOption | null;
-  selectedAutoRouteId: string | null;
-  setSelectedAutoRouteId: (id: string) => void;
 }) {
+  const queryClient = useQueryClient();
   type LeftTab = 'scenario' | 'geo' | 'gdt' | 'features' | 'machine';
   const [tab, setTab] = useState<LeftTab>('scenario');
   const [productLine, setProductLine] = useState('');
-  const [currency, setCurrency] = useState('INR');
+  const [currency, setCurrency] = useState('USD');
   const [askPrice, setAskPrice] = useState('');
   const [matPickerOpen, setMatPickerOpen] = useState(false);
   const [blankThickness, setBlankThickness] = useState(item.sheetThicknessMm != null ? String(item.sheetThicknessMm) : '');
@@ -2657,16 +3036,6 @@ function CostGuidePanel({
   const isSheetMetalCAD =
     fg?.classification?.family === 'sheet_metal' || (summary?.sheetThicknessMm ?? 0) > 0;
   const cadThicknessMm = summary?.sheetThicknessMm ?? 0;
-  const autoRoutes = KB_ROUTE_ALTERNATIVES[fg?.classification?.family ?? ''] ?? [];
-  const scoringCtx: RouteScoringContext | null = summary ? { summary, item, batchSize } : null;
-  const routeScores: Record<string, RouteScore> = scoringCtx
-    ? Object.fromEntries(autoRoutes.map((r) => [r.id, computeRouteScore(r.id, scoringCtx)]))
-    : {};
-  const recommendedRouteId: string | null = autoRoutes.length > 0 && Object.keys(routeScores).length > 0
-    ? autoRoutes.reduce((best, r) =>
-        (routeScores[r.id]?.totalScore ?? 0) > (routeScores[best.id]?.totalScore ?? 0) ? r : best
-      ).id
-    : null;
 
   return (
     <div className="flex flex-col h-full">
@@ -2773,7 +3142,6 @@ function CostGuidePanel({
             </Section>
 
             <Section title="Process Routing">
-              {/* ── Auto routing ── */}
               <div className="flex items-center gap-2 py-0.5">
                 <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
                   <input type="radio" name="proc_routing" checked={processRouting === 'auto'}
@@ -2787,37 +3155,6 @@ function CostGuidePanel({
                   title="View workflow"
                 >...</button>
               </div>
-
-              {processRouting === 'auto' && autoRoutes.length > 0 && (
-                <div className="ml-4 mt-1 space-y-0.5">
-                  {autoRoutes.map((route) => {
-                    const isSelected = selectedAutoRouteId === route.id;
-                    return (
-                      <label key={route.id} className={cn(
-                        'flex items-start gap-2 py-1 px-1.5 rounded cursor-pointer transition-colors',
-                        isSelected ? 'bg-violet-500/10' : 'hover:bg-muted/50',
-                      )}>
-                        <input type="radio" name="auto_route" checked={isSelected}
-                          onChange={() => setSelectedAutoRouteId(route.id)}
-                          className="accent-violet-600 mt-0.5 shrink-0" />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span className="text-xs leading-tight">{route.label}</span>
-                            {route.id === recommendedRouteId && (
-                              <span className="text-[9px] font-semibold text-blue-400 border border-blue-500/40 rounded px-1 py-px leading-none">REC</span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-muted-foreground/70 mt-0.5 leading-tight">
-                            {route.processes.join(' → ')}
-                          </p>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* ── Manual routing ── */}
               <div className="flex items-center gap-2 py-0.5 mt-1">
                 <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
                   <input type="radio" name="proc_routing" checked={processRouting === 'manual'}
@@ -3042,7 +3379,12 @@ function CostGuidePanel({
 
       {/* Action buttons */}
       <div className="border-t px-3 py-2 flex gap-1.5 shrink-0">
-        <button onClick={() => toast.success('Settings applied')}
+        <button
+          onClick={() => {
+            queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'cost-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'route-comparison'] });
+            toast.success('Scenario applied — recalculating…');
+          }}
           className="flex-1 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded px-2 py-1 font-medium transition-colors">Apply</button>
         <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">Copy</button>
         <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">New</button>
@@ -4260,6 +4602,371 @@ function DrawingIntelligenceTab({ item }: { item: BOMItem }) {
   );
 }
 
+// ── NRE Investment constants (INR base; converted at render time) ──────────────
+
+const INV_LOC_RATE: Record<string, { symbol: string; inrRate: number }> = {
+  'India':     { symbol: '₹', inrRate: 1 },
+  'USA':       { symbol: '$', inrRate: 83.5 },
+  'China':     { symbol: '¥', inrRate: 11.52 },
+  'Germany':   { symbol: '€', inrRate: 90.8 },
+  'France':    { symbol: '€', inrRate: 90.8 },
+  'W. Europe': { symbol: '€', inrRate: 90.8 },
+  'E. Europe': { symbol: '€', inrRate: 90.8 },
+  'Other':     { symbol: '$', inrRate: 83.5 },
+};
+
+const INV_FIXTURE_NRE: Record<string, number> = {
+  cnc_3ax_vmc: 25_000, cnc_4ax_vmc: 45_000, cnc_5ax_mc: 85_000,
+  cnc_lathe: 12_000, cnc_lathe_live: 22_000, cnc_mill_turn: 35_000,
+};
+const INV_SETUP_COUNT: Record<string, number> = {
+  cnc_3ax_vmc: 3, cnc_4ax_vmc: 2, cnc_5ax_mc: 1,
+  cnc_lathe: 2, cnc_lathe_live: 1, cnc_mill_turn: 1,
+};
+const INV_TIGHT_TOL_PREMIUM   = 1.5;
+const INV_PROG_BASE: Record<string, number> = {
+  easy: 8_000, medium: 20_000, hard: 45_000, very_hard: 90_000,
+};
+const INV_PROG_PER_POCKET     = 500;
+const INV_PROG_5AX_ADDER      = 25_000;
+const INV_PROG_HOURLY_RATE    = 1_200;
+const INV_TOOL_DRILL_SET      = 1_200;
+const INV_TOOL_ENDMILL        = 3_000;
+const INV_TOOL_CHAMFER        = 2_500;
+const INV_TOOL_TAP_SET        = 800;
+const INV_TOOL_BORING_BAR     = 8_000;
+const INV_INSP_CMM_BASE       = 15_000;
+const INV_INSP_CMM_HARD       = 5_000;
+const INV_INSP_FAI_RATE       = 400;
+const INV_INSP_MIN_PER_FEAT   = 3;
+const INV_INSP_GAUGE          = 12_000;
+const INV_INSP_PROFILOMETER   = 3_000;
+
+// ── InvestmentTab ──────────────────────────────────────────────────────────────
+
+function InvestmentTab({
+  item, fg, batchSize, productionLife, factory,
+}: {
+  item: BOMItem; fg: FeatureGraph | null;
+  batchSize: number; productionLife: number; factory: string;
+}) {
+  const { data: cost } = useCostSummary(item.id, batchSize, factory);
+
+  const cncSummary: Record<string, number> = (fg as any)?.cnc_features?.feature_summary ?? {};
+  const holeGroups   = fg?.summary?.holeGroups ?? [];
+  const threads      = item.drawingIntelligence?.threads ?? [];
+  const difficulty   = fg?.difficultyLevel ?? 'medium';
+  const tightestTolMm =
+    item.tightestToleranceMm ?? item.drawingIntelligence?.tightest_tolerance_mm ?? null;
+  const surfaceRa =
+    item.surfaceFinishRa ?? item.drawingIntelligence?.surface_finish_ra ?? null;
+  const isTightTol = tightestTolMm != null && tightestTolMm <= 0.05;
+
+  const machineClass =
+    cost?.processLines?.find((l) => l.machineClass?.startsWith('cnc_'))?.machineClass
+    ?? 'cnc_3ax_vmc';
+
+  const pocketCount       = cncSummary['pocket']       ?? 0;
+  const chamferCount      = cncSummary['chamfer']      ?? 0;
+  const countersinkCount  = cncSummary['countersink']  ?? 0;
+  const uniqueDrillDiams  = holeGroups.length || ((fg?.summary?.holeCount ?? 0) > 0 ? 3 : 0);
+  const uniqueThreadSizes = new Set(threads.map((t) => t.size)).size;
+
+  const loc   = INV_LOC_RATE[factory] ?? INV_LOC_RATE['India'];
+  const fmtC  = (inr: number, dec = 0) =>
+    `${loc.symbol}${(inr / loc.inrRate).toLocaleString(undefined, {
+      minimumFractionDigits: dec, maximumFractionDigits: dec,
+    })}`;
+
+  if (!fg) {
+    return (
+      <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
+        <AlertCircle className="h-6 w-6 opacity-30" />
+        <p className="text-xs text-center">Run Auto-Fill to see investment estimate.</p>
+      </div>
+    );
+  }
+
+  // ── Fixture ──
+  const fixtureBase   = INV_FIXTURE_NRE[machineClass] ?? 25_000;
+  const fixtureSetups = INV_SETUP_COUNT[machineClass] ?? 3;
+  const fixtureTotal  = fixtureBase * fixtureSetups * (isTightTol ? INV_TIGHT_TOL_PREMIUM : 1);
+
+  // ── Programming ──
+  const progBase    = INV_PROG_BASE[difficulty] ?? INV_PROG_BASE['medium'];
+  const progPockets = pocketCount * INV_PROG_PER_POCKET;
+  const prog5ax     = machineClass === 'cnc_5ax_mc' ? INV_PROG_5AX_ADDER : 0;
+  const progTotal   = progBase + progPockets + prog5ax;
+  const progHours   = Math.round(progTotal / INV_PROG_HOURLY_RATE);
+
+  // ── Tools ──
+  const toolDrills   = uniqueDrillDiams * INV_TOOL_DRILL_SET;
+  const roughMills   = pocketCount > 0 ? Math.ceil(pocketCount / 5) : 0;
+  const finishMills  = pocketCount > 0 ? Math.ceil(pocketCount / 3) : 0;
+  const toolEndmills = (roughMills + finishMills) * INV_TOOL_ENDMILL;
+  const toolChamfer  = (chamferCount + countersinkCount) > 0 ? INV_TOOL_CHAMFER : 0;
+  const toolTaps     = uniqueThreadSizes * INV_TOOL_TAP_SET;
+  const toolBoring   = isTightTol ? INV_TOOL_BORING_BAR : 0;
+  const toolTotal    = toolDrills + toolEndmills + toolChamfer + toolTaps + toolBoring;
+
+  // ── Inspection ──
+  const cmmProg       = INV_INSP_CMM_BASE + (difficulty === 'very_hard' ? INV_INSP_CMM_HARD : 0);
+  const totalFeats    = Object.values(cncSummary).reduce((s, v) => s + v, 0) || (fg.summary?.holeCount ?? 0);
+  const faiHours      = (totalFeats * INV_INSP_MIN_PER_FEAT) / 60;
+  const faiCost       = faiHours * INV_INSP_FAI_RATE;
+  const needsGauge    = isTightTol || (surfaceRa != null && surfaceRa <= 0.8)
+    || ['H6', 'H7', 'g6', 'f7'].includes(item.toleranceGrade ?? '');
+  const criticalFeats = needsGauge
+    ? Math.max(1, uniqueThreadSizes + Math.ceil(uniqueDrillDiams / 2))
+    : 0;
+  const gaugeNRE      = criticalFeats * INV_INSP_GAUGE;
+  const profNRE       = surfaceRa != null ? INV_INSP_PROFILOMETER : 0;
+  const inspTotal     = cmmProg + faiCost + gaugeNRE + profNRE;
+
+  // ── Summary ──
+  const totalNRE         = fixtureTotal + progTotal + toolTotal + inspTotal;
+  const lifetimeVol      = (item.annualVolume ?? 0) * productionLife;
+  const amortizedPerUnit = lifetimeVol > 0 ? totalNRE / lifetimeVol : null;
+  const amortizedPct     =
+    amortizedPerUnit != null && (cost?.totalCost ?? 0) > 0
+      ? (amortizedPerUnit / cost!.totalCost) * 100
+      : null;
+
+  // Local row helpers
+  const InvRow = ({
+    label, sub, value, warn = false, indent = 0,
+  }: {
+    label: ReactNode; sub?: ReactNode;
+    value?: string; warn?: boolean; indent?: number;
+  }) => (
+    <div className={cn(
+      'flex items-baseline justify-between py-2 border-b border-border/20 last:border-0',
+      indent === 1 && 'pl-5',
+      indent === 2 && 'pl-9',
+    )}>
+      <div className="flex-1 min-w-0 pr-4">
+        <span className="text-sm text-foreground">{label}</span>
+        {warn && <span className="text-sm text-amber-500 ml-1">⚠</span>}
+        {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+      </div>
+      {value !== undefined && (
+        <span className="text-sm tabular-nums text-foreground shrink-0">{value}</span>
+      )}
+    </div>
+  );
+
+  const InvSection = ({ label }: { label: string }) => (
+    <div className="pt-4 pb-1">
+      <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
+    </div>
+  );
+
+  const InvTotal = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
+    <div className="flex items-baseline justify-between py-2.5 border-t border-border mt-1">
+      <div>
+        <span className="text-sm font-bold text-foreground">{label}</span>
+        {sub && <span className="text-xs text-muted-foreground ml-2">{sub}</span>}
+      </div>
+      <span className="text-sm font-bold tabular-nums text-foreground shrink-0">{value}</span>
+    </div>
+  );
+
+  return (
+    <div className="px-4 pb-6">
+
+      {/* Grand Total Header */}
+      <div className="flex items-start justify-between pt-3 pb-2 border-b-2 border-border">
+        <div>
+          <p className="text-sm font-bold text-foreground">Total NRE Investment</p>
+          <p className="text-xs text-muted-foreground mt-0.5">One-time · pre-production</p>
+        </div>
+        <div className="text-right shrink-0 ml-4">
+          <p className="text-2xl font-bold tabular-nums leading-tight text-foreground">
+            {fmtC(totalNRE)}
+          </p>
+          {loc.symbol !== '₹' && (
+            <p className="text-sm text-muted-foreground tabular-nums mt-0.5">
+              ₹{totalNRE.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Section 1: Fixture */}
+      <InvSection label="Fixture & Work-Holding" />
+      <InvRow
+        indent={1}
+        label={`Fixture design & fab · ${machineClass.replace(/_/g, ' ').toUpperCase()}`}
+        sub={`${fixtureSetups} setup${fixtureSetups > 1 ? 's' : ''} × ${fmtC(fixtureBase)} each`}
+        value={fmtC(fixtureBase * fixtureSetups)}
+      />
+      {isTightTol && (
+        <InvRow
+          indent={1}
+          label="Tight tolerance premium (+50%)"
+          sub={`Tolerance ≤ 0.05 mm — precision datum & locating required`}
+          value={fmtC(fixtureBase * fixtureSetups * 0.5)}
+          warn
+        />
+      )}
+      <InvTotal label="Total Fixture Investment" value={fmtC(fixtureTotal)} />
+
+      {/* Section 2: Programming */}
+      <InvSection label="CNC Programming" />
+      <InvRow
+        indent={1}
+        label={`Programming base · ${difficulty.replace('_', ' ')}`}
+        sub={`~${Math.round(progBase / INV_PROG_HOURLY_RATE)} hr @ ${fmtC(INV_PROG_HOURLY_RATE)}/hr`}
+        value={fmtC(progBase)}
+        warn={difficulty === 'hard' || difficulty === 'very_hard'}
+      />
+      {pocketCount > 0 && (
+        <InvRow
+          indent={1}
+          label={`Pocket toolpath generation (${pocketCount} pockets)`}
+          sub="Rough + finish pass per pocket"
+          value={fmtC(progPockets)}
+        />
+      )}
+      {prog5ax > 0 && (
+        <InvRow
+          indent={1}
+          label="5-axis multi-axis strategy"
+          sub="Simultaneous 5-axis CAM setup and validation"
+          value={fmtC(prog5ax)}
+          warn
+        />
+      )}
+      <InvTotal
+        label="Total Programming"
+        value={fmtC(progTotal)}
+        sub={`~${progHours} programmer hours`}
+      />
+
+      {/* Section 3: Cutting Tools */}
+      <InvSection label="Cutting Tool Investment" />
+      {uniqueDrillDiams > 0 && (
+        <InvRow
+          indent={1}
+          label={`Drill sets (${uniqueDrillDiams} unique diameters)`}
+          sub="3 drills per diameter: roughing, semi-finish, finish/reserve"
+          value={fmtC(toolDrills)}
+        />
+      )}
+      {pocketCount > 0 && (
+        <InvRow
+          indent={1}
+          label={`End mills (${roughMills} roughing + ${finishMills} finishing)`}
+          sub={`${pocketCount} pockets · 1 rougher/5 pockets, 1 finisher/3 pockets`}
+          value={fmtC(toolEndmills)}
+        />
+      )}
+      {toolChamfer > 0 && (
+        <InvRow
+          indent={1}
+          label={`Chamfer mill (${chamferCount + countersinkCount} chamfers/countersinks)`}
+          value={fmtC(toolChamfer)}
+        />
+      )}
+      {uniqueThreadSizes > 0 && (
+        <InvRow
+          indent={1}
+          label={`Tap sets (${uniqueThreadSizes} thread size${uniqueThreadSizes > 1 ? 's' : ''})`}
+          sub={threads.map((t) => t.size).join(', ')}
+          value={fmtC(toolTaps)}
+        />
+      )}
+      {toolBoring > 0 && (
+        <InvRow
+          indent={1}
+          label="Boring bar / precision reamer"
+          sub="Required for hole tolerances ≤ 0.05 mm"
+          value={fmtC(toolBoring)}
+          warn
+        />
+      )}
+      <InvTotal label="Total Cutting Tools" value={fmtC(toolTotal)} />
+
+      {/* Section 4: Inspection */}
+      <InvSection label="Inspection & Gauging" />
+      <InvRow
+        indent={1}
+        label="CMM programming"
+        sub={difficulty === 'very_hard' ? 'Complex part — extended CMM program' : 'Standard CMM program'}
+        value={fmtC(cmmProg)}
+      />
+      <InvRow
+        indent={1}
+        label={`First article inspection (${totalFeats} features)`}
+        sub={`~${Math.ceil(faiHours * 60)} min @ ${fmtC(INV_INSP_FAI_RATE)}/hr`}
+        value={fmtC(faiCost)}
+      />
+      {needsGauge && (
+        <InvRow
+          indent={1}
+          label={`Custom gauges (${criticalFeats} critical feature${criticalFeats > 1 ? 's' : ''})`}
+          sub={[
+            isTightTol ? 'Tight tolerance ≤ 0.05 mm' : '',
+            surfaceRa != null && surfaceRa <= 0.8 ? `Fine Ra ${surfaceRa} μm` : '',
+          ].filter(Boolean).join(' · ')}
+          value={fmtC(gaugeNRE)}
+          warn
+        />
+      )}
+      {profNRE > 0 && (
+        <InvRow
+          indent={1}
+          label={`Surface profilometer${surfaceRa != null ? ` (Ra ${surfaceRa} μm)` : ''}`}
+          value={fmtC(profNRE)}
+        />
+      )}
+      <InvTotal label="Total Inspection" value={fmtC(inspTotal)} />
+
+      {/* NRE Summary recap */}
+      <InvSection label="NRE Summary" />
+      <InvRow label="Fixture & Work-Holding" value={fmtC(fixtureTotal)} />
+      <InvRow label="CNC Programming"        value={fmtC(progTotal)} />
+      <InvRow label="Cutting Tools"          value={fmtC(toolTotal)} />
+      <InvRow label="Inspection & Gauging"   value={fmtC(inspTotal)} />
+      <div className="flex items-baseline justify-between pt-3 mt-1 border-t-2 border-border">
+        <span className="text-base font-bold text-foreground">Total NRE Investment</span>
+        <span className="text-xl font-bold tabular-nums text-foreground">{fmtC(totalNRE)}</span>
+      </div>
+
+      {/* Amortization */}
+      {lifetimeVol > 0 && (
+        <>
+          <InvSection label="Amortization" />
+          <InvRow
+            label="Lifetime volume"
+            sub={`${(item.annualVolume ?? 0).toLocaleString('en-IN')} pcs/yr × ${productionLife} yr`}
+            value={lifetimeVol.toLocaleString('en-IN') + ' pcs'}
+          />
+          {amortizedPerUnit != null && (
+            <InvRow
+              label="Amortized NRE / unit"
+              value={fmtC(amortizedPerUnit, 2)}
+            />
+          )}
+          {amortizedPct != null && (
+            <InvRow
+              label="NRE as % of part cost"
+              sub={`Part cost: ${fmtC(cost!.totalCost, 2)}`}
+              value={`${amortizedPct.toFixed(1)}%`}
+            />
+          )}
+        </>
+      )}
+
+      <p className="text-[10px] text-muted-foreground/50 pt-4 leading-relaxed">
+        NRE estimates based on industry benchmarks for {factory || 'India'} market.
+        Fixture and tooling are one-time investments; programming and CMM costs
+        recur on engineering change orders.
+      </p>
+    </div>
+  );
+}
+
 // ── AnalysisTabsPanel (Right) ──────────────────────────────────────────────────
 
 function AnalysisTabsPanel({
@@ -4271,9 +4978,11 @@ function AnalysisTabsPanel({
   onCNCFeatureSelect?: (key: string | null) => void;
 }) {
   const [tab, setTab] = useState<RightTabKey>('part_summary');
+  const [appliedRouteId, setAppliedRouteId] = useState<string | null>(null);
   const cls = fg?.classification;
   const cncSummary: Record<string, number> | null = (fg as any)?.cnc_features?.feature_summary ?? null;
   const lifetimeVol = (item.annualVolume ?? 0) * productionLife;
+  const { data: summaryForPartTab } = useCostSummary(item.id, batchSize);
 
   return (
     <div className="flex flex-col h-full">
@@ -4292,8 +5001,8 @@ function AnalysisTabsPanel({
           <>
             {cls && (
               <Section title="Classification">
-                <div className="flex items-center justify-between py-0.5">
-                  <span className="text-xs font-semibold">{familyLabel(cls.family)}</span>
+                <div className="flex items-center justify-between pb-1">
+                  <code className="text-[11px] font-semibold font-mono tracking-tight">{cls.family}</code>
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${confidenceCls(cls.confidence)}`}>
                     {Math.round(cls.confidence * 100)}%
                   </span>
@@ -4315,11 +5024,52 @@ function AnalysisTabsPanel({
                     ))}
                   </div>
                 )}
+                {cls.classificationSignals && (
+                  <div className="mt-2 divide-y divide-border/30">
+                    {(['flatness', 'hole_count', 'planar_face_fraction', 'cyl_axis_alignment', 'rotational_face_ratio'] as const)
+                      .filter((k) => cls.classificationSignals![k] != null)
+                      .map((k) => {
+                        const val = cls.classificationSignals![k];
+                        const display = k === 'planar_face_fraction' || k === 'cyl_axis_alignment' || k === 'rotational_face_ratio' || k === 'flatness'
+                          ? `${(Number(val) * 100).toFixed(0)}%`
+                          : String(val);
+                        const label = k === 'flatness' ? 'Flatness' : k === 'hole_count' ? 'Hole Count' : k === 'planar_face_fraction' ? 'Planar Faces' : k === 'cyl_axis_alignment' ? 'Cyl Alignment' : 'Rot Ratio';
+                        return (
+                          <div key={k} className="flex items-baseline py-0.5 gap-2">
+                            <span className="text-[9px] text-muted-foreground w-20 shrink-0">{label}</span>
+                            <span className="text-[10px] font-mono tabular-nums">{display}</span>
+                          </div>
+                        );
+                      })}
+                    {cls.classificationReasons?.map((r, i) => (
+                      <p key={i} className="text-[9px] text-muted-foreground pt-1 leading-relaxed">{r}</p>
+                    ))}
+                    {cls.classificationSignals.classification_version && (
+                      <p className="text-[9px] text-muted-foreground/50 pt-0.5">v{cls.classificationSignals.classification_version}</p>
+                    )}
+                  </div>
+                )}
               </Section>
             )}
             <Section title="Part Geometry">
-              <Row label="Rough Mass (kg)" value={item.weight != null ? fmt(item.weight * 1.05, 3) : '—'} />
-              <Row label="Finish Mass (kg)" value={item.weight != null ? fmt(item.weight, 3) : '—'} />
+              {(() => {
+                const finishKg = item.weight ?? null;
+                const roughKg = summaryForPartTab?.materialRemoval?.billetWeightKg ?? (() => {
+                  if (finishKg == null) return null;
+                  const fam: string = fg?.classification?.family ?? '';
+                  if (fam === 'cnc_turned') return finishKg * 2.5;
+                  if (fam === 'mill_turn')  return finishKg * 2.0;
+                  if (fam === 'cnc_milled') return finishKg * 1.5;
+                  if (fam === 'sheet_metal') return finishKg;
+                  return finishKg * 1.1;
+                })();
+                return (
+                  <>
+                    <Row label="Rough Mass (kg)" value={roughKg != null ? fmt(roughKg, 3) : '—'} />
+                    <Row label="Finish Mass (kg)" value={finishKg != null ? fmt(finishKg, 3) : '—'} />
+                  </>
+                );
+              })()}
               <Row label="Length (mm)" value={item.maxLength != null ? fmt(item.maxLength, 1) : '—'} />
               <Row label="Width (mm)" value={item.maxWidth != null ? fmt(item.maxWidth, 1) : '—'} />
               <Row label="Height (mm)" value={item.maxHeight != null ? fmt(item.maxHeight, 1) : '—'} />
@@ -4340,8 +5090,13 @@ function AnalysisTabsPanel({
 
         {tab === 'cost' && (
           <>
-            <CostSummaryTab item={item} batchSize={batchSize} />
-            <RouteComparisonCard item={item} batchSize={batchSize} />
+            <CostSummaryTab item={item} batchSize={batchSize} appliedRouteId={appliedRouteId} factory={factory} />
+            <RouteComparisonCard
+              item={item}
+              batchSize={batchSize}
+              appliedRouteId={appliedRouteId}
+              onAppliedRouteChange={setAppliedRouteId}
+            />
           </>
         )}
 
@@ -4366,7 +5121,17 @@ function AnalysisTabsPanel({
           />
         )}
 
-        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'validation' && tab !== 'design' && tab !== 'sustainability' && tab !== 'detail' && (
+        {tab === 'investment' && (
+          <InvestmentTab
+            item={item}
+            fg={fg}
+            batchSize={batchSize}
+            productionLife={productionLife}
+            factory={factory}
+          />
+        )}
+
+        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'validation' && tab !== 'design' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && (
           <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
             <AlertCircle className="h-6 w-6 opacity-30" />
             <p className="text-xs text-center">{RIGHT_TABS.find((t) => t.key === tab)?.label} coming in Phase 2.</p>
@@ -4896,6 +5661,12 @@ export default function ManufacturingIntelligencePage() {
   const bomId = params.bomId as string;
   const itemId = params.itemId as string;
 
+  const { setOpen } = useSidebar();
+  useEffect(() => {
+    setOpen(false);
+    return () => setOpen(true);
+  }, [setOpen]);
+
   const queryClient = useQueryClient();
   const { data: item, isLoading } = useBOMItem(itemId);
   const { data: analysisVersionData } = useAnalysisVersion();
@@ -4913,7 +5684,7 @@ export default function ManufacturingIntelligencePage() {
   const [selectedAutoRouteId, setSelectedAutoRouteId] = useState<string | null>(null);
   const [operationVisual, setOperationVisual] = useState<OperationVisual>(null);
   const [vizLabel, setVizLabel] = useState<string | null>(null);
-  const [factory, setFactory] = useState('Mithran India');
+  const [factory, setFactory] = useState('India');
   const [refreshing, setRefreshing] = useState(false);
 
   // ── Heatmap state ─────────────────────────────────────────────────────────────
@@ -4932,6 +5703,12 @@ export default function ManufacturingIntelligencePage() {
 
   // Clear inspector whenever the user switches layers — stale data from the previous layer is misleading
   useEffect(() => { setHeatmapInspector(null); }, [heatmapLayer]);
+
+  // Scroll right panel to top when inspector is set so the user sees it immediately
+  const rightPanelScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (heatmapInspector) rightPanelScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [heatmapInspector]);
 
   // All hooks must appear before any conditional returns
   const fg = useMemo(
@@ -5118,7 +5895,9 @@ export default function ManufacturingIntelligencePage() {
       .map((c) => {
         const v2 = fg?.feature_graph_v2?.features.find((f) => f.id === c.featureId);
         const label = v2
-          ? `${v2.feature_type === 'hole' ? `Ø${v2.diameter_mm}mm hole` : `R${v2.radius_mm}mm bend`} · occ ${c.occurrenceIndex + 1}`
+          ? v2.feature_type === 'hole' ? `Ø${v2.diameter_mm}mm hole · occ ${c.occurrenceIndex + 1}`
+            : v2.feature_type === 'bend' ? `R${v2.radius_mm}mm bend · occ ${c.occurrenceIndex + 1}`
+            : `${v2.feature_type} · occ ${c.occurrenceIndex + 1}`
           : c.featureId;
         return { ...c, label };
       });
@@ -5140,10 +5919,18 @@ export default function ManufacturingIntelligencePage() {
 
         if (heatmapLayer === 'cost_density') {
           if (v2.feature_type === 'hole') {
-            const pp = costHeatmapWeights.laserCostPerPierce;
-            impact.push({ code: 'PIERCE', label: pp != null ? `Pierce: ₹${pp.toFixed(2)}/hole (laser)` : 'Laser pierce — run cost analysis for exact figure', severity: (pp ?? 0) > 5 ? 'high' : 'medium' });
-            if ((item?.holeCount ?? 0) > 100) recs.push({ label: 'Consider gang punch tooling to reduce per-hole cost', priority: 'medium' });
-            if (v2.diameter_mm != null && v2.diameter_mm < 2 * thk) recs.push({ label: `Small hole Ø${v2.diameter_mm}mm — increase to ≥ 2× thickness if tolerance allows`, priority: 'high' });
+            const occ2 = v2.occurrences[c.occurrenceIndex];
+            const ldRatio = occ2?.ld_ratio ?? 0;
+            if (thk === 0) {
+              impact.push({ code: 'DRILL_COST', label: ldRatio > 5 ? `Deep hole L/D ${ldRatio.toFixed(1)} — peck drilling required, higher cost` : ldRatio > 3 ? `Moderate depth L/D ${ldRatio.toFixed(1)} — standard drilling` : 'Shallow hole — standard drilling', severity: ldRatio > 5 ? 'high' : ldRatio > 3 ? 'medium' : 'low' });
+              if (occ2?.tapped) impact.push({ code: 'TAP_COST', label: `Tapped${occ2.spec ? ` ${occ2.spec}` : ''} — tapping adds cycle time`, severity: 'medium' });
+              if (ldRatio > 8) recs.push({ label: 'Consider gun-drilling or step-boring for very deep holes', priority: 'high' });
+            } else {
+              const pp = costHeatmapWeights.laserCostPerPierce;
+              impact.push({ code: 'PIERCE', label: pp != null ? `Pierce: ₹${pp.toFixed(2)}/hole (laser)` : 'Laser pierce — run cost analysis for exact figure', severity: (pp ?? 0) > 5 ? 'high' : 'medium' });
+              if ((item?.holeCount ?? 0) > 100) recs.push({ label: 'Consider gang punch tooling to reduce per-hole cost', priority: 'medium' });
+              if (v2.diameter_mm != null && v2.diameter_mm < 2 * thk) recs.push({ label: `Small hole Ø${v2.diameter_mm}mm — increase to ≥ 2× thickness if tolerance allows`, priority: 'high' });
+            }
           } else if (v2.feature_type === 'bend') {
             const pb = costHeatmapWeights.brakeCostPerBend;
             impact.push({ code: 'BEND', label: pb != null ? `Bend: ₹${pb.toFixed(2)}/bend (press brake)` : 'Press brake — run cost analysis for exact figure', severity: (pb ?? 0) > 10 ? 'high' : 'medium' });
@@ -5182,10 +5969,20 @@ export default function ManufacturingIntelligencePage() {
           if (v2.feature_type === 'hole') {
             const occ = v2.occurrences[c.occurrenceIndex];
             const density = occ?.local_feature_density ?? 0;
-            const isSmall = v2.diameter_mm != null && v2.diameter_mm < 2 * thk;
-            impact.push({ code: 'WEAR', label: isSmall ? `Small hole Ø${v2.diameter_mm}mm — highest nozzle wear` : 'Pierce concentration — moderate wear', severity: isSmall ? 'high' : density > 5 ? 'high' : 'medium' });
-            if (isSmall) recs.push({ label: `Increase Ø${v2.diameter_mm}mm to ≥ ${(2 * thk).toFixed(1)}mm where tolerance allows`, priority: 'high' });
-            if (density > 5) recs.push({ label: 'Schedule nozzle inspection every 500 pierces in this zone', priority: 'medium' });
+            const ldRatio = occ?.ld_ratio ?? 0;
+            if (thk === 0) {
+              const wearSev = ldRatio > 8 ? 'critical' : ldRatio > 5 ? 'high' : ldRatio > 3 ? 'medium' : 'low';
+              impact.push({ code: 'DRILL_WEAR', label: ldRatio > 8 ? `L/D ${ldRatio.toFixed(1)} — very deep, chip packing → drill breakage risk` : ldRatio > 5 ? `L/D ${ldRatio.toFixed(1)} — deep, peck drill required, faster drill wear` : ldRatio > 3 ? `L/D ${ldRatio.toFixed(1)} — moderate depth, standard wear` : 'Shallow hole — minimal wear', severity: wearSev });
+              if (occ?.tapped) impact.push({ code: 'TAP_WEAR', label: `Tapped — tap wear is cumulative; inspect after every 200 parts`, severity: 'medium' });
+              if (ldRatio > 8) recs.push({ label: 'Use peck cycle + high-pressure coolant; replace drill after 50 holes', priority: 'high' });
+              else if (ldRatio > 5) recs.push({ label: 'Peck drilling recommended; check for chip build-up', priority: 'medium' });
+              if (density > 5) recs.push({ label: 'Dense hole cluster — rotate tool more frequently in this zone', priority: 'medium' });
+            } else {
+              const isSmall = v2.diameter_mm != null && v2.diameter_mm < 2 * thk;
+              impact.push({ code: 'WEAR', label: isSmall ? `Small hole Ø${v2.diameter_mm}mm — highest nozzle wear` : 'Pierce concentration — moderate wear', severity: isSmall ? 'high' : density > 5 ? 'high' : 'medium' });
+              if (isSmall) recs.push({ label: `Increase Ø${v2.diameter_mm}mm to ≥ ${(2 * thk).toFixed(1)}mm where tolerance allows`, priority: 'high' });
+              if (density > 5) recs.push({ label: 'Schedule nozzle inspection every 500 pierces in this zone', priority: 'medium' });
+            }
           }
           impact.push({ code: 'NOTE', label: 'Estimated from geometry — not actual tool life data', severity: 'low' });
         }
@@ -5215,6 +6012,7 @@ export default function ManufacturingIntelligencePage() {
       riskValue > 0.75 ? 'critical' : riskValue > 0.50 ? 'high' : riskValue > 0.25 ? 'medium' : 'low';
 
     const IMPACT_MAP: Record<string, { label: string; severity: 'critical' | 'high' | 'medium' | 'low' }> = {
+      // Sheet metal
       EDGE_TEAR_CRITICAL:    { label: 'Edge tear / burr formation risk', severity: 'critical' },
       EDGE_TEAR_HIGH:        { label: 'Burr formation risk', severity: 'high' },
       BEND_PROXIMITY_HIGH:   { label: 'Hole distortion at bend line', severity: 'high' },
@@ -5225,9 +6023,16 @@ export default function ManufacturingIntelligencePage() {
       FLANGE_TEAR:           { label: 'Flange edge tear risk', severity: 'high' },
       SPRINGBACK_COMPOUND:   { label: 'Springback / angular deviation', severity: 'medium' },
       BEND_HOLE_PROXIMITY:   { label: 'Hole elongation at bend', severity: 'high' },
+      // CNC
+      LD_CRITICAL:           { label: 'Very deep hole (L/D > 8) — chip evacuation critical', severity: 'critical' },
+      LD_HIGH:               { label: 'Deep hole (L/D > 5) — peck drilling required', severity: 'high' },
+      LD_MEDIUM:             { label: 'Moderate hole depth (L/D > 3)', severity: 'medium' },
+      TAPPED:                { label: 'Tapped hole — tap breakage risk increases with L/D', severity: 'medium' },
+      SMALL_BORE:            { label: 'Small diameter bore — fragile drill, slow feed required', severity: 'medium' },
     };
 
     const REC_MAP: Record<string, { label: string; priority: 'high' | 'medium' | 'low' }> = {
+      // Sheet metal
       EDGE_TEAR_CRITICAL:    { label: 'Increase edge clearance to ≥ 1× sheet thickness', priority: 'high' },
       EDGE_TEAR_HIGH:        { label: 'Increase edge clearance to ≥ 1× sheet thickness', priority: 'medium' },
       BEND_PROXIMITY_HIGH:   { label: 'Move hole ≥ 2× material thickness from bend line', priority: 'high' },
@@ -5238,6 +6043,12 @@ export default function ManufacturingIntelligencePage() {
       FLANGE_TEAR:           { label: 'Increase flange height to ≥ 1× material thickness', priority: 'high' },
       SPRINGBACK_COMPOUND:   { label: 'Compensate for springback with overbend correction', priority: 'medium' },
       BEND_HOLE_PROXIMITY:   { label: 'Move hole ≥ 3× material thickness from bend line', priority: 'high' },
+      // CNC
+      LD_CRITICAL:           { label: 'Use peck drilling + high-pressure coolant; replace drill after 50 holes', priority: 'high' },
+      LD_HIGH:               { label: 'Use peck drilling cycle; monitor chip evacuation', priority: 'high' },
+      LD_MEDIUM:             { label: 'Standard drilling with coolant; verify chip clearance', priority: 'medium' },
+      TAPPED:                { label: 'Use spiral-flute tap with CNC rigid tapping; inspect tap every 200 parts', priority: 'medium' },
+      SMALL_BORE:            { label: 'Reduce feed rate; use centre-drill pilot; check runout', priority: 'medium' },
     };
 
     const impactSeen = new Map<string, { code: string; label: string; severity: 'critical' | 'high' | 'medium' | 'low' }>();
@@ -5357,7 +6168,6 @@ export default function ManufacturingIntelligencePage() {
       <button onClick={() => router.push(`/projects/${projectId}/bom/${bomId}`)} className="p-1.5 rounded hover:bg-muted transition-colors" title="Back to BOM">
         <ArrowLeft className="h-4 w-4" />
       </button>
-      <Cpu className="h-4 w-4 text-violet-500 shrink-0" />
       <div className="flex-1 min-w-0">
         <h1 className="text-sm font-semibold truncate">{item.name}</h1>
         {item.partNumber && <p className="text-xs text-muted-foreground">{item.partNumber}</p>}
@@ -5379,7 +6189,7 @@ export default function ManufacturingIntelligencePage() {
       >
         <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
         Refresh Analysis
-        {isStale && !refreshing && <AlertTriangle className="h-3 w-3 text-amber-500 ml-0.5" />}
+        {isStale && !refreshing && <span className="text-amber-500 ml-0.5">⚠</span>}
       </button>
       <button disabled className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border border-border opacity-40 cursor-not-allowed">
         <Calculator className="h-3 w-3" />
@@ -5390,7 +6200,6 @@ export default function ManufacturingIntelligencePage() {
         Re-run DFM
       </button>
       <button disabled className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border border-border opacity-40 cursor-not-allowed">
-        <GitCompare className="h-3 w-3" />
         Compare Versions
       </button>
 
@@ -5398,12 +6207,12 @@ export default function ManufacturingIntelligencePage() {
 
       <button
         onClick={() => { setHeatmapMode((m) => !m); setHeatmapInspector(null); }}
-        disabled={!dfmScores?.features?.length}
-        title={dfmScores?.features?.length ? 'Toggle manufacturing risk heatmap' : 'Run DFM analysis first'}
+        disabled={!fg?.feature_graph_v2}
+        title={fg?.feature_graph_v2 ? 'Toggle heatmap overlay' : 'Upload and analyze a 3D model to enable heatmaps'}
         className={cn(
           'flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border transition-colors',
           heatmapMode ? 'bg-blue-600 text-white border-blue-500' : 'border-border hover:bg-muted',
-          !dfmScores?.features?.length && 'opacity-40 cursor-not-allowed',
+          !fg?.feature_graph_v2 && 'opacity-40 cursor-not-allowed',
         )}
       >
         <Flame className="h-3 w-3" />
@@ -5567,8 +6376,6 @@ export default function ManufacturingIntelligencePage() {
     processRouting, setProcessRouting, factory, setFactory,
     onManualClick: () => setRouteDialogOpen(true),
     selectedManualRoute,
-    selectedAutoRouteId,
-    setSelectedAutoRouteId,
   };
   const analysisProps = {
     item, fg, batchSize, productionLife, factory,
@@ -5646,87 +6453,94 @@ export default function ManufacturingIntelligencePage() {
       {heatmapLegend}
 
       <div className="flex-1 overflow-hidden min-h-0">
-        <PanelGroup direction="vertical" className="h-full">
+        <PanelGroup id="mi-root" direction="horizontal" className="h-full">
 
-          {/* TOP ROW */}
-          <Panel defaultSize={62} minSize={28}>
-            <PanelGroup direction="horizontal" className="h-full">
+          {/* LEFT: Cost Guide + 3D Viewer + Process Tree (original layout unchanged) */}
+          <Panel defaultSize={67} minSize={40} className="flex flex-col overflow-hidden">
+            <PanelGroup id="mi-left-col" direction="vertical" className="h-full">
 
-              {/* LEFT: Cost Guide */}
-              <Panel defaultSize={22} minSize={12} className="flex flex-col border-r overflow-hidden">
-                <PanelHeader title="Cost Guide" panelId="left" maximized={maximized} onMaximize={maximize} />
-                <div className="flex-1 overflow-hidden min-h-0">
-                  <CostGuidePanel {...costGuideProps} />
-                </div>
-              </Panel>
+              {/* TOP ROW */}
+              <Panel defaultSize={62} minSize={28}>
+                <PanelGroup id="mi-top-row" direction="horizontal" className="h-full">
 
-              <HResizeHandle />
-
-              {/* CENTER: 3D Viewer */}
-              <Panel defaultSize={48} minSize={20} className="flex flex-col overflow-hidden">
-                <PanelHeader title="3D Viewer" panelId="center" maximized={maximized} onMaximize={maximize} />
-                {vizLabel && (
-                  <div className="px-3 py-1 text-xs text-muted-foreground border-b border-border/40 bg-muted/20 truncate">
-                    Showing: {vizLabel}
-                  </div>
-                )}
-                <div className="flex-1 overflow-hidden min-h-0 bg-muted/10 [&>div]:min-h-0">
-                  {file3dUrl ? (
-                    <ModelViewer key={file3dUrl} fileUrl={file3dUrl}
-                      fileName={item.file3dPath?.split('/').pop() ?? 'model'}
-                      fileType={item.file3dPath?.split('.').pop() ?? 'stl'}
-                      bomItemId={item.id}
-                      highlightOccurrences={operationVisual?.highlight ?? selectedV2Feature}
-                    {...(operationVisual?.color ? { highlightColor: operationVisual.color } : {})}
-                      selectedOccurrenceIndex={selectedOccurrenceIndex}
-                      onOccurrenceSelect={setSelectedOccurrenceIndex}
-                      faceMap={faceMap}
-                      sheetThickness={item.sheetThicknessMm ?? 0}
-                      {...(selectedFeatureScores !== undefined && !operationVisual ? { dfmOccurrenceScores: selectedFeatureScores } : {})}
-                      heatmapSources={heatmapSources}
-                      heatmapNormalization={heatmapNorm}
-                      onHeatmapInspect={handleHeatmapInspect}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
-                      <AlertCircle className="h-8 w-8 opacity-30" />
-                      <span className="text-sm">{item.file3dPath ? 'Loading 3D model…' : 'No 3D model attached'}</span>
+                  {/* Cost Guide */}
+                  <Panel defaultSize={32} minSize={18} className="flex flex-col border-r overflow-hidden">
+                    <PanelHeader title="Cost Guide" panelId="left" maximized={maximized} onMaximize={maximize} />
+                    <div className="flex-1 overflow-hidden min-h-0">
+                      <CostGuidePanel {...costGuideProps} />
                     </div>
-                  )}
-                </div>
+                  </Panel>
+
+                  <HResizeHandle />
+
+                  {/* 3D Viewer */}
+                  <Panel defaultSize={68} minSize={30} className="flex flex-col overflow-hidden">
+                    <PanelHeader title="3D Viewer" panelId="center" maximized={maximized} onMaximize={maximize} />
+                    {vizLabel && (
+                      <div className="px-3 py-1 text-xs text-muted-foreground border-b border-border/40 bg-muted/20 truncate">
+                        Showing: {vizLabel}
+                      </div>
+                    )}
+                    <div className="flex-1 overflow-hidden min-h-0 bg-muted/10 [&>div]:min-h-0">
+                      {file3dUrl ? (
+                        <ModelViewer key={file3dUrl} fileUrl={file3dUrl}
+                          fileName={item.file3dPath?.split('/').pop() ?? 'model'}
+                          fileType={item.file3dPath?.split('.').pop() ?? 'stl'}
+                          bomItemId={item.id}
+                          highlightOccurrences={operationVisual?.highlight ?? selectedV2Feature}
+                          {...(operationVisual?.color ? { highlightColor: operationVisual.color } : {})}
+                          selectedOccurrenceIndex={selectedOccurrenceIndex}
+                          onOccurrenceSelect={setSelectedOccurrenceIndex}
+                          faceMap={faceMap}
+                          sheetThickness={item.sheetThicknessMm ?? 0}
+                          {...(selectedFeatureScores !== undefined && !operationVisual ? { dfmOccurrenceScores: selectedFeatureScores } : {})}
+                          heatmapSources={heatmapSources}
+                          heatmapNormalization={heatmapNorm}
+                          onHeatmapInspect={handleHeatmapInspect}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+                          <AlertCircle className="h-8 w-8 opacity-30" />
+                          <span className="text-sm">{item.file3dPath ? 'Loading 3D model…' : 'No 3D model attached'}</span>
+                        </div>
+                      )}
+                    </div>
+                  </Panel>
+
+                </PanelGroup>
               </Panel>
 
-              <HResizeHandle />
+              <VResizeHandle />
 
-              {/* RIGHT: Analysis Tabs */}
-              <Panel defaultSize={30} minSize={15} className="flex flex-col border-l overflow-hidden">
-                <PanelHeader title="Analysis" panelId="right" maximized={maximized} onMaximize={maximize} />
-                <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
-                  {heatmapInspectorPanel && <div className="p-2">{heatmapInspectorPanel}</div>}
-                  <AnalysisTabsPanel {...analysisProps} />
-                </div>
+              {/* BOTTOM: Process Tree + Geometric Cost Drivers */}
+              <Panel defaultSize={38} minSize={15} className="flex overflow-hidden border-t">
+                <PanelGroup id="mi-bottom-row" direction="horizontal" className="h-full w-full">
+
+                  <Panel defaultSize={60} minSize={30} className="flex flex-col overflow-hidden">
+                    <ProcessTreePanel {...treeProps} />
+                  </Panel>
+
+                  <HResizeHandle />
+
+                  <Panel defaultSize={40} minSize={20} className="flex flex-col overflow-hidden">
+                    <GeometricCostDriversPanel {...driversProps} />
+                  </Panel>
+
+                </PanelGroup>
               </Panel>
 
             </PanelGroup>
           </Panel>
 
-          <VResizeHandle />
+          <HResizeHandle />
 
-          {/* BOTTOM: Process Tree + Cost Drivers */}
-          <Panel defaultSize={38} minSize={15} className="flex overflow-hidden border-t">
-            <PanelGroup direction="horizontal" className="h-full w-full">
-
-              <Panel defaultSize={65} minSize={30} className="flex flex-col overflow-hidden">
-                <ProcessTreePanel {...treeProps} />
-              </Panel>
-
-              <HResizeHandle />
-
-              <Panel defaultSize={35} minSize={18} className="flex flex-col overflow-hidden">
-                <GeometricCostDriversPanel {...driversProps} />
-              </Panel>
-
-            </PanelGroup>
+          {/* RIGHT: Analysis — full height */}
+          <Panel defaultSize={33} minSize={18} className="flex flex-col overflow-hidden border-l">
+            <PanelHeader title="Analysis" panelId="right" maximized={maximized} onMaximize={maximize} />
+            <div ref={rightPanelScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+              {heatmapInspectorPanel && <div className="p-2">{heatmapInspectorPanel}</div>}
+              <AnalysisTabsPanel {...analysisProps} />
+            </div>
           </Panel>
 
         </PanelGroup>

@@ -182,7 +182,7 @@ export class ToolingCostService {
         lead_time: dto.leadTime,
         notes: dto.notes,
         is_active: dto.isActive ?? true,
-        currency: 'INR',
+        currency: 'USD',
       };
 
       const { data, error } = await client

@@ -357,13 +357,11 @@ export class ExportService {
   }
 
   private formatCurrency(value: number): string {
-    // Use Rs. instead of ₹ symbol for PDF compatibility
-    return `Rs. ${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    return `$ ${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
   }
-  
+
   private formatCurrencyForPDF(value: number): string {
-    // Use INR prefix for PDF to avoid font issues
-    return `INR ${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    return `USD ${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
   }
 
   private formatPercentage(value: number): string {

@@ -303,6 +303,7 @@ export function buildToolWearSources(fg: FeatureGraph, sheetThicknessMm: number)
   const v2 = fg.feature_graph_v2;
   if (!v2) return [];
 
+  const isCNC = sheetThicknessMm === 0;
   const t = Math.max(sheetThicknessMm, 0.5);
   const holeSignals: RawSignal[] = [];
 
@@ -312,11 +313,19 @@ export function buildToolWearSources(fg: FeatureGraph, sheetThicknessMm: number)
       const occ = feat.occurrences[i];
       if (!occ?.centroid) continue;
       let amplitude = 0.35;
-      // Holes < 2t use smallest-bore / most fragile nozzle focus — highest wear
-      if (feat.diameter_mm != null && feat.diameter_mm < 2 * t) {
-        amplitude += (1 - feat.diameter_mm / (2 * t)) * 0.45;
+      if (isCNC) {
+        const ld = occ.ld_ratio ?? 0;
+        if (ld > 8)      amplitude += 0.50;
+        else if (ld > 5) amplitude += 0.35;
+        else if (ld > 3) amplitude += 0.20;
+        if (occ.tapped) amplitude += 0.15;
+      } else {
+        // Holes < 2t use smallest-bore / most fragile nozzle focus — highest wear
+        if (feat.diameter_mm != null && feat.diameter_mm < 2 * t) {
+          amplitude += (1 - feat.diameter_mm / (2 * t)) * 0.45;
+        }
       }
-      // High local density = many rapid repositioning moves = faster nozzle wear
+      // High local density = many rapid repositioning moves = faster tooling wear
       if ((occ.local_feature_density ?? 0) > 5) amplitude += 0.15;
       holeSignals.push({ centroid: occ.centroid, amplitude: Math.min(amplitude, 1.0), featureId: feat.id, occurrenceIndex: i });
     }
@@ -340,6 +349,7 @@ export function buildCostDensitySources(
   const v2 = fg.feature_graph_v2;
   if (!v2) return [];
 
+  const isCNC = sheetThicknessMm === 0;
   const t = Math.max(sheetThicknessMm, 0.5);
 
   // Normalise: find the max per-unit cost to scale amplitudes 0→1.
@@ -357,10 +367,17 @@ export function buildCostDensitySources(
       if (!occ?.centroid) continue;
 
       if (feat.feature_type === 'hole') {
-        let amplitude = pierceBase;
-        // Small holes (diameter < 2t) pierce slower — geometry penalty, no constant duplication
-        if (feat.diameter_mm != null && feat.diameter_mm < 2 * t) {
-          amplitude += (1 - feat.diameter_mm / (2 * t)) * 0.3;
+        let amplitude: number;
+        if (isCNC) {
+          const ld = occ.ld_ratio ?? 0;
+          amplitude = pierceBase + Math.min(ld / 15, 0.4);
+          if (occ.tapped) amplitude += 0.15;
+        } else {
+          amplitude = pierceBase;
+          // Small holes (diameter < 2t) pierce slower — geometry penalty
+          if (feat.diameter_mm != null && feat.diameter_mm < 2 * t) {
+            amplitude += (1 - feat.diameter_mm / (2 * t)) * 0.3;
+          }
         }
         holeSignals.push({ centroid: occ.centroid, amplitude: Math.min(amplitude, 1.0), featureId: feat.id, occurrenceIndex: i });
       } else if (feat.feature_type === 'bend') {

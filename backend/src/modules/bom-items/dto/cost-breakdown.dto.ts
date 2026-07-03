@@ -87,10 +87,24 @@ export interface CostSummaryDto {
   // Scenario context
   batchSize: number;
   family: string;
+  setupCount?: number;  // CNC: number of machine setups (1 = 5-axis, 2 = 4-axis, 3 = 3-axis)
+
+  // CNC: billet/bar stock vs finish weight breakdown
+  materialRemoval?: {
+    billetWeightKg: number;
+    finishedWeightKg: number;
+    utilizationPct: number;   // 0–100 (net/billet × 100)
+    chipScrapPct: number;     // 100 - utilizationPct
+  };
 
   // Transparency
   warnings: string[];
   ratesSource: string;
+
+  // Location currency (set by getCostSummary; undefined = legacy INR response)
+  currency?: string;         // ISO 4217 code: 'INR', 'USD', 'EUR', 'CNY'
+  currencySymbol?: string;   // display symbol: '₹', '$', '€', '¥'
+  toUsdRate?: number;        // amount_local × toUsdRate = amount_usd
 
   // Manufacturing sustainability (computed from same inputs, zero extra DB queries)
   sustainability: SustainabilitySummaryDto;

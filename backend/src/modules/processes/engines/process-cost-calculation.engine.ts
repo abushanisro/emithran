@@ -253,7 +253,7 @@ export class ProcessCostCalculationEngine {
       fringeRate: input.fringeRate ?? 0,
       machineRate: input.machineRate ?? 0,
       machineValue: input.machineValue ?? 0,
-      currency: input.currency ?? 'INR',
+      currency: input.currency ?? 'USD',
       setupManning: input.setupManning,
       setupTime: input.setupTime,
       batchSize: input.batchSize,

@@ -20,7 +20,7 @@ export const CHILD_PART_COST_PRECISION = {
  * Default values for optional parameters
  */
 export const CHILD_PART_COST_DEFAULTS = {
-  CURRENCY: 'INR',
+  CURRENCY: 'USD',
   FREIGHT: 0,
   DUTY: 0,
   OVERHEAD: 0,

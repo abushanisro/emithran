@@ -139,7 +139,7 @@ export class ToolDispatcherService {
     const ownTotal = material + process + tooling + packaging + procured;
     const totalCost = num(item.total_cost) || ownTotal || num(item.unit_cost);
     const pct = (n: number) => (totalCost > 0 ? Math.round((n / totalCost) * 1000) / 10 : 0);
-    const currency = item.currency ?? 'INR';
+    const currency = item.currency ?? 'USD';
 
     const data = {
       bomItemId,

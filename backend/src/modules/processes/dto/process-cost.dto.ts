@@ -671,7 +671,7 @@ export class ProcessCostResponseDto {
       operation: row.operation || '',
       mhrId: row.mhr_id,
       lsrId: row.lsr_id,
-      currency: row.currency || 'INR',
+      currency: row.currency || 'USD',
       directRate: parseFloat(row.direct_rate) || 0,
       indirectRate: parseFloat(row.indirect_rate) || 0,
       fringeRate: parseFloat(row.fringe_rate) || 0,

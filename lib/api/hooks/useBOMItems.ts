@@ -242,17 +242,9 @@ export function useUpdateBOMItem() {
         queryClient.invalidateQueries({ queryKey: bomItemKeys.list(data.bomId) });
         queryClient.invalidateQueries({ queryKey: bomItemKeys.detail(data.id) });
         
-        // Trigger automatic cost calculation for the BOM if cost-affecting fields were updated
-        try {
-          await apiClient.post(`/bom/${data.bomId}/recalculate-all-costs`);
-          // Invalidate cost-related queries
-          queryClient.invalidateQueries({ queryKey: ['bom-item-cost'] });
-          queryClient.invalidateQueries({ queryKey: ['bom-cost-summary'] });
-          queryClient.invalidateQueries({ queryKey: ['bom-cost-report'] });
-        } catch (error) {
-          // Cost recalculation failed but item was updated successfully
-          console.warn('Auto cost recalculation failed for updated BOM item:', error);
-        }
+        // Invalidate the Manufacturing Intelligence cost/route queries for this item
+        queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'cost-summary'] });
+        queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'route-comparison'] });
       }
     },
     onError: (error: any) => {
@@ -472,22 +464,37 @@ export interface CostSummaryDto {
   };
   batchSize: number;
   family: string;
+  setupCount?: number;
+  materialRemoval?: {
+    billetWeightKg: number;
+    finishedWeightKg: number;
+    utilizationPct: number;
+    chipScrapPct: number;
+  };
   warnings: string[];
   ratesSource: string;
+  currency?: string;
+  currencySymbol?: string;
+  toUsdRate?: number;
   sustainability?: SustainabilitySummaryDto;
 }
 
-export function useCostSummary(itemId: string | undefined, batchSize: number = 1) {
+export function useCostSummary(itemId: string | undefined, batchSize: number = 1, location = 'USA') {
   return useQuery({
-    queryKey: ['bom-items', itemId, 'cost-summary', batchSize],
+    queryKey: ['bom-items', itemId, 'cost-summary', batchSize, location],
     queryFn: () =>
-      apiClient.get<CostSummaryDto>(`/bom-items/${itemId}/cost-summary?batchSize=${batchSize}`),
+      apiClient.get<CostSummaryDto>(
+        `/bom-items/${itemId}/cost-summary?batchSize=${batchSize}&location=${encodeURIComponent(location)}`,
+      ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
   });
 }
 
-export type RouteId = "sm-laser" | "sm-turret" | "sm-waterjet";
+export type RouteId =
+  | "sm-laser" | "sm-turret" | "sm-waterjet"
+  | "cnc-3ax" | "cnc-4ax" | "cnc-5ax"
+  | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn";
 
 export type CapabilityReasonCode =
   | "DIMENSIONS_UNAVAILABLE"
@@ -528,6 +535,9 @@ export interface RouteResultDto {
   warnings: string[];
   ratesSource: string;
   sustainability?: RouteResultSustainability;
+  setupCount?: number;
+  machineCapabilityWarnings?: string[];
+  routeComplexityScore?: number;
 }
 
 export interface RouteComparisonDto {

@@ -292,7 +292,7 @@ export function calculateProcessCost(input: ProcessCostInput): ProcessCostResult
     fringeRate: input.fringeRate ?? 0,
     machineRate: input.machineRate ?? 0,
     machineValue: input.machineValue ?? 0,
-    currency: input.currency ?? 'INR',
+    currency: input.currency ?? 'USD',
     setupManning: input.setupManning,
     setupTime: input.setupTime,
     batchSize: input.batchSize,
@@ -435,7 +435,7 @@ export function validateProcessCostInput(input: Partial<ProcessCostInput>): stri
 /**
  * Format currency value
  */
-export function formatCurrency(value: number, currency: string = 'INR', decimals: number = 6): string {
+export function formatCurrency(value: number, currency: string = 'USD', decimals: number = 6): string {
   const currencySymbols: Record<string, string> = {
     USD: '$',
     INR: '₹',

@@ -150,7 +150,7 @@ export default function DashboardPage() {
   const vendors = vendorsData?.vendors || [];
   const rawMaterials = rawMaterialsData?.items || [];
   const mhrRecords = mhrData?.records || [];
-  const lsrRecords = lsrData || [];
+  const lsrRecords = lsrData?.records ?? [];
 
   // Get dynamic modules with real data
   const manufacturingModules = getManufacturingModules(projects);

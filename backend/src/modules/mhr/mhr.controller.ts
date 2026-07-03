@@ -49,6 +49,18 @@ export class MHRController {
     return this.mhrService.getDistinctProcessGroups(user.id, token);
   }
 
+  @Get('locations')
+  @ApiOperation({ summary: 'Get distinct locations from MHR records' })
+  async getLocations(@CurrentUser() user: User, @AccessToken() token: string): Promise<string[]> {
+    return this.mhrService.getDistinctLocations(user.id, token);
+  }
+
+  @Get('currencies')
+  @ApiOperation({ summary: 'Get distinct currencies from MHR records' })
+  async getCurrencies(@CurrentUser() user: User, @AccessToken() token: string): Promise<string[]> {
+    return this.mhrService.getDistinctCurrencies(user.id, token);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get MHR record by ID' })
   @ApiResponse({ status: 200, description: 'MHR record retrieved successfully', type: MHRResponseDto })

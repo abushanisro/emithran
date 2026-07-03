@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { lsrApi, CreateLSRDto, UpdateLSRDto } from '../lsr';
+import { lsrApi } from '../lsr';
+import type { CreateLSRDto, UpdateLSRDto } from '../lsr';
 import { toast } from 'sonner';
 import { ApiError } from '../client';
 import { useMemo } from 'react';
@@ -28,14 +29,12 @@ export const useLSR = (search?: string) => {
   return useQuery({
     queryKey: ['lsr', search],
     queryFn: () => lsrApi.getAll(search),
-    retry: false, // 2026 Best Practice: Fail fast for background data
-    staleTime: 30 * 60 * 1000, // 30 minutes - reference data changes slowly
+    retry: false,
+    staleTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    // Graceful error handling - don't throw errors to ErrorBoundary
     throwOnError: false,
-    // Return empty array on error for graceful degradation
-    select: (data) => data ?? [],
+    select: (data) => data ?? { records: [], total: 0 },
   });
 };
 
@@ -112,6 +111,19 @@ export const useDeleteLSR = () => {
   });
 };
 
+export const useDeleteAllLSR = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => lsrApi.deleteAll(),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['lsr'] });
+      toast.success(`Deleted ${result.deleted} LHR records`);
+    },
+    onError: () => toast.error('Failed to delete all LHR records'),
+  });
+};
+
 export const useImportLSRFromExcel = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -160,28 +172,20 @@ export const useLSRStatistics = (search?: string) => {
   const { data: lsrData, ...queryResult } = useLSR(search);
 
   const statistics = useMemo((): LSRStatistics => {
-    if (!lsrData || lsrData.length === 0) {
-      return {
-        total: 0,
-        averageLHR: 0,
-        byType: {},
-      };
+    const records = lsrData?.records ?? [];
+    if (records.length === 0) {
+      return { total: lsrData?.total ?? 0, averageLHR: 0, byType: {} };
     }
 
-    const total = lsrData.length;
-    const totalLHR = lsrData.reduce((sum, entry) => sum + entry.lhr, 0);
-    const averageLHR = total > 0 ? totalLHR / total : 0;
+    const totalLHR = records.reduce((sum, entry) => sum + entry.lhr, 0);
+    const averageLHR = records.length > 0 ? totalLHR / records.length : 0;
 
-    const byType = lsrData.reduce((acc, entry) => {
+    const byType = records.reduce((acc, entry) => {
       acc[entry.labourType] = (acc[entry.labourType] || 0) + 1;
       return acc;
     }, {} as { [key: string]: number });
 
-    return {
-      total,
-      averageLHR,
-      byType,
-    };
+    return { total: lsrData?.total ?? records.length, averageLHR, byType };
   }, [lsrData]);
 
   return {

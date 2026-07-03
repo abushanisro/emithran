@@ -246,7 +246,7 @@ export class ProcessCostService {
       machine_rate: createDto.machineRate || 0,
       machine_value: createDto.machineValue || 0,
       labor_rate: createDto.laborRate || 0,
-      currency: createDto.currency || 'INR',
+      currency: createDto.currency || 'USD',
       shift_pattern_id: createDto.shiftPatternId,
       shift_pattern_hours_per_day: createDto.shiftPatternHoursPerDay,
       setup_manning: createDto.setupManning,

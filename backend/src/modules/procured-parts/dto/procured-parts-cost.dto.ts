@@ -97,7 +97,7 @@ export class CreateProcuredPartsCostDto {
   @Min(0)
   leadTimeDays?: number;
 
-  @ApiPropertyOptional({ description: 'Currency code', default: 'INR' })
+  @ApiPropertyOptional({ description: 'Currency code', default: 'USD' })
   @IsOptional()
   @IsString()
   currency?: string;

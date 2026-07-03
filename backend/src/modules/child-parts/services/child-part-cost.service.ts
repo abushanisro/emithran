@@ -199,7 +199,7 @@ export class ChildPartCostService {
       part_name: createDto.partName || '',
       description: createDto.description || '',
       make_buy: createDto.makeBuy,
-      currency: createDto.currency || 'INR',
+      currency: createDto.currency || 'USD',
 
       // For purchased parts
       unit_cost: createDto.unitCost || 0,

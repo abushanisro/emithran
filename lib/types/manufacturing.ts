@@ -112,6 +112,8 @@ export interface FamilyClassification {
   family: ManufacturingFamily;
   confidence: number;
   signals: string[];
+  classificationSignals?: Record<string, number | string>;
+  classificationReasons?: string[];
 }
 
 export interface ProcessRecommendation {
@@ -248,6 +250,12 @@ export interface FeatureOccurrence {
   risk_score?: number;
   risk_level?: 'low' | 'medium' | 'high' | 'critical';
   risk_factors?: Array<{ code: string; label: string }>;
+  // CNC-specific fields — present for machined parts only
+  ld_ratio?: number | null;
+  depth_mm?: number | null;
+  tapped?: boolean | null;
+  spec?: string | null;
+  material_removed_mm3?: number | null;
 }
 
 export interface FeatureNodeV2 {

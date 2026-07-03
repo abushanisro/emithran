@@ -74,7 +74,7 @@ export const PROCESS_COST_CONSTANTS = {
     INDIRECT_RATE: 0,
     FRINGE_RATE: 0,
     MACHINE_RATE: 0,
-    CURRENCY: 'INR',
+    CURRENCY: 'USD',
     SHIFT_HOURS_PER_DAY: 8,
   },
 

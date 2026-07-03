@@ -28,6 +28,10 @@ export interface LSREntry {
   usdLhrBase?: number;
   usdLhrBurden?: number;
   usdLhrTotal?: number;
+  currency?: string;
+  currencySymbol?: string;
+  lhrUsdEffective?: number;
+  employerBurdenPercentage?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,20 +63,24 @@ export interface CreateLSRDto {
   usdLhrBase?: number;
   usdLhrBurden?: number;
   usdLhrTotal?: number;
+  lhrUsdEffective?: number;
+  currency?: string;
+  currencySymbol?: string;
 }
 
 export interface UpdateLSRDto extends Partial<CreateLSRDto> { }
 
+export type LSRListResponse = { records: LSREntry[]; total: number };
+
 export const lsrApi = {
-  getAll: async (search?: string): Promise<LSREntry[]> => {
+  getAll: async (search?: string): Promise<LSRListResponse> => {
     const params = search ? { search } : {};
-    // 2026 Best Practice: Silent mode for background/optional data
-    const response = await apiClient.get<LSREntry[]>('/lsr', {
+    const response = await apiClient.get<LSRListResponse>('/lsr', {
       params,
-      silent: true, // Don't show error toasts for background data
-      retry: false, // Fail fast - don't retry background data
+      silent: true,
+      retry: false,
     });
-    return response || [];
+    return response ?? { records: [], total: 0 };
   },
 
   getById: async (id: string | number): Promise<LSREntry> => {
@@ -101,6 +109,11 @@ export const lsrApi = {
 
   delete: async (id: string | number): Promise<void> => {
     await apiClient.delete(`/lsr/${id}`);
+  },
+
+  deleteAll: async (): Promise<{ deleted: number }> => {
+    const response = await apiClient.delete<{ deleted: number }>('/lsr');
+    return response ?? { deleted: 0 };
   },
 
   bulkCreate: async (data: CreateLSRDto[]): Promise<LSREntry[]> => {

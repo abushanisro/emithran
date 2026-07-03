@@ -1,7 +1,10 @@
 import type { ProcessLineCost, RouteResultSustainability } from "./cost-breakdown.dto";
 import type { CapabilityReasonCode } from "../costing/machine-capability";
 
-export type RouteId = "sm-laser" | "sm-turret" | "sm-waterjet";
+export type RouteId =
+  | "sm-laser" | "sm-turret" | "sm-waterjet"
+  | "cnc-3ax" | "cnc-4ax" | "cnc-5ax"
+  | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn";
 
 export interface RouteCapability {
   cuttingCapable: boolean;
@@ -33,6 +36,9 @@ export interface RouteResultDto {
   warnings: string[];
   ratesSource: string;
   sustainability?: RouteResultSustainability;
+  setupCount?: number;
+  machineCapabilityWarnings?: string[];
+  routeComplexityScore?: number;  // 0–100: holes + pockets + threads + setups + GD&T
 }
 
 export interface RouteComparisonDto {

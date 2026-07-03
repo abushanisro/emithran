@@ -236,7 +236,7 @@ export function ModelViewer({
   // Priority check: Always show 3D viewer for STL/OBJ files regardless of other conditions
   if (shouldShow3DViewer) {
     return (
-      <div className="h-full min-h-[400px] relative overflow-hidden">
+      <div className="h-full relative overflow-hidden">
         <Suspense fallback={
           <div className="h-full w-full flex items-center justify-center bg-[#4a4a4a]">
             <div className="text-center text-white">
@@ -370,7 +370,7 @@ export function ModelViewer({
   // Interactive 3D Viewer (STL/OBJ)
   if (isInteractiveSupported) {
     return (
-      <div className="h-full min-h-[400px] relative overflow-hidden">
+      <div className="h-full relative overflow-hidden">
         <Suspense fallback={
           <div className="h-full w-full flex items-center justify-center bg-[#4a4a4a]">
             <div className="text-center text-white">

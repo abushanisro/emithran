@@ -164,6 +164,8 @@ export class CreateMHRDto {
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrBurden?: number;
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrTotal?: number;
   @ApiPropertyOptional() @IsOptional() specs?: Record<string, any>;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() directOverheadRate?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() indirectOverheadRate?: number;
 }
 
 export class UpdateMHRDto {
@@ -337,6 +339,8 @@ export class UpdateMHRDto {
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrBase?: number;
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrBurden?: number;
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrTotal?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() directOverheadRate?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() indirectOverheadRate?: number;
 }
 
 export class QueryMHRDto {
@@ -365,6 +369,11 @@ export class QueryMHRDto {
   @IsOptional()
   wageGrade?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by currency code (e.g. INR, USD, EUR)' })
+  @IsString()
+  @IsOptional()
+  currency?: string;
+
   @ApiPropertyOptional({ description: 'Page number', default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -372,11 +381,11 @@ export class QueryMHRDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ description: 'Items per page', default: 10 })
+  @ApiPropertyOptional({ description: 'Items per page', default: 50 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  @Max(100)
+  @Max(1000)
   limit?: number;
 }

@@ -496,8 +496,6 @@ async def analyze_geometry_advanced(
 
             logger.info(f"Advanced analysis completed for {file.filename}")
 
-            ai_enhanced_result = getattr(optimization_result.dfm_analysis, '_ai_enhanced_result', None)
-
             # CNC feature recognition — runs only for non-sheet-metal families
             cnc_features_result = None
             try:
@@ -521,6 +519,22 @@ async def analyze_geometry_advanced(
                         f"features={len(cnc_features_result.get('features', []))} "
                         f"face_map_entries={len(_face_map)}"
                     )
+                    try:
+                        from cnc_feature_recognizer import build_feature_graph_v2_from_cnc, _part_bounding_box  # type: ignore
+                        _bbox_raw = _part_bounding_box(shape)
+                        _bcx = (_bbox_raw["xmin"] + _bbox_raw["xmax"]) / 2
+                        _bcy = (_bbox_raw["ymin"] + _bbox_raw["ymax"]) / 2
+                        _bcz = (_bbox_raw["zmin"] + _bbox_raw["zmax"]) / 2
+                        _total_tris = sum(e.get("tri_count", 0) for e in _face_map)
+                        cnc_features_result["feature_graph_v2"] = build_feature_graph_v2_from_cnc(
+                            cnc_features_result, (_bcx, _bcy, _bcz), _face_map, _total_tris
+                        )
+                        logger.info(
+                            f"[cnc_fgv2] synthesised "
+                            f"{len(cnc_features_result['feature_graph_v2']['features'])} features"
+                        )
+                    except Exception as _fgv2_exc:
+                        logger.warning(f"[cnc_fgv2] synthesis failed: {_fgv2_exc}")
             except Exception as _cnc_exc:
                 logger.warning(f"[cnc_features] extraction failed: {_cnc_exc}")
 
@@ -557,24 +571,6 @@ async def analyze_geometry_advanced(
                     "recommended_processes": optimization_result.dfm_analysis.recommended_processes,
                     "warnings": optimization_result.dfm_analysis.warnings,
                     "confidence": optimization_result.dfm_analysis.confidence,
-                    "ai_enhanced": ai_enhanced_result is not None,
-                    "ai_insights": {
-                        "manufacturing_complexity": ai_enhanced_result.ai_insights.manufacturing_complexity if ai_enhanced_result and ai_enhanced_result.ai_insights else None,
-                        "process_recommendations": ai_enhanced_result.ai_insights.process_recommendations if ai_enhanced_result and ai_enhanced_result.ai_insights else [],
-                        "cost_optimization_suggestions": ai_enhanced_result.ai_insights.cost_optimization_suggestions if ai_enhanced_result and ai_enhanced_result.ai_insights else [],
-                        "quality_considerations": ai_enhanced_result.ai_insights.quality_considerations if ai_enhanced_result and ai_enhanced_result.ai_insights else [],
-                        "material_recommendations": ai_enhanced_result.ai_insights.material_recommendations if ai_enhanced_result and ai_enhanced_result.ai_insights else [],
-                        "tooling_requirements": ai_enhanced_result.ai_insights.tooling_requirements if ai_enhanced_result and ai_enhanced_result.ai_insights else {},
-                        "lead_time_estimate_days": ai_enhanced_result.ai_insights.lead_time_estimate_days if ai_enhanced_result and ai_enhanced_result.ai_insights else None,
-                        "risk_assessment": ai_enhanced_result.ai_insights.risk_assessment if ai_enhanced_result and ai_enhanced_result.ai_insights else {},
-                        "ai_confidence": ai_enhanced_result.ai_insights.ai_confidence if ai_enhanced_result and ai_enhanced_result.ai_insights else 0.0,
-                        "generation_time_ms": ai_enhanced_result.ai_insights.generation_time_ms if ai_enhanced_result and ai_enhanced_result.ai_insights else None,
-                        # New fields from enhanced prompt
-                        "dfm_warnings": getattr(ai_enhanced_result.ai_insights, 'dfm_warnings', []) if ai_enhanced_result and ai_enhanced_result.ai_insights else []
-                    },
-                    "detailed_recommendations": ai_enhanced_result.detailed_recommendations if ai_enhanced_result else [],
-                    "competitive_analysis": ai_enhanced_result.competitive_analysis if ai_enhanced_result else {},
-                    "sustainability_metrics": ai_enhanced_result.sustainability_metrics if ai_enhanced_result else {}
                 },
 
                 "performance_metrics": {

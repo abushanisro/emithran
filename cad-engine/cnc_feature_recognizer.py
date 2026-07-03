@@ -33,6 +33,7 @@ FeatureType = Literal[
     "external_diameter",  # outer cylindrical step along rotation axis
     "through_hole",       # cylindrical bore traversing full part thickness
     "blind_hole",         # cylindrical bore with closed bottom
+    "tapped_hole",        # blind hole whose diameter matches a tap drill size (geometry heuristic)
     "cross_hole",         # single hole perpendicular to main axis (not in PCD)
     "pcd_hole_pattern",   # group of cross holes at equal radius + equal angular spacing
     "chamfer",            # conical face (entry/exit taper)
@@ -45,6 +46,49 @@ FeatureType = Literal[
     "keyway",             # axial slot on OD for key/spline engagement
     "pocket",             # enclosed prismatic recess (all walls perpendicular or angled)
 ]
+
+# ── Tap drill size table ──────────────────────────────────────────────────────
+# Maps (min_mm, max_mm) tap pre-drill range → thread spec.
+# Tolerance is ±0.15 mm to handle STEP tessellation rounding.
+# Helicoil pre-drills are ~10% larger than standard; those matches are tagged separately.
+_TAP_DRILL_RANGES: List[Tuple[float, float, str]] = [
+    (1.45, 1.75, "M2×0.4"),
+    (1.95, 2.20, "M2.5×0.45"),
+    (2.40, 2.65, "M3×0.5"),
+    (3.20, 3.50, "M4×0.7"),
+    (4.10, 4.40, "M5×0.8"),
+    (4.85, 5.20, "M6×1.0"),
+    (6.60, 7.00, "M8×1.25"),
+    (8.30, 8.70, "M10×1.5"),
+    (10.10, 10.60, "M12×1.75"),
+]
+# Helicoil pre-drill diameters (nominally thread_OD × 1.10, ±0.15 mm)
+_HELICOIL_DRILL_RANGES: List[Tuple[float, float, str]] = [
+    (2.15, 2.45, "M2×0.4"),
+    (2.65, 2.95, "M2.5×0.45"),
+    (3.25, 3.60, "M3×0.5"),
+    (4.30, 4.65, "M4×0.7"),
+    (5.40, 5.75, "M5×0.8"),
+    (6.50, 6.90, "M6×1.0"),
+    (8.70, 9.10, "M8×1.25"),
+]
+
+
+def _classify_blind_hole(diameter_mm: float) -> Tuple[str, Optional[str], bool]:
+    """
+    Returns (feature_type, thread_spec_or_None, is_helicoil).
+
+    Heuristic: blind holes whose diameter falls within a known tap pre-drill range
+    are emitted as 'tapped_hole' (confidence 0.55 — geometry only, no PMI to confirm).
+    Helicoil variant flagged separately for the process planner.
+    """
+    for lo, hi, spec in _TAP_DRILL_RANGES:
+        if lo <= diameter_mm <= hi:
+            return "tapped_hole", spec, False
+    for lo, hi, spec in _HELICOIL_DRILL_RANGES:
+        if lo <= diameter_mm <= hi:
+            return "tapped_hole", spec, True
+    return "blind_hole", None, False
 
 # ── Data structures ───────────────────────────────────────────────────────────
 
@@ -203,15 +247,27 @@ class CNCFeatureRecognizer:
 
             elif kind in ("through_hole", "blind_hole"):
                 fid = f"bore_{bore_idx}"
+                if kind == "blind_hole":
+                    emit_type, tap_spec, is_helicoil = _classify_blind_hole(diameter_mm)
+                else:
+                    emit_type, tap_spec, is_helicoil = "through_hole", None, False
+
+                params: Dict = {
+                    "diameter_mm": diameter_mm,
+                    "depth_mm": round(cyl["length"], 3),
+                    "centroid": centroid,
+                }
+                if tap_spec:
+                    params["spec"] = tap_spec
+                    params["detection"] = "geometry_heuristic"
+                    if is_helicoil:
+                        params["helicoil_candidate"] = True
+
                 features.append(CNCFeature(
                     id=fid,
-                    type=kind,
-                    params={
-                        "diameter_mm": diameter_mm,
-                        "depth_mm": round(cyl["length"], 3),
-                        "centroid": centroid,
-                    },
-                    confidence=0.85 if kind == "through_hole" else 0.80,
+                    type=emit_type,
+                    params=params,
+                    confidence=0.85 if emit_type == "through_hole" else (0.55 if tap_spec else 0.80),
                     face_ids=face_ids,
                 ))
                 bore_id_to_cyl[fid] = cyl
@@ -237,8 +293,8 @@ class CNCFeatureRecognizer:
 
         # ── PCD from axially-aligned bores (disc/flange/lens holder pattern) ─
         # PCD holes in a disc are parallel to the rotation axis, not cross holes.
-        # They appear as through_hole/blind_hole with non-zero dist_from_axis.
-        bore_features = [f for f in features if f.type in ("through_hole", "blind_hole")]
+        # They appear as through_hole/blind_hole/tapped_hole with non-zero dist_from_axis.
+        bore_features = [f for f in features if f.type in ("through_hole", "blind_hole", "tapped_hole")]
         bore_face_ids_map = {f.id: f.face_ids for f in bore_features}
         axial_pcd_groups = _detect_pcd_from_axial_bores(bore_features, bore_id_to_cyl)
         pcd_feature_idx = 0
@@ -248,6 +304,13 @@ class CNCFeatureRecognizer:
                 pcd_face_ids = list(set(
                     fid for gid in group_ids for fid in bore_face_ids_map.get(gid, [])
                 ))
+                # If all holes in the group are tapped, propagate the spec + helicoil flag
+                group_features = [f for f in bore_features if f.id in group_ids]
+                tap_specs = [f.params.get("spec") for f in group_features if f.type == "tapped_hole"]
+                if tap_specs and all(s == tap_specs[0] for s in tap_specs):
+                    pcd_params = {**pcd_params, "tap_spec": tap_specs[0], "hole_type": "tapped"}
+                    if any(f.params.get("helicoil_candidate") for f in group_features):
+                        pcd_params["helicoil_candidate"] = True
                 features.append(CNCFeature(
                     id=f"pcd_{pcd_feature_idx}",
                     type="pcd_hole_pattern",
@@ -993,7 +1056,7 @@ def _detect_pcd_from_axial_bores(
         if len(group) < 2:
             continue
         angles = sorted(cyl["angle_deg"] for _, cyl in group)
-        if not _angles_equally_spaced(angles, tolerance_deg=10.0):
+        if not _angles_equally_spaced(angles, tolerance_deg=15.0):
             continue
         group_ids = [f.id for f, _ in group]
         avg_depth = round(sum(f.params["depth_mm"] for f, _ in group) / len(group), 3)
@@ -1036,7 +1099,14 @@ def _detect_pcd_patterns(cross_features: List[CNCFeature]) -> List[List[str]]:
         if len(group) < 2:
             continue
         angles = sorted(f.params.get("angle_deg", 0.0) for f in group)
-        if _angles_equally_spaced(angles, tolerance_deg=8.0):
+        if len(group) == 3:
+            # Fast path for 3-hole patterns: check all gaps ≈ 120° (±20°)
+            a = sorted(f.params.get("angle_deg", 0.0) for f in group)
+            gaps = [(a[(i + 1) % 3] - a[i]) % 360.0 for i in range(3)]
+            if all(100.0 < g < 140.0 for g in gaps):
+                pcd_groups.append([f.id for f in group])
+                continue
+        if _angles_equally_spaced(angles, tolerance_deg=15.0):
             pcd_groups.append([f.id for f in group])
 
     return pcd_groups
@@ -1198,4 +1268,101 @@ def _part_bounding_box(shape) -> Dict:
     return {
         "xmin": xmin, "ymin": ymin, "zmin": zmin,
         "xmax": xmax, "ymax": ymax, "zmax": zmax,
+    }
+
+
+_HOLE_TYPES = {"through_hole", "blind_hole", "tapped_hole", "cross_hole", "counterbore"}
+_POCKET_TYPES = {"pocket", "slot", "radial_slot", "keyway"}
+
+
+def build_feature_graph_v2_from_cnc(
+    cnc_dict: dict,
+    bbox_center: tuple,
+    face_map_list: list,
+    total_tris: int,
+) -> dict:
+    """Synthesise a feature_graph_v2 payload from CNC feature data.
+
+    Groups holes by diameter bucket and pockets/slots by type so the heatmap
+    builders (sources.ts) can consume CNC parts the same way as sheet metal.
+    """
+    from collections import defaultdict
+
+    cx, cy, cz = bbox_center
+    buckets: dict = defaultdict(list)
+
+    for feat in cnc_dict.get("features", []):
+        ftype = feat.get("type", "")
+        p = feat.get("params", {})
+        centroid_abs = p.get("centroid")
+        if centroid_abs is None:
+            continue
+
+        if ftype in _HOLE_TYPES:
+            diam = p.get("diameter_mm")
+            if diam is None:
+                continue
+            d_bucket = round(diam / 0.1) * 0.1
+            depth = p.get("depth_mm", 0.0) or 0.0
+            buckets[("hole", d_bucket)].append({
+                "centroid_abs": centroid_abs,
+                "depth_mm": depth,
+                "face_ids": feat.get("face_ids", []),
+                "tapped": ftype == "tapped_hole",
+                "spec": p.get("spec"),
+                "material_removed_mm3": round(math.pi * (diam / 2) ** 2 * depth, 2),
+            })
+
+        elif ftype in _POCKET_TYPES:
+            feat_type_out = "slot" if ftype == "keyway" else "pocket"
+            dims = p.get("dims") or [
+                p.get("depth_mm", 0) or 0,
+                p.get("width_mm", 0) or 0,
+                p.get("length_mm", 0) or 0,
+            ]
+            vol = round(dims[-1] * dims[-2] * dims[0], 2) if len(dims) >= 3 else 0.0
+            buckets[(feat_type_out, "pocket")].append({
+                "centroid_abs": centroid_abs,
+                "face_ids": feat.get("face_ids", []),
+                "material_removed_mm3": vol,
+            })
+
+    features_out = []
+    for (feat_type_out, diam_or_tag), occurrences in buckets.items():
+        diam = diam_or_tag if feat_type_out == "hole" else None
+        count = len(occurrences)
+        feat_id = (
+            f"hole_d{diam}_c{count}_cnc" if feat_type_out == "hole"
+            else f"{feat_type_out}_c{count}_cnc"
+        )
+        occ_list = []
+        for occ in occurrences:
+            ax, ay, az = occ["centroid_abs"]
+            centered = [round(ax - cx, 3), round(ay - cy, 3), round(az - cz, 3)]
+            depth = occ.get("depth_mm", 0.0) or 0.0
+            ld_ratio = round(depth / max(diam, 0.1), 3) if diam else None
+            occ_entry: dict = {
+                "centroid": centered,
+                "face_ids": occ["face_ids"],
+                "local_feature_density": count,
+                "material_removed_mm3": occ.get("material_removed_mm3", 0.0),
+            }
+            if feat_type_out == "hole":
+                occ_entry["depth_mm"] = round(depth, 3)
+                occ_entry["ld_ratio"] = ld_ratio
+                occ_entry["tapped"] = occ.get("tapped", False)
+                occ_entry["spec"] = occ.get("spec")
+            occ_list.append(occ_entry)
+        entry: dict = {"id": feat_id, "feature_type": feat_type_out, "occurrences": occ_list}
+        if diam is not None:
+            entry["diameter_mm"] = diam
+        features_out.append(entry)
+
+    return {
+        "metadata": {
+            "face_map": face_map_list,
+            "stl_tri_total": total_tris,
+            "source": "cnc_features",
+        },
+        "features": features_out,
     }

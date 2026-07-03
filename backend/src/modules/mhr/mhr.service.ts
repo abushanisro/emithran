@@ -6,6 +6,7 @@ import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult } from './dto/
 import { validate as isValidUUID } from 'uuid';
 import { MHRCalculationEngine } from './engines/mhr-calculation.engine';
 import { MHRInputValidator } from './validators/mhr-input.validator';
+import { getCurrencyForLocation, getUsdPerLocal, MHR_CALCULATION_CONSTANTS, FX_RATES_LOCAL_PER_USD } from './constants/mhr-calculation.constants';
 import * as ExcelJS from 'exceljs';
 
 /**
@@ -37,58 +38,104 @@ export class MHRService {
   }
 
   /**
-   * Create a complete MHRCalculationResult for manual entries
-   * All values set to 0 except the manual MHR value
+   * Create a complete MHRCalculationResult for manual entries.
+   * Hours derived from operational parameters when available.
    */
-  private createManualEntryCalculation(manualMHRValue: number): MHRCalculationResult {
+  private createManualEntryCalculation(
+    manualMHRValue: number,
+    row?: any,
+  ): MHRCalculationResult {
+    const workingDays  = parseFloat(row?.working_days_per_year ?? 0) || 250;
+    const shiftsPerDay = parseFloat(row?.shifts_per_day ?? 0) || 2;
+    const hoursPerShift = parseFloat(row?.hours_per_shift ?? 0) || 8;
+    const maintHrs  = parseFloat(row?.planned_maintenance_hours_per_year ?? 0) || 0;
+    const utilPct   = parseFloat(row?.capacity_utilization_rate ?? 0) || 85;
+
+    const workingHrs   = workingDays * shiftsPerDay * hoursPerShift;
+    const availableHrs = Math.max(0, workingHrs - maintHrs);
+    const effectiveHrs = availableHrs * (utilPct / 100);
+
+    const storedFixed  = row?.total_fixed_cost_per_hour ? parseFloat(row.total_fixed_cost_per_hour) : manualMHRValue;
+    // MRO/maintenance is a fixed cost — any non-zero stored variable cost is legacy MRO data
+    // that was incorrectly classified; fold it back into the fixed bucket for display purposes.
+    const storedVar    = row?.total_variable_cost_per_hour ? parseFloat(row.total_variable_cost_per_hour) : 0;
+    const storedAnnual = row?.total_annual_cost ? parseFloat(row.total_annual_cost) : manualMHRValue * effectiveHrs;
+    const maintenanceFromVar = storedVar > 0 && storedFixed < storedVar ? storedVar : 0;
+    const trueFixed = storedFixed + maintenanceFromVar;
+    const trueVar   = maintenanceFromVar > 0 ? 0 : storedVar;
+
     return {
-      // Working Hours Calculations
-      workingHoursPerYear: 0,
-      availableHoursPerYear: 0,
-      effectiveHoursPerYear: 0,
-      
-      // Cost Components - Per Hour
-      depreciationPerHour: 0,
-      interestPerHour: 0,
-      insurancePerHour: 0,
-      rentPerHour: 0,
-      maintenancePerHour: 0,
-      electricityPerHour: 0,
-      
-      // Totals - Per Hour
-      costOfOwnershipPerHour: 0,
-      totalFixedCostPerHour: manualMHRValue,
-      totalVariableCostPerHour: 0,
-      totalOperatingCostPerHour: manualMHRValue,
-      adminOverheadPerHour: 0,
-      profitMarginPerHour: 0,
-      totalMachineHourRate: manualMHRValue,
-      
-      // Annual Costs
-      depreciationPerAnnum: 0,
-      interestPerAnnum: 0,
-      insurancePerAnnum: 0,
-      rentPerAnnum: 0,
-      maintenancePerAnnum: 0,
-      electricityPerAnnum: 0,
-      totalFixedCostPerAnnum: 0,
+      workingHoursPerYear:       workingHrs,
+      availableHoursPerYear:     availableHrs,
+      effectiveHoursPerYear:     effectiveHrs,
+      depreciationPerHour:       0,
+      interestPerHour:           0,
+      insurancePerHour:          0,
+      rentPerHour:               0,
+      maintenancePerHour:        maintenanceFromVar,
+      electricityPerHour:        trueVar,
+      costOfOwnershipPerHour:    storedFixed,
+      totalFixedCostPerHour:     trueFixed,
+      totalVariableCostPerHour:  trueVar,
+      totalOperatingCostPerHour: trueFixed + trueVar,
+      adminOverheadPerHour:      0,
+      profitMarginPerHour:       0,
+      totalMachineHourRate:      manualMHRValue,
+      depreciationPerAnnum:      0,
+      interestPerAnnum:          0,
+      insurancePerAnnum:         0,
+      rentPerAnnum:              0,
+      maintenancePerAnnum:       0,
+      electricityPerAnnum:       0,
+      totalFixedCostPerAnnum:    0,
       totalVariableCostPerAnnum: 0,
-      totalAnnualCost: manualMHRValue * 8 * 250, // Estimate: 8hrs/day * 250 days
-      
-      // Capital Investment Breakdown
-      accessoriesCost: 0,
-      installationCost: 0,
-      totalCapitalInvestment: 0,
+      totalAnnualCost:           storedAnnual,
+      accessoriesCost:           0,
+      installationCost:          0,
+      totalCapitalInvestment:    0,
     };
+  }
+
+  /**
+   * Derives currency from location and computes USD equivalents for MHR and fully-burdened rates.
+   * For India (INR): uses lhrInrPerHr for the labor component.
+   * For all other locations: uses usdLhrTotal as the labor USD rate directly.
+   */
+  private computeUsdAndBurdenedRates(
+    totalMachineHourRate: number,
+    location: string,
+    lhrInrPerHr?: number | null,
+    usdLhrTotal?: number | null,
+  ): {
+    currency: string;
+    currencySymbol: string;
+    mhrUsdPerHour: number;
+    fullyBurdenedLocalPerHr: number | null;
+    fullyBurdenedUsdPerHr: number | null;
+  } {
+    const { currency, symbol } = getCurrencyForLocation(location);
+    const usdPerLocal = getUsdPerLocal(currency);
+    const mhrUsdPerHour = parseFloat((totalMachineHourRate * usdPerLocal).toFixed(4));
+
+    let fullyBurdenedLocalPerHr: number | null = null;
+    let fullyBurdenedUsdPerHr: number | null = null;
+
+    if (currency === 'INR' && lhrInrPerHr && lhrInrPerHr > 0) {
+      fullyBurdenedLocalPerHr = parseFloat((totalMachineHourRate + lhrInrPerHr).toFixed(2));
+      fullyBurdenedUsdPerHr = parseFloat((fullyBurdenedLocalPerHr * usdPerLocal).toFixed(4));
+    } else if (currency !== 'INR' && usdLhrTotal && usdLhrTotal > 0) {
+      // Convert USD labor back to local for the local burdened rate
+      const lhrInLocal = usdLhrTotal / usdPerLocal;
+      fullyBurdenedLocalPerHr = parseFloat((totalMachineHourRate + lhrInLocal).toFixed(2));
+      fullyBurdenedUsdPerHr = parseFloat((mhrUsdPerHour + usdLhrTotal).toFixed(4));
+    }
+
+    return { currency, currencySymbol: symbol, mhrUsdPerHour, fullyBurdenedLocalPerHr, fullyBurdenedUsdPerHr };
   }
 
   /**
    * Calculate all MHR metrics based on input parameters
    * Uses the calculation engine for clean separation of concerns
-   *
-   * @param dto Input parameters
-   * @param skipValidation Skip validation for recalculations (default: false)
-   * @returns Complete MHR calculation result
    */
   calculateMHR(dto: CreateMHRDto | UpdateMHRDto, skipValidation = false): MHRCalculationResult {
     try {
@@ -113,7 +160,7 @@ export class MHRService {
     this.logger.log('Fetching all MHR records', 'MHRService');
 
     const page = query.page || 1;
-    const limit = Math.min(query.limit || 10, 100);
+    const limit = Math.min(query.limit || 50, 1000);
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -130,6 +177,10 @@ export class MHRService {
 
     if (query.location) {
       queryBuilder = queryBuilder.eq('location', query.location);
+    }
+
+    if (query.currency) {
+      queryBuilder = queryBuilder.eq('currency', query.currency);
     }
 
     if (query.commodityCode) {
@@ -157,15 +208,14 @@ export class MHRService {
     const records = (data || []).map(row => {
       // For manual entries, use stored values; for others, recalculate to ensure accuracy
       let calculations: MHRCalculationResult;
-      
+
       if (row.is_manual_entry && row.manual_mhr_value) {
-        // Use complete calculation result for manual entries
-        calculations = this.createManualEntryCalculation(parseFloat(row.manual_mhr_value));
+        calculations = this.createManualEntryCalculation(parseFloat(row.manual_mhr_value), row);
       } else {
         // Recalculate for automatic entries (skip validation for DB data)
         calculations = this.calculateMHR(this.mapRowToDto(row), true);
       }
-      
+
       return MHRResponseDto.fromDatabase({ ...row, calculations: JSON.stringify(calculations) });
     });
 
@@ -207,17 +257,14 @@ export class MHRService {
       throw new NotFoundException(`MHR record with ID ${id} was not found or you do not have access to it.`);
     }
 
-    // For manual entries, use stored calculations; for others, recalculate to ensure accuracy
     let calculations: MHRCalculationResult;
-    
+
     if (data.is_manual_entry && data.manual_mhr_value) {
-      // Use complete calculation result for manual entries
-      calculations = this.createManualEntryCalculation(parseFloat(data.manual_mhr_value));
+      calculations = this.createManualEntryCalculation(parseFloat(data.manual_mhr_value), data);
     } else {
-      // Recalculate for automatic entries (skip validation for DB data)
       calculations = this.calculateMHR(this.mapRowToDto(data), true);
     }
-    
+
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
   }
 
@@ -228,12 +275,17 @@ export class MHRService {
     let calculations: MHRCalculationResult;
     if (createMHRDto.isManualEntry && createMHRDto.manualMHRValue) {
       this.logger.log(`Using manual MHR value: ${createMHRDto.manualMHRValue}`, 'MHRService');
-      // Create complete calculation result for manual entry
       calculations = this.createManualEntryCalculation(createMHRDto.manualMHRValue);
     } else {
-      // Calculate all metrics using the engine
       calculations = this.calculateMHR(createMHRDto);
     }
+
+    const usdRates = this.computeUsdAndBurdenedRates(
+      calculations.totalMachineHourRate,
+      createMHRDto.location,
+      createMHRDto.lhrInrPerHr ?? null,
+      createMHRDto.usdLhrTotal ?? null,
+    );
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
@@ -281,6 +333,14 @@ export class MHRService {
         usd_lhr_base: createMHRDto.usdLhrBase || null,
         usd_lhr_burden: createMHRDto.usdLhrBurden || null,
         usd_lhr_total: createMHRDto.usdLhrTotal || null,
+        direct_overhead_rate: createMHRDto.directOverheadRate ?? null,
+        indirect_overhead_rate: createMHRDto.indirectOverheadRate ?? null,
+        // Derived currency and USD rates from location
+        currency:                    usdRates.currency,
+        currency_symbol:             usdRates.currencySymbol,
+        mhr_usd_per_hour:            usdRates.mhrUsdPerHour,
+        fully_burdened_local_per_hr: usdRates.fullyBurdenedLocalPerHr,
+        fully_burdened_usd_per_hr:   usdRates.fullyBurdenedUsdPerHr,
         total_machine_hour_rate: calculations.totalMachineHourRate,
         total_fixed_cost_per_hour: calculations.totalFixedCostPerHour,
         total_variable_cost_per_hour: calculations.totalVariableCostPerHour,
@@ -395,6 +455,24 @@ export class MHRService {
     if (updateMHRDto.usdLhrBase !== undefined) updateData.usd_lhr_base = updateMHRDto.usdLhrBase;
     if (updateMHRDto.usdLhrBurden !== undefined) updateData.usd_lhr_burden = updateMHRDto.usdLhrBurden;
     if (updateMHRDto.usdLhrTotal !== undefined) updateData.usd_lhr_total = updateMHRDto.usdLhrTotal;
+    if (updateMHRDto.directOverheadRate !== undefined) updateData.direct_overhead_rate = updateMHRDto.directOverheadRate;
+    if (updateMHRDto.indirectOverheadRate !== undefined) updateData.indirect_overhead_rate = updateMHRDto.indirectOverheadRate;
+
+    // Recompute currency and USD rates based on (possibly updated) location
+    const effectiveLocation = updateMHRDto.location ?? existing.location;
+    const effectiveLhrInr   = updateMHRDto.lhrInrPerHr ?? (existing as any).lhrInrPerHr ?? null;
+    const effectiveUsdLhr   = updateMHRDto.usdLhrTotal ?? (existing as any).usdLhrTotal ?? null;
+    const usdRates = this.computeUsdAndBurdenedRates(
+      calculations.totalMachineHourRate,
+      effectiveLocation,
+      effectiveLhrInr,
+      effectiveUsdLhr,
+    );
+    updateData.currency                    = usdRates.currency;
+    updateData.currency_symbol             = usdRates.currencySymbol;
+    updateData.mhr_usd_per_hour            = usdRates.mhrUsdPerHour;
+    updateData.fully_burdened_local_per_hr = usdRates.fullyBurdenedLocalPerHr;
+    updateData.fully_burdened_usd_per_hr   = usdRates.fullyBurdenedUsdPerHr;
 
     // Update calculated values
     updateData.total_machine_hour_rate = calculations.totalMachineHourRate;
@@ -509,7 +587,10 @@ export class MHRService {
     const processSheets = workbook.worksheets.filter(ws =>
       /^\d{2}_/.test(ws.name.trim()) && ws.name.toLowerCase().trim() !== '00_index'
     );
-    const sheetsToProcess = namedSheet ? [namedSheet] : processSheets;
+    // Fallback: if no named or process sheets found, try all sheets (Combined format)
+    const sheetsToProcess = namedSheet ? [namedSheet]
+      : processSheets.length > 0 ? processSheets
+      : workbook.worksheets;
 
     if (sheetsToProcess.length === 0) {
       this.logger.log('No MHR sheet found in Excel file — skipping MHR import', 'MHRService');
@@ -546,7 +627,10 @@ export class MHRService {
       const machineNameCol      = getCol('machine name', 'primary id', 'name');
       if (!machineNameCol) continue;
 
-      const locationCol         = getCol('location', 'manufacturer information', 'machine manufacturer location');
+      // Detect Combined_All_Countries format by presence of overhead breakdown columns
+      const isCombinedFormat = colMap['direct overhead rate'] !== undefined && colMap['indirect overhead rate'] !== undefined;
+
+      const locationCol         = getCol('location', 'manufacturer information', 'machine manufacturer location', 's');
       const commodityCodeCol    = getCol('commodity code');
       const machineDescCol      = getCol('machine description', 'other id', 'description');
       const manufacturerCol     = getCol('manufacturer');
@@ -555,38 +639,72 @@ export class MHRService {
       const shiftsCol           = getCol('shifts day', 'shifts per day', 'shifts_per_day');
       const hoursCol            = getCol('hours shift', 'hours per shift', 'hours_per_shift');
       const daysCol             = getCol('working days year', 'working days per year', 'working_days_per_year');
-      const maintHoursCol       = getCol('planned maint hours year', 'planned maintenance hours year', 'maintenance_hours_per_year');
+      const maintHoursCol       = getCol('planned maint hours year', 'planned maintenance hours year', 'maintenance_hours_per_year', 'maintenance hours year');
       const utilCol             = getCol('capacity utilization', 'capacity utilization rate', 'avg utilization', 'yields', 'capacity_utilization_pct');
-      const landedCostCol       = getCol('landed machine cost', 'landed cost', 'machine price', 'bottom up over', 'landed_machine_cost_inr');
-      const accessoriesCol      = getCol('accessories cost', 'accessories cost', 'accessories_pct');
-      const installationCol     = getCol('installation cost', 'installation cost', 'installation_pct');
+      const landedCostCol       = getCol('landed machine cost local', 'landed machine cost', 'landed cost', 'bottom up over', 'landed_machine_cost_inr');
+      const accessoriesCol      = getCol('accessories cost 6 local', 'accessories cost', 'accessories_pct');
+      const installationCol     = getCol('installation cost 20 local', 'installation cost', 'installation_pct');
       const paybackCol          = getCol('payback period yrs', 'payback period years', 'payback period', 'payback_years');
-      const interestCol         = getCol('interest rate', 'interest rate', 'interest_rate_pct');
-      const insuranceCol        = getCol('insurance rate', 'insurance rate', 'insurance_rate_pct');
-      const footprintCol        = getCol('machine footprint sqm', 'machine footprint', 'machine_footprint_m2');
-      const rentCol             = getCol('rent sqm month', 'rent per sqm per month', 'rent_per_m2_per_month_inr');
-      const maintenanceCol      = getCol('maintenance cost', 'maintenance cost', 'maintenance_cost_pct');
+      const interestCol         = getCol('interest rate', 'interest_rate_pct');
+      const insuranceCol        = getCol('insurance rate', 'insurance_rate_pct');
+      const footprintCol        = getCol('machine footprint m', 'machine footprint sqm', 'machine footprint', 'machine_footprint_m2');
+      const rentCol             = getCol('rent per m per month local', 'rent sqm month', 'rent per sqm per month', 'rent_per_m2_per_month_inr');
+      const maintenanceCol      = getCol('maintenance cost', 'maintenance_cost_pct');
       const powerCol            = getCol('power kwh per hour', 'power kwh hr', 'spindle power kw', 'powers', 'power_kwh_per_hour');
-      const electricityCol      = getCol('electricity cost kwh', 'electricity cost per kwh', 'electricity_cost_per_kwh_inr');
-      const adminCol            = getCol('admin overhead', 'admin overhead', 'admin_overhead_pct');
-      const profitCol           = getCol('profit margin', 'profit margin', 'profit_margin_pct');
-      const mhrValueCol         = getCol('mhr hour', 'mhr', 'mhr value', 'mhr_inr_per_hour', 'accounting', 'labour rate');
+      const electricityCol      = getCol('electricity cost per kwh local', 'electricity cost kwh', 'electricity cost per kwh', 'electricity_cost_per_kwh_inr');
+      const adminCol            = getCol('admin overhead', 'admin_overhead_pct');
+      const profitCol           = getCol('profit margin', 'profit_margin_pct');
+      const mhrValueCol         = getCol('mhr local hour', 'mhr local hr', 'mhr hour', 'mhr', 'mhr value', 'mhr_inr_per_hour', 'accounting', 'labour rate', 'total overhead rate');
+      // Combined format overhead breakdown columns
+      const directOverheadCol   = getCol('direct overhead rate');
+      const indirectOverheadCol = getCol('indirect overhead rate');
       // India 2026 extended columns
-      const processGroupCol     = getCol('process group', 'process_group');
+      const processGroupCol     = getCol('process group', 'process_group', 'process goup');
       const processCategoryCol  = getCol('process category', 'process_category');
-      const machineClassCol     = getCol('machine class', 'machine_class');
+      const machineClassCol     = getCol('machine class', 'machine_class', 'process sequence');
       const automationLevelCol  = getCol('automation level', 'automation_level');
       const operatorsCol        = getCol('operators');
       const wageGradeCol        = getCol('wage grade', 'wage_grade');
-      const machinePriceUsdCol  = getCol('machine price usd', 'machine_price_usd');
+      const machinePriceUsdCol  = getCol('machine price usd', 'machine_price_usd', 'machine price');
       const mfrCountryCol       = getCol('manufacturer country', 'manufacturer_country');
-      const setupTimeCol        = getCol('setup time hr', 'setup time hr', 'setup_time_hr');
-      const lhrInrCol           = getCol('lhr hr india', 'lhr inr hr', 'lhr_inr_per_hr_india', 'lhr_inr_per_hour');
+      const setupTimeCol        = getCol('setup time hr', 'setup_time_hr');
+      const lhrInrCol           = getCol('lhr local hr', 'lhr hr india', 'lhr inr hr', 'lhr_inr_per_hr_india', 'lhr_inr_per_hour');
       // USD LHR columns embedded in the MHR sheet
       const usdLaborRateCol     = getCol('labor rate usd hr', 'labor rate usd hr person', 'usd labor rate', 'labor_rate_usd_per_hr');
       const usdLhrBaseCol       = getCol('lhr base usd hr', 'usd lhr base', 'lhr_base_usd_per_hr');
       const usdLhrBurdenCol     = getCol('lhr burden 38 usd hr', 'usd lhr burden', 'lhr_burden_38pct_usd_per_hr');
-      const usdLhrTotalCol      = getCol('lhr total usd hr', 'usd lhr total', 'lhr_total_usd_per_hr');
+      const usdLhrTotalCol      = getCol('lhr total usd hr', 'usd lhr total', 'lhr_total_usd_per_hr', 'skill based labor rate');
+      // Multi-currency and fully-burdened rate columns (new combined format)
+      const currencyCol              = getCol('currency');
+      const currencySymbolCol        = getCol('currency symbol');
+      const lhrUsdEffectiveCol       = getCol('lhr usd hr', 'lhr usd hour');
+      const mhrUsdCol                = getCol('mhr usd hour', 'mhr usd hr');
+      const fullyBurdenedLocalCol    = getCol('fully burdened rate incl labor local hr');
+      const fullyBurdenedUsdCol      = getCol('fully burdened rate incl labor usd hr');
+      // Per-hour breakdown columns for calculations JSONB
+      const depPerHrCol          = getCol('depreciation local hr');
+      const intPerHrCol          = getCol('interest local hr');
+      const insPerHrCol          = getCol('insurance local hr');
+      const rentPerHrCol2        = getCol('rent local hr');
+      const costOfOwnPerHrCol    = getCol('cost of ownership local hr');
+      const mroPerHrCol          = getCol('mro local hr');
+      const elecPerHrCol         = getCol('electricity local hr');
+      const totalOpCostPerHrCol  = getCol('total operating cost local hr');
+      // Per-annum breakdown columns
+      const depPaCol             = getCol('depreciation p a local');
+      const intPaCol             = getCol('interest on capital p a local');
+      const insPaCol             = getCol('insurance p a local');
+      const rentPaCol            = getCol('rent p a local');
+      const mroPaCol             = getCol('mro consumables p a local');
+      const elecPaCol            = getCol('electricity cost p a local');
+      const totalHrsYrCol        = getCol('total hours year', 'total hrs year');
+      const availHrsYrCol        = getCol('available hours year');
+      const effectiveHrsCol      = getCol('effective hours cycle time', 'effective hours');
+      const accsCostLocCol       = getCol('accessories cost 6 local');
+      const instCostLocCol       = getCol('installation cost 20 local');
+      const totalCapInvCol       = getCol('total capital investment local');
+      const capacityUnitCol      = getCol('capacity unit');
+      const floorAreaCol         = getCol('floor area sqft');
       // specs sub-columns (optional)
       const maxCapacityCol      = getCol('max capacity', 'max_capacity');
       const toleranceCol        = getCol('tolerance mm', 'tolerance_mm');
@@ -610,7 +728,8 @@ export class MHRService {
         if (mhrValueCol && typeof mhrRaw === 'string' && isNaN(mhrNum)) return;
 
         const isManual = mhrValueCol !== null && !isNaN(mhrNum) && mhrNum > 0;
-        const landedCost = landedCostCol ? toNum(row.getCell(landedCostCol).value, 0) : 0;
+        const rawLandedCost = landedCostCol ? toNum(row.getCell(landedCostCol).value, 0) : 0;
+        const rawMachinePriceUsd = machinePriceUsdCol ? toNum(row.getCell(machinePriceUsdCol).value, 0) : 0;
 
         // Derive utilization: aPriori stores it as 0-1 fraction, convert to percentage
         let utilRaw = utilCol ? toNum(row.getCell(utilCol).value, 0.85) : 0.85;
@@ -625,10 +744,90 @@ export class MHRService {
         if (applicationsCol)  { const v = toStr(row.getCell(applicationsCol).value);   if (v) specsObj.typical_applications = v; }
         if (processNotesCol)  { const v = toStr(row.getCell(processNotesCol).value);   if (v) specsObj.process_notes = v; }
 
+        const preCalcValues = (depPerHrCol || intPerHrCol || mhrUsdCol) ? {
+          depPerHr:       depPerHrCol ? toNum(row.getCell(depPerHrCol).value, 0) : 0,
+          intPerHr:       intPerHrCol ? toNum(row.getCell(intPerHrCol).value, 0) : 0,
+          insPerHr:       insPerHrCol ? toNum(row.getCell(insPerHrCol).value, 0) : 0,
+          rentPerHr:      rentPerHrCol2 ? toNum(row.getCell(rentPerHrCol2).value, 0) : 0,
+          costOfOwnPerHr: costOfOwnPerHrCol ? toNum(row.getCell(costOfOwnPerHrCol).value, 0) : 0,
+          mroPerHr:       mroPerHrCol ? toNum(row.getCell(mroPerHrCol).value, 0) : 0,
+          elecPerHr:      elecPerHrCol ? toNum(row.getCell(elecPerHrCol).value, 0) : 0,
+          totalOpCostPerHr: totalOpCostPerHrCol ? toNum(row.getCell(totalOpCostPerHrCol).value, 0) : 0,
+          depPa:          depPaCol ? toNum(row.getCell(depPaCol).value, 0) : 0,
+          intPa:          intPaCol ? toNum(row.getCell(intPaCol).value, 0) : 0,
+          insPa:          insPaCol ? toNum(row.getCell(insPaCol).value, 0) : 0,
+          rentPa:         rentPaCol ? toNum(row.getCell(rentPaCol).value, 0) : 0,
+          mroPa:          mroPaCol ? toNum(row.getCell(mroPaCol).value, 0) : 0,
+          elecPa:         elecPaCol ? toNum(row.getCell(elecPaCol).value, 0) : 0,
+          totalHrsPerYear:  totalHrsYrCol ? toNum(row.getCell(totalHrsYrCol).value, 0) : 0,
+          availHrsPerYear:  availHrsYrCol ? toNum(row.getCell(availHrsYrCol).value, 0) : 0,
+          effectiveHrs:     effectiveHrsCol ? toNum(row.getCell(effectiveHrsCol).value, 0) : 0,
+          accsCost:       accsCostLocCol ? toNum(row.getCell(accsCostLocCol).value, 0) : 0,
+          instCost:       instCostLocCol ? toNum(row.getCell(instCostLocCol).value, 0) : 0,
+          totalCapInv:    totalCapInvCol ? toNum(row.getCell(totalCapInvCol).value, 0) : 0,
+          mhrUsd:         mhrUsdCol ? toNum(row.getCell(mhrUsdCol).value, 0) : 0,
+          fullyBurdenedLocal: fullyBurdenedLocalCol ? toNum(row.getCell(fullyBurdenedLocalCol).value, 0) : 0,
+          fullyBurdenedUsd: fullyBurdenedUsdCol ? toNum(row.getCell(fullyBurdenedUsdCol).value, 0) : 0,
+        } : null;
+
+        if (capacityUnitCol) { const v = toStr(row.getCell(capacityUnitCol).value); if (v) specsObj.capacity_unit = v; }
+        if (floorAreaCol)    { const v = toNum(row.getCell(floorAreaCol).value, 0);  if (v) specsObj.floor_area_sqft = v; }
+
+        const locationVal = locationCol ? toStr(row.getCell(locationCol).value, 'India') || 'India' : 'India';
+        const currencyVal = currencyCol ? toStr(row.getCell(currencyCol).value) || null : null;
+        // If Excel has no local landed cost column, derive from USD machine price × location FX rate
+        const { currency: locCurrency } = getCurrencyForLocation(locationVal);
+        const localPerUsd = FX_RATES_LOCAL_PER_USD[locCurrency] ?? 84.5;
+        const landedCost = rawLandedCost > 0
+          ? rawLandedCost
+          : (rawMachinePriceUsd > 0 ? Math.round(rawMachinePriceUsd * localPerUsd) : 0);
+
+        // Reconcile USD LHR: prefer computed base+burden sum over the raw column value
+        const rawUsdLhrBase   = usdLhrBaseCol   ? toNum(row.getCell(usdLhrBaseCol).value,   0) || null : null;
+        const rawUsdLhrBurden = usdLhrBurdenCol ? toNum(row.getCell(usdLhrBurdenCol).value, 0) || null : null;
+        const rawUsdLhrTotal  = usdLhrTotalCol  ? toNum(row.getCell(usdLhrTotalCol).value,  0) || null : null;
+        const computedLhrTotal = (rawUsdLhrBase && rawUsdLhrBurden) ? rawUsdLhrBase + rawUsdLhrBurden : null;
+        const reconciledLhrTotal = computedLhrTotal ?? rawUsdLhrTotal;
+
+        const rawLhrUsdEffective = lhrUsdEffectiveCol ? toNum(row.getCell(lhrUsdEffectiveCol).value, 0) || null : null;
+        // If "lhr usd hr" and the computed base+burden total differ by >15%, log a warning
+        if (rawLhrUsdEffective && reconciledLhrTotal && Math.abs(rawLhrUsdEffective - reconciledLhrTotal) / reconciledLhrTotal > 0.15) {
+          this.logger.warn(
+            `${machineName} (${locationVal}): lhr_usd_effective=${rawLhrUsdEffective} vs base+burden=${reconciledLhrTotal.toFixed(2)} — using base+burden as authoritative total`,
+            'MHRService.importFromExcel',
+          );
+        }
+        // Use reconciledLhrTotal as lhr_usd_effective when the raw column is absent or contradicts the breakdown
+        const finalLhrUsdEffective = reconciledLhrTotal ?? rawLhrUsdEffective;
+
+        // Warn on currency/location mismatch (e.g., CNY assigned to USA/UK/EU locations)
+        const nonCnyLocations = ['usa', 'united states', 'uk', 'united kingdom', 'germany', 'france', 'europe',
+          'mexico', 'japan', 'taiwan', 'korea', 'australia', 'canada', 'spain', 'italy', 'sweden'];
+        if (currencyVal === 'CNY' && nonCnyLocations.some(l => locationVal.toLowerCase().includes(l))) {
+          this.logger.warn(
+            `${machineName}: currency=CNY but location="${locationVal}" — verify currency is correct for this cost centre`,
+            'MHRService.importFromExcel',
+          );
+        }
+
+        // Combined format: force manual entry, compute total OH from breakdown columns
+        let effectiveMhrNum = mhrNum;
+        let effectiveIsManual = isManual;
+        let directOHVal: number | null = null;
+        let indirectOHVal: number | null = null;
+        if (isCombinedFormat) {
+          directOHVal = directOverheadCol ? toNum(row.getCell(directOverheadCol).value, 0) || null : null;
+          indirectOHVal = indirectOverheadCol ? toNum(row.getCell(indirectOverheadCol).value, 0) || null : null;
+          const computedTotal = directOHVal && indirectOHVal ? directOHVal + indirectOHVal : null;
+          // Use Total OH column if present and nonzero, otherwise sum the breakdown
+          effectiveMhrNum = (isNaN(mhrNum) || mhrNum === 0) && computedTotal != null ? computedTotal : (isNaN(mhrNum) ? 0 : mhrNum);
+          effectiveIsManual = true;
+        }
+
         rows.push({
           user_id:                            userId,
           machine_name:                       machineName,
-          location:                           locationCol ? toStr(row.getCell(locationCol).value, 'India') || 'India' : 'India',
+          location:                           locationVal,
           commodity_code:                     commodityCodeCol ? toStr(row.getCell(commodityCodeCol).value, processGroupVal) || processGroupVal : processGroupVal,
           machine_description:                machineDescCol ? toStr(row.getCell(machineDescCol).value) || null : null,
           manufacturer:                       manufacturerCol ? toStr(row.getCell(manufacturerCol).value) || null : null,
@@ -640,20 +839,20 @@ export class MHRService {
           planned_maintenance_hours_per_year: maintHoursCol ? toNum(row.getCell(maintHoursCol).value, 0) : 0,
           capacity_utilization_rate:          Math.min(Math.max(utilRaw, 1), 100),
           landed_machine_cost:                Math.max(landedCost, 1),
-          accessories_cost_percentage:        accessoriesCol ? toNum(row.getCell(accessoriesCol).value, 6) : 6,
-          installation_cost_percentage:       installationCol ? toNum(row.getCell(installationCol).value, 20) : 20,
-          payback_period_years:               paybackCol ? toNum(row.getCell(paybackCol).value, 10) : 10,
-          interest_rate_percentage:           interestCol ? toNum(row.getCell(interestCol).value, 8) : 8,
-          insurance_rate_percentage:          insuranceCol ? toNum(row.getCell(insuranceCol).value, 1) : 1,
+          accessories_cost_percentage:        accessoriesCol ? toNum(row.getCell(accessoriesCol).value, MHR_CALCULATION_CONSTANTS.DEFAULTS.ACCESSORIES_COST_PERCENTAGE) : MHR_CALCULATION_CONSTANTS.DEFAULTS.ACCESSORIES_COST_PERCENTAGE,
+          installation_cost_percentage:       installationCol ? toNum(row.getCell(installationCol).value, MHR_CALCULATION_CONSTANTS.DEFAULTS.INSTALLATION_COST_PERCENTAGE) : MHR_CALCULATION_CONSTANTS.DEFAULTS.INSTALLATION_COST_PERCENTAGE,
+          payback_period_years:               paybackCol ? toNum(row.getCell(paybackCol).value, MHR_CALCULATION_CONSTANTS.DEFAULTS.PAYBACK_PERIOD_YEARS) : MHR_CALCULATION_CONSTANTS.DEFAULTS.PAYBACK_PERIOD_YEARS,
+          interest_rate_percentage:           interestCol ? toNum(row.getCell(interestCol).value, MHR_CALCULATION_CONSTANTS.DEFAULTS.INTEREST_RATE) : MHR_CALCULATION_CONSTANTS.DEFAULTS.INTEREST_RATE,
+          insurance_rate_percentage:          insuranceCol ? toNum(row.getCell(insuranceCol).value, MHR_CALCULATION_CONSTANTS.DEFAULTS.INSURANCE_RATE) : MHR_CALCULATION_CONSTANTS.DEFAULTS.INSURANCE_RATE,
           machine_footprint_sqm:              footprintCol ? toNum(row.getCell(footprintCol).value, 0) : 0,
-          rent_per_sqm_per_month:             rentCol ? toNum(row.getCell(rentCol).value, 250) : 250,
-          maintenance_cost_percentage:        maintenanceCol ? toNum(row.getCell(maintenanceCol).value, 6) : 6,
+          rent_per_sqm_per_month:             rentCol ? toNum(row.getCell(rentCol).value, 0) : 0,
+          maintenance_cost_percentage:        maintenanceCol ? toNum(row.getCell(maintenanceCol).value, MHR_CALCULATION_CONSTANTS.DEFAULTS.MAINTENANCE_COST_PERCENTAGE) : MHR_CALCULATION_CONSTANTS.DEFAULTS.MAINTENANCE_COST_PERCENTAGE,
           power_kwh_per_hour:                 powerCol ? toNum(row.getCell(powerCol).value, 0) : 0,
-          electricity_cost_per_kwh:           electricityCol ? toNum(row.getCell(electricityCol).value, 8.36) : 8.36,
+          electricity_cost_per_kwh:           electricityCol ? toNum(row.getCell(electricityCol).value, 0) : 0,
           admin_overhead_percentage:          adminCol ? toNum(row.getCell(adminCol).value, 0) : 0,
           profit_margin_percentage:           profitCol ? toNum(row.getCell(profitCol).value, 0) : 0,
-          is_manual_entry:                    isManual,
-          manual_mhr_value:                   isManual ? mhrNum : null,
+          is_manual_entry:                    effectiveIsManual,
+          manual_mhr_value:                   effectiveIsManual ? effectiveMhrNum : null,
           total_machine_hour_rate:            null as number | null,
           total_fixed_cost_per_hour:          null as number | null,
           total_variable_cost_per_hour:       null as number | null,
@@ -665,15 +864,26 @@ export class MHRService {
           automation_level:     automationLevelCol ? toStr(row.getCell(automationLevelCol).value) || null : null,
           operators:            operatorsCol ? Math.max(1, toNum(row.getCell(operatorsCol).value, 1)) : 1,
           wage_grade:           wageGradeCol ? toStr(row.getCell(wageGradeCol).value) || null : null,
-          machine_price_usd:    machinePriceUsdCol ? toNum(row.getCell(machinePriceUsdCol).value, 0) || null : null,
+          machine_price_usd:    rawMachinePriceUsd || null,
           manufacturer_country: mfrCountryCol ? toStr(row.getCell(mfrCountryCol).value) || null : null,
           setup_time_hr:        setupTimeCol ? toNum(row.getCell(setupTimeCol).value, 0) || null : null,
           lhr_inr_per_hr:       lhrInrCol ? toNum(row.getCell(lhrInrCol).value, 0) || null : null,
           usd_labor_rate_per_hr: usdLaborRateCol ? toNum(row.getCell(usdLaborRateCol).value, 0) || null : null,
-          usd_lhr_base:          usdLhrBaseCol ? toNum(row.getCell(usdLhrBaseCol).value, 0) || null : null,
-          usd_lhr_burden:        usdLhrBurdenCol ? toNum(row.getCell(usdLhrBurdenCol).value, 0) || null : null,
-          usd_lhr_total:         usdLhrTotalCol ? toNum(row.getCell(usdLhrTotalCol).value, 0) || null : null,
+          usd_lhr_base:          rawUsdLhrBase,
+          usd_lhr_burden:        rawUsdLhrBurden,
+          usd_lhr_total:         reconciledLhrTotal,
+          // Multi-currency and fully-burdened fields
+          currency:                    isCombinedFormat ? 'USD' : currencyVal,
+          currency_symbol:             isCombinedFormat ? '$' : (currencySymbolCol ? toStr(row.getCell(currencySymbolCol).value) || null : null),
+          lhr_usd_effective:           finalLhrUsdEffective,
+          mhr_usd_per_hour:            isCombinedFormat ? effectiveMhrNum : (preCalcValues?.mhrUsd || null),
+          fully_burdened_local_per_hr: isCombinedFormat ? effectiveMhrNum : (preCalcValues?.fullyBurdenedLocal || null),
+          fully_burdened_usd_per_hr:   isCombinedFormat ? effectiveMhrNum : (preCalcValues?.fullyBurdenedUsd || null),
           specs:                Object.keys(specsObj).length ? specsObj : null,
+          _pre_calc:            preCalcValues,
+          // Combined format overhead breakdown
+          direct_overhead_rate:   directOHVal,
+          indirect_overhead_rate: indirectOHVal,
         });
       });
     }
@@ -683,22 +893,98 @@ export class MHRService {
       return { imported: 0, skipped: 0, errors: [] };
     }
 
-    // Compute stored calculated fields
+    // Compute stored calculated fields and serialize calculations JSONB
     for (const record of rows) {
+      const pc = record._pre_calc as Record<string, number> | null;
+      delete record._pre_calc;
       try {
-        if (record.is_manual_entry) {
-          const calc = this.createManualEntryCalculation(record.manual_mhr_value);
-          record.total_machine_hour_rate      = calc.totalMachineHourRate;
-          record.total_fixed_cost_per_hour    = calc.totalFixedCostPerHour;
-          record.total_variable_cost_per_hour = calc.totalVariableCostPerHour;
-          record.total_annual_cost            = calc.totalAnnualCost;
+        let calcResult: any;
+        if (pc) {
+          // Pre-calculated import: build rich calculations object from Excel values.
+          // Sanity guard: if mroPerHr is >20× depreciation, the Excel formula was USD-based
+          // without FX conversion — recompute from standard engine formula using corrected landed cost.
+          const D = MHR_CALCULATION_CONSTANTS.DEFAULTS;
+          const mroPerHrRaw = pc.mroPerHr || 0;
+          const depPerHr = pc.depPerHr || 0;
+          let mroPerHr = mroPerHrRaw;
+          if (depPerHr > 0 && mroPerHrRaw > depPerHr * 20) {
+            const lmc = record.landed_machine_cost || 0;
+            const effHrs = pc.effectiveHrs > 0 ? pc.effectiveHrs
+              : (record.shifts_per_day * record.hours_per_shift * record.working_days_per_year * (record.capacity_utilization_rate / 100));
+            const accsPct = record.accessories_cost_percentage || D.ACCESSORIES_COST_PERCENTAGE;
+            const instPct = record.installation_cost_percentage || D.INSTALLATION_COST_PERCENTAGE;
+            const maintPct = record.maintenance_cost_percentage || D.MAINTENANCE_COST_PERCENTAGE;
+            const totalCapInvEngine = lmc * (1 + accsPct / 100) * (1 + instPct / 100);
+            mroPerHr = effHrs > 0 && totalCapInvEngine > 0
+              ? parseFloat((totalCapInvEngine * maintPct / 100 / effHrs).toFixed(2))
+              : 0;
+            this.logger.warn(
+              `${record.machine_name}: mroPerHr=${mroPerHrRaw.toFixed(2)} reset to engine-computed ${mroPerHr} (>20× depPerHr — USD→INR conversion error in source Excel)`,
+              'MHRService.importFromExcel',
+            );
+          }
+          // MRO/maintenance is a FIXED cost (matches engine); only electricity is variable
+          const fixedPerHr = (pc.costOfOwnPerHr || 0) + mroPerHr;
+          const varPerHr   = (pc.elecPerHr || 0);
+          const annualCost = (pc.depPa || 0) + (pc.intPa || 0) + (pc.insPa || 0) +
+                             (pc.rentPa || 0) + (pc.mroPa || 0) + (pc.elecPa || 0);
+          // Recompute total operating cost if MRO was corrected
+          const totalOpCostPerHr = mroPerHr !== mroPerHrRaw
+            ? (pc.costOfOwnPerHr || 0) + mroPerHr + varPerHr
+            : (pc.totalOpCostPerHr || 0);
+          const totalMhr = mroPerHr !== mroPerHrRaw
+            ? totalOpCostPerHr  // no admin/profit on these pre-calc records
+            : (record.manual_mhr_value || 0);
+          calcResult = {
+            workingHoursPerYear:       pc.totalHrsPerYear || 0,
+            availableHoursPerYear:     pc.availHrsPerYear || 0,
+            effectiveHoursPerYear:     pc.effectiveHrs || 0,
+            depreciationPerHour:       depPerHr,
+            interestPerHour:           pc.intPerHr || 0,
+            insurancePerHour:          pc.insPerHr || 0,
+            rentPerHour:               pc.rentPerHr || 0,
+            maintenancePerHour:        mroPerHr,
+            electricityPerHour:        pc.elecPerHr || 0,
+            costOfOwnershipPerHour:    pc.costOfOwnPerHr || 0,
+            totalFixedCostPerHour:     fixedPerHr,
+            totalVariableCostPerHour:  varPerHr,
+            totalOperatingCostPerHour: totalOpCostPerHr,
+            adminOverheadPerHour:      0,
+            profitMarginPerHour:       0,
+            totalMachineHourRate:      totalMhr,
+            depreciationPerAnnum:      pc.depPa || 0,
+            interestPerAnnum:          pc.intPa || 0,
+            insurancePerAnnum:         pc.insPa || 0,
+            rentPerAnnum:              pc.rentPa || 0,
+            maintenancePerAnnum:       pc.mroPa || 0,
+            electricityPerAnnum:       pc.elecPa || 0,
+            totalFixedCostPerAnnum:    (pc.depPa || 0) + (pc.intPa || 0) + (pc.insPa || 0) + (pc.rentPa || 0),
+            totalVariableCostPerAnnum: (pc.mroPa || 0) + (pc.elecPa || 0),
+            totalAnnualCost:           annualCost,
+            accessoriesCost:           pc.accsCost || 0,
+            installationCost:          pc.instCost || 0,
+            totalCapitalInvestment:    pc.totalCapInv || 0,
+          };
+          record.total_machine_hour_rate      = totalMhr;
+          record.total_fixed_cost_per_hour    = fixedPerHr;
+          record.total_variable_cost_per_hour = varPerHr;
+          record.total_annual_cost            = annualCost;
+          // When MRO was corrected, the original Excel MHR is also wrong — update it
+          if (mroPerHr !== mroPerHrRaw) record.manual_mhr_value = parseFloat(totalMhr.toFixed(2));
+        } else if (record.is_manual_entry) {
+          calcResult = this.createManualEntryCalculation(record.manual_mhr_value);
+          record.total_machine_hour_rate      = calcResult.totalMachineHourRate;
+          record.total_fixed_cost_per_hour    = calcResult.totalFixedCostPerHour;
+          record.total_variable_cost_per_hour = calcResult.totalVariableCostPerHour;
+          record.total_annual_cost            = calcResult.totalAnnualCost;
         } else {
-          const calc = this.calculateMHR(this.mapRowToDto(record), true);
-          record.total_machine_hour_rate      = calc.totalMachineHourRate;
-          record.total_fixed_cost_per_hour    = calc.totalFixedCostPerHour;
-          record.total_variable_cost_per_hour = calc.totalVariableCostPerHour;
-          record.total_annual_cost            = calc.totalAnnualCost;
+          calcResult = this.calculateMHR(this.mapRowToDto(record), true);
+          record.total_machine_hour_rate      = calcResult.totalMachineHourRate;
+          record.total_fixed_cost_per_hour    = calcResult.totalFixedCostPerHour;
+          record.total_variable_cost_per_hour = calcResult.totalVariableCostPerHour;
+          record.total_annual_cost            = calcResult.totalAnnualCost;
         }
+        // calculations is never stored in DB — it is recomputed on every read by findAll/findOne
       } catch {
         record.total_machine_hour_rate      = 0;
         record.total_fixed_cost_per_hour    = 0;
@@ -707,36 +993,81 @@ export class MHRService {
       }
     }
 
-    // Filter out machine names that already exist for this user (no unique constraint → manual dedup)
-    const client = this.supabaseService.getClient(accessToken);
+    // Dedup by composite (machine_name, location, machine_class)
+    // machine_class is needed for Combined format where same machine name exists at same location across process sequences
+    const client = this.supabaseService.getAdminClient();
     const { data: existing } = await client
       .from('mhr_records')
-      .select('machine_name')
-      .eq('user_id', userId);
-    const existingNames = new Set((existing ?? []).map((r: any) => (r.machine_name as string).toLowerCase()));
+      .select('machine_name, location, machine_class')
+      .eq('user_id', userId)
+      .limit(20000);
+    const dedupKey = (r: any) =>
+      `${String(r.machine_name ?? '').toLowerCase()}::${String(r.location ?? '').toLowerCase()}::${String(r.machine_class ?? '').toLowerCase()}`;
+    const existingKeys = new Set((existing ?? []).map(dedupKey));
 
-    const newRows = rows.filter(r => !existingNames.has((r.machine_name as string).toLowerCase()));
+    const newRows = rows.filter(r => !existingKeys.has(dedupKey(r)));
     const skipped = rows.length - newRows.length;
 
     if (newRows.length === 0) return { imported: 0, skipped, errors: [] };
 
+    const CHUNK_SIZE = 500;
+    const chunks: any[][] = [];
+    for (let offset = 0; offset < newRows.length; offset += CHUNK_SIZE) {
+      chunks.push(newRows.slice(offset, offset + CHUNK_SIZE));
+    }
+
+    // Insert one chunk, auto-retrying after stripping any column that doesn't exist yet
+    // (handles cases where migration 322/323 haven't been applied to the DB yet).
+    const insertChunk = async (
+      chunk: any[],
+      chunkIdx: number,
+      excluded: Set<string> = new Set(),
+    ): Promise<{ data: any[] | null; error: any }> => {
+      const rows = excluded.size > 0
+        ? chunk.map(row => {
+            const out: any = {};
+            for (const [k, v] of Object.entries(row)) {
+              if (!excluded.has(k)) out[k] = v;
+            }
+            return out;
+          })
+        : chunk;
+
+      const { data, error } = await client.from('mhr_records').insert(rows).select('id');
+      if (!error) return { data, error };
+
+      // Handle both PostgreSQL native and PostgREST schema-cache error formats:
+      //   PostgreSQL: column "xyz" of relation "mhr_records" does not exist
+      //   PostgREST:  Could not find the 'xyz' column of 'mhr_records' in the schema cache
+      const miss = error.message.match(
+        /column "([^"]+)" of relation "mhr_records" does not exist|Could not find the '([^']+)' column of 'mhr_records' in the schema cache/,
+      );
+      const missingCol = miss?.[1] ?? miss?.[2];
+      if (missingCol) {
+        this.logger.warn(
+          `MHR import chunk ${chunkIdx}: column '${missingCol}' missing (pending migration) — retrying without it`,
+          'MHRService',
+        );
+        excluded.add(missingCol);
+        return insertChunk(chunk, chunkIdx, excluded);
+      }
+
+      return { data, error };
+    };
+
+    // Parallel insert — all chunks fire simultaneously to stay within HTTP timeout
+    const results = await Promise.all(chunks.map((chunk, i) => insertChunk(chunk, i)));
+
     let imported = 0;
     const errors: string[] = [];
-    const CHUNK_SIZE = 200;
-
-    for (let offset = 0; offset < newRows.length; offset += CHUNK_SIZE) {
-      const chunk = newRows.slice(offset, offset + CHUNK_SIZE);
-      const { data, error } = await client
-        .from('mhr_records')
-        .insert(chunk)
-        .select('id');
+    results.forEach(({ data, error }, i) => {
       if (error) {
-        this.logger.error(`MHR import chunk error at offset ${offset}: ${error.message}`, 'MHRService');
-        errors.push(`Batch at offset ${offset} failed: ${error.message}`);
+        this.logger.error(`MHR import chunk ${i} error: ${error.message}`, 'MHRService');
+        errors.push(`Batch ${i} failed: ${error.message}`);
       } else {
         imported += (data ?? []).length;
       }
-    }
+    });
 
     this.logger.log(`MHR import complete: ${imported} imported, ${skipped} skipped`, 'MHRService');
     return { imported, skipped, errors };
@@ -746,10 +1077,10 @@ export class MHRService {
     this.logger.log(`Deleting all MHR records for user ${userId}`, 'MHRService');
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getAdminClient()
       .from('mhr_records')
       .delete()
-      .eq('user_id', userId)
+      .not('id', 'is', null)
       .select('id');
 
     if (error) {
@@ -783,14 +1114,14 @@ export class MHRService {
       plannedMaintenanceHoursPerYear: parseFloat(row.plannedMaintenanceHoursPerYear || row.planned_maintenance_hours_per_year || 0),
       capacityUtilizationRate: parseFloat(row.capacityUtilizationRate || row.capacity_utilization_rate || 95),
       landedMachineCost: parseFloat(row.landedMachineCost || row.landed_machine_cost || 0),
-      accessoriesCostPercentage: parseFloat(row.accessoriesCostPercentage || row.accessories_cost_percentage || 6),
-      installationCostPercentage: parseFloat(row.installationCostPercentage || row.installation_cost_percentage || 20),
-      paybackPeriodYears: parseFloat(row.paybackPeriodYears || row.payback_period_years || 10),
-      interestRatePercentage: parseFloat(row.interestRatePercentage || row.interest_rate_percentage || 8),
-      insuranceRatePercentage: parseFloat(row.insuranceRatePercentage || row.insurance_rate_percentage || 1),
+      accessoriesCostPercentage: parseFloat(row.accessoriesCostPercentage || row.accessories_cost_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.ACCESSORIES_COST_PERCENTAGE),
+      installationCostPercentage: parseFloat(row.installationCostPercentage || row.installation_cost_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.INSTALLATION_COST_PERCENTAGE),
+      paybackPeriodYears: parseFloat(row.paybackPeriodYears || row.payback_period_years || MHR_CALCULATION_CONSTANTS.DEFAULTS.PAYBACK_PERIOD_YEARS),
+      interestRatePercentage: parseFloat(row.interestRatePercentage || row.interest_rate_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.INTEREST_RATE),
+      insuranceRatePercentage: parseFloat(row.insuranceRatePercentage || row.insurance_rate_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.INSURANCE_RATE),
       machineFootprintSqm: parseFloat(row.machineFootprintSqm || row.machine_footprint_sqm || 0),
       rentPerSqmPerMonth: parseFloat(row.rentPerSqmPerMonth || row.rent_per_sqm_per_month || 0),
-      maintenanceCostPercentage: parseFloat(row.maintenanceCostPercentage || row.maintenance_cost_percentage || 6),
+      maintenanceCostPercentage: parseFloat(row.maintenanceCostPercentage || row.maintenance_cost_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.MAINTENANCE_COST_PERCENTAGE),
       powerKwhPerHour: parseFloat(row.powerKwhPerHour || row.power_kwh_per_hour || 0),
       electricityCostPerKwh: parseFloat(row.electricityCostPerKwh || row.electricity_cost_per_kwh || 0),
       adminOverheadPercentage: parseFloat(row.adminOverheadPercentage || row.admin_overhead_percentage || 0),
@@ -806,7 +1137,8 @@ export class MHRService {
       .from('mhr_records')
       .select('process_group')
       .eq('user_id', userId)
-      .not('process_group', 'is', null);
+      .not('process_group', 'is', null)
+      .limit(20000);
 
     if (error) {
       this.logger.error(`Error fetching distinct process groups: ${error.message}`, 'MHRService');
@@ -814,5 +1146,39 @@ export class MHRService {
     }
 
     return [...new Set(data?.map((r: any) => r.process_group).filter(Boolean) as string[])].sort();
+  }
+
+  async getDistinctCurrencies(userId: string, accessToken: string): Promise<string[]> {
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('mhr_records')
+      .select('currency')
+      .eq('user_id', userId)
+      .not('currency', 'is', null)
+      .limit(20000);
+
+    if (error) {
+      this.logger.error(`Error fetching distinct currencies: ${error.message}`, 'MHRService');
+      return [];
+    }
+
+    return [...new Set(data?.map((r: any) => r.currency).filter(Boolean) as string[])].sort();
+  }
+
+  async getDistinctLocations(userId: string, accessToken: string): Promise<string[]> {
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('mhr_records')
+      .select('location')
+      .eq('user_id', userId)
+      .not('location', 'is', null)
+      .limit(20000);
+
+    if (error) {
+      this.logger.error(`Error fetching distinct locations: ${error.message}`, 'MHRService');
+      return [];
+    }
+
+    return [...new Set(data?.map((r: any) => r.location).filter(Boolean) as string[])].sort();
   }
 }

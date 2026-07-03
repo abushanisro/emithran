@@ -184,7 +184,7 @@ export class CreateVendorQuoteDto {
   @Type(() => Date)
   validUntil?: Date;
 
-  @ApiPropertyOptional({ description: 'Currency code', default: 'INR' })
+  @ApiPropertyOptional({ description: 'Currency code', default: 'USD' })
   @IsOptional()
   @IsString()
   currency?: string;

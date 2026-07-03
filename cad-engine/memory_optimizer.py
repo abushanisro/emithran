@@ -18,14 +18,6 @@ from pathlib import Path
 import tempfile
 import json
 
-# Import AI-enhanced DFM analyzer
-try:
-    from ai_dfm_analyzer import AIEnhancedDFMAnalyzer, EnhancedDFMResult  # type: ignore
-    AI_DFM_AVAILABLE = True
-except ImportError:
-    AI_DFM_AVAILABLE = False
-    logging.warning("AI DFM Analyzer not available - running with traditional analysis only")
-
 from OCC.Core.TopoDS import TopoDS_Shape  # type: ignore
 from OCC.Core.GProp import GProp_GProps  # type: ignore
 from OCC.Core.BRepGProp import brepgprop, brepgprop_LinearProperties, brepgprop_VolumeProperties  # type: ignore
@@ -151,7 +143,7 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v7"  # bump when extraction logic changes to auto-invalidate stale cache entries
+    CACHE_VERSION = "geo_v11"  # bump when extraction logic changes to auto-invalidate stale cache entries
     
     # Performance constants optimized for enterprise workloads
     OPTIMIZATION_THRESHOLDS = {
@@ -191,17 +183,6 @@ class AdvancedCADMemoryOptimizer:
             'average_processing_time': 0.0,
             'average_memory_reduction': 0.0
         }
-        
-        # Initialize AI-enhanced DFM analyzer
-        self.ai_dfm_analyzer = None
-        if AI_DFM_AVAILABLE:
-            try:
-                self.ai_dfm_analyzer = AIEnhancedDFMAnalyzer()
-                logging.info("AI-Enhanced DFM Analyzer initialized successfully")
-            except Exception as e:
-                logging.warning(f"Failed to initialize AI DFM Analyzer: {e}")
-        else:
-            logging.info("Running with traditional DFM analysis only")
         
         logger.info(f"AdvancedCADMemoryOptimizer initialized - Version: {self.VERSION}")
         logger.info(f"Cache directory: {self.cache_dir}")
@@ -414,6 +395,15 @@ class AdvancedCADMemoryOptimizer:
             # (detect_part_family computes it internally but doesn't return it).
             _dims_sorted = sorted(d for d in dims_list if d > 0)
             flatness_val = round(_dims_sorted[0] / _dims_sorted[2], 3) if len(_dims_sorted) >= 3 else 0.0
+            # Count cylinders with radius > 15% of max bbox dimension.
+            # These represent external OD surfaces (turned diameters, large bores) rather than
+            # drilled holes. > 3 is a hard veto against sheet_metal misclassification.
+            _max_dim = max(dims_list) if dims_list else 1.0
+            _large_cyl_threshold = _max_dim * 0.15
+            large_cyl_count = sum(
+                1 for cyl in holes.get('raw_cylinders_full', [])
+                if len(cyl) > 0 and cyl[0] > _large_cyl_threshold
+            )
             detected_family, family_confidence, classification_reasons = detect_part_family(
                 dims_list,
                 holes.get('count', 0),
@@ -422,6 +412,7 @@ class AdvancedCADMemoryOptimizer:
                 rotational_face_ratio=rotational_face_ratio,
                 planar_face_fraction=planar_face_fraction,
                 total_face_count=total_face_count,
+                large_cyl_count=large_cyl_count,
             )
             _hole_density_val = round(holes.get('count', 0) / max(total_face_count, 1), 3)
             manufacturing_intelligence = {
@@ -437,7 +428,8 @@ class AdvancedCADMemoryOptimizer:
                     'cyl_axis_alignment':     round(cyl_axis_alignment, 3),
                     'rotational_face_ratio':  round(rotational_face_ratio, 3),
                     'secondary_features_count': secondary_features_count,
-                    'classification_version': 'v3',
+                    'large_cyl_count':        large_cyl_count,
+                    'classification_version': 'v4',
                 },
                 'classification_reason': classification_reasons,
             }
@@ -458,7 +450,8 @@ class AdvancedCADMemoryOptimizer:
             logger.info(
                 f"[mfg_intel] family={detected_family} conf={family_confidence:.2f} "
                 f"flatness={flatness_val} holes={holes.get('count', 0)} "
-                f"total_faces={total_face_count} hole_density={_hole_density_val} "
+                f"large_cyl={large_cyl_count} total_faces={total_face_count} "
+                f"hole_density={_hole_density_val} "
                 f"planar_frac={round(planar_face_fraction, 2)} "
                 f"reasons={classification_reasons}"
             )
@@ -990,58 +983,6 @@ class AdvancedCADMemoryOptimizer:
             cost_impact_factors=cost_impact_factors,
             confidence=confidence
         )
-        
-        # Enhance with AI insights if available
-        if self.ai_dfm_analyzer:
-            try:
-                # Prepare geometry features for AI analysis
-                geometry_dict = {
-                    'volume_mm3': features.volume,
-                    'surface_area_mm2': features.surface_area,
-                    'bounding_box': features.bounding_box,
-                    'complexity_score': features.complexity_score,
-                    'feature_count': features.feature_count,
-                    'manufacturing_features': features.manufacturing_features
-                }
-                
-                traditional_dict = {
-                    'manufacturability_score': manufacturability_score,
-                    'difficulty_level': difficulty_level,
-                    'recommended_processes': recommended_processes,
-                    'warnings': warnings,
-                    'cost_impact_factors': cost_impact_factors,
-                    'confidence': confidence
-                }
-                
-                # Get AI-enhanced analysis (pass real processes from user's database)
-                analyzer = self.ai_dfm_analyzer
-                assert analyzer is not None
-                enhanced_result = analyzer.analyze_with_ai_enhancement(
-                    geometry_dict, traditional_dict, file_name, user_processes or []
-                )
-                
-                # Update traditional DFM with AI insights
-                traditional_dfm.manufacturability_score = enhanced_result.manufacturability_score
-                traditional_dfm.confidence = min(0.98, enhanced_result.confidence + 0.1)  # Boost confidence with AI
-                
-                # Add AI recommendations to warnings as insights
-                if enhanced_result.ai_insights and enhanced_result.ai_insights.cost_optimization_suggestions:
-                    warnings.append({
-                        'type': 'ai_insight',
-                        'code': 'AI-001',
-                        'message': f'AI Recommendations: {"; ".join(enhanced_result.ai_insights.cost_optimization_suggestions[:2])}',
-                        'cost_impact_percent': 10.0,
-                        'severity': 3,
-                        'ai_confidence': enhanced_result.ai_insights.ai_confidence
-                    })
-                
-                # Store enhanced result for later retrieval (if needed)
-                setattr(traditional_dfm, '_ai_enhanced_result', enhanced_result)
-                
-                logger.info(f"AI-enhanced DFM analysis completed with confidence: {enhanced_result.ai_insights.ai_confidence:.2f}")
-                
-            except Exception as e:
-                logger.warning(f"AI enhancement failed, using traditional analysis: {e}")
         
         return traditional_dfm
 
