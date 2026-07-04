@@ -53,12 +53,19 @@ export class DeterministicPlannerService {
 
     const steps: RouteStep[] = [...(template.routing_sequence ?? [])].sort((a, b) => a.step - b.step);
 
+    // What the route already covers — template steps first, merged ops appended.
+    // mergeMandatoryOps dedups against this so rule-engine ops never duplicate steps.
+    const coverage: CoverageEntry[] = [];
+
     for (const step of steps) {
-      // Skip conditional steps when the triggering feature is absent
-      const conditionFeature = (step as any).condition_feature as string | undefined;
+      // Skip conditional steps when the triggering feature is absent.
+      // Case-insensitive with '|'-separated alternatives ("ANODIZE|PLATE") —
+      // seeded templates use lowercase, feature types are UPPER_SNAKE.
+      const conditionFeature = step.condition_feature;
       if (!step.required && conditionFeature) {
+        const wanted = conditionFeature.toUpperCase().split('|').map((s) => s.trim()).filter(Boolean);
         const featurePresent = (brief.featureGraph?.features ?? []).some(
-          (f: any) => f.type === conditionFeature,
+          (f) => wanted.includes(String(f.type).toUpperCase()),
         );
         if (!featurePresent) {
           this.logger.debug(`[planner] Skipping conditional Op ${step.step} "${step.process}" — feature ${conditionFeature} not present`);
@@ -117,17 +124,57 @@ export class DeterministicPlannerService {
         cycleSec,
         reason: step.description || `${step.process} — Op ${step.step} per ${template.template_name}`,
       });
+      coverage.push({ text: `${step.process} ${step.description ?? ''}`, machineType: step.machine_type });
     }
 
-    // Link feature graph features to process lines (one feature per line, first-match wins)
+    // Merge rule-engine mandatory ops the template doesn't cover (Tapping,
+    // Cleaning, Surface Treatment, CMM Inspection, ...). Without this pass,
+    // feature-driven ops are computed but silently dropped — the cost engine
+    // then charges for work (e.g. tapping) that never appears in the route.
+    const templateCount = processLines.length;
+    pmCounter = this.mergeMandatoryOps(
+      brief, candidates, processLines, proposedMasters, coverage,
+      batchSize, defaultLabour, pmCounter,
+    );
+
+    // Re-sequence into canonical manufacturing order. Template steps NEVER
+    // reorder relative to each other (monotone rank clamp); merged ops insert
+    // by manufacturing stage (tapping after machining, cleaning before
+    // treatment, CMM before final inspection).
+    const ranked = processLines.map((line, seq) => ({
+      line, seq,
+      rank: stageRank(line.machineCategoryHint ?? '', line.reason),
+    }));
+    let running = 0;
+    for (const r of ranked) {
+      if (r.seq < templateCount) r.rank = running = Math.max(running, r.rank);
+    }
+    ranked.sort((a, b) => (a.rank - b.rank) || (a.seq - b.seq));
+    processLines.length = 0;
+    ranked.forEach((r, i) => {
+      r.line.opNbr = (i + 1) * 10;
+      processLines.push(r.line);
+    });
+
+    // Link feature graph features to process lines (one feature per line, first-match wins).
+    // Features already claimed by a merged mandatory-op line are skipped.
+    const linkedFeatureIds = new Set(processLines.map((l) => l.featureId).filter(Boolean));
     for (const feature of (brief.featureGraph?.features ?? [])) {
+      if (linkedFeatureIds.has(feature.id)) continue;
       const targetMachineType = machineTypeForFeatureType(feature.type, brief.scope.family);
       if (!targetMachineType) continue;
-      const targetLine = processLines.find(
+      // Threads prefer the Tapping/Thread line over the generic machining line
+      const preferred = feature.type.startsWith('THREAD')
+        ? processLines.find(
+            (l) => l.machineCategoryHint === targetMachineType && !l.featureId && /\btap|thread/i.test(l.reason),
+          )
+        : undefined;
+      const targetLine = preferred ?? processLines.find(
         (l) => l.machineCategoryHint === targetMachineType && !l.featureId,
       );
       if (targetLine) {
         targetLine.featureId = feature.id;
+        targetLine.featureQty = feature.count ?? 1;
         this.logger.debug(`[planner] Linked feature ${feature.id} (${feature.type}) → Op ${targetLine.opNbr}`);
       }
     }
@@ -179,6 +226,90 @@ export class DeterministicPlannerService {
         materialWarning,
     };
   }
+
+  /**
+   * Appends rule-engine mandatory ops that no template step (or earlier merged
+   * op) already covers. Returns the updated proposed-master counter.
+   *
+   * Skipped op kinds:
+   *   - features priced inside the machining cycle (finish passes, pockets, bores)
+   *   - hole-making ops when a milling/turning line exists (drilling is part of
+   *     the CNC cycle in the cost engine — a separate line would double-count)
+   *   - hints with no deterministic machine mapping ('any')
+   */
+  private mergeMandatoryOps(
+    brief: EngineeringBrief,
+    candidates: CandidateSet,
+    processLines: AbstractProcessLine[],
+    proposedMasters: AbstractProposedMaster[],
+    coverage: CoverageEntry[],
+    batchSize: number,
+    defaultLabour: LabourCandidate,
+    pmCounter: number,
+  ): number {
+    const features = brief.featureGraph?.features ?? [];
+    const machiningLineExists = processLines.some(
+      (l) => ['cnc_mill', 'cnc_lathe', 'cnc_mill_turn'].includes(l.machineCategoryHint ?? ''),
+    );
+
+    for (const op of brief.mandatoryOps ?? []) {
+      const feature = features.find((f) => f.id === op.featureId);
+      const featureType = feature?.type ?? null;
+
+      if (featureType && FOLDED_INTO_MACHINING.has(featureType)) continue;
+      if (featureType && DRILLING_TYPES.has(featureType) && machiningLineExists) continue;
+
+      const machineType =
+        machineTypeForCategoryHint(op.machineCategoryHint) ??
+        (featureType === 'GRIND' ? 'cylindrical_grinder' : null);
+      if (!machineType) continue;
+
+      if (coverage.some((c) => opCoveredBy(op.operationHint, machineType, c))) {
+        this.logger.debug(`[planner] Mandatory op "${op.operationHint}" already covered by route — skipped`);
+        continue;
+      }
+
+      const opCand = findProcessCandidate(candidates.processes, op.operationHint);
+      const macCand = findMachineCandidate(candidates.machines, machineType);
+
+      let candidateId: string | undefined;
+      let proposedMasterId: string | undefined;
+      if (opCand) {
+        candidateId = opCand.candidateId;
+      } else {
+        pmCounter++;
+        proposedMasterId = `pm-${pmCounter}`;
+        proposedMasters.push({
+          kind: 'process',
+          proposedMasterId,
+          processGroup: groupFromMachineType(machineType),
+          processRoute: routeFromMachineType(machineType),
+          operation: op.operationHint,
+          reason: `${op.reason} — required by manufacturing rule engine, not covered by the routing template. Add this to your process library to avoid re-proposing on next generation.`,
+        });
+      }
+
+      processLines.push({
+        opNbr: op.suggestedOpNbr,
+        candidateId,
+        proposedMasterId,
+        machineCandidateId: macCand.candidateId,
+        labourCandidateId: defaultLabour.candidateId,
+        calculatorCandidateId: null,
+        featureId: op.featureId,
+        featureQty: feature?.count,
+        machineCategoryHint: machineType,
+        batchSize,
+        heads: 1,
+        partsPerCycle: 1,
+        scrapPct: 3,
+        reason: op.reason,
+      });
+      coverage.push({ text: op.operationHint, machineType });
+      this.logger.log(`[planner] Merged mandatory op "${op.operationHint}" (${machineType}) — missing from template`);
+    }
+    return pmCounter;
+  }
 }
 
 // ── Machine type → keyword / label helpers ────────────────────────────────────
@@ -191,6 +322,8 @@ const MACHINE_TYPE_KEYWORDS: Record<string, string[]> = {
   saw:                 ['saw', 'band saw'],
   bench_manual:        ['bench', 'workstation', 'manual', 'deburr'],
   inspection_bench:    ['inspection', 'cmm', 'quality'],
+  cmm:                 ['cmm', 'coordinate', 'video measuring', 'inspection', 'quality'],
+  cleaning:            ['wash', 'clean', 'degreas', 'ultrasonic'],
   surface_treatment:   ['treatment', 'coating', 'plating', 'anodiz', 'passivat'],
   heat_treatment:      ['heat treat', 'furnace', 'temper', 'anneal', 'carburiz'],
   cylindrical_grinder: ['grinder', 'grinding'],
@@ -200,7 +333,8 @@ const MACHINE_TYPE_GROUP: Record<string, string> = {
   cnc_lathe: 'Machining',        cnc_mill: 'Machining',
   press_brake: 'Sheet Metal',    laser_cut: 'Sheet Metal',
   saw: 'Machining',              bench_manual: 'Finishing',
-  inspection_bench: 'Quality',   surface_treatment: 'Surface Treatment',
+  inspection_bench: 'Quality',   cmm: 'Quality',
+  cleaning: 'Finishing',         surface_treatment: 'Surface Treatment',
   heat_treatment: 'Heat Treatment', cylindrical_grinder: 'Grinding',
 };
 
@@ -208,9 +342,101 @@ const MACHINE_TYPE_ROUTE: Record<string, string> = {
   cnc_lathe: 'CNC Turning',      cnc_mill: 'CNC Milling',
   press_brake: 'Press Brake',    laser_cut: 'Laser Cutting',
   saw: 'Band Saw',               bench_manual: 'Manual',
-  inspection_bench: 'Inspection', surface_treatment: 'Surface Treatment',
+  inspection_bench: 'Inspection', cmm: 'CMM Inspection',
+  cleaning: 'Cleaning',          surface_treatment: 'Surface Treatment',
   heat_treatment: 'Heat Treatment', cylindrical_grinder: 'Grinding',
 };
+
+// ── mandatoryOps merge helpers ────────────────────────────────────────────────
+
+interface CoverageEntry {
+  text: string;         // step process+description, or a merged op's operationHint
+  machineType: string;
+}
+
+// Features whose work is priced inside the milling/turning cycle — a separate
+// route line would double-count cycle time.
+const FOLDED_INTO_MACHINING = new Set([
+  'SHOULDER_TURN', 'SURFACE_FINISH_FINE', 'OD_TURN', 'FACE_TURN',
+  'ID_BORE', 'POCKET', 'SLOT', 'FLAT_FACE',
+]);
+
+// Hole-making features — folded into machining when a milling/turning line exists.
+const DRILLING_TYPES = new Set(['AXIAL_HOLE', 'CROSS_HOLE', 'COUNTERBORE', 'COUNTERSINK']);
+
+// Non-machining categories where "same category" means "same route step".
+// Machining types (cnc_mill/cnc_lathe) are deliberately absent — a Tapping op on
+// the mill must NOT be deduped by the CNC Milling step; keywords decide instead.
+const CATEGORY_GROUPS: Record<string, string> = {
+  saw: 'saw', laser_cut: 'profile', turret_punch: 'profile', waterjet: 'profile',
+  press_brake: 'form', bench_manual: 'bench', cleaning: 'cleaning',
+  heat_treatment: 'heat', surface_treatment: 'surface',
+  cmm: 'cmm', inspection: 'inspect', inspection_bench: 'inspect',
+  cylindrical_grinder: 'grind',
+};
+
+// First pattern whose opMatch hits the mandatory op decides which stepMatch to
+// test — order matters ("CMM Inspection" must match the cmm rule, not the
+// generic inspection rule, or the Final Inspection step would swallow it).
+const OP_KEYWORD_PATTERNS: Array<{ opMatch: RegExp; stepMatch: RegExp }> = [
+  { opMatch: /\btap/i,              stepMatch: /\btap/i },
+  { opMatch: /thread/i,             stepMatch: /thread/i },
+  { opMatch: /\bcmm\b/i,            stepMatch: /\bcmm\b|coordinate/i },
+  { opMatch: /clean|degreas|wash/i, stepMatch: /clean|degreas|wash/i },
+  { opMatch: /anodi|plating|surface treatment|passivat|coating/i,
+    stepMatch: /anodi|plating|\bplate\b|surface treat|passivat|coating/i },
+  { opMatch: /deburr/i,             stepMatch: /deburr/i },
+  { opMatch: /grind/i,              stepMatch: /grind/i },
+  { opMatch: /heat treat/i,         stepMatch: /heat|anneal|temper|carburiz|harden/i },
+  { opMatch: /saw|stock cut/i,      stepMatch: /\bsaw\b|stock cut|billet/i },
+  { opMatch: /drill/i,              stepMatch: /drill/i },
+  { opMatch: /inspect/i,            stepMatch: /inspect|quality/i },
+];
+
+function opCoveredBy(opHint: string, opMachineType: string, entry: CoverageEntry): boolean {
+  const opGroup = CATEGORY_GROUPS[opMachineType];
+  const entryGroup = CATEGORY_GROUPS[entry.machineType];
+  if (opGroup && entryGroup && opGroup === entryGroup) return true;
+  const kw = OP_KEYWORD_PATTERNS.find((p) => p.opMatch.test(opHint));
+  return kw != null && kw.stepMatch.test(entry.text);
+}
+
+// MandatoryOp.machineCategoryHint → planner machine type. 'any' has no
+// deterministic mapping and is left to the LLM path.
+function machineTypeForCategoryHint(hint: string | undefined): string | null {
+  switch (hint) {
+    case 'cnc_lathe': case 'cnc_mill': case 'laser_cut': case 'press_brake':
+    case 'saw': case 'bench_manual': case 'inspection_bench': case 'cmm':
+    case 'cleaning': case 'surface_treatment': case 'heat_treatment':
+      return hint;
+    case 'inspection':
+      return 'inspection_bench';
+    default:
+      return null;
+  }
+}
+
+// Canonical manufacturing stage for route sequencing. Template steps are
+// clamped to be monotone (never reordered); merged ops insert by this rank.
+function stageRank(machineType: string, text: string): number {
+  const t = (text ?? '').toLowerCase();
+  switch (machineType) {
+    case 'saw':                                      return 10;
+    case 'laser_cut': case 'turret_punch': case 'waterjet': return 15;
+    case 'press_brake':                              return 20;
+    case 'cnc_mill': case 'cnc_lathe': case 'cnc_mill_turn':
+      return /\btap|thread/.test(t) ? 35 : 30;
+    case 'cylindrical_grinder':                      return 40;
+    case 'bench_manual':
+      return /clean|wash|degreas/.test(t) ? 55 : 50;
+    case 'heat_treatment':                           return 52;
+    case 'cleaning':                                 return 55;
+    case 'surface_treatment':                        return 60;
+    case 'cmm':                                      return 70;
+    case 'inspection_bench': case 'inspection':      return 80;
+    default:                                         return 45;
+  }
+}
 
 function findMachineCandidate(machines: MachineCandidate[], machineType: string): MachineCandidate {
   // Phase 1: exact process_family match — deterministic, no keyword guessing
@@ -266,8 +492,9 @@ function machineTypeForFeatureType(featureType: string, family: string): string 
       return family === 'sheet_metal' ? 'laser_cut' : 'cnc_mill';
     case 'BEND': case 'FORM':
       return 'press_brake';
-    case 'OD_TURN': case 'FACE_TURN': case 'SHOULDER_TURN':
-    case 'ID_BORE': case 'THREAD_INTERNAL': case 'THREAD_EXTERNAL':
+    case 'THREAD_INTERNAL': case 'THREAD_EXTERNAL':
+      return family === 'cnc_milled' ? 'cnc_mill' : 'cnc_lathe';
+    case 'OD_TURN': case 'FACE_TURN': case 'SHOULDER_TURN': case 'ID_BORE':
       return 'cnc_lathe';
     case 'GRIND': case 'SURFACE_FINISH_FINE': case 'HONE': case 'LAPP':
       return 'cylindrical_grinder';

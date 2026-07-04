@@ -6,6 +6,7 @@ import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-ma
 import { PlasticRubberContainerService } from './containers/plastic-rubber-container.service';
 import { FerrousContainerService } from './containers/ferrous-container.service';
 import { MaterialCategory, MATERIAL_CATEGORY_LABELS } from './constants/material-categories.constants';
+import { shapeRankForFamily } from './constants/material-shape-ranking';
 
 @Injectable()
 export class RawMaterialsService {
@@ -142,6 +143,7 @@ export class RawMaterialsService {
         cost_india: createRawMaterialDto.costIndia,
         cost_e_europe: createRawMaterialDto.costEEurope,
         cost_china: createRawMaterialDto.costChina,
+        cost_mexico: createRawMaterialDto.costMexico,
         // Additional properties
         density: createRawMaterialDto.density,
         ultimate_tensile_strength: createRawMaterialDto.ultimate_tensile_strength,
@@ -205,6 +207,7 @@ export class RawMaterialsService {
       cost_india: dto.costIndia,
       cost_e_europe: dto.costEEurope,
       cost_china: dto.costChina,
+      cost_mexico: dto.costMexico,
       // Additional properties
       density: dto.density,
       ultimate_tensile_strength: dto.ultimate_tensile_strength,
@@ -613,28 +616,13 @@ export class RawMaterialsService {
       };
     });
 
-    // Form-based ranking by manufacturing family
-    const FAMILY_PREFERRED_SHAPES: Record<string, string[]> = {
-      'sheet_metal':       ['sheets', 'coils', 'plates'],
-      'cnc_milled':        ['plates', 'blocks', 'bars', 'ingots'],
-      'cnc_turned':        ['bars', 'rods', 'tubes', 'profiles'],
-      'casting':           ['ingots'],
-      'forging':           ['bars', 'rods', 'ingots'],
-      'injection_moulded': ['granules', 'pellets'],
-      'stamping':          ['coils', 'sheets'],
-    };
-    const getShapeRank = (shape: string | undefined, family: string): number => {
-      const preferred = FAMILY_PREFERRED_SHAPES[family] ?? [];
-      if (!shape) return 99;
-      const idx = preferred.indexOf(shape.toLowerCase());
-      return idx === -1 ? 50 : idx;
-    };
-
+    // Form-based ranking by manufacturing family — shared with the BOM costing
+    // material lookup so browse order and costing pick can never disagree.
     if (query.partFamily) {
       const family = query.partFamily;
       transformedData.sort((a, b) => {
-        const rankA = getShapeRank(a.shape, family);
-        const rankB = getShapeRank(b.shape, family);
+        const rankA = shapeRankForFamily(a.shape, family);
+        const rankB = shapeRankForFamily(b.shape, family);
         if (rankA !== rankB) return rankA - rankB;
         return (a.materialName ?? '').localeCompare(b.materialName ?? '');
       });

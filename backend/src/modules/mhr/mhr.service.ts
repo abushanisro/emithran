@@ -6,7 +6,9 @@ import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult } from './dto/
 import { validate as isValidUUID } from 'uuid';
 import { MHRCalculationEngine } from './engines/mhr-calculation.engine';
 import { MHRInputValidator } from './validators/mhr-input.validator';
-import { getCurrencyForLocation, getUsdPerLocal, MHR_CALCULATION_CONSTANTS, FX_RATES_LOCAL_PER_USD } from './constants/mhr-calculation.constants';
+import { getCurrencyForLocation, MHR_CALCULATION_CONSTANTS } from './constants/mhr-calculation.constants';
+import { invalidateMachinePools } from '../bom-items/costing/machine-selection/pool-cache';
+import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
 import * as ExcelJS from 'exceljs';
 
 /**
@@ -32,6 +34,7 @@ export class MHRService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
+    private readonly exchangeRateService: ExchangeRateService,
   ) {
     this.calculationEngine = new MHRCalculationEngine();
     this.validator = new MHRInputValidator();
@@ -100,30 +103,47 @@ export class MHRService {
    * Derives currency from location and computes USD equivalents for MHR and fully-burdened rates.
    * For India (INR): uses lhrInrPerHr for the labor component.
    * For all other locations: uses usdLhrTotal as the labor USD rate directly.
+   *
+   * FX rate comes from the `exchange_rates` table (via ExchangeRateService), not a
+   * hardcoded constant — an admin maintains the rate; this method never invents one.
+   * If the DB has no rate for this currency, mhrUsdPerHour falls back to the raw
+   * local figure (visibly wrong in USD terms, but never silently mispriced) and a
+   * warning is logged instead of failing the create/update request outright.
    */
-  private computeUsdAndBurdenedRates(
+  private async computeUsdAndBurdenedRates(
     totalMachineHourRate: number,
     location: string,
+    accessToken: string,
     lhrInrPerHr?: number | null,
     usdLhrTotal?: number | null,
-  ): {
+  ): Promise<{
     currency: string;
     currencySymbol: string;
     mhrUsdPerHour: number;
     fullyBurdenedLocalPerHr: number | null;
     fullyBurdenedUsdPerHr: number | null;
-  } {
+  }> {
     const { currency, symbol } = getCurrencyForLocation(location);
-    const usdPerLocal = getUsdPerLocal(currency);
-    const mhrUsdPerHour = parseFloat((totalMachineHourRate * usdPerLocal).toFixed(4));
+    await this.exchangeRateService.loadRates(accessToken);
+    const usdPerLocal = this.exchangeRateService.convert(currency, 'USD');
+    if (usdPerLocal == null) {
+      this.logger.warn(
+        `No exchange rate on file for '${currency}' — add it to the exchange_rates table. ` +
+        `USD-equivalent fields will be left unconverted for this record.`,
+        'MHRService',
+      );
+    }
+    const mhrUsdPerHour = parseFloat((totalMachineHourRate * (usdPerLocal ?? 1)).toFixed(4));
 
     let fullyBurdenedLocalPerHr: number | null = null;
     let fullyBurdenedUsdPerHr: number | null = null;
 
     if (currency === 'INR' && lhrInrPerHr && lhrInrPerHr > 0) {
       fullyBurdenedLocalPerHr = parseFloat((totalMachineHourRate + lhrInrPerHr).toFixed(2));
-      fullyBurdenedUsdPerHr = parseFloat((fullyBurdenedLocalPerHr * usdPerLocal).toFixed(4));
-    } else if (currency !== 'INR' && usdLhrTotal && usdLhrTotal > 0) {
+      fullyBurdenedUsdPerHr = usdPerLocal != null
+        ? parseFloat((fullyBurdenedLocalPerHr * usdPerLocal).toFixed(4))
+        : null;
+    } else if (currency !== 'INR' && usdLhrTotal && usdLhrTotal > 0 && usdPerLocal != null) {
       // Convert USD labor back to local for the local burdened rate
       const lhrInLocal = usdLhrTotal / usdPerLocal;
       fullyBurdenedLocalPerHr = parseFloat((totalMachineHourRate + lhrInLocal).toFixed(2));
@@ -280,9 +300,10 @@ export class MHRService {
       calculations = this.calculateMHR(createMHRDto);
     }
 
-    const usdRates = this.computeUsdAndBurdenedRates(
+    const usdRates = await this.computeUsdAndBurdenedRates(
       calculations.totalMachineHourRate,
       createMHRDto.location,
+      accessToken,
       createMHRDto.lhrInrPerHr ?? null,
       createMHRDto.usdLhrTotal ?? null,
     );
@@ -385,6 +406,7 @@ export class MHRService {
       throw new InternalServerErrorException('Failed to create MHR record. Please check your input and try again.');
     }
 
+    invalidateMachinePools(data.location);
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
   }
 
@@ -462,9 +484,10 @@ export class MHRService {
     const effectiveLocation = updateMHRDto.location ?? existing.location;
     const effectiveLhrInr   = updateMHRDto.lhrInrPerHr ?? (existing as any).lhrInrPerHr ?? null;
     const effectiveUsdLhr   = updateMHRDto.usdLhrTotal ?? (existing as any).usdLhrTotal ?? null;
-    const usdRates = this.computeUsdAndBurdenedRates(
+    const usdRates = await this.computeUsdAndBurdenedRates(
       calculations.totalMachineHourRate,
       effectiveLocation,
+      accessToken,
       effectiveLhrInr,
       effectiveUsdLhr,
     );
@@ -518,6 +541,7 @@ export class MHRService {
       throw new InternalServerErrorException('Failed to update MHR record. Please verify your input and try again.');
     }
 
+    invalidateMachinePools(data.location);
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
   }
 
@@ -550,6 +574,7 @@ export class MHRService {
       throw new InternalServerErrorException('Failed to delete MHR record. Please try again later.');
     }
 
+    invalidateMachinePools();
     return { message: 'MHR record deleted successfully' };
   }
 
@@ -559,6 +584,11 @@ export class MHRService {
     accessToken: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     this.logger.log(`Importing MHR records from Excel for user ${userId}`, 'MHRService');
+
+    // Loaded once for the whole import — every row's USD→local conversion below
+    // reads from this live DB-backed rate map, never a hardcoded FX table.
+    await this.exchangeRateService.loadRates(accessToken);
+    const missingRateCurrencies = new Set<string>();
 
     const workbook = new ExcelJS.Workbook();
     const arrayBuffer = fileBuffer.buffer.slice(
@@ -705,6 +735,27 @@ export class MHRService {
       const totalCapInvCol       = getCol('total capital investment local');
       const capacityUnitCol      = getCol('capacity unit');
       const floorAreaCol         = getCol('floor area sqft');
+      // Machine capability columns (optional — physics-based machine selection)
+      const maxXCol             = getCol('max x mm', 'max x', 'bed length mm');
+      const maxYCol             = getCol('max y mm', 'max y', 'bed width mm');
+      const maxZCol             = getCol('max z mm', 'max z');
+      const maxDiaCol           = getCol('max diameter mm', 'max diameter', 'swing mm');
+      const maxLenCol           = getCol('max length mm', 'max length', 'bend length mm');
+      const maxTonnageCol       = getCol('max tonnage', 'tonnage');
+      const maxThicknessCol     = getCol('max thickness mm', 'max thickness');
+      const maxWeightCol        = getCol('max workpiece weight kg', 'max workpiece weight', 'table load kg');
+      const powerKwCol          = getCol('power kw', 'laser power kw', 'spindle power kw');
+      const thkMsCol            = getCol('max thickness ms mm', 'max thickness ms');
+      const thkSsCol            = getCol('max thickness ss mm', 'max thickness ss');
+      const thkAlCol            = getCol('max thickness al mm', 'max thickness al');
+      const thkCuCol            = getCol('max thickness cu mm', 'max thickness cu');
+      const cuttableMatsCol     = getCol('cuttable materials', 'material grades');
+      // Availability columns (optional)
+      const availStatusCol      = getCol('availability status', 'availability');
+      const nextAvailCol        = getCol('next available at', 'next available');
+      const schedLoadCol        = getCol('scheduled load', 'scheduled load pct');
+      const maintStartCol       = getCol('maintenance window start');
+      const maintEndCol         = getCol('maintenance window end');
       // specs sub-columns (optional)
       const maxCapacityCol      = getCol('max capacity', 'max_capacity');
       const toleranceCol        = getCol('tolerance mm', 'tolerance_mm');
@@ -773,14 +824,53 @@ export class MHRService {
         if (capacityUnitCol) { const v = toStr(row.getCell(capacityUnitCol).value); if (v) specsObj.capacity_unit = v; }
         if (floorAreaCol)    { const v = toNum(row.getCell(floorAreaCol).value, 0);  if (v) specsObj.floor_area_sqft = v; }
 
+        // Capability columns — nullable; any populated value marks the row 'imported'
+        const capNum = (col: number | null): number | null => {
+          if (!col) return null;
+          const v = toNum(row.getCell(col).value, 0);
+          return v > 0 ? v : null;
+        };
+        const capability = {
+          max_x_mm:                capNum(maxXCol),
+          max_y_mm:                capNum(maxYCol),
+          max_z_mm:                capNum(maxZCol),
+          max_diameter_mm:         capNum(maxDiaCol),
+          max_length_mm:           capNum(maxLenCol),
+          max_tonnage:             capNum(maxTonnageCol),
+          max_thickness_mm:        capNum(maxThicknessCol),
+          max_workpiece_weight_kg: capNum(maxWeightCol),
+          power_kw:                capNum(powerKwCol),
+          max_thickness_ms_mm:     capNum(thkMsCol),
+          max_thickness_ss_mm:     capNum(thkSsCol),
+          max_thickness_al_mm:     capNum(thkAlCol),
+          max_thickness_cu_mm:     capNum(thkCuCol),
+          cuttable_materials:      cuttableMatsCol
+            ? (toStr(row.getCell(cuttableMatsCol).value).split(',').map(s => s.trim()).filter(Boolean) as string[])
+            : null,
+        };
+        if (capability.cuttable_materials?.length === 0) capability.cuttable_materials = null;
+        const hasCapability = Object.values(capability).some(v => v != null);
+
+        const availabilityStatusRaw = availStatusCol ? toStr(row.getCell(availStatusCol).value).toLowerCase() : '';
+        const VALID_AVAILABILITY = ['available', 'maintenance', 'down', 'retired', 'commissioning'];
+        const toIso = (col: number | null): string | null => {
+          if (!col) return null;
+          const v = row.getCell(col).value;
+          if (v instanceof Date) return v.toISOString();
+          const d = v != null ? new Date(String(v)) : null;
+          return d && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
+        };
+
         const locationVal = locationCol ? toStr(row.getCell(locationCol).value, 'India') || 'India' : 'India';
         const currencyVal = currencyCol ? toStr(row.getCell(currencyCol).value) || null : null;
-        // If Excel has no local landed cost column, derive from USD machine price × location FX rate
-        const { currency: locCurrency } = getCurrencyForLocation(locationVal);
-        const localPerUsd = FX_RATES_LOCAL_PER_USD[locCurrency] ?? 84.5;
+        // If Excel has no local landed cost column, derive from USD machine price × location FX
+        // rate — read live from exchange_rates (loaded once above), never a hardcoded table.
+        const { currency: locCurrency, symbol: locSymbol } = getCurrencyForLocation(locationVal);
+        const localPerUsd = this.exchangeRateService.convert('USD', locCurrency);
+        if (localPerUsd == null) missingRateCurrencies.add(locCurrency);
         const landedCost = rawLandedCost > 0
           ? rawLandedCost
-          : (rawMachinePriceUsd > 0 ? Math.round(rawMachinePriceUsd * localPerUsd) : 0);
+          : (rawMachinePriceUsd > 0 && localPerUsd != null ? Math.round(rawMachinePriceUsd * localPerUsd) : 0);
 
         // Reconcile USD LHR: prefer computed base+burden sum over the raw column value
         const rawUsdLhrBase   = usdLhrBaseCol   ? toNum(row.getCell(usdLhrBaseCol).value,   0) || null : null;
@@ -810,17 +900,30 @@ export class MHRService {
           );
         }
 
-        // Combined format: force manual entry, compute total OH from breakdown columns
+        // Combined format: force manual entry, compute total OH from breakdown columns.
+        // The Combined_All_Countries benchmark sheet is USD-denominated regardless of
+        // the row's location — direct/indirect overhead rate columns are USD/hr. Every
+        // other code path (pickRate, cost engine, MHR list UI) treats manual_mhr_value /
+        // fully_burdened_local_per_hr / total_machine_hour_rate as the row's LOCAL
+        // currency, so the raw USD figure must be FX-converted before being stored in
+        // those fields — storing it unconverted understates cost by the FX factor
+        // (e.g. ~84x for India) everywhere the rate is used, including live BOM costing.
         let effectiveMhrNum = mhrNum;
         let effectiveIsManual = isManual;
         let directOHVal: number | null = null;
         let indirectOHVal: number | null = null;
+        let combinedUsdMhr: number | null = null;
         if (isCombinedFormat) {
           directOHVal = directOverheadCol ? toNum(row.getCell(directOverheadCol).value, 0) || null : null;
           indirectOHVal = indirectOverheadCol ? toNum(row.getCell(indirectOverheadCol).value, 0) || null : null;
           const computedTotal = directOHVal && indirectOHVal ? directOHVal + indirectOHVal : null;
           // Use Total OH column if present and nonzero, otherwise sum the breakdown
-          effectiveMhrNum = (isNaN(mhrNum) || mhrNum === 0) && computedTotal != null ? computedTotal : (isNaN(mhrNum) ? 0 : mhrNum);
+          const usdMhr = (isNaN(mhrNum) || mhrNum === 0) && computedTotal != null ? computedTotal : (isNaN(mhrNum) ? 0 : mhrNum);
+          combinedUsdMhr = usdMhr;
+          // No rate on file for this location's currency — leave the figure in USD
+          // rather than guessing a conversion; missingRateCurrencies flags it in the
+          // returned errors[] so the caller knows exactly which rows need attention.
+          effectiveMhrNum = localPerUsd != null ? Math.round(usdMhr * localPerUsd * 100) / 100 : usdMhr;
           effectiveIsManual = true;
         }
 
@@ -873,17 +976,28 @@ export class MHRService {
           usd_lhr_burden:        rawUsdLhrBurden,
           usd_lhr_total:         reconciledLhrTotal,
           // Multi-currency and fully-burdened fields
-          currency:                    isCombinedFormat ? 'USD' : currencyVal,
-          currency_symbol:             isCombinedFormat ? '$' : (currencySymbolCol ? toStr(row.getCell(currencySymbolCol).value) || null : null),
+          currency:                    isCombinedFormat ? locCurrency : currencyVal,
+          currency_symbol:             isCombinedFormat ? locSymbol : (currencySymbolCol ? toStr(row.getCell(currencySymbolCol).value) || null : null),
           lhr_usd_effective:           finalLhrUsdEffective,
-          mhr_usd_per_hour:            isCombinedFormat ? effectiveMhrNum : (preCalcValues?.mhrUsd || null),
+          mhr_usd_per_hour:            isCombinedFormat ? combinedUsdMhr : (preCalcValues?.mhrUsd || null),
           fully_burdened_local_per_hr: isCombinedFormat ? effectiveMhrNum : (preCalcValues?.fullyBurdenedLocal || null),
-          fully_burdened_usd_per_hr:   isCombinedFormat ? effectiveMhrNum : (preCalcValues?.fullyBurdenedUsd || null),
+          fully_burdened_usd_per_hr:   isCombinedFormat ? combinedUsdMhr : (preCalcValues?.fullyBurdenedUsd || null),
           specs:                Object.keys(specsObj).length ? specsObj : null,
           _pre_calc:            preCalcValues,
           // Combined format overhead breakdown
           direct_overhead_rate:   directOHVal,
           indirect_overhead_rate: indirectOHVal,
+          // Machine capability (physics-based selection) — insertChunk strips these
+          // automatically if migration 324 hasn't been applied yet
+          ...capability,
+          capability_source:      hasCapability ? 'imported' : null,
+          capability_updated_at:  hasCapability ? new Date().toISOString() : null,
+          capability_updated_by:  hasCapability ? userId : null,
+          availability_status:    VALID_AVAILABILITY.includes(availabilityStatusRaw) ? availabilityStatusRaw : 'available',
+          next_available_at:      toIso(nextAvailCol),
+          scheduled_load_pct:     capNum(schedLoadCol),
+          maintenance_window_start: toIso(maintStartCol),
+          maintenance_window_end:   toIso(maintEndCol),
         });
       });
     }
@@ -1069,7 +1183,17 @@ export class MHRService {
       }
     });
 
+    if (missingRateCurrencies.size > 0) {
+      const list = [...missingRateCurrencies].join(', ');
+      this.logger.warn(`MHR import: no exchange rate on file for ${list} — affected rows kept raw USD figures`, 'MHRService');
+      errors.push(
+        `No exchange rate on file for: ${list}. Add these to the exchange_rates table, then re-import — ` +
+        `affected rows were saved with unconverted USD figures and will under-price by the FX factor until fixed.`,
+      );
+    }
+
     this.logger.log(`MHR import complete: ${imported} imported, ${skipped} skipped`, 'MHRService');
+    if (imported > 0) invalidateMachinePools();
     return { imported, skipped, errors };
   }
 
@@ -1088,6 +1212,7 @@ export class MHRService {
       throw new InternalServerErrorException('Failed to delete all MHR records.');
     }
 
+    invalidateMachinePools();
     return { deleted: (data ?? []).length };
   }
 

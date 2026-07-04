@@ -16,7 +16,6 @@ import {
   TrendingUp,
   Eye,
   Cpu,
-  Box,
 } from 'lucide-react';
 
 // DFM Color Constants - matching edrawings-viewer.tsx
@@ -1214,10 +1213,7 @@ export default function ManufacturingAnalysisPanel({
             {/* BOM Item Details */}
             {bomItem && (
               <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Box className="h-5 w-5" />
-                  <h3 className="font-medium">Part Details</h3>
-                </div>
+                <h3 className="font-medium mb-2">Part Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
                   <div className="space-y-1">
                     <span className="text-sm font-medium text-muted-foreground">Annual Volume</span>

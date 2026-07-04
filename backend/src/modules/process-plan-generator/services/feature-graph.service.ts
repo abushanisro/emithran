@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { resolveInspectionRule } from '../../bom-items/costing/gdt-severity';
+import type { InspectionMethod, InspectionRuleRow } from '../../bom-items/costing/gdt-severity';
 import type { EngineeringBrief } from '../dto/engineering-brief.dto';
 import type {
   ManufacturingFeature,
@@ -18,10 +20,15 @@ import type {
  */
 @Injectable()
 export class FeatureGraphService {
-  build(brief: EngineeringBrief): ManufacturingFeatureGraph {
+  build(brief: EngineeringBrief, inspectionRules: InspectionRuleRow[] = []): ManufacturingFeatureGraph {
     const features: ManufacturingFeature[] = [];
     let seq = 1;
     const dr = brief.drawing;
+
+    // Inspection requirement accumulator — upgraded by GD&T callouts below,
+    // consumed by the always-present INSPECT feature at the end.
+    let gdtCmmCount = 0;
+    let gdtCalloutCount = 0;
 
     // ── From 2D drawing (confidence ≥ 0.92) ────────────────────────────────
     if (dr.available) {
@@ -101,6 +108,16 @@ export class FeatureGraphService {
           source: 'drawing', confidence: 0.95,
           spec: dr.surfaceTreatment,
         });
+      }
+
+      // GD&T callouts → inspection method. Thresholds come from the
+      // inspection_rules table when seeded, falling back to the code matrix in
+      // gdt-severity.ts (shared with the cost engine) — e.g. position ≤ 0.05mm → CMM.
+      for (const g of dr.gdt) {
+        if (g.tolerance == null || g.tolerance <= 0) continue;
+        gdtCalloutCount++;
+        const severity = resolveInspectionRule(inspectionRules, g.symbol, g.tolerance);
+        if (severity.reasonCodes.includes('CMM_REQUIRED')) gdtCmmCount++;
       }
 
       // Heat treatment (skip generic placeholders)
@@ -183,7 +200,21 @@ export class FeatureGraphService {
       features.push({ id: `F${seq++}`, type: 'SAW_CUT', source: 'bom', confidence: 0.99 });
     }
     features.push({ id: `F${seq++}`, type: 'DEBURR',  source: 'bom', confidence: 0.99 });
-    features.push({ id: `F${seq++}`, type: 'INSPECT', source: 'bom', confidence: 0.99 });
+
+    // INSPECT is always present; GD&T callouts or a tight BOM tolerance upgrade
+    // it to CMM so the rule engine emits a dedicated CMM Inspection op.
+    const tightestTol = brief.bomItem.tightestToleranceMm;
+    const tolNeedsCmm = tightestTol != null && tightestTol > 0 && tightestTol <= 0.10;
+    const inspectionMethod: InspectionMethod = (gdtCmmCount > 0 || tolNeedsCmm) ? 'cmm' : 'visual';
+    features.push({
+      id: `F${seq++}`, type: 'INSPECT', source: gdtCmmCount > 0 ? 'drawing' : 'bom', confidence: 0.99,
+      inspectionMethod,
+      spec: gdtCmmCount > 0
+        ? `CMM — ${gdtCmmCount} of ${gdtCalloutCount} GD&T callout(s) require CMM`
+        : tolNeedsCmm
+        ? `CMM — tightest tolerance ±${tightestTol}mm ≤ 0.10mm`
+        : undefined,
+    });
 
     const overallConfidence = features.length > 0
       ? Math.min(...features.map((f) => f.confidence))

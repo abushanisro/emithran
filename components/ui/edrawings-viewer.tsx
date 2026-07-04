@@ -3474,17 +3474,17 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       <div className="bg-[#3f3f3f] border-b border-[#555555] px-3 py-1.5 shrink-0 overflow-x-auto">
         <div className="flex items-center justify-between min-w-max">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={toggleTransparent}
-              className={`gap-1.5 font-medium text-xs ${isTransparent ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
-              <Eye className="h-3.5 w-3.5" /> Transparent
+            <Button variant="outline" size="sm" onClick={toggleTransparent} title="Transparent"
+              className={`font-medium text-xs ${isTransparent ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+              <Eye className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="outline" size="sm" onClick={toggleWireframe}
-              className={`gap-1.5 font-medium text-xs ${isWireframe ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
-              <Square className="h-3.5 w-3.5" /> Wireframe
+            <Button variant="outline" size="sm" onClick={toggleWireframe} title="Wireframe"
+              className={`font-medium text-xs ${isWireframe ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+              <Square className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="outline" size="sm" onClick={toggleCrossSection}
-              className={`gap-1.5 font-medium text-xs ${showCrossSection ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
-              <Slice className="h-3.5 w-3.5" /> Cross Section
+            <Button variant="outline" size="sm" onClick={toggleCrossSection} title="Cross Section"
+              className={`font-medium text-xs ${showCrossSection ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+              <Slice className="h-3.5 w-3.5" />
             </Button>
 
             {features.length > 0 && (

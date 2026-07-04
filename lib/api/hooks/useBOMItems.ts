@@ -72,6 +72,11 @@ export interface BOMItem {
   tightestToleranceMm?: number;
   toleranceConfidence?: number;
   drawingIntelligence?: import('@/lib/api/vave').DrawingAnalysisResult;
+  validationConfig?: {
+    solverType: 'fea_plastic_elastic' | 'fea_elastic_only' | 'geometric_unfolding';
+    surfaceForFlattening: 'mid_surface' | 'larger_area' | 'smaller_area';
+    fillHolesInBlanks: boolean;
+  } | null;
 }
 
 export interface MaterialCandidate {
@@ -141,6 +146,11 @@ export interface UpdateBOMItemDto {
   maxHeight?: number | undefined;
   surfaceArea?: number | undefined;
   volume?: number | undefined;
+  validationConfig?: {
+    solverType: 'fea_plastic_elastic' | 'fea_elastic_only' | 'geometric_unfolding';
+    surfaceForFlattening: 'mid_surface' | 'larger_area' | 'smaller_area';
+    fillHolesInBlanks: boolean;
+  } | null;
 }
 
 const bomItemKeys = {
@@ -385,6 +395,64 @@ export function useDFMScores(bomItemId?: string) {
 
 // ── Cost Summary ──────────────────────────────────────────────────────────────
 
+// ── Machine selection (physics-based capability engine) ──────────────────────
+
+export type CapabilitySource = 'imported' | 'seed' | 'default_class';
+export type AvailabilityStatus = 'available' | 'maintenance' | 'down' | 'retired' | 'commissioning';
+export type SelectionProfile = 'balanced' | 'cheapest' | 'fastest';
+
+export interface MachineCapability {
+  maxXMm: number | null;
+  maxYMm: number | null;
+  maxZMm: number | null;
+  maxDiameterMm: number | null;
+  maxLengthMm: number | null;
+  maxTonnage: number | null;
+  maxThicknessMm: number | null;
+  maxWorkpieceWeightKg: number | null;
+  powerKw: number | null;
+  maxThicknessMsMm: number | null;
+  maxThicknessSsMm: number | null;
+  maxThicknessAlMm: number | null;
+  maxThicknessCuMm: number | null;
+  cuttableMaterials: string[] | null;
+}
+
+export interface MachineCandidate {
+  machineId: string | null;
+  machineName: string | null;
+  commodityCode: string | null;
+  machineClass: string;
+  hourlyRate: number;
+  utilizationPct: number;
+  scheduledLoadPct: number | null;
+  availabilityStatus: AvailabilityStatus;
+  nextAvailableAt: string | null;
+  maintenanceWindowStart: string | null;
+  maintenanceWindowEnd: string | null;
+  capability: MachineCapability;
+  capabilitySource: CapabilitySource;
+  capabilityVersion: number | null;
+}
+
+export interface MachineRecommendation {
+  candidate: MachineCandidate;
+  score: number;
+  reasons: string[];
+}
+
+export interface MachineSelectionResult {
+  balanced: MachineRecommendation;
+  cheapest: MachineRecommendation;
+  fastest: MachineRecommendation;
+  alternatives: MachineCandidate[];
+  confidence: number;
+  requirement: { kind: string } & Record<string, unknown>;
+  allowOverride: true;
+  overridden: boolean;
+  availabilityWarning?: string;
+}
+
 export interface ProcessLineCost {
   process: string;
   setupCost: number;
@@ -396,6 +464,7 @@ export interface ProcessLineCost {
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;
+  machineSelection?: MachineSelectionResult;
 }
 
 export interface ProcessCO2 {
@@ -550,18 +619,42 @@ export interface RouteComparisonDto {
   materialSource: "db" | "default";
   routes: RouteResultDto[];
   comparisonWarnings: string[];
+  currency: string;
+  currencySymbol: string;
 }
 
-export function useRouteComparison(itemId: string | undefined, batchSize: number = 1) {
+export function useRouteComparison(itemId: string | undefined, batchSize: number = 1, location = 'USA') {
   return useQuery({
-    queryKey: ["bom-items", itemId, "route-comparison", batchSize],
+    queryKey: ["bom-items", itemId, "route-comparison", batchSize, location],
     queryFn: () =>
       apiClient.get<RouteComparisonDto>(
-        `/bom-items/${itemId}/route-comparison?batchSize=${batchSize}`,
+        `/bom-items/${itemId}/route-comparison?batchSize=${batchSize}&location=${encodeURIComponent(location)}`,
       ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+  });
+}
+
+// ── Machine override ──────────────────────────────────────────────────────────
+// Force a specific machine for one process line; null mhrRecordId reverts to
+// auto-selection. Overrides are scoped to the Digital Factory location — an
+// India machine pick must not follow the item into a USA costing (the backend
+// rejects cross-location machines). Invalidates cost summary + route comparison
+// so costs recompute.
+
+export function useMachineOverride(itemId: string | undefined, location: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ processKey, mhrRecordId }: { processKey: string; mhrRecordId: string | null }) =>
+      apiClient.post<{ processKey: string; mhrRecordId: string | null; location: string }>(
+        `/bom-items/${itemId}/machine-override`,
+        { processKey, mhrRecordId, location },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'cost-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'route-comparison'] });
+    },
   });
 }
 

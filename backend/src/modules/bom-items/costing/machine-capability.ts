@@ -4,6 +4,7 @@
 // override these benchmark defaults without a code deployment.
 
 import type { MachineClass } from "./default-rates";
+import { estimateBendTonnage } from "./default-rates";
 
 export interface MachineCapabilitySpec {
   maxThicknessMm?: number;
@@ -41,6 +42,10 @@ export interface PartGeometryForCapability {
   sheetThicknessMm: number;
   flatPatternLengthMm: number | null;
   flatPatternWidthMm: number | null;
+  // Bend-force inputs (optional — tonnage skipped when absent). bendLengthMm is
+  // the longest bend line; the longest flat-pattern edge is a conservative proxy.
+  bendLengthMm?: number | null;
+  materialUtsMpa?: number | null;
 }
 
 export type CapabilityReasonCode =
@@ -50,7 +55,8 @@ export type CapabilityReasonCode =
   | "CLASS_THICKNESS_LIMIT"
   | "THICKNESS_EXCEEDED"
   | "BED_LENGTH_EXCEEDED"
-  | "BED_WIDTH_EXCEEDED";
+  | "BED_WIDTH_EXCEEDED"
+  | "TONNAGE_EXCEEDED";
 
 export interface CapabilityCheck {
   capable: boolean;
@@ -75,6 +81,14 @@ export function checkMachineCapability(
   commodityCode: string | null,
   geometry: PartGeometryForCapability,
 ): CapabilityCheck {
+  // Bend tonnage — air-bending physics (1.42 × UTS × t² × L / V), press brake only
+  const estimatedTonnage =
+    machineClass === "press_brake" &&
+    geometry.materialUtsMpa != null &&
+    geometry.bendLengthMm != null
+      ? estimateBendTonnage(geometry.materialUtsMpa, geometry.sheetThicknessMm, geometry.bendLengthMm)
+      : null;
+
   // NULL dimensions — assume capable, low confidence
   if (geometry.flatPatternLengthMm == null || geometry.flatPatternWidthMm == null) {
     return {
@@ -82,7 +96,7 @@ export function checkMachineCapability(
       confidence: "low",
       reasonCodes: ["DIMENSIONS_UNAVAILABLE"],
       reasons: ["Dimensions unavailable — capability assumed"],
-      estimatedTonnage: null,
+      estimatedTonnage,
     };
   }
 
@@ -103,7 +117,7 @@ export function checkMachineCapability(
       reasons: failures.length > 0
         ? failures.map((f) => f.message)
         : ["No specific machine selected — assumed capable"],
-      estimatedTonnage: null,
+      estimatedTonnage,
     };
   }
 
@@ -120,7 +134,7 @@ export function checkMachineCapability(
       reasons: failures.length > 0
         ? failures.map((f) => f.message)
         : ["Machine spec not on file — assumed capable"],
-      estimatedTonnage: null,
+      estimatedTonnage,
     };
   }
 
@@ -134,12 +148,18 @@ export function checkMachineCapability(
   if (spec.maxBedWidthMm != null && geometry.flatPatternWidthMm > spec.maxBedWidthMm) {
     failures.push({ code: "BED_WIDTH_EXCEEDED", message: `Part width ${geometry.flatPatternWidthMm}mm exceeds machine bed (${spec.maxBedWidthMm}mm)` });
   }
+  if (estimatedTonnage != null && spec.maxTonnage != null && estimatedTonnage > spec.maxTonnage) {
+    failures.push({
+      code: "TONNAGE_EXCEEDED",
+      message: `Estimated bend force ${estimatedTonnage}t exceeds machine capacity (${spec.maxTonnage}t)`,
+    });
+  }
 
   return {
     capable: failures.length === 0,
     confidence: "high",
     reasonCodes: failures.map((f) => f.code),
     reasons: failures.map((f) => f.message),
-    estimatedTonnage: null, // Phase 2: (material × thickness² × bend_length) / die_opening
+    estimatedTonnage,
   };
 }

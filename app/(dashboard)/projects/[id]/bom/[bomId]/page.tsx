@@ -299,10 +299,10 @@ export default function BOMDetailPage() {
   // while viewingItem is non-null, and reverts to the BOM when null.
   usePageContext({
     entityType: 'bom_item',
-    entityId: viewingItem?.id,
-    breadcrumbs: viewingItem
-      ? ['Project', 'BOM', viewingItem.name ?? viewingItem.partNumber ?? 'Part']
-      : undefined,
+    entityId: viewingItem?.id ?? null,
+    ...(viewingItem && {
+      breadcrumbs: ['Project', 'BOM', viewingItem.name ?? viewingItem.partNumber ?? 'Part'],
+    }),
   });
 
   // -------------------------------------------------------------------------
@@ -1075,55 +1075,64 @@ export default function BOMDetailPage() {
         </Card>
       )}
 
-      {/* BOM metadata card */}
+      {/* BOM metadata strip */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardContent className="py-4">
+          <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
             <div>
-              <CardTitle>BOM Information</CardTitle>
-              <CardDescription>Version: {bom.version}</CardDescription>
+              <p className="text-sm font-semibold">BOM Information</p>
+              <p className="text-xs text-muted-foreground">Assembly BOM</p>
             </div>
-            <Button variant="outline" size="icon">
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div className="hidden md:block h-8 w-px bg-border" />
             <div>
-              <p className="text-muted-foreground">Project</p>
-              <p className="font-medium">{project?.name ?? 'Loading…'}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Version</p>
+              <p className="text-sm font-medium">{bom.version}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Created</p>
-              <p className="font-medium">{new Date(bom.createdAt).toLocaleDateString()}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Project</p>
+              <p className="text-sm font-medium">{project?.name ?? 'Loading…'}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Last Updated</p>
-              <p className="font-medium">{new Date(bom.updatedAt).toLocaleDateString()}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Created</p>
+              <p className="text-sm font-medium">{new Date(bom.createdAt).toLocaleDateString()}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Last Updated</p>
+              <p className="text-sm font-medium">{new Date(bom.updatedAt).toLocaleDateString()}</p>
+            </div>
+            <div className="ml-auto">
+              <Button variant="outline" size="icon">
+                <Settings className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* STEP / assembly upload */}
-      <AssemblyTreeGenerator
-        bomId={bomId}
-        projectId={projectId}
-        onAssemblyGenerated={(tree, assemblyData) => {
-          if (assemblyData) setUploadedAssembly3D(assemblyData);
-          if (tree?.length) refetchBOMItems();
-        }}
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Assembly Model</CardTitle>
+          <CardDescription>
+            Upload the top-level assembly STEP file — sub-assemblies and child parts are
+            parsed and costed automatically
+          </CardDescription>
+        </CardHeader>
+        <AssemblyTreeGenerator
+          bomId={bomId}
+          projectId={projectId}
+          onAssemblyGenerated={(tree, assemblyData) => {
+            if (assemblyData) setUploadedAssembly3D(assemblyData);
+            if (tree?.length) refetchBOMItems();
+          }}
+        />
+      </Card>
 
       {/* 3D Assembly viewer */}
       {uploadedAssembly3D && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Box className="h-5 w-5" />
-              Assembly 3D Model
-            </CardTitle>
+            <CardTitle>Assembly 3D Model</CardTitle>
             <CardDescription>
               3D visualization — {uploadedAssembly3D.fileName}
             </CardDescription>
@@ -1303,8 +1312,36 @@ export default function BOMDetailPage() {
         <TabsContent value="items" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>BOM Items</CardTitle>
-              <CardDescription>Manage parts, materials, and components</CardDescription>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>BOM Items</CardTitle>
+                  <CardDescription>Manage parts, materials, and components</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => handleAddTreeItem(null, BOMItemType.SUB_ASSEMBLY)}
+                  >
+                    <Layers3 className="h-4 w-4" />
+                    Add Sub-Assembly
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => handleAddTreeItem(null, BOMItemType.CHILD_PART)}
+                  >
+                    <Box className="h-4 w-4" />
+                    Add Child Part
+                  </Button>
+                  <Button size="sm" className="gap-2" onClick={handleAddItem}>
+                    <Plus className="h-4 w-4" />
+                    Add BOM Item
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <BOMItemsFlat
@@ -1313,12 +1350,6 @@ export default function BOMDetailPage() {
                 onViewItem={handleViewItem}
                 onAddChildItem={handleAddTreeItem}
               />
-              <div className="flex justify-center">
-                <Button onClick={handleAddItem} className="gap-2" size="lg">
-                  <Plus className="h-4 w-4" />
-                  Add BOM Item
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

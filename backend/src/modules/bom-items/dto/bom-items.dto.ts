@@ -262,6 +262,10 @@ export class CreateBOMItemDto {
   @ApiPropertyOptional({ description: 'Full drawing intelligence JSON — threads, GD&T callouts, tolerances, revision, notes' })
   @IsOptional()
   drawingIntelligence?: Record<string, any>;
+
+  @ApiPropertyOptional({ description: 'Blank development solver config (persisted from Validation tab)' })
+  @IsOptional()
+  validationConfig?: Record<string, unknown> | null;
 }
 
 export class UpdateBOMItemDto extends PartialType(CreateBOMItemDto) { }

@@ -15,12 +15,16 @@ export interface WaterjetInput {
   pierceCount: number;  // contour starts; 5 sec each (waterjet pierces in motion)
   batchSize: number;
   waterjetRate?: MHRRateInput;
+  // Garnet price in the SAME currency as waterjetRate.rate (from
+  // LOCATION_ABRASIVE_PRICE_PER_KG). Falls back to the India INR rate — only
+  // valid when the machine rate is also INR.
+  abrasivePricePerKg?: number;
 }
 
 export interface WaterjetResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
-  abrasiveCost: number;  // ₹ — separate from processLines machine cost
+  abrasiveCost: number;  // same currency as the machine rate / abrasivePricePerKg
   warnings: string[];
 }
 
@@ -38,8 +42,9 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
   const cuttingMin = totalSec / 60;
 
   // Abrasive charged only for active cutting time, not piercing
+  const abrasivePricePerKg = input.abrasivePricePerKg ?? WATERJET_ABRASIVE_INR_PER_KG;
   const abrasiveCost = r2(
-    (cuttingSec / 60) * WATERJET_ABRASIVE_KG_PER_MIN * WATERJET_ABRASIVE_INR_PER_KG,
+    (cuttingSec / 60) * WATERJET_ABRASIVE_KG_PER_MIN * abrasivePricePerKg,
   );
 
   const setupCost = r2((WATERJET_SETUP_MIN / 60) * rate.rate / Math.max(input.batchSize, 1));

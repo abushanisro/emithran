@@ -64,11 +64,65 @@ function build(
   };
 }
 
+// Canonical symbol names for rule matching. Drawing extraction emits
+// 'profile_line'/'profile_surface'/'total_runout' (DrawingGdt enum) which the
+// per-symbol matrices key as 'profile'/'runout'; deprecated ISO controls map to
+// their measurement-equivalent modern symbol.
+export function normalizeGdtSymbol(rawType: string): string {
+  const t = (rawType ?? "").trim().toLowerCase();
+  if (t.startsWith("profile")) return "profile";
+  if (t === "total_runout" || t === "total runout") return "runout";
+  if (t === "concentricity") return "runout";   // measured as runout on modern equipment
+  if (t === "symmetry") return "position";       // replaced by position per ASME Y14.5-2018
+  return t;
+}
+
+// ── DB-backed rule resolution (inspection_rules table) ────────────────────────
+// Row shape mirrors migration 334. Matching: rules for the normalized symbol
+// (or '*' catch-all), tightest tol_max_mm band that still contains the
+// tolerance wins. Falls back to the code matrix below when no rule matches —
+// costing and routing must never fail because the KB read failed or is empty.
+
+export interface InspectionRuleRow {
+  gdt_symbol: string;
+  tol_max_mm: number;
+  severity: GdtSeverity;
+  inspection_method: InspectionMethod;
+  inspection_time_min: number;
+  cost_impact_percent: number;
+  cost_impact_range: string;
+  reason_codes: string[];
+  manufacturing_actions: string[];
+}
+
+export function resolveInspectionRule(
+  rules: InspectionRuleRow[],
+  rawType: string,
+  toleranceMm: number,
+): GdtSeverityResult {
+  const symbol = normalizeGdtSymbol(rawType);
+  const pool = rules.filter((r) => r.gdt_symbol === symbol);
+  const candidates = pool.length > 0 ? pool : rules.filter((r) => r.gdt_symbol === "*");
+  const match = candidates
+    .filter((r) => Number(r.tol_max_mm) >= toleranceMm)
+    .sort((a, b) => Number(a.tol_max_mm) - Number(b.tol_max_mm))[0];
+  if (!match) return deriveGdtSeverity(rawType, toleranceMm);
+  return {
+    severity: match.severity,
+    inspectionMethod: match.inspection_method,
+    inspectionTimeMin: Number(match.inspection_time_min),
+    costImpactPercent: Number(match.cost_impact_percent),
+    costImpactRange: match.cost_impact_range,
+    reasonCodes: (match.reason_codes ?? []) as GdtReasonCode[],
+    manufacturingActions: match.manufacturing_actions ?? [],
+  };
+}
+
 export function deriveGdtSeverity(
   rawType: string,
   toleranceMm: number,
 ): GdtSeverityResult {
-  const type = (rawType ?? "").trim().toLowerCase();
+  const type = normalizeGdtSymbol(rawType);
 
   switch (type) {
     case "position": {

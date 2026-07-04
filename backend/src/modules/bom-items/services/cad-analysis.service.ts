@@ -755,6 +755,79 @@ export class CADAnalysisService {
 
     this.logger.log(`STL bbox: x[${xmin.toFixed(2)},${xmax.toFixed(2)}] y[${ymin.toFixed(2)},${ymax.toFixed(2)}] z[${zmin.toFixed(2)},${zmax.toFixed(2)}]`);
 
+    // ── Sort bbox dimensions (matches Python OCC engine convention) ────────
+    // Python sorts descending so height is always the thinnest axis regardless
+    // of STL orientation — extractDfm relies on this for flatness detection.
+    const sortedDims = [dx, dy, dz].sort((a, b) => b - a);
+    const [dimL, dimW, dimH] = sortedDims; // length (max), width (mid), height (min)
+
+    // ── Geometry signals computable from STL without topology ──────────────
+    const flatness = dimH / Math.max(dimL, 0.1);
+    const rawBboxVol = dx * dy * dz;
+    // fillFraction is -1 when volume wasn't computed (ASCII STL fallback)
+    const fillFraction = computedVolumeMm3 > 0 && rawBboxVol > 0
+      ? computedVolumeMm3 / rawBboxVol : -1;
+    const saVolRatio = computedVolumeMm3 > 0 && computedSurfaceAreaMm2 > 0
+      ? computedSurfaceAreaMm2 / computedVolumeMm3 : 0;
+    const elongation = dimL / Math.max(dimW, 0.1);
+
+    // ── Simplified family detection — mirrors Python detect_part_family() ──
+    // Without OCC topology we lose hole density and planar face fraction.
+    // Flatness + fill fraction + SA/Vol are sufficient for the main families.
+    let detectedFamily = 'cnc_milled';
+    let familyConfidence = 0.60;
+    let classificationReason = 'Default STL heuristic — no strong geometry signal; upload STEP for accurate classification';
+
+    if (flatness < 0.15) {
+      // Solid CNC billets cannot achieve flatness < 0.15 — this is always sheet metal
+      familyConfidence = Math.min(0.90, 0.65 + (0.15 - flatness) * 2.0);
+      detectedFamily = 'sheet_metal';
+      classificationReason = `Very flat cross-section (flatness=${flatness.toFixed(3)} < 0.15) → sheet metal`;
+    } else if (fillFraction > 0 && fillFraction < 0.10 && flatness < 0.60) {
+      // Very low fill + moderately flat: perforated/cutout sheet metal frame
+      detectedFamily = 'sheet_metal';
+      familyConfidence = 0.78;
+      classificationReason = `Low fill fraction (${(fillFraction * 100).toFixed(0)}%) + flat bbox (flatness=${flatness.toFixed(2)}) → sheet metal frame`;
+    } else if (saVolRatio > 0.8 && flatness < 0.60 && rawBboxVol > 100_000) {
+      // High surface-to-volume: open frame/panel with lots of cutouts
+      detectedFamily = 'sheet_metal';
+      familyConfidence = 0.75;
+      classificationReason = `High SA/Vol ratio (${saVolRatio.toFixed(2)}) + flat bbox → sheet metal panel/frame`;
+    } else if (elongation > 2.5 && flatness > 0.20) {
+      // Elongated and not flat: rod, shaft, or turned part
+      detectedFamily = 'cnc_turned';
+      familyConfidence = 0.70;
+      classificationReason = `Elongated geometry (L/W=${elongation.toFixed(2)}) + not flat → CNC turned`;
+    }
+
+    // Sheet thickness: only populate when min dim is plausibly a material gauge (< 10 mm).
+    // For box-form sheet metal (e.g. 414×307×46 mm enclosure) dimH = 46 is the box depth,
+    // NOT the material thickness — leave 0 so the scope classifier relies on detected_family.
+    // The Python STEP engine uses topology (antiparallel face pairs) to find the true gauge.
+    const sheetFeatures = detectedFamily === 'sheet_metal' && dimH < 10
+      ? { sheet_thickness_mm: parseFloat(dimH.toFixed(2)), bend_count: 0, slot_count: 0, cut_length_mm: 0 }
+      : { sheet_thickness_mm: 0, bend_count: 0, slot_count: 0, cut_length_mm: 0 };
+
+    const manufactIntel = {
+      detected_family: detectedFamily,
+      family_confidence: parseFloat(familyConfidence.toFixed(3)),
+      classification_reason: [classificationReason],
+      classification_signals: {
+        flatness:      parseFloat(flatness.toFixed(3)),
+        fill_fraction: fillFraction >= 0 ? parseFloat(fillFraction.toFixed(3)) : null,
+        sa_vol_ratio:  parseFloat(saVolRatio.toFixed(3)),
+        elongation:    parseFloat(elongation.toFixed(3)),
+        source: 'stl_geometry_heuristic',
+      },
+      features: sheetFeatures,
+    };
+
+    this.logger.log(
+      `[STL classify] family=${detectedFamily} conf=${familyConfidence.toFixed(2)} ` +
+      `flatness=${flatness.toFixed(3)} fill=${fillFraction >= 0 ? (fillFraction * 100).toFixed(0) + '%' : 'n/a'} ` +
+      `saVol=${saVolRatio.toFixed(2)} reason="${classificationReason}"`,
+    );
+
     // ── Generate normalised DFM positions spread across real model surfaces ─
     // nx/ny/nz are each in [-1,+1] relative to bbox centre.
     // Frontend multiplies by scene half-extents to get exact scene position.
@@ -824,15 +897,19 @@ export class CADAnalysisService {
       geometry_features: {
         file_size_bytes: fileSize,
         triangle_count: safeTriangleCount,
-        estimated_volume_mm3: computedVolumeMm3 > 0 ? computedVolumeMm3 : dx * dy * dz * 0.4,
-        surface_area_estimation: computedSurfaceAreaMm2 > 0 ? computedSurfaceAreaMm2 : 2 * (dx * dy + dy * dz + dx * dz),
+        // Use computed volume when available; fall back to 10% fill (not 40%) since
+        // the most common STL-only parts are sheet metal frames with low fill fraction.
+        estimated_volume_mm3: computedVolumeMm3 > 0 ? computedVolumeMm3 : rawBboxVol * 0.10,
+        surface_area_estimation: computedSurfaceAreaMm2 > 0 ? computedSurfaceAreaMm2 : 2 * (dimL * dimW + dimW * dimH + dimL * dimH),
         complexity_score: Math.min(safeTriangleCount / 1000, 9.99),
+        // Sorted: length (max) → width → height (min) — matches Python OCC convention
         bounding_box: {
-          length: parseFloat(dx.toFixed(2)),
-          width: parseFloat(dy.toFixed(2)),
-          height: parseFloat(dz.toFixed(2)),
+          length: parseFloat(dimL.toFixed(2)),
+          width:  parseFloat(dimW.toFixed(2)),
+          height: parseFloat(dimH.toFixed(2)),
         },
         manufacturing_features: {
+          manufacturing_intelligence: manufactIntel,
           holes: holeResult,
           pockets: pocketResult,
           thin_walls: thinWallMm,

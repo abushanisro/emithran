@@ -21,6 +21,32 @@ from typing import Dict, List, Optional, Tuple, Any
 logger = logging.getLogger(__name__)
 
 
+def _annotate_tap_candidates(hole_groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Annotate hole groups whose diameter falls in a tap pre-drill band
+    (shared table from cnc_feature_recognizer) with 'tap_candidate_spec' and
+    return a [{spec, count}] summary.
+
+    RECOGNITION DATA ONLY — sheet metal is full of clearance holes whose sizes
+    overlap tap-drill bands (M3 clearance Ø3.2–3.4 vs M4 tap drill Ø3.3), so the
+    backend must NOT price tapping from these candidates alone; drawing thread
+    callouts remain the authoritative source for sheet-metal tapping cost.
+    """
+    from cnc_feature_recognizer import _TAP_DRILL_RANGES
+
+    tap_candidates: List[Dict[str, Any]] = []
+    for g in hole_groups:
+        d = g.get("diameter_mm")
+        if d is None:
+            continue
+        for lo, hi, spec in _TAP_DRILL_RANGES:
+            if lo <= d <= hi:
+                g["tap_candidate_spec"] = spec
+                tap_candidates.append({"spec": spec, "count": g.get("count", 0)})
+                break
+    return tap_candidates
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Part-family detection
 # ─────────────────────────────────────────────────────────────────────────────
@@ -34,6 +60,7 @@ def detect_part_family(
     planar_face_fraction: float = 0.0,
     total_face_count: int = 1,
     large_cyl_count: int = 0,
+    pocket_count: int = 0,
 ) -> Tuple[str, float, List[str]]:
     """
     Heuristic family classification from bounding-box geometry + cylindrical face signals.
@@ -61,6 +88,9 @@ def detect_part_family(
     large_cyl_count: number of cylindrical faces with radius > 15% of max bbox dimension.
       These represent external OD surfaces (turned diameters, large bores) — not sheet holes.
       > 3 → hard veto on sheet_metal gates (a genuine sheet metal part has only small holes).
+
+    pocket_count: number of prismatic pocket floor faces detected.
+      > 2 → hard veto on sheet_metal gates (pockets require milling, not laser/punch).
     """
     dims = sorted(d for d in bbox_dims if d > 0)
     if len(dims) < 3:
@@ -78,10 +108,64 @@ def detect_part_family(
 
     hole_density = hole_count / max(total_face_count, 1)
 
+    # Pre-veto gate: cylindrical-face-dominated topology with non-rotational alignment.
+    # Sheet metal enclosures (boxes, frames, channels) have many small cylindrical faces
+    # from bend radii. The pocket detector false-positives heavily on their enclosed
+    # cavities, so the normal pocket veto would incorrectly block classification.
+    # When > 40% of faces are cylindrical AND the part is not rotationally symmetric
+    # (cyl_axis_alignment < 0.50 — rules out turned discs/flanges with many holes)
+    # AND no large external-OD cylinders, the dominant signal is sheet metal.
+    # ZDR90 enclosure: hole_density=0.57, flatness=0.52, cyl_alignment=0.41 → fires here.
+    if (hole_density > 0.40
+            and flatness < 0.65
+            and cyl_axis_alignment < 0.50
+            and large_cyl_count == 0):
+        confidence = min(0.88, 0.72 + min(hole_density, 0.80) * 0.18)
+        return "sheet_metal", round(confidence, 3), [
+            f"Cylindrical-face-dominated topology ({hole_density:.0%} of faces) "
+            f"with flat-ish bbox (flatness={flatness:.2f}) and non-rotational alignment "
+            f"(cyl_alignment={cyl_axis_alignment:.2f}) — bend-rich or perforated sheet metal",
+        ]
+
     # Hard veto: parts with multiple large-radius cylinders (external OD surfaces) cannot
     # be sheet metal. A lens holder / flange / shaft has external diameters >> hole radii;
     # a perforated sheet has only small holes. Threshold: > 3 large cylinders detected.
-    sheet_metal_veto = large_cyl_count > 3
+    #
+    # BUT large_cyl_count only counts hole RADIUS — it cannot tell a big external turned
+    # diameter from a big clearance/lightening hole punched or laser-cut through a flat
+    # sheet (motor-mount brackets routinely have a Ø50+ shaft-clearance hole). Once the
+    # part is already hole-dense (hole_density ≥ 0.20 — the same bar gate 1b below uses
+    # to call a part "perforated sheet metal"), a couple of oversized holes among many
+    # small ones is normal sheet-metal geometry, not evidence of turning. Only veto on
+    # large cylinders when the part is NOT already hole-dense — i.e. a genuinely turned/
+    # milled part with a few big bores and otherwise sparse holes.
+    #
+    # Pocket veto: enclosed prismatic recesses require milling — not achievable on laser/punch.
+    # > 2 pockets distinguishes CNC milled blocks (e.g. Boom Clamp, bracket with bosses)
+    # from sheet metal — BUT the pocket detector false-positives on rectangular slot
+    # cutouts and bend-relief/corner-notch geometry in perforated sheet (e.g. ZDR90 basket:
+    # 505 holes + 271 pockets from body topology). When holes overwhelm pockets (≥ 5:1 and
+    # past the perforation threshold of 20), the part is hole-dominated sheet and the
+    # pocket veto must not apply.
+    #
+    # That ratio/count escape hatch doesn't scale down to smaller parts with proportionally
+    # fewer total features: Motor Bracket regression (bbox 135x165.5x70, 15 holes incl.
+    # Ø58x2 + Ø70x1 motor-shaft clearance, only 26 total faces) has just 9 "pockets" — almost
+    # certainly bend-relief/corner-notch artifacts on a 3.2mm sheet, which cannot physically
+    # have real machined pockets — but 15 holes never reaches the 5:1/20-hole escape tuned for
+    # ZDR90-scale parts. hole_density (58% of ALL faces are holes here) is a normalized signal
+    # that scales correctly regardless of part size: comfortably past gate 1b's own 0.20 bar,
+    # a majority-hole-faces topology is unambiguously perforated sheet, so it overrides the
+    # pocket veto independently of the ratio/count check. Without this fix the part fell
+    # through to the disc/flange rotational heuristic (which false-positives here because
+    # every hole through a flat sheet is perpendicular to it, i.e. axis-aligned, mimicking a
+    # turned part's shared spin axis) → misclassified as mill_turn at 75% confidence.
+    pockets_dominate = (
+        pocket_count > 2
+        and hole_count < max(20, pocket_count * 5)
+        and hole_density < 0.50
+    )
+    sheet_metal_veto = (large_cyl_count > 3 and hole_density < 0.20) or pockets_dominate
 
     # Gate 1b-abs — absolute hole count + moderately flat bbox.
     # Perforated brackets with flanges that inflate bbox height will have flatness 0.40–0.60
@@ -223,9 +307,34 @@ class SheetMetalFeatureExtractor:
 
         bends: Dict[str, Any] = {"count": 0, "radii": [], "all_radii": []}
         try:
-            bends = self._count_bends_from_list(raw_cylinders, sheet_thickness)
+            if raw_cylinders_full:
+                # Full tuples carry axial patch length → profile-radius filtering possible
+                bends = self._count_bends_from_full(raw_cylinders_full, sheet_thickness)
+            else:
+                bends = self._count_bends_from_list(raw_cylinders, sheet_thickness)
         except Exception as e:
             logger.warning(f"[SheetMetal] bend detection failed: {e}")
+
+        # Sharp-corner fallback: no cylindrical bend-radius faces found on a
+        # confirmed sheet (thickness detected) — the part may be a "dumb solid"
+        # STEP import (mitered fold lines, no bend relief). Detect folds from
+        # face-normal dihedral angles instead of bend-radius cylinders.
+        if bends["count"] == 0 and sheet_thickness > 0:
+            try:
+                sharp = self._detect_sharp_bends(shape, bbox_dims, sheet_thickness)
+                if sharp["count"] > 0:
+                    # radii stay empty — sharp folds have none; angles are NOT radii
+                    # and must not leak into bend_radii_mm ("R90.0" in the UI)
+                    bends = {
+                        "count": sharp["count"], "radii": [], "all_radii": [],
+                        "angles_deg": sharp["angles"],
+                    }
+                    logger.info(
+                        f"[SheetMetal] sharp-corner bend fallback: {sharp['count']} fold(s) "
+                        f"detected via dihedral angle (no bend-radius cylinders present)"
+                    )
+            except Exception as e:
+                logger.warning(f"[SheetMetal] sharp-bend fallback failed: {e}")
 
         holes: Dict[str, Any] = {"count": 0, "diameters": [], "all_diameters": []}
         try:
@@ -297,7 +406,8 @@ class SheetMetalFeatureExtractor:
             "cut_length_confidence": 0.90,
             "bend_count": bends["count"],
             "bend_radii_mm": bends.get("all_radii", bends["radii"]),
-            "bend_confidence": 0.75,
+            "bend_angles_deg": bends.get("angles_deg", []),
+            "bend_confidence": 0.65 if bends.get("angles_deg") else 0.75,
             "hole_count": holes["count"],
             "hole_diameters_mm": holes.get("all_diameters", holes["diameters"]),
             "hole_groups": holes.get("hole_groups", []),
@@ -708,11 +818,13 @@ class SheetMetalFeatureExtractor:
             c for c in raw_cylinders_full
             if c[1] >= 0.5 and 0.3 <= c[0] <= 150.0
         ]
-        # Bends: axis roughly horizontal (abs_axis_z < 0.5), radius within sheet-thickness range
+        # Bends: axis roughly horizontal (abs_axis_z < 0.5), radius within sheet-thickness
+        # range, AND axial length well above sheet thickness — cut-edge profile radii and
+        # corner fillets are cylinders too, but only span the thickness of the sheet.
         max_bend_r = max(sheet_thickness * 8, 20.0)
         bend_entries = [
             c for c in raw_cylinders_full
-            if c[1] < 0.5 and 0.1 <= c[0] <= max_bend_r
+            if self._is_bend_cylinder(c, sheet_thickness, max_bend_r)
         ]
 
         # ── Pre-compute spatial data for per-occurrence metrics ─────────────────
@@ -876,6 +988,57 @@ class SheetMetalFeatureExtractor:
 
         return features
 
+    @staticmethod
+    def _min_bend_line_mm(sheet_thickness: float) -> float:
+        """
+        Minimum axial length for a cylindrical face to qualify as a bend.
+
+        A press-brake bend cylinder spans the flange width (tens of mm). A profile
+        radius or corner fillet on the CUT EDGE of the sheet is also a cylinder with
+        an in-plane axis, but its axial extent equals the sheet thickness — that is
+        the physical height of the cut edge. Requiring axial length > 2× thickness
+        (floor 3 mm) rejects outer-contour radii (e.g. R35/R29 profile arcs) and
+        corner fillets (R2.5) without touching real bends, whose shortest practical
+        bend line is a ~6 mm tab.
+        """
+        return max(2.0 * sheet_thickness, 3.0) if sheet_thickness > 0 else 3.0
+
+    def _is_bend_cylinder(
+        self,
+        cyl: Tuple,
+        sheet_thickness: float,
+        max_bend_radius: float,
+    ) -> bool:
+        """Bend test for a full cylinder tuple (see _build_feature_occurrences)."""
+        if cyl[1] >= 0.5:                       # axis must be in the sheet plane
+            return False
+        if not (0.1 <= cyl[0] <= max_bend_radius):
+            return False
+        # m[9] = axial patch length — absent on legacy 9-tuples; skip filter then
+        if len(cyl) > 9 and cyl[9] is not None and cyl[9] < self._min_bend_line_mm(sheet_thickness):
+            return False
+        return True
+
+    def _count_bends_from_full(
+        self,
+        raw_cylinders_full: List[Tuple],
+        sheet_thickness: float,
+    ) -> Dict[str, Any]:
+        """Bend count/radii from full tuples, with profile-radius noise filtered out."""
+        max_bend_radius = max(sheet_thickness * 8, 20.0)
+        bend_radii: List[float] = [
+            round(c[0], 3)
+            for c in raw_cylinders_full
+            if self._is_bend_cylinder(c, sheet_thickness, max_bend_radius)
+        ]
+        sorted_radii = sorted(round(r, 1) for r in bend_radii)
+        inner_radii = sorted_radii[::2]
+        return {
+            "count": len(bend_radii) // 2,
+            "radii": sorted(set(inner_radii)),
+            "all_radii": inner_radii,
+        }
+
     def _count_bends_from_list(
         self,
         raw_cylinders: List[Tuple[float, float]],
@@ -896,6 +1059,122 @@ class SheetMetalFeatureExtractor:
             "all_radii": inner_radii,
         }
 
+    def _detect_sharp_bends(
+        self,
+        shape: Any,
+        bbox_dims: List[float],
+        sheet_thickness: float,
+    ) -> Dict[str, Any]:
+        """
+        Fallback bend detector for STEP files modeled with sharp/mitered fold lines
+        instead of filleted bend radii — a "dumb solid" import (sewn faces, no bend
+        relief) common in customer-supplied STEP files. _count_bends_from_full/_list
+        only see cylindrical bend-radius faces; a sharp-corner model has none of
+        those, so bend_count silently reads 0 even on a visibly folded part.
+
+        Detects large planar face pairs that:
+          - share a common straight (non-arc) edge — a fold line, not a hole/fillet
+            boundary,
+          - are NOT coplanar: dihedral angle between unit normals in (15°, 165°).
+            Below 15° is a coplanar split face (not a bend); above 165° is a
+            hem/fold-flat — geometrically degenerate for this proxy, excluded to
+            avoid double-counting a hem as an extra bend line,
+          - both faces are large flange panels, not the laser-cut perimeter wall.
+            That wall meets the top/bottom panel at ~90° too, but it is only
+            sheet_thickness wide — min_flange_area excludes it by area, not angle.
+
+        Each qualifying pair counts as one bend line (a topology proxy for one
+        press-brake hit, matching how the cylindrical-radius path already counts
+        one bend per radius pair).
+        """
+        from OCC.Core.TopExp import TopExp_Explorer, topexp  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE  # type: ignore
+        from OCC.Core.TopoDS import topods  # type: ignore
+        from OCC.Core.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape  # type: ignore
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve  # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Plane, GeomAbs_Line  # type: ignore
+        from OCC.Core.BRepGProp import brepgprop  # type: ignore
+        from OCC.Core.GProp import GProp_GProps  # type: ignore
+
+        MAX_HASH = 2 ** 31 - 1
+        max_dim = max(bbox_dims) if bbox_dims else 1.0
+        min_flange_area = max(sheet_thickness * 20.0, (max_dim * 0.15) ** 2 * 0.5)
+
+        # ── Collect large planar faces (candidate flanges) ────────────────────
+        planar_faces: List[Tuple[Any, Tuple[float, float, float]]] = []
+        face_hash_to_idx: Dict[int, int] = {}
+        explorer = TopExp_Explorer(shape, TopAbs_FACE)
+        while explorer.More():
+            try:
+                face = topods.Face(explorer.Current())
+                adaptor = BRepAdaptor_Surface(face)
+                if adaptor.GetType() == GeomAbs_Plane:
+                    plane = adaptor.Plane()
+                    n = plane.Axis().Direction()
+                    nx, ny, nz = float(n.X()), float(n.Y()), float(n.Z())
+                    mag = math.sqrt(nx * nx + ny * ny + nz * nz)
+                    if mag > 1e-9:
+                        nx, ny, nz = nx / mag, ny / mag, nz / mag
+                        props = GProp_GProps()
+                        brepgprop.SurfaceProperties(face, props)
+                        if props.Mass() >= min_flange_area:
+                            face_hash_to_idx[face.HashCode(MAX_HASH)] = len(planar_faces)
+                            planar_faces.append((face, (nx, ny, nz)))
+            except Exception:
+                pass
+            explorer.Next()
+
+        if len(planar_faces) < 2:
+            return {"count": 0, "angles": []}
+
+        # ── Edge → adjacent-face map for the whole shape ──────────────────────
+        try:
+            edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+            topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_face_map)  # type: ignore
+        except Exception as e:
+            logger.warning(f"[SheetMetal] sharp-bend edge map failed: {e}")
+            return {"count": 0, "angles": []}
+
+        seen_pairs = set()
+        bend_angles: List[float] = []
+        edge_exp = TopExp_Explorer(shape, TopAbs_EDGE)
+        while edge_exp.More():
+            edge = topods.Edge(edge_exp.Current())
+            edge_exp.Next()
+            try:
+                if BRepAdaptor_Curve(edge).GetType() != GeomAbs_Line:
+                    continue  # only straight fold lines — arcs are hole/fillet boundaries
+
+                idx = edge_face_map.FindIndex(edge)
+                if idx <= 0:
+                    continue
+                adj_list = edge_face_map.FindFromIndex(idx)
+                it = TopTools_ListIteratorOfListOfShape(adj_list)
+                candidate_idxs = []
+                while it.More():
+                    fh = topods.Face(it.Value()).HashCode(MAX_HASH)
+                    it.Next()
+                    fidx = face_hash_to_idx.get(fh)
+                    if fidx is not None:
+                        candidate_idxs.append(fidx)
+                if len(candidate_idxs) != 2:
+                    continue
+
+                i, j = sorted(set(candidate_idxs))
+                if i == j or (i, j) in seen_pairs:
+                    continue
+                seen_pairs.add((i, j))
+
+                n1, n2 = planar_faces[i][1], planar_faces[j][1]
+                dot = max(-1.0, min(1.0, n1[0]*n2[0] + n1[1]*n2[1] + n1[2]*n2[2]))
+                angle_deg = math.degrees(math.acos(dot))
+                if 15.0 < angle_deg < 165.0:
+                    bend_angles.append(round(angle_deg, 1))
+            except Exception:
+                continue
+
+        return {"count": len(bend_angles), "angles": sorted(bend_angles)}
+
     def _count_holes_from_list(
         self,
         raw_cylinders: List[Tuple[float, float]],
@@ -914,11 +1193,13 @@ class SheetMetalFeatureExtractor:
             [{"diameter_mm": d, "count": c} for d, c in counter.items()],
             key=lambda x: x["diameter_mm"],
         )
+        tap_candidates = _annotate_tap_candidates(hole_groups)
         return {
             "count":        sum(counter.values()),
             "diameters":    sorted(counter.keys()),
             "all_diameters": sorted(diameters),   # kept for backward compat
             "hole_groups":  hole_groups,
+            "tap_candidates": tap_candidates,
         }
 
     def _count_holes_with_location(
@@ -1013,11 +1294,13 @@ class SheetMetalFeatureExtractor:
             })
 
         all_diameters_sorted = sorted(all_diameters)
+        tap_candidates = _annotate_tap_candidates(hole_groups)
         return {
             "count":         len(hole_entries),
             "diameters":     sorted(groups.keys()),
             "all_diameters": all_diameters_sorted,
             "hole_groups":   hole_groups,
+            "tap_candidates": tap_candidates,
         }
 
     # ── Cut length, flat area, slots (accept pre-found dominant face) ─────────

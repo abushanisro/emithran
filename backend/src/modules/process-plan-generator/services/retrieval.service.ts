@@ -18,10 +18,11 @@ import { rankTooling } from '../ranking/tooling-ranker';
 
 import { ScopeClassifierService } from './scope-classifier.service';
 import { DrawingExtractorService } from './drawing-extractor.service';
-import { ExchangeRateService } from './exchange-rate.service';
+import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { FeatureGraphService } from './feature-graph.service';
 import { RuleEngineService } from './rule-engine.service';
 import { ManufacturingKnowledgeService } from '../../../modules/manufacturing-knowledge/manufacturing-knowledge.service';
+import { InspectionKnowledgeService } from '../../../modules/manufacturing-knowledge/services/inspection-knowledge.service';
 import { CADAnalysisService } from '../../bom-items/services/cad-analysis.service';
 
 /**
@@ -55,6 +56,7 @@ export class RetrievalService {
     private readonly featureGraph: FeatureGraphService,
     private readonly ruleEngine: RuleEngineService,
     private readonly knowledgeService: ManufacturingKnowledgeService,
+    private readonly inspectionKnowledge: InspectionKnowledgeService,
     private readonly cadAnalysis: CADAnalysisService,
   ) {}
 
@@ -274,12 +276,17 @@ export class RetrievalService {
       featureGraph: { features: [], buildSources: [] as ('drawing' | 'geometry' | 'bom')[], overallConfidence: 1 },
       mandatoryOps: [],
     };
-    const featureGraph = this.featureGraph.build(partialBrief as EngineeringBrief);
+    // DB-backed inspection rules (inspection_rules table) — [] on failure so the
+    // feature graph falls back to the code matrix in gdt-severity.ts
+    const inspectionRules = await this.inspectionKnowledge
+      .getInspectionRules(accessToken ?? '')
+      .catch(() => []);
+    const featureGraph = this.featureGraph.build(partialBrief as EngineeringBrief, inspectionRules);
     const drawingNotes =
       typeof bomRow.drawing_intelligence === 'object' && bomRow.drawing_intelligence !== null
         ? String((bomRow.drawing_intelligence as any).drawing_notes ?? '')
         : '';
-    const mandatoryOps = this.ruleEngine.evaluate(featureGraph, bomBrief, drawingNotes);
+    const mandatoryOps = this.ruleEngine.evaluate(featureGraph, bomBrief, drawingNotes, scope.family);
 
     const brief: EngineeringBrief = {
       bomItem: bomBrief,
@@ -538,22 +545,37 @@ export class RetrievalService {
 
     const rawVolume = numberOr(ga.estimated_volume_mm3 ?? ga.volume_mm3, 0);
     const bboxVol   = lengthMm * widthMm * heightMm;
+    const surfaceAreaMm2 = numberOr(ga.surface_area_mm2 ?? ga.surface_area_estimation, 0);
 
     // Sanity check: CAD engines occasionally emit near-zero artifact volumes (<1% of bounding box).
-    // When detected, estimate from bounding box geometry instead.
+    // BUT: perforated sheet-metal frames/baskets legitimately have <1% fill (e.g. a bent
+    // wire-basket at 0.5% fill = 99.5% "chip scrap" if costed as billet CNC). Distinguish
+    // real sparse parts from scan artifacts via implied sheet thickness = 2·V/SA:
+    // a genuine sheet part lands in 0.2–12 mm; a broken scan gives near-zero.
     let volumeMm3: number;
     if (rawVolume > 0 && bboxVol > 0 && rawVolume < bboxVol * 0.01) {
-      // Heuristic: if two shortest dims are within 20% of each other → cylindrical part
-      const dims = [lengthMm, widthMm, heightMm].sort((a, b) => a - b);
-      if (dims[1] / Math.max(dims[0], 1) < 1.2) {
-        const avgDiam = (dims[0] + dims[1]) / 2;
-        volumeMm3 = (Math.PI / 4) * avgDiam * avgDiam * dims[2];
+      const impliedThicknessMm = surfaceAreaMm2 > 0 ? (2 * rawVolume) / surfaceAreaMm2 : 0;
+      if (impliedThicknessMm >= 0.2 && impliedThicknessMm <= 12) {
+        volumeMm3 = rawVolume;
+        this.logger.log(
+          `[extractDfm] Sparse-part volume accepted: ${rawVolume.toFixed(0)}mm³ ` +
+          `(${((rawVolume / bboxVol) * 100).toFixed(2)}% of bbox, implied sheet thickness ` +
+          `${impliedThicknessMm.toFixed(2)}mm) — likely perforated/bent sheet frame`,
+        );
       } else {
-        volumeMm3 = bboxVol * 0.5; // box-like part, ~50% fill
+        // Heuristic: if two shortest dims are within 20% of each other → cylindrical part
+        const dims = [lengthMm, widthMm, heightMm].sort((a, b) => a - b);
+        if (dims[1] / Math.max(dims[0], 1) < 1.2) {
+          const avgDiam = (dims[0] + dims[1]) / 2;
+          volumeMm3 = (Math.PI / 4) * avgDiam * avgDiam * dims[2];
+        } else {
+          volumeMm3 = bboxVol * 0.5; // box-like part, ~50% fill
+        }
+        this.logger.warn(
+          `[extractDfm] Volume artifact: ${rawVolume.toFixed(1)}mm³ < 1% of bbox ${bboxVol.toFixed(0)}mm³ ` +
+          `(implied thickness ${impliedThicknessMm.toFixed(3)}mm implausible) → estimated ${volumeMm3.toFixed(0)}mm³`,
+        );
       }
-      this.logger.warn(
-        `[extractDfm] Volume artifact: ${rawVolume.toFixed(1)}mm³ < 1% of bbox ${bboxVol.toFixed(0)}mm³ → estimated ${volumeMm3.toFixed(0)}mm³`,
-      );
     } else if (rawVolume > 0) {
       volumeMm3 = rawVolume;
     } else if (bboxVol > 0) {
@@ -569,10 +591,12 @@ export class RetrievalService {
     }
 
     const mi = ga?.manufacturing_features?.manufacturing_intelligence?.features ?? {};
+    const cadDetectedFamily: string | undefined =
+      ga?.manufacturing_features?.manufacturing_intelligence?.detected_family ?? undefined;
 
     return {
       volumeMm3,
-      surfaceAreaMm2: numberOr(ga.surface_area_mm2 ?? ga.surface_area_estimation, 0),
+      surfaceAreaMm2,
       boundingBox: { lengthMm, widthMm, heightMm },
       holeCount: numberOr(da?.holes?.count ?? ga?.feature_detection?.holes_detected, 0),
       pocketCount: numberOr(da?.pockets?.count, 0),
@@ -583,6 +607,7 @@ export class RetrievalService {
       slotCount:        numberOr(mi.slot_count, 0),
       cutLengthMm:      numberOr(mi.cut_length_mm, 0),
       sheetThicknessMm: numberOr(mi.sheet_thickness_mm, 0),
+      cadDetectedFamily,
     };
   }
 

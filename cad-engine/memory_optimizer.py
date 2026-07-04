@@ -143,7 +143,10 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v11"  # bump when extraction logic changes to auto-invalidate stale cache entries
+    CACHE_VERSION = "geo_v17"  # bump when extraction logic changes to auto-invalidate stale cache entries
+    # NOTE: this version must also be bumped when classification logic in
+    # feature_extractors.py changes — detect_part_family output is embedded
+    # in the cached result, so a stale entry silently serves old family verdicts.
     
     # Performance constants optimized for enterprise workloads
     OPTIMIZATION_THRESHOLDS = {
@@ -413,6 +416,7 @@ class AdvancedCADMemoryOptimizer:
                 planar_face_fraction=planar_face_fraction,
                 total_face_count=total_face_count,
                 large_cyl_count=large_cyl_count,
+                pocket_count=pocket_count,
             )
             _hole_density_val = round(holes.get('count', 0) / max(total_face_count, 1), 3)
             manufacturing_intelligence = {
@@ -429,7 +433,8 @@ class AdvancedCADMemoryOptimizer:
                     'rotational_face_ratio':  round(rotational_face_ratio, 3),
                     'secondary_features_count': secondary_features_count,
                     'large_cyl_count':        large_cyl_count,
-                    'classification_version': 'v4',
+                    'pocket_count':           pocket_count,
+                    'classification_version': 'v5',
                 },
                 'classification_reason': classification_reasons,
             }
@@ -450,7 +455,7 @@ class AdvancedCADMemoryOptimizer:
             logger.info(
                 f"[mfg_intel] family={detected_family} conf={family_confidence:.2f} "
                 f"flatness={flatness_val} holes={holes.get('count', 0)} "
-                f"large_cyl={large_cyl_count} total_faces={total_face_count} "
+                f"pockets={pocket_count} large_cyl={large_cyl_count} total_faces={total_face_count} "
                 f"hole_density={_hole_density_val} "
                 f"planar_frac={round(planar_face_fraction, 2)} "
                 f"reasons={classification_reasons}"
@@ -657,6 +662,13 @@ class AdvancedCADMemoryOptimizer:
 
         diameters = [r * 2 for r in hole_radii]
         all_diameters = sorted(round(d, 1) for d in diameters)
+        # L/D per hole-range cylinder: axial patch length (m[9]) / diameter (2×m[0]).
+        # Max ratio drives deep-hole DFM — L/D > 3 needs peck cycles; > 5 gun drilling.
+        ld_ratios = [
+            round(m[9] / (2 * m[0]), 2)
+            for m in raw_cylinders_full
+            if 0.5 <= m[0] <= 150.0 and m[9] > 0
+        ]
         logger.info(f"face_map built: {len(face_map)} faces, {_tri_counter} triangles total")
         return {
             'count': len(hole_radii),
@@ -664,7 +676,8 @@ class AdvancedCADMemoryOptimizer:
             'max_diameter': round(max(diameters), 3),
             'diameters': sorted(set(all_diameters)),
             'all_diameters': all_diameters,
-            'depth_diameter_ratio': None,
+            'depth_diameter_ratio': max(ld_ratios) if ld_ratios else None,
+            'deep_hole_count': sum(1 for ld in ld_ratios if ld > 3.0),
             'edge_distance': None,
             'positions': hole_positions,
             'raw_cylinders': raw_cylinders,

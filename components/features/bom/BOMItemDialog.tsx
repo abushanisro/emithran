@@ -923,9 +923,10 @@ export function BOMItemDialog({
         setFormData(prev => {
           const patch: Partial<typeof prev> = {};
 
-          // Material — drawing is authoritative; always overrides CAD material
+          // Material — drawing is authoritative; always overrides CAD material.
+          // Placeholder strings from the extractor are not grades — never store them.
           const mat = result.material ?? '';
-          if (mat && mat !== 'Unknown') {
+          if (mat && !/^(unknown|not\s*specified|none|n\/?a)$/i.test(mat.trim())) {
             patch.materialGrade = mat;
             patch.materialSource = 'drawing';
             patch.materialConfidence = result.material_confidence ?? 0.5;

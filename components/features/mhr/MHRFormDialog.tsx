@@ -70,20 +70,81 @@ const LOCATION_COST_DEFAULTS: Record<string, {
   'Other':     { landedMachineCost: 50000,   rentPerSqmPerMonth: 15,   electricityCostPerKwh: 0.15,  interestRatePercentage: 6.0  },
 };
 
-// ── LHR defaults in USD (standard skill labour rates by location) ─────────────
-const LOCATION_LHR_DEFAULTS: Record<string, {
+// ── LHR defaults in USD, tiered by labour skill level ─────────────────────────
+// 'skilled' is the original baseline for each location (CNC operator / setter-
+// equivalent — matches the "Skill-Based Labour Rate" already used in process
+// costing). 'semi_skilled' and 'unskilled' scale that baseline by a multiplier
+// derived from two verified anchors:
+//   - India statutory minimum wage (Delhi, effective 2025-04-01): unskilled
+//     ₹18,456 : semi-skilled ₹20,371 : skilled ₹22,411/month ≈ 0.82 : 0.91 : 1.00
+//     (a wage-FLOOR ratio — compressed by law, narrower than real shop-floor pay)
+//   - US BLS OEWS (May 2024): machine feeders/offbearers $18.12/hr vs
+//     machinists $27.00/hr ≈ 0.67 : 1.00; CNC operators $24.02/hr ≈ 0.89 : 1.00
+//     (a market-productivity ratio — wider, reflects actual skill premium)
+// 0.60 (unskilled) / 0.80 (semi-skilled) sits between those two verified bands
+// and is applied uniformly across all locations — per-country skill-tier wage
+// data isn't available at this granularity for every location on this form.
+// Base/Burden split preserves each location's own Base+Burden=Total identity
+// (burden scales with base wage, matching how statutory contributions work).
+export type LaborSkillLevel = 'unskilled' | 'semi_skilled' | 'skilled';
+
+export const LABOR_SKILL_LEVEL_OPTIONS: Array<{ value: LaborSkillLevel; label: string }> = [
+  { value: 'unskilled', label: 'Unskilled' },
+  { value: 'semi_skilled', label: 'Semi-Skilled' },
+  { value: 'skilled', label: 'Skilled' },
+];
+
+interface LhrTierRates {
   lhrInrPerHr: number; usdLaborRatePerHr: number;
   usdLhrBase: number; usdLhrBurden: number; usdLhrTotal: number;
-}> = {
-  'India':     { lhrInrPerHr: 180, usdLaborRatePerHr: 2.16, usdLhrBase: 1.50, usdLhrBurden: 0.66, usdLhrTotal: 2.16  },
-  'China':     { lhrInrPerHr: 0,   usdLaborRatePerHr: 8.0,  usdLhrBase: 6.00, usdLhrBurden: 2.00, usdLhrTotal: 8.0   },
-  'USA':       { lhrInrPerHr: 0,   usdLaborRatePerHr: 22.0, usdLhrBase: 16.0, usdLhrBurden: 6.00, usdLhrTotal: 22.0  },
-  'Germany':   { lhrInrPerHr: 0,   usdLaborRatePerHr: 28.0, usdLhrBase: 20.0, usdLhrBurden: 8.00, usdLhrTotal: 28.0  },
-  'France':    { lhrInrPerHr: 0,   usdLaborRatePerHr: 25.0, usdLhrBase: 18.0, usdLhrBurden: 7.00, usdLhrTotal: 25.0  },
-  'W. Europe': { lhrInrPerHr: 0,   usdLaborRatePerHr: 26.0, usdLhrBase: 19.0, usdLhrBurden: 7.00, usdLhrTotal: 26.0  },
-  'E. Europe': { lhrInrPerHr: 0,   usdLaborRatePerHr: 12.0, usdLhrBase: 9.00, usdLhrBurden: 3.00, usdLhrTotal: 12.0  },
-  'Mexico':    { lhrInrPerHr: 0,   usdLaborRatePerHr: 5.0,  usdLhrBase: 3.50, usdLhrBurden: 1.50, usdLhrTotal: 5.0   },
-  'Other':     { lhrInrPerHr: 0,   usdLaborRatePerHr: 10.0, usdLhrBase: 7.00, usdLhrBurden: 3.00, usdLhrTotal: 10.0  },
+}
+
+const LOCATION_LHR_DEFAULTS: Record<string, Record<LaborSkillLevel, LhrTierRates>> = {
+  'India':     {
+    skilled:      { lhrInrPerHr: 180, usdLaborRatePerHr: 2.16, usdLhrBase: 1.50, usdLhrBurden: 0.66, usdLhrTotal: 2.16 },
+    semi_skilled: { lhrInrPerHr: 144, usdLaborRatePerHr: 1.73, usdLhrBase: 1.20, usdLhrBurden: 0.53, usdLhrTotal: 1.73 },
+    unskilled:    { lhrInrPerHr: 108, usdLaborRatePerHr: 1.30, usdLhrBase: 0.90, usdLhrBurden: 0.40, usdLhrTotal: 1.30 },
+  },
+  'China':     {
+    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 8.00, usdLhrBase: 6.00,  usdLhrBurden: 2.00, usdLhrTotal: 8.00  },
+    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 6.40, usdLhrBase: 4.80,  usdLhrBurden: 1.60, usdLhrTotal: 6.40  },
+    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 4.80, usdLhrBase: 3.60,  usdLhrBurden: 1.20, usdLhrTotal: 4.80  },
+  },
+  'USA':       {
+    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 22.00, usdLhrBase: 16.00, usdLhrBurden: 6.00, usdLhrTotal: 22.00 },
+    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 17.60, usdLhrBase: 12.80, usdLhrBurden: 4.80, usdLhrTotal: 17.60 },
+    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 13.20, usdLhrBase: 9.60,  usdLhrBurden: 3.60, usdLhrTotal: 13.20 },
+  },
+  'Germany':   {
+    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 28.00, usdLhrBase: 20.00, usdLhrBurden: 8.00, usdLhrTotal: 28.00 },
+    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 22.40, usdLhrBase: 16.00, usdLhrBurden: 6.40, usdLhrTotal: 22.40 },
+    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 16.80, usdLhrBase: 12.00, usdLhrBurden: 4.80, usdLhrTotal: 16.80 },
+  },
+  'France':    {
+    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 25.00, usdLhrBase: 18.00, usdLhrBurden: 7.00, usdLhrTotal: 25.00 },
+    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 20.00, usdLhrBase: 14.40, usdLhrBurden: 5.60, usdLhrTotal: 20.00 },
+    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 15.00, usdLhrBase: 10.80, usdLhrBurden: 4.20, usdLhrTotal: 15.00 },
+  },
+  'W. Europe': {
+    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 26.00, usdLhrBase: 19.00, usdLhrBurden: 7.00, usdLhrTotal: 26.00 },
+    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 20.80, usdLhrBase: 15.20, usdLhrBurden: 5.60, usdLhrTotal: 20.80 },
+    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 15.60, usdLhrBase: 11.40, usdLhrBurden: 4.20, usdLhrTotal: 15.60 },
+  },
+  'E. Europe': {
+    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 12.00, usdLhrBase: 9.00, usdLhrBurden: 3.00, usdLhrTotal: 12.00 },
+    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 9.60,  usdLhrBase: 7.20, usdLhrBurden: 2.40, usdLhrTotal: 9.60  },
+    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 7.20,  usdLhrBase: 5.40, usdLhrBurden: 1.80, usdLhrTotal: 7.20  },
+  },
+  'Mexico':    {
+    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 5.00, usdLhrBase: 3.50, usdLhrBurden: 1.50, usdLhrTotal: 5.00 },
+    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 4.00, usdLhrBase: 2.80, usdLhrBurden: 1.20, usdLhrTotal: 4.00 },
+    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 3.00, usdLhrBase: 2.10, usdLhrBurden: 0.90, usdLhrTotal: 3.00 },
+  },
+  'Other':     {
+    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 10.00, usdLhrBase: 7.00, usdLhrBurden: 3.00, usdLhrTotal: 10.00 },
+    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 8.00,  usdLhrBase: 5.60, usdLhrBurden: 2.40, usdLhrTotal: 8.00  },
+    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 6.00,  usdLhrBase: 4.20, usdLhrBurden: 1.80, usdLhrTotal: 6.00  },
+  },
 };
 
 interface MHRFormDialogProps {
@@ -224,6 +285,11 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   const [selectedOperation, setSelectedOperation] = useState('');
   const [isManualMode, setIsManualMode] = useState(false);
   const [manualMHRValue, setManualMHRValue] = useState(0);
+  // Convenience tier picker for the Labour tab — not persisted (mirrors how
+  // location defaults work: a lookup that fills the real, persisted LHR
+  // fields below). Defaults to 'skilled' so a brand-new record's auto-fill
+  // behaviour is unchanged from before this tier picker existed.
+  const [laborSkillLevel, setLaborSkillLevel] = useState<LaborSkillLevel>('skilled');
 
   // Prevent location-watch effect from overwriting values during form reset
   const isInitializingRef = useRef(false);
@@ -322,6 +388,9 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
       });
       setIsManualMode(Boolean(existingRecord.isManualEntry || (existingRecord as any).is_manual_entry));
       setManualMHRValue(Number(existingRecord.manualMHRValue || (existingRecord as any).manual_mhr_value || 0));
+      // Skill tier isn't persisted (see field comment) — an existing record's
+      // numbers stay exactly as saved; the picker just resets to its default.
+      setLaborSkillLevel('skilled');
       // Use processGroup first (set by Combined-format import); fall back to commodityCode
       const groupFromRecord = existingRecord.processGroup || existingRecord.commodityCode || '';
       if (allMappings?.mappings) {
@@ -341,6 +410,7 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
       reset(getDefaultValues());
       setIsManualMode(false); setManualMHRValue(0);
       setSelectedGroup(''); setSelectedRoute(''); setSelectedOperation('');
+      setLaborSkillLevel('skilled');
     }
   }, [existingRecord, reset, allMappings]);
 
@@ -358,6 +428,27 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
     [locationWatched],
   );
 
+  // Writes one skill tier's rates into the four LHR fields (+ local-currency
+  // rate where the location has one, e.g. India). Shared by the location-change
+  // auto-fill (blank-only) and the tier picker (explicit — always overwrites).
+  const applyLhrTier = (loc: string, skill: LaborSkillLevel) => {
+    const lhrDefs = LOCATION_LHR_DEFAULTS[loc]?.[skill];
+    if (!lhrDefs) return;
+    if (lhrDefs.lhrInrPerHr) setValue('lhrInrPerHr', lhrDefs.lhrInrPerHr);
+    setValue('usdLaborRatePerHr', lhrDefs.usdLaborRatePerHr);
+    setValue('usdLhrBase', lhrDefs.usdLhrBase);
+    setValue('usdLhrBurden', lhrDefs.usdLhrBurden);
+    setValue('usdLhrTotal', lhrDefs.usdLhrTotal, { shouldValidate: true, shouldDirty: true });
+  };
+
+  // Explicit tier selection: the whole point of picking a tier is to (re)fill
+  // the four rates below, so — unlike the location auto-fill — this always
+  // overwrites, even over a manually-typed value.
+  const handleSkillLevelChange = (skill: LaborSkillLevel) => {
+    setLaborSkillLevel(skill);
+    applyLhrTier(locationWatched || 'India', skill);
+  };
+
   // When location changes, apply location-specific defaults (skip during form init from existingRecord)
   useEffect(() => {
     if (!locationWatched || isInitializingRef.current) return;
@@ -368,17 +459,9 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
       setValue('electricityCostPerKwh', costDefs.electricityCostPerKwh);
       setValue('interestRatePercentage', costDefs.interestRatePercentage);
     }
-    // Only auto-fill LHR when blank (don't overwrite user-entered values)
-    if (!currentLhrTotal) {
-      const lhrDefs = LOCATION_LHR_DEFAULTS[locationWatched];
-      if (lhrDefs) {
-        if (lhrDefs.lhrInrPerHr) setValue('lhrInrPerHr', lhrDefs.lhrInrPerHr);
-        setValue('usdLaborRatePerHr', lhrDefs.usdLaborRatePerHr);
-        setValue('usdLhrBase', lhrDefs.usdLhrBase);
-        setValue('usdLhrBurden', lhrDefs.usdLhrBurden);
-        setValue('usdLhrTotal', lhrDefs.usdLhrTotal);
-      }
-    }
+    // Only auto-fill LHR when blank (don't overwrite user-entered values) —
+    // sourced from the currently selected skill tier.
+    if (!currentLhrTotal) applyLhrTier(locationWatched, laborSkillLevel);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationWatched]);
 
@@ -735,8 +818,21 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
             <TabsContent value="labour" className="space-y-4 mt-4">
               <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 px-4 py-2.5 mb-1">
                 <p className="text-xs text-green-800 dark:text-green-300">
-                  Labour rates auto-suggested from location defaults when blank. All LHR values are in <strong>USD</strong>.
+                  Pick a labour skill level to fill the four rates below from location defaults, or type your own.
+                  All LHR values are in <strong>USD</strong>.
                   <span className="font-semibold"> LHR Total ($/hr)</span> is the Skill-Based Labour Rate used in process costing.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Labour Skill Level</Label>
+                <Select value={laborSkillLevel} onValueChange={(v) => handleSkillLevelChange(v as LaborSkillLevel)}>
+                  <SelectTrigger><SelectValue placeholder="Select skill level" /></SelectTrigger>
+                  <SelectContent>
+                    {LABOR_SKILL_LEVEL_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Selecting a level recalculates the rates below for the current location — this replaces any values already entered.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-4">

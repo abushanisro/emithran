@@ -145,6 +145,12 @@ export class CreateRawMaterialDto {
   @Min(0)
   costChina?: number;
 
+  @ApiPropertyOptional({ example: 1.20 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costMexico?: number;
+
 
   @ApiPropertyOptional({ enum: MaterialShape, example: MaterialShape.GRANULES })
   @IsOptional()

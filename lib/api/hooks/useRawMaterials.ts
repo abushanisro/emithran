@@ -36,6 +36,7 @@ export interface RawMaterial {
   costIndia?: number;
   costEEurope?: number;
   costChina?: number;
+  costMexico?: number;
 
   // Material properties
   density?: number;

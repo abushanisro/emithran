@@ -22,8 +22,12 @@ export class RuleEngineService {
     graph: ManufacturingFeatureGraph,
     bomItem?: Pick<BriefBomItem, 'tightestToleranceMm' | 'coating'>,
     drawingNotes?: string,
+    family?: string,
   ): MandatoryOp[] {
     const mandatory: MandatoryOp[] = [];
+    // Hole-making and tapping run on the mill for milled parts, on the lathe otherwise
+    const holeMachine: MandatoryOp['machineCategoryHint'] =
+      family === 'cnc_milled' ? 'cnc_mill' : 'cnc_lathe';
 
     for (const f of graph.features) {
       switch (f.type) {
@@ -42,13 +46,17 @@ export class RuleEngineService {
         case 'AXIAL_HOLE': {
           const diamStr = f.diameter != null ? `Ø${f.diameter}mm` : 'Ø?mm';
           const thruStr = f.throughHole ? ' THRU' : '';
+          // L/D > 3: standard twist drilling needs peck cycles; > 5 gun drilling
+          const isDeepHole =
+            f.depth != null && f.diameter != null && f.diameter > 0 && f.depth / f.diameter > 3;
           mandatory.push({
             featureId: f.id,
             suggestedOpNbr: f.type === 'CROSS_HOLE' ? 50 : 40,
-            operationHint: `Drilling ${diamStr}${thruStr}`,
-            reason: `${f.type} ${diamStr} requires dedicated drilling op`,
+            operationHint: `Drilling ${diamStr}${thruStr}${isDeepHole ? ' (deep hole)' : ''}`,
+            reason: `${f.type} ${diamStr} requires dedicated drilling op` +
+              (isDeepHole ? ` — L/D ${(f.depth! / f.diameter!).toFixed(1)} > 3 requires peck drilling cycles` : ''),
             confidence: f.confidence,
-            machineCategoryHint: 'cnc_lathe',
+            machineCategoryHint: holeMachine,
             // Drilling can be done on CNC lathe (drill attachment) OR VMC — AI picks best
             alternativeMachineHints: ['cnc_lathe', 'cnc_mill'],
           });
@@ -62,7 +70,7 @@ export class RuleEngineService {
             operationHint: 'Counterboring',
             reason: 'Counterbore must follow drilling',
             confidence: f.confidence,
-            machineCategoryHint: 'cnc_lathe',
+            machineCategoryHint: holeMachine,
           });
           break;
 
@@ -73,7 +81,7 @@ export class RuleEngineService {
             operationHint: `Tapping ${f.spec ?? ''}`.trim(),
             reason: `Internal thread ${f.spec ?? ''} requires tapping op`,
             confidence: f.confidence,
-            machineCategoryHint: 'cnc_lathe',
+            machineCategoryHint: holeMachine,
           });
           break;
 
@@ -156,6 +164,18 @@ export class RuleEngineService {
           break;
 
         case 'INSPECT':
+          // GD&T / tight tolerance upgraded the feature to CMM — dedicated CMM op
+          // before final inspection (same featureId + suffix keeps traceability).
+          if (f.inspectionMethod === 'cmm') {
+            mandatory.push({
+              featureId: `${f.id}_cmm`,
+              suggestedOpNbr: 90,
+              operationHint: 'CMM Inspection',
+              reason: f.spec ?? 'GD&T / tight tolerance callouts require CMM inspection',
+              confidence: f.confidence,
+              machineCategoryHint: 'cmm',
+            });
+          }
           mandatory.push({
             featureId: f.id,
             suggestedOpNbr: 99,
@@ -217,9 +237,10 @@ export class RuleEngineService {
     // These fire independently of the feature graph — they use Gemini-extracted
     // fields persisted on the BOM item, not Claude DrawingBrief features.
 
-    // Tight tolerance → CMM Inspection
+    // Tight tolerance → CMM Inspection (skip when the feature graph already produced one)
+    const alreadyHasCmm = mandatory.some((op) => op.machineCategoryHint === 'cmm');
     const tol = bomItem?.tightestToleranceMm;
-    if (tol != null && tol > 0 && tol <= 0.10) {
+    if (!alreadyHasCmm && tol != null && tol > 0 && tol <= 0.10) {
       mandatory.push({
         featureId: 'tol_cmm',
         suggestedOpNbr: 90,
@@ -245,6 +266,21 @@ export class RuleEngineService {
         machineCategoryHint: 'surface_treatment',
         trigger: 'drawing_coating',
       } as MandatoryOp & { trigger: string });
+    }
+
+    // Surface treatment present → Cleaning/Degreasing must precede it.
+    // Anodize/plating on an oily or chip-contaminated surface fails adhesion.
+    const surfaceOps = mandatory.filter((op) => op.machineCategoryHint === 'surface_treatment');
+    if (surfaceOps.length > 0) {
+      const firstSurfaceOpNbr = Math.min(...surfaceOps.map((op) => op.suggestedOpNbr));
+      mandatory.push({
+        featureId: 'clean_pre_treatment',
+        suggestedOpNbr: Math.max(firstSurfaceOpNbr - 3, 1),
+        operationHint: 'Cleaning / Degreasing',
+        reason: 'Surface treatment requires a clean, oil-free surface — cleaning op inserted before treatment',
+        confidence: 0.9,
+        machineCategoryHint: 'cleaning',
+      });
     }
 
     // Bending dimensions critical in notes → First Article Inspection

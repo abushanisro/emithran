@@ -30,6 +30,8 @@ import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient } from '@/lib/api/client';
+import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
+import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import type { FeatureGraph, FeatureGraphSummary, DFMWarning, DFMSeverity, ValidationResult, ManufacturingFeature, HoleGroup, HoleGroupLocation, BendFeature, FeatureNodeV2, FaceMapEntry, FeatureCategory } from '@/lib/types/manufacturing';
 
@@ -126,6 +128,7 @@ const SURFACE_TREATMENT_KB: Record<string, KBFeature[]> = {
       attrs: [
         { name: 'Type',    value: 'Chemical conversion coating' },
         { name: 'Purpose', value: 'Corrosion inhibition + paint adhesion' },
+        { name: 'Substrate', value: 'Carbon / mild steel only' },
       ],
     },
     {
@@ -138,21 +141,85 @@ const SURFACE_TREATMENT_KB: Record<string, KBFeature[]> = {
       ],
     },
   ],
+  'Anodize': [
+    {
+      label: 'Anodizing',
+      machine: 'Anodizing Line',
+      attrs: [
+        { name: 'Type',      value: 'Type II sulfuric (per drawing)' },
+        { name: 'Thickness', value: '10–25 µm' },
+        { name: 'Substrate', value: 'Aluminium alloys' },
+      ],
+    },
+  ],
+  'Powder Coat Only': [
+    {
+      label: 'Powder Coating',
+      machine: 'Powder Coat Booth',
+      attrs: [
+        { name: 'Pre-treatment', value: 'Chromate conversion (aluminium)' },
+        { name: 'Finish',        value: 'RAL (per drawing)' },
+        { name: 'DFT',           value: '60–80 µm' },
+      ],
+    },
+  ],
 };
 
 // Default treatment sequence for carbon steels (CRCA, MS, IS2062, DC01)
 const CARBON_STEEL_TREATMENT_KEY = 'Zinc + Powder Coat';
 
+// Carbon/mild steel grades that corrode bare and default to Zinc + Powder Coat
+const RUSTY_MATERIALS = ['CRCA', 'MS', 'IS2062', 'DC01'];
+
+type SubstrateClass = 'aluminum' | 'stainless' | 'carbon_steel' | 'unknown';
+
+// Substrate classification drives surface-treatment defaults. Zinc phosphating is a
+// steel-only chemistry — it must never be applied to aluminium or stainless.
+function classifySubstrate(materialText: string): SubstrateClass {
+  const m = materialText.toUpperCase();
+  if (m.trim().length === 0) return 'unknown';
+  if (/ALUMIN|(^|[^A-Z0-9])(AA\s?\d{4}|AL)([^A-Z]|$)|6061|6063|5052|5754|7075|2024/.test(m)) {
+    return 'aluminum';
+  }
+  if (/STAINLESS|(^|[^A-Z])SS([^A-Z]|$)|304|316|430|17-4/.test(m)) return 'stainless';
+  if (RUSTY_MATERIALS.some((k) => m.includes(k)) || /MILD|EN\s?8|S235|S355|HR\b|CR[1-5]\b/.test(m)) {
+    return 'carbon_steel';
+  }
+  return 'unknown';
+}
+
+// Resolve which SURFACE_TREATMENT_KB sequence applies. Explicit drawing coating wins;
+// otherwise the substrate decides (aluminium → anodize, steel → zinc + powder coat).
+function resolveTreatmentKey(substrate: SubstrateClass, coating: string | null | undefined): string {
+  const c = (coating ?? '').toLowerCase();
+  if (coating && SURFACE_TREATMENT_KB[coating]) return coating;
+  if (c.includes('anodiz')) return 'Anodize';
+  if (c.includes('powder')) return substrate === 'aluminum' ? 'Powder Coat Only' : CARBON_STEEL_TREATMENT_KEY;
+  if (substrate === 'aluminum') return 'Anodize';
+  return CARBON_STEEL_TREATMENT_KEY;
+}
+
 // ── Inspection KB ──────────────────────────────────────────────────────────────
 // Composable inspection templates. Phase 2: driven by drawing quality requirements.
 
 const INSPECTION_KB: Record<string, KBFeature> = {
+  // Default for general-tolerance parts (no GD&T frames, no tight tolerances)
   dimensional: {
     label: 'Dimensional Inspection',
-    machine: 'CMM',
+    machine: 'Inspection Bench',
     attrs: [
       { name: 'Scope',  value: 'Critical holes + bends' },
-      { name: 'Method', value: 'CMM / Go-NoGo gauge' },
+      { name: 'Method', value: 'Calipers / height gauge / Go-NoGo gauge' },
+    ],
+  },
+  // Upgraded only when the drawing carries GD&T callouts or tolerance ≤ 0.10 mm
+  // (same gate as backend feature-graph.service.ts CMM rule)
+  dimensional_cmm: {
+    label: 'CMM Inspection',
+    machine: 'CMM',
+    attrs: [
+      { name: 'Scope',  value: 'GD&T callouts + critical dimensions' },
+      { name: 'Method', value: 'CMM per drawing datum scheme' },
     ],
   },
   visual: {
@@ -184,6 +251,25 @@ const FAMILY_GROUP: Record<string, string> = {
   weldment: 'Welding',
   additive: 'Additive Manufacturing',
   extrusion: 'Extrusion',
+};
+
+// ── Validation tab types & constants ──────────────────────────────────────────
+type SolverType = 'fea_plastic_elastic' | 'fea_elastic_only' | 'geometric_unfolding';
+type SurfaceForFlattening = 'mid_surface' | 'larger_area' | 'smaller_area';
+
+interface ValidationConfig {
+  solverType: SolverType;
+  surfaceForFlattening: SurfaceForFlattening;
+  fillHolesInBlanks: boolean;
+}
+
+// ANSI Y14.5 standard K-factor for mid-surface blank development
+const K_FACTOR_MID_SURFACE = 0.44;
+
+const DEFAULT_VALIDATION_CONFIG: ValidationConfig = {
+  solverType: 'fea_plastic_elastic',
+  surfaceForFlattening: 'mid_surface',
+  fillHolesInBlanks: false,
 };
 
 const KB_ROUTE_ALTERNATIVES: Record<string, ManualRouteOption[]> = {
@@ -554,7 +640,7 @@ function autoCompleteRoute(
   recs: Array<{ process: string; estimated_time_sec?: number | null }>,
   family: string,
   summary: FeatureGraphSummary,
-  ctx: { materialGrade?: string | null; material?: string | null } = {},
+  ctx: { materialGrade?: string | null; material?: string | null; coating?: string | null } = {},
 ): Array<{ process: string; estimated_time_sec?: number | null }> {
   const processes = new Set(recs.map((r) => r.process));
   const completed = [...recs];
@@ -589,13 +675,15 @@ function autoCompleteRoute(
       completed.splice(deburrIdx >= 0 ? deburrIdx : completed.length, 0, { process: 'Tapping' });
     }
 
-    // Surface Treatment: carbon/mild steels that corrode, OR unknown material (most sheet metal is coated)
-    const RUSTY_MATERIALS = ['CRCA', 'MS', 'IS2062', 'DC01'];
-    const mat = `${ctx.materialGrade ?? ''} ${ctx.material ?? ''}`.toUpperCase().trim();
-    const isRustyMetal = RUSTY_MATERIALS.some((m) => mat.includes(m));
-    const materialUnknown = mat.length === 0;
+    // Surface Treatment: only when the drawing calls out a coating, or the substrate
+    // is a known carbon/mild steel that corrodes bare. An unknown/pending material is
+    // MISSING INFORMATION, not a coating requirement — inventing a treatment op there
+    // adds phantom cost to quotes. The material-pending state is surfaced separately.
+    const substrate = classifySubstrate(`${ctx.materialGrade ?? ''} ${ctx.material ?? ''}`);
+    const coatingSpecified =
+      !!ctx.coating?.trim() && !/^(none|n\/?a|nil|-)$/i.test(ctx.coating.trim());
     if (
-      (isRustyMetal || materialUnknown) &&
+      (coatingSpecified || substrate === 'carbon_steel') &&
       !completed.some((r) => r.process === 'Surface Treatment')
     ) {
       completed.push({ process: 'Surface Treatment' });
@@ -647,10 +735,24 @@ function buildProcessTree(
   const recs = autoCompleteRoute(baseRecs, family, summary, {
     materialGrade: item.materialGrade ?? null,
     material: item.material ?? null,
+    coating: item.coating ?? null,
   });
 
+  const substrate = classifySubstrate(`${item.materialGrade ?? ''} ${item.material ?? ''}`);
+  const routeHasCoating = recs.some((r) => r.process === 'Surface Treatment');
+  // CMM only on GD&T callouts or tolerance ≤ 0.10 mm — same gate as the backend
+  // feature graph (feature-graph.service.ts). General-tolerance parts get manual.
+  const gdtCallouts = (item.drawingIntelligence?.gdt_callouts ?? []).filter(
+    (g) => typeof g.tolerance === 'number' && g.tolerance > 0,
+  );
+  const needsCmm =
+    gdtCallouts.length > 0 ||
+    (item.tightestToleranceMm != null && item.tightestToleranceMm > 0 && item.tightestToleranceMm <= 0.10);
+
   const operations: ProcessTreeNode[] = recs.map((rec, opIdx) => {
-    const machine = MACHINE_FOR[rec.process] ?? '—';
+    const machine = rec.process === 'Inspection'
+      ? (needsCmm ? 'CMM' : 'Inspection Bench')
+      : MACHINE_FOR[rec.process] ?? '—';
     const subLabel = SUB_OP[rec.process] ?? 'As Processed';
     const featureNodes: ProcessTreeNode[] = [];
 
@@ -854,11 +956,9 @@ function buildProcessTree(
     }
 
     if (isSurfaceTreatment) {
-      const matStr = `${item.materialGrade ?? ''} ${item.material ?? ''}`.toUpperCase().trim();
+      const matStr = `${item.materialGrade ?? ''} ${item.material ?? ''}`.trim();
       const materialUnknownHere = matStr.length === 0;
-      const coatingKey = item.coating && SURFACE_TREATMENT_KB[item.coating]
-        ? item.coating
-        : CARBON_STEEL_TREATMENT_KEY;
+      const coatingKey = resolveTreatmentKey(substrate, item.coating);
       const steps = SURFACE_TREATMENT_KB[coatingKey] ?? [];
       steps.forEach((step, i) => {
         const attrs = materialUnknownHere && i === 0
@@ -869,13 +969,12 @@ function buildProcessTree(
     }
 
     if (isInspection) {
-      const matStr = `${item.materialGrade ?? ''} ${item.material ?? ''}`.toUpperCase();
-      const RUSTY = ['CRCA', 'MS', 'IS2062', 'DC01'];
-      const hasCoating = RUSTY.some((m) => matStr.includes(m)) || matStr.trim().length === 0;
+      // Coating-thickness check exists only when the route actually coats the part;
+      // CMM only when GD&T / tight tolerance demands it (needsCmm computed above).
       const templates: KBFeature[] = [
-        INSPECTION_KB.dimensional!,
+        needsCmm ? INSPECTION_KB.dimensional_cmm! : INSPECTION_KB.dimensional!,
         INSPECTION_KB.visual!,
-        ...(hasCoating ? [INSPECTION_KB.coating_thickness!] : []),
+        ...(routeHasCoating ? [INSPECTION_KB.coating_thickness!] : []),
       ];
       templates.forEach((tmpl, i) => {
         featureNodes.push({ id: `feat_insp_${i}`, kind: 'feature', label: tmpl.label, factory, machine: tmpl.machine ?? machine, attrs: tmpl.attrs });
@@ -1133,9 +1232,9 @@ function EditCell({
 
 // ── CostSummaryTab — aPriori-style with inline editing ─────────────────────
 
-function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'India' }: { item: BOMItem; batchSize: number; appliedRouteId?: string | null; factory?: string }) {
+function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { item: BOMItem; batchSize: number; appliedRouteId?: string | null; factory?: string }) {
   const { data: cost, isLoading } = useCostSummary(item.id, batchSize, factory);
-  const { data: comparison } = useRouteComparison(item.id, batchSize);
+  const { data: comparison } = useRouteComparison(item.id, batchSize, factory);
   const appliedRoute: RouteResultDto | null = appliedRouteId
     ? (comparison?.routes.find((r) => r.routeId === appliedRouteId) ?? null)
     : null;
@@ -1200,6 +1299,10 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'India' }: 
   const [expandedProcs, setExpandedProcs] = useState<Set<string>>(new Set());
   const toggleProc = (key: string) =>
     setExpandedProcs((prev) => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+
+  const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set());
+  const toggleMachine = (key: string) =>
+    setExpandedMachines((prev) => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
 
   if (isLoading) return (
     <div className="py-10 text-center text-sm text-muted-foreground">Calculating cost…</div>
@@ -1316,6 +1419,73 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'India' }: 
 
       <TotalRow label="Total Direct Material" value={totalMatCost} pct={eff.pct(totalMatCost)} />
 
+      {/* ── MACHINE SELECTION ── */}
+      {/* One row PER PROCESS. Processes on the same physical machine (Setup and
+          CNC Milling run in one clamping) each get their own row but share one
+          override key — changing the machine on either row changes both, and the
+          row says so. Fixture carries no machine (backend attaches no selection). */}
+      {(() => {
+        const rows = eff.lines.filter((l) => l.machineSelection);
+        if (rows.length === 0) return null;
+        const classPeers = new Map<string, string[]>();
+        for (const l of rows) {
+          classPeers.set(l.machineClass, [...(classPeers.get(l.machineClass) ?? []), l.process]);
+        }
+        return (
+          <>
+            <SectionHeader label="Machine Selection" />
+            {rows.map((line) => {
+              const selection = line.machineSelection!;
+              const rec = selection.balanced.candidate;
+              const isOpen = expandedMachines.has(line.process);
+              const peers = (classPeers.get(line.machineClass) ?? []).filter((p) => p !== line.process);
+              return (
+                <div key={line.process}>
+                  <button
+                    type="button"
+                    onClick={() => toggleMachine(line.process)}
+                    className="w-full flex items-baseline justify-between py-2 border-b border-border/20 hover:bg-muted/10 transition-colors text-left pl-5"
+                  >
+                    <div className="flex-1 min-w-0 pr-4">
+                      <span className="text-sm text-foreground">
+                        {isOpen ? '▾' : '▸'} {line.process}
+                      </span>
+                      <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                        <span className="truncate">
+                          {rec.machineName ?? `Class default (${rec.machineClass.replace(/_/g, ' ')})`}
+                        </span>
+                        {peers.length > 0 && (
+                          <span className="shrink-0">· same machine as {peers.join(', ')}</span>
+                        )}
+                        {selection.overridden && <span className="text-amber-500 shrink-0">· overridden</span>}
+                        {selection.availabilityWarning && <span className="text-amber-500 shrink-0">⚠</span>}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="text-sm tabular-nums text-foreground">
+                        {sym}{rec.hourlyRate.toLocaleString(undefined, { maximumFractionDigits: 0 })}/hr
+                      </span>
+                    </div>
+                  </button>
+
+                  {isOpen && (
+                    <div className="pl-9 pr-0 py-1.5 bg-muted/10 border-b border-border/20">
+                      <MachineSelector
+                        itemId={item.id}
+                        processKey={line.machineClass}
+                        selection={selection}
+                        currencySymbol={sym}
+                        location={factory}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        );
+      })()}
+
       {/* ── DIRECT PROCESS ── */}
       <SectionHeader label="Direct Process Costs" />
 
@@ -1407,14 +1577,16 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'India' }: 
 }
 
 function RouteComparisonCard({
-  item, batchSize, appliedRouteId, onAppliedRouteChange,
+  item, batchSize, appliedRouteId, onAppliedRouteChange, factory = 'USA',
 }: {
   item: BOMItem; batchSize: number;
   appliedRouteId: string | null;
   onAppliedRouteChange: (id: string | null) => void;
+  factory?: string;
 }) {
-  const { data: comparison, isLoading } = useRouteComparison(item.id, batchSize);
+  const { data: comparison, isLoading } = useRouteComparison(item.id, batchSize, factory);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const sym = comparison?.currencySymbol ?? '₹';
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
@@ -1472,10 +1644,10 @@ function RouteComparisonCard({
                   </div>
                   <div className="text-right shrink-0">
                     <p className={cn('text-sm font-bold tabular-nums', incapable ? 'line-through text-muted-foreground/40' : 'text-foreground')}>
-                      ₹{fmt(route.totalCost, 2)}
+                      {sym}{fmt(route.totalCost, 2)}
                     </p>
                     {savings > 0.01 && !incapable && (
-                      <p className="text-[10px] text-muted-foreground tabular-nums">+₹{fmt(savings, 2)}</p>
+                      <p className="text-[10px] text-muted-foreground tabular-nums">+{sym}{fmt(savings, 2)}</p>
                     )}
                     {route.badges.lowestCost && (
                       <p className="text-[10px] text-emerald-600 font-medium">Lowest</p>
@@ -1510,7 +1682,7 @@ function RouteComparisonCard({
                   {route.abrasiveCost > 0 && (
                     <div>
                       <p className="text-[10px] text-muted-foreground">Abrasive</p>
-                      <p className="text-xs font-medium tabular-nums text-foreground">₹{fmt(route.abrasiveCost, 2)}</p>
+                      <p className="text-xs font-medium tabular-nums text-foreground">{sym}{fmt(route.abrasiveCost, 2)}</p>
                     </div>
                   )}
                 </div>
@@ -1583,21 +1755,21 @@ function RouteComparisonCard({
                 <div>
                   <p className="text-xs font-medium text-foreground">{item.materialGrade ?? comparison.materialGrade}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {fmt(comparison.grossWeightKg, 3)} kg × ₹{fmt(comparison.materialCostPerKg, 0)}/kg
+                    {fmt(comparison.grossWeightKg, 3)} kg × {sym}{fmt(comparison.materialCostPerKg, 0)}/kg
                   </p>
                 </div>
-                <span className="text-xs font-semibold tabular-nums shrink-0 ml-2">₹{fmt(comparison.materialCost, 2)}</span>
+                <span className="text-xs font-semibold tabular-nums shrink-0 ml-2">{sym}{fmt(comparison.materialCost, 2)}</span>
               </div>
               {appliedRoute.processLines.map((line) => (
                 <div key={line.process} className="px-3 py-2.5">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium text-foreground">{line.process}</p>
-                    <span className="text-xs font-semibold tabular-nums shrink-0 ml-2">₹{fmt(line.totalCost, 2)}</span>
+                    <span className="text-xs font-semibold tabular-nums shrink-0 ml-2">{sym}{fmt(line.totalCost, 2)}</span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground mt-1">
                     {line.machineName && <span>{line.machineName}</span>}
                     <span className="tabular-nums">{fmt(line.cycleTimeMin, 1)} min</span>
-                    <span className="tabular-nums">₹{fmt(line.hourlyRate, 0)}/hr</span>
+                    <span className="tabular-nums">{sym}{fmt(line.hourlyRate, 0)}/hr</span>
                     <span className={line.rateSource === 'mhr_database' ? 'text-emerald-600' : 'text-amber-600'}>
                       {line.rateSource === 'mhr_database' ? 'MHR DB' : 'est.'}
                     </span>
@@ -1611,7 +1783,7 @@ function RouteComparisonCard({
                     1 pc · batch {comparison.batchSize} · {fmt(appliedRoute.cycleTimes.totalMin, 1)} min
                   </p>
                 </div>
-                <span className="text-sm font-bold tabular-nums shrink-0 ml-2">₹{fmt(appliedRoute.totalCost, 2)}</span>
+                <span className="text-sm font-bold tabular-nums shrink-0 ml-2">{sym}{fmt(appliedRoute.totalCost, 2)}</span>
               </div>
               {appliedRoute.sustainability && (
                 <div className="flex items-center justify-between px-3 py-2 text-[11px] text-muted-foreground">
@@ -2759,6 +2931,7 @@ function MaterialPickerDialog({
     { label: 'France',  value: sel?.costFrance },
     { label: 'W. Europe', value: sel?.costWEurope },
     { label: 'E. Europe', value: sel?.costEEurope },
+    { label: 'Mexico', value: sel?.costMexico },
   ];
   const hasAnyCost = regionalCosts.some((r) => r.value != null);
 
@@ -3137,6 +3310,7 @@ function CostGuidePanel({
                 <option value="France">France</option>
                 <option value="W. Europe">W. Europe</option>
                 <option value="E. Europe">E. Europe</option>
+                <option value="Mexico">Mexico</option>
                 <option value="Other">Other</option>
               </select>
             </Section>
@@ -3372,7 +3546,7 @@ function CostGuidePanel({
         )}
 
         {tab === 'machine' && (
-          <ProcessCapabilityTab item={item} batchSize={batchSize} />
+          <ProcessCapabilityTab item={item} batchSize={batchSize} factory={factory} />
         )}
 
       </div>
@@ -3403,8 +3577,9 @@ function CostGuidePanel({
 
 // ── ProcessCapabilityTab ──────────────────────────────────────────────────────
 
-function ProcessCapabilityTab({ item, batchSize }: { item: BOMItem; batchSize: number }) {
-  const { data: comparison, isLoading } = useRouteComparison(item.id, batchSize);
+function ProcessCapabilityTab({ item, batchSize, factory = 'USA' }: { item: BOMItem; batchSize: number; factory?: string }) {
+  const { data: comparison, isLoading } = useRouteComparison(item.id, batchSize, factory);
+  const sym = comparison?.currencySymbol ?? '₹';
 
   if (isLoading) {
     return (
@@ -3553,7 +3728,7 @@ function ProcessCapabilityTab({ item, batchSize }: { item: BOMItem; batchSize: n
                 {fmt(route.cycleTimes.totalMin, 1)} min
               </span>
               <span className="text-[10px] text-muted-foreground tabular-nums ml-auto">
-                {capability.overallCapable ? `₹${fmt(route.totalCost, 0)}` : 'N/A'}
+                {capability.overallCapable ? `${sym}${fmt(route.totalCost, 0)}` : 'N/A'}
               </span>
             </div>
           </div>
@@ -4120,16 +4295,21 @@ function PartDetailTab({
   };
   const routeFromCost =
     cost?.processLines && cost.processLines.length > 0
-      ? cost.processLines.map((l) => SHORT_NAME[l.process] ?? l.process).join(' → ')
+      ? cost.processLines.map((l) => SHORT_NAME[l.process] ?? l.process)
       : null;
-  const routeFromFg =
-    fg?.processRecommendations && fg.processRecommendations.length > 0
-      ? fg.processRecommendations
-          .filter((r) => r.status === 'recommended')
-          .map((r) => r.process)
-          .join(' → ') || null
-      : null;
-  const route = routeFromCost ?? routeFromFg ?? '—';
+  const fgRecommended =
+    fg?.processRecommendations
+      ?.filter((r) => r.status === 'recommended')
+      .map((r) => r.process) ?? [];
+  const routeFromFg = fgRecommended.length > 0 ? fgRecommended : null;
+  const routeParts = [...(routeFromCost ?? routeFromFg ?? [])];
+  // A part with bends must show a bending step even when cost lines or
+  // recommendations omit it (e.g. material pending → no tonnage/cost line yet).
+  if (bendCount > 0 && routeParts.length > 0 && !routeParts.some((p) => /press brake|bend/i.test(p))) {
+    const cutIdx = routeParts.findIndex((p) => /laser|punch|waterjet|cutting/i.test(p));
+    routeParts.splice(cutIdx >= 0 ? cutIdx + 1 : 0, 0, 'Press Brake');
+  }
+  const route = routeParts.length > 0 ? routeParts.join(' → ') : '—';
   const routeConfidence = routeFromCost
     ? 'Based on cost analysis'
     : routeFromFg
@@ -4247,74 +4427,416 @@ function PartDetailTab({
   );
 }
 
+// ── ValidationTab helpers ──────────────────────────────────────────────────────
+
+const ValidationRow = ({ label, value }: { label: string; value: string }) => (
+  <div className="flex items-baseline gap-2 py-0.5">
+    <span className="text-xs text-muted-foreground flex-1 truncate">{label}</span>
+    <span className="text-xs font-medium truncate max-w-[140px]" title={value}>{value}</span>
+  </div>
+);
+
+// ── BlankDevOptionsDialog ──────────────────────────────────────────────────────
+
+function BlankDevOptionsDialog({
+  open, initialConfig, onClose, onSave, saving,
+}: {
+  open: boolean;
+  initialConfig: ValidationConfig;
+  onClose: () => void;
+  onSave: (cfg: ValidationConfig) => void;
+  saving: boolean;
+}) {
+  const [draft, setDraft] = useState<ValidationConfig>(initialConfig);
+  useEffect(() => { if (open) setDraft(initialConfig); }, [open, initialConfig]);
+
+  const RadioSet = ({ label, field, options }: {
+    label: string;
+    field: keyof Pick<ValidationConfig, 'solverType' | 'surfaceForFlattening'>;
+    options: Array<{ value: string; label: string }>;
+  }) => (
+    <fieldset className="space-y-1.5">
+      <legend className="text-xs font-semibold text-foreground border-b border-border/40 pb-1 mb-1.5 w-full">
+        {label}
+      </legend>
+      {options.map((opt) => (
+        <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name={field} value={opt.value}
+            checked={draft[field] === opt.value}
+            onChange={() => setDraft((d) => ({ ...d, [field]: opt.value as never }))}
+            className="accent-violet-500 h-3.5 w-3.5" />
+          <span className="text-xs text-foreground">{opt.label}</span>
+        </label>
+      ))}
+    </fieldset>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm bg-[#2a2a2a] border-border text-foreground">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold">Blank Development Options</DialogTitle>
+          <p className="text-xs text-muted-foreground">Control how blanks are developed for sheet metal parts.</p>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          <RadioSet label="Solver Type" field="solverType" options={[
+            { value: 'fea_plastic_elastic', label: 'FEA – Plastic and elastic behaviours considered' },
+            { value: 'fea_elastic_only',    label: 'FEA – Only elastic behaviour considered' },
+            { value: 'geometric_unfolding', label: 'Geometric Unfolding' },
+          ]} />
+          <RadioSet label="Surface for Flattening" field="surfaceForFlattening" options={[
+            { value: 'mid_surface',  label: 'Mid-Surface' },
+            { value: 'larger_area',  label: 'Larger Area Side' },
+            { value: 'smaller_area', label: 'Smaller Area Side' },
+          ]} />
+          <fieldset className="space-y-1.5">
+            <legend className="text-xs font-semibold text-foreground border-b border-border/40 pb-1 mb-1.5 w-full">
+              Fill Holes in Blanks
+            </legend>
+            {([{ v: true, l: 'Yes' }, { v: false, l: 'No' }] as const).map(({ v, l }) => (
+              <label key={String(v)} className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="fillHolesInBlanks" checked={draft.fillHolesInBlanks === v}
+                  onChange={() => setDraft((d) => ({ ...d, fillHolesInBlanks: v }))}
+                  className="accent-violet-500 h-3.5 w-3.5" />
+                <span className="text-xs text-foreground">{l}</span>
+              </label>
+            ))}
+          </fieldset>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={saving} className="text-xs">Cancel</Button>
+          <Button size="sm" onClick={() => onSave(draft)} disabled={saving}
+            className="text-xs bg-violet-600 hover:bg-violet-700 text-white">
+            {saving ? 'Saving…' : 'OK'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── ValidationTab ─────────────────────────────────────────────────────────────
 
-function ValidationTab({ fg }: { fg: FeatureGraph | null }) {
+function ValidationTab({ fg, item, modelScreenshot, file3dUrl }: { fg: FeatureGraph | null; item: BOMItem; modelScreenshot?: string | null; file3dUrl?: string | null }) {
+  const [optionsOpen, setOptionsOpen]     = useState(false);
+  const [tolerancesOpen, setTolerancesOpen] = useState(false);
+  const [machiningOpen, setMachiningOpen]   = useState(false);
+  const updateBOMItem = useUpdateBOMItem();
+
+  const isSheetMetal = (item.sheetThicknessMm ?? 0) > 0;
+
+  const [liveConfig, setLiveConfig] = useState<ValidationConfig>(
+    (item.validationConfig as ValidationConfig | null | undefined) ?? DEFAULT_VALIDATION_CONFIG,
+  );
+  useEffect(() => {
+    setLiveConfig((item.validationConfig as ValidationConfig | null | undefined) ?? DEFAULT_VALIDATION_CONFIG);
+  }, [item.validationConfig]);
+
+  const kFactor = liveConfig.surfaceForFlattening === 'mid_surface' ? K_FACTOR_MID_SURFACE : null;
+
+  const di = item.drawingIntelligence as Record<string, unknown> | undefined;
+  const generalTolerance = (di?.general_tolerances as string | undefined) ?? null;
+  const tightestToleranceMm: number | null =
+    item.tightestToleranceMm ?? (di?.tightest_tolerance_mm as number | undefined) ?? null;
+  const gdtCalloutCount = ((di?.gdt_callouts as unknown[]) ?? []).length;
+  const tolerancedHoleCount = ((fg as any)?.summary?.holeGroups ?? []).filter(
+    (g: any) => g?.tolerance_class || g?.fit_class,
+  ).length;
+  const toleranceCount = gdtCalloutCount + tolerancedHoleCount;
+
+  const featureOps: string[] = (() => {
+    if (!fg) return [];
+    const summary = (fg as any)?.summary ?? {};
+    if (isSheetMetal) {
+      const ops: string[] = [];
+      if ((summary.cutLengthMm ?? 0) > 0) ops.push('Laser Cutting');
+      if ((summary.bendCount ?? 0) > 0)   ops.push('Press Brake');
+      if ((summary.holeCount ?? 0) > 0)   ops.push('Deburring');
+      return ops;
+    }
+    const cncSummary: Record<string, number> = (fg as any)?.cnc_features?.feature_summary ?? {};
+    const ops: string[] = [];
+    if ((cncSummary.pockets ?? 0) > 0) ops.push('Milling');
+    if ((summary.holeCount ?? 0) > 0)  ops.push('Drilling');
+    if ((cncSummary.threads ?? 0) > 0) ops.push('Tapping');
+    return ops;
+  })();
+  const routeSummary = featureOps.length > 0 ? featureOps.join(' → ') : null;
+  const surfaceFinishStr = item.surfaceFinishRa != null ? `Ra ${item.surfaceFinishRa} µm` : null;
+
   const checks = (fg?.validationResults ?? []) as ValidationResult[];
   const score = fg?.manufacturabilityScore;
   const difficulty = fg?.difficultyLevel;
 
   const severityIcon = (passed: boolean, severity: string) => {
-    if (passed) return <span className="text-emerald-600 font-bold text-sm">✅</span>;
-    if (severity === 'critical') return <span className="text-red-600 font-bold text-sm">❌</span>;
-    return <span className="text-amber-500 font-bold text-sm">⚠️</span>;
+    if (passed)                  return <span className="text-emerald-400 text-sm leading-none">✓</span>;
+    if (severity === 'critical') return <span className="text-red-500 text-sm leading-none">✗</span>;
+    return                              <span className="text-amber-400 text-sm leading-none">!</span>;
   };
 
-  const difficultyColor = (d?: string) => {
-    if (d === 'easy') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-    if (d === 'medium') return 'text-amber-700 bg-amber-50 border-amber-200';
-    if (d === 'hard') return 'text-orange-700 bg-orange-50 border-orange-200';
-    if (d === 'very_hard') return 'text-red-700 bg-red-50 border-red-200';
-    return 'text-muted-foreground bg-muted border-border';
-  };
+  const difficultyColor = (d?: string) =>
+    d === 'easy'      ? 'text-emerald-400 bg-emerald-500/20 border-emerald-500/40' :
+    d === 'medium'    ? 'text-amber-400 bg-amber-500/20 border-amber-500/40' :
+    d === 'hard'      ? 'text-orange-400 bg-orange-500/20 border-orange-500/40' :
+    d === 'very_hard' ? 'text-red-400 bg-red-500/20 border-red-500/40' :
+                        'text-muted-foreground bg-muted/30 border-border';
 
-  if (!fg) {
-    return (
-      <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
-        <AlertCircle className="h-6 w-6 opacity-30" />
-        <p className="text-xs text-center">Run Auto-Fill to generate validation results.</p>
-      </div>
+  const handleSaveOptions = (cfg: ValidationConfig) => {
+    setLiveConfig(cfg);
+    updateBOMItem.mutate(
+      { id: item.id, data: { validationConfig: cfg as any } },
+      {
+        onSuccess: () => { toast.success('Blank development options saved'); setOptionsOpen(false); },
+        onError:   () => toast.error('Failed to save options'),
+      },
     );
-  }
+  };
 
   return (
-    <div className="p-3 space-y-3">
-      {/* Score + Difficulty */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {score != null && (
-          <span className={`text-xs font-semibold px-2 py-1 rounded border ${score >= 80 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : score >= 60 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-red-700 bg-red-50 border-red-200'}`}>
-            Score: {score}/100
-          </span>
+    <>
+      <BlankDevOptionsDialog open={optionsOpen} initialConfig={liveConfig}
+        onClose={() => setOptionsOpen(false)} onSave={handleSaveOptions}
+        saving={updateBOMItem.isPending} />
+
+      <div className="divide-y divide-border/40">
+
+        {/* Part Envelope — live 3D render with projected dimension arrows */}
+        {(file3dUrl || item.maxLength != null || item.maxWidth != null) && (
+          <div className="px-3 pt-2 pb-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+              Part Envelope
+            </span>
+            <div className="flex justify-center" style={{ minHeight: 158 }}>
+              {file3dUrl && item.file3dPath?.toLowerCase().endsWith('.stl') ? (
+                <PartDimensionViewer
+                  fileUrl={file3dUrl}
+                  maxLength={item.maxLength}
+                  maxWidth={item.maxWidth}
+                  maxHeight={item.maxHeight}
+                />
+              ) : (
+                /* Fallback: proportional bounding-box rectangle when no model loaded yet */
+                (() => {
+                  const L = item.maxLength ?? 0;
+                  const W = item.maxWidth ?? 0;
+                  const D = item.maxHeight ?? 0;
+                  if (L === 0 && W === 0) return null;
+                  const svgW = 230, svgH = 155;
+                  const padT = 10, padL = 10, padB = 44, padR = 82;
+                  const areaW = svgW - padL - padR;
+                  const areaH = svgH - padT - padB;
+                  const s = Math.min(areaW / (L || 1), areaH / (W || 1), 4);
+                  const rW = (L || areaW) * s;
+                  const rH = (W || areaH) * s;
+                  const rx = padL + (areaW - rW) / 2;
+                  const ry = padT + (areaH - rH) / 2;
+                  const extGap = 5;
+                  const arrowY = ry + rH + extGap + 14;
+                  const arrowX = rx + rW + extGap + 14;
+                  return (
+                    <svg width={svgW} height={svgH} style={{ overflow: 'visible' }}>
+                      <defs>
+                        <marker id="vl-arr-e" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                          <polygon points="0,0 6,2.5 0,5" fill="#6b7280" />
+                        </marker>
+                        <marker id="vl-arr-s" markerWidth="6" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+                          <polygon points="0,0 6,2.5 0,5" fill="#6b7280" />
+                        </marker>
+                        {isSheetMetal && (
+                          <pattern id="vl-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                            <line x1="0" y1="0" x2="0" y2="7" stroke="#3b82f625" strokeWidth="2.5" />
+                          </pattern>
+                        )}
+                      </defs>
+                      <rect x={rx} y={ry} width={rW} height={rH} fill={isSheetMetal ? 'url(#vl-hatch)' : '#1e2a3a'} />
+                      <rect x={rx} y={ry} width={rW} height={rH} fill="none" stroke="#3b82f6" strokeWidth="1.5" rx="1" />
+                      <line x1={rx} y1={ry + rH + extGap} x2={rx} y2={arrowY + 4} stroke="#4b5563" strokeWidth="0.5" />
+                      <line x1={rx + rW} y1={ry + rH + extGap} x2={rx + rW} y2={arrowY + 4} stroke="#4b5563" strokeWidth="0.5" />
+                      {L > 0 && <>
+                        <line x1={rx} y1={arrowY} x2={rx + rW} y2={arrowY} stroke="#6b7280" strokeWidth="0.9" markerStart="url(#vl-arr-s)" markerEnd="url(#vl-arr-e)" />
+                        <text x={rx + rW / 2} y={arrowY + 13} textAnchor="middle" fontSize="9.5" fill="#d1d5db" fontFamily="ui-monospace,monospace">{L.toFixed(2)} mm</text>
+                      </>}
+                      <line x1={rx + rW + extGap} y1={ry} x2={arrowX + 4} y2={ry} stroke="#4b5563" strokeWidth="0.5" />
+                      <line x1={rx + rW + extGap} y1={ry + rH} x2={arrowX + 4} y2={ry + rH} stroke="#4b5563" strokeWidth="0.5" />
+                      {W > 0 && <>
+                        <line x1={arrowX} y1={ry} x2={arrowX} y2={ry + rH} stroke="#6b7280" strokeWidth="0.9" markerStart="url(#vl-arr-s)" markerEnd="url(#vl-arr-e)" />
+                        <text x={arrowX + 7} y={ry + rH / 2} textAnchor="start" dominantBaseline="middle" fontSize="9.5" fill="#d1d5db" fontFamily="ui-monospace,monospace">{W.toFixed(2)} mm</text>
+                      </>}
+                      {D > 0 && <text x={rx + rW} y={ry - 4} textAnchor="end" fontSize="8" fill="#6b7280" fontFamily="ui-monospace,monospace">D: {D.toFixed(2)} mm</text>}
+                    </svg>
+                  );
+                })()
+              )}
+            </div>
+          </div>
         )}
-        {difficulty && (
-          <span className={`text-xs font-semibold px-2 py-1 rounded border uppercase ${difficultyColor(difficulty)}`}>
-            {difficulty.replace('_', ' ')}
-          </span>
+
+        {/* Score + Difficulty — or prompt to run Auto-Fill */}
+        {!fg ? (
+          <div className="px-3 py-2 flex items-center gap-2 text-muted-foreground">
+            <AlertCircle className="h-4 w-4 opacity-40 shrink-0" />
+            <p className="text-xs">Run Auto-Fill to generate DFM validation results.</p>
+          </div>
+        ) : (
+          <div className="px-3 py-2 flex items-center gap-2 flex-wrap">
+            {score != null && (
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${
+                score >= 80 ? 'text-emerald-400 bg-emerald-500/20 border-emerald-500/40'
+                : score >= 60 ? 'text-amber-400 bg-amber-500/20 border-amber-500/40'
+                : 'text-red-400 bg-red-500/20 border-red-500/40'}`}>
+                Score {score}/100
+              </span>
+            )}
+            {difficulty && (
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded border uppercase ${difficultyColor(difficulty)}`}>
+                {difficulty.replace('_', ' ')}
+              </span>
+            )}
+          </div>
         )}
-      </div>
-      {/* Checklist */}
-      {checks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No validation checks available for this part.</p>
-      ) : (
-        <div className="divide-y divide-border/40 border rounded">
-          {checks.map((c) => (
-            <div key={c.id} className="px-2 py-1.5 flex items-start gap-2">
-              <span className="shrink-0 mt-0.5">{severityIcon(c.passed, c.severity)}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-xs font-medium">{c.check}</span>
-                  {c.threshold && <span className="text-[10px] text-muted-foreground">{c.threshold}</span>}
-                  {c.actualValue && <span className="text-[10px] font-mono text-foreground/70">{c.actualValue}</span>}
-                </div>
-                {c.recommendation && !c.passed && (
-                  <p className="text-[10px] text-amber-700 mt-0.5">{c.recommendation}</p>
+
+        {/* Blank Development — sheet metal only */}
+        {isSheetMetal && (
+          <div className="px-3 py-2 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Blank Development
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => setOptionsOpen(true)}
+                className="text-[10px] h-5 px-2 text-violet-400 hover:text-violet-300 hover:bg-violet-500/10">
+                Options
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
+              <span className="text-muted-foreground">Solver</span>
+              <span className="text-foreground font-medium truncate">
+                {liveConfig.solverType === 'fea_plastic_elastic' ? 'FEA Plastic+Elastic'
+                  : liveConfig.solverType === 'fea_elastic_only' ? 'FEA Elastic Only'
+                  : 'Geometric Unfolding'}
+              </span>
+              <span className="text-muted-foreground">Surface</span>
+              <span className="text-foreground font-medium">
+                {liveConfig.surfaceForFlattening === 'mid_surface' ? 'Mid-Surface'
+                  : liveConfig.surfaceForFlattening === 'larger_area' ? 'Larger Area'
+                  : 'Smaller Area'}
+              </span>
+              <span className="text-muted-foreground">Fill Holes</span>
+              <span className="text-foreground font-medium">{liveConfig.fillHolesInBlanks ? 'Yes' : 'No'}</span>
+              {kFactor != null && (
+                <>
+                  <span className="text-muted-foreground">K-Factor</span>
+                  <span className="text-foreground font-medium">{kFactor} (ANSI)</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tolerances */}
+        <div className="px-3 py-2">
+          <button onClick={() => setTolerancesOpen((v) => !v)}
+            className="flex items-center gap-1.5 w-full text-left">
+            {tolerancesOpen
+              ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+              : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex-1">
+              Tolerances
+            </span>
+            <span className="text-[10px] tabular-nums text-foreground font-medium mr-2">
+              {toleranceCount > 0 ? toleranceCount : '—'}
+            </span>
+            <Button variant="ghost" size="sm"
+              onClick={(e) => { e.stopPropagation(); setTolerancesOpen(true); }}
+              className="text-[10px] h-5 px-1.5 text-muted-foreground hover:text-foreground">
+              Review
+            </Button>
+          </button>
+          {tolerancesOpen && (
+            <div className="mt-1.5 space-y-0.5 pl-4">
+              <ValidationRow label="General Tolerance" value={generalTolerance ?? '—'} />
+              <ValidationRow label="Tightest" value={tightestToleranceMm != null ? `±${tightestToleranceMm} mm` : '—'} />
+              {item.toleranceGrade && <ValidationRow label="Grade" value={item.toleranceGrade} />}
+            </div>
+          )}
+        </div>
+
+        {/* Machining / Sheet Metal Details */}
+        <div className="px-3 py-2">
+          <button onClick={() => setMachiningOpen((v) => !v)}
+            className="flex items-center gap-1.5 w-full text-left">
+            {machiningOpen
+              ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+              : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex-1">
+              {isSheetMetal ? 'Sheet Metal Details' : 'Machining Details'}
+            </span>
+            <Button variant="ghost" size="sm"
+              onClick={(e) => { e.stopPropagation(); setMachiningOpen(true); }}
+              className="text-[10px] h-5 px-1.5 text-muted-foreground hover:text-foreground">
+              Review Setups
+            </Button>
+          </button>
+          {machiningOpen && (
+            <div className="mt-1.5 pl-4 space-y-1.5">
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Key {isSheetMetal ? 'sheet metal' : 'machining'} assumptions need to be validated
+                to ensure outputs are accurate.
+              </p>
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Process Route</span>
+                {routeSummary ? (
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs text-foreground flex-1">{routeSummary}</p>
+                    <Button variant="ghost" size="sm"
+                      className="text-[10px] h-5 px-1.5 text-violet-400 hover:text-violet-300 shrink-0">
+                      Edit Routing
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-400">No Machining — upload a 3D model or run Auto-Fill</p>
                 )}
               </div>
+              {surfaceFinishStr && <ValidationRow label="Surface Finish" value={surfaceFinishStr} />}
+              {isSheetMetal && item.sheetThicknessMm != null && (
+                <ValidationRow label="Sheet Thickness" value={`${item.sheetThicknessMm} mm`} />
+              )}
             </div>
-          ))}
+          )}
         </div>
-      )}
-    </div>
+
+        {/* DFM Checks */}
+        <div className="px-3 py-2">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              DFM Checks ({checks.length})
+            </span>
+          </div>
+          {checks.length === 0 ? (
+            <p className="text-xs text-muted-foreground pl-4">No DFM checks available.</p>
+          ) : (
+            <div className="divide-y divide-border/30 border border-border/40 rounded text-[11px]">
+              {checks.map((c) => (
+                <div key={c.id} className="px-2 py-1.5 flex items-start gap-2">
+                  <span className="shrink-0 mt-0.5 w-3">{severityIcon(c.passed, c.severity)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span className="font-medium text-foreground">{c.check}</span>
+                      {c.threshold && <span className="text-muted-foreground">{c.threshold}</span>}
+                      {c.actualValue && <span className="font-mono text-foreground/70">{c.actualValue}</span>}
+                    </div>
+                    {!c.passed && c.recommendation && (
+                      <p className="text-amber-400/80 mt-0.5 leading-snug">{c.recommendation}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+    </>
   );
 }
 
@@ -4612,6 +5134,7 @@ const INV_LOC_RATE: Record<string, { symbol: string; inrRate: number }> = {
   'France':    { symbol: '€', inrRate: 90.8 },
   'W. Europe': { symbol: '€', inrRate: 90.8 },
   'E. Europe': { symbol: '€', inrRate: 90.8 },
+  'Mexico':    { symbol: 'MX$', inrRate: 4.77 },
   'Other':     { symbol: '$', inrRate: 83.5 },
 };
 
@@ -4971,11 +5494,14 @@ function InvestmentTab({
 
 function AnalysisTabsPanel({
   item, fg, batchSize, productionLife, factory, selectedCNCFeatureKey, onCNCFeatureSelect,
+  modelScreenshot, file3dUrl,
 }: {
   item: BOMItem; fg: FeatureGraph | null;
   batchSize: number; productionLife: number; factory: string;
   selectedCNCFeatureKey?: string | null;
   onCNCFeatureSelect?: (key: string | null) => void;
+  modelScreenshot?: string | null;
+  file3dUrl?: string | null;
 }) {
   const [tab, setTab] = useState<RightTabKey>('part_summary');
   const [appliedRouteId, setAppliedRouteId] = useState<string | null>(null);
@@ -5096,12 +5622,13 @@ function AnalysisTabsPanel({
               batchSize={batchSize}
               appliedRouteId={appliedRouteId}
               onAppliedRouteChange={setAppliedRouteId}
+              factory={factory}
             />
           </>
         )}
 
-        {tab === 'validation' && (
-          <ValidationTab fg={fg} />
+        {tab === 'validation' && item && (
+          <ValidationTab fg={fg} item={item} modelScreenshot={modelScreenshot} file3dUrl={file3dUrl} />
         )}
 
         {tab === 'design' && (
@@ -5671,6 +6198,7 @@ export default function ManufacturingIntelligencePage() {
   const { data: item, isLoading } = useBOMItem(itemId);
   const { data: analysisVersionData } = useAnalysisVersion();
   const [file3dUrl, setFile3dUrl] = useState<string | null>(null);
+  const [modelScreenshot, setModelScreenshot] = useState<string | null>(null);
   const [maximized, setMaximized] = useState<PanelId | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
     () => new Set(['root', 'grp_0', 'op_0', 'op_1', 'op_2', 'subop_0', 'subop_1', 'subop_2', 'op_threads', 'subop_threads']),
@@ -5684,7 +6212,7 @@ export default function ManufacturingIntelligencePage() {
   const [selectedAutoRouteId, setSelectedAutoRouteId] = useState<string | null>(null);
   const [operationVisual, setOperationVisual] = useState<OperationVisual>(null);
   const [vizLabel, setVizLabel] = useState<string | null>(null);
-  const [factory, setFactory] = useState('India');
+  const [factory, setFactory] = useState('USA');
   const [refreshing, setRefreshing] = useState(false);
 
   // ── Heatmap state ─────────────────────────────────────────────────────────────
@@ -6094,6 +6622,7 @@ export default function ManufacturingIntelligencePage() {
 
   useEffect(() => {
     if (!item?.file3dPath) return;
+    setModelScreenshot(null); // clear stale screenshot when model changes
     apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/3d`)
       .then((r) => { if (r?.url) setFile3dUrl(r.url); })
       .catch(() => {});
@@ -6380,6 +6909,7 @@ export default function ManufacturingIntelligencePage() {
   const analysisProps = {
     item, fg, batchSize, productionLife, factory,
     selectedCNCFeatureKey, onCNCFeatureSelect: setSelectedCNCFeatureKey,
+    modelScreenshot, file3dUrl,
   };
   const treeProps = { item, fg, tree, expanded: expandedNodes, selectedId: selectedNodeId, onToggle: toggleNode, onSelect: handleTreeSelect, factory, maximized, onMaximize: maximize };
   const driversProps = { tree, summary, fg, selectedId: selectedNodeId, onSelect: setSelectedNodeId, maximized, onMaximize: maximize, selectedHoleGroup, selectedBend, dfmWarnings: fg?.dfmWarnings ?? [], item };
@@ -6497,6 +7027,7 @@ export default function ManufacturingIntelligencePage() {
                           heatmapSources={heatmapSources}
                           heatmapNormalization={heatmapNorm}
                           onHeatmapInspect={handleHeatmapInspect}
+                          onScreenshotReady={setModelScreenshot}
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">

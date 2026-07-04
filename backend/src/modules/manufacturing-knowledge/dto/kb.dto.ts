@@ -51,6 +51,10 @@ export interface RouteStep {
   required: boolean;
   machine_type: string;
   description: string;
+  // Optional-step gate: when required=false, the step is emitted only if the
+  // feature graph contains one of these types (case-insensitive, '|'-separated,
+  // e.g. "THREAD_INTERNAL" or "ANODIZE|PLATE").
+  condition_feature?: string;
 }
 
 export interface PartFamilyRoutingTemplate {

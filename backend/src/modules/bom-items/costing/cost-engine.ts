@@ -2,7 +2,7 @@ import {
   LASER_MHR_INR, PRESS_BRAKE_MHR_INR, DEBURRING_MHR_INR, TAPPING_MHR_INR,
   LASER_SETUP_MIN, PRESS_BRAKE_SETUP_MIN, TAPPING_SETUP_MIN,
   MATERIAL_OVERHEAD_PCT,
-  LASER_SPEED_MM_PER_MIN, LASER_PIERCE_SEC,
+  LASER_SPEED_MM_PER_MIN, LASER_PIERCE_SEC, laserSpeedFactor,
   PRESS_BRAKE_SEC_PER_BEND,
   TAP_CYCLE_SEC,
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
@@ -21,6 +21,8 @@ export interface MHRRateInput {
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;
+  // Full physics-based selection result; present when the capability selector ran
+  selection?: import('../dto/machine-selection.dto').MachineSelectionResult;
 }
 
 export interface CostEngineInput {
@@ -200,7 +202,8 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     const thk = sheetThicknessMm > 0 ? sheetThicknessMm : 2.0;
     const speedKey = nearest(thk, LASER_SPEED_MM_PER_MIN);
     const pierceKey = nearest(thk, LASER_PIERCE_SEC);
-    const speedMmPerMin = LASER_SPEED_MM_PER_MIN[speedKey] ?? 3000;
+    // Speed table is mild-steel baseline — derate for stainless (N₂) / aluminium
+    const speedMmPerMin = (LASER_SPEED_MM_PER_MIN[speedKey] ?? 3000) * laserSpeedFactor(materialGrade);
     const pierceSec = LASER_PIERCE_SEC[pierceKey] ?? 1.5;
 
     const cuttingSec = cutLengthMm > 0 ? (cutLengthMm / speedMmPerMin) * 60 : 0;

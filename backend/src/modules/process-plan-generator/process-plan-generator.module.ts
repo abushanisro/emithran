@@ -11,7 +11,6 @@ import { ResolverService } from './services/resolver.service';
 import { PersistenceService } from './services/persistence.service';
 import { CreditMeterService } from './services/credit-meter.service';
 import { DrawingExtractorService } from './services/drawing-extractor.service';
-import { ExchangeRateService } from './services/exchange-rate.service';
 import { ExpandCandidatesTool } from './services/tools/expand-candidates.tool';
 import { FeatureGraphService } from './services/feature-graph.service';
 import { RuleEngineService } from './services/rule-engine.service';
@@ -20,11 +19,12 @@ import { AlternativeRoutePlannerService } from './services/alternative-route-pla
 
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 import { LoggerModule } from '../../common/logger/logger.module';
+import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.module';
 import { BOMItemsModule } from '../bom-items/bom-items.module';
 import { ManufacturingKnowledgeModule } from '../manufacturing-knowledge/manufacturing-knowledge.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule, ConfigModule, BOMItemsModule, ManufacturingKnowledgeModule],
+  imports: [SupabaseModule, LoggerModule, ConfigModule, ExchangeRateModule, BOMItemsModule, ManufacturingKnowledgeModule],
   controllers: [ProcessPlanGeneratorController],
   providers: [
     OrchestratorService,
@@ -35,7 +35,6 @@ import { ManufacturingKnowledgeModule } from '../manufacturing-knowledge/manufac
     PersistenceService,
     CreditMeterService,
     DrawingExtractorService,
-    ExchangeRateService,
     ExpandCandidatesTool,
     FeatureGraphService,
     RuleEngineService,

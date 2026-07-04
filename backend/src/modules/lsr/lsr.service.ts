@@ -4,18 +4,22 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateLSRDto, UpdateLSRDto } from './lsr.dto';
 import { validate as isValidUUID } from 'uuid';
 import * as ExcelJS from 'exceljs';
-import { getCurrencyForLocation, getUsdPerLocal } from '../mhr/constants/mhr-calculation.constants';
+import { getCurrencyForLocation } from '../mhr/constants/mhr-calculation.constants';
+import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
 
 @Injectable()
 export class LSRService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
+    private readonly exchangeRateService: ExchangeRateService,
   ) { }
 
   /**
    * Derives currency from location and computes lhr_usd_effective.
-   * Works for all countries: lhr is always in local currency, conversion uses FX table.
+   * Works for all countries: lhr is always in local currency, conversion rate is
+   * read live from the exchange_rates table (via ExchangeRateService.loadRates,
+   * which the caller must have awaited already) — never a hardcoded FX constant.
    */
   private computeLhrCurrencyFields(lhr: number, location: string | undefined | null): {
     currency: string;
@@ -23,11 +27,17 @@ export class LSRService {
     lhrUsdEffective: number;
   } {
     const { currency, symbol } = getCurrencyForLocation(location ?? '');
-    const usdPerLocal = getUsdPerLocal(currency);
+    const usdPerLocal = this.exchangeRateService.convert(currency, 'USD');
+    if (usdPerLocal == null) {
+      this.logger.warn(
+        `No exchange rate on file for '${currency}' — add it to the exchange_rates table. lhr_usd_effective left unconverted.`,
+        'LSRService',
+      );
+    }
     return {
       currency,
       currencySymbol: symbol,
-      lhrUsdEffective: parseFloat((lhr * usdPerLocal).toFixed(4)),
+      lhrUsdEffective: parseFloat((lhr * (usdPerLocal ?? 1)).toFixed(4)),
     };
   }
 
@@ -46,6 +56,7 @@ export class LSRService {
       throw new ConflictException(`Labour code ${createLSRDto.labourCode} already exists`);
     }
 
+    await this.exchangeRateService.loadRates(accessToken);
     const lhrCurrency = this.computeLhrCurrencyFields(createLSRDto.lhr, createLSRDto.location);
 
     const { data, error } = await this.supabaseService
@@ -213,6 +224,7 @@ export class LSRService {
     // Always recompute currency and lhr_usd_effective from the effective lhr + location
     const effectiveLhr      = updateLSRDto.lhr      ?? existingRecord.lhr;
     const effectiveLocation = updateLSRDto.location  ?? existingRecord.location;
+    await this.exchangeRateService.loadRates(accessToken);
     const lhrCurrency = this.computeLhrCurrencyFields(effectiveLhr, effectiveLocation);
     updateData.currency          = lhrCurrency.currency;
     updateData.currency_symbol   = lhrCurrency.currencySymbol;
@@ -281,6 +293,7 @@ export class LSRService {
   async bulkCreate(data: CreateLSRDto[], userId: string, accessToken: string) {
     this.logger.log(`Bulk creating ${data.length} LSR records`, 'LSRService');
 
+    await this.exchangeRateService.loadRates(accessToken);
     const records = data.map(dto => {
       const lhrCurrency = this.computeLhrCurrencyFields(dto.lhr, dto.location);
       return {

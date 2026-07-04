@@ -83,6 +83,23 @@ const PROCESSING_STEPS: string[] = [
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = ['.step', '.stp', '.iges', '.igs', '.stl', '.sldprt'];
 
+interface PipelineStage {
+  title: string;
+  desc: string;
+  highlight?: boolean;
+  optional?: boolean;
+}
+
+const PIPELINE_STAGES: PipelineStage[] = [
+  { title: 'STEP Parse & Geometry', desc: 'STEP file → OpenCascade → volume, surface area, holes, walls' },
+  { title: 'Material DB Lookup',    desc: 'Density, price/kg from material master' },
+  { title: 'Process Classifier',    desc: 'CNC / casting / sheet metal' },
+  { title: 'Cost Formulas',         desc: 'Material + machining + setup' },
+  { title: 'XGBoost Adjustment',    desc: 'Correction factor from cost history' },
+  { title: 'Accurate Cost',         desc: 'Final estimate, ready for quoting', highlight: true },
+  { title: 'LLM Explanation + DFM Advice', desc: 'Runs after costing — never blocks the estimate', optional: true },
+];
+
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
@@ -521,31 +538,48 @@ export function AssemblyTreeGenerator({
 
       {/* CAD processing pipeline info */}
       <Card className="bg-muted/30 p-4">
-        <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+        <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
           <Settings className="h-4 w-4" />
           CAD Processing Pipeline
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          {[
-            { color: 'bg-blue-500',    label: 'STEP file to OpenCascade to volume, surface area, holes, walls' },
-            { color: 'bg-green-500',   label: 'Material DB lookup for density, price/kg' },
-            { color: 'bg-yellow-500',  label: 'Process classifier for CNC / casting / sheet metal' },
-            { color: 'bg-purple-500',  label: 'Cost formulas for material + machining + setup' },
-            { color: 'bg-red-500',     label: 'XGBoost adjustment with correction factor from history' },
-            { color: 'bg-emerald-500', label: 'ACCURATE COST', bold: true },
-          ].map(({ color, label, bold }) => (
-            <div key={label} className="flex items-center gap-3">
-              <div className={`w-2 h-2 rounded-full ${color}`} />
-              <span className={bold ? 'font-semibold' : ''}>{label}</span>
-            </div>
+        <ol className="relative">
+          {PIPELINE_STAGES.map((stage, i) => (
+            <li key={stage.title} className="relative flex gap-3 pb-4 last:pb-0">
+              {i < PIPELINE_STAGES.length - 1 && (
+                <span
+                  className="absolute left-[11px] top-6 bottom-0 w-px bg-border"
+                  aria-hidden="true"
+                />
+              )}
+              <span
+                className={cn(
+                  'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold',
+                  stage.highlight
+                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600'
+                    : 'border-border bg-background text-muted-foreground',
+                )}
+              >
+                {i + 1}
+              </span>
+              <div className="min-w-0 pt-0.5">
+                <div
+                  className={cn(
+                    'text-xs font-semibold flex items-center gap-2',
+                    stage.highlight && 'text-emerald-600 uppercase tracking-wide',
+                  )}
+                >
+                  {stage.title}
+                  {stage.optional && (
+                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 uppercase">
+                      Optional · Async
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">{stage.desc}</p>
+              </div>
+            </li>
           ))}
-        </div>
-        <div className="mt-3 pt-3 border-t border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-indigo-500" />
-            <span className="text-xs">LLM (optional, async) for explanation + DFM advice</span>
-          </div>
-        </div>
+        </ol>
       </Card>
 
     </div>

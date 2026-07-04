@@ -53,6 +53,9 @@ export class RawMaterialResponseDto {
   @ApiProperty({ required: false })
   costChina?: number;
 
+  @ApiProperty({ required: false })
+  costMexico?: number;
+
   // Material properties
   @ApiProperty({ required: false, description: 'Material density in g/cm³' })
   density?: number;
@@ -147,6 +150,7 @@ export class RawMaterialResponseDto {
       costIndia: row.cost_india ? parseFloat(row.cost_india) : undefined,
       costEEurope: row.cost_e_europe ? parseFloat(row.cost_e_europe) : undefined,
       costChina: row.cost_china ? parseFloat(row.cost_china) : undefined,
+      costMexico: row.cost_mexico ? parseFloat(row.cost_mexico) : undefined,
       // Material properties
       density: row.density ? parseFloat(row.density) : undefined,
       ultimateTensileStrength: row.ultimate_tensile_strength ? parseFloat(row.ultimate_tensile_strength) : undefined,

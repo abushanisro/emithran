@@ -1,14 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { SupabaseService } from '../supabase/supabase.service';
 
 /**
  * Loads the active budget exchange rates from the `exchange_rates` table and
- * provides cost conversion to INR.
+ * provides cost conversion between currencies. Shared by every module that
+ * prices in a non-INR currency (MHR, LSR, process-plan-generator) so there is
+ * exactly one FX source of truth in the app — the DB table an admin maintains,
+ * not a hardcoded constant that drifts out of date in code.
  *
  * Rates are admin-set (budget rates for the financial year), NOT live FX.
  * This is the correct approach for manufacturing cost engineering:
  *   - Live rates introduce noise and break reproducibility
- *   - Every generated plan snapshots the rates it used so costs remain
+ *   - Every generated plan/quote snapshots the rates it used so costs remain
  *     stable when reopened months later
  *
  * All rates are from_currency → INR. INR itself has a rate of 1.
@@ -17,7 +20,7 @@ import { SupabaseService } from '../../../common/supabase/supabase.service';
 export class ExchangeRateService {
   private readonly logger = new Logger(ExchangeRateService.name);
 
-  // In-memory cache — reloaded once per generate call (stateless across requests)
+  // In-memory cache — reloaded once per TTL window (stateless across requests)
   private rateMap: Map<string, number> = new Map([['INR', 1]]);
   private lastLoaded: number = 0;
   private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -26,7 +29,7 @@ export class ExchangeRateService {
 
   /**
    * Load the active budget rates from DB (cached per TTL).
-   * Always call this at the start of a generation session.
+   * Always call this before converting anything.
    */
   async loadRates(accessToken: string | null): Promise<void> {
     const now = Date.now();
@@ -79,19 +82,43 @@ export class ExchangeRateService {
   }
 
   /**
+   * Units of `toCurrency` equal to 1 unit of `fromCurrency`, derived via the
+   * INR anchor (rateMap values are always "1 unit of X = rate INR").
+   * Returns null — never a guessed default — when either currency's rate is
+   * missing, so callers can surface a visible error instead of silently
+   * mispricing (a wrong rate is worse than a blocked import).
+   */
+  convert(fromCurrency: string, toCurrency: string): number | null {
+    const from = fromCurrency.toUpperCase();
+    const to = toCurrency.toUpperCase();
+    if (from === to) return 1;
+    const fromRate = this.rateMap.get(from);
+    const toRate = this.rateMap.get(to);
+    if (fromRate == null || toRate == null) return null;
+    return fromRate / toRate;
+  }
+
+  hasRate(currency: string): boolean {
+    return this.rateMap.has(currency.toUpperCase());
+  }
+
+  /**
    * Returns the current rate map as a plain object suitable for snapshotting
-   * on the process_plan_generations record.
+   * on a generation/import record.
    */
   snapshot(): Record<string, number> {
     return Object.fromEntries(this.rateMap);
   }
 
   private applyDefaults(): void {
-    // FY2026-27 fallback rates if table is empty or unreachable
+    // Fallback only when the exchange_rates table is empty or unreachable —
+    // never the primary path. FY2026-27 budget rates.
     this.rateMap.set('USD', 83.50);
     this.rateMap.set('EUR', 89.00);
     this.rateMap.set('GBP', 104.00);
     this.rateMap.set('AED', 22.75);
     this.rateMap.set('SGD', 61.50);
+    this.rateMap.set('CNY', 11.52);
+    this.rateMap.set('MXN', 4.77);
   }
 }

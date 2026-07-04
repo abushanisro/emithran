@@ -12,9 +12,10 @@ import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService } from './services/material-intelligence.service';
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 import { LoggerModule } from '../../common/logger/logger.module';
+import { ManufacturingKnowledgeModule } from '../manufacturing-knowledge/manufacturing-knowledge.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule, ConfigModule],
+  imports: [SupabaseModule, LoggerModule, ConfigModule, ManufacturingKnowledgeModule],
   controllers: [BOMItemsController],
   providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalFeatureExtractorService, DFMScoringService, MaterialIntelligenceService],
   exports: [BOMItemsService, BomItemCostService, CADAnalysisService, AutoFillService],

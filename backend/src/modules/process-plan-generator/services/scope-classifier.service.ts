@@ -30,6 +30,47 @@ export class ScopeClassifierService {
       );
     }
 
+    // 1b. CAD engine's own topology-based family decision — highest-confidence signal
+    //     The Python OCC engine computes flatness, hole density, and planar face fraction
+    //     directly from geometry. Trust it over any BOM/name heuristic.
+    //     CAVEAT: detected_family is persisted in geometry_analysis at upload time, so it
+    //     can predate classifier fixes. A "cnc_milled" verdict is NOT trusted when the
+    //     geometry carries sheet-metal evidence no milled billet part can have (extreme
+    //     low fill, extracted sheet thickness, or bends) — fall through to the geometry
+    //     rules below, which will re-derive the family with their own reasons.
+    if (dfm.cadDetectedFamily && dfm.cadDetectedFamily !== 'unknown') {
+      const familyMap: Record<string, PartFamily | null> = {
+        sheet_metal: 'sheet_metal',
+        cnc_turned:  'cnc_turned',
+        cnc_milled:  'cnc_milled',
+        mill_turn:   'cnc_turned',
+      };
+      const mapped = familyMap[dfm.cadDetectedFamily];
+      if (mapped) {
+        const bb = dfm.boundingBox;
+        const storedBboxVol = bb.lengthMm * bb.widthMm * bb.heightMm;
+        const fill = storedBboxVol > 0 && dfm.volumeMm3 > 0 ? dfm.volumeMm3 / storedBboxVol : 1;
+        const storedMinDim = Math.min(
+          bb.lengthMm || Infinity, bb.widthMm || Infinity, bb.heightMm || Infinity,
+        );
+        const sheetContradiction =
+          mapped === 'cnc_milled' &&
+          ((fill < 0.10 && storedMinDim < 200) ||
+            (dfm.sheetThicknessMm > 0 && dfm.sheetThicknessMm < 10) ||
+            (dfm.bendCount > 0 && fill < 0.30));
+        if (sheetContradiction) {
+          this.logger.warn(
+            `[classify] Stored CAD family "cnc_milled" contradicted by sheet-metal geometry ` +
+            `(fill ${(fill * 100).toFixed(1)}%, sheetThickness ${dfm.sheetThicknessMm}mm, ` +
+            `bends ${dfm.bendCount}) — ignoring stored family, using geometry rules`,
+          );
+        } else {
+          this.logger.log(`[classify] CAD engine detected family "${dfm.cadDetectedFamily}" → ${mapped}`);
+          return this.inScope(mapped, `CAD engine topology analysis: "${dfm.cadDetectedFamily}"`, 0.90);
+        }
+      }
+    }
+
     // 2. Material/process hints in the material name → out of scope
     const materialHint = (bom.materialHint ?? '').toLowerCase();
     const castOrForgeKeywords = ['cast iron', 'gg25', 'gg30', 'ductile iron', 'sand cast', 'die cast', 'investment cast', 'forging', 'forged', 'composite', 'frp', 'cfrp', 'gfrp'];
@@ -81,6 +122,7 @@ export class ScopeClassifierService {
     const aspectRatio = maxDim / Math.max(minDim, 0.1);
     const volumeCm3 = (dfm.volumeMm3 || 1) / 1000;
     const complexity = dfm.holeCount + dfm.pocketCount * 2 + dfm.thinWallCount + dfm.undercutCount * 3;
+    const bboxVol = lengthMm * widthMm * heightMm;
 
     // 4. Very large + very complex → likely casting (out of scope)
     if (volumeCm3 > 5000 && complexity > 8) {
@@ -88,6 +130,26 @@ export class ScopeClassifierService {
         `Large volume ${volumeCm3.toFixed(0)}cm³ + high complexity score ${complexity} suggests casting/forging`,
         0.75,
       );
+    }
+
+    // 4b. Sheet-metal geometry signals extracted from OCC analysis.
+    //     These fire even when the full CAD family decision is missing (STL-only parts).
+    if (dfm.sheetThicknessMm > 0 && dfm.sheetThicknessMm < 10) {
+      return this.inScope(
+        'sheet_metal',
+        `Sheet thickness ${dfm.sheetThicknessMm}mm extracted by CAD engine → sheet metal`,
+        0.92,
+      );
+    }
+    if (dfm.bendCount > 0) {
+      const fillRatio = bboxVol > 0 ? dfm.volumeMm3 / bboxVol : 1;
+      if (fillRatio < 0.30) {
+        return this.inScope(
+          'sheet_metal',
+          `${dfm.bendCount} bend(s) detected with low fill fraction (${(fillRatio * 100).toFixed(0)}%) → sheet metal`,
+          0.88,
+        );
+      }
     }
 
     // 5. Sheet metal — one dim thin + flat profile.
@@ -102,9 +164,10 @@ export class ScopeClassifierService {
     }
 
     // 5b. Low volume fill-fraction: perforated/cut-out sheet with holes uses much less
-    //     volume than the bounding box predicts.
-    const bboxVol = lengthMm * widthMm * heightMm;
-    if (bboxVol > 0 && dfm.volumeMm3 > 0 && (dfm.volumeMm3 / bboxVol) < 0.10 && minDim < 60) {
+    //     volume than the bounding box predicts. A solid CNC block cannot have < 10 %
+    //     fill; sheet metal enclosures routinely do. minDim < 200 excludes only truly
+    //     massive structural fabrications (ship hull sections, etc.).
+    if (bboxVol > 0 && dfm.volumeMm3 > 0 && (dfm.volumeMm3 / bboxVol) < 0.10 && minDim < 200) {
       return this.inScope(
         'sheet_metal',
         `Low volume fill (${((dfm.volumeMm3 / bboxVol) * 100).toFixed(0)}%) with min dim ${minDim.toFixed(1)}mm → sheet metal frame`,

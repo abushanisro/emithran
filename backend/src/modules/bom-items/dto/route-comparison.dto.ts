@@ -51,4 +51,6 @@ export interface RouteComparisonDto {
   materialSource: "db" | "default";
   routes: RouteResultDto[];
   comparisonWarnings: string[];
+  currency: string;       // ISO 4217 code, e.g. 'USD'
+  currencySymbol: string; // display symbol, e.g. '$'
 }

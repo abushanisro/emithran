@@ -503,6 +503,7 @@ export class RawMaterialsController {
             costIndia:   parseNumeric(getColumnValue(rowData, 'INDIA', 'COST\nIndia\n(USD/kg)', 'COST India (USD/kg)', 'Cost India (USD/kg)')),
             costEEurope: parseNumeric(getColumnValue(rowData, 'E. EUROPE', 'COST\nE. Europe\n(USD/kg)', 'COST E. Europe (USD/kg)', 'Cost E. Europe (USD/kg)')),
             costChina:   parseNumeric(getColumnValue(rowData, 'CHINA', 'COST\nChina\n(USD/kg)', 'COST China (USD/kg)', 'Cost China (USD/kg)')),
+            costMexico:  parseNumeric(getColumnValue(rowData, 'MEXICO', 'COST\nMexico\n(USD/kg)', 'COST Mexico (USD/kg)', 'Cost Mexico (USD/kg)')),
             cost: parseNumeric(getColumnValue(rowData, 'INDIA', 'COST\nIndia\n(USD/kg)', 'COST India (USD/kg)', 'Unit Cost ($)', 'Unit Cost', 'Cost', 'cost', 'COST')),
             // Material properties — ferrous uses 'DENSITY\n(g/cm³)', 'UTS\n(MPa)', etc.
             density: parseNumeric(getColumnValue(rowData,

@@ -59,6 +59,8 @@ export interface BriefDfm {
   slotCount: number;
   cutLengthMm: number;
   sheetThicknessMm: number;
+  // CAD engine's own family decision — strong override signal for scope classifier
+  cadDetectedFamily?: string;
 }
 
 export interface BriefContext {

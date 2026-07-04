@@ -56,6 +56,9 @@ export interface ManufacturingFeature {
   raMicrons?: number;
   tightest_tol_mm?: number;
   cutLengthMm?: number;         // LASER_CUT: total laser path length from geometry
+  // INSPECT only: strictest inspection method demanded by GD&T / tolerance callouts
+  // (derived via deriveGdtSeverity — 'cmm' triggers a dedicated CMM Inspection op)
+  inspectionMethod?: 'visual' | 'caliper' | 'height_gauge' | 'cmm';
 }
 
 export interface ManufacturingFeatureGraph {
@@ -74,10 +77,11 @@ export type MachineCategoryHint =
   | 'laser_cut'          // fiber/CO2 laser cutting machine
   | 'press_brake'        // press brake, CNC bending machine
   | 'saw'                // band saw, cold saw, power hacksaw
-  | 'bench_manual'       // deburring, cleaning, marking — bench or manual workstation
-  | 'inspection_bench'   // QC bench, CMM, inspection station
+  | 'bench_manual'       // deburring, marking — bench or manual workstation
+  | 'inspection_bench'   // QC bench, inspection station
   | 'cmm'                // coordinate measuring machine
   | 'inspection'         // general inspection (visual, gauge, etc.)
+  | 'cleaning'           // washing / degreasing station — before surface treatment
   | 'surface_treatment'  // anodizing, plating — usually outsourced
   | 'heat_treatment'     // furnace — usually outsourced
   | 'any';               // no preference — AI picks best match

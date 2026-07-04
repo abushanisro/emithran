@@ -74,12 +74,22 @@ _HELICOIL_DRILL_RANGES: List[Tuple[float, float, str]] = [
 ]
 
 
-def _classify_blind_hole(diameter_mm: float) -> Tuple[str, Optional[str], bool]:
+def _classify_hole(diameter_mm: float, through: bool) -> Tuple[str, Optional[str], bool]:
     """
     Returns (feature_type, thread_spec_or_None, is_helicoil).
 
-    Heuristic: blind holes whose diameter falls within a known tap pre-drill range
-    are emitted as 'tapped_hole' (confidence 0.55 — geometry only, no PMI to confirm).
+    Heuristic: holes whose diameter falls within a known tap pre-drill range are
+    emitted as 'tapped_hole' (confidence 0.55 — geometry only, no PMI to confirm).
+    Applies to BOTH blind and through holes: an M4×0.7 tapped-thru hole pre-drills
+    at Ø3.3 exactly like a blind one. The old blind-only gate silently dropped
+    every through-tapped hole, so drawing-less parts lost all thru-thread cost.
+
+    Known limitation (through holes): tap-drill bands overlap clearance-drill
+    sizes of the next thread size down (e.g. M5 tap drill Ø4.2 vs M4 close
+    clearance Ø4.3–4.5 in the M5 helicoil band). Confidence stays 0.55 with
+    detection='geometry_heuristic'; the backend treats 2D-drawing thread callouts
+    as authoritative and only uses these candidates when no drawing exists.
+
     Helicoil variant flagged separately for the process planner.
     """
     for lo, hi, spec in _TAP_DRILL_RANGES:
@@ -88,7 +98,23 @@ def _classify_blind_hole(diameter_mm: float) -> Tuple[str, Optional[str], bool]:
     for lo, hi, spec in _HELICOIL_DRILL_RANGES:
         if lo <= diameter_mm <= hi:
             return "tapped_hole", spec, True
-    return "blind_hole", None, False
+    return ("through_hole" if through else "blind_hole"), None, False
+
+def _annotate_hole_depth(params: Dict, diameter_mm: float, depth_mm: float) -> None:
+    """
+    Depth-driven machinability annotations shared by all hole emit sites:
+      ld_ratio  — depth / diameter
+      deep_hole — L/D > 3: standard twist drilling needs peck cycles; > 5 needs
+                  parabolic-flute or gun drilling. The process planner uses this
+                  to adjust drilling cycle time and flag DFM risk.
+    """
+    if diameter_mm <= 0 or depth_mm <= 0:
+        return
+    ld = round(depth_mm / diameter_mm, 2)
+    params["ld_ratio"] = ld
+    if ld > 3.0:
+        params["deep_hole"] = True
+
 
 # ── Data structures ───────────────────────────────────────────────────────────
 
@@ -247,19 +273,20 @@ class CNCFeatureRecognizer:
 
             elif kind in ("through_hole", "blind_hole"):
                 fid = f"bore_{bore_idx}"
-                if kind == "blind_hole":
-                    emit_type, tap_spec, is_helicoil = _classify_blind_hole(diameter_mm)
-                else:
-                    emit_type, tap_spec, is_helicoil = "through_hole", None, False
+                emit_type, tap_spec, is_helicoil = _classify_hole(
+                    diameter_mm, through=(kind == "through_hole"),
+                )
 
                 params: Dict = {
                     "diameter_mm": diameter_mm,
                     "depth_mm": round(cyl["length"], 3),
                     "centroid": centroid,
                 }
+                _annotate_hole_depth(params, diameter_mm, cyl["length"])
                 if tap_spec:
                     params["spec"] = tap_spec
                     params["detection"] = "geometry_heuristic"
+                    params["through"] = kind == "through_hole"
                     if is_helicoil:
                         params["helicoil_candidate"] = True
 
@@ -275,16 +302,18 @@ class CNCFeatureRecognizer:
 
             elif kind == "cross_hole":
                 fid = f"cross_{cross_idx}"
+                cross_params: Dict = {
+                    "diameter_mm": diameter_mm,
+                    "depth_mm": round(cyl["length"], 3),
+                    "distance_from_axis_mm": round(cyl["dist_from_axis"], 3),
+                    "angle_deg": round(cyl.get("angle_deg", 0.0), 1),
+                    "centroid": centroid,
+                }
+                _annotate_hole_depth(cross_params, diameter_mm, cyl["length"])
                 features.append(CNCFeature(
                     id=fid,
                     type="cross_hole",
-                    params={
-                        "diameter_mm": diameter_mm,
-                        "depth_mm": round(cyl["length"], 3),
-                        "distance_from_axis_mm": round(cyl["dist_from_axis"], 3),
-                        "angle_deg": round(cyl.get("angle_deg", 0.0), 1),
-                        "centroid": centroid,
-                    },
+                    params=cross_params,
                     confidence=0.75,
                     face_ids=face_ids,
                 ))
@@ -434,8 +463,9 @@ class CNCFeatureRecognizer:
         Prismatic / milled part recognition.
 
         No dominant rotation axis is assumed. All internal cylinders become
-        through_hole or blind_hole; conical faces become chamfers; planar
-        recesses become pockets or slots. No external_diameter is emitted.
+        through_hole / tapped_hole / blind_hole; conical faces become chamfers
+        or countersinks; planar recesses become pockets or slots.
+        No external_diameter is emitted.
         """
         features: List[CNCFeature] = []
         warnings: List[str] = []
@@ -449,42 +479,73 @@ class CNCFeatureRecognizer:
         # For milled parts the machining datum is the largest planar face.
         # Use dominant planar normal as the "Z axis" for through vs blind checks.
         datum_axis = self._dominant_planar_normal(shape)
-        part_span = _axis_span(bbox, datum_axis)
 
-        cylinders = self._collect_cylinders(shape, datum_axis, bbox)
+        raw_cylinders = self._collect_cylinders(shape, datum_axis, bbox)
+        # Merge OCC arc patches of the same physical bore. Without this, one bore
+        # represented as 4 quarter-circle patches would inflate hole counts 4×.
+        cylinders = _deduplicate_cylinders(raw_cylinders)
         cones = self._collect_cones(shape)
         prismatic = self._collect_prismatic_pockets(shape, datum_axis)
 
+        logger.info(
+            f"[milled] raw_cyl={len(raw_cylinders)} deduped={len(cylinders)} "
+            f"cones={len(cones)} prismatic={len(prismatic)}"
+        )
+
         bore_idx = 0
+        bore_id_to_cyl: Dict[str, Dict] = {}
+
         for cyl in cylinders:
             # Milled parts have no external_diameter — skip outward-facing cylinders
             if cyl["kind"] == "external_diameter":
                 continue
             diameter_mm = round(cyl["radius"] * 2.0, 3)
-            kind = cyl["kind"] if cyl["kind"] in ("through_hole", "blind_hole") else "blind_hole"
             cx, cy, cz = cyl["centroid"]
+            centroid = [round(cx, 3), round(cy, 3), round(cz, 3)]
+            fid = f"bore_{bore_idx}"
+
+            kind = cyl["kind"] if cyl["kind"] in ("through_hole", "blind_hole") else "blind_hole"
+            emit_type, tap_spec, is_helicoil = _classify_hole(
+                diameter_mm, through=(kind == "through_hole"),
+            )
+
+            params: Dict = {
+                "diameter_mm": diameter_mm,
+                "depth_mm": round(cyl["length"], 3),
+                "centroid": centroid,
+            }
+            _annotate_hole_depth(params, diameter_mm, cyl["length"])
+            if tap_spec:
+                params["spec"] = tap_spec
+                params["detection"] = "geometry_heuristic"
+                params["through"] = kind == "through_hole"
+                if is_helicoil:
+                    params["helicoil_candidate"] = True
+
             features.append(CNCFeature(
-                id=f"bore_{bore_idx}",
-                type=kind,
-                params={
-                    "diameter_mm": diameter_mm,
-                    "depth_mm": round(cyl["length"], 3),
-                    "centroid": [round(cx, 3), round(cy, 3), round(cz, 3)],
-                },
-                confidence=0.80,
+                id=fid,
+                type=emit_type,
+                params=params,
+                confidence=0.85 if emit_type == "through_hole" else (0.55 if tap_spec else 0.80),
                 face_ids=cyl.get("face_indices", []),
             ))
+            bore_id_to_cyl[fid] = cyl
             bore_idx += 1
 
-        # Counterbore detection
-        bore_features = [f for f in features if f.type in ("through_hole", "blind_hole")]
-        bore_face_ids = {f.id: f.face_ids for f in bore_features}
-        counterbores = _detect_counterbores(bore_features)
+        # Counterbore detection with centroid distance guard. Without bore_id_to_cyl the
+        # O(n²) pair check would produce thousands of false positives from non-coaxial
+        # bore pairs that happen to satisfy diam_outer > diam_inner + depth_outer < depth_inner.
+        bore_features = [f for f in features if f.type in ("through_hole", "blind_hole", "tapped_hole")]
+        counterbores = _detect_counterbores(
+            [f for f in bore_features if f.type in ("through_hole", "blind_hole")],
+            bore_id_to_cyl,
+        )
         if counterbores:
             absorbed: set = set()
             for cb_idx, (outer_id, inner_id, params) in enumerate(counterbores):
                 cb_face_ids = list(set(
-                    bore_face_ids.get(outer_id, []) + bore_face_ids.get(inner_id, [])
+                    bore_id_to_cyl.get(outer_id, {}).get("face_indices", []) +
+                    bore_id_to_cyl.get(inner_id, {}).get("face_indices", [])
                 ))
                 features.append(CNCFeature(
                     id=f"cbore_{cb_idx}",

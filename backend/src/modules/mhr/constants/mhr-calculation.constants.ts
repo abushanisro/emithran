@@ -4,45 +4,11 @@
  * Based on ISO 31000 and APQP guidelines
  */
 
-/**
- * Approximate FX rates: units of local currency per 1 USD.
- * These are reference rates for cost reporting only — not for financial settlement.
- * Update periodically. Derived from IMF/World Bank averages.
- */
-export const FX_RATES_LOCAL_PER_USD: Record<string, number> = {
-  INR: 84.5,
-  USD: 1.0,
-  EUR: 0.92,
-  CNY: 7.25,
-  MXN: 17.5,
-  GBP: 0.79,
-  JPY: 154,
-  TWD: 32.5,
-  KRW: 1380,
-  AUD: 1.56,
-  CAD: 1.37,
-  BRL: 5.1,
-  THB: 36,
-  MYR: 4.75,
-  IDR: 15700,
-  VND: 25300,
-  SGD: 1.35,
-  ZAR: 19.5,
-  TRY: 34,
-  RUB: 91,
-  SAR: 3.75,
-  AED: 3.67,
-  PLN: 4.0,
-  CZK: 23.5,
-  HUF: 365,
-  RON: 4.6,
-};
-
-/** Returns USD equivalent for 1 unit of the given currency code. */
-export function getUsdPerLocal(currency: string): number {
-  const localPerUsd = FX_RATES_LOCAL_PER_USD[currency?.toUpperCase()] ?? FX_RATES_LOCAL_PER_USD['USD'];
-  return 1 / localPerUsd;
-}
+// FX conversion for MHR/LSR pricing is sourced live from the `exchange_rates`
+// table via common/exchange-rate/exchange-rate.service.ts (ExchangeRateService),
+// not a hardcoded constant here — a hardcoded rate table drifts out of date and
+// was the root cause of a currency-conversion bug that silently mispriced
+// machines by the FX factor. Rates are admin-maintained in that table.
 
 /** Infers currency code and symbol from a free-text location string. Defaults to USD. */
 export function getCurrencyForLocation(location: string): { currency: string; symbol: string } {

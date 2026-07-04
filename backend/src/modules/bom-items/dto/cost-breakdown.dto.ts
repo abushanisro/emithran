@@ -47,6 +47,8 @@ export interface RouteResultSustainability {
   sustainabilityScore: number;
 }
 
+import type { MachineSelectionResult } from './machine-selection.dto';
+
 export interface ProcessLineCost {
   process: string;       // "Laser Cutting", "Press Brake", "Tapping", "Deburring"
   setupCost: number;     // INR — amortised over batchSize
@@ -58,6 +60,9 @@ export interface ProcessLineCost {
   machineClass: string;        // e.g. 'fiber_laser' — maps to MACHINE_REGISTRY key
   machineName: string | null;  // DB machine_name; null when source is 'default_rate'
   commodityCode: string | null; // DB commodity_code; null when source is 'default_rate'
+  // Physics-based selection result (recommendation + alternatives + profiles).
+  // Attached by BOMItemsService when ENABLE_PHYSICS_MACHINE_SELECTION is on.
+  machineSelection?: MachineSelectionResult;
 }
 
 export interface CostSummaryDto {
@@ -100,6 +105,15 @@ export interface CostSummaryDto {
   // Transparency
   warnings: string[];
   ratesSource: string;
+
+  // Provenance of cost-critical geometry inputs (sheet metal only) — which
+  // source supplied each value, for quote debugging. 'cad' = measured geometry,
+  // 'drawing' = drawing intelligence, 'estimated' = inferred from route,
+  // 'reconstructed' = derived (volume ÷ thickness).
+  geometryProvenance?: {
+    bendSource: 'cad' | 'drawing' | 'estimated';
+    blankAreaSource: 'cad' | 'reconstructed';
+  };
 
   // Location currency (set by getCostSummary; undefined = legacy INR response)
   currency?: string;         // ISO 4217 code: 'INR', 'USD', 'EUR', 'CNY'

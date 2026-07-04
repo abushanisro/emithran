@@ -97,6 +97,31 @@ export class AutoFillService {
       );
     }
 
+    // 2c. Reverse override: Python topology classifier is authoritative when it confidently
+    // says sheet_metal but the TypeScript heuristic fell through to its weak CNC default.
+    // This happens on flanged/perforated brackets: the flat-pattern extractor returns
+    // sheetThicknessMm = 0 (flanges break antiparallel face-pair detection) and the bbox
+    // rules miss (flatness 0.40–0.60 → neither minDim<8+AR>5 nor fillRatio gate fires),
+    // while the Python hole-count/flatness gates correctly identify sheet metal.
+    // Only the low-confidence CNC fallthrough (≤ 0.65) is overridden — Die Casting /
+    // Injection Molding / high-confidence CNC suggestions are signal-backed and kept.
+    if (
+      cadFamilyClassification.family === 'sheet_metal' &&
+      (cadFamilyClassification.confidence ?? 0) >= 0.70 &&
+      processSuggestion.processType === 'CNC Machining' &&
+      processSuggestion.processConfidence <= 0.65
+    ) {
+      processSuggestion.processType =
+        rawGeometry.bendCount > 0 ? 'Sheet Metal Bending' : 'Sheet Metal Laser Cutting';
+      processSuggestion.processConfidence = cadFamilyClassification.confidence ?? 0.70;
+      processSuggestion.estimatedCycleTimeMin = 15;
+      processSuggestion.itemType = 'child_part';
+      this.logger.debug(
+        `[classify] Python family overrides TypeScript process: CNC Machining → ${processSuggestion.processType} ` +
+        `(family confidence ${cadFamilyClassification.confidence})`,
+      );
+    }
+
     // 3. Lookup material
     const materialResult = await this.suggestMaterial(
       rawGeometry, processSuggestion.processType, effectiveFamily.family ?? '', userId, accessToken,

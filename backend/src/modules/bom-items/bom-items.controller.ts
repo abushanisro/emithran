@@ -26,6 +26,8 @@ import { BOMItemsService } from './bom-items.service';
 import { CreateBOMItemDto, UpdateBOMItemDto, QueryBOMItemsDto, BOMItemType } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import { AutoFillResponseDto } from './dto/auto-fill.dto';
+import { MachineOverrideDto } from './dto/machine-selection.dto';
+import { DEFAULT_COSTING_LOCATION } from './costing/default-rates';
 import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -1836,7 +1838,7 @@ export class BOMItemsController {
       user.id,
       token,
       batchSize ? parseInt(batchSize, 10) : 1,
-      location || 'India',
+      location || DEFAULT_COSTING_LOCATION,
     );
   }
 
@@ -1848,6 +1850,7 @@ export class BOMItemsController {
   async getRouteComparison(
     @Param('id') id: string,
     @Query('batchSize') batchSize: string,
+    @Query('location') location: string,
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
@@ -1856,6 +1859,7 @@ export class BOMItemsController {
       user.id,
       token,
       batchSize ? parseInt(batchSize, 10) : 1,
+      location || DEFAULT_COSTING_LOCATION,
     );
   }
 
@@ -1867,5 +1871,26 @@ export class BOMItemsController {
     @AccessToken() token: string,
   ) {
     return this.bomItemsService.getGdtAnalysis(id, token);
+  }
+
+  @Post(':id/machine-override')
+  @ApiOperation({
+    summary: 'Force a specific machine for one process line (null mhrRecordId clears the override)',
+  })
+  @ApiResponse({ status: 201, description: 'Override saved (or cleared) — next cost summary uses it' })
+  async setMachineOverride(
+    @Param('id') id: string,
+    @Body() dto: MachineOverrideDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    return this.bomItemsService.setMachineOverride(
+      id,
+      user.id,
+      token,
+      dto.processKey,
+      dto.mhrRecordId ?? null,
+      dto.location || DEFAULT_COSTING_LOCATION,
+    );
   }
 }

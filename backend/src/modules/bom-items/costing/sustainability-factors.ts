@@ -14,6 +14,9 @@ export const ENERGY_KWH_PER_HR: Record<string, number> = {
   cnc_lathe_live: 7.0,  // live tooling: additional spindle power
   cnc_mill_turn: 10.0,  // full mill-turn: two spindles
   inspection:    0.5,   // CMM / bench gauge: minimal draw
+  cmm:           0.5,   // coordinate measuring machine: probe + controller
+  surface_treatment: 2.5, // anodize/plating line share: rectifier + tanks + rinse
+  cleaning:      1.0,   // wash / degrease station: pump + heater share
 };
 
 // India grid CO₂ intensity — CEA 2023 Annual Report (kg CO₂e per kWh consumed)

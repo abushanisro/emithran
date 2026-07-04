@@ -155,15 +155,13 @@ export class ResolverService {
       // Skip geometry estimate for bench/manual ops (deburr, inspect, surface treat, heat treat)
       // even when the AI incorrectly assigns a CNC machine candidate.
       const linkedMandatoryOp = brief?.mandatoryOps.find((op) => op.featureId === line.featureId);
+      const BENCH_HINTS = new Set([
+        'bench_manual', 'inspection_bench', 'cmm', 'inspection',
+        'cleaning', 'surface_treatment', 'heat_treatment',
+      ]);
       const isBenchOp =
-        linkedMandatoryOp?.machineCategoryHint === 'bench_manual' ||
-        line.machineCategoryHint === 'bench_manual' ||
-        linkedMandatoryOp?.machineCategoryHint === 'inspection_bench' ||
-        line.machineCategoryHint === 'inspection_bench' ||
-        linkedMandatoryOp?.machineCategoryHint === 'surface_treatment' ||
-        line.machineCategoryHint === 'surface_treatment' ||
-        linkedMandatoryOp?.machineCategoryHint === 'heat_treatment' ||
-        line.machineCategoryHint === 'heat_treatment';
+        BENCH_HINTS.has(linkedMandatoryOp?.machineCategoryHint ?? '') ||
+        BENCH_HINTS.has(line.machineCategoryHint ?? '');
 
       // Feature-specific timing: uses actual hole diameter/depth/count from the feature graph.
       // Takes priority over AI hints because the AI frequently stamps total batch time on every
@@ -181,6 +179,9 @@ export class ResolverService {
       const defaultSetupMin =
         categoryHint === 'bench_manual'      ? 2  :
         categoryHint === 'inspection_bench'  ? 5  :
+        categoryHint === 'inspection'        ? 5  :
+        categoryHint === 'cmm'               ? 10 :
+        categoryHint === 'cleaning'          ? 5  :
         categoryHint === 'saw'               ? 5  :
         categoryHint === 'surface_treatment' ? 10 :
         categoryHint === 'heat_treatment'    ? 10 :
@@ -188,6 +189,9 @@ export class ResolverService {
       const defaultCycleSec =
         categoryHint === 'bench_manual'      ? 120 :
         categoryHint === 'inspection_bench'  ? 300 :
+        categoryHint === 'inspection'        ? 300 :
+        categoryHint === 'cmm'               ? 480 :  // ~8 min CMM routine per part
+        categoryHint === 'cleaning'          ? 90  :
         categoryHint === 'saw'               ? 30  :
         60;
 
@@ -199,10 +203,10 @@ export class ResolverService {
       // billing for manual deburring is physically wrong and inflates cost ×100.
       // Once the user adds a Deburring Bench or Inspection Bench MHR record, the machine
       // ranker will match it and its real rate will be used instead.
-      const benchCategoryHints = ['bench_manual', 'inspection_bench', 'surface_treatment', 'heat_treatment'];
+      const benchCategoryHints = ['bench_manual', 'inspection_bench', 'cmm', 'cleaning', 'surface_treatment', 'heat_treatment'];
       const machineIsBench = benchCategoryHints.some((kw) =>
         `${macCand.machineName} ${macCand.commodityCode ?? ''}`.toLowerCase().includes(kw.replace(/_/g, ' '))
-        || ['bench', 'deburr', 'workstation', 'inspection', 'cmm', 'quality', 'treatment', 'plating', 'furnace'].some(
+        || ['bench', 'deburr', 'workstation', 'inspection', 'cmm', 'quality', 'treatment', 'plating', 'furnace', 'wash', 'clean', 'degreas'].some(
           (mk) => `${macCand.machineName}`.toLowerCase().includes(mk),
         ),
       );
@@ -271,6 +275,7 @@ export class ResolverService {
           featureId:    line.featureId ?? null,
           featureType:  line.featureId ? (brief?.featureGraph?.features?.find((f: any) => f.id === line.featureId)?.type ?? null) : null,
           featureGroup: line.featureId ? featureGroupFromType(brief?.featureGraph?.features?.find((f: any) => f.id === line.featureId)?.type) : null,
+          featureQty:   line.featureQty ?? (line.featureId ? brief?.featureGraph?.features?.find((f: any) => f.id === line.featureId)?.count : undefined),
         },
         references: refs,
         reason: line.reason,
