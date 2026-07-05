@@ -90,12 +90,27 @@ export interface GenericRequirement {
   kind: 'generic';        // deburring, tapping — no dimensional gate
 }
 
+export interface InjectionMoldingRequirement {
+  kind: 'injection_molding';
+  clampTonnageRequired: number;  // selector applies TONNAGE_MARGIN
+  projectedAreaMm2: number;
+  // Full IMM sizing criteria: clamp force, shot weight, tie-bar spacing vs
+  // part dims. Only clamp tonnage has capability data in mhr_records today
+  // (max_tonnage, migration 324); shot weight and part dims are carried on
+  // the requirement so the selector can gate on them the day shot-capacity /
+  // tie-bar columns exist — and can already explain them in reasons.
+  shotWeightG: number | null;    // part + runner mass per shot; null = volume/density unknown
+  partLengthMm: number;          // largest bbox dim — future tie-bar spacing check
+  partWidthMm: number;           // second bbox dim
+}
+
 export type MachineRequirement =
   | PressBrakeRequirement
   | LaserRequirement
   | VmcRequirement
   | LatheRequirement
-  | GenericRequirement;
+  | GenericRequirement
+  | InjectionMoldingRequirement;
 
 // ── Requirement builders ──────────────────────────────────────────────────────
 
@@ -160,5 +175,64 @@ export function latheRequirement(input: {
     kind: 'lathe',
     diameterMm: Math.max(input.maxDiameterMm, 0),
     lengthMm: Math.max(input.maxLengthMm, 0),
+  };
+}
+
+// ── Injection molding ──────────────────────────────────────────────────────────
+// Clamp tonnage = projected area × material-specific cavity pressure factor —
+// the standard shop-floor sizing rule (aPriori/industry convention). Phase 1
+// approximates projected area with the part's bbox footprint (the true
+// projected-area-in-mold-opening-direction is a Phase 2 refinement — see the
+// injection-molding plan doc). Keyed by the SAME resin-family strings already
+// used for material cost lookup (MATERIAL_DEFAULTS in default-rates.ts) so
+// there is one resin classification scheme, not two.
+// Reference bands (converted from the common tons/in² shop convention,
+// 1 in² = 6.4516 cm²): easy-flow commodity resins ~2-3 tons/in² (0.31-0.47
+// tons/cm²), general engineering resins (nylon/PA, acetal/POM) ~4-6 tons/in²
+// (0.62-0.93 tons/cm²), higher-viscosity/glass-filled resins ~6-8 tons/in²
+// (0.93-1.24 tons/cm²).
+export const MATERIAL_PRESSURE_FACTOR_TON_CM2: Record<string, number> = {
+  ABS: 0.55,
+  PLASTIC: 0.65, // generic/unknown thermoplastic — mid-band
+  NYLON: 0.75,
+  PA6: 0.75,
+  PA66: 0.75,
+  POM: 0.8,
+  ACETAL: 0.8,
+  DELRIN: 0.8,
+  PEEK: 1.1, // high-viscosity engineering resin
+  __default__: 0.65,
+};
+
+export function classifyResinFamily(grade: string | null): string {
+  if (!grade) return '__default__';
+  const gradeUpper = grade.toUpperCase();
+  return (
+    Object.keys(MATERIAL_PRESSURE_FACTOR_TON_CM2).find(
+      (k) => k !== '__default__' && gradeUpper.includes(k),
+    ) ?? '__default__'
+  );
+}
+
+export function injectionMoldingRequirement(input: {
+  projectedAreaMm2: number;
+  materialGrade: string | null;
+  shotWeightG?: number | null;
+  partLengthMm?: number;
+  partWidthMm?: number;
+}): InjectionMoldingRequirement {
+  const resinFamily = classifyResinFamily(input.materialGrade);
+  const pressureFactor =
+    MATERIAL_PRESSURE_FACTOR_TON_CM2[resinFamily] ?? MATERIAL_PRESSURE_FACTOR_TON_CM2.__default__;
+  const projectedAreaMm2 = Math.max(input.projectedAreaMm2, 0);
+  const projectedAreaCm2 = projectedAreaMm2 / 100; // 1 cm² = 100 mm²
+  const clampTonnageRequired = projectedAreaCm2 * pressureFactor;
+  return {
+    kind: 'injection_molding',
+    clampTonnageRequired,
+    projectedAreaMm2,
+    shotWeightG: input.shotWeightG ?? null,
+    partLengthMm: Math.max(input.partLengthMm ?? 0, 0),
+    partWidthMm: Math.max(input.partWidthMm ?? 0, 0),
   };
 }

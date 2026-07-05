@@ -27,6 +27,7 @@ import { CreateBOMItemDto, UpdateBOMItemDto, QueryBOMItemsDto, BOMItemType } fro
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import { AutoFillResponseDto } from './dto/auto-fill.dto';
 import { MachineOverrideDto } from './dto/machine-selection.dto';
+import { CostOverrideDto } from './dto/cost-override.dto';
 import { DEFAULT_COSTING_LOCATION } from './costing/default-rates';
 import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -1890,6 +1891,27 @@ export class BOMItemsController {
       token,
       dto.processKey,
       dto.mhrRecordId ?? null,
+      dto.location || DEFAULT_COSTING_LOCATION,
+    );
+  }
+
+  @Post(':id/cost-override')
+  @ApiOperation({
+    summary: 'aPriori-style manual override for one cost field (null/omitted value clears it)',
+  })
+  @ApiResponse({ status: 201, description: 'Override saved (or cleared) — next cost summary uses it' })
+  async setCostOverride(
+    @Param('id') id: string,
+    @Body() dto: CostOverrideDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    return this.bomItemsService.setCostOverride(
+      id,
+      user.id,
+      token,
+      dto.fieldKey,
+      dto.value ?? null,
       dto.location || DEFAULT_COSTING_LOCATION,
     );
   }

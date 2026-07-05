@@ -42,7 +42,9 @@ export type FeatureCategory =
   | 'louver'  // ventilation cut-form — not yet detected
   | 'flange'  // bent-up edge (distinct from bend) — not yet detected
   | 'hem'     // folded-back edge — not yet detected
-  | 'bead';   // stiffening rib — not yet detected
+  | 'bead'    // stiffening rib — not yet detected
+  | 'im_undercut'   // injection molding undercut face (DFM)
+  | 'im_undrafted'; // injection molding undrafted face (DFM)
 
 export type ExtractionMethod =
   | 'occ_cylindrical_face'    // OCC topology — STEP, trusted
@@ -174,6 +176,13 @@ export interface FeatureGraphSummary {
   holeDiameters?: number[];
   holeGroups?: HoleGroup[];
   bendRadii?: number[];
+  // Injection-molded Phase-1 features (present when family = injection_molded)
+  wallThicknessNominalMm?: number;
+  wallThicknessMinMm?: number;
+  wallThicknessMaxMm?: number;
+  holeOrBossCount?: number;
+  filletCount?: number;
+  ribCountProxy?: number;
 }
 
 export interface FeatureGraph {

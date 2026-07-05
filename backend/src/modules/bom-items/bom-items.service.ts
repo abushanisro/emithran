@@ -10,6 +10,9 @@ import {
   requiredMilledMachineClass, meetsRequiredMilledClass, pickRecommendedRoute,
 } from './costing/cost-cnc-engine';
 import type { CNCCostInput, CNCMachineClass } from './costing/cost-cnc-engine';
+import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT } from './costing/cost-injection-molding-engine';
+import type { InjectionMoldingCostInput } from './costing/cost-injection-molding-engine';
+import { isPlasticGrade } from './costing/injection-molding/process-tree';
 import {
   MATERIAL_DEFAULTS, MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL,
   LASER_SETUP_MIN, LASER_SPEED_MM_PER_MIN, LASER_PIERCE_SEC,
@@ -19,7 +22,7 @@ import {
   MACHINE_REGISTRY, LOCATION_INFO, LOCATION_MHR_DEFAULTS,
   LOCATION_ABRASIVE_PRICE_PER_KG,
   DEFAULT_COSTING_LOCATION, benchmarkRateWarning,
-  resolveUtsMpa, laserSpeedFactor,
+  resolveUtsMpa, laserSpeedFactor, isSheetFormableMaterial,
 } from './costing/default-rates';
 import type { MachineClass } from './costing/default-rates';
 import { computeTurretPunchCost } from './costing/turret-punch-engine';
@@ -35,11 +38,12 @@ import { InspectionKnowledgeService } from '../manufacturing-knowledge/services/
 import type { GdtAnalysisDto, GdtFeatureDto } from './dto/gdt-analysis.dto';
 import {
   classifyLaserMaterial, laserRequirement, latheRequirement,
-  pressBrakeRequirement, vmcRequirement,
+  pressBrakeRequirement, vmcRequirement, injectionMoldingRequirement,
   MATERIAL_K, MATERIAL_MRR_CM3_MIN,
 } from './costing/machine-selection/physics';
 import type { MachineRequirement } from './costing/machine-selection/physics';
 import { fetchMachinePool, selectMachine } from './costing/machine-selection/selector';
+import { lookupSeedCapability } from './costing/machine-selection/seed-registry';
 import type { MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
 import {
   shapeRankForFamily,
@@ -945,6 +949,25 @@ export class BOMItemsService {
       requirements.cnc_mill_turn = latheReq;
     }
 
+    if (input.family === 'injection_molded') {
+      // Projected area (mold-opening direction) approximated as the footprint in
+      // the two largest bbox dims — Phase 1 approximation; true projected area
+      // in the actual pull direction is a Phase 2 refinement (see plan doc).
+      const dims = [input.bboxXMm, input.bboxYMm, input.bboxZMm].sort((a, b) => b - a);
+      const projectedAreaMm2 = dims[0] * dims[1];
+      requirements.injection_molding = injectionMoldingRequirement({
+        projectedAreaMm2,
+        materialGrade: input.grade,
+        // Shot weight = finished part + runner allowance (same constant the
+        // cost engine's material model uses — one number, not two copies).
+        shotWeightG: input.weightKg > 0
+          ? input.weightKg * 1000 * (1 + IM_RUNNER_SCRAP_PCT / 100)
+          : null,
+        partLengthMm: dims[0],
+        partWidthMm: dims[1],
+      });
+    }
+
     return requirements;
   }
 
@@ -1149,6 +1172,116 @@ export class BOMItemsService {
     return { processKey, mhrRecordId, location };
   }
 
+  // aPriori-style manual overrides: field_key = 'mat_rate' | '<process>::rate' |
+  // '<process>::cycleMin'. Scoped by location for the same reason as machine
+  // overrides — an India rate override must not silently apply after switching
+  // the Digital Factory to USA.
+  private async fetchCostOverrides(
+    bomItemId: string,
+    accessToken: string,
+    location: string,
+  ): Promise<Map<string, number>> {
+    const overrides = new Map<string, number>();
+    try {
+      const { data, error } = await this.supabaseService
+        .getClient(accessToken)
+        .from('bom_item_cost_overrides')
+        .select('field_key, value')
+        .eq('bom_item_id', bomItemId)
+        .eq('location', location);
+      if (error) return overrides;
+      for (const row of data ?? []) {
+        const v = Number(row.value);
+        if (row.field_key && Number.isFinite(v)) overrides.set(row.field_key, v);
+      }
+    } catch {
+      // Table missing (migration 330 pending) — no overrides
+    }
+    return overrides;
+  }
+
+  // Applied after the family-specific engine + attachMachineSelections, so it
+  // sees the final process line set for whichever route was actually costed.
+  //
+  // Material rate is applied as a SCALE FACTOR on the engine's own computed
+  // materialCost (override / originalRatePerKg), not reconstructed from
+  // scratch — the CNC engine folds a billet-overhead multiplier into
+  // materialCost that this method must not have to know about or duplicate.
+  // Scaling proportionally reproduces "the engine had run with this rate" for
+  // any formula that is linear in cost-per-kg, which weight × rate always is.
+  //
+  // Process line rate/cycle time ARE reconstructed directly (runCost =
+  // rate/60 × cycleMin, setupCost untouched) — this is the exact formula the
+  // UI's inline editor already uses, not a new one.
+  private applyCostOverrides(result: CostSummaryDto, overrides: Map<string, number>): void {
+    if (overrides.size === 0) return;
+
+    const matRateOv = overrides.get('mat_rate');
+    if (matRateOv != null && result.materialCostPerKg > 0) {
+      const scale = matRateOv / result.materialCostPerKg;
+      result.materialCost = this.r2(result.materialCost * scale);
+      result.materialCostPerKg = matRateOv;
+      result.materialSource = 'db'; // user-confirmed rate — no longer a default estimate
+    }
+
+    for (const line of result.processLines) {
+      const rateOv = overrides.get(`${line.process}::rate`);
+      const cycleOv = overrides.get(`${line.process}::cycleMin`);
+      if (rateOv == null && cycleOv == null) continue;
+      line.hourlyRate = rateOv ?? line.hourlyRate;
+      line.cycleTimeMin = cycleOv ?? line.cycleTimeMin;
+      line.runCost = this.r2((line.hourlyRate / 60) * line.cycleTimeMin);
+      line.totalCost = this.r2(line.setupCost + line.runCost);
+    }
+
+    result.totalProcessCost = this.r2(result.processLines.reduce((s, l) => s + l.totalCost, 0));
+    result.totalCost = this.r2(result.materialCost + result.totalProcessCost);
+  }
+
+  async setCostOverride(
+    bomItemId: string,
+    userId: string,
+    accessToken: string,
+    fieldKey: string,
+    value: number | null,
+    location: string = DEFAULT_COSTING_LOCATION,
+  ): Promise<{ fieldKey: string; value: number | null; location: string }> {
+    // findOne enforces the caller can access this BOM item
+    await this.findOne(bomItemId, userId, accessToken);
+    const client = this.supabaseService.getClient(accessToken);
+
+    if (value === null) {
+      const { error } = await client
+        .from('bom_item_cost_overrides')
+        .delete()
+        .eq('bom_item_id', bomItemId)
+        .eq('field_key', fieldKey)
+        .eq('location', location);
+      if (error) throw new InternalServerErrorException(`Failed to clear cost override: ${error.message}`);
+      return { fieldKey, value: null, location };
+    }
+
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new BadRequestException(`Cost override value must be a positive number: ${value}`);
+    }
+
+    const { error } = await client
+      .from('bom_item_cost_overrides')
+      .upsert(
+        {
+          bom_item_id: bomItemId,
+          location,
+          field_key: fieldKey,
+          value,
+          overridden_by: userId,
+          overridden_at: new Date().toISOString(),
+        },
+        { onConflict: 'bom_item_id,location,field_key' },
+      );
+    if (error) throw new InternalServerErrorException(`Failed to save cost override: ${error.message}`);
+    return { fieldKey, value, location };
+  }
+
   private async resolveMHRRates(
     accessToken: string,
     location = 'India',
@@ -1170,6 +1303,7 @@ export class BOMItemsService {
     cncLathe: MHRRateInput;
     cncLatheLive: MHRRateInput;
     cncMillTurn: MHRRateInput;
+    injectionMolding: MHRRateInput;
   }> {
     const locationMHR = (LOCATION_MHR_DEFAULTS as Record<string, Partial<Record<MachineClass, number>>>)[location];
     const makeDefault = (cls: MachineClass): MHRRateInput => ({
@@ -1183,6 +1317,7 @@ export class BOMItemsService {
     const allClasses: MachineClass[] = [
       'fiber_laser', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet',
       'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn',
+      'injection_molding',
     ];
 
     const buildOutput = (resolved: Map<MachineClass, MHRRateInput>) => ({
@@ -1199,6 +1334,7 @@ export class BOMItemsService {
       cncLathe:     resolved.get('cnc_lathe')      ?? makeDefault('cnc_lathe'),
       cncLatheLive: resolved.get('cnc_lathe_live') ?? makeDefault('cnc_lathe_live'),
       cncMillTurn:  resolved.get('cnc_mill_turn')  ?? makeDefault('cnc_mill_turn'),
+      injectionMolding: resolved.get('injection_molding') ?? makeDefault('injection_molding'),
     });
 
     // ── Physics-based capability selection (new engine) ───────────────────────
@@ -1401,6 +1537,58 @@ export class BOMItemsService {
   // "T6 - Sheet on a machined boom clamp" defect). All INR fallbacks convert
   // to the location currency; a raw INR number in a EUR/USD costing is a
   // silent ~80-90× error.
+  // ── Family resolution ───────────────────────────────────────────────────────
+  // Single precedence chain used by BOTH costing endpoints (summary ≡ route
+  // invariant): user override > material physics > geometry classifier.
+  //
+  // Geometry alone cannot distinguish a machined plate from a molded cover of
+  // the identical shape — the material can. This is the aPriori routing model:
+  // geometry proposes, material routes, user override is final.
+  //   1. manufacturing_family_override — explicit user intent, always wins
+  //      (e.g. machined-PEEK prototype pinned to cnc_milled).
+  //   2. Thermoplastic grade → injection_molded, whatever the shape classifier
+  //      guessed (a PA66 cover and an aluminium cover are the same geometry).
+  //   3. Non-sheet-formable alloy on a sheet-shaped part → cnc_milled (flat
+  //      bronze casting can never run a laser + press-brake route).
+  //   4. Geometry classifier result.
+  private resolveEffectiveFamily(input: {
+    item: BOMItemResponseDto;
+    fg: any;
+    grade: string | null;
+    sheetThicknessMm: number;
+  }): { family: string; familySource: 'override' | 'material' | 'geometry'; warning: string | null } {
+    const override = (input.item.manufacturingFamilyOverride ?? '').trim();
+    if (override) return { family: override, familySource: 'override', warning: null };
+
+    const geoFamily: string =
+      input.fg?.classification?.family ??
+      input.item.familyClassification ??
+      (input.sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown');
+
+    if (isPlasticGrade(input.grade) && geoFamily !== 'injection_molded') {
+      return {
+        family: 'injection_molded',
+        familySource: 'material',
+        warning:
+          `Material "${input.grade}" is a thermoplastic — routed to injection molding ` +
+          `(geometry classifier suggested ${geoFamily.replace(/_/g, ' ')}). ` +
+          'Set a manufacturing-family override on the item to force a machining route instead.',
+      };
+    }
+
+    if (geoFamily === 'sheet_metal' && !isSheetFormableMaterial(input.grade)) {
+      return {
+        family: 'cnc_milled',
+        familySource: 'material',
+        warning:
+          `${input.grade} is not sheet-formable (cast alloy) — geometry looks like flat sheet ` +
+          'but the part is costed as a machined plate; verify the intended process',
+      };
+    }
+
+    return { family: geoFamily, familySource: 'geometry', warning: null };
+  }
+
   private async resolveMaterialForFamily(input: {
     accessToken: string;
     grade: string | null;
@@ -1606,10 +1794,17 @@ export class BOMItemsService {
     const summary = fg?.summary ?? {};
 
     const sheetThicknessMm = (summary.sheetThicknessMm ?? item.sheetThicknessMm ?? 0) as number;
-    const family: string =
-      fg?.classification?.family ??
-      item.familyClassification ??
-      (sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown');
+
+    // Drawing analysis material always wins — it reads the title block directly.
+    // Auto-fill material (from geometry heuristics) is a fallback only.
+    const drawingGrade = ((item.drawingIntelligence as any)?.material ?? null) as string | null;
+    const grade = (drawingGrade?.trim() || null) ?? item.materialGrade ?? item.material ?? null;
+
+    // Override > material > geometry — one precedence chain for both costing
+    // endpoints (see resolveEffectiveFamily).
+    const familyResolution = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
+    const family = familyResolution.family;
+
     const cutLengthMm = (summary.cutLengthMm ?? item.cutLengthMm ?? 0) as number;
     const pierceCount = (summary.pierceCount ?? item.pierceCount ?? 0) as number;
     const geoBendCount = (summary.bendCount ?? item.bendCount ?? 0) as number;
@@ -1629,11 +1824,6 @@ export class BOMItemsService {
     const bendCount = geo?.bendCount ?? geoBendCount;
     const flatPatternAreaMm2 = geo?.flatPatternAreaMm2 ?? measuredFlatAreaMm2;
 
-    // Drawing analysis material always wins — it reads the title block directly.
-    // Auto-fill material (from geometry heuristics) is a fallback only.
-    const drawingGrade = ((item.drawingIntelligence as any)?.material ?? null) as string | null;
-    const grade = (drawingGrade?.trim() || null) ?? item.materialGrade ?? item.material ?? null;
-
     const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO[DEFAULT_COSTING_LOCATION];
     const exchangeRates = await this.fetchExchangeRates(accessToken);
     const usdInrRate = exchangeRates.get('USD') ?? 83.5;
@@ -1642,6 +1832,7 @@ export class BOMItemsService {
     const currencyMeta = { currency: locInfo.code, currencySymbol: locInfo.symbol, toUsdRate };
 
     const materialWarnings: string[] = [];
+    if (familyResolution.warning) materialWarnings.push(familyResolution.warning);
     const { materialCostPerKg, materialDensityKgM3, materialSource } =
       await this.resolveMaterialForFamily({
         accessToken,
@@ -1651,6 +1842,8 @@ export class BOMItemsService {
         locInrRate,
         warnings: materialWarnings,
       });
+
+    const costOverrides = await this.fetchCostOverrides(id, accessToken, location);
 
     const physics = this.physicsSelectionEnabled()
       ? {
@@ -1764,7 +1957,73 @@ export class BOMItemsService {
         }
       }
       this.appendRateWarnings(cncResult, location);
+      this.applyCostOverrides(cncResult, costOverrides);
+      if (costOverrides.size > 0) cncResult.costOverrides = Object.fromEntries(costOverrides);
       return cncResult;
+    }
+
+    if (family === 'injection_molded') {
+      const imBbox = [
+        ((item as any).maxLength ?? 0) as number,
+        ((item as any).maxWidth ?? 0) as number,
+        ((item as any).maxHeight ?? 0) as number,
+      ].sort((a, b) => b - a);
+      // Derive machine physical specs from seed registry for cavity count model.
+      // Tonnage from machine name → kN (1 metric ton = 10 kN).
+      const machineSpec = lookupSeedCapability(mhrRates.injectionMolding.machineName);
+      const clampTonnageKN = machineSpec?.maxTonnage != null ? machineSpec.maxTonnage * 10 : undefined;
+      // Shot capacity: ~0.9 × tonnage (industry rule of thumb; see cost-injection-molding-engine.ts)
+      const shotCapacityCm3 = machineSpec?.maxTonnage != null ? machineSpec.maxTonnage * 0.9 : undefined;
+
+      const imInput: InjectionMoldingCostInput = {
+        volume: (item.volume ?? 0) as number,
+        surfaceArea: (item.surfaceArea ?? 0) as number,
+        wallThicknessNominalMm: (summary.wallThicknessNominalMm ?? 0) as number,
+        materialGrade: grade,
+        materialCostPerKg,
+        materialDensityKgM3,
+        materialSource,
+        batchSize,
+        family,
+        mhrRate: mhrRates.injectionMolding,
+        deburrRate: mhrRates.deburring,
+        inspectionRate: mhrRates.inspection,
+        clampTonnageKN,
+        shotCapacityCm3,
+        // Tooling amortization: use annualVolume from item; default 5yr production life.
+        annualVolume: ((item as any).annualVolume as number | null | undefined) ?? undefined,
+        productionLifeYears: 5,
+        // Phase 4: bbox dimensions for fill-time and gate-recommendation models.
+        // imBbox is sorted descending, so [0]=longest, [1]=mid, [2]=shortest.
+        bboxMaxMm: imBbox[0],
+        bboxMidMm: imBbox[1],
+        signals: {
+          projectedAreaMm2: imBbox[0] * imBbox[1] > 0 ? imBbox[0] * imBbox[1] : null,
+          wallThicknessMinMm: (summary.wallThicknessMinMm as number) > 0 ? (summary.wallThicknessMinMm as number) : null,
+          wallThicknessMaxMm: (summary.wallThicknessMaxMm as number) > 0 ? (summary.wallThicknessMaxMm as number) : null,
+          // Phase 4: use real rib count (antiparallel wall-face pairs); fall back to
+          // pocket-floor proxy when CAD engine is pre-Phase 4.
+          ribCount: (summary.ribCount as number) > 0
+            ? (summary.ribCount as number)
+            : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
+          // Phase 4: bosses = blind cylindrical features (capped), NOT all cylinders.
+          // holeOrBossCount lumps through-holes and bosses; blindFeatureCount is cap-detected.
+          bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
+          // Phase 2 signals — null when CAD engine is pre-Phase 2 (safe: router applies
+          // conservative defaults and records routingWarnings when signals are null)
+          undercutCount: (summary.undercutFaceCount as number) > 0 ? (summary.undercutFaceCount as number) : null,
+          partingComplexity: (summary.partingComplexity as number | null) ?? null,
+          // Phase 3: insert candidates from CAD blind-hole OD matching
+          insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
+        },
+      };
+      const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
+      imResult.warnings.push(...materialWarnings);
+      this.attachMachineSelections(imResult.processLines, mhrRates);
+      this.appendRateWarnings(imResult, location);
+      this.applyCostOverrides(imResult, costOverrides);
+      if (costOverrides.size > 0) imResult.costOverrides = Object.fromEntries(costOverrides);
+      return imResult;
     }
 
     const smResult = {
@@ -1793,6 +2052,8 @@ export class BOMItemsService {
     }
     this.attachMachineSelections(smResult.processLines, mhrRates);
     this.appendRateWarnings(smResult, location);
+    this.applyCostOverrides(smResult, costOverrides);
+    if (costOverrides.size > 0) smResult.costOverrides = Object.fromEntries(costOverrides);
     return smResult;
   }
 
@@ -1809,10 +2070,13 @@ export class BOMItemsService {
     const summary = fg?.summary ?? {};
 
     const sheetThicknessMm = (summary.sheetThicknessMm ?? item.sheetThicknessMm ?? 0) as number;
-    const family: string =
-      fg?.classification?.family ??
-      item.familyClassification ??
-      (sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown');
+    const drawingGradeRC = ((item.drawingIntelligence as any)?.material ?? null) as string | null;
+    const grade = (drawingGradeRC?.trim() || null) ?? item.materialGrade ?? item.material ?? null;
+
+    // Override > material > geometry — same resolver as getCostSummary, by
+    // construction (summary ≡ route invariant).
+    const familyResolutionRC = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
+    const family = familyResolutionRC.family;
 
     const cutLengthMm     = (summary.cutLengthMm      ?? item.cutLengthMm      ?? 0) as number;
     const pierceCount     = (summary.pierceCount       ?? item.pierceCount      ?? 0) as number;
@@ -1833,8 +2097,6 @@ export class BOMItemsService {
     const bendCount = geo?.bendCount ?? geoBendCount;
     const flatPatternAreaMm2 = geo?.flatPatternAreaMm2 ?? measuredFlatAreaMm2;
     const threads = ((item.drawingIntelligence as any)?.threads ?? []) as Array<{ size: string; count: number }>;
-    const drawingGradeRC = ((item.drawingIntelligence as any)?.material ?? null) as string | null;
-    const grade = (drawingGradeRC?.trim() || null) ?? item.materialGrade ?? item.material ?? null;
 
     // Flat pattern dimensions — from bom_items.max_length / max_width (set by CAD pipeline).
     // Access both camelCase and snake_case to handle FIELD_MAPPING variations safely.
@@ -1857,6 +2119,7 @@ export class BOMItemsService {
     const comparisonWarnings: string[] = [];
     if (!grade) comparisonWarnings.push('Material grade not set — default mild steel rates applied');
     if (geo) comparisonWarnings.push(...geo.warnings);
+    if (familyResolutionRC.warning) comparisonWarnings.push(familyResolutionRC.warning);
 
     // ── Material cost — same resolver as getCostSummary, by construction ──────
     const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO[DEFAULT_COSTING_LOCATION];
@@ -1972,6 +2235,103 @@ export class BOMItemsService {
         comparisonWarnings: ['No 3D model analysed — upload a STEP/STL file for accurate routing.'],
       };
     }
+    if (family === 'injection_molded') {
+      // Phase 1: single route, no multi-tonnage-class comparison yet (see plan
+      // doc §8/Roadmap) — the "comparison" is just the one costed route,
+      // mirroring the 'unknown' family's single-entry shape above.
+      const imBboxRC = [
+        ((item as any).maxLength ?? 0) as number,
+        ((item as any).maxWidth ?? 0) as number,
+        ((item as any).maxHeight ?? 0) as number,
+      ].sort((a, b) => b - a);
+      const machineSpecRC = lookupSeedCapability(mhrRates.injectionMolding.machineName);
+      const imInput: InjectionMoldingCostInput = {
+        volume: (item.volume ?? 0) as number,
+        surfaceArea: (item.surfaceArea ?? 0) as number,
+        wallThicknessNominalMm: (summary.wallThicknessNominalMm ?? 0) as number,
+        materialGrade: grade,
+        materialCostPerKg,
+        materialDensityKgM3,
+        materialSource,
+        batchSize,
+        family,
+        mhrRate: mhrRates.injectionMolding,
+        deburrRate: mhrRates.deburring,
+        inspectionRate: mhrRates.inspection,
+        clampTonnageKN: machineSpecRC?.maxTonnage != null ? machineSpecRC.maxTonnage * 10 : undefined,
+        shotCapacityCm3: machineSpecRC?.maxTonnage != null ? machineSpecRC.maxTonnage * 0.9 : undefined,
+        annualVolume: ((item as any).annualVolume as number | null | undefined) ?? undefined,
+        productionLifeYears: 5,
+        bboxMaxMm: imBboxRC[0],
+        bboxMidMm: imBboxRC[1],
+        signals: {
+          projectedAreaMm2: imBboxRC[0] * imBboxRC[1] > 0 ? imBboxRC[0] * imBboxRC[1] : null,
+          wallThicknessMinMm: (summary.wallThicknessMinMm as number) > 0 ? (summary.wallThicknessMinMm as number) : null,
+          wallThicknessMaxMm: (summary.wallThicknessMaxMm as number) > 0 ? (summary.wallThicknessMaxMm as number) : null,
+          // Phase 4: use real rib count (antiparallel wall-face pairs); fall back to
+          // pocket-floor proxy when CAD engine is pre-Phase 4.
+          ribCount: (summary.ribCount as number) > 0
+            ? (summary.ribCount as number)
+            : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
+          // Phase 4: bosses = blind cylindrical features (capped), NOT all cylinders.
+          // holeOrBossCount lumps through-holes and bosses; blindFeatureCount is cap-detected.
+          bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
+          undercutCount: (summary.undercutFaceCount as number) > 0 ? (summary.undercutFaceCount as number) : null,
+          partingComplexity: (summary.partingComplexity as number | null) ?? null,
+          insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
+        },
+      };
+      const cost = computeInjectionMoldedCostSummary(imInput);
+      cost.warnings.push(...comparisonWarnings);
+      const route: RouteResultDto = {
+        routeId: 'injection-molding',
+        routeLabel: 'Injection Molding',
+        processLines: cost.processLines,
+        materialCost: cost.materialCost,
+        abrasiveCost: 0,
+        totalProcessCost: cost.totalProcessCost,
+        totalCost: cost.totalCost,
+        cycleTimes: {
+          cuttingMin:    cost.cycleTimes.laserMin,
+          pressBrakeMin: cost.cycleTimes.pressBrakeMin,
+          tappingMin:    cost.cycleTimes.tappingMin,
+          deburrMin:     cost.cycleTimes.deburrMin,
+          totalMin:      cost.cycleTimes.totalMin,
+        },
+        badges: { lowestCost: true, fastest: true, bestQuality: true },
+        capability: {
+          cuttingCapable: true,
+          pressBrakeCapable: true,
+          overallCapable: true,
+          confidence: 'medium',
+          estimatedTonnage: null,
+          reasonCodes: [],
+          warnings: [],
+        },
+        warnings: cost.warnings,
+        ratesSource: cost.ratesSource,
+        sustainability: cost.sustainability
+          ? {
+              totalCo2Kg:            cost.sustainability.totalCo2Kg,
+              totalProcessEnergyKwh: cost.sustainability.totalProcessEnergyKwh,
+              wasteCostInr:          cost.sustainability.wasteCostInr,
+              sustainabilityScore:   cost.sustainability.sustainabilityScore,
+            }
+          : undefined,
+      };
+      return attachToRoutes({
+        bomItemId: id, batchSize,
+        materialCost: cost.materialCost,
+        materialGrade: grade ?? '',
+        grossWeightKg: cost.grossWeightKg,
+        materialCostPerKg,
+        materialSource,
+        currency: locInfo.code, currencySymbol: locInfo.symbol,
+        routes: [route],
+        comparisonWarnings,
+      });
+    }
+
     if (family !== 'sheet_metal') {
       return {
         bomItemId: id, batchSize, materialCost: 0,

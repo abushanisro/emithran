@@ -62,7 +62,8 @@ export class AutoFillService {
   ): Promise<AutoFillResponseDto> {
     let cadEngineAvailable = false;
     let rawGeometry: RawGeometry;
-    let cadFamilyClassification: { family: string | null; confidence: number | null } = { family: null, confidence: null };
+    let cadFamilyClassification: { family: string | null; confidence: number | null; sheetMetalVetoed: boolean } =
+      { family: null, confidence: null, sheetMetalVetoed: false };
     let cadResult: any = null;
 
     // 1. Try CAD engine; fall back to STL bounding-box parse
@@ -83,17 +84,31 @@ export class AutoFillService {
     const processSuggestion = this.classifyProcess(rawGeometry);
 
     // 2b. TypeScript geometry rules are authoritative over Python family when structure signals sheet metal,
-    // but only when Python classification is uncertain (< 70% confidence).
-    // High-confidence CNC/mill_turn classifications must not be overridden by heuristic process type.
-    let effectiveFamily = cadFamilyClassification;
+    // but only when Python classification is uncertain (< 70% confidence) AND Python did not
+    // actively veto sheet metal. The veto is a geometric impossibility proof (stepped solid
+    // thickness) — the TS bbox heuristic sees the same flat outline that fooled the Python
+    // flatness gate and must not resurrect the vetoed family.
+    let effectiveFamily: { family: string | null; confidence: number | null } = cadFamilyClassification;
     if (
       processSuggestion.processType.startsWith('Sheet Metal') &&
       cadFamilyClassification.family !== 'sheet_metal' &&
-      (cadFamilyClassification.confidence ?? 0) < 0.70
+      (cadFamilyClassification.confidence ?? 0) < 0.70 &&
+      !cadFamilyClassification.sheetMetalVetoed
     ) {
       effectiveFamily = { family: 'sheet_metal', confidence: processSuggestion.processConfidence };
       this.logger.debug(
         `[classify] TypeScript overrides Python family: ${cadFamilyClassification.family ?? 'null'} → sheet_metal`,
+      );
+    }
+    if (cadFamilyClassification.sheetMetalVetoed && processSuggestion.processType.startsWith('Sheet Metal')) {
+      // The process heuristic also thinks "flat = sheet" — align it with the veto,
+      // following whichever family Python's veto disambiguation actually picked
+      // (uniform-wall shell → molded; stepped plate → machined).
+      processSuggestion.processType =
+        cadFamilyClassification.family === 'injection_molded' ? 'Injection Molding' : 'CNC Machining';
+      this.logger.debug(
+        `[classify] Sheet-metal veto upheld: ${cadFamilyClassification.family ?? 'cnc_milled'} — ` +
+        `process → ${processSuggestion.processType}`,
       );
     }
 
@@ -246,6 +261,7 @@ export class AutoFillService {
     }
 
     const isSheetMetal = family.family === 'sheet_metal' || proc.processType.includes('Sheet Metal');
+    const isInjectionMolded = family.family === 'injection_molded';
 
     const cadV2: any =
       cadResult?.geometry_features?.manufacturing_features
@@ -295,6 +311,40 @@ export class AutoFillService {
           geometry_refs: { faces: [], edges: [] },
         })),
         bendRadii:          geo.bendRadii ?? [],
+        // Injection-molded features — promoted from InjectionMoldedFeatureExtractor
+        // output (cadMI.features). Phase 1 fields are always present; Phase 2 fields
+        // are present when extraction_version >= im_v2_phase2 and fall back to safe
+        // defaults (0 / null) so older CAD engine responses keep working unchanged.
+        ...(isInjectionMolded ? {
+          // Phase 1 — wall thickness
+          wallThicknessNominalMm: cadMI?.features?.wall_thickness_nominal_mm ?? 0,
+          wallThicknessMinMm:     cadMI?.features?.wall_thickness_min_mm ?? 0,
+          wallThicknessMaxMm:     cadMI?.features?.wall_thickness_max_mm ?? 0,
+          // Phase 1 — cylindrical features (hole/boss lumped)
+          holeOrBossCount:        cadMI?.features?.hole_or_boss_count ?? 0,
+          filletCount:            cadMI?.features?.fillet_count ?? 0,
+          // Phase 1 — rib proxy (pocket-floor count, kept for backward compat)
+          ribCountProxy:          cadMI?.features?.rib_count_proxy ?? 0,
+          // Phase 4 — real rib count (antiparallel wall-face pairs at rib separation)
+          // Falls back to rib_count_proxy when CAD engine is pre-Phase 4.
+          ribCount:               cadMI?.features?.rib_count ?? cadMI?.features?.rib_count_proxy ?? 0,
+          // Phase 2 — wall uniformity (null when CAD engine is pre-Phase 2)
+          wallThicknessStdDevMm:    cadMI?.features?.wall_thickness_std_dev_mm ?? null,
+          thinWallViolationCount:   cadMI?.features?.thin_wall_violation_count ?? 0,
+          thickWallViolationCount:  cadMI?.features?.thick_wall_violation_count ?? 0,
+          wallUniformityRatio:      cadMI?.features?.wall_uniformity_ratio ?? null,
+          // Phase 2 — blind feature split
+          throughHoleCount:     cadMI?.features?.through_hole_count ?? 0,
+          blindFeatureCount:    cadMI?.features?.blind_feature_count ?? 0,
+          // Phase 3 — insert candidates (blind holes at standard insert OD sizes)
+          insertCandidateCount: cadMI?.features?.insert_candidate_count ?? 0,
+          // Phase 2 — draft angles
+          undraftedFaceCount:   cadMI?.features?.undrafted_face_count ?? 0,
+          draftedFaceCount:     cadMI?.features?.drafted_face_count ?? 0,
+          undercutFaceCount:    cadMI?.features?.undercut_face_count ?? 0,
+          partingComplexity:    cadMI?.features?.parting_complexity ?? null,
+          avgDraftAngleDeg:     cadMI?.features?.avg_draft_angle_deg ?? null,
+        } : {}),
       },
       dfmWarnings:            this.buildDFMWarnings(geo, proc, cadResult),
       validationResults:      this.buildValidationChecks(geo, proc, cadResult),
@@ -548,19 +598,29 @@ export class AutoFillService {
   // FAMILY CLASSIFICATION EXTRACTION
   // ────────────────────────────────────────────────────────────────────────────
 
-  private extractFamilyClassification(cadResult: any): { family: string | null; confidence: number | null } {
+  private extractFamilyClassification(
+    cadResult: any,
+  ): { family: string | null; confidence: number | null; sheetMetalVetoed: boolean } {
     try {
       const mi = cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence;
-      if (!mi || mi.error) return { family: null, confidence: null };
+      if (!mi || mi.error) return { family: null, confidence: null, sheetMetalVetoed: false };
       const family = mi.detected_family ?? null;
       const rawConfidence = mi.family_confidence;
       const confidence = rawConfidence != null ? parseFloat(rawConfidence) : null;
+      // Python's sheet-metal impossibility veto (min bbox between ~1.4× and
+      // ~3.5× the gauge → stepped solid thickness) is a hard geometric proof,
+      // not a low-confidence guess — it must survive the TS heuristic override.
+      const reasons: unknown[] = Array.isArray(mi.classification_reason) ? mi.classification_reason : [];
+      const sheetMetalVetoed = reasons.some(
+        (r) => typeof r === 'string' && r.includes('Sheet-metal veto'),
+      );
       return {
         family: typeof family === 'string' ? family : null,
         confidence: confidence !== null && isFinite(confidence) ? confidence : null,
+        sheetMetalVetoed,
       };
     } catch {
-      return { family: null, confidence: null };
+      return { family: null, confidence: null, sheetMetalVetoed: false };
     }
   }
 

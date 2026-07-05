@@ -305,6 +305,10 @@ export function isCapable(candidate: MachineCandidate, req: MachineRequirement):
       if (cap.maxLengthMm != null && cap.maxLengthMm < req.lengthMm * ENVELOPE_MARGIN) return false;
       return true;
     }
+    case 'injection_molding': {
+      if (cap.maxTonnage != null && cap.maxTonnage < req.clampTonnageRequired * TONNAGE_MARGIN) return false;
+      return true;
+    }
     case 'generic':
       return true;
   }
@@ -356,6 +360,11 @@ export function fitScore(candidate: MachineCandidate, req: MachineRequirement): 
       const l = ratio(req.lengthMm * ENVELOPE_MARGIN, cap.maxLengthMm);
       if (d != null) parts.push(d);
       if (l != null) parts.push(l);
+      break;
+    }
+    case 'injection_molding': {
+      const t = ratio(req.clampTonnageRequired * TONNAGE_MARGIN, cap.maxTonnage);
+      if (t != null) parts.push(t);
       break;
     }
     case 'generic':
@@ -422,6 +431,18 @@ function buildReasons(candidate: MachineCandidate, req: MachineRequirement): str
     case 'lathe':
       if (cap.maxDiameterMm != null) reasons.push(`Ø${r0(req.diameterMm)} mm ≤ Ø${r0(cap.maxDiameterMm)} mm swing (×1.2 margin)`);
       if (cap.maxLengthMm != null) reasons.push(`Length ${r0(req.lengthMm)} mm ≤ ${r0(cap.maxLengthMm)} mm between centres`);
+      break;
+    case 'injection_molding':
+      reasons.push(`Requires ${r0(req.clampTonnageRequired * TONNAGE_MARGIN)} t clamp force (incl. 15% margin)` +
+        (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
+      if (req.shotWeightG != null && req.shotWeightG > 0) {
+        // Informational until mhr_records carries shot capacity (barrel size) —
+        // the gate switches on the day that column exists.
+        reasons.push(`Shot weight ${r0(req.shotWeightG)} g incl. runner — verify against barrel capacity`);
+      }
+      if (req.partLengthMm > 0 && req.partWidthMm > 0) {
+        reasons.push(`Part footprint ${r0(req.partLengthMm)}×${r0(req.partWidthMm)} mm — verify against tie-bar spacing`);
+      }
       break;
     case 'generic':
       reasons.push('No dimensional constraints for this process');

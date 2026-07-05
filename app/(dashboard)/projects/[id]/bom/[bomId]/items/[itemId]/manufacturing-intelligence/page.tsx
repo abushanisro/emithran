@@ -22,7 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
-import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useUpdateBOMItem, useCostSummary, useRouteComparison, useGdtAnalysis } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useUpdateBOMItem, useCostSummary, useRouteComparison, useGdtAnalysis, useCostOverride } from '@/lib/api/hooks/useBOMItems';
 import type { MaterialCandidate, GdtSeverity, CostSummaryDto, RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
 import type { RawMaterial } from '@/lib/api/hooks/useRawMaterials';
@@ -86,13 +86,17 @@ const MACHINE_FOR: Record<string, string> = {
   'Sheet Metal Bending': 'CNC Press Brake 100T',
   'Injection Moulding': 'Injection Molder 1,000kN Clamp Force',
   'Injection Molding': 'Injection Molder 1,000kN Clamp Force',
+  'Material Drying': 'Material Dryer / Hopper',
+  'Gate Trimming': 'Bench Station',
+  'Deflashing': 'Bench Station',
+  'Insert Installation': 'Bench Station',
   'CNC Milling': 'CNC Milling Center',
   'CNC Machining': 'CNC Milling Center',
   'CNC Turning': 'CNC Lathe',
   'Die Casting': 'Die Casting Machine',
   'Deburring': 'Deburring Station',
   'Drilling': 'CNC Drilling Machine',
-  'Inspection': 'CMM',
+  'Inspection': 'Inspection Bench',
   'Tapping': 'CNC Tapping Machine',
   'Surface Treatment': 'Surface Treatment Line',
 };
@@ -104,6 +108,10 @@ const SUB_OP: Record<string, string> = {
   'Sheet Metal Bending': 'As Bent',
   'Injection Moulding': 'As Moulded',
   'Injection Molding': 'As Moulded',
+  'Material Drying': 'As Dried',
+  'Gate Trimming': 'As Trimmed',
+  'Deflashing': 'As Deflashed',
+  'Insert Installation': 'As Assembled',
   'CNC Milling': 'As Machined',
   'CNC Machining': 'As Machined',
   'CNC Turning': 'As Turned',
@@ -186,6 +194,29 @@ function classifySubstrate(materialText: string): SubstrateClass {
     return 'carbon_steel';
   }
   return 'unknown';
+}
+
+// Cast alloys that can never run a laser + press-brake route, however flat the
+// geometry looks (ALBC bronze plate ≙ sheet steel to the geometric classifier).
+// Mirrors backend isSheetFormableMaterial — keep the keyword lists in sync.
+const NON_SHEET_FORMABLE_RE = /BRONZE|ALBC|AL\.?\s?BR|CU\s?AL|C9[0-5]\d|GUNMETAL|LG[124]\b|CAST\s?IRON|FG\s?\d{3}|SG\s?IRON|EN-?GJ/i;
+function isSheetFormableMaterial(materialText: string): boolean {
+  if (materialText.trim().length === 0) return true; // unknown → don't veto
+  return !NON_SHEET_FORMABLE_RE.test(materialText);
+}
+
+// Family for routing/display: geometric classification with the material veto
+// applied. Single source of truth — every consumer of classification.family on
+// this page must go through here or a bronze plate gets a press-brake route.
+function resolveDisplayFamily(
+  item: { materialGrade?: string | null; material?: string | null },
+  fg: { classification?: { family?: string } } | null,
+): string {
+  const family = fg?.classification?.family ?? 'cnc_milled';
+  if (family !== 'sheet_metal') return family;
+  return isSheetFormableMaterial(`${item.materialGrade ?? ''} ${item.material ?? ''}`)
+    ? family
+    : 'cnc_milled';
 }
 
 // Resolve which SURFACE_TREATMENT_KB sequence applies. Explicit drawing coating wins;
@@ -515,6 +546,18 @@ function fmt(n: number | undefined | null, d = 1): string {
   if (n == null || isNaN(n)) return '—';
   return n.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
 }
+// A bare grade/temper fragment ("T6 - Round Bar", "HAZ Weldable Sheet") means
+// nothing on its own — "T6" applies to many unrelated aluminum alloys. Prefix
+// the material name so the saved/displayed value is unambiguous, unless the
+// grade string already names the material (e.g. "AA6061-T6" already says
+// aluminum) — avoids "Aluminum AA6061-T6 Aluminum".
+function materialLabel(material: string, materialGrade?: string | null): string {
+  if (!materialGrade) return material;
+  const g = materialGrade.toLowerCase();
+  const m = material.toLowerCase();
+  if (g.includes(m) || m.includes(g)) return materialGrade;
+  return `${material} ${materialGrade}`;
+}
 function fmtInt(n: number | undefined | null): string {
   if (n == null || isNaN(n)) return '—';
   return n.toLocaleString('en-IN');
@@ -634,6 +677,31 @@ function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: st
   return { id: fallback.id, kind: 'feature', label: String(fallback.type), factory, machine };
 }
 
+// Mirrors backend HYGROSCOPIC_RESIN_TOKENS — keep in sync with process-tree.ts.
+const HYGROSCOPIC_TOKENS = new Set([
+  'PA', 'PA6', 'PA66', 'PA12', 'NYLON', 'POLYAMIDE',
+  'PC', 'POLYCARBONATE',
+  'PET', 'PBT',
+  'ABS',
+  'PMMA', 'ACRYLIC',
+  'PEI', 'ULTEM', 'PSU', 'PES',
+  'TPU',
+  'PEEK',
+]);
+
+function isHygroscopicResin(grade: string | null | undefined): boolean {
+  if (!grade) return false;
+  const tokens = new Set(
+    grade.toUpperCase()
+      .replace(/([A-Z])(\d)/g, '$1 $2')
+      .replace(/(\d)([A-Z])/g, '$1 $2')
+      .split(/[^A-Z0-9]+/)
+      .filter(Boolean),
+  );
+  for (const t of tokens) if (HYGROSCOPIC_TOKENS.has(t)) return true;
+  return false;
+}
+
 // ── autoCompleteRoute ──────────────────────────────────────────────────────────
 
 function autoCompleteRoute(
@@ -713,6 +781,31 @@ function autoCompleteRoute(
       completed.unshift({ process: 'CNC Milling' });
     }
     if (!processes.has('Deburring')) completed.push({ process: 'Deburring' });
+  } else if (family === 'injection_molded') {
+    // Mirror backend routing-engine.ts rules — same precedence, same conservative defaults.
+    // Gate type unknown → cold edge gate → Gate Trimming always routed (conservative).
+    // Hot-tip suppression is a Phase-2 signal.
+
+    const hasDrying = processes.has('Material Drying');
+    const hasMolding = [...processes].some((p) => p.includes('Moulding') || p.includes('Molding'));
+    const hasGateTrim = processes.has('Gate Trimming');
+    const hasInspection = processes.has('Inspection');
+
+    if (!hasDrying && isHygroscopicResin(ctx.materialGrade)) {
+      completed.unshift({ process: 'Material Drying' });
+    }
+
+    if (!hasMolding) {
+      const dryIdx = completed.findIndex((r) => r.process === 'Material Drying');
+      completed.splice(dryIdx >= 0 ? dryIdx + 1 : 0, 0, { process: 'Injection Moulding' });
+    }
+
+    if (!hasGateTrim) {
+      const moldIdx = completed.findIndex((r) => r.process.includes('Moulding') || r.process.includes('Molding'));
+      completed.splice(moldIdx >= 0 ? moldIdx + 1 : completed.length, 0, { process: 'Gate Trimming' });
+    }
+
+    if (!hasInspection) completed.push({ process: 'Inspection' });
   }
 
   return completed;
@@ -727,7 +820,7 @@ function buildProcessTree(
   factory: string,
   overrideProcesses?: string[],
 ): ProcessTreeNode {
-  const family = fg?.classification?.family ?? 'cnc_milled';
+  const family = resolveDisplayFamily(item, fg);
   const groupLabel = FAMILY_GROUP[family] ?? 'Manufacturing';
   const baseRecs = overrideProcesses?.map((p) => ({ process: p, estimated_time_sec: null as number | null }))
     ?? fg?.processRecommendations
@@ -911,17 +1004,96 @@ function buildProcessTree(
         });
       }
     } else if (isMolding) {
-      const realFeats = fg?.features ?? [];
-      if (realFeats.length > 0) {
-        realFeats.slice(0, 12).forEach((f) => {
-          featureNodes.push(featureToTreeNode(f, factory, machine));
-        });
-      } else {
+      // ── In-cycle sub-ops as feature nodes ──────────────────────────────────
+      // Each step in the molding cycle gets its own feature row so the cost
+      // engineer can see WHAT drives cycle time without opening the cost panel.
+      const wall = summary.wallThicknessNominalMm ?? 2.0;
+      const wallMin = summary.wallThicknessMinMm;
+      const wallMax = summary.wallThicknessMaxMm;
+      const bossCount = summary.holeOrBossCount ?? 0;
+      const ribCount = (summary as any).ribCount ?? (summary as any).ribCountProxy ?? 0;
+      const volMm3 = (item.volume as number | null | undefined) ?? 0;
+      const densityGcm3 = 1.15; // PA66 default for mass estimate display
+      const massG = volMm3 > 0 ? Math.round((volMm3 / 1e3) * densityGcm3 * 10) / 10 : 0;
+      const undercutCount = (summary as any).undercutFaceCount ?? 0;
+      const undraftedCount = (summary as any).undraftedFaceCount ?? 0;
+      const partingComplexity = (summary as any).partingComplexity ?? null;
+
+      featureNodes.push({
+        id: 'feat_im_setup', kind: 'feature', label: 'Mold Setup',
+        factory, machine,
+        attrs: [
+          { name: 'Std. time',  value: '60 min (amortized per batch)' },
+          { name: 'Cavities',   value: 'Estimated from clamp tonnage + batch (see Cost tab)' },
+          { name: 'Includes',   value: 'Mount mold, clamp, trial shots, process stabilization' },
+        ],
+      });
+      featureNodes.push({
+        id: 'feat_im_injection', kind: 'feature', label: 'Injection (Fill)',
+        factory, machine,
+        attrs: [
+          { name: 'Fill time', value: 'Computed via flow-length model (see Cost tab)' },
+          { name: 'Gate',      value: 'Auto-recommended from geometry + material (see Cost tab)' },
+        ],
+      });
+      featureNodes.push({
+        id: 'feat_im_packing', kind: 'feature', label: 'Packing / Holding',
+        factory, machine,
+        attrs: [
+          { name: 'Hold time', value: '35% of cooling time (gate-freeze proxy — Menges)' },
+          { name: 'Purpose',   value: 'Compensate volumetric shrinkage; prevent sink marks' },
+        ],
+      });
+      featureNodes.push({
+        id: 'feat_im_cooling', kind: 'feature', label: 'Cooling',
+        factory, machine,
+        attrs: [
+          { name: 'Cool time', value: 'Menges formula: t = (wall²/π²α) × ln(4(Tm-Tw)/π(Te-Tw))' },
+          { name: 'Wall (nom)', value: `${fmt(wall, 1)} mm` },
+          ...(wallMin != null && wallMax != null
+            ? [{ name: 'Wall range', value: `${fmt(wallMin, 1)} – ${fmt(wallMax, 1)} mm` }]
+            : []),
+          { name: 'Note', value: 'Uniform wall → shorter cycle; thick bosses/ribs → longer' },
+        ],
+      });
+      featureNodes.push({
+        id: 'feat_im_ejection', kind: 'feature', label: 'Ejection',
+        factory, machine,
+        attrs: [{ name: 'Eject time', value: '~2.5 sec (mold open + ejector stroke + part release)' }],
+      });
+      featureNodes.push({
+        id: 'feat_im_part', kind: 'feature', label: 'Moulded Part',
+        factory, machine,
+        attrs: [
+          { name: 'Volume',    value: volMm3 > 0 ? `${fmtInt(volMm3)} mm³` : '—' },
+          { name: 'Est. mass', value: massG > 0 ? `${massG} g (net part)` : '—' },
+          { name: 'Wall nom.', value: `${fmt(wall, 1)} mm` },
+          ...(partingComplexity != null ? [{ name: 'Parting complexity', value: `${Math.round(partingComplexity * 100)}%` }] : []),
+          ...(bossCount > 0 ? [{ name: 'Bosses / holes', value: String(bossCount) }] : []),
+          ...(ribCount > 0  ? [{ name: 'Ribs (detected)', value: String(ribCount) }] : []),
+        ],
+      });
+
+      // ── DFM feature nodes — clickable → 3D face highlighting ─────────────
+      if (undercutCount > 0) {
         featureNodes.push({
-          id: 'feat_mold', kind: 'feature', label: 'Moulded Part', factory, machine,
+          id: 'feat_im_undercut', kind: 'feature', label: `Undercuts (${undercutCount} face${undercutCount > 1 ? 's' : ''})`,
+          factory, machine,
           attrs: [
-            { name: 'Family', value: 'Injection Moulding' },
-            { name: 'Volume', value: item.volume != null ? `${fmtInt(item.volume)} mm³` : '—' },
+            { name: 'Severity', value: 'High — requires slide or lifter' },
+            { name: 'Back-angle', value: '>5° opposing pull direction' },
+            { name: 'Action', value: 'Click to highlight in 3D viewer' },
+          ],
+        });
+      }
+      if (undraftedCount > 0) {
+        featureNodes.push({
+          id: 'feat_im_undrafted', kind: 'feature', label: `Undrafted Faces (${undraftedCount})`,
+          factory, machine,
+          attrs: [
+            { name: 'Severity', value: 'Medium — ejection stick risk' },
+            { name: 'Draft angle', value: '<0.3° (below industry minimum)' },
+            { name: 'Action', value: 'Click to highlight in 3D viewer' },
           ],
         });
       }
@@ -932,6 +1104,53 @@ function buildProcessTree(
     const isTapping = rec.process === 'Tapping';
     const isSurfaceTreatment = rec.process === 'Surface Treatment';
     const isInspection = rec.process === 'Inspection';
+    const isMaterialDrying = rec.process === 'Material Drying';
+    const isGateTrimming = rec.process === 'Gate Trimming';
+
+    if (isMaterialDrying) {
+      const grade = (item.materialGrade ?? item.material ?? '').toUpperCase();
+      const dryParams: Record<string, { temp: string; time: string; target: string }> = {
+        PA66: { temp: '80°C',  time: '4 h',  target: '<0.20% moisture' },
+        PA6:  { temp: '80°C',  time: '4 h',  target: '<0.20% moisture' },
+        PC:   { temp: '120°C', time: '4 h',  target: '<0.02% moisture' },
+        ABS:  { temp: '80°C',  time: '2–3 h', target: '<0.10% moisture' },
+        PET:  { temp: '160°C', time: '4 h',  target: '<0.02% moisture' },
+        PBT:  { temp: '120°C', time: '3 h',  target: '<0.04% moisture' },
+        PEEK: { temp: '150°C', time: '3 h',  target: '<0.02% moisture' },
+        TPU:  { temp: '90°C',  time: '2 h',  target: '<0.05% moisture' },
+        PMMA: { temp: '80°C',  time: '4 h',  target: '<0.10% moisture' },
+      };
+      const key = Object.keys(dryParams).find((k) => grade.includes(k));
+      const params = key ? dryParams[key]! : null;
+      featureNodes.push({
+        id: 'feat_im_dry_resin', kind: 'feature', label: 'Hygroscopic Resin — Pre-Drying',
+        factory, machine,
+        attrs: [
+          { name: 'Material',  value: item.materialGrade ?? item.material ?? '—' },
+          { name: 'Dryer',     value: 'Dehumidifying hopper dryer (unattended operation)' },
+          ...(params
+            ? [
+                { name: 'Temp',    value: params.temp },
+                { name: 'Time',    value: params.time },
+                { name: 'Target',  value: params.target },
+              ]
+            : [{ name: 'Params', value: 'Refer to material datasheet (grade not in table)' }]),
+          { name: 'Risk if skipped', value: 'Splay / voids / hydrolysis / loss of mechanical properties' },
+        ],
+      });
+    }
+
+    if (isGateTrimming) {
+      featureNodes.push({
+        id: 'feat_im_gate', kind: 'feature', label: 'Gate Vestige',
+        factory, machine,
+        attrs: [
+          { name: 'Gate type',  value: 'Cold runner gate (auto-recommended from geometry — see Cost tab)' },
+          { name: 'Vestige',    value: 'Trim flush to part surface; max protrusion per drawing' },
+          { name: 'Note',       value: 'Hot-tip / sub gates self-de-gate (this step suppressed for those types)' },
+        ],
+      });
+    }
 
     if (isTapping) {
       const threadSpecs = (item.drawingIntelligence as any)?.threads as Array<{ size: string; pitch: number; count: number }> | undefined;
@@ -969,16 +1188,48 @@ function buildProcessTree(
     }
 
     if (isInspection) {
-      // Coating-thickness check exists only when the route actually coats the part;
-      // CMM only when GD&T / tight tolerance demands it (needsCmm computed above).
-      const templates: KBFeature[] = [
-        needsCmm ? INSPECTION_KB.dimensional_cmm! : INSPECTION_KB.dimensional!,
-        INSPECTION_KB.visual!,
-        ...(routeHasCoating ? [INSPECTION_KB.coating_thickness!] : []),
-      ];
-      templates.forEach((tmpl, i) => {
-        featureNodes.push({ id: `feat_insp_${i}`, kind: 'feature', label: tmpl.label, factory, machine: tmpl.machine ?? machine, attrs: tmpl.attrs });
-      });
+      if (family === 'injection_molded') {
+        // Injection-molded QC: visual → dimensional → weight check (routing engine baseline).
+        featureNodes.push({
+          id: 'feat_im_visual', kind: 'feature', label: 'Visual Inspection',
+          factory, machine,
+          attrs: [
+            { name: 'Check for', value: 'Splay, sink marks, short shots, flash, colour streaks, weld lines' },
+            { name: 'Method',    value: '100% visual (operator)' },
+            { name: 'Est. time', value: '~10 sec / part' },
+          ],
+        });
+        featureNodes.push({
+          id: 'feat_im_dimensional', kind: 'feature', label: 'Dimensional Inspection',
+          factory, machine,
+          attrs: [
+            { name: 'Scope',     value: 'Critical dimensions vs drawing — shrinkage compensation verification' },
+            { name: 'Method',    value: 'Calipers + height gauge; CMM for GD&T callouts' },
+            { name: 'Frequency', value: 'First article + 1-in-10 in-process' },
+            { name: 'Est. time', value: '~5 min / batch setup + per-part criticals' },
+          ],
+        });
+        featureNodes.push({
+          id: 'feat_im_weight', kind: 'feature', label: 'Weight Check',
+          factory, machine,
+          attrs: [
+            { name: 'Method',  value: 'Precision scale (±0.1 g)' },
+            { name: 'Purpose', value: 'Shot weight monitoring — detects short shots and pack pressure drift' },
+            { name: 'Est. time', value: '~5 sec / part' },
+          ],
+        });
+      } else {
+        // Coating-thickness check exists only when the route actually coats the part;
+        // CMM only when GD&T / tight tolerance demands it (needsCmm computed above).
+        const templates: KBFeature[] = [
+          needsCmm ? INSPECTION_KB.dimensional_cmm! : INSPECTION_KB.dimensional!,
+          INSPECTION_KB.visual!,
+          ...(routeHasCoating ? [INSPECTION_KB.coating_thickness!] : []),
+        ];
+        templates.forEach((tmpl, i) => {
+          featureNodes.push({ id: `feat_insp_${i}`, kind: 'feature', label: tmpl.label, factory, machine: tmpl.machine ?? machine, attrs: tmpl.attrs });
+        });
+      }
     }
 
     const subOp: ProcessTreeNode = {
@@ -1086,6 +1337,17 @@ function computeOperationVisual(
   }
   if (l.includes('turning') || l.includes('milling') || l.includes('machining'))
     return merge('op-all', v2Features, '#64748b');
+  // ── Injection molding operations ──
+  if (l.includes('material drying') || l.includes('drying'))
+    return null; // Pre-process — no part geometry involved yet
+  if (l.includes('injection mould') || l.includes('injection mold')) {
+    const hl = buildFullModelHL('op-injection', faceMap);
+    return hl ? { highlight: hl, color: '#f97316' } : null; // orange — molten cavity fill
+  }
+  if (l.includes('gate trimming') || l.includes('degating')) {
+    const hl = buildFullModelHL('op-gate-trim', faceMap);
+    return hl ? { highlight: hl, color: '#eab308' } : null; // yellow — secondary bench op
+  }
   return null;
 }
 
@@ -1112,11 +1374,23 @@ function computeFeatureNodeVisual(
     if (l.includes('dimensional'))
       return merge('hl-dimensional', v2Features, '#e2e8f0');
     // Visual Inspection + Coating Thickness Check → full model tint
-    // Phase 2 (Coating Thickness): expose VertexHighlight via ModelViewer.samplePoints prop
-    // to render 5 measurement point markers across the coated surface.
     const hl = buildFullModelHL('hl-inspect-surface', faceMap);
     return hl ? { highlight: hl, color: '#e2e8f0' } : null;
   }
+  // ── Injection molding feature nodes ──
+  if (node.id === 'feat_im_part' || node.id === 'feat_im_injection' || node.id === 'feat_im_cooling') {
+    const hl = buildFullModelHL('hl-im-part', faceMap);
+    return hl ? { highlight: hl, color: '#f97316' } : null; // orange — molded geometry
+  }
+  if (node.id === 'feat_im_gate') {
+    const hl = buildFullModelHL('hl-im-gate', faceMap);
+    return hl ? { highlight: hl, color: '#eab308' } : null; // yellow — gate location
+  }
+  if (node.id === 'feat_im_visual' || node.id === 'feat_im_dimensional' || node.id === 'feat_im_weight') {
+    const hl = buildFullModelHL('hl-im-inspect', faceMap);
+    return hl ? { highlight: hl, color: '#e2e8f0' } : null; // light — quality overlay
+  }
+  if (node.id === 'feat_im_dry_resin') return null; // Pre-process — no geometry
   return null;
 }
 
@@ -1133,6 +1407,13 @@ function getVizLabel(node: ProcessTreeNode): string | null {
     if (l.includes('visual')) return 'Visual Inspection — full exterior surface';
     if (l.includes('coating thickness')) return 'Coating Thickness — full exterior surface';
   }
+  if (node.id === 'feat_im_part') return 'Moulded part — full cavity geometry';
+  if (node.id === 'feat_im_injection') return 'Cavity fill — full mold geometry';
+  if (node.id === 'feat_im_cooling') return 'Cooling — full part surface (wall thickness drives cycle time)';
+  if (node.id === 'feat_im_gate') return 'Gate vestige location — full part surface';
+  if (node.id === 'feat_im_visual') return 'Visual Inspection — full exterior surface';
+  if (node.id === 'feat_im_dimensional') return 'Dimensional Inspection — critical features vs drawing';
+  if (node.id === 'feat_im_weight') return 'Weight Check — full part (shot weight monitoring)';
   if (node.kind === 'operation') {
     if (l.includes('laser') || l.includes('cutting')) return 'Pierce holes';
     if (l.includes('press brake') || l.includes('bending')) return 'Bend lines';
@@ -1140,6 +1421,9 @@ function getVizLabel(node: ProcessTreeNode): string | null {
     if (l.includes('deburr')) return 'All cut edges — holes & bends';
     if (l.includes('surface treatment') || l.includes('coating')) return 'Full exterior surface';
     if (l.includes('inspection')) return 'Holes & bends (geometric features)';
+    if (l.includes('injection mould') || l.includes('injection mold')) return 'Cavity + core faces — full mold geometry';
+    if (l.includes('gate trimming')) return 'Gate vestige — bench degating operation';
+    if (l.includes('material drying')) return null; // pre-process, no geometry
   }
   return null;
 }
@@ -1239,37 +1523,39 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
     ? (comparison?.routes.find((r) => r.routeId === appliedRouteId) ?? null)
     : null;
 
-  // Override state: materialRate + per-process rate / cycleTime
-  const [matRateOverride, setMatRateOverride] = useState<number | null>(null);
-  const [procOverrides, setProcOverrides] = useState<Record<string, { rate?: number; cycleMin?: number }>>({});
+  // aPriori-style persistent overrides — sourced from the server response
+  // (bom_item_cost_overrides, scoped by BOM item + Digital Factory location),
+  // not local useState. Survives refresh and is visible to anyone else who
+  // opens this BOM item; previously these were pure client state that vanished
+  // on navigation.
+  const costOverride = useCostOverride(item.id, factory);
   const [editingKey, setEditingKey] = useState<string | null>(null);
 
-  // Clear overrides when the applied route changes so stale rates don't bleed across routes
-  useEffect(() => { setProcOverrides({}); setMatRateOverride(null); }, [appliedRouteId]);
+  const persistedOverrides = cost?.costOverrides ?? {};
+  const matRateOverride = persistedOverrides['mat_rate'] ?? null;
+  const procOverrides = useMemo(() => {
+    const map: Record<string, { rate?: number; cycleMin?: number }> = {};
+    for (const [key, val] of Object.entries(persistedOverrides)) {
+      if (key === 'mat_rate') continue;
+      const [proc, field] = key.split('::');
+      if (!proc || !field) continue;
+      map[proc] = { ...map[proc], [field === 'rate' ? 'rate' : 'cycleMin']: val };
+    }
+    return map;
+  }, [cost?.costOverrides]);
 
   const handleStartEdit = (key: string) => setEditingKey(key);
 
   const handleCommit = (key: string, val: number) => {
     setEditingKey(null);
-    if (key === 'mat_rate') { setMatRateOverride(val); return; }
-    const [proc, field] = key.split('::');
-    if (!proc || !field) return;
-    setProcOverrides((prev) => ({ ...prev, [proc]: { ...prev[proc], [field === 'rate' ? 'rate' : 'cycleMin']: val } }));
+    costOverride.mutate({ fieldKey: key, value: val });
   };
 
   const handleReset = (key: string) => {
-    if (key === 'mat_rate') { setMatRateOverride(null); return; }
-    const [proc, field] = key.split('::');
-    if (!proc || !field) return;
-    setProcOverrides((prev) => {
-      const next = { ...prev, [proc]: { ...prev[proc] } };
-      if (field === 'rate') delete next[proc]!.rate;
-      else delete next[proc]!.cycleMin;
-      return next;
-    });
+    costOverride.mutate({ fieldKey: key, value: null });
   };
 
-  const hasAnyOverride = matRateOverride !== null || Object.keys(procOverrides).length > 0;
+  const hasAnyOverride = Object.keys(persistedOverrides).length > 0;
 
   // Compute effective figures (uses applied route's process lines when a route is selected)
   const eff = useMemo(() => {
@@ -1557,7 +1843,8 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
       {/* override reset */}
       {hasAnyOverride && (
         <div className="mt-2 flex justify-end">
-          <button onClick={() => { setMatRateOverride(null); setProcOverrides({}); }}
+          <button
+            onClick={() => { for (const key of Object.keys(persistedOverrides)) costOverride.mutate({ fieldKey: key, value: null }); }}
             className="text-xs text-amber-500 hover:text-amber-400 underline underline-offset-2 transition-colors">
             Reset all overrides
           </button>
@@ -1698,9 +1985,9 @@ function RouteComparisonCard({
                   ))}
                 </div>
               )}
-              {!incapable && route.machineCapabilityWarnings?.length > 0 && (
+              {!incapable && (route.machineCapabilityWarnings?.length ?? 0) > 0 && (
                 <div className="px-3 py-1.5 border-t border-amber-400/20 bg-amber-500/5 flex flex-wrap gap-1">
-                  {route.machineCapabilityWarnings.map((w, i) => (
+                  {route.machineCapabilityWarnings!.map((w, i) => (
                     <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-400/20">⚠ {w}</span>
                   ))}
                 </div>
@@ -3134,7 +3421,7 @@ function MaterialPickerDialog({
                 <div className="border-t pt-3 mt-auto">
                   <Button
                     className="w-full"
-                    onClick={() => { onSelect(sel.materialGrade ?? sel.material); onClose(); }}
+                    onClick={() => { onSelect(materialLabel(sel.material, sel.materialGrade)); onClose(); }}
                   >
                     Apply Material
                   </Button>
@@ -3178,7 +3465,12 @@ function CostGuidePanel({
   const [matInputValue, setMatInputValue] = useState(item.materialGrade ?? '');
   const [matDropOpen, setMatDropOpen] = useState(false);
   useEffect(() => { setMatInputValue(item.materialGrade ?? ''); }, [item.materialGrade]);
-  const { data: allMatsData } = useRawMaterials(matInputValue.length >= 1 ? { limit: 500 } : undefined);
+  // Search server-side (material / material_group / material_grade) instead of
+  // a fixed 500-row client-side slice — a blind limit can miss "Aluminum"
+  // entirely if it doesn't happen to sort within the first 500 rows fetched.
+  const { data: allMatsData } = useRawMaterials(
+    matInputValue.trim().length >= 1 ? { search: matInputValue.trim(), limit: 50 } : undefined,
+  );
   const matDropItems = (allMatsData?.items ?? [])
     .filter((m) => {
       const q = matInputValue.toLowerCase();
@@ -3396,7 +3688,7 @@ function CostGuidePanel({
                 {matDropOpen && matDropItems.length > 0 && (
                   <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-popover border border-border rounded shadow-lg max-h-52 overflow-y-auto">
                     {matDropItems.map((m) => {
-                      const grade = m.materialGrade ?? m.material;
+                      const grade = materialLabel(m.material, m.materialGrade);
                       return (
                         <button
                           key={m.id}
@@ -3409,9 +3701,9 @@ function CostGuidePanel({
                           className="w-full text-left px-2.5 py-1.5 hover:bg-muted/60 transition-colors border-b border-border/20 last:border-0"
                         >
                           <div className="text-xs font-medium truncate">{grade}</div>
-                          <div className="text-[10px] text-muted-foreground truncate">
-                            {m.materialGroup}{m.material !== grade ? ` · ${m.material}` : ''}
-                          </div>
+                          {m.materialGroup && (
+                            <div className="text-[10px] text-muted-foreground truncate">{m.materialGroup}</div>
+                          )}
                         </button>
                       );
                     })}
@@ -3457,7 +3749,7 @@ function CostGuidePanel({
               ) : (
                 <div className="space-y-px">
                   {(materialCandidates ?? []).map((cand: MaterialCandidate, idx) => {
-                    const grade = cand.materialGrade ?? cand.material;
+                    const grade = materialLabel(cand.material, cand.materialGrade);
                     const isActive = item.materialGrade === grade;
                     const isHeat = ['stainless', 'ss304', 'ss316', 'inconel', 'titanium'].some((k) =>
                       cand.material.toLowerCase().includes(k),
@@ -5679,7 +5971,7 @@ function ProcessTreePanel({
   onToggle: (id: string) => void; onSelect: (node: ProcessTreeNode) => void;
   factory: string; maximized: PanelId | null; onMaximize: (id: PanelId | null) => void;
 }) {
-  const family = fg?.classification?.family ?? 'cnc_milled';
+  const family = resolveDisplayFamily(item, fg);
   const groupLabel = FAMILY_GROUP[family] ?? 'Manufacturing';
   const UNSPEC_MAT = new Set(['Unknown', 'Not specified', 'Not Specified', 'None', '']);
   const diMat = item.drawingIntelligence?.material;
@@ -6248,11 +6540,12 @@ export default function ManufacturingIntelligencePage() {
 
   // Auto-select the recommended KB route when the detected part family changes
   useEffect(() => {
-    const family = fg?.classification?.family;
+    const family = item ? resolveDisplayFamily(item, fg) : fg?.classification?.family;
     const routes = KB_ROUTE_ALTERNATIVES[family ?? ''] ?? [];
     const recommended = routes.find((r) => r.isRecommended) ?? routes[0] ?? null;
     setSelectedAutoRouteId(recommended?.id ?? null);
-  }, [fg?.classification?.family]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fg?.classification?.family, item?.materialGrade, item?.material]);
 
   const summary = useMemo(
     () => fg?.summary ?? (item ? buildSummary(item, fg) : null),
@@ -6261,7 +6554,7 @@ export default function ManufacturingIntelligencePage() {
   const activeOverrideProcesses = useMemo(() => {
     if (processRouting === 'manual' && selectedManualRoute) return selectedManualRoute.processes;
     if (processRouting === 'auto') {
-      const family = fg?.classification?.family;
+      const family = item ? resolveDisplayFamily(item, fg) : fg?.classification?.family;
       const autoRoutes = KB_ROUTE_ALTERNATIVES[family ?? ''] ?? [];
       if (autoRoutes.length > 0) {
         const picked = autoRoutes.find((r) => r.id === selectedAutoRouteId)
@@ -6271,7 +6564,7 @@ export default function ManufacturingIntelligencePage() {
       }
     }
     return undefined;
-  }, [processRouting, selectedManualRoute, selectedAutoRouteId, fg?.classification?.family]);
+  }, [processRouting, selectedManualRoute, selectedAutoRouteId, fg, item]);
 
   const tree = useMemo(
     () => (item && summary) ? buildProcessTree(item, fg, summary, factory, activeOverrideProcesses) : null,
@@ -6665,6 +6958,20 @@ export default function ManufacturingIntelligencePage() {
         }
         setOperationVisual(null);
         setVizLabel(null);
+      } else if (node.id === 'feat_im_undercut' || node.id === 'feat_im_undrafted') {
+        // IM DFM highlighting — look up matching feature from feature_graph_v2
+        const targetType = node.id === 'feat_im_undercut' ? 'im_undercut' : 'im_undrafted';
+        const imFeature = v2Features.find((f) => f.feature_type === targetType);
+        if (imFeature) {
+          setOperationVisual({
+            highlight: imFeature,
+            color: node.id === 'feat_im_undercut' ? '#ef4444' : '#f97316',
+          });
+          setVizLabel(getVizLabel(node));
+        } else {
+          setOperationVisual(null);
+          setVizLabel(null);
+        }
       } else {
         const visual = computeFeatureNodeVisual(node, v2Features, fm);
         setOperationVisual(visual);

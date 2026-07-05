@@ -2,10 +2,9 @@
 
 /**
  * MachineSelector — renders the physics-based machine recommendation inside an
- * expanded process-line row: recommended machine + confidence, profile tabs
- * (balanced / cheapest / fastest — re-scored client-side from the same payload,
- * no API round-trip), up to two alternatives, and a full-list override picker.
- * Overrides persist via POST /bom-items/:id/machine-override.
+ * expanded process-line row: recommended (balanced) machine + confidence, up
+ * to two alternatives, and a full-list override picker. Overrides persist via
+ * POST /bom-items/:id/machine-override.
  */
 
 import { useMemo, useState } from 'react';
@@ -14,15 +13,8 @@ import { useMachineOverride } from '@/lib/api/hooks/useBOMItems';
 import type {
   MachineCandidate,
   MachineSelectionResult,
-  SelectionProfile,
 } from '@/lib/api/hooks/useBOMItems';
 import { useMHRRecords } from '@/lib/api/hooks/useMHR';
-
-const PROFILE_LABELS: Record<SelectionProfile, string> = {
-  balanced: 'Balanced',
-  cheapest: 'Cheapest',
-  fastest: 'Fastest',
-};
 
 export function confidenceColor(confidence: number): string {
   if (confidence >= 80) return 'text-emerald-500';
@@ -62,7 +54,6 @@ export function MachineSelector({
   currencySymbol: string;
   location: string;
 }) {
-  const [profile, setProfile] = useState<SelectionProfile>('balanced');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
   // Location-scoped: the override is stored for THIS Digital Factory location only
@@ -74,7 +65,7 @@ export function MachineSelector({
     { enabled: pickerOpen },
   );
 
-  const active = selection[profile];
+  const active = selection.balanced;
   const recommended = active.candidate;
   const fmtRate = (rate: number) => `${currencySymbol}${rate.toLocaleString(undefined, { maximumFractionDigits: 0 })}/hr`;
 
@@ -103,33 +94,11 @@ export function MachineSelector({
 
   return (
     <div className="space-y-1.5">
-      {/* Header + profile tabs */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">Machine</span>
-        <div className="flex gap-0.5">
-          {(Object.keys(PROFILE_LABELS) as SelectionProfile[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setProfile(p)}
-              className={cn(
-                'px-1.5 py-0.5 text-[10px] rounded transition-colors',
-                profile === p
-                  ? 'bg-muted text-foreground font-semibold'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {PROFILE_LABELS[p]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Recommended machine for the active profile */}
+      {/* Recommended machine */}
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
           <span className="text-xs text-foreground">
-            {selection.overridden && profile === 'balanced' ? '✎ ' : '⭐ '}
+            {selection.overridden ? '✎ ' : '⭐ '}
             {recommended.machineName ?? `Class default (${recommended.machineClass.replace(/_/g, ' ')})`}
           </span>
           <span className="text-[10px] text-muted-foreground ml-1.5">{fmtRate(recommended.hourlyRate)}</span>

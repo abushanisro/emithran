@@ -545,6 +545,10 @@ export interface CostSummaryDto {
   currency?: string;
   currencySymbol?: string;
   toUsdRate?: number;
+  // Persistent aPriori-style manual overrides already applied to the figures
+  // above ('mat_rate' | '<process>::rate' | '<process>::cycleMin') — read-only
+  // hint for the "overridden" badge + reset control, not something to re-apply.
+  costOverrides?: Record<string, number>;
   sustainability?: SustainabilitySummaryDto;
 }
 
@@ -563,7 +567,8 @@ export function useCostSummary(itemId: string | undefined, batchSize: number = 1
 export type RouteId =
   | "sm-laser" | "sm-turret" | "sm-waterjet"
   | "cnc-3ax" | "cnc-4ax" | "cnc-5ax"
-  | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn";
+  | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn"
+  | "injection-molding";
 
 export type CapabilityReasonCode =
   | "DIMENSIONS_UNAVAILABLE"
@@ -650,6 +655,26 @@ export function useMachineOverride(itemId: string | undefined, location: string)
       apiClient.post<{ processKey: string; mhrRecordId: string | null; location: string }>(
         `/bom-items/${itemId}/machine-override`,
         { processKey, mhrRecordId, location },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'cost-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'route-comparison'] });
+    },
+  });
+}
+
+// aPriori-style persistent cost-field override — replaces the click-to-edit
+// material-rate / process-rate / cycle-time cells' local-only state with a
+// saved value that survives a refresh and is visible to anyone else opening
+// this BOM item. Scoped by Digital Factory location, same reason as machine
+// overrides: an India rate override must not leak into a USA costing.
+export function useCostOverride(itemId: string | undefined, location: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fieldKey, value }: { fieldKey: string; value: number | null }) =>
+      apiClient.post<{ fieldKey: string; value: number | null; location: string }>(
+        `/bom-items/${itemId}/cost-override`,
+        { fieldKey, value, location },
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'cost-summary'] });

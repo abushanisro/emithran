@@ -143,7 +143,7 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v17"  # bump when extraction logic changes to auto-invalidate stale cache entries
+    CACHE_VERSION = "geo_v19"  # bumped Jul 2026: Phase 4 draft detection axis + undercut threshold fixes
     # NOTE: this version must also be bumped when classification logic in
     # feature_extractors.py changes — detect_part_family output is embedded
     # in the cached result, so a stale entry silently serves old family verdicts.
@@ -383,7 +383,9 @@ class AdvancedCADMemoryOptimizer:
         # ── Manufacturing intelligence: family detection + family-specific features ──
         manufacturing_intelligence: dict = {}
         try:
-            from feature_extractors import detect_part_family, SheetMetalFeatureExtractor  # type: ignore
+            from feature_extractors import (  # type: ignore
+                detect_part_family, SheetMetalFeatureExtractor, InjectionMoldedFeatureExtractor,
+            )
             dims_list = [bounding_box['length'], bounding_box['width'], bounding_box['height']]
             total_face_count = holes.get('total_face_count', 1)
             planar_face_count = holes.get('planar_face_count', 0)
@@ -407,6 +409,24 @@ class AdvancedCADMemoryOptimizer:
                 1 for cyl in holes.get('raw_cylinders_full', [])
                 if len(cyl) > 0 and cyl[0] > _large_cyl_threshold
             )
+            # Wall-thickness-uniformity signal for injection_molded classification —
+            # reuses the antiparallel-face-pair histogram (built for sheet-metal
+            # gauge detection) purely for its area_ratio/tight_area_frac output.
+            # High thin_wall_ratio = thin-wall area spread across several close
+            # bins (shell + rib + boss walls, all thin but not identical) rather
+            # than concentrated in one dominant bin (a single sheet gauge). Costs
+            # one extra full planar-face scan per part; cheap relative to the
+            # mesh/BRep work already done above.
+            sheet_geometry = None
+            thin_wall_ratio = 0.0
+            try:
+                sheet_geometry = SheetMetalFeatureExtractor()._extract_sheet_metal_geometry(shape, dims_list)
+                _geo_debug = sheet_geometry[3]
+                _tight_frac = _geo_debug.get('tight_area_frac', 0.0)
+                _area_ratio = _geo_debug.get('area_ratio', 0.0)
+                thin_wall_ratio = round(_tight_frac * (1.0 - _area_ratio), 3)
+            except Exception as e:
+                logger.warning(f"[mfg_intel] thin_wall_ratio computation failed: {e}")
             detected_family, family_confidence, classification_reasons = detect_part_family(
                 dims_list,
                 holes.get('count', 0),
@@ -417,7 +437,51 @@ class AdvancedCADMemoryOptimizer:
                 total_face_count=total_face_count,
                 large_cyl_count=large_cyl_count,
                 pocket_count=pocket_count,
+                thin_wall_ratio=thin_wall_ratio,
+                # draft_face_ratio left at its 0.0 default — no draft-angle detector
+                # yet (see InjectionMoldedFeatureExtractor docstring); the gate falls
+                # back to pocket_count when draft isn't available.
             )
+            # ── Sheet-metal impossibility veto ────────────────────────────────
+            # Sheet stock has ONE gauge everywhere, so a sheet part's smallest
+            # bbox dimension is either ≈1× the gauge (flat blank) or ≥~4× the
+            # gauge (formed — minimum press-brake flange is 4t). A min bbox
+            # strictly between ~1.4× and ~3.5× the gauge means the body has
+            # stepped SOLID thickness (e.g. a 6mm cover with 3mm-deep recesses)
+            # — machinable or castable, but impossible to make from sheet.
+            if detected_family == 'sheet_metal' and sheet_geometry is not None:
+                _gauge = float(sheet_geometry[0] or 0)
+                _pos_dims = [d for d in dims_list if d > 0]
+                _min_bbox = min(_pos_dims) if _pos_dims else 0.0
+                if _gauge > 0 and 1.4 * _gauge < _min_bbox < 3.5 * _gauge:
+                    _veto_note = (
+                        f"Sheet-metal veto: min bbox {_min_bbox:.1f}mm is "
+                        f"{_min_bbox / _gauge:.1f}x the detected gauge {_gauge:.1f}mm — "
+                        f"impossible for sheet stock (flat blank ~1x, formed >=4x)"
+                    )
+                    # Disambiguate what the part actually is. A molded shell has ONE
+                    # uniform wall gauge everywhere (design rule of injection molding)
+                    # plus ribs/bosses that read as pockets; a machined/cast plate has
+                    # stepped solid zones and its pair area spreads across bins.
+                    _tight_frac_veto = 0.0
+                    try:
+                        _tight_frac_veto = float((sheet_geometry[3] or {}).get('tight_area_frac', 0.0))
+                    except Exception:
+                        pass
+                    if _tight_frac_veto >= 0.90 and pocket_count >= 3:
+                        detected_family = 'injection_molded'
+                        family_confidence = min(family_confidence, 0.62)
+                        classification_reasons.append(
+                            _veto_note + f"; uniform wall gauge (tight_frac={_tight_frac_veto:.2f}) "
+                            f"with {pocket_count} rib/boss pockets => injection molded shell"
+                        )
+                    else:
+                        detected_family = 'cnc_milled'
+                        family_confidence = min(family_confidence, 0.60)
+                        classification_reasons.append(
+                            _veto_note + "; stepped solid thickness => machined/cast plate"
+                        )
+
             _hole_density_val = round(holes.get('count', 0) / max(total_face_count, 1), 3)
             manufacturing_intelligence = {
                 'detected_family': detected_family,
@@ -434,7 +498,8 @@ class AdvancedCADMemoryOptimizer:
                     'secondary_features_count': secondary_features_count,
                     'large_cyl_count':        large_cyl_count,
                     'pocket_count':           pocket_count,
-                    'classification_version': 'v5',
+                    'thin_wall_ratio':        thin_wall_ratio,
+                    'classification_version': 'v6',
                 },
                 'classification_reason': classification_reasons,
             }
@@ -452,12 +517,23 @@ class AdvancedCADMemoryOptimizer:
                     face_id_map=holes.get('face_id_map', {}),
                     adjacent_face_ids=holes.get('adjacent_face_ids', {}),
                 )
+            elif detected_family == 'injection_molded':
+                im_extractor = InjectionMoldedFeatureExtractor()
+                manufacturing_intelligence['features'] = im_extractor.extract(
+                    shape, dims_list,
+                    raw_cylinders_full=holes.get('raw_cylinders_full'),
+                    sheet_geometry=sheet_geometry,
+                    pocket_count=pocket_count,
+                    face_map=holes.get('face_map', []),
+                    face_map_tri_total=holes.get('face_map_tri_total', 0),
+                )
             logger.info(
                 f"[mfg_intel] family={detected_family} conf={family_confidence:.2f} "
                 f"flatness={flatness_val} holes={holes.get('count', 0)} "
                 f"pockets={pocket_count} large_cyl={large_cyl_count} total_faces={total_face_count} "
                 f"hole_density={_hole_density_val} "
                 f"planar_frac={round(planar_face_fraction, 2)} "
+                f"thin_wall_ratio={thin_wall_ratio} "
                 f"reasons={classification_reasons}"
             )
         except Exception as e:

@@ -4,7 +4,8 @@ import type { CapabilityReasonCode } from "../costing/machine-capability";
 export type RouteId =
   | "sm-laser" | "sm-turret" | "sm-waterjet"
   | "cnc-3ax" | "cnc-4ax" | "cnc-5ax"
-  | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn";
+  | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn"
+  | "injection-molding";
 
 export interface RouteCapability {
   cuttingCapable: boolean;

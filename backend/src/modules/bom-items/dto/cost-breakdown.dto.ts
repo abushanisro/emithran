@@ -120,6 +120,49 @@ export interface CostSummaryDto {
   currencySymbol?: string;   // display symbol: '₹', '$', '€', '¥'
   toUsdRate?: number;        // amount_local × toUsdRate = amount_usd
 
+  // Persistent aPriori-style manual overrides applied to this response, keyed
+  // by 'mat_rate' | '<process>::rate' | '<process>::cycleMin'. materialCost /
+  // processLines above already reflect these — this map is purely so the UI
+  // can render the amber "overridden" state and a reset-to-computed control
+  // without re-deriving which fields were touched.
+  costOverrides?: Record<string, number>;
+
   // Manufacturing sustainability (computed from same inputs, zero extra DB queries)
   sustainability: SustainabilitySummaryDto;
+
+  // Routed process tree (injection molding today; other families as their
+  // routing engines migrate to the tree structure). Each operation carries the
+  // rule that selected it — the route's audit trail, line by line.
+  processTree?: import('../costing/injection-molding/process-tree').IMProcessTree;
+
+  // Injection-molding-specific piece-cost breakdown (separate from tooling).
+  // Present only when family === 'injection_molded'.
+  injectionMolding?: InjectionMoldingBreakdown;
+
+  // Tooling cost — always separate from pieceCostUsd.
+  // Present only when family === 'injection_molded' and annualVolume / productionLifeYears provided.
+  tooling?: ToolingCostDto;
+}
+
+export interface InjectionMoldingBreakdown {
+  moldingSubtype: 'standard' | 'lsr' | 'insert' | 'overmold' | 'gas_assisted' | 'two_shot' | 'unscrewing';
+  cavityCount: number;
+  cavityConstrainedBy: 'clamp' | 'shot_capacity' | 'economic' | 'default';
+  runnerSystemType: 'hot' | 'cold';
+  runnerScrapKg: number;
+  gateType: string;
+  undercutCount: number | null;
+  partingComplexity: number | null;
+  cycleTimeSec: number;           // Menges (thermoplastic) or Arrhenius (LSR)
+  cavityCycleTimeSec: number;     // cycleTime / cavityCount
+  costConfidence: number;         // 0.0–1.0
+}
+
+export interface ToolingCostDto {
+  moldClass: 'Class101' | 'Class102' | 'Class103' | 'Class104' | 'Class105';
+  moldLifeShotRating: number;
+  moldCostUsd: number;
+  moldCostPerPartUsd: number;
+  annualVolume: number;
+  productionLifeYears: number;
 }

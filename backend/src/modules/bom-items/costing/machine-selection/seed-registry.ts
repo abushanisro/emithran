@@ -84,6 +84,34 @@ const SEED_ENTRIES: SeedEntry[] = [
     capability: { maxXMm: 3000, maxYMm: 1500, maxThicknessMm: 100 } },
   { pattern: /turret|punch/i,
     capability: { maxXMm: 2500, maxYMm: 1250, maxThicknessMm: 6, maxTonnage: 20 } },
+
+  // ── Injection molding machines ──
+  // Mirror of migration 336_seed_injection_molding_machines.sql — keep in sync.
+  { pattern: /arburg.*allrounder.*370|allrounder.*370/i,  capability: { maxTonnage: 37  } },
+  { pattern: /arburg.*allrounder.*570|allrounder.*570/i,  capability: { maxTonnage: 57  } },
+  { pattern: /arburg.*allrounder.*1020|allrounder.*1020/i, capability: { maxTonnage: 102 } },
+  { pattern: /arburg.*allrounder.*1600|allrounder.*1600/i, capability: { maxTonnage: 160 } },
+  { pattern: /arburg.*allrounder.*2000|allrounder.*2000/i, capability: { maxTonnage: 200 } },
+  { pattern: /engel.*e-?mac.*310|e-?mac.*310/i,           capability: { maxTonnage: 31  } },
+  { pattern: /engel.*e-?mac.*440|e-?mac.*440/i,           capability: { maxTonnage: 44  } },
+  { pattern: /engel.*(victory|v-duo).*80\b/i,             capability: { maxTonnage: 80  } },
+  { pattern: /engel.*(victory|v-duo).*120\b/i,            capability: { maxTonnage: 120 } },
+  { pattern: /engel.*duo.*650|duo.*650/i,                 capability: { maxTonnage: 650 } },
+  { pattern: /kraussmaffei.*cx.?160|cx.?160/i,            capability: { maxTonnage: 160 } },
+  { pattern: /kraussmaffei.*gx.?450|gx.?450/i,            capability: { maxTonnage: 450 } },
+  { pattern: /kraussmaffei.*gx.?650|gx.?650/i,            capability: { maxTonnage: 650 } },
+  { pattern: /milacron.*roboshot.*110|roboshot.*110/i,    capability: { maxTonnage: 110 } },
+  { pattern: /milacron.*roboshot.*165|roboshot.*165/i,    capability: { maxTonnage: 165 } },
+  { pattern: /milacron.*roboshot.*330|roboshot.*330/i,    capability: { maxTonnage: 330 } },
+  // Generic clamp-force patterns ("Injection Molder 1,000kN" → 100T, "IMM 250T"):
+  // These are static approximations for common lab-scale machines.
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*500\s*kN|500\s*kN.*injection/i,  capability: { maxTonnage: 50  } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*800\s*kN|800\s*kN.*injection/i,  capability: { maxTonnage: 80  } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*1[,.]?000\s*kN|1[,.]?000\s*kN.*injection/i, capability: { maxTonnage: 100 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*1[,.]?500\s*kN|1[,.]?500\s*kN.*injection/i, capability: { maxTonnage: 150 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*2[,.]?000\s*kN|2[,.]?000\s*kN.*injection/i, capability: { maxTonnage: 200 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*3[,.]?000\s*kN|3[,.]?000\s*kN.*injection/i, capability: { maxTonnage: 300 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*5[,.]?000\s*kN|5[,.]?000\s*kN.*injection/i, capability: { maxTonnage: 500 } },
 ];
 
 export function lookupSeedCapability(machineName: string | null): Partial<MachineCapability> | null {
@@ -109,4 +137,8 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   cnc_lathe:      { maxDiameterMm: 250, maxLengthMm: 500 },
   cnc_lathe_live: { maxDiameterMm: 200, maxLengthMm: 400 },
   cnc_mill_turn:  { maxDiameterMm: 300, maxLengthMm: 600 },
+  // Small/entry-tier clamp tonnage (see backend/data/MHR_LHR_India_2026.json's
+  // 30-80T Arburg Allrounder class) — an unknown injection molding machine
+  // should only win small parts, not silently claim a 500T part.
+  injection_molding: { maxTonnage: 80 },
 };

@@ -66,6 +66,17 @@ export function classifyMaterialFamily(
   return 'unknown';
 }
 
+// Materials that can NEVER run a laser + press-brake sheet route, regardless of
+// how flat the geometry looks. Cast bronzes (ALBC, gunmetal, C95x) and cast irons
+// are machined from plate/castings — bending cracks them. Deliberately
+// conservative: copper and brass SHEET are formable (busbars) and stay allowed.
+const NON_SHEET_FORMABLE = /BRONZE|ALBC|AL\.?\s?BR|CU\s?AL|C9[0-5]\d|GUNMETAL|LG[124]\b|CAST\s?IRON|FG\s?\d{3}|SG\s?IRON|EN-?GJ/i;
+
+export function isSheetFormableMaterial(grade: string | null | undefined): boolean {
+  if (!grade || grade.trim().length === 0) return true; // unknown → don't veto
+  return !NON_SHEET_FORMABLE.test(grade);
+}
+
 export function laserSpeedFactor(grade: string | null | undefined): number {
   const family = classifyMaterialFamily(grade);
   return LASER_MATERIAL_SPEED_FACTOR[family] ?? LASER_MATERIAL_SPEED_FACTOR['__default__']!;
@@ -199,6 +210,7 @@ export const LOCATION_ABRASIVE_PRICE_PER_KG: Readonly<Record<string, number>> = 
   'USA':       0.55,   // $/kg — imported garnet + logistics
   'China':     4.0,    // ¥/kg
   'Germany':   0.65,   // €/kg
+  'UK':        0.58,   // £/kg (imported garnet, UK job shop)
   'France':    0.62,   // €/kg
   'W. Europe': 0.63,   // €/kg
   'E. Europe': 0.50,   // €/kg
@@ -252,6 +264,13 @@ export const CNC_LATHE_MHR_INR     =   700;
 export const CNC_LATHE_LIVE_MHR_INR = 1_100;
 export const CNC_MILL_TURN_MHR_INR = 1_800;
 
+// ── Injection molding default rate (INR/hr) ───────────────────────────────────
+// Anchored to real machine data, not guessed: median fully-burdened rate of
+// mid-tonnage (140-220T) injection molding machines — Milacron MAGNA T170,
+// KraussMaffei 160 CX, Toyo TM-180H2 — in backend/data/MHR_LHR_India_2026.json
+// (83 real Indian IMM records, ₹850-1400/hr in that tonnage band).
+export const INJECTION_MOLDING_MHR_INR = 900;
+
 // ── Machine Registry ──────────────────────────────────────────────────────────
 // Maps each cost-engine process to the exact commodity codes that belong to it.
 // The Capability Engine (future sprint) will extend each entry with machine limits
@@ -279,6 +298,7 @@ export const MACHINE_REGISTRY = {
   cnc_lathe:      { defaultRate: CNC_LATHE_MHR_INR,       commodityCodes: ['CNC-LATHE-2AX'],                             processGroupKeywords: ['Turning', 'Lathe'],           machineClassKeywords: ['2-Axis Lathe', 'CNC Lathe', '2-Axis', 'Lathe'] },
   cnc_lathe_live: { defaultRate: CNC_LATHE_LIVE_MHR_INR,  commodityCodes: ['CNC-LATHE-LT'],                              processGroupKeywords: ['Turning', 'Lathe'],           machineClassKeywords: ['Live Tool', 'Sub-Spindle', 'Live Tooling'] },
   cnc_mill_turn:  { defaultRate: CNC_MILL_TURN_MHR_INR,   commodityCodes: ['CNC-MILLTURN'],                              processGroupKeywords: ['Mill-Turn', 'Turn-Mill'],     machineClassKeywords: ['Mill-Turn', 'MillTurn', 'Turn Mill', 'Mill Turn'] },
+  injection_molding: { defaultRate: INJECTION_MOLDING_MHR_INR, commodityCodes: ['IM-SMALL', 'IM-MED', 'IM-LARGE'],       processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Injection Mold'], machineClassKeywords: ['Injection Molding', 'Injection Molder', 'IMM', 'Injection Mold'] },
 } as const satisfies Record<string, MachineRegistryEntry>;
 
 export type MachineClass = keyof typeof MACHINE_REGISTRY;
@@ -303,6 +323,8 @@ export const LOCATION_INFO: Readonly<Record<string, LocationCurrencyInfo>> = {
   'France':    { code: 'EUR', symbol: '€', defaultInrRate: 90.8,   materialCol: 'cost_france'   },
   'W. Europe': { code: 'EUR', symbol: '€', defaultInrRate: 90.8,   materialCol: 'cost_w_europe' },
   'E. Europe': { code: 'EUR', symbol: '€', defaultInrRate: 90.8,   materialCol: 'cost_e_europe' },
+  'UK':        { code: 'GBP', symbol: '£', defaultInrRate: 107.0,  materialCol: 'cost_usa'      },
+  'Vietnam':   { code: 'USD', symbol: '$', defaultInrRate: 83.5,   materialCol: 'cost_usa'      },
   'Mexico':    { code: 'MXN', symbol: 'MX$', defaultInrRate: 4.77, materialCol: 'cost_mexico'   },
   'Other':     { code: 'USD', symbol: '$', defaultInrRate: 83.5,   materialCol: 'cost_usa'      },
 } as const;
@@ -324,15 +346,22 @@ export const LOCATION_INFO: Readonly<Record<string, LocationCurrencyInfo>> = {
 // the Mexico defaults already seeded in MHRFormDialog.tsx's per-record form).
 // Used as fallback when no mhr_records row exists for a given (location, commodityCode).
 
+// injection_molding mirrors cnc_3ax_vmc's per-location figure — the India value
+// (900) is independently anchored to real IMM machine data (see
+// INJECTION_MOLDING_MHR_INR), and happens to land almost exactly on the
+// existing cnc_3ax_vmc benchmark, so the same cross-location ratios are reused
+// rather than inventing a second set of location multipliers for one class.
 export const LOCATION_MHR_DEFAULTS = {
-  'India':     { fiber_laser:1200, press_brake:600, turret_punch:1350, waterjet:1800, tapping:400,  deburring:300, cmm:450,  cnc_3ax_vmc:900,  cnc_4ax_vmc:1200, cnc_5ax_mc:2200, cnc_lathe:700,  cnc_lathe_live:1100, cnc_mill_turn:1800 },
-  'USA':       { fiber_laser:95,   press_brake:60,  turret_punch:85,   waterjet:100,  tapping:35,   deburring:30,  cmm:55,   cnc_3ax_vmc:85,   cnc_4ax_vmc:105,  cnc_5ax_mc:145,  cnc_lathe:70,   cnc_lathe_live:95,   cnc_mill_turn:115  },
-  'China':     { fiber_laser:320,  press_brake:190, turret_punch:280,  waterjet:350,  tapping:110,  deburring:85,  cmm:170,  cnc_3ax_vmc:300,  cnc_4ax_vmc:400,  cnc_5ax_mc:580,  cnc_lathe:230,  cnc_lathe_live:340,  cnc_mill_turn:460  },
-  'Germany':   { fiber_laser:95,   press_brake:60,  turret_punch:85,   waterjet:100,  tapping:32,   deburring:26,  cmm:60,   cnc_3ax_vmc:85,   cnc_4ax_vmc:105,  cnc_5ax_mc:140,  cnc_lathe:68,   cnc_lathe_live:95,   cnc_mill_turn:115  },
-  'France':    { fiber_laser:88,   press_brake:55,  turret_punch:78,   waterjet:92,   tapping:29,   deburring:24,  cmm:55,   cnc_3ax_vmc:78,   cnc_4ax_vmc:96,   cnc_5ax_mc:128,  cnc_lathe:62,   cnc_lathe_live:87,   cnc_mill_turn:105  },
-  'W. Europe': { fiber_laser:92,   press_brake:58,  turret_punch:82,   waterjet:96,   tapping:30,   deburring:25,  cmm:57,   cnc_3ax_vmc:82,   cnc_4ax_vmc:100,  cnc_5ax_mc:134,  cnc_lathe:65,   cnc_lathe_live:91,   cnc_mill_turn:110  },
-  'E. Europe': { fiber_laser:50,   press_brake:32,  turret_punch:45,   waterjet:55,   tapping:17,   deburring:14,  cmm:26,   cnc_3ax_vmc:42,   cnc_4ax_vmc:55,   cnc_5ax_mc:75,   cnc_lathe:34,   cnc_lathe_live:48,   cnc_mill_turn:60   },
-  'Mexico':    { fiber_laser:860,  press_brake:470, turret_punch:760,  waterjet:920,  tapping:220,  deburring:155, cmm:560,  cnc_3ax_vmc:705,  cnc_4ax_vmc:970,  cnc_5ax_mc:1340, cnc_lathe:545,  cnc_lathe_live:845,  cnc_mill_turn:1045 },
+  'India':     { fiber_laser:1200, press_brake:600, turret_punch:1350, waterjet:1800, tapping:400,  deburring:300, cmm:450,  cnc_3ax_vmc:900,  cnc_4ax_vmc:1200, cnc_5ax_mc:2200, cnc_lathe:700,  cnc_lathe_live:1100, cnc_mill_turn:1800, injection_molding:900  },
+  'USA':       { fiber_laser:95,   press_brake:60,  turret_punch:85,   waterjet:100,  tapping:35,   deburring:30,  cmm:55,   cnc_3ax_vmc:85,   cnc_4ax_vmc:105,  cnc_5ax_mc:145,  cnc_lathe:70,   cnc_lathe_live:95,   cnc_mill_turn:115,  injection_molding:85   },
+  'China':     { fiber_laser:320,  press_brake:190, turret_punch:280,  waterjet:350,  tapping:110,  deburring:85,  cmm:170,  cnc_3ax_vmc:300,  cnc_4ax_vmc:400,  cnc_5ax_mc:580,  cnc_lathe:230,  cnc_lathe_live:340,  cnc_mill_turn:460,  injection_molding:300  },
+  'Germany':   { fiber_laser:95,   press_brake:60,  turret_punch:85,   waterjet:100,  tapping:32,   deburring:26,  cmm:60,   cnc_3ax_vmc:85,   cnc_4ax_vmc:105,  cnc_5ax_mc:140,  cnc_lathe:68,   cnc_lathe_live:95,   cnc_mill_turn:115,  injection_molding:85   },
+  'France':    { fiber_laser:88,   press_brake:55,  turret_punch:78,   waterjet:92,   tapping:29,   deburring:24,  cmm:55,   cnc_3ax_vmc:78,   cnc_4ax_vmc:96,   cnc_5ax_mc:128,  cnc_lathe:62,   cnc_lathe_live:87,   cnc_mill_turn:105,  injection_molding:78   },
+  'W. Europe': { fiber_laser:92,   press_brake:58,  turret_punch:82,   waterjet:96,   tapping:30,   deburring:25,  cmm:57,   cnc_3ax_vmc:82,   cnc_4ax_vmc:100,  cnc_5ax_mc:134,  cnc_lathe:65,   cnc_lathe_live:91,   cnc_mill_turn:110,  injection_molding:82   },
+  'E. Europe': { fiber_laser:50,   press_brake:32,  turret_punch:45,   waterjet:55,   tapping:17,   deburring:14,  cmm:26,   cnc_3ax_vmc:42,   cnc_4ax_vmc:55,   cnc_5ax_mc:75,   cnc_lathe:34,   cnc_lathe_live:48,   cnc_mill_turn:60,   injection_molding:42   },
+  'UK':        { fiber_laser:80,   press_brake:52,  turret_punch:72,   waterjet:88,   tapping:28,   deburring:22,  cmm:48,   cnc_3ax_vmc:72,   cnc_4ax_vmc:90,   cnc_5ax_mc:130,  cnc_lathe:60,   cnc_lathe_live:82,   cnc_mill_turn:100,  injection_molding:68   },
+  'Vietnam':   { fiber_laser:20,   press_brake:14,  turret_punch:18,   waterjet:24,   tapping:8,    deburring:6,   cmm:12,   cnc_3ax_vmc:18,   cnc_4ax_vmc:24,   cnc_5ax_mc:32,   cnc_lathe:15,   cnc_lathe_live:20,   cnc_mill_turn:26,   injection_molding:22   },
+  'Mexico':    { fiber_laser:860,  press_brake:470, turret_punch:760,  waterjet:920,  tapping:220,  deburring:155, cmm:560,  cnc_3ax_vmc:705,  cnc_4ax_vmc:970,  cnc_5ax_mc:1340, cnc_lathe:545,  cnc_lathe_live:845,  cnc_mill_turn:1045, injection_molding:705  },
 } as const satisfies Record<string, Record<MachineClass, number>>;
 
 // ── Rate plausibility guard ────────────────────────────────────────────────────
