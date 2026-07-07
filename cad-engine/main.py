@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import Dict, Any
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Security
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,6 +37,7 @@ from exceptions import (
     FileValidationError,
     ConversionError
 )
+from copilot.router import router as copilot_router
 
 # ============================================================================
 # CONFIGURATION & LOGGING
@@ -133,6 +137,9 @@ app = FastAPI(
 # Add rate limiter to app state
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Manufacturing Copilot routes (Groq-powered, streaming SSE)
+app.include_router(copilot_router, prefix="/copilot", tags=["copilot"])
 
 # ============================================================================
 # API KEY AUTHENTICATION

@@ -238,6 +238,8 @@ export interface InjectionMoldingCostInput {
   productionLifeYears?: number;
   // Molding subtype — auto-derived from material grade + signals when not supplied.
   moldingSubtype?: MoldingSubtype;
+  // Local currency symbol (₹, $, €, …) for warning messages; defaults to '$'.
+  currencySymbol?: string;
 }
 
 // Auto-derive molding subtype from material grade + signals.
@@ -296,14 +298,15 @@ export function computeInjectionMoldedCostSummary(
   if (isLsr) {
     warnings.push('LSR (thermoset) — Arrhenius cure model used; Menges cooling does NOT apply. Mold temperature 180°C (heated).');
   }
-  // Injection-molded plastics are $2–40/kg (commodity to engineering resin).
+  // Engineering plastics are $2–40/kg (commodity to engineering resin).
   // Anything above $50/kg almost certainly indicates a mis-mapped material grade
   // (e.g. a metal or composite grade resolved as the fallback for a plastic name).
   // Surface this early so it is impossible to miss in the cost breakdown.
   if (materialCostPerKg > 50) {
+    const alertSym = input.currencySymbol ?? '$';
     warnings.push(
-      `MATERIAL COST ALERT: ${materialGrade ?? 'Unknown'} resolved to $${materialCostPerKg.toFixed(2)}/kg — ` +
-      `injection-molded plastics are typically $2–40/kg. ` +
+      `MATERIAL COST ALERT: ${materialGrade ?? 'Unknown'} resolved to ${alertSym}${materialCostPerKg.toFixed(2)}/kg — ` +
+      `engineering plastics are typically $2–40/kg (USD benchmark). ` +
       `Verify the material grade in the BOM item; the cost breakdown below is unreliable until corrected.`,
     );
   }
@@ -430,7 +433,8 @@ export function computeInjectionMoldedCostSummary(
   if (routed.has('material_drying')) {
     const dryMin = IM_DRYING_ATTENDED_MIN / batch;
     setupMin += dryMin;
-    processLines.push(makeLine('Material Drying', r2((dryMin / 60) * deburrRate.rate), 0, dryMin, deburrRate));
+    const dryerRate: MHRRateInput = { ...deburrRate, machineClass: 'material_drying', machineName: 'Material Dryer / Hopper' };
+    processLines.push(makeLine('Material Drying', r2((dryMin / 60) * deburrRate.rate), 0, dryMin, dryerRate));
   }
 
   if (routed.has('mold_setup')) {

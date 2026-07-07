@@ -1,0 +1,7 @@
+[
+  {
+    "title": "Company Rules Template",
+    "body": "Add your company's engineering rules here. Examples: preferred suppliers, approved materials, customer-specific DFM rules, internal tolerance standards, preferred machine types. Each entry should have title, body, and tags.",
+    "tags": ["template", "company", "rules"]
+  }
+]

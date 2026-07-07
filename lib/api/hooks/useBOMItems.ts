@@ -460,7 +460,7 @@ export interface ProcessLineCost {
   totalCost: number;
   cycleTimeMin: number;
   hourlyRate: number;
-  rateSource: 'mhr_database' | 'default_rate';
+  rateSource: 'mhr_database' | 'default_rate' | 'tier_synthetic';
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;
@@ -568,7 +568,8 @@ export type RouteId =
   | "sm-laser" | "sm-turret" | "sm-waterjet"
   | "cnc-3ax" | "cnc-4ax" | "cnc-5ax"
   | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn"
-  | "injection-molding";
+  | "injection-molding"
+  | "im-small-50t" | "im-standard-200t" | "im-large-500t";
 
 export type CapabilityReasonCode =
   | "DIMENSIONS_UNAVAILABLE"

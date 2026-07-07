@@ -17,7 +17,7 @@ import type { CostSummaryDto, ProcessLineCost, ProcessCO2, SustainabilitySummary
 
 export interface MHRRateInput {
   rate: number;
-  source: 'mhr_database' | 'default_rate';
+  source: 'mhr_database' | 'default_rate' | 'tier_synthetic';
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;

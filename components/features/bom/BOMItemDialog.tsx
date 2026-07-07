@@ -1360,8 +1360,8 @@ export function BOMItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[780px] w-[95vw] h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -1397,8 +1397,9 @@ export function BOMItemDialog({
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="grid gap-5">
             {/* 3D Models — first so geometry auto-fills the form below */}
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
@@ -1541,48 +1542,49 @@ export function BOMItemDialog({
               )}
             </div>
 
-            {/* Name */}
-            <div className="grid gap-2">
-              <Label htmlFor="name" className="flex items-center">Name * <AutoBadge field="name" /></Label>
-              <Input
-                id="name"
-                placeholder="e.g., Cylinder Head Assembly"
-                value={formData.name}
-                onChange={(e) => {
-                  setFormData({ ...formData, name: e.target.value });
-                  setAutoFilledFields(prev => { const s = new Set(prev); s.delete('name'); return s; });
-                }}
-                className={validationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
-                required
-              />
-              {validationErrors.name && (
-                <div className="flex items-center gap-1 text-xs text-red-600">
-                  <XCircle className="h-3 w-3" />
-                  <span>{validationErrors.name}</span>
-                </div>
-              )}
-            </div>
+            {/* Name + Part Number — side by side */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name" className="flex items-center">Name * <AutoBadge field="name" /></Label>
+                <Input
+                  id="name"
+                  placeholder="e.g., Cylinder Head Assembly"
+                  value={formData.name}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    setAutoFilledFields(prev => { const s = new Set(prev); s.delete('name'); return s; });
+                  }}
+                  className={validationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
+                  required
+                />
+                {validationErrors.name && (
+                  <div className="flex items-center gap-1 text-xs text-red-600">
+                    <XCircle className="h-3 w-3" />
+                    <span>{validationErrors.name}</span>
+                  </div>
+                )}
+              </div>
 
-            {/* Part Number */}
-            <div className="grid gap-2">
-              <Label htmlFor="partNumber" className="flex items-center">Part Number * <AutoBadge field="partNumber" /></Label>
-              <Input
-                id="partNumber"
-                placeholder="e.g., CH-2024-001"
-                value={formData.partNumber}
-                onChange={(e) => {
-                  setFormData({ ...formData, partNumber: e.target.value });
-                  setAutoFilledFields(prev => { const s = new Set(prev); s.delete('partNumber'); return s; });
-                }}
-                className={validationErrors.partNumber ? 'border-red-500 focus:border-red-500' : ''}
-                required
-              />
-              {validationErrors.partNumber && (
-                <div className="flex items-center gap-1 text-xs text-red-600">
-                  <XCircle className="h-3 w-3" />
-                  <span>{validationErrors.partNumber}</span>
-                </div>
-              )}
+              <div className="grid gap-2">
+                <Label htmlFor="partNumber" className="flex items-center">Part Number * <AutoBadge field="partNumber" /></Label>
+                <Input
+                  id="partNumber"
+                  placeholder="e.g., CH-2024-001"
+                  value={formData.partNumber}
+                  onChange={(e) => {
+                    setFormData({ ...formData, partNumber: e.target.value });
+                    setAutoFilledFields(prev => { const s = new Set(prev); s.delete('partNumber'); return s; });
+                  }}
+                  className={validationErrors.partNumber ? 'border-red-500 focus:border-red-500' : ''}
+                  required
+                />
+                {validationErrors.partNumber && (
+                  <div className="flex items-center gap-1 text-xs text-red-600">
+                    <XCircle className="h-3 w-3" />
+                    <span>{validationErrors.partNumber}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Description */}
@@ -1591,14 +1593,15 @@ export function BOMItemDialog({
               <Textarea
                 id="description"
                 placeholder="Detailed description of the part..."
-                rows={3}
+                rows={2}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
 
-            {/* Material Category */}
-            <div className="grid gap-2">
+            {/* Material Category + Grade — side by side */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
               <Label htmlFor="materialCategory" className="flex items-center">Material Category <AutoBadge field="materialCategory" /></Label>
               <Select
                 value={formData.materialCategory}
@@ -1609,7 +1612,7 @@ export function BOMItemDialog({
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select material category..." />
+                  <SelectValue placeholder="Select category..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="PLASTIC_RUBBER">Plastic &amp; Rubber</SelectItem>
@@ -1618,17 +1621,17 @@ export function BOMItemDialog({
               </Select>
               <p className="text-xs text-muted-foreground">
                 {formData.materialCategory === 'PLASTIC_RUBBER' &&
-                  `Thermoplastic and rubber-based materials including polymers, elastomers, and composites (${rawMaterialsData?.items?.length ?? 0} available)`
+                  `${rawMaterialsData?.items?.length ?? 0} grades available`
                 }
                 {formData.materialCategory === 'FERROUS_NON_FERROUS' &&
-                  `All metallic materials including iron-based materials (steel, cast iron) and non-iron metals (aluminum, copper, titanium) (${rawMaterialsData?.items?.length ?? 0} available)`
+                  `${rawMaterialsData?.items?.length ?? 0} grades available`
                 }
-                {!formData.materialCategory && 'Choose the type of material to see relevant grades from your database'}
+                {!formData.materialCategory && 'Select a category first'}
               </p>
             </div>
 
             {/* Material Grade */}
-            {formData.materialCategory && (
+            {formData.materialCategory ? (
               <div className="grid gap-2">
                 <Label htmlFor="materialGrade">Material Grade</Label>
                 <Popover open={materialGradeOpen} onOpenChange={setMaterialGradeOpen}>
@@ -1749,10 +1752,14 @@ export function BOMItemDialog({
                   </PopoverContent>
                 </Popover>
               </div>
+            ) : (
+              <div />
             )}
+            </div>
 
-            {/* 2D Drawing */}
-            <div className="grid gap-2 border-t pt-4">
+            {/* 2D Drawing + Make/Buy — side by side */}
+            <div className="grid grid-cols-2 gap-4 border-t pt-4">
+            <div className="grid gap-2">
               <Label className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 2D Drawing (PDF, PNG, JPG)
@@ -1790,7 +1797,7 @@ export function BOMItemDialog({
             </div>
 
             {/* Make or Buy */}
-            <div className="grid gap-3 border-t pt-4">
+            <div className="grid gap-3">
               <Label>Make or Buy Decision</Label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1841,6 +1848,7 @@ export function BOMItemDialog({
                 </div>
               )}
             </div>
+            </div>{/* end 2D Drawing + Make/Buy grid */}
 
             {/* Quantity & Annual Volume */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2027,8 +2035,9 @@ export function BOMItemDialog({
               </div>
             </div>
           </div>
+          </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 px-6 py-4 border-t shrink-0 bg-background">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading || isBatchCreating}>
               Cancel
             </Button>

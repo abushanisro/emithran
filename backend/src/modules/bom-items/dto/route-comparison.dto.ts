@@ -5,7 +5,8 @@ export type RouteId =
   | "sm-laser" | "sm-turret" | "sm-waterjet"
   | "cnc-3ax" | "cnc-4ax" | "cnc-5ax"
   | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn"
-  | "injection-molding";
+  | "injection-molding"
+  | "im-small-50t" | "im-standard-200t" | "im-large-500t";
 
 export interface RouteCapability {
   cuttingCapable: boolean;
@@ -24,7 +25,8 @@ export interface RouteResultDto {
   materialCost: number;
   abrasiveCost: number;
   totalProcessCost: number;
-  totalCost: number;
+  totalCost: number | null;  // null when isFeasible === false — prevents sort/ML pollution
+  isFeasible: boolean;       // false when the machine cannot physically produce this part
   cycleTimes: {
     cuttingMin: number;
     pressBrakeMin: number;

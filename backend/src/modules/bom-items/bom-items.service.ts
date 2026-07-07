@@ -10,9 +10,13 @@ import {
   requiredMilledMachineClass, meetsRequiredMilledClass, pickRecommendedRoute,
 } from './costing/cost-cnc-engine';
 import type { CNCCostInput, CNCMachineClass } from './costing/cost-cnc-engine';
-import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT } from './costing/cost-injection-molding-engine';
+import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT, recommendCavityCount } from './costing/cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from './costing/cost-injection-molding-engine';
 import { isPlasticGrade } from './costing/injection-molding/process-tree';
+import {
+  selectIMmachinesByTier,
+  type IMSelectionRequirements,
+} from './costing/injection-molding/machine-selector-im';
 import {
   MATERIAL_DEFAULTS, MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL,
   LASER_SETUP_MIN, LASER_SPEED_MM_PER_MIN, LASER_PIERCE_SEC,
@@ -1695,7 +1699,8 @@ export class BOMItemsService {
       if (line.rateSource === 'mhr_database') {
         const warning = benchmarkRateWarning(line.machineClass, location, line.hourlyRate, line.machineName);
         if (warning && !result.warnings.includes(warning)) result.warnings.push(warning);
-      } else {
+      } else if (line.rateSource !== 'tier_synthetic') {
+        // 'tier_synthetic' = route comparison benchmark slot with no DB machine — expected, suppress
         benchmarkPriced.push(line.machineClass.replace(/_/g, ' '));
       }
     }
@@ -1975,10 +1980,20 @@ export class BOMItemsService {
       // Shot capacity: ~0.9 × tonnage (industry rule of thumb; see cost-injection-molding-engine.ts)
       const shotCapacityCm3 = machineSpec?.maxTonnage != null ? machineSpec.maxTonnage * 0.9 : undefined;
 
+      // Wall thickness: prefer CAD-extracted nominal value. When unavailable (0),
+      // fall back to the minimum bounding-box dimension — for flat/thin-walled
+      // parts like covers and housings this is physically correct. Cap at 20mm
+      // so a thick block doesn't misidentify its section height as a wall.
+      const cadWallMm = (summary.wallThicknessNominalMm ?? 0) as number;
+      const bboxMinMm = imBbox[2] ?? 0;
+      const effectiveWallMm = cadWallMm > 0
+        ? cadWallMm
+        : (bboxMinMm > 0 && bboxMinMm <= 20 ? bboxMinMm : 0);
+
       const imInput: InjectionMoldingCostInput = {
         volume: (item.volume ?? 0) as number,
         surfaceArea: (item.surfaceArea ?? 0) as number,
-        wallThicknessNominalMm: (summary.wallThicknessNominalMm ?? 0) as number,
+        wallThicknessNominalMm: effectiveWallMm,
         materialGrade: grade,
         materialCostPerKg,
         materialDensityKgM3,
@@ -2221,7 +2236,8 @@ export class BOMItemsService {
           materialCost: 0,
           abrasiveCost: 0,
           totalProcessCost: 0,
-          totalCost: 0,
+          isFeasible: false,
+          totalCost: null,
           cycleTimes: { cuttingMin: 0, pressBrakeMin: 0, tappingMin: 0, deburrMin: 0, totalMin: 0 },
           badges: { lowestCost: false, fastest: false, bestQuality: false },
           capability: {
@@ -2236,99 +2252,208 @@ export class BOMItemsService {
       };
     }
     if (family === 'injection_molded') {
-      // Phase 1: single route, no multi-tonnage-class comparison yet (see plan
-      // doc §8/Roadmap) — the "comparison" is just the one costed route,
-      // mirroring the 'unknown' family's single-entry shape above.
       const imBboxRC = [
         ((item as any).maxLength ?? 0) as number,
         ((item as any).maxWidth ?? 0) as number,
         ((item as any).maxHeight ?? 0) as number,
       ].sort((a, b) => b - a);
-      const machineSpecRC = lookupSeedCapability(mhrRates.injectionMolding.machineName);
-      const imInput: InjectionMoldingCostInput = {
-        volume: (item.volume ?? 0) as number,
-        surfaceArea: (item.surfaceArea ?? 0) as number,
-        wallThicknessNominalMm: (summary.wallThicknessNominalMm ?? 0) as number,
-        materialGrade: grade,
-        materialCostPerKg,
+      const cadWallMmRC = (summary.wallThicknessNominalMm ?? 0) as number;
+      const bboxMinMmRC = imBboxRC[2] ?? 0;
+      const effectiveWallMmRC = cadWallMmRC > 0
+        ? cadWallMmRC
+        : (bboxMinMmRC > 0 && bboxMinMmRC <= 20 ? bboxMinMmRC : 0);
+      const projectedAreaMm2 = imBboxRC[0] * imBboxRC[1] > 0 ? imBboxRC[0] * imBboxRC[1] : null;
+      const partVolumeMm3 = (item.volume ?? 0) as number;
+      const annualVolume = ((item as any).annualVolume as number | null | undefined) ?? undefined;
+
+      const imSignals = {
+        projectedAreaMm2,
+        wallThicknessMinMm: (summary.wallThicknessMinMm as number) > 0 ? (summary.wallThicknessMinMm as number) : null,
+        wallThicknessMaxMm: (summary.wallThicknessMaxMm as number) > 0 ? (summary.wallThicknessMaxMm as number) : null,
+        ribCount: (summary.ribCount as number) > 0
+          ? (summary.ribCount as number)
+          : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
+        bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
+        undercutCount: (summary.undercutFaceCount as number) > 0 ? (summary.undercutFaceCount as number) : null,
+        partingComplexity: (summary.partingComplexity as number | null) ?? null,
+        insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
+      };
+
+      // Cavity count estimation for pre-selection clamp requirement
+      const cavityCountEst = projectedAreaMm2 != null
+        ? recommendCavityCount({
+            projectedAreaMm2,
+            annualVolume: annualVolume ?? 10_000,
+            clampTonnageKN: 2000, // neutral 200T baseline for pre-selection
+            shotCapacityCm3: 180,
+            partVolumeMm3,
+            gateType: 'edge',
+          }).count
+        : 1;
+
+      // Runner volume estimate: 10% of part volume for cold runner; 0 for hot
+      const runnerVolumeMm3 = partVolumeMm3 * 0.10;
+
+      const imReq: IMSelectionRequirements = {
+        projectedAreaMm2,
+        cavityCount: cavityCountEst,
+        partVolumeMm3,
+        runnerVolumeMm3,
         materialDensityKgM3,
-        materialSource,
-        batchSize,
-        family,
-        mhrRate: mhrRates.injectionMolding,
-        deburrRate: mhrRates.deburring,
-        inspectionRate: mhrRates.inspection,
-        clampTonnageKN: machineSpecRC?.maxTonnage != null ? machineSpecRC.maxTonnage * 10 : undefined,
-        shotCapacityCm3: machineSpecRC?.maxTonnage != null ? machineSpecRC.maxTonnage * 0.9 : undefined,
-        annualVolume: ((item as any).annualVolume as number | null | undefined) ?? undefined,
-        productionLifeYears: 5,
-        bboxMaxMm: imBboxRC[0],
-        bboxMidMm: imBboxRC[1],
-        signals: {
-          projectedAreaMm2: imBboxRC[0] * imBboxRC[1] > 0 ? imBboxRC[0] * imBboxRC[1] : null,
-          wallThicknessMinMm: (summary.wallThicknessMinMm as number) > 0 ? (summary.wallThicknessMinMm as number) : null,
-          wallThicknessMaxMm: (summary.wallThicknessMaxMm as number) > 0 ? (summary.wallThicknessMaxMm as number) : null,
-          // Phase 4: use real rib count (antiparallel wall-face pairs); fall back to
-          // pocket-floor proxy when CAD engine is pre-Phase 4.
-          ribCount: (summary.ribCount as number) > 0
-            ? (summary.ribCount as number)
-            : (summary.ribCountProxy as number) > 0 ? (summary.ribCountProxy as number) : null,
-          // Phase 4: bosses = blind cylindrical features (capped), NOT all cylinders.
-          // holeOrBossCount lumps through-holes and bosses; blindFeatureCount is cap-detected.
-          bossCount: (summary.blindFeatureCount as number) > 0 ? (summary.blindFeatureCount as number) : null,
-          undercutCount: (summary.undercutFaceCount as number) > 0 ? (summary.undercutFaceCount as number) : null,
-          partingComplexity: (summary.partingComplexity as number | null) ?? null,
-          insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
-        },
+        materialGrade: grade,
+        partLengthMm: imBboxRC[0] > 0 ? imBboxRC[0] : null,  // largest bbox dim
+        partWidthMm: imBboxRC[1] > 0 ? imBboxRC[1] : null,
+        partHeightMm: imBboxRC[2] > 0 ? imBboxRC[2] : null,
+        // Tool height estimate: bbox max + 100mm tooling allowance (conservative)
+        estimatedToolHeightMm: imBboxRC[0] > 0 ? imBboxRC[0] + 100 : null,
       };
-      const cost = computeInjectionMoldedCostSummary(imInput);
-      cost.warnings.push(...comparisonWarnings);
-      const route: RouteResultDto = {
-        routeId: 'injection-molding',
-        routeLabel: 'Injection Molding',
-        processLines: cost.processLines,
-        materialCost: cost.materialCost,
-        abrasiveCost: 0,
-        totalProcessCost: cost.totalProcessCost,
-        totalCost: cost.totalCost,
-        cycleTimes: {
-          cuttingMin:    cost.cycleTimes.laserMin,
-          pressBrakeMin: cost.cycleTimes.pressBrakeMin,
-          tappingMin:    cost.cycleTimes.tappingMin,
-          deburrMin:     cost.cycleTimes.deburrMin,
-          totalMin:      cost.cycleTimes.totalMin,
-        },
-        badges: { lowestCost: true, fastest: true, bestQuality: true },
-        capability: {
-          cuttingCapable: true,
-          pressBrakeCapable: true,
-          overallCapable: true,
-          confidence: 'medium',
-          estimatedTonnage: null,
-          reasonCodes: [],
-          warnings: [],
-        },
-        warnings: cost.warnings,
-        ratesSource: cost.ratesSource,
-        sustainability: cost.sustainability
-          ? {
-              totalCo2Kg:            cost.sustainability.totalCo2Kg,
-              totalProcessEnergyKwh: cost.sustainability.totalProcessEnergyKwh,
-              wasteCostInr:          cost.sustainability.wasteCostInr,
-              sustainabilityScore:   cost.sustainability.sustainabilityScore,
-            }
-          : undefined,
+
+      // Fetch machine pool and run tier-based 4-constraint selection.
+      // Each tier (Small ≤120T / Standard 121–350T / Large 351T+) picks the best
+      // DB machine in range; falls back to a synthetic class rate when the DB has
+      // no machine for that tier so the comparison always shows 3 routes.
+      let tierResults: ReturnType<typeof selectIMmachinesByTier> = [];
+      try {
+        const pool = await fetchMachinePool(this.supabaseService.getClient(accessToken), location);
+        tierResults = selectIMmachinesByTier(pool, imReq);
+      } catch (e) {
+        this.logger.warn(
+          `IM machine selection failed, using synthetic fallback: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+
+      // If pool fetch failed entirely, seed an empty tier structure
+      if (tierResults.length === 0) {
+        tierResults = [
+          { tierId: 'small',  tierLabel: 'Small Press',    evaluation: null, syntheticTonnageT: 100  },
+          { tierId: 'medium', tierLabel: 'Standard Press', evaluation: null, syntheticTonnageT: 200  },
+          { tierId: 'large',  tierLabel: 'Large Press',    evaluation: null, syntheticTonnageT: 500  },
+        ];
+      }
+
+      // MHR rate multipliers relative to the DB-selected standard rate
+      // USA reference: 100T≈$65/hr (0.76×), 200T≈$85/hr (1.0×), 500T≈$130/hr (1.53×)
+      // These ratios hold across all locations since they scale from the same baseline.
+      const baseMhrRate = mhrRates.injectionMolding.rate;
+      const TIER_RATE_MULT: Record<string, number> = { small: 0.76, medium: 1.00, large: 1.53 };
+
+      // Synthetic clamp/shot specs per tier (used when no DB machine exists)
+      const TIER_SPECS: Record<string, { clampKN: number; shotCm3: number; label: string }> = {
+        small:  { clampKN: 1000, shotCm3: 90,  label: 'Small Press (100T)'    },
+        medium: { clampKN: 2000, shotCm3: 180, label: 'Standard Press (200T)' },
+        large:  { clampKN: 5000, shotCm3: 450, label: 'Large Press (500T)'    },
       };
+
+      const TIER_ROUTE_IDS: Record<string, 'im-small-50t' | 'im-standard-200t' | 'im-large-500t'> = {
+        small:  'im-small-50t',
+        medium: 'im-standard-200t',
+        large:  'im-large-500t',
+      };
+
+      const imRoutes: RouteResultDto[] = tierResults.map((tier) => {
+        const ev = tier.evaluation;
+        const cand = ev?.candidate;
+        const spec = TIER_SPECS[tier.tierId]!;
+        const mult = TIER_RATE_MULT[tier.tierId] ?? 1.0;
+
+        const mhrRate: InjectionMoldingCostInput['mhrRate'] = cand
+          ? { rate: cand.hourlyRate, source: cand.machineId ? 'mhr_database' : 'default_rate',
+              machineClass: 'injection_molding', machineName: cand.machineName, commodityCode: cand.commodityCode }
+          : { rate: Math.round(baseMhrRate * mult), source: 'tier_synthetic',
+              machineClass: 'injection_molding', machineName: null, commodityCode: null };
+
+        const clampKN = cand?.capability.maxTonnage != null
+          ? cand.capability.maxTonnage * 10
+          : spec.clampKN;
+        const shotCm3 = cand?.capability.shotCapacityGrams != null
+          ? cand.capability.shotCapacityGrams / (materialDensityKgM3 / 1000)
+          : spec.shotCm3;
+
+        const imInput: InjectionMoldingCostInput = {
+          volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
+          wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
+          materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
+          mhrRate, deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
+          clampTonnageKN: clampKN, shotCapacityCm3: shotCm3,
+          annualVolume, productionLifeYears: 5,
+          bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
+          currencySymbol: locInfo.symbol,
+        };
+        const cost = computeInjectionMoldedCostSummary(imInput);
+        cost.warnings.push(...comparisonWarnings);
+        if (ev && !ev.capable) cost.warnings.push(...ev.blockReasons.map((r) => `⚠ ${r}`));
+
+        const isSynthetic = cand == null;
+        const capable = ev ? ev.capable : true; // synthetic routes are always marked capable
+        const routeLabel = cand?.machineName
+          ? `${tier.tierLabel} — ${cand.machineName}`
+          : spec.label;
+
+        return {
+          routeId: TIER_ROUTE_IDS[tier.tierId]!,
+          routeLabel,
+          processLines: cost.processLines, materialCost: cost.materialCost, abrasiveCost: 0,
+          totalProcessCost: cost.totalProcessCost,
+          isFeasible: capable,
+          totalCost: capable ? cost.totalCost : null,
+          cycleTimes: {
+            cuttingMin: cost.cycleTimes.laserMin, pressBrakeMin: cost.cycleTimes.pressBrakeMin,
+            tappingMin: cost.cycleTimes.tappingMin, deburrMin: cost.cycleTimes.deburrMin,
+            totalMin: cost.cycleTimes.totalMin,
+          },
+          badges: { lowestCost: false, fastest: false, bestQuality: false },
+          capability: {
+            cuttingCapable: capable, pressBrakeCapable: capable, overallCapable: capable,
+            confidence: isSynthetic ? 'low' : cand!.capabilitySource === 'imported' ? 'high' : 'medium',
+            estimatedTonnage: cand?.capability.maxTonnage ?? tier.syntheticTonnageT,
+            reasonCodes: capable ? [] : ['DIMENSIONS_UNAVAILABLE' as const],
+            warnings: ev?.blockReasons ?? [],
+          },
+          warnings: cost.warnings, ratesSource: cost.ratesSource,
+          sustainability: cost.sustainability ? {
+            totalCo2Kg: cost.sustainability.totalCo2Kg,
+            totalProcessEnergyKwh: cost.sustainability.totalProcessEnergyKwh,
+            wasteCostInr: cost.sustainability.wasteCostInr,
+            sustainabilityScore: cost.sustainability.sustainabilityScore,
+          } : undefined,
+        } satisfies RouteResultDto;
+      });
+
+      const capableRoutes = imRoutes.filter((r) => r.capability.overallCapable);
+      if (capableRoutes.length > 0) {
+        const feasibleRoutes = capableRoutes.filter((r) => r.isFeasible && r.totalCost != null);
+        if (feasibleRoutes.length > 0) {
+          const minFeasibleCost = Math.min(...feasibleRoutes.map((r) => r.totalCost!));
+          feasibleRoutes.forEach((r) => { r.badges.lowestCost = r.totalCost === minFeasibleCost; });
+        }
+        capableRoutes.reduce((a, b) => a.cycleTimes.totalMin < b.cycleTimes.totalMin ? a : b).badges.fastest = true;
+        // bestQuality = DB machine with clamp utilisation closest to 60-85% sweet spot
+        const capableTiers = tierResults.filter((t) =>
+          t.evaluation?.capable || t.evaluation == null,
+        );
+        const bestTier = capableTiers
+          .filter((t) => t.evaluation != null)
+          .sort((a, b) => {
+            const au = a.evaluation!.clampUtil;
+            const bu = b.evaluation!.clampUtil;
+            const aInRange = au != null && au >= 0.60 && au <= 0.85 ? 1 : 0;
+            const bInRange = bu != null && bu >= 0.60 && bu <= 0.85 ? 1 : 0;
+            return bInRange - aInRange || b.evaluation!.score - a.evaluation!.score;
+          })[0];
+        const qualRoute = bestTier
+          ? imRoutes[tierResults.indexOf(bestTier)]
+          : capableRoutes[capableRoutes.length - 1];
+        if (qualRoute) qualRoute.badges.bestQuality = true;
+      }
+
+      const imGrossKg = (partVolumeMm3 / 1e9) * materialDensityKgM3 * (1 + MATERIAL_OVERHEAD_PCT / 100);
+      const medRoute = imRoutes.find((r) => r.routeId === 'im-standard-200t') ?? imRoutes[0];
       return attachToRoutes({
         bomItemId: id, batchSize,
-        materialCost: cost.materialCost,
-        materialGrade: grade ?? '',
-        grossWeightKg: cost.grossWeightKg,
-        materialCostPerKg,
-        materialSource,
+        materialCost: medRoute?.materialCost ?? 0,
+        materialGrade: grade ?? '', grossWeightKg: imGrossKg, materialCostPerKg, materialSource,
         currency: locInfo.code, currencySymbol: locInfo.symbol,
-        routes: [route],
-        comparisonWarnings,
+        routes: imRoutes, comparisonWarnings,
       });
     }
 
@@ -2499,7 +2624,9 @@ export class BOMItemsService {
       return {
         routeId, routeLabel,
         processLines: allLines,
-        materialCost, abrasiveCost, totalProcessCost, totalCost,
+        materialCost, abrasiveCost, totalProcessCost,
+        isFeasible: capability.overallCapable,
+        totalCost,
         cycleTimes: {
           cuttingMin: this.r2(cuttingMin),
           pressBrakeMin: this.r2(pressBrakeMin),
@@ -2528,7 +2655,7 @@ export class BOMItemsService {
     const capableRoutes = routes.filter((r) => r.capability.overallCapable);
 
     if (capableRoutes.length > 0) {
-      const minCost = Math.min(...capableRoutes.map((r) => r.totalCost));
+      const minCost = Math.min(...capableRoutes.map((r) => r.totalCost ?? Infinity));
       routes.forEach((r) => {
         r.badges.lowestCost = r.capability.overallCapable && r.totalCost === minCost;
       });
@@ -2817,6 +2944,7 @@ export class BOMItemsService {
         materialCost: cost.materialCost,
         abrasiveCost: 0,
         totalProcessCost: cost.totalProcessCost,
+        isFeasible: overallCapable,
         totalCost: cost.totalCost,
         cycleTimes: {
           cuttingMin:    cost.cycleTimes.laserMin,
@@ -2858,7 +2986,7 @@ export class BOMItemsService {
     const capable = routes.filter((r) => r.capability.overallCapable);
     if (capable.length > 0) {
       const recommended = pickRecommendedRoute(
-        routes.map((r) => ({ route: r, totalCost: r.totalCost, capable: r.capability.overallCapable, setupCount: r.setupCount ?? 99 })),
+        routes.map((r) => ({ route: r, totalCost: r.totalCost ?? Infinity, capable: r.capability.overallCapable, setupCount: r.setupCount ?? 99 })),
       ).route;
       routes.forEach((r) => { r.badges.lowestCost = r.routeId === recommended.routeId; });
 
@@ -2955,6 +3083,7 @@ export class BOMItemsService {
         materialCost: cost.materialCost,
         abrasiveCost: 0,
         totalProcessCost: cost.totalProcessCost,
+        isFeasible: capability.overallCapable,
         totalCost: cost.totalCost,
         cycleTimes: {
           cuttingMin:    cost.cycleTimes.laserMin,
@@ -2998,7 +3127,7 @@ export class BOMItemsService {
     const capable = routes.filter((r) => r.capability.overallCapable);
     if (capable.length > 0) {
       const recommended = pickRecommendedRoute(
-        routes.map((r) => ({ route: r, totalCost: r.totalCost, capable: r.capability.overallCapable, setupCount: r.setupCount ?? 99 })),
+        routes.map((r) => ({ route: r, totalCost: r.totalCost ?? Infinity, capable: r.capability.overallCapable, setupCount: r.setupCount ?? 99 })),
       ).route;
       routes.forEach((r) => { r.badges.lowestCost = r.routeId === recommended.routeId; });
       routes.forEach((r) => { r.badges.fastest    = r.routeId === 'cnc-mill-turn' && r.capability.overallCapable; });

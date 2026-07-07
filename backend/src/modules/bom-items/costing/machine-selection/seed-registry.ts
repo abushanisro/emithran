@@ -21,6 +21,12 @@ export interface MachineCapability {
   maxThicknessAlMm: number | null;
   maxThicknessCuMm: number | null;
   cuttableMaterials: string[] | null;
+  // IM-specific fields (migration 339)
+  tieBarXMm: number | null;         // horizontal tie-bar (platen) opening
+  tieBarYMm: number | null;         // vertical tie-bar (platen) opening
+  shotCapacityGrams: number | null; // max shot weight in grams
+  minMoldHeightMm: number | null;   // min daylight (mold height)
+  maxMoldHeightMm: number | null;   // max daylight (mold height)
 }
 
 export const EMPTY_CAPABILITY: MachineCapability = {
@@ -31,6 +37,8 @@ export const EMPTY_CAPABILITY: MachineCapability = {
   maxThicknessMsMm: null, maxThicknessSsMm: null,
   maxThicknessAlMm: null, maxThicknessCuMm: null,
   cuttableMaterials: null,
+  tieBarXMm: null, tieBarYMm: null, shotCapacityGrams: null,
+  minMoldHeightMm: null, maxMoldHeightMm: null,
 };
 
 interface SeedEntry {
@@ -86,32 +94,103 @@ const SEED_ENTRIES: SeedEntry[] = [
     capability: { maxXMm: 2500, maxYMm: 1250, maxThicknessMm: 6, maxTonnage: 20 } },
 
   // ── Injection molding machines ──
-  // Mirror of migration 336_seed_injection_molding_machines.sql — keep in sync.
-  { pattern: /arburg.*allrounder.*370|allrounder.*370/i,  capability: { maxTonnage: 37  } },
-  { pattern: /arburg.*allrounder.*570|allrounder.*570/i,  capability: { maxTonnage: 57  } },
-  { pattern: /arburg.*allrounder.*1020|allrounder.*1020/i, capability: { maxTonnage: 102 } },
-  { pattern: /arburg.*allrounder.*1600|allrounder.*1600/i, capability: { maxTonnage: 160 } },
-  { pattern: /arburg.*allrounder.*2000|allrounder.*2000/i, capability: { maxTonnage: 200 } },
-  { pattern: /engel.*e-?mac.*310|e-?mac.*310/i,           capability: { maxTonnage: 31  } },
-  { pattern: /engel.*e-?mac.*440|e-?mac.*440/i,           capability: { maxTonnage: 44  } },
-  { pattern: /engel.*(victory|v-duo).*80\b/i,             capability: { maxTonnage: 80  } },
-  { pattern: /engel.*(victory|v-duo).*120\b/i,            capability: { maxTonnage: 120 } },
-  { pattern: /engel.*duo.*650|duo.*650/i,                 capability: { maxTonnage: 650 } },
-  { pattern: /kraussmaffei.*cx.?160|cx.?160/i,            capability: { maxTonnage: 160 } },
-  { pattern: /kraussmaffei.*gx.?450|gx.?450/i,            capability: { maxTonnage: 450 } },
-  { pattern: /kraussmaffei.*gx.?650|gx.?650/i,            capability: { maxTonnage: 650 } },
-  { pattern: /milacron.*roboshot.*110|roboshot.*110/i,    capability: { maxTonnage: 110 } },
-  { pattern: /milacron.*roboshot.*165|roboshot.*165/i,    capability: { maxTonnage: 165 } },
-  { pattern: /milacron.*roboshot.*330|roboshot.*330/i,    capability: { maxTonnage: 330 } },
+  // Mirror of migrations 336 + 339 — keep in sync.
+  { pattern: /arburg.*allrounder.*370|allrounder.*370/i,
+    capability: { maxTonnage: 37,  tieBarXMm: 280, tieBarYMm: 250, shotCapacityGrams: 56,   minMoldHeightMm: 150, maxMoldHeightMm: 370 } },
+  { pattern: /arburg.*allrounder.*570|allrounder.*570/i,
+    capability: { maxTonnage: 57,  tieBarXMm: 370, tieBarYMm: 320, shotCapacityGrams: 115,  minMoldHeightMm: 200, maxMoldHeightMm: 450 } },
+  { pattern: /arburg.*allrounder.*1020|allrounder.*1020/i,
+    capability: { maxTonnage: 102, tieBarXMm: 470, tieBarYMm: 420, shotCapacityGrams: 300,  minMoldHeightMm: 250, maxMoldHeightMm: 580 } },
+  { pattern: /arburg.*allrounder.*1600|allrounder.*1600/i,
+    capability: { maxTonnage: 160, tieBarXMm: 570, tieBarYMm: 500, shotCapacityGrams: 630,  minMoldHeightMm: 300, maxMoldHeightMm: 680 } },
+  { pattern: /arburg.*allrounder.*2000|allrounder.*2000/i,
+    capability: { maxTonnage: 200, tieBarXMm: 620, tieBarYMm: 520, shotCapacityGrams: 900,  minMoldHeightMm: 350, maxMoldHeightMm: 730 } },
+  { pattern: /engel.*e-?mac.*310|e-?mac.*310/i,
+    capability: { maxTonnage: 31,  tieBarXMm: 250, tieBarYMm: 220, shotCapacityGrams: 38,   minMoldHeightMm: 130, maxMoldHeightMm: 330 } },
+  { pattern: /engel.*e-?mac.*440|e-?mac.*440/i,
+    capability: { maxTonnage: 44,  tieBarXMm: 320, tieBarYMm: 280, shotCapacityGrams: 80,   minMoldHeightMm: 170, maxMoldHeightMm: 400 } },
+  { pattern: /engel.*(victory|v-duo).*80\b/i,
+    capability: { maxTonnage: 80,  tieBarXMm: 430, tieBarYMm: 380, shotCapacityGrams: 180,  minMoldHeightMm: 220, maxMoldHeightMm: 480 } },
+  { pattern: /engel.*(victory|v-duo).*120\b/i,
+    capability: { maxTonnage: 120, tieBarXMm: 510, tieBarYMm: 450, shotCapacityGrams: 340,  minMoldHeightMm: 270, maxMoldHeightMm: 560 } },
+  { pattern: /engel.*duo.*350|duo.*350/i,
+    capability: { maxTonnage: 350, tieBarXMm: 820, tieBarYMm: 700, shotCapacityGrams: 1900, minMoldHeightMm: 420, maxMoldHeightMm: 920 } },
+  { pattern: /engel.*duo.*650|duo.*650/i,
+    capability: { maxTonnage: 650, tieBarXMm: 1050, tieBarYMm: 850, shotCapacityGrams: 3800, minMoldHeightMm: 500, maxMoldHeightMm: 1100 } },
+  { pattern: /kraussmaffei.*cx.?160|cx.?160/i,
+    capability: { maxTonnage: 160, tieBarXMm: 580, tieBarYMm: 510, shotCapacityGrams: 660,  minMoldHeightMm: 310, maxMoldHeightMm: 700 } },
+  { pattern: /kraussmaffei.*gx.?450|gx.?450/i,
+    capability: { maxTonnage: 450, tieBarXMm: 890, tieBarYMm: 760, shotCapacityGrams: 2200, minMoldHeightMm: 450, maxMoldHeightMm: 1000 } },
+  { pattern: /kraussmaffei.*gx.?650|gx.?650/i,
+    capability: { maxTonnage: 650, tieBarXMm: 1060, tieBarYMm: 860, shotCapacityGrams: 3900, minMoldHeightMm: 510, maxMoldHeightMm: 1120 } },
+  { pattern: /milacron.*roboshot.*110|roboshot.*110/i,
+    capability: { maxTonnage: 110, tieBarXMm: 470, tieBarYMm: 410, shotCapacityGrams: 295,  minMoldHeightMm: 245, maxMoldHeightMm: 575 } },
+  { pattern: /milacron.*roboshot.*165|roboshot.*165/i,
+    capability: { maxTonnage: 165, tieBarXMm: 580, tieBarYMm: 510, shotCapacityGrams: 670,  minMoldHeightMm: 305, maxMoldHeightMm: 695 } },
+  { pattern: /milacron.*roboshot.*330|roboshot.*330/i,
+    capability: { maxTonnage: 330, tieBarXMm: 780, tieBarYMm: 650, shotCapacityGrams: 1700, minMoldHeightMm: 410, maxMoldHeightMm: 880 } },
   // Generic clamp-force patterns ("Injection Molder 1,000kN" → 100T, "IMM 250T"):
-  // These are static approximations for common lab-scale machines.
-  { pattern: /injection\s*mol(?:d(?:er|ing))?.*500\s*kN|500\s*kN.*injection/i,  capability: { maxTonnage: 50  } },
-  { pattern: /injection\s*mol(?:d(?:er|ing))?.*800\s*kN|800\s*kN.*injection/i,  capability: { maxTonnage: 80  } },
-  { pattern: /injection\s*mol(?:d(?:er|ing))?.*1[,.]?000\s*kN|1[,.]?000\s*kN.*injection/i, capability: { maxTonnage: 100 } },
-  { pattern: /injection\s*mol(?:d(?:er|ing))?.*1[,.]?500\s*kN|1[,.]?500\s*kN.*injection/i, capability: { maxTonnage: 150 } },
-  { pattern: /injection\s*mol(?:d(?:er|ing))?.*2[,.]?000\s*kN|2[,.]?000\s*kN.*injection/i, capability: { maxTonnage: 200 } },
-  { pattern: /injection\s*mol(?:d(?:er|ing))?.*3[,.]?000\s*kN|3[,.]?000\s*kN.*injection/i, capability: { maxTonnage: 300 } },
-  { pattern: /injection\s*mol(?:d(?:er|ing))?.*5[,.]?000\s*kN|5[,.]?000\s*kN.*injection/i, capability: { maxTonnage: 500 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*500\s*kN|500\s*kN.*injection/i,
+    capability: { maxTonnage: 50,  tieBarXMm: 320, tieBarYMm: 280, shotCapacityGrams: 100,  minMoldHeightMm: 160, maxMoldHeightMm: 390 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*800\s*kN|800\s*kN.*injection/i,
+    capability: { maxTonnage: 80,  tieBarXMm: 430, tieBarYMm: 380, shotCapacityGrams: 180,  minMoldHeightMm: 220, maxMoldHeightMm: 480 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*1[,.]?000\s*kN|1[,.]?000\s*kN.*injection/i,
+    capability: { maxTonnage: 100, tieBarXMm: 470, tieBarYMm: 420, shotCapacityGrams: 280,  minMoldHeightMm: 250, maxMoldHeightMm: 580 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*1[,.]?500\s*kN|1[,.]?500\s*kN.*injection/i,
+    capability: { maxTonnage: 150, tieBarXMm: 560, tieBarYMm: 490, shotCapacityGrams: 600,  minMoldHeightMm: 295, maxMoldHeightMm: 670 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*2[,.]?000\s*kN|2[,.]?000\s*kN.*injection/i,
+    capability: { maxTonnage: 200, tieBarXMm: 620, tieBarYMm: 520, shotCapacityGrams: 900,  minMoldHeightMm: 350, maxMoldHeightMm: 730 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*3[,.]?000\s*kN|3[,.]?000\s*kN.*injection/i,
+    capability: { maxTonnage: 300, tieBarXMm: 750, tieBarYMm: 640, shotCapacityGrams: 1600, minMoldHeightMm: 400, maxMoldHeightMm: 860 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*5[,.]?000\s*kN|5[,.]?000\s*kN.*injection/i,
+    capability: { maxTonnage: 500, tieBarXMm: 900, tieBarYMm: 770, shotCapacityGrams: 2600, minMoldHeightMm: 460, maxMoldHeightMm: 1020 } },
+  { pattern: /injection\s*mol(?:d(?:er|ing))?.*10[,.]?000\s*kN|10[,.]?000\s*kN.*injection/i,
+    capability: { maxTonnage: 1000, tieBarXMm: 1200, tieBarYMm: 980, shotCapacityGrams: 7000, minMoldHeightMm: 600, maxMoldHeightMm: 1400 } },
+  // Generic tonnage-label patterns: "Injection Molder 100T", "IMM 250T", "IM 500T"
+  { pattern: /\binjection\s*mol(?:d(?:er|ing))?\s*1000\s*T\b/i,
+    capability: { maxTonnage: 1000, tieBarXMm: 1200, tieBarYMm: 980, shotCapacityGrams: 7000, minMoldHeightMm: 600, maxMoldHeightMm: 1400 } },
+  { pattern: /\b(?:imm?|injection\s*mol(?:d(?:er|ing))?)\s*500\s*T\b/i,
+    capability: { maxTonnage: 500, tieBarXMm: 900, tieBarYMm: 770, shotCapacityGrams: 2600, minMoldHeightMm: 460, maxMoldHeightMm: 1020 } },
+  { pattern: /\b(?:imm?|injection\s*mol(?:d(?:er|ing))?)\s*250\s*T\b/i,
+    capability: { maxTonnage: 250, tieBarXMm: 680, tieBarYMm: 570, shotCapacityGrams: 1100, minMoldHeightMm: 370, maxMoldHeightMm: 760 } },
+  { pattern: /\b(?:imm?|injection\s*mol(?:d(?:er|ing))?)\s*200\s*T\b/i,
+    capability: { maxTonnage: 200, tieBarXMm: 620, tieBarYMm: 520, shotCapacityGrams: 900,  minMoldHeightMm: 350, maxMoldHeightMm: 730 } },
+  // Asian OEM brands — Haitian (China #1 IM OEM by volume), Chen Hsong, Sumitomo, Fanuc
+  // Haitian Ma series (most common in Asia: India, Vietnam, China)
+  { pattern: /haitian.*ma.*900|ma.*900.*haitian/i,
+    capability: { maxTonnage: 90,  tieBarXMm: 440, tieBarYMm: 390, shotCapacityGrams: 200,  minMoldHeightMm: 230, maxMoldHeightMm: 490 } },
+  { pattern: /haitian.*ma.*1300|ma.*1300.*haitian/i,
+    capability: { maxTonnage: 130, tieBarXMm: 530, tieBarYMm: 460, shotCapacityGrams: 390,  minMoldHeightMm: 275, maxMoldHeightMm: 570 } },
+  { pattern: /haitian.*ma.*2500|ma.*2500.*haitian/i,
+    capability: { maxTonnage: 250, tieBarXMm: 680, tieBarYMm: 570, shotCapacityGrams: 1100, minMoldHeightMm: 370, maxMoldHeightMm: 760 } },
+  { pattern: /haitian.*ma.*4500|ma.*4500.*haitian/i,
+    capability: { maxTonnage: 450, tieBarXMm: 890, tieBarYMm: 760, shotCapacityGrams: 2400, minMoldHeightMm: 450, maxMoldHeightMm: 1000 } },
+  { pattern: /haitian/i,
+    capability: { maxTonnage: 150, tieBarXMm: 560, tieBarYMm: 490, shotCapacityGrams: 600,  minMoldHeightMm: 295, maxMoldHeightMm: 670 } },
+  // Chen Hsong (Hong Kong / China)
+  { pattern: /chen\s*hsong.*sm.*900|sm.*900.*chen\s*hsong/i,
+    capability: { maxTonnage: 90,  tieBarXMm: 440, tieBarYMm: 390, shotCapacityGrams: 195,  minMoldHeightMm: 225, maxMoldHeightMm: 485 } },
+  { pattern: /chen\s*hsong.*sm.*2000|sm.*2000.*chen\s*hsong/i,
+    capability: { maxTonnage: 200, tieBarXMm: 615, tieBarYMm: 515, shotCapacityGrams: 880,  minMoldHeightMm: 345, maxMoldHeightMm: 720 } },
+  { pattern: /chen\s*hsong/i,
+    capability: { maxTonnage: 120, tieBarXMm: 500, tieBarYMm: 440, shotCapacityGrams: 330,  minMoldHeightMm: 265, maxMoldHeightMm: 555 } },
+  // Sumitomo (Demag) — common in Japan/Europe/India
+  { pattern: /sumitomo.*se.*180|se.*180.*sumitomo/i,
+    capability: { maxTonnage: 180, tieBarXMm: 600, tieBarYMm: 500, shotCapacityGrams: 770,  minMoldHeightMm: 325, maxMoldHeightMm: 710 } },
+  { pattern: /sumitomo.*se.*450|se.*450.*sumitomo/i,
+    capability: { maxTonnage: 450, tieBarXMm: 885, tieBarYMm: 755, shotCapacityGrams: 2180, minMoldHeightMm: 445, maxMoldHeightMm: 995 } },
+  { pattern: /sumitomo|demag.*el.?exis/i,
+    capability: { maxTonnage: 180, tieBarXMm: 600, tieBarYMm: 500, shotCapacityGrams: 770,  minMoldHeightMm: 325, maxMoldHeightMm: 710 } },
+  // Fanuc ROBOSHOT (all-electric, common in precision/medical)
+  { pattern: /fanuc.*roboshot.*s\d*150|roboshot.*150/i,
+    capability: { maxTonnage: 150, tieBarXMm: 555, tieBarYMm: 485, shotCapacityGrams: 580,  minMoldHeightMm: 290, maxMoldHeightMm: 665 } },
+  { pattern: /fanuc.*roboshot/i,
+    capability: { maxTonnage: 100, tieBarXMm: 460, tieBarYMm: 405, shotCapacityGrams: 270,  minMoldHeightMm: 245, maxMoldHeightMm: 570 } },
+  // Generic "Power Line" / "Powerline" — Milacron legacy branding used in many US shops
+  { pattern: /milacron.*power\s*line.*[89]00|power\s*line.*[89]00/i,
+    capability: { maxTonnage: 80,  tieBarXMm: 430, tieBarYMm: 380, shotCapacityGrams: 185,  minMoldHeightMm: 220, maxMoldHeightMm: 480 } },
+  { pattern: /milacron.*power\s*line|power\s*line.*milacron/i,
+    capability: { maxTonnage: 100, tieBarXMm: 465, tieBarYMm: 410, shotCapacityGrams: 275,  minMoldHeightMm: 245, maxMoldHeightMm: 575 } },
 ];
 
 export function lookupSeedCapability(machineName: string | null): Partial<MachineCapability> | null {
@@ -140,5 +219,5 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   // Small/entry-tier clamp tonnage (see backend/data/MHR_LHR_India_2026.json's
   // 30-80T Arburg Allrounder class) — an unknown injection molding machine
   // should only win small parts, not silently claim a 500T part.
-  injection_molding: { maxTonnage: 80 },
+  injection_molding: { maxTonnage: 80, tieBarXMm: 430, tieBarYMm: 380, shotCapacityGrams: 180, minMoldHeightMm: 220, maxMoldHeightMm: 480 },
 };

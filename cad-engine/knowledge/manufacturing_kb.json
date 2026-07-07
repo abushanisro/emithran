@@ -1,0 +1,47 @@
+[
+  {
+    "title": "Injection Moulding — Cost Drivers",
+    "body": "Primary cost drivers in order: (1) Mould tool amortisation — dominates at low volumes. (2) Cooling time — proportional to wall thickness squared; reducing wall by 20% cuts cooling by 36%. (3) Clamp force / machine size — larger machine = higher MHR. (4) Material: engineering resins (PA, PC, POM) cost 3–8× commodity PP/PE. (5) Gates and runners — hot runner eliminates regrind and reduces cycle. Break-even vs. alternatives: IM wins above ~5000 parts/year vs. machining.",
+    "tags": ["injection molding", "cost", "cycle time", "cooling", "tooling", "amortisation", "PA66", "ABS"]
+  },
+  {
+    "title": "Injection Moulding — Family Indicators",
+    "body": "Part classified as injection moulded if: uniform thin walls (1–4 mm), draft angles present, ribs and bosses visible, gate vestige or marks, parting line evidence. Complexity increases with: undercuts, inserts, overmoulding, tight tolerances, high-gloss finish requirements.",
+    "tags": ["injection molding", "classification", "family", "detection", "indicators", "wall", "draft"]
+  },
+  {
+    "title": "Sheet Metal — Cost Drivers",
+    "body": "Primary cost drivers: (1) Material — blank area × thickness × density × price/kg. (2) Laser cutting time — proportional to cut length and pierce count, plus speed reduction at corners. (3) Bending — press brake setups are expensive for complex bend sequences; CNC press brake reduces setup time. (4) Welding — adds labour and distortion risk. (5) Coating (powder coat / zinc plate) — area-based. Nest efficiency (material utilisation %) directly drives material cost.",
+    "tags": ["sheet metal", "laser", "bending", "forming", "cost", "nest", "utilisation", "powder coat"]
+  },
+  {
+    "title": "CNC Machining — Cost Drivers",
+    "body": "Primary cost drivers: (1) Setup — fixturing and programming, amortised over batch. (2) Cycle time — driven by material removal rate, surface finish, and feature complexity. (3) Machine type — 5-axis doubles MHR vs. 3-axis but reduces setups for complex parts. (4) Tight tolerances — ±0.01 mm requires additional finishing passes. (5) Material — titanium/Inconel can be 5–10× harder to machine than aluminium. CNC machining is cost-effective for prototypes and low volumes; injection moulding wins above ~5k parts.",
+    "tags": ["CNC", "machining", "milling", "turning", "cost", "setup", "fixturing", "tolerance", "material removal"]
+  },
+  {
+    "title": "Die Casting — Cost Drivers",
+    "body": "Primary cost drivers: (1) Tooling — $30k–$150k for aluminium dies. (2) Machine hourly rate (500T–2500T presses). (3) Cycle time — faster than IM for thin walls (15–60 s). (4) Secondary machining — most die cast parts need CNC finishing. (5) Post-processing: deburring, shot blasting, heat treatment (T6 for structural Al). Break-even vs. IM: die casting wins on thin-wall metal parts above ~10k/year.",
+    "tags": ["die casting", "aluminium", "cost", "tooling", "cycle", "secondary machining", "T6"]
+  },
+  {
+    "title": "Additive Manufacturing — When to Use",
+    "body": "Additive (SLA/SLS/FDM/DMLS) is cost-effective for: prototypes (1–5 parts), complex organic shapes impossible to mould/machine, lattice structures, low-volume end-use (<50 parts). DMLS (metal) has high feedstock cost ($50–$400/kg) and slow build rates; economical only for complex aerospace or medical parts. Not cost-competitive with IM above 100 parts for most geometries.",
+    "tags": ["additive", "3D printing", "SLA", "SLS", "FDM", "DMLS", "prototype", "low volume", "when to use"]
+  },
+  {
+    "title": "Forging — Design Rules",
+    "body": "Closed-die forging: draft 5–7°, fillet radii min 3–6 mm, parting line design critical. Flash removed in trimming. Material savings: near-net shape reduces machining. Grain flow follows part contour — better fatigue resistance than machining. Tooling: $20k–$100k. Economic above ~5k parts for structural components.",
+    "tags": ["forging", "closed die", "draft", "fillet", "grain flow", "tooling", "flash"]
+  },
+  {
+    "title": "Process Selection — Volume Break-Even Rules of Thumb",
+    "body": "1–50 parts: machining or 3D print. 50–2000 parts: machining, vacuum casting, or small-lot IM on aluminium tooling. 2000–10000 parts: injection moulding (steel tool), die casting (zinc). 10000+ parts: IM, die casting, stamping, or forging depending on material and geometry. Always compare (tooling NRE + piece cost × volume) across processes.",
+    "tags": ["process selection", "volume", "break even", "injection molding", "machining", "tooling", "NRE"]
+  },
+  {
+    "title": "Sustainability — CO2 Intensity by Process",
+    "body": "Rough CO2 intensity (kg CO2e per kg of finished part, excluding material): Injection moulding 0.3–0.8, CNC aluminium 3–8, CNC steel 1–4, Die casting aluminium 1.5–3, Sheet metal laser 0.5–1.5, Additive DMLS 8–20. Material production dominates for most parts: virgin aluminium 9–11 kg CO2/kg, recycled aluminium 0.5 kg CO2/kg, virgin PA66 7–9 kg CO2/kg.",
+    "tags": ["CO2", "sustainability", "carbon", "process", "aluminium", "PA66", "injection molding", "CNC"]
+  }
+]

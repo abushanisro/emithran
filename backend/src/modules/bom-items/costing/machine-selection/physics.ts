@@ -31,6 +31,12 @@ export const ENVELOPE_MARGIN = 1.2;
 export const BED_MARGIN = 1.1;
 export const TONNAGE_MARGIN = 1.15;
 
+// IM tie-bar clearance: part footprint + runner allowance + platen-edge clearance.
+// Additive (not proportional) — a 20mm runner is 20mm regardless of part size.
+export const IM_TIEBAR_RUNNER_ALLOWANCE_MM = 20;  // cold-runner edge on mold face
+export const IM_TIEBAR_PLATEN_CLEARANCE_MM = 25;  // platen edge to tie-bar inner face
+export const IM_TIEBAR_ADDEND_MM = IM_TIEBAR_RUNNER_ALLOWANCE_MM + IM_TIEBAR_PLATEN_CLEARANCE_MM; // = 45mm
+
 export function classifyLaserMaterial(grade: string | null): LaserMaterialFamily {
   if (!grade) return 'OTHER';
   // Split letter/digit boundaries so compact codes tokenize: "SS304" → "SS 304",

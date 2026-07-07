@@ -1,0 +1,62 @@
+[
+  {
+    "title": "IM Draft Angle — ISO 10724",
+    "body": "Minimum draft angle for injection moulding: 0.5° for cosmetic/unpainted surfaces, 1.0° standard, 1.5° minimum for textured/EDM surfaces, 3° for deep ribs. Insufficient draft causes drag marks, ejection damage, and increased cycle time.",
+    "tags": ["draft", "injection molding", "moulding", "ISO", "draft angle", "ejection"]
+  },
+  {
+    "title": "IM Gate Types — SPI Gating Guidelines",
+    "body": "Hot-tip gate: preferred for engineering resins (PA, PC, POM, PBT) — eliminates gate vestige and regrind. Sub-gate (tunnel/banana): self-degating, good for PP/PE/ABS. Edge gate: simplest, leaves witness mark. Fan gate: reduces weld lines on thin walls. Valve gate: best surface finish, highest tooling cost.",
+    "tags": ["gate", "injection molding", "hot tip", "sub gate", "SPI", "runner", "regrind"]
+  },
+  {
+    "title": "IM Wall Thickness — SPI Design Guide",
+    "body": "PA66: nominal 2.0–3.0 mm, min 0.8 mm, max 4.0 mm. PP: 0.8–3.0 mm. PC: 0.75–3.5 mm. ABS: 1.2–3.5 mm. Non-uniform walls cause sink marks, warpage, and longer cycle times. Rib thickness: 50–60% of adjacent wall. Boss OD: 2–2.5× wall.",
+    "tags": ["wall thickness", "injection molding", "PA66", "ABS", "PP", "PC", "rib", "boss", "sink", "warp"]
+  },
+  {
+    "title": "IM Clamp Force — Engineering Rule",
+    "body": "Clamp force (tonnes) = projected area (cm²) × cavity pressure factor. Factor: 0.35 t/cm² thin-wall PP, 0.5 t/cm² standard ABS/PP, 0.7 t/cm² engineering resins (PA/PC), 1.0 t/cm² high-viscosity materials. Add 15% safety margin. Exceeding machine clamp force causes flash.",
+    "tags": ["clamp force", "injection molding", "tonnage", "projected area", "cavity pressure", "flash"]
+  },
+  {
+    "title": "Sheet Metal Bend Radius — DIN 6935",
+    "body": "Minimum inside bend radius = 1× material thickness for mild steel, 1.5× for stainless steel, 2× for aluminium 5052. Tighter radii cause outer fibre cracking. Bend deduction ≈ 0.43× thickness for 90° bends (varies by tool radius).",
+    "tags": ["bend radius", "sheet metal", "DIN 6935", "mild steel", "stainless", "aluminium", "forming"]
+  },
+  {
+    "title": "CNC Tolerances — ASME Y14.5",
+    "body": "Standard CNC milling tolerance: ±0.1 mm (IT9). Fine finish: ±0.025 mm (IT7). Grinding: ±0.005 mm (IT5). Surface finish: Ra 3.2 µm standard turning, Ra 0.8 µm finish turning, Ra 0.4 µm grinding. Tighter tolerances multiply cycle time and increase inspection cost significantly.",
+    "tags": ["tolerance", "CNC", "ASME Y14.5", "surface finish", "Ra", "IT grade", "machining"]
+  },
+  {
+    "title": "Injection Moulding Shrinkage — SPI",
+    "body": "Material shrinkage rates: PP 1.5–2.5%, PA66 (dry) 0.8–1.5%, PA66 (conditioned) 1.5–2.5%, ABS 0.4–0.7%, PC 0.5–0.7%, POM 1.9–2.3%. Higher shrinkage = larger mould cavities required and tighter process control. Anisotropic shrinkage causes warpage in thin or asymmetric parts.",
+    "tags": ["shrinkage", "warpage", "PA66", "ABS", "PC", "POM", "PP", "injection molding", "SPI"]
+  },
+  {
+    "title": "Die Casting Design Rules",
+    "body": "Aluminium die casting: min wall 1.0 mm, draft 1–3°, fillets min 0.8 mm radius. Zinc: min wall 0.4 mm, higher precision. Clamp force: 1.0–1.5 t/cm² of projected area. Porosity risk increases with wall >5 mm or poorly vented die. Tooling life: 50k–200k shots (Al), 500k+ shots (Zn).",
+    "tags": ["die casting", "aluminium", "zinc", "draft", "wall thickness", "porosity", "tooling life"]
+  },
+  {
+    "title": "Undercut Detection — IM Tooling",
+    "body": "Undercuts parallel to mould open direction require side actions (lifters, slides, collapsible cores). Side actions add $3k–$15k per action to tooling cost and 15–25% to cycle time. Internal undercuts require collapsible cores (+$5k–20k). Design review should eliminate undercuts or plan for split tooling before design freeze.",
+    "tags": ["undercut", "side action", "lifter", "slide", "injection molding", "tooling", "core"]
+  },
+  {
+    "title": "Surface Finish Standards — ISO 1302",
+    "body": "Ra 25 µm: rough machining. Ra 6.3 µm: general machining. Ra 3.2 µm: standard turned/milled. Ra 1.6 µm: fine machining. Ra 0.8 µm: fine turning or grinding. Ra 0.4 µm: precision grinding. Ra 0.1 µm: lapping/super-finishing. Each step tighter approximately doubles machining time.",
+    "tags": ["surface finish", "Ra", "roughness", "ISO 1302", "machining", "grinding", "lapping"]
+  },
+  {
+    "title": "Sheet Metal Hole-to-Edge Rules",
+    "body": "Minimum hole-to-edge distance: 2× material thickness. Minimum hole diameter: 1× material thickness (punching), 0.5× (laser). Hole-to-hole minimum: 2× thickness. Violating these rules causes burring, tear-out, and fixture issues. Laser can achieve tighter spacings than punch.",
+    "tags": ["hole", "edge", "sheet metal", "punch", "laser", "spacing", "burr"]
+  },
+  {
+    "title": "Anodising Design Rules — MIL-A-8625",
+    "body": "Type II (decorative): 0.005–0.025 mm coating thickness. Type III (hard): 0.025–0.075 mm. Anodising adds to all surfaces including threads (design for undersize by coating thickness). Masking areas adds cost. Best on 6061/6063 Al; 7075 and 2024 give lower quality coatings.",
+    "tags": ["anodising", "anodizing", "aluminium", "MIL-A-8625", "coating", "Type II", "Type III"]
+  }
+]

@@ -19,6 +19,7 @@ import {
 import {
   BED_MARGIN,
   ENVELOPE_MARGIN,
+  IM_TIEBAR_ADDEND_MM,
   TONNAGE_MARGIN,
   type LaserRequirement,
   type MachineRequirement,
@@ -49,7 +50,8 @@ const CAPABILITY_COLUMNS =
   'max_thickness_mm, max_workpiece_weight_kg, power_kw, capability_source, ' +
   'max_thickness_ms_mm, max_thickness_ss_mm, max_thickness_al_mm, max_thickness_cu_mm, ' +
   'cuttable_materials, availability_status, next_available_at, scheduled_load_pct, ' +
-  'maintenance_window_start, maintenance_window_end, capability_version';
+  'maintenance_window_start, maintenance_window_end, capability_version, ' +
+  'tie_bar_x_mm, tie_bar_y_mm, shot_capacity_grams, min_mold_height_mm, max_mold_height_mm';
 
 const BASE_COLUMNS =
   'id, machine_name, commodity_code, process_group, machine_class, ' +
@@ -97,6 +99,12 @@ interface RawMachineRow {
   maintenance_window_start?: string | null;
   maintenance_window_end?: string | null;
   capability_version?: number | null;
+  // IM-specific columns — absent until migration 339 runs
+  tie_bar_x_mm?: number | string | null;
+  tie_bar_y_mm?: number | string | null;
+  shot_capacity_grams?: number | string | null;
+  min_mold_height_mm?: number | string | null;
+  max_mold_height_mm?: number | string | null;
 }
 
 function num(v: number | string | null | undefined): number | null {
@@ -179,6 +187,11 @@ function hydrateCapability(row: RawMachineRow, cls: MachineClass): {
     maxThicknessAlMm: num(row.max_thickness_al_mm),
     maxThicknessCuMm: num(row.max_thickness_cu_mm),
     cuttableMaterials: row.cuttable_materials ?? null,
+    tieBarXMm: num(row.tie_bar_x_mm),
+    tieBarYMm: num(row.tie_bar_y_mm),
+    shotCapacityGrams: num(row.shot_capacity_grams),
+    minMoldHeightMm: num(row.min_mold_height_mm),
+    maxMoldHeightMm: num(row.max_mold_height_mm),
   };
 
   const hasDbCapability = Object.entries(db).some(([k, v]) => k !== 'cuttableMaterials' && v != null);
@@ -307,6 +320,14 @@ export function isCapable(candidate: MachineCandidate, req: MachineRequirement):
     }
     case 'injection_molding': {
       if (cap.maxTonnage != null && cap.maxTonnage < req.clampTonnageRequired * TONNAGE_MARGIN) return false;
+      // Tie-bar spacing: additive formula, allow 90° rotation
+      if (cap.tieBarXMm != null && cap.tieBarYMm != null && req.partLengthMm > 0 && req.partWidthMm > 0) {
+        const reqL = req.partLengthMm + IM_TIEBAR_ADDEND_MM;
+        const reqW = req.partWidthMm  + IM_TIEBAR_ADDEND_MM;
+        const fitsNormal  = reqL <= cap.tieBarXMm && reqW <= cap.tieBarYMm;
+        const fitsRotated = reqL <= cap.tieBarYMm && reqW <= cap.tieBarXMm;
+        if (!fitsNormal && !fitsRotated) return false;
+      }
       return true;
     }
     case 'generic':
@@ -441,7 +462,13 @@ function buildReasons(candidate: MachineCandidate, req: MachineRequirement): str
         reasons.push(`Shot weight ${r0(req.shotWeightG)} g incl. runner — verify against barrel capacity`);
       }
       if (req.partLengthMm > 0 && req.partWidthMm > 0) {
-        reasons.push(`Part footprint ${r0(req.partLengthMm)}×${r0(req.partWidthMm)} mm — verify against tie-bar spacing`);
+        const reqL = req.partLengthMm + IM_TIEBAR_ADDEND_MM;
+        const reqW = req.partWidthMm  + IM_TIEBAR_ADDEND_MM;
+        reasons.push(
+          cap.tieBarXMm != null && cap.tieBarYMm != null
+            ? `Tie-bar: requires ${reqL.toFixed(0)}×${reqW.toFixed(0)} mm (incl. +45mm allowance), machine has ${cap.tieBarXMm}×${cap.tieBarYMm} mm`
+            : `Part footprint ${r0(req.partLengthMm)}×${r0(req.partWidthMm)} mm — tie-bar spec not on file`,
+        );
       }
       break;
     case 'generic':

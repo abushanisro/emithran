@@ -400,6 +400,156 @@ export class AutoFillService {
     const warnings: object[] = [];
     let id = 0;
 
+    const cadMI = cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence;
+    const isIM = cadMI?.detected_family === 'injection_molded';
+
+    // ── Injection Molding DFM ──────────────────────────────────────────────────
+    if (isIM && cadMI?.features) {
+      const f = cadMI.features;
+      const undrafted: number = f.undrafted_face_count ?? 0;
+      const undercut: number = f.undercut_face_count ?? 0;
+      const thinViolations: number = f.thin_wall_violation_count ?? 0;
+      const wallNominal: number = f.wall_thickness_nominal_mm ?? 0;
+      const uniformityRatio: number = f.wall_uniformity_ratio ?? 0;
+      const partingComplexity: number = f.parting_complexity ?? 0;
+      const ribCount: number = f.rib_count ?? f.rib_count_proxy ?? 0;
+      const filletCount: number = f.fillet_count ?? 0;
+      const insertCount: number = f.insert_candidate_count ?? 0;
+
+      // 1. Draft angle — faces with < 0.3° are ejection risks
+      if (undrafted > 0) {
+        warnings.push({
+          id: `dfm_im_draft_${id++}`,
+          severity: undrafted > 5 ? 'critical' : 'warning',
+          category: 'draft_angle',
+          message: `${undrafted} face(s) have < 0.3° draft angle — ejection damage risk.`,
+          recommendation:
+            'Add ≥ 0.5° draft on all pull-axis surfaces. Textured finishes require ≥ 1.5°. ' +
+            'Insufficient draft causes the part to stick to the core on ejection.',
+        });
+      }
+
+      // 2. Undercuts — side-action or lifter required
+      if (undercut > 0) {
+        warnings.push({
+          id: `dfm_im_undercut_${id++}`,
+          severity: 'critical',
+          category: 'undercut',
+          message: `${undercut} undercut face(s) detected — side-action or lifter required.`,
+          recommendation:
+            'Redesign feature to eliminate undercut or budget for side-action tooling ' +
+            '($2,000–$8,000 per direction). Side actions increase cycle time by ~10–15%.',
+        });
+      }
+
+      // 3. Thin wall zones below 60% of nominal
+      if (thinViolations > 0) {
+        warnings.push({
+          id: `dfm_im_thin_wall_${id++}`,
+          severity: 'warning',
+          category: 'thin_wall',
+          message: `${thinViolations} zone(s) below 60% of nominal wall (${wallNominal > 0 ? wallNominal.toFixed(1) + ' mm' : 'unknown'}).`,
+          recommendation:
+            'Thin zones cause short shots, sink marks, and differential shrinkage. ' +
+            'Maintain wall thickness within 40–60% of nominal for uniform fill and cooling.',
+        });
+      }
+
+      // 4. Nominal wall below minimum fill threshold
+      if (wallNominal > 0 && wallNominal < 1.0) {
+        warnings.push({
+          id: `dfm_im_wall_min_${id++}`,
+          severity: 'critical',
+          category: 'thin_wall',
+          message: `Nominal wall ${wallNominal.toFixed(2)} mm is below 1.0 mm — incomplete fill likely.`,
+          recommendation:
+            'Increase wall to ≥ 1.0 mm (engineering resins: 1.5–3.5 mm optimal). ' +
+            'Walls below 1 mm require high injection pressure and are prone to knit lines.',
+        });
+      }
+
+      // 5. Nominal wall above sink mark threshold
+      if (wallNominal > 6.0) {
+        warnings.push({
+          id: `dfm_im_wall_max_${id++}`,
+          severity: 'warning',
+          category: 'thin_wall',
+          message: `Nominal wall ${wallNominal.toFixed(1)} mm exceeds 6.0 mm — sink marks and long cycle time expected.`,
+          recommendation:
+            'Core out thick sections. Target 2.5–4.0 mm for structural plastics. ' +
+            'Each mm above 4 mm adds ~5 s cooling time. Consider hollow ribbed design.',
+        });
+      }
+
+      // 6. High wall thickness variation → differential shrinkage → warpage
+      if (wallNominal > 0 && uniformityRatio > 0.40) {
+        warnings.push({
+          id: `dfm_im_wall_variation_${id++}`,
+          severity: 'warning',
+          category: 'thin_wall',
+          message: `Wall thickness variation ${(uniformityRatio * 100).toFixed(0)}% of nominal — warpage and differential shrinkage risk.`,
+          recommendation:
+            'Uniform wall thickness within ±20% of nominal minimises differential cooling, ' +
+            'reduces weld lines, and balances cavity fill pressure.',
+        });
+      }
+
+      // 7. Complex parting geometry — stepped shutoff / flash risk
+      if (partingComplexity >= 0.50) {
+        warnings.push({
+          id: `dfm_im_parting_${id++}`,
+          severity: partingComplexity >= 0.75 ? 'critical' : 'warning',
+          category: 'general',
+          message: `Complex parting geometry (score: ${(partingComplexity * 100).toFixed(0)}%) — stepped shutoff likely.`,
+          recommendation:
+            'Simplify parting to a single plane where possible. ' +
+            'Stepped shutoffs require tight land tolerances (±0.02 mm) to prevent flash and increase mold cost by 20–40%.',
+        });
+      }
+
+      // 8. Ribs without confirmed fillets — stress concentration + sink marks
+      if (ribCount > 0 && filletCount === 0) {
+        warnings.push({
+          id: `dfm_im_rib_fillet_${id++}`,
+          severity: 'warning',
+          category: 'fillet',
+          message: `${ribCount} rib(s) detected — base fillets not confirmed.`,
+          recommendation:
+            'Add R ≥ 0.3× wall thickness fillet at all rib roots. ' +
+            'Sharp rib bases concentrate stress and cause sink marks on the opposite face.',
+        });
+      }
+
+      // 9. Threaded insert candidates — flag for procurement and drawing callout
+      if (insertCount > 0) {
+        warnings.push({
+          id: `dfm_im_inserts_${id++}`,
+          severity: 'info',
+          category: 'general',
+          message: `${insertCount} threaded insert location(s) detected.`,
+          recommendation:
+            'Confirm insert type (Helicoil / Spiralform / ultrasonic press-in) and specify ' +
+            'pull-out torque on drawing. Boss OD should be 2× insert OD.',
+        });
+      }
+
+      // 10. All checks passed — confirm with gate / venting reminder
+      if (warnings.length === 0) {
+        warnings.push({
+          id: `dfm_im_pass_${id++}`,
+          severity: 'info',
+          category: 'general',
+          message: 'No critical DFM issues detected for injection molding.',
+          recommendation:
+            'Confirm gate location (gate area ≥ 1 mm² per 10 cm³ part volume), ' +
+            'venting at last-fill extremities (0.025 mm land), and ejector pin layout with toolmaker before cutting steel.',
+        });
+      }
+
+      return warnings;
+    }
+
+    // ── Sheet Metal DFM ────────────────────────────────────────────────────────
     if (geo.sheetThicknessMm > 0 && geo.sheetThicknessMm < 1.0) {
       warnings.push({
         id: `dfm_thin_wall_${id++}`,
@@ -439,6 +589,111 @@ export class AutoFillService {
 
   private buildValidationChecks(geo: RawGeometry, proc: ProcessSuggestion, cadResult?: any): object[] {
     const checks: object[] = [];
+
+    const cadMI = cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence;
+    const isIM =
+      proc.processType.includes('Injection') ||
+      cadMI?.detected_family === 'injection_molded';
+
+    // ── Injection Molding validation checks ───────────────────────────────────
+    if (isIM && cadMI?.features) {
+      const f = cadMI.features;
+      const undrafted: number = f.undrafted_face_count ?? 0;
+      const undercut: number = f.undercut_face_count ?? 0;
+      const wallNominal: number = f.wall_thickness_nominal_mm ?? 0;
+      const uniformityRatio: number = f.wall_uniformity_ratio ?? 0;
+      const thinViolations: number = f.thin_wall_violation_count ?? 0;
+      const partingComplexity: number = f.parting_complexity ?? 0;
+
+      checks.push({
+        id: 'check_im_draft',
+        check: 'Draft angles ≥ 0.5° on all faces',
+        passed: undrafted === 0,
+        severity: undrafted === 0 ? 'info' : undrafted > 5 ? 'critical' : 'warning',
+        actualValue: undrafted === 0 ? 'All faces drafted' : `${undrafted} undrafted face(s)`,
+        threshold: '0 undrafted faces',
+        ...(undrafted > 0 ? { recommendation: 'Add ≥ 0.5° draft on all pull-axis surfaces.' } : {}),
+      });
+
+      checks.push({
+        id: 'check_im_undercut',
+        check: 'No undercuts (single-action pull)',
+        passed: undercut === 0,
+        severity: undercut === 0 ? 'info' : 'critical',
+        actualValue: undercut === 0 ? 'Clear' : `${undercut} undercut face(s)`,
+        threshold: '0 undercut faces',
+        ...(undercut > 0 ? { recommendation: 'Eliminate undercuts or design in side-action tooling.' } : {}),
+      });
+
+      if (wallNominal > 0) {
+        const wallOk = wallNominal >= 1.0 && wallNominal <= 6.0;
+        checks.push({
+          id: 'check_im_wall_range',
+          check: 'Wall thickness in moldable range (1.0–6.0 mm)',
+          passed: wallOk,
+          severity: wallOk ? 'info' : wallNominal < 1.0 ? 'critical' : 'warning',
+          actualValue: `${wallNominal.toFixed(1)} mm`,
+          threshold: '1.0–6.0 mm',
+          ...(wallOk ? {} : {
+            recommendation: wallNominal < 1.0
+              ? 'Increase wall to ≥ 1.0 mm to ensure complete fill.'
+              : 'Core out thick sections to < 6.0 mm to prevent sink marks.',
+          }),
+        });
+      }
+
+      const uniformityOk = uniformityRatio <= 0.40;
+      checks.push({
+        id: 'check_im_wall_uniformity',
+        check: 'Wall uniformity (variation ≤ 40% of nominal)',
+        passed: uniformityOk,
+        severity: uniformityOk ? 'info' : 'warning',
+        actualValue: `${(uniformityRatio * 100).toFixed(0)}% variation`,
+        threshold: '≤ 40% of nominal',
+        ...(uniformityOk ? {} : { recommendation: 'Uniform walls minimise warpage and differential shrinkage.' }),
+      });
+
+      const thinOk = thinViolations === 0;
+      checks.push({
+        id: 'check_im_thin_zones',
+        check: 'No zones below 60% of nominal wall',
+        passed: thinOk,
+        severity: thinOk ? 'info' : 'warning',
+        actualValue: thinOk ? 'None detected' : `${thinViolations} zone(s)`,
+        threshold: '0 thin zones',
+        ...(thinOk ? {} : { recommendation: 'Increase thin zones to ≥ 60% of nominal wall thickness.' }),
+      });
+
+      const partingOk = partingComplexity < 0.50;
+      checks.push({
+        id: 'check_im_parting',
+        check: 'Parting line complexity acceptable (< 50%)',
+        passed: partingOk,
+        severity: partingOk ? 'info' : partingComplexity >= 0.75 ? 'critical' : 'warning',
+        actualValue: `${(partingComplexity * 100).toFixed(0)}%`,
+        threshold: '< 50%',
+        ...(partingOk ? {} : { recommendation: 'Simplify parting plane to reduce flash risk and tooling cost.' }),
+      });
+
+      // Common manufacturability score check
+      const score = this.extractManufacturabilityScore(cadResult);
+      if (score != null) {
+        const passed = score >= 60;
+        checks.push({
+          id: 'check_mfr_score',
+          check: 'Manufacturability score',
+          passed,
+          severity: passed ? (score >= 80 ? 'info' : 'warning') : 'critical',
+          actualValue: `${score}/100`,
+          threshold: '≥ 60',
+          ...(passed ? {} : { recommendation: 'Review DFM warnings and redesign flagged features.' }),
+        });
+      }
+
+      return checks;
+    }
+
+    // ── Sheet Metal / CNC validation checks ───────────────────────────────────
     const isSheetMetal = proc.processType.includes('Sheet Metal');
 
     if (geo.sheetThicknessMm > 0) {

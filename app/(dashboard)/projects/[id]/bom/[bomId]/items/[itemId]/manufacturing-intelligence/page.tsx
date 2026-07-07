@@ -32,6 +32,7 @@ import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient } from '@/lib/api/client';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
 import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
+import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import type { FeatureGraph, FeatureGraphSummary, DFMWarning, DFMSeverity, ValidationResult, ManufacturingFeature, HoleGroup, HoleGroupLocation, BendFeature, FeatureNodeV2, FaceMapEntry, FeatureCategory } from '@/lib/types/manufacturing';
 
@@ -530,6 +531,7 @@ function computeRouteScore(routeId: string, ctx: RouteScoringContext): RouteScor
 }
 
 const RIGHT_TABS = [
+  { key: 'copilot', label: '✦ AI Copilot' },
   { key: 'validation', label: 'Validation' },
   { key: 'part_summary', label: 'Part Summary' },
   { key: 'design', label: 'Design Guidance' },
@@ -565,10 +567,12 @@ function fmtInt(n: number | undefined | null): string {
 function familyLabel(f: string): string {
   const m: Record<string, string> = {
     sheet_metal: 'Sheet Metal', cnc_milled: 'CNC Milled', cnc_turned: 'CNC Turned',
-    injection_molded: 'Injection Moulded', casting: 'Casting', forging: 'Forging',
-    weldment: 'Weldment', additive: 'Additive',
+    mill_turn: 'Mill-Turn', injection_molded: 'Injection Moulded',
+    casting: 'Casting', forging: 'Forging',
+    extrusion: 'Extrusion', weldment: 'Weldment', additive: 'Additive',
   };
-  return m[f] ?? f;
+  if (!f) return '—';
+  return m[f] ?? f.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 function confidenceCls(c: number): string {
   if (c >= 0.85) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
@@ -1790,7 +1794,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                   {isExpanded ? '▾' : '▸'} {line.process}
                 </span>
                 <span className="text-xs text-muted-foreground ml-2">
-                  {line.rateSource === 'mhr_database' ? 'MHR DB' : 'est.'}
+                  {line.rateSource === 'mhr_database' ? 'MHR DB' : line.rateSource === 'tier_synthetic' ? 'Benchmark' : 'est.'}
                   {line.machineName ? `  ·  ${line.machineName}` : ''}
                   {(procOv.rate || procOv.cycleMin) ? '  ·  overridden' : ''}
                 </span>
@@ -1884,8 +1888,11 @@ function RouteComparisonCard({
   if (!comparison?.routes?.length) return null;
 
   const appliedRoute = comparison.routes.find((r) => r.routeId === appliedRouteId) ?? null;
-  const minCost = Math.min(...comparison.routes.map((r) => r.totalCost));
-  const maxCost = Math.max(...comparison.routes.map((r) => r.totalCost));
+  const feasibleCosts = comparison.routes
+    .filter((r) => r.isFeasible !== false && r.totalCost != null)
+    .map((r) => r.totalCost as number);
+  const minCost = feasibleCosts.length > 0 ? Math.min(...feasibleCosts) : 0;
+  const maxCost = feasibleCosts.length > 0 ? Math.max(...feasibleCosts) : 0;
 
   return (
     <Section title="Route Comparison" defaultOpen>
@@ -1893,9 +1900,9 @@ function RouteComparisonCard({
         {comparison.routes.map((route) => {
           const isSelected = selectedRouteId === route.routeId;
           const isApplied = appliedRouteId === route.routeId;
-          const incapable = route.capability?.overallCapable === false;
-          const costBarPct = maxCost > 0 ? (route.totalCost / maxCost) * 100 : 0;
-          const savings = route.totalCost - minCost;
+          const incapable = route.capability?.overallCapable === false || route.isFeasible === false;
+          const costBarPct = maxCost > 0 && route.totalCost != null ? (route.totalCost / maxCost) * 100 : 0;
+          const savings = route.totalCost != null ? route.totalCost - minCost : 0;
 
           return (
             <div
@@ -1930,14 +1937,20 @@ function RouteComparisonCard({
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={cn('text-sm font-bold tabular-nums', incapable ? 'line-through text-muted-foreground/40' : 'text-foreground')}>
-                      {sym}{fmt(route.totalCost, 2)}
-                    </p>
-                    {savings > 0.01 && !incapable && (
-                      <p className="text-[10px] text-muted-foreground tabular-nums">+{sym}{fmt(savings, 2)}</p>
-                    )}
-                    {route.badges.lowestCost && (
-                      <p className="text-[10px] text-emerald-600 font-medium">Lowest</p>
+                    {incapable ? (
+                      <p className="text-sm font-bold text-red-500">INFEASIBLE</p>
+                    ) : (
+                      <>
+                        <p className="text-sm font-bold tabular-nums text-foreground">
+                          {sym}{fmt(route.totalCost ?? 0, 2)}
+                        </p>
+                        {savings > 0.01 && (
+                          <p className="text-[10px] text-muted-foreground tabular-nums">+{sym}{fmt(savings, 2)}</p>
+                        )}
+                        {route.badges.lowestCost && (
+                          <p className="text-[10px] text-emerald-600 font-medium">Lowest</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -2057,8 +2070,8 @@ function RouteComparisonCard({
                     {line.machineName && <span>{line.machineName}</span>}
                     <span className="tabular-nums">{fmt(line.cycleTimeMin, 1)} min</span>
                     <span className="tabular-nums">{sym}{fmt(line.hourlyRate, 0)}/hr</span>
-                    <span className={line.rateSource === 'mhr_database' ? 'text-emerald-600' : 'text-amber-600'}>
-                      {line.rateSource === 'mhr_database' ? 'MHR DB' : 'est.'}
+                    <span className={line.rateSource === 'mhr_database' ? 'text-emerald-600' : line.rateSource === 'tier_synthetic' ? 'text-slate-400' : 'text-amber-600'}>
+                      {line.rateSource === 'mhr_database' ? 'MHR DB' : line.rateSource === 'tier_synthetic' ? 'Benchmark' : 'est.'}
                     </span>
                   </div>
                 </div>
@@ -3905,6 +3918,8 @@ function ProcessCapabilityTab({ item, batchSize, factory = 'USA' }: { item: BOMI
           ['fiber_laser', 'turret_punch', 'waterjet'].includes(l.machineClass),
         );
         const pbLine = route.processLines.find((l) => l.machineClass === 'press_brake');
+        const imLine = route.processLines.find((l) => l.machineClass === 'injection_molding');
+        const isImRoute = route.routeId === 'injection-molding' || route.routeId.startsWith('im-');
 
         const risk: RiskLevel =
           !capability.overallCapable ? 'High'
@@ -3945,6 +3960,33 @@ function ProcessCapabilityTab({ item, batchSize, factory = 'USA' }: { item: BOMI
                 {capability.overallCapable ? '✓ CAPABLE' : '✗ BLOCKED'}
               </span>
             </div>
+
+            {/* Injection molding machine info */}
+            {isImRoute && (
+              <div className="mb-2">
+                <p className="text-[9px] text-muted-foreground/60 uppercase tracking-wide mb-0.5">Machine</p>
+                <p className="text-[10px] font-mono text-foreground/80">
+                  {imLine?.machineName ?? 'Injection Molder'}
+                </p>
+                <div className="mt-0.5 space-y-0.5">
+                  {capability.estimatedTonnage != null && (
+                    <p className={`text-[9px] ${capability.overallCapable ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {capability.overallCapable ? '✓' : '✗'} {capability.estimatedTonnage} T clamp
+                    </p>
+                  )}
+                  {imLine && imLine.cycleTimeMin > 0 && (
+                    <p className="text-[9px] text-muted-foreground">
+                      Cycle: {(imLine.cycleTimeMin * 60).toFixed(0)} s
+                    </p>
+                  )}
+                  {capability.confidence !== 'low' && (
+                    <p className="text-[9px] text-muted-foreground capitalize">
+                      Capability: {capability.confidence}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Cutting process */}
             {cuttingLine && (
@@ -4553,14 +4595,15 @@ function buildRiskFlags(item: BOMItem): string[] {
 }
 
 function PartDetailTab({
-  item, batchSize, selectedCNCFeatureKey, onCNCFeatureSelect,
+  item, batchSize, factory = 'USA', selectedCNCFeatureKey, onCNCFeatureSelect,
 }: {
   item: BOMItem;
   batchSize: number;
+  factory?: string;
   selectedCNCFeatureKey?: string | null;
   onCNCFeatureSelect?: (key: string | null) => void;
 }) {
-  const { data: cost } = useCostSummary(item.id, batchSize);
+  const { data: cost } = useCostSummary(item.id, batchSize, factory);
   const fg = item.featureGraph;
   const di = item.drawingIntelligence;
 
@@ -4574,10 +4617,34 @@ function PartDetailTab({
   const threadTotal = threads.reduce((s, t) => s + t.count, 0);
   const cncFeatures: any = (fg as any)?.cnc_features ?? null;
 
+  const family = item.familyClassification ?? fg?.classification?.family ?? '';
+  const isIM = family === 'injection_molded';
+  const isSM = family === 'sheet_metal';
+
+  // IM-specific summary fields (zero-default so downstream display logic is clean)
+  const imS = (fg?.summary as any) ?? {};
+  const undraftedFaceCount: number = imS.undraftedFaceCount ?? 0;
+  const undercutFaceCount: number = imS.undercutFaceCount ?? 0;
+  const ribCount: number = imS.ribCount ?? imS.ribCountProxy ?? 0;
+  const blindFeatureCount: number = imS.blindFeatureCount ?? 0;
+  const insertCandidateCount: number = imS.insertCandidateCount ?? 0;
+  const throughHoleCount: number = imS.throughHoleCount ?? 0;
+  const wallNominalMm: number | null = imS.wallThicknessNominalMm || null;
+  const wallMinMm: number | null = imS.wallThicknessMinMm || null;
+  const wallMaxMm: number | null = imS.wallThicknessMaxMm || null;
+  const thinWallViolations: number = imS.thinWallViolationCount ?? 0;
+  const avgDraftDeg: number | null = imS.avgDraftAngleDeg ?? null;
+
   const complexityDrivers: string[] = [];
-  if (holeCount > 0) complexityDrivers.push(`${holeCount} holes`);
-  if (bendCount > 0) complexityDrivers.push(`${bendCount} bends`);
-  if (threadTotal > 0) complexityDrivers.push(`${threadTotal} threads`);
+  if (isIM) {
+    if (holeCount > 0) complexityDrivers.push(`${holeCount} holes`);
+    if (undraftedFaceCount > 0) complexityDrivers.push(`${undraftedFaceCount} undrafted`);
+    if (ribCount > 0) complexityDrivers.push(`${ribCount} ribs`);
+  } else {
+    if (holeCount > 0) complexityDrivers.push(`${holeCount} holes`);
+    if (bendCount > 0) complexityDrivers.push(`${bendCount} bends`);
+    if (threadTotal > 0) complexityDrivers.push(`${threadTotal} threads`);
+  }
 
   const SHORT_NAME: Record<string, string> = {
     'Laser Cutting': 'Laser',
@@ -4611,15 +4678,26 @@ function PartDetailTab({
   const topDrivers = [...(cost?.processLines ?? [])].sort((a, b) => b.totalCost - a.totalCost).slice(0, 2);
   const sustainDriver = cost?.sustainability?.co2Contributors?.[0];
 
+  const thicknessSuffix =
+    (item.sheetThicknessMm ?? 0) > 0 ? `${item.sheetThicknessMm} mm`
+    : (wallNominalMm ?? 0) > 0 ? `${wallNominalMm} mm wall`
+    : null;
   const materialLabel =
-    [item.materialGrade, item.sheetThicknessMm != null ? `${item.sheetThicknessMm} mm` : null]
+    [item.materialGrade, thicknessSuffix]
       .filter(Boolean)
       .join(' ') || '—';
   const materialSuffix = !item.materialGrade
     ? '(Not Set)'
     : item.materialSource === 'drawing'
     ? ''
+    : thicknessSuffix
+    ? ''
     : '(Estimated)';
+  const materialRowLabel = isIM
+    ? 'Grade & Wall Thickness'
+    : isSM
+    ? 'Grade & Sheet Thickness'
+    : 'Grade';
 
   return (
     <div>
@@ -4637,7 +4715,13 @@ function PartDetailTab({
       </Section>
 
       <Section title="Material">
-        <Row label="Grade & Thickness" value={`${materialLabel} ${materialSuffix}`.trim()} />
+        <Row label={materialRowLabel} value={`${materialLabel} ${materialSuffix}`.trim()} />
+        {isIM && wallMinMm != null && wallMaxMm != null && wallMinMm > 0 && (
+          <Row label="Wall Range (mm)" value={`${wallMinMm} – ${wallMaxMm}`} />
+        )}
+        {isIM && thinWallViolations > 0 && (
+          <Row label="Thin Wall Violations" value={String(thinWallViolations)} />
+        )}
         {di?.surface_finish_ra != null && (
           <Row label="Surface Finish" value={`Ra ${di.surface_finish_ra} µm`} />
         )}
@@ -4653,6 +4737,40 @@ function PartDetailTab({
           selectedKey={selectedCNCFeatureKey ?? null}
           {...(onCNCFeatureSelect ? { onSelect: onCNCFeatureSelect } : {})}
         />
+      ) : isIM ? (
+        <Section title="Feature Summary">
+          {/* Prefer IM-specific through/blind split; fall back to general holeCount */}
+          {throughHoleCount > 0 && <Row label="Through Holes" value={String(throughHoleCount)} />}
+          {blindFeatureCount > 0 && <Row label="Bosses / Blind Holes" value={String(blindFeatureCount)} />}
+          {throughHoleCount === 0 && blindFeatureCount === 0 && holeCount > 0 && (
+            <Row label="Holes" value={String(holeCount)} />
+          )}
+          {ribCount > 0 && <Row label="Ribs" value={String(ribCount)} />}
+          {undraftedFaceCount > 0 && <Row label="Undrafted Faces" value={String(undraftedFaceCount)} />}
+          {undercutFaceCount > 0 && <Row label="Undercuts" value={String(undercutFaceCount)} />}
+          {insertCandidateCount > 0 && <Row label="Insert Candidates" value={String(insertCandidateCount)} />}
+          {avgDraftDeg != null && <Row label="Avg Draft Angle" value={`${avgDraftDeg.toFixed(1)}°`} />}
+          {holeCount === 0 && ribCount === 0 && undraftedFaceCount === 0 && (
+            <p className="text-[10px] text-muted-foreground">Features pending re-analysis.</p>
+          )}
+        </Section>
+      ) : isSM ? (
+        <Section title="Feature Summary">
+          {holeCount > 0 && <Row label="Holes" value={String(holeCount)} />}
+          {bendCount > 0 && <Row label="Bends" value={String(bendCount)} />}
+          {(fg?.summary?.cutLengthMm ?? 0) > 0 && (
+            <Row label="Cut Length (mm)" value={Math.round(fg!.summary!.cutLengthMm).toLocaleString()} />
+          )}
+          {(fg?.summary?.pierceCount ?? 0) > 0 && (
+            <Row label="Pierces" value={String(fg!.summary!.pierceCount)} />
+          )}
+          {threadTotal > 0 && (
+            <Row label="Threads" value={threads.map((t) => `${t.size} ×${t.count}`).join(', ')} />
+          )}
+          {holeCount === 0 && bendCount === 0 && (
+            <p className="text-[10px] text-muted-foreground">No features extracted yet.</p>
+          )}
+        </Section>
       ) : (
         <Section title="Feature Summary">
           {holeCount > 0 && <Row label="Holes" value={String(holeCount)} />}
@@ -4675,13 +4793,20 @@ function PartDetailTab({
 
       {topDrivers.length > 0 && (
         <Section title="Major Cost Drivers">
-          {topDrivers.map((d) => (
-            <Row
-              key={d.process}
-              label={d.process}
-              value={`₹${d.totalCost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-            />
-          ))}
+          {topDrivers.map((d) => {
+            const sym = cost?.currencySymbol ?? '₹';
+            const isInr = !cost?.currency || cost.currency === 'INR';
+            const formatted = isInr
+              ? d.totalCost.toLocaleString('en-IN', { maximumFractionDigits: 0 })
+              : d.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return (
+              <Row
+                key={d.process}
+                label={d.process}
+                value={`${sym}${formatted}`}
+              />
+            );
+          })}
         </Section>
       )}
 
@@ -4710,10 +4835,13 @@ function PartDetailTab({
       </Section>
 
       <Section title="Classification" defaultOpen={false}>
-        <Row label="Family" value={item.familyClassification ?? fg?.classification?.family ?? '—'} />
-        {fg?.classification?.confidence != null && (
-          <Row label="Confidence" value={`${Math.round(fg.classification.confidence * 100)}%`} />
-        )}
+        <Row label="Family" value={familyLabel(item.familyClassification ?? fg?.classification?.family ?? '')} />
+        {(() => {
+          const conf = fg?.classification?.confidence ?? item.familyConfidence;
+          return conf != null
+            ? <Row label="Confidence" value={`${Math.round(conf * 100)}%`} />
+            : null;
+        })()}
       </Section>
     </div>
   );
@@ -5795,7 +5923,7 @@ function AnalysisTabsPanel({
   modelScreenshot?: string | null;
   file3dUrl?: string | null;
 }) {
-  const [tab, setTab] = useState<RightTabKey>('part_summary');
+  const [tab, setTab] = useState<RightTabKey>('copilot');
   const [appliedRouteId, setAppliedRouteId] = useState<string | null>(null);
   const cls = fg?.classification;
   const cncSummary: Record<string, number> | null = (fg as any)?.cnc_features?.feature_summary ?? null;
@@ -5820,9 +5948,9 @@ function AnalysisTabsPanel({
             {cls && (
               <Section title="Classification">
                 <div className="flex items-center justify-between pb-1">
-                  <code className="text-[11px] font-semibold font-mono tracking-tight">{cls.family}</code>
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${confidenceCls(cls.confidence)}`}>
-                    {Math.round(cls.confidence * 100)}%
+                  <code className="text-[11px] font-semibold font-mono tracking-tight">{familyLabel(cls.family)}</code>
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${confidenceCls(cls.confidence ?? 0)}`}>
+                    {cls.confidence != null ? `${Math.round(cls.confidence * 100)}%` : '—'}
                   </span>
                 </div>
                 {cncSummary ? (
@@ -5935,6 +6063,7 @@ function AnalysisTabsPanel({
           <PartDetailTab
             item={item}
             batchSize={batchSize}
+            factory={factory}
             selectedCNCFeatureKey={selectedCNCFeatureKey ?? null}
             {...(onCNCFeatureSelect ? { onCNCFeatureSelect } : {})}
           />
@@ -5950,7 +6079,18 @@ function AnalysisTabsPanel({
           />
         )}
 
-        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'validation' && tab !== 'design' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && (
+        {tab === 'copilot' && (
+          <CopilotPanel
+            item={item}
+            fg={fg}
+            batchSize={batchSize}
+            productionLife={productionLife}
+            factory={factory}
+            activeTab={tab}
+          />
+        )}
+
+        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'validation' && tab !== 'design' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && tab !== 'copilot' && (
           <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
             <AlertCircle className="h-6 w-6 opacity-30" />
             <p className="text-xs text-center">{RIGHT_TABS.find((t) => t.key === tab)?.label} coming in Phase 2.</p>
@@ -6898,6 +7038,20 @@ export default function ManufacturingIntelligencePage() {
     setHeatmapInspector({ worldPos, riskValue, riskLevel, contributors, nearbyFeatures: nearbyFeatures.slice(0, 6), manufacturingImpact, recommendations });
   }, [heatmapSources, fg, dfmScores, heatmapLayer, costHeatmapWeights, toleranceHeatmapWeights, sustainabilityHeatmapWeights, item?.holeCount, item?.bendCount, item?.sheetThicknessMm]);
 
+  const [recalculating, setRecalculating] = useState(false);
+
+  const handleRecalculateCost = async () => {
+    if (recalculating) return;
+    setRecalculating(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'cost-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'route-comparison'] });
+      toast.success('Cost recalculated');
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   const handleRefreshAnalysis = async () => {
     if (!item?.file3dPath || refreshing) return;
     setRefreshing(true);
@@ -7009,8 +7163,8 @@ export default function ManufacturingIntelligencePage() {
         {item.partNumber && <p className="text-xs text-muted-foreground">{item.partNumber}</p>}
       </div>
       {cls && (
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border shrink-0 ${confidenceCls(cls.confidence)}`}>
-          {familyLabel(cls.family)} · {Math.round(cls.confidence * 100)}%
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border shrink-0 ${confidenceCls(cls.confidence ?? 0)}`}>
+          {familyLabel(cls.family)}{cls.confidence != null ? ` · ${Math.round(cls.confidence * 100)}%` : ''}
         </span>
       )}
     </header>
@@ -7027,8 +7181,12 @@ export default function ManufacturingIntelligencePage() {
         Refresh Analysis
         {isStale && !refreshing && <span className="text-amber-500 ml-0.5">⚠</span>}
       </button>
-      <button disabled className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border border-border opacity-40 cursor-not-allowed">
-        <Calculator className="h-3 w-3" />
+      <button
+        onClick={handleRecalculateCost}
+        disabled={recalculating}
+        className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Calculator className={`h-3 w-3 ${recalculating ? 'animate-spin' : ''}`} />
         Recalculate Cost
       </button>
       <button disabled className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border border-border opacity-40 cursor-not-allowed">
