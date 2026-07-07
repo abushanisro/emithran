@@ -1,6 +1,6 @@
 """
 STEP to STL Conversion Services
-deplou
+
 Refactored with SOLID principles and dependency injection
 """
 
