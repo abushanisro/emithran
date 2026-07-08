@@ -352,6 +352,109 @@ function useCopilotChat(
   return { messages, isStreaming, error, send, reset };
 }
 
+// ── Copilot response renderer ──────────────────────────────────────────────────
+
+function parseInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|\(source:[^)]+\)|Source:[^\n]+)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("(source:") || part.startsWith("Source:")) {
+      return <span key={i} className="text-[9px] text-muted-foreground/50 ml-1">{part}</span>;
+    }
+    return part;
+  });
+}
+
+function CopilotResponse({ content }: { content: string }) {
+  const lines = content.split("\n");
+  const nodes: React.ReactNode[] = [];
+  let i = 0;
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+
+    if (!trimmed) {
+      nodes.push(<div key={i++} className="h-1.5" />);
+      continue;
+    }
+
+    // Section header: line that is purely **text** (possibly with — suffix)
+    if (trimmed.startsWith("**") && trimmed.endsWith("**")) {
+      const inner = trimmed.slice(2, -2);
+      const isTitle = nodes.length === 0 || (nodes.length <= 2);
+      nodes.push(
+        <div key={i++} className={cn(
+          "font-semibold",
+          isTitle
+            ? "text-[11px] text-foreground mb-1"
+            : "text-[9px] uppercase tracking-wider text-violet-600 dark:text-violet-400 mt-3 mb-1 border-b border-violet-100 dark:border-violet-900 pb-0.5",
+        )}>
+          {inner}
+        </div>
+      );
+      continue;
+    }
+
+    // Numbered items ①②③④⑤⑥⑦⑧⑨
+    if (/^[①②③④⑤⑥⑦⑧⑨]/.test(trimmed)) {
+      const rest = trimmed.slice(1).trim();
+      nodes.push(
+        <div key={i++} className="flex gap-2 py-1.5 border-b border-border/30 last:border-0">
+          <span className="shrink-0 w-4 h-4 rounded-full bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 text-[8px] font-bold flex items-center justify-center mt-0.5">
+            {trimmed[0]}
+          </span>
+          <span className="text-[10px] leading-relaxed">{parseInline(rest)}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // Source citation lines (indented)
+    if (/^\s*(Source:|source:)/.test(rawLine)) {
+      nodes.push(
+        <div key={i++} className="text-[9px] text-muted-foreground/50 pl-6 -mt-1 mb-0.5">
+          {trimmed}
+        </div>
+      );
+      continue;
+    }
+
+    // Opportunity lines ✓
+    if (trimmed.startsWith("✓")) {
+      nodes.push(
+        <div key={i++} className="flex items-start gap-1.5 py-0.5">
+          <span className="text-emerald-500 shrink-0 text-[11px] mt-0.5">✓</span>
+          <span className="text-[10px] leading-relaxed">{parseInline(trimmed.slice(1).trim())}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // Key-value lines like "Machine: X" / "Total cost: $X"
+    const kvMatch = trimmed.match(/^(Machine|Total cost|Cycle time|Material|NRE|Break-even):\s*(.+)$/);
+    if (kvMatch) {
+      nodes.push(
+        <div key={i++} className="flex gap-1.5 py-0.5 text-[10px]">
+          <span className="text-muted-foreground shrink-0">{kvMatch[1]}:</span>
+          <span className="font-medium text-foreground">{parseInline(kvMatch[2])}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // Regular paragraph
+    nodes.push(
+      <p key={i++} className="text-[10px] leading-relaxed text-foreground/80">
+        {parseInline(trimmed)}
+      </p>
+    );
+  }
+
+  return <div>{nodes}</div>;
+}
+
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function MessageBubble({ msg }: { msg: ChatMessage }) {
@@ -372,14 +475,19 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
       </div>
       <div
         className={cn(
-          "max-w-[85%] text-[11px] leading-relaxed whitespace-pre-wrap rounded-lg px-2.5 py-1.5",
+          "max-w-[85%] rounded-lg px-2.5 py-1.5",
           isUser
-            ? "bg-violet-50 text-violet-900 dark:bg-violet-950/40 dark:text-violet-100"
+            ? "bg-violet-50 text-violet-900 dark:bg-violet-950/40 dark:text-violet-100 text-[11px] leading-relaxed"
             : "bg-muted text-foreground",
         )}
       >
-        {msg.content || (msg.streaming ? null : <span className="text-muted-foreground italic">Empty response</span>)}
-        {msg.streaming && !msg.content && (
+        {isUser
+          ? <span className="text-[11px] leading-relaxed whitespace-pre-wrap">{msg.content}</span>
+          : msg.content
+            ? <CopilotResponse content={msg.content} />
+            : null
+        }
+        {!msg.content && msg.streaming && (
           <span className="inline-flex items-center gap-1 text-muted-foreground">
             <Loader2 className="w-3 h-3 animate-spin" />
             <span className="text-[10px]">Thinking…</span>
