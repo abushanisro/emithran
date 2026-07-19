@@ -20,8 +20,9 @@ httpx==0.26.0
 slowapi==0.1.9
 
 # Security - File type validation (magic number checking)
+# python-magic-bin is Windows-only; on Linux libmagic is provided by the OS / conda libmagic
 python-magic==0.4.27
-python-magic-bin==0.4.14
+python-magic-bin==0.4.14; sys_platform == "win32"
 
 # Logging and monitoring
 python-json-logger==2.0.7

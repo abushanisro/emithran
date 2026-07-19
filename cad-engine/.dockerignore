@@ -1,5 +1,5 @@
-# Python
-__pycache__
+# Python bytecode — never needed in the image
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -11,20 +11,27 @@ ENV/
 dist/
 build/
 
-# IDE
+# IDE / OS noise
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs and temp files
 *.log
-
-# Temporary files
 tmp/
 temp/
 *.tmp
+
+# Local env files — secrets are injected via Railway env vars, not baked in
+.env
+.env.development
+.env.production
+
+# Docs and dev-only files (reduce image size)
+README.md
+DEPLOYMENT.md
+ADVANCED_FEATURES.md
+memory.md

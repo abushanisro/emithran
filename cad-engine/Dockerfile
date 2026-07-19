@@ -19,7 +19,7 @@ RUN conda create -n cad-env python=3.11 -y && \
 
 # Activate conda environment and install additional packages
 SHELL ["conda", "run", "-n", "cad-env", "/bin/bash", "-c"]
-# Install Python deps into cad-env (CORRECT)
+# Install heavy conda-forge packages (OCCT-compatible ABI pins)
 RUN conda install -n cad-env -c conda-forge \
     fastapi=0.109.0 \
     uvicorn=0.27.0 \
@@ -28,14 +28,25 @@ RUN conda install -n cad-env -c conda-forge \
     python-multipart=0.0.6 \
     aiofiles=23.2.1 \
     httpx=0.26.0 \
-    python-json-logger=2.0.7 -y && \
+    python-json-logger=2.0.7 \
+    python-dotenv=1.0.1 \
+    libmagic=5.45 -y && \
     conda clean -afy
 
-# Install Claude AI SDK and requests (needed for AI DFM analysis)
-RUN conda run -n cad-env pip install anthropic==0.18.1 requests --no-cache-dir
+# Copy requirements first so pip layer is cached independently of source changes
+COPY requirements.txt ./
 
-# Copy application code — includes AI DFM analyzer
-COPY main.py config.py services.py validators.py exceptions.py memory_optimizer.py ai_dfm_analyzer.py ./
+# Install remaining Python deps — pip handles packages not available on conda-forge.
+# python-magic-bin is Windows-only; libmagic was already installed above via conda.
+RUN conda run -n cad-env pip install \
+    --no-cache-dir \
+    anthropic==0.18.1 \
+    "openai>=1.35.0" \
+    python-magic==0.4.27 \
+    requests
+
+# Copy all application source (copilot package, feature extractors, converters, knowledge)
+COPY . .
 
 # Create default .env configuration (can be overridden by environment variables)
 RUN echo "# CAD Engine Configuration" > .env && \
