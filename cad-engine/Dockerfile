@@ -4,9 +4,11 @@
 FROM continuumio/miniconda3:24.9.2-0
 
 # Install system dependencies
+# libmagic1 provides the native shared library required by python-magic
 RUN apt-get update && apt-get install -y \
     curl \
     libgomp1 \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -29,15 +31,14 @@ RUN conda install -n cad-env -c conda-forge \
     aiofiles=23.2.1 \
     httpx=0.26.0 \
     python-json-logger=2.0.7 \
-    python-dotenv=1.0.1 \
-    libmagic=5.45 -y && \
+    python-dotenv=1.0.1 -y && \
     conda clean -afy
 
 # Copy requirements first so pip layer is cached independently of source changes
 COPY requirements.txt ./
 
 # Install remaining Python deps — pip handles packages not available on conda-forge.
-# python-magic-bin is Windows-only; libmagic was already installed above via conda.
+# python-magic-bin is Windows-only; libmagic1 was already installed via apt-get above.
 RUN conda run -n cad-env pip install \
     --no-cache-dir \
     anthropic==0.18.1 \
