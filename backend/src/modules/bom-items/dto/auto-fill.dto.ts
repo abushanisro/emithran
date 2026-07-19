@@ -53,5 +53,7 @@ export class AutoFillResponseDto {
   costs: AutoFillCostsDto;
   confidence: AutoFillConfidenceDto;
   cadEngineAvailable: boolean;
+  /** Human-readable reason the CAD engine was unavailable (e.g. FreeCAD not installed for SLDPRT). Absent when cadEngineAvailable is true. */
+  cadEngineError?: string;
   featureGraph: object;
 }

@@ -49,6 +49,18 @@ export class ProjectResponseDto {
   @ApiProperty({ example: '2025-01-20T14:45:00Z' })
   updatedAt: string;
 
+  // ── Aggregate fields enriched post-query ──────────────────────────────────
+
+  @ApiProperty({ example: 2, required: false, description: 'Number of BOMs in this project' })
+  bomCount?: number;
+
+  @ApiProperty({ example: 14, required: false, description: 'Total BOM line items across all BOMs' })
+  bomItemCount?: number;
+
+  /** Sum of bom_items.unit_cost across all BOMs — the computed "should cost" for this project. */
+  @ApiProperty({ example: 4250.00, required: false, description: 'Actual cost derived from BOM item costs' })
+  actualCost?: number;
+
   /**
    * Transform database row to DTO
    * Validates all required fields exist
@@ -73,6 +85,10 @@ export class ProjectResponseDto {
     dto.targetBomCostCurrency = row.target_bom_cost_currency || undefined;
     dto.createdAt = row.created_at;
     dto.updatedAt = row.updated_at;
+    // Aggregate fields — set externally after enrichment, default to 0
+    dto.bomCount = row.bom_count ?? 0;
+    dto.bomItemCount = row.bom_item_count ?? 0;
+    dto.actualCost = row.actual_cost != null ? Number(row.actual_cost) : 0;
 
     return dto;
   }

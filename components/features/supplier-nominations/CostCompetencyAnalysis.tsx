@@ -110,7 +110,7 @@ function transformPartWiseCostToComponentData(
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
         return analysis?.rawMaterialCost || 0;
       }),
-      unit: "₹"
+      unit: "$"
     },
     {
       id: 2,
@@ -120,7 +120,7 @@ function transformPartWiseCostToComponentData(
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
         return analysis?.processCost || 0;
       }),
-      unit: "₹"
+      unit: "$"
     },
     {
       id: 3,
@@ -130,7 +130,7 @@ function transformPartWiseCostToComponentData(
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
         return analysis?.overheadsProfit || 0;
       }),
-      unit: "₹"
+      unit: "$"
     },
     {
       id: 4,
@@ -140,7 +140,7 @@ function transformPartWiseCostToComponentData(
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
         return analysis?.packingForwardingCost || 0;
       }),
-      unit: "₹"
+      unit: "$"
     },
     {
       id: 5,
@@ -160,7 +160,7 @@ function transformPartWiseCostToComponentData(
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
         return analysis?.netPriceUnit || 0;
       }),
-      unit: "₹"
+      unit: "$"
     },
     {
       id: 7,
@@ -386,28 +386,28 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
         costComponent: "Raw Material Cost",
         baseValue: 0,
         supplierValues: new Array(numVendors).fill(0),
-        unit: "₹"
+        unit: "$"
       },
       {
         id: 2,
         costComponent: "Process Cost",
         baseValue: 0,
         supplierValues: new Array(numVendors).fill(0),
-        unit: "₹"
+        unit: "$"
       },
       {
         id: 3,
         costComponent: "Overheads & Profit",
         baseValue: 0,
         supplierValues: new Array(numVendors).fill(0),
-        unit: "₹"
+        unit: "$"
       },
       {
         id: 4,
         costComponent: "Packing & Forwarding Cost",
         baseValue: 0,
         supplierValues: new Array(numVendors).fill(0),
-        unit: "₹"
+        unit: "$"
       },
       {
         id: 5,
@@ -421,7 +421,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
         costComponent: "Net Price/unit",
         baseValue: 0,
         supplierValues: new Array(numVendors).fill(0),
-        unit: "₹"
+        unit: "$"
       },
       {
         id: 7,
@@ -1169,7 +1169,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                         <div className="flex items-center justify-between">
                           <span className="text-gray-400 text-xs">Best Price:</span>
                           <span className="text-green-400 text-xs font-medium">
-                            ₹{partSummary.lowestCost.toFixed(2)}
+                            ${partSummary.lowestCost.toFixed(2)}
                           </span>
                         </div>
                       )}

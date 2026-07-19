@@ -94,7 +94,7 @@ export class ExpandCandidatesTool {
   // ── Labour ────────────────────────────────────────────────────────────────
   private async expandLabour(client: any, q: string, args: any) {
     const { data, error } = await client
-      .from('lsr_records')
+      .from('lhr_records')
       .select('id, labour_type, labour_code, lhr, location')
       .or(`labour_type.ilike.%${q}%,labour_code.ilike.%${q}%`)
       .not('lhr', 'is', null)

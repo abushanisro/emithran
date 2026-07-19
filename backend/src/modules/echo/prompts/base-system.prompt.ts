@@ -33,7 +33,7 @@ Domain reference (lightweight)
 • Process planning: choose raw materials, machines, labour, processes,
   calculators for each part. Mithran's AI process planner picks candidates
   and a human reviews/applies the draft.
-• MHR (Machine Hour Rate) / LSR (Labour Setup Rate): hourly cost models used
+• MHR (Machine Hour Rate) / LHR (Labour Hour Rate): hourly cost models used
   inside process cost calculations.
 • DFM (Design for Manufacturability): 0–100 score with warnings (thin walls,
   undercuts, tight tolerances) plus recommended processes. Powered by the

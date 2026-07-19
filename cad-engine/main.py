@@ -37,6 +37,7 @@ from exceptions import (
     FileValidationError,
     ConversionError
 )
+import sldprt_converter
 from copilot.router import router as copilot_router
 
 # ============================================================================
@@ -298,9 +299,19 @@ async def convert_step_to_stl(
             logger.warning(f"File validation failed: {str(e)}")
             raise HTTPException(status_code=400, detail=str(e))
         
+        # SolidWorks files need FreeCAD conversion to STEP before OpenCascade can read them
+        if file_ext == '.sldprt':
+            try:
+                converted = sldprt_converter.convert(step_path, config.temp_dir)
+                cleanup_files(step_path)
+                step_path = converted
+            except RuntimeError as e:
+                cleanup_files(step_path)
+                raise HTTPException(status_code=422, detail=str(e))
+
         # Create output STL path
         stl_path = str(Path(step_path).with_suffix('.stl'))
-        
+
         # Convert STEP to STL
         try:
             output_path, stl_tri_count = conversion_service.convert(step_path, stl_path)
@@ -390,9 +401,19 @@ async def convert_step_to_stl_base64(
         except FileValidationError as e:
             cleanup_files(step_path)
             raise HTTPException(status_code=400, detail=str(e))
-        
+
+        # SolidWorks files need FreeCAD conversion to STEP before OpenCascade can read them
+        if file_ext == '.sldprt':
+            try:
+                converted = sldprt_converter.convert(step_path, config.temp_dir)
+                cleanup_files(step_path)
+                step_path = converted
+            except RuntimeError as e:
+                cleanup_files(step_path)
+                raise HTTPException(status_code=422, detail=str(e))
+
         stl_path = str(Path(step_path).with_suffix('.stl'))
-        
+
         # Convert
         try:
             output_path, stl_tri_count = conversion_service.convert(step_path, stl_path)
@@ -482,6 +503,18 @@ async def analyze_geometry_advanced(
         except FileValidationError as e:
             cleanup_files(step_path)
             raise HTTPException(status_code=400, detail=str(e))
+
+        # SolidWorks files need FreeCAD conversion to STEP before OpenCascade can read them
+        converted_path = None
+        if file_ext == '.sldprt':
+            try:
+                converted_path = sldprt_converter.convert(step_path, config.temp_dir)
+                cleanup_files(step_path)
+                step_path = converted_path
+                converted_path = None  # ownership transferred to step_path
+            except RuntimeError as e:
+                cleanup_files(step_path)
+                raise HTTPException(status_code=422, detail=str(e))
 
         try:
             step_reader = StepReader()
@@ -588,6 +621,23 @@ async def analyze_geometry_advanced(
 
             if cnc_features_result is not None:
                 response["cnc_features"] = cnc_features_result
+
+            # Component feature analysis (aPriori-style decomposition) —
+            # runs for all families; results stored inside manufacturing_features
+            # so they flow through the existing backend JSONB storage path.
+            try:
+                from feature_extractors import ComponentFeatureAnalyzer  # type: ignore
+                _mfg = optimization_result.geometry_features.manufacturing_features
+                _bbox = optimization_result.geometry_features.bounding_box
+                _cf = ComponentFeatureAnalyzer().analyze(shape, _mfg, _bbox)
+                response["geometry_features"]["manufacturing_features"]["component_features"] = _cf
+                logger.info(
+                    f"[component_features] blank={_cf['blank']['face_id']} "
+                    f"setup_axes={len(_cf['setup_axes_candidates'])} "
+                    f"gcd_relations={len(_cf['gcd_relations'])}"
+                )
+            except Exception as _cf_exc:
+                logger.warning(f"[component_features] extraction failed: {_cf_exc}")
 
             return response
 

@@ -56,7 +56,18 @@ export async function proxy(request: NextRequest) {
       },
     }
   )
-  await supabase.auth.getUser()
+  // getSession() reads the JWT from the cookie and refreshes it if expired.
+  // We use getSession() here (not getUser()) because middleware runs on every
+  // request — getUser() makes a server-side API call to validate the JWT every
+  // time, which adds a full network roundtrip and causes minute-long hangs when
+  // the Supabase API has any latency. getSession() is local-first and only hits
+  // the network when the access token actually needs refreshing.
+  try {
+    await supabase.auth.getSession()
+  } catch {
+    // Session refresh failed (expired/invalid refresh token) — swallow the error.
+    // The browser client will detect the missing session and redirect to /auth.
+  }
 
   return response
 }

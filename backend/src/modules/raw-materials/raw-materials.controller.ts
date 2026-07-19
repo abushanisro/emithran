@@ -231,7 +231,7 @@ export class RawMaterialsController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: User,
     @AccessToken() token: string,
-  ): Promise<{ message: string; created: number; failed: number; errors?: any[] }> {
+  ): Promise<{ message: string; created: number; failed: number; errors?: any[]; dataWarnings?: string[] }> {
     this.logger.log(`Upload request received: ${file?.originalname || 'No file'}`, 'RawMaterialsController');
 
     if (!file) {
@@ -254,20 +254,15 @@ export class RawMaterialsController {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(file.buffer as any);
       
-      const worksheet = workbook.worksheets[0];
-      if (!worksheet) {
+      if (!workbook.worksheets.length) {
         throw new BadRequestException('Excel file has no worksheets');
       }
 
-      // Helper function to find the header row
-      const findHeaderRow = (): number => {
-        // Try reading first 5 rows to find where headers are
-        for (let rowIndex = 1; rowIndex <= Math.min(5, worksheet.rowCount); rowIndex++) {
-          const row = worksheet.getRow(rowIndex);
-          const values = row.values as any[];
-          
+      // Helper: find the header row within a worksheet
+      const findHeaderRow = (ws: ExcelJS.Worksheet): number => {
+        for (let rowIndex = 1; rowIndex <= Math.min(5, ws.rowCount); rowIndex++) {
+          const values = ws.getRow(rowIndex).values as any[];
           if (!values || values.length === 0) continue;
-
           const validHeaders = values.filter(cell =>
             cell && typeof cell === 'string' &&
             (cell.toLowerCase().includes('material') ||
@@ -277,39 +272,32 @@ export class RawMaterialsController {
               cell.toLowerCase().includes('density') ||
               cell.toLowerCase().includes('temp'))
           );
-
-          // If we found at least 2 material-related headers, this is likely the header row
-          if (validHeaders.length >= 2) {
-            return rowIndex;
-          }
+          if (validHeaders.length >= 2) return rowIndex;
         }
-
-        return 1; // Default to first row if nothing found
+        return 1;
       };
 
-      const headerRowIndex = findHeaderRow();
-      const headerRow = worksheet.getRow(headerRowIndex);
-      const headers = headerRow.values as any[];
-
-      // Convert worksheet data to JSON format
-      const jsonData: any[] = [];
-      for (let rowIndex = headerRowIndex + 1; rowIndex <= worksheet.rowCount; rowIndex++) {
-        const row = worksheet.getRow(rowIndex);
-        const values = row.values as any[];
-        
-        if (!values || values.length === 0) continue;
-
-        const rowData: any = {};
-        headers.forEach((header, colIndex) => {
-          if (header && colIndex > 0) { // Skip index 0 as it's usually empty in ExcelJS
-            rowData[header] = values[colIndex] || '';
-          }
-        });
-
-        // Only add rows that have some data
-        if (Object.values(rowData).some(value => value && value.toString().trim())) {
-          jsonData.push(rowData);
+      // Helper: extract JSON rows from a single worksheet
+      const extractRows = (ws: ExcelJS.Worksheet): any[] => {
+        const headerRowIndex = findHeaderRow(ws);
+        const headers = ws.getRow(headerRowIndex).values as any[];
+        const rows: any[] = [];
+        for (let rowIndex = headerRowIndex + 1; rowIndex <= ws.rowCount; rowIndex++) {
+          const values = ws.getRow(rowIndex).values as any[];
+          if (!values || values.length === 0) continue;
+          const rowData: any = {};
+          headers.forEach((header, colIndex) => {
+            if (header && colIndex > 0) rowData[header] = values[colIndex] ?? '';
+          });
+          if (Object.values(rowData).some(v => v && v.toString().trim())) rows.push(rowData);
         }
+        return rows;
+      };
+
+      // Collect rows from ALL sheets — supports workbooks with separate plastics/ferrous sheets
+      const jsonData: any[] = [];
+      for (const ws of workbook.worksheets) {
+        if (ws.rowCount > 1) jsonData.push(...extractRows(ws));
       }
 
       if (!jsonData || jsonData.length === 0) {
@@ -397,12 +385,31 @@ export class RawMaterialsController {
           } else {
             // ── Plastics / Rubber file ──
             materialTypeFromExcel = getColumnValue(rowData,
-              'GROUP', 'Group', 'MaterialGroup', 'Material Group', 'material_group', 'MATERIALGROUP');
+              'GROUP', 'Group', 'MaterialGroup', 'Material Group', 'material_group', 'MATERIALGROUP',
+              'Material Type', 'MATERIAL TYPE', 'MaterialType', 'material_type');
             const rawCategory = getColumnValue(rowData,
               'CATEGORY', 'Category', 'MaterialCategory', 'Material Category');
             materialGroup = rawCategory
               ? this.mapMaterialGroupFromExcel(rawCategory)
               : this.mapMaterialGroupFromExcel(materialTypeFromExcel || '');
+            // If the group isn't one of the two canonical values, decide based on
+            // meaningful plastic processing parameters (not just column existence —
+            // combined sheets always have these columns even for metals, with 0/No).
+            const KNOWN_GROUPS = ['Plastic & Rubber', 'Ferrous & Non-Ferrous'];
+            if (!KNOWN_GROUPS.includes(materialGroup)) {
+              const toNum = (v: any) => {
+                const n = parseFloat(String(v ?? '0').replace(/[^0-9.-]/g, ''));
+                return isNaN(n) ? 0 : n;
+              };
+              // Eject deflect temp / clamp pressure / mold temp are non-zero only for
+              // injection-moulded plastics — metals have 0 or N/A in these columns.
+              const hasPlasticIndicators =
+                toNum(rowData['Eject Deflect T (°C)']) > 0 ||
+                toNum(rowData['Clamp Pressure (MPa)']) > 0 ||
+                toNum(rowData['Mold Temp (°C)']) > 0 ||
+                String(rowData['Regrinding'] ?? '').toLowerCase() === 'yes';
+              materialGroup = hasPlasticIndicators ? 'Plastic & Rubber' : 'Ferrous & Non-Ferrous';
+            }
           }
 
           const material = getColumnValue(
@@ -439,6 +446,7 @@ export class RawMaterialsController {
             'SPECIFIC HEAT\n(J/g·°C)',        // actual Excel header (with newline)
             'SPECIFIC HEAT (J/g·°C)',          // actual Excel header (flat)
             'Specific Heat (J/g·°C)',
+            'Specific Heat (J/g°C)',           // new format (no middle dot)
             'Specific Heat of Melt',
             'Specific Heat of Melt (J / g * °C)',
             'Specific Heat of Melt (J / g * Â°C)',
@@ -452,6 +460,8 @@ export class RawMaterialsController {
             'THERMAL COND.\n(W/m·°C)',         // actual Excel header (with newline)
             'THERMAL COND. (W/m·°C)',           // actual Excel header (flat)
             'Thermal Cond. (W/m·°C)',
+            'Thermal Cond (W/m°C)',            // new format (no middle dot, no period)
+            'Thermal Cond (W/m·°C)',
             'Thermal Conductivity of Melt',
             'Thermal Conductivity of Melt (Watts / m * °C)',
             'Thermal Conductivity of Melt (Watts / m * Â°C)',
@@ -485,9 +495,9 @@ export class RawMaterialsController {
               'SHAPE /\nSTOCK FORM', 'SHAPE / STOCK FORM',        // ferrous / plastics
               'Shape / Stock Form', 'Stock Form', 'StockForm', 'stock_form'),
             regrinding: this.convertBooleanToYesNo(getColumnValue(rowData, 'REGRINDING', 'Regrinding', 'regrinding')),
-            regrindingPercentage: parseNumeric(getColumnValue(rowData, 'REGRIND %', 'Regrind %', 'Regrinding%', 'Regrinding Percentage', 'regrinding_percentage', 'RegrindingPercentage')),
-            clampingPressureMpa: parseNumeric(getColumnValue(rowData, 'CLAMP PRESSURE\n(MPa)', 'CLAMP PRESSURE (MPa)', 'Clamping Pressure (MPa)', 'ClampingPressureMpa', 'clamping_pressure_mpa')),
-            ejectDeflectionTempC: parseNumeric(getColumnValue(rowData, 'EJECT DEFLECT\nTEMP (°C)', 'EJECT DEFLECT TEMP (°C)', 'Eject Deflection Temp (°C)', 'EjectDeflectionTempC', 'eject_deflection_temp_c')),
+            regrindingPercentage: parseNumeric(getColumnValue(rowData, 'REGRIND %', 'Regrind %', 'Regrinding %', 'Regrinding%', 'Regrinding Percentage', 'regrinding_percentage', 'RegrindingPercentage')),
+            clampingPressureMpa: parseNumeric(getColumnValue(rowData, 'CLAMP PRESSURE\n(MPa)', 'CLAMP PRESSURE (MPa)', 'Clamp Pressure (MPa)', 'Clamping Pressure (MPa)', 'ClampingPressureMpa', 'clamping_pressure_mpa')),
+            ejectDeflectionTempC: parseNumeric(getColumnValue(rowData, 'EJECT DEFLECT\nTEMP (°C)', 'EJECT DEFLECT TEMP (°C)', 'Eject Deflect T (°C)', 'Eject Deflection Temp (°C)', 'EjectDeflectionTempC', 'eject_deflection_temp_c')),
             meltingTempC: parseNumeric(getColumnValue(rowData, 'MELTING\nTEMP (°C)', 'MELTING TEMP (°C)', 'Melting Temp (°C)', 'MeltingTempC', 'melting_temp_c')),
             moldTempC: parseNumeric(getColumnValue(rowData, 'MOLD\nTEMP (°C)', 'MOLD TEMP (°C)', 'Mold Temp (°C)', 'MoldTempC', 'mold_temp_c')),
             densityKgM3: parseNumeric(getColumnValue(rowData,
@@ -495,33 +505,36 @@ export class RawMaterialsController {
             specificHeatMelt: parseNumeric(specificHeatRaw),
             thermalConductivityMelt: parseNumeric(thermalCondRaw),
             currency: 'USD' as any,
-            // Regional costs — plastics format: 'COST\nFrance\n(USD/kg)'; ferrous format: 'FRANCE'
-            costFrance:  parseNumeric(getColumnValue(rowData, 'FRANCE', 'COST\nFrance\n(USD/kg)', 'COST France (USD/kg)', 'Cost France (USD/kg)')),
-            costGermany: parseNumeric(getColumnValue(rowData, 'GERMANY', 'COST\nGermany\n(USD/kg)', 'COST Germany (USD/kg)', 'Cost Germany (USD/kg)')),
-            costWEurope: parseNumeric(getColumnValue(rowData, 'W. EUROPE', 'COST\nW. Europe\n(USD/kg)', 'COST W. Europe (USD/kg)', 'Cost W. Europe (USD/kg)')),
-            costUsa:     parseNumeric(getColumnValue(rowData, 'USA', 'COST\nUSA\n(USD/kg)', 'COST USA (USD/kg)', 'Cost USA (USD/kg)')),
-            costIndia:   parseNumeric(getColumnValue(rowData, 'INDIA', 'COST\nIndia\n(USD/kg)', 'COST India (USD/kg)', 'Cost India (USD/kg)')),
-            costEEurope: parseNumeric(getColumnValue(rowData, 'E. EUROPE', 'COST\nE. Europe\n(USD/kg)', 'COST E. Europe (USD/kg)', 'Cost E. Europe (USD/kg)')),
-            costChina:   parseNumeric(getColumnValue(rowData, 'CHINA', 'COST\nChina\n(USD/kg)', 'COST China (USD/kg)', 'Cost China (USD/kg)')),
-            costMexico:  parseNumeric(getColumnValue(rowData, 'MEXICO', 'COST\nMexico\n(USD/kg)', 'COST Mexico (USD/kg)', 'Cost Mexico (USD/kg)')),
-            cost: parseNumeric(getColumnValue(rowData, 'INDIA', 'COST\nIndia\n(USD/kg)', 'COST India (USD/kg)', 'Unit Cost ($)', 'Unit Cost', 'Cost', 'cost', 'COST')),
+            // Regional costs — plastics format: 'COST\nFrance\n(USD/kg)'; ferrous format: 'FRANCE'; new format: 'France Cost (USD)'
+            costFrance:  parseNumeric(getColumnValue(rowData, 'FRANCE', 'COST\nFrance\n(USD/kg)', 'COST France (USD/kg)', 'Cost France (USD/kg)', 'France Cost (USD)', 'France Cost (USD/kg)')),
+            costGermany: parseNumeric(getColumnValue(rowData, 'GERMANY', 'COST\nGermany\n(USD/kg)', 'COST Germany (USD/kg)', 'Cost Germany (USD/kg)', 'Germany Cost (USD)', 'Germany Cost (USD/kg)')),
+            costWEurope: parseNumeric(getColumnValue(rowData, 'W. EUROPE', 'COST\nW. Europe\n(USD/kg)', 'COST W. Europe (USD/kg)', 'Cost W. Europe (USD/kg)', 'W. Europe Cost (USD)', 'W. Europe Cost (USD/kg)')),
+            costUsa:     parseNumeric(getColumnValue(rowData, 'USA', 'COST\nUSA\n(USD/kg)', 'COST USA (USD/kg)', 'Cost USA (USD/kg)', 'USA Cost (USD)', 'USA Cost (USD/kg)')),
+            costIndia:   parseNumeric(getColumnValue(rowData, 'INDIA', 'COST\nIndia\n(USD/kg)', 'COST India (USD/kg)', 'Cost India (USD/kg)', 'India Cost (USD)', 'India Cost (USD/kg)')),
+            costEEurope: parseNumeric(getColumnValue(rowData, 'E. EUROPE', 'COST\nE. Europe\n(USD/kg)', 'COST E. Europe (USD/kg)', 'Cost E. Europe (USD/kg)', 'E. Europe Cost (USD)', 'E. Europe Cost (USD/kg)')),
+            costChina:   parseNumeric(getColumnValue(rowData, 'CHINA', 'COST\nChina\n(USD/kg)', 'COST China (USD/kg)', 'Cost China (USD/kg)', 'China Cost (USD)', 'China Cost (USD/kg)')),
+            costMexico:  parseNumeric(getColumnValue(rowData, 'MEXICO', 'COST\nMexico\n(USD/kg)', 'COST Mexico (USD/kg)', 'Cost Mexico (USD/kg)', 'Mexico Cost (USD)', 'Mexico Cost (USD/kg)')),
+            cost: parseNumeric(getColumnValue(rowData, 'INDIA', 'COST\nIndia\n(USD/kg)', 'COST India (USD/kg)', 'India Cost (USD)', 'Unit Cost ($)', 'Unit Cost', 'Cost', 'cost', 'COST')),
             // Material properties — ferrous uses 'DENSITY\n(g/cm³)', 'UTS\n(MPa)', etc.
             density: parseNumeric(getColumnValue(rowData,
               'DENSITY\n(g/cm³)', 'DENSITY (g/cm³)',               // ferrous file
               'Density (g/cm³)', 'Density', 'density', 'DENSITY')),
             ultimate_tensile_strength: parseNumeric(getColumnValue(rowData,
               'UTS\n(MPa)', 'UTS (MPa)',                           // ferrous file
-              'UltimateTensileStrength', 'Ultimate Tensile Strength', 'UTS', 'ultimate_tensile_strength')),
+              'UltimateTensileStrength', 'Ultimate Tensile Strength', 'UTS (MPa)', 'UTS', 'ultimate_tensile_strength')),
             yield_tensile_strength: parseNumeric(getColumnValue(rowData,
               'YTS\n(MPa)', 'YTS (MPa)',                           // ferrous file
-              'YeildTensileStrength', 'Yield Tensile Strength', 'YTS', 'yield_tensile_strength')),
+              'Yield Strength (MPa)', 'YeildTensileStrength', 'Yield Tensile Strength', 'Yield Strength', 'YTS', 'yield_tensile_strength')),
             shearing_strength: parseNumeric(getColumnValue(rowData,
               'SHEAR\n(MPa)', 'SHEAR (MPa)',                       // ferrous file
-              'ShearingStrength', 'Shearing Strength', 'Shear', 'shearing_strength')),
+              'Shear Strength (MPa)', 'ShearingStrength', 'Shearing Strength', 'Shear Strength', 'Shear', 'shearing_strength')),
             astm_standard: getColumnValue(rowData, 'ASTM', 'ASTM Standard', 'ASTM_Standard', 'astm_standard'),
             din_standard:  getColumnValue(rowData, 'DIN',  'DIN Standard',  'DIN_Standard',  'din_standard'),
             en_standard:   getColumnValue(rowData, 'EN',   'EN Standard',   'EN_Standard',   'en_standard'),
             jis_standard:  getColumnValue(rowData, 'JIS',  'JIS Standard',  'JIS_Standard',  'jis_standard'),
+            hardness: parseNumeric(getColumnValue(rowData, 'Hardness', 'HARDNESS', 'hardness')),
+            hardnessSystem: getColumnValue(rowData, 'Hardness System', 'HARDNESS SYSTEM', 'Hardness_System', 'hardnessSystem', 'hardness_system'),
+            cutCode: parseNumeric(getColumnValue(rowData, 'Cut Code', 'CUT CODE', 'Cut_Code', 'cutCode', 'cut_code')),
             shape: mapShapeValue(getColumnValue(rowData,
               'SHAPE /\nSTOCK FORM', 'SHAPE / STOCK FORM', 'Shape / Stock Form', 'Shape', 'shape', 'SHAPE')),
           };
@@ -559,6 +572,19 @@ export class RawMaterialsController {
 
       this.logger.log(`Validation complete: ${validMaterials.length} valid, ${errors.length} failed`, 'RawMaterialsController');
 
+      // Identify rows with incomplete physical properties — these import successfully
+      // but will render as '-' in the UI. Surface them as data quality warnings so
+      // the user knows to fix the Excel source rather than assuming a code bug.
+      const dataWarnings: string[] = [];
+      validMaterials.forEach((dto, i) => {
+        const missing: string[] = [];
+        if (!dto.densityKgM3 && !dto.density) missing.push('Density');
+        if (!dto.costIndia && !dto.cost) missing.push('India cost');
+        if (missing.length > 0) {
+          dataWarnings.push(`Row ${i + 2} (${dto.material}): missing ${missing.join(', ')}`);
+        }
+      });
+
       // Batch insert all valid materials
       let created = 0;
       if (validMaterials.length > 0) {
@@ -579,12 +605,16 @@ export class RawMaterialsController {
       if (failed > 0) {
         this.logger.debug(`Failed rows: ${errors.map(e => e.row).join(', ')}`, 'RawMaterialsController');
       }
+      if (dataWarnings.length > 0) {
+        this.logger.warn(`${dataWarnings.length} rows imported with missing physical properties`, 'RawMaterialsController');
+      }
 
       return {
         message: `Excel file processed: ${created} materials created, ${failed} failed`,
         created,
         failed,
         errors: failed > 0 ? errors : undefined,
+        dataWarnings: dataWarnings.length > 0 ? dataWarnings : undefined,
       };
     } catch (error) {
       throw new BadRequestException(`Failed to process Excel file: ${error.message}`);
@@ -630,27 +660,25 @@ export class RawMaterialsController {
     const lowerGroup = excelMaterialGroup.toLowerCase().trim();
 
     // Map Excel values to PLASTIC & RUBBER materials
-    if (lowerGroup.includes('plastic') ||
-        lowerGroup.includes('rubber') ||
-        lowerGroup.includes('polymer') ||
-        lowerGroup.includes('elastomer') ||
-        lowerGroup.includes('thermoplastic') ||
-        lowerGroup.includes('thermoset') ||
-        lowerGroup.includes('silicone') ||
-        lowerGroup.includes('polyurethane') ||
-        lowerGroup === 'plastics' ||
-        lowerGroup === 'plastic' ||
-        lowerGroup === 'abs' ||
-        lowerGroup === 'pvc' ||
-        lowerGroup === 'pp' ||
-        lowerGroup === 'pe' ||
-        lowerGroup === 'pa' ||
-        lowerGroup === 'pc' ||
-        lowerGroup === 'pet' ||
-        lowerGroup === 'pom' ||
-        lowerGroup === 'pmma' ||
-        lowerGroup === 'ps' ||
-        lowerGroup === 'san') {
+    const plasticKeywords = ['plastic', 'rubber', 'polymer', 'elastomer', 'thermoplastic',
+      'thermoset', 'silicone', 'polyurethane', 'epoxy', 'nylon', 'resin'];
+    // Common resin abbreviations (exact match after trimming)
+    const plasticCodes = new Set([
+      'abs', 'pvc', 'pp', 'pe', 'pa', 'pc', 'pet', 'pom', 'pmma', 'ps', 'san',
+      'pa6', 'pa66', 'pa12', 'pa11', 'pa46', 'pa610', 'pa612',
+      'peek', 'pps', 'lcp', 'pbt', 'pei', 'psu', 'ppsu', 'pes',
+      'eva', 'evoh', 'hips', 'gpps', 'ldpe', 'hdpe', 'lldpe', 'uhmwpe',
+      'tpe', 'tpu', 'tpv', 'tps', 'tpee', 'tpa',
+      'pla', 'pha', 'pu', 'pur', 'pf', 'uf', 'mf', 'ep',
+      'ppsu', 'pvdf', 'ptfe', 'pfa', 'fep', 'etfe',
+      'acetal', 'delrin', 'polycarbonate',
+      // SLA/FDM/MJF photopolymer resin type names (combined-sheet format)
+      'waterclear', 'standard grey', 'black', 'durable', 'tough', 'flexible',
+      'castable', 'dental', 'engineering', 'high temp', 'elastic', 'rigid',
+    ]);
+    if (plasticKeywords.some(kw => lowerGroup.includes(kw)) ||
+        plasticCodes.has(lowerGroup) ||
+        lowerGroup === 'plastics') {
       return 'Plastic & Rubber';
     }
 
@@ -668,6 +696,19 @@ export class RawMaterialsController {
         lowerGroup.includes('bronze') ||
         lowerGroup.includes('stainless') ||
         lowerGroup.includes('alloy') ||
+        lowerGroup.includes('nickel') ||
+        lowerGroup.includes('cobalt') ||
+        lowerGroup.includes('magnesium') ||
+        lowerGroup.includes('lead') ||
+        lowerGroup.includes('tin') ||
+        lowerGroup.includes('tungsten') ||
+        lowerGroup.includes('chrome') ||
+        lowerGroup.includes('manganese') ||
+        lowerGroup.includes('cast') ||
+        lowerGroup.includes('ductile') ||
+        lowerGroup.includes('malleable') ||
+        lowerGroup.includes('galvanized') ||
+        lowerGroup.includes('maraging') ||
         lowerGroup === 'ferrous' ||
         lowerGroup === 'metals') {
       return 'Ferrous & Non-Ferrous';

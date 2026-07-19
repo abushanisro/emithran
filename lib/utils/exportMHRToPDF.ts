@@ -48,7 +48,7 @@ export const exportMHRToPDF = ({
 
   // Date and Document Info (Right side)
   doc.setFontSize(10);
-  const dateStr = new Date().toLocaleDateString('en-IN', {
+  const dateStr = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
@@ -92,7 +92,7 @@ export const exportMHRToPDF = ({
   doc.text('AVG. MACHINE HOUR RATE', 20 + statSpacing, statsY);
   doc.setFontSize(16);
   doc.setTextColor(...primaryColor);
-  doc.text(`₹${avgMHR.toFixed(2)}/hr`, 20 + statSpacing, statsY + 10);
+  doc.text(`$${avgMHR.toFixed(2)}/hr`, 20 + statSpacing, statsY + 10);
 
   // Stat 3: Total Annual Cost
   doc.setFontSize(10);
@@ -100,7 +100,7 @@ export const exportMHRToPDF = ({
   doc.text('TOTAL ANNUAL COST', 20 + statSpacing * 2, statsY);
   doc.setFontSize(16);
   doc.setTextColor(...primaryColor);
-  doc.text(`₹${totalAnnualCost.toLocaleString('en-IN')}`, 20 + statSpacing * 2, statsY + 10);
+  doc.text(`$${totalAnnualCost.toLocaleString('en-US')}`, 20 + statSpacing * 2, statsY + 10);
 
   // Stat 4: Locations
   doc.setFontSize(10);
@@ -126,10 +126,10 @@ export const exportMHRToPDF = ({
     getCommodityLabel(record.commodityCode),
     record.manufacturer || '-',
     record.model || '-',
-    `₹${record.calculations.totalMachineHourRate.toFixed(2)}`,
-    `₹${record.calculations.totalFixedCostPerHour.toFixed(2)}`,
-    `₹${record.calculations.totalVariableCostPerHour.toFixed(2)}`,
-    `₹${record.calculations.totalAnnualCost.toLocaleString('en-IN')}`,
+    `$${record.calculations.totalMachineHourRate.toFixed(2)}`,
+    `$${record.calculations.totalFixedCostPerHour.toFixed(2)}`,
+    `$${record.calculations.totalVariableCostPerHour.toFixed(2)}`,
+    `$${record.calculations.totalAnnualCost.toLocaleString('en-US')}`,
   ]);
 
   autoTable(doc, {
@@ -140,7 +140,7 @@ export const exportMHRToPDF = ({
       'Commodity',
       'Manufacturer',
       'Model',
-      'MHR (₹/hr)',
+      'MHR ($/hr)',
       'Fixed Cost',
       'Variable Cost',
       'Annual Cost',
@@ -244,7 +244,7 @@ export const exportSingleMHRToPDF = (
   doc.text('MACHINE HOUR RATE CALCULATION', 15, 28);
 
   doc.setFontSize(9);
-  const dateStr = new Date().toLocaleDateString('en-IN', {
+  const dateStr = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
@@ -315,12 +315,12 @@ export const exportSingleMHRToPDF = (
   const col2X = pageWidth / 2;
 
   doc.setFontSize(18);
-  doc.text(`₹${record.calculations.totalMachineHourRate.toFixed(2)}/hr`, col1X, metricsY);
+  doc.text(`$${record.calculations.totalMachineHourRate.toFixed(2)}/hr`, col1X, metricsY);
   doc.setFontSize(9);
   doc.text('Machine Hour Rate', col1X, metricsY + 5);
 
   doc.setFontSize(18);
-  doc.text(`₹${record.calculations.totalAnnualCost.toLocaleString('en-IN')}`, col2X, metricsY);
+  doc.text(`$${record.calculations.totalAnnualCost.toLocaleString('en-US')}`, col2X, metricsY);
   doc.setFontSize(9);
   doc.text('Total Annual Cost', col2X, metricsY + 5);
 
@@ -335,18 +335,18 @@ export const exportSingleMHRToPDF = (
 
   autoTable(doc, {
     startY: currentY,
-    head: [['Cost Component', 'Per Hour (₹)', 'Per Annum (₹)']],
+    head: [['Cost Component', 'Per Hour ($)', 'Per Annum ($)']],
     body: [
-      ['Depreciation', `${record.calculations.depreciationPerHour.toFixed(2)}`, `${record.calculations.depreciationPerAnnum.toLocaleString('en-IN')}`],
-      ['Interest', `${record.calculations.interestPerHour.toFixed(2)}`, `${record.calculations.interestPerAnnum.toLocaleString('en-IN')}`],
-      ['Insurance', `${record.calculations.insurancePerHour.toFixed(2)}`, `${record.calculations.insurancePerAnnum.toLocaleString('en-IN')}`],
-      ['Rent', `${record.calculations.rentPerHour.toFixed(2)}`, `${record.calculations.rentPerAnnum.toLocaleString('en-IN')}`],
-      ['Maintenance', `${record.calculations.maintenancePerHour.toFixed(2)}`, `${record.calculations.maintenancePerAnnum.toLocaleString('en-IN')}`],
-      ['Electricity', `${record.calculations.electricityPerHour.toFixed(2)}`, `${record.calculations.electricityPerAnnum.toLocaleString('en-IN')}`],
+      ['Depreciation', `${record.calculations.depreciationPerHour.toFixed(2)}`, `${record.calculations.depreciationPerAnnum.toLocaleString('en-US')}`],
+      ['Interest', `${record.calculations.interestPerHour.toFixed(2)}`, `${record.calculations.interestPerAnnum.toLocaleString('en-US')}`],
+      ['Insurance', `${record.calculations.insurancePerHour.toFixed(2)}`, `${record.calculations.insurancePerAnnum.toLocaleString('en-US')}`],
+      ['Rent', `${record.calculations.rentPerHour.toFixed(2)}`, `${record.calculations.rentPerAnnum.toLocaleString('en-US')}`],
+      ['Maintenance', `${record.calculations.maintenancePerHour.toFixed(2)}`, `${record.calculations.maintenancePerAnnum.toLocaleString('en-US')}`],
+      ['Electricity', `${record.calculations.electricityPerHour.toFixed(2)}`, `${record.calculations.electricityPerAnnum.toLocaleString('en-US')}`],
       ['Admin Overhead', `${record.calculations.adminOverheadPerHour.toFixed(2)}`, '-'],
       ['Profit Margin', `${record.calculations.profitMarginPerHour.toFixed(2)}`, '-'],
     ],
-    foot: [['TOTAL', `₹${record.calculations.totalMachineHourRate.toFixed(2)}`, `₹${record.calculations.totalAnnualCost.toLocaleString('en-IN')}`]],
+    foot: [['TOTAL', `$${record.calculations.totalMachineHourRate.toFixed(2)}`, `$${record.calculations.totalAnnualCost.toLocaleString('en-US')}`]],
     theme: 'striped',
     headStyles: {
       fillColor: primaryColor,

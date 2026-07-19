@@ -61,6 +61,16 @@ export class MHRController {
     return this.mhrService.getDistinctCurrencies(user.id, token);
   }
 
+  @Get('benchmark')
+  @ApiOperation({ summary: 'Get global MHR benchmark rates (no user data required)' })
+  @ApiResponse({ status: 200, description: 'Benchmark MHR rates from mhr_benchmark_rates table' })
+  async getBenchmarkRates(
+    @Query('location') location?: string,
+    @Query('processGroup') processGroup?: string,
+  ) {
+    return this.mhrService.getBenchmarkRates(location, processGroup);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get MHR record by ID' })
   @ApiResponse({ status: 200, description: 'MHR record retrieved successfully', type: MHRResponseDto })

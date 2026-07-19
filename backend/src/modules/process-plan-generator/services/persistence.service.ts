@@ -102,6 +102,13 @@ export class PersistenceService {
 
     const bomItemId = gen.bom_item_id as string;
 
+    // Extract location from the stored brief (available at generation time from Digital Factory selection)
+    const storedBriefForLocation = gen.brief as any;
+    const appliedLocation: string | null =
+      storedBriefForLocation?.context?.location ??
+      storedBriefForLocation?.scope?.location ??
+      null;
+
     try {
       for (const pm of approvedMasters.filter((m) => m.approved)) {
         if (pm.kind === 'raw_material') {
@@ -165,7 +172,7 @@ export class PersistenceService {
               user_id: userId,
               process_id: processId,
               mhr_id: line.data.mhrId,
-              lsr_id: line.data.lsrId,
+              lhr_id: line.data.lhrId,
               machine_name: line.data.machineName,
               labor_type: line.data.labourType,
               op_nbr: line.data.opNbr,
@@ -187,6 +194,9 @@ export class PersistenceService {
               feature_id:    line.data.featureId    ?? null,
               feature_type:  line.data.featureType  ?? null,
               feature_group: line.data.featureGroup ?? null,
+              location:      appliedLocation,
+              is_override:   false,
+              timing_source: line.data.timingSource ?? null,
             };
             const { data, error } = await client.from('process_cost_records').insert(payload).select('id').single();
             if (error) throw new Error(`process_cost_records insert failed: ${error.message}`);

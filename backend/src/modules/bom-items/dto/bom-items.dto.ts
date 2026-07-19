@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsString, IsOptional, IsUUID, IsNumber, IsEnum, Min, IsIn, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum BOMItemType {
   ASSEMBLY = 'assembly',
@@ -288,12 +289,14 @@ export class QueryBOMItemsDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   limit?: number;

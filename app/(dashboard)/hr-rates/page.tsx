@@ -61,7 +61,7 @@ const MASTER_LOCATIONS = ['China', 'E. Europe', 'France', 'Germany', 'India', 'M
 // fxRate = local units per 1 USD
 function getLocationCurrency(location: string): { symbol: string; code: string; fxRate: number } {
   const l = (location || '').toLowerCase();
-  if (l.includes('india'))                                    return { symbol: '₹',   code: 'INR', fxRate: 84.5  };
+  if (l.includes('india'))                                    return { symbol: '$',   code: 'INR', fxRate: 84.5  };
   if (l.includes('china'))                                    return { symbol: '¥',   code: 'CNY', fxRate: 7.25  };
   if (l.includes('mexico'))                                   return { symbol: 'MX$', code: 'MXN', fxRate: 17.5  };
   if (l.includes('germany') || l.includes('france') ||

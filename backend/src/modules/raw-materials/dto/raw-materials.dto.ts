@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsString, IsOptional, IsNumber, IsInt, Min, Max, IsEnum } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { Currency, MaterialShape } from '../constants/material-categories.constants';
 
 export class CreateRawMaterialDto {
@@ -208,6 +208,23 @@ export class CreateRawMaterialDto {
   @IsString()
   country?: string;
 
+  @ApiPropertyOptional({ example: 30.0, description: 'Hardness value in the units of hardness_system' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  hardness?: number;
+
+  @ApiPropertyOptional({ example: 'Brinell', description: 'Brinell, Rockwell, Vickers, Shore' })
+  @IsOptional()
+  @IsString()
+  hardnessSystem?: string;
+
+  @ApiPropertyOptional({ example: 51.31, description: 'Cutting parameter code from material library' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  cutCode?: number;
+
   @ApiPropertyOptional({ example: 'Sheet' })
   @IsOptional()
   @IsString()
@@ -266,12 +283,14 @@ export class QueryRawMaterialsDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   minCost?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   maxCost?: number;

@@ -5,7 +5,7 @@
  * Symbolic-ID prefixes:
  *   rm-N → raw material
  *   mc-N → machine (MHR)
- *   lb-N → labour band (LSR)
+ *   lb-N → labour band (LHR)
  *   op-N → process operation
  *   cl-N → calculator
  */
@@ -36,7 +36,7 @@ export interface MachineCandidate {
 
 export interface LabourCandidate {
   candidateId: string;        // 'lb-1', ...
-  dbId: string;               // real lsr.id (or lsr_records.id)
+  dbId: string;               // lhr_records.id
   labourType: string;         // Unskilled | Semi-Skilled | Skilled | Highly Skilled
   labourCode: string | null;
   lhrInrPerHour: number;

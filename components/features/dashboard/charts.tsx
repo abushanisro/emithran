@@ -73,7 +73,7 @@ export function CostChart({ projects }: CostChartProps) {
           <YAxis
             yAxisId="cost"
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`}
+            tickFormatter={(v) => `$${(v / 100000).toFixed(1)}L`}
             axisLine={{ stroke: 'hsl(var(--border))' }}
           />
           <YAxis
@@ -92,7 +92,7 @@ export function CostChart({ projects }: CostChartProps) {
             }}
             formatter={(value: any, name: string) => {
               if (name === 'Savings %') return [`${Number(value).toFixed(1)}%`, name];
-              return [`₹${Number(value).toLocaleString('en-IN')}`, name];
+              return [`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name];
             }}
           />
           <Legend />
@@ -319,7 +319,7 @@ export function ManufacturingPerformanceChart({ modules }: { modules: any[] }) {
             }}
             formatter={(value: any, name: string) => {
               if (name === 'Efficiency') return [`${Number(value).toFixed(1)}%`, name];
-              if (name === 'Value') return [`₹${Number(value).toFixed(1)}L`, name];
+              if (name === 'Value') return [`$${Number(value).toFixed(1)}L`, name];
               return [value, name];
             }}
           />
@@ -373,7 +373,7 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
         <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/80 backdrop-blur-sm">
           <div className="text-center">
             <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-950/20 flex items-center justify-center mx-auto mb-3">
-              <div className="text-xl font-bold text-green-600">₹</div>
+              <div className="text-xl font-bold text-green-600">$</div>
             </div>
             <p className="text-sm font-medium">Add cost data to see savings analysis</p>
             <p className="text-xs text-muted-foreground mt-1">Enter target price and should cost in projects</p>
@@ -389,7 +389,7 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
             />
             <YAxis 
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-              tickFormatter={() => '₹0'}
+              tickFormatter={() => '$0'}
               axisLine={{ stroke: 'hsl(var(--border))' }}
             />
             <Bar dataKey="savings" fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} />
@@ -404,7 +404,7 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
       <div className="h-64 flex items-center justify-center text-muted-foreground">
         <div className="text-center">
           <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-950/20 flex items-center justify-center mx-auto mb-3">
-            <div className="text-xl font-bold text-green-600">₹</div>
+            <div className="text-xl font-bold text-green-600">$</div>
           </div>
           <p className="text-sm">No projects available</p>
           <p className="text-xs text-muted-foreground mt-1">Create projects to see cost savings analysis</p>
@@ -430,9 +430,9 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
             tickFormatter={(v) => {
               const absV = Math.abs(v);
-              if (absV >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
-              if (absV >= 1000) return `₹${(v / 1000).toFixed(1)}K`;
-              return `₹${v.toFixed(0)}`;
+              if (absV >= 100000) return `$${(v / 100000).toFixed(1)}L`;
+              if (absV >= 1000) return `$${(v / 1000).toFixed(1)}K`;
+              return `$${v.toFixed(0)}`;
             }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
           />
@@ -447,9 +447,9 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
               if (name === 'Cost Savings') {
                 const numValue = Number(value);
                 const sign = numValue >= 0 ? 'Savings' : 'Overspend';
-                return [`₹${Math.abs(numValue).toLocaleString('en-IN')} (${sign})`, name];
+                return [`$${Math.abs(numValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${sign})`, name];
               }
-              return [`₹${Number(value).toLocaleString('en-IN')}`, name];
+              return [`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name];
             }}
             labelFormatter={(label) => `Project: ${label}`}
           />

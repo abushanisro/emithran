@@ -76,7 +76,7 @@ const CATEGORY_MAP: Record<string, string[]> = {
   'Auth & Setup': ['authentication', 'profile', 'developer'],
   'Core Data': ['projects', 'bom', 'bom-items', 'raw-materials', 'vendors'],
   'Manufacturing': ['processes', 'process-routes', 'production-planning', 'quality-control', 'vave'],
-  'Costing': ['cost-analysis', 'calculators', 'lsr', 'mhr'],
+  'Costing': ['cost-analysis', 'calculators', 'lhr', 'mhr'],
   'Procurement': ['rfq', 'supplier-evaluation', 'supplier-nominations', 'vendor-quotes', 'delivery', 'benchmarks'],
 };
 

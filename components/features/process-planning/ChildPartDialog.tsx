@@ -281,7 +281,7 @@ export function ChildPartDialog({
                   <h4 className="font-semibold text-sm mb-3">Purchased Part Costs</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Unit Cost (₹) *</Label>
+                      <Label>Unit Cost ($) *</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -342,7 +342,7 @@ export function ChildPartDialog({
                   <h4 className="font-semibold text-sm mb-3">Manufactured Part Costs</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Raw Material Cost (₹)</Label>
+                      <Label>Raw Material Cost ($)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -354,7 +354,7 @@ export function ChildPartDialog({
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Process Cost (₹)</Label>
+                      <Label>Process Cost ($)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -438,13 +438,13 @@ export function ChildPartDialog({
                       <div>
                         <Label className="text-xs text-muted-foreground">Cost Per Part</Label>
                         <div className="text-2xl font-bold text-primary">
-                          ₹{totalCost.toFixed(2)}
+                          ${totalCost.toFixed(2)}
                         </div>
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">Extended Cost (×{quantity})</Label>
                         <div className="text-2xl font-bold text-primary">
-                          ₹{extendedCost.toFixed(2)}
+                          ${extendedCost.toFixed(2)}
                         </div>
                       </div>
                     </div>
@@ -453,26 +453,26 @@ export function ChildPartDialog({
                     <div className="border-t pt-3 space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">Base Cost:</span>
-                        <span>₹{calculatedCost.baseCost?.toFixed(2)}</span>
+                        <span>${calculatedCost.baseCost?.toFixed(2)}</span>
                       </div>
                       {makeBuy === 'buy' && (
                         <>
                           {calculatedCost.freightCost > 0 && (
                             <div className="flex justify-between text-xs">
                               <span className="text-muted-foreground">Freight:</span>
-                              <span>₹{calculatedCost.freightCost?.toFixed(2)}</span>
+                              <span>${calculatedCost.freightCost?.toFixed(2)}</span>
                             </div>
                           )}
                           {calculatedCost.dutyCost > 0 && (
                             <div className="flex justify-between text-xs">
                               <span className="text-muted-foreground">Duty:</span>
-                              <span>₹{calculatedCost.dutyCost?.toFixed(2)}</span>
+                              <span>${calculatedCost.dutyCost?.toFixed(2)}</span>
                             </div>
                           )}
                           {calculatedCost.overheadCost > 0 && (
                             <div className="flex justify-between text-xs">
                               <span className="text-muted-foreground">Overhead:</span>
-                              <span>₹{calculatedCost.overheadCost?.toFixed(2)}</span>
+                              <span>${calculatedCost.overheadCost?.toFixed(2)}</span>
                             </div>
                           )}
                         </>
@@ -480,13 +480,13 @@ export function ChildPartDialog({
                       {calculatedCost.scrapAdjustment > 0 && (
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">Scrap Adjustment:</span>
-                          <span>₹{calculatedCost.scrapAdjustment?.toFixed(2)}</span>
+                          <span>${calculatedCost.scrapAdjustment?.toFixed(2)}</span>
                         </div>
                       )}
                       {calculatedCost.defectAdjustment > 0 && (
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">Defect Adjustment:</span>
-                          <span>₹{calculatedCost.defectAdjustment?.toFixed(2)}</span>
+                          <span>${calculatedCost.defectAdjustment?.toFixed(2)}</span>
                         </div>
                       )}
                     </div>

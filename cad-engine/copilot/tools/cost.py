@@ -7,10 +7,14 @@ from copilot.registry import register_tool
 
 async def _get_cost_breakdown(ctx: dict, **_) -> dict[str, Any]:
     cost = ctx.get("cost", {})
+    part = ctx.get("part") or {}
     mat = cost.get("material") or {}
     total = cost.get("totalCost") or 0
     mat_cost = mat.get("cost") or 0
     return {
+        "partName": part.get("name") or part.get("partNumber"),
+        "partNumber": part.get("partNumber"),
+        "materialGrade": part.get("materialGrade") or mat.get("grade") or cost.get("materialGrade"),
         "totalCost": cost.get("totalCost"),
         "currencySymbol": cost.get("currencySymbol", "$"),
         "material": {

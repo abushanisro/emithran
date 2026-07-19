@@ -221,12 +221,13 @@ export function useDeleteRawMaterialCost() {
       await apiClient.delete(`/raw-material-costs/${id}`);
       return { id, bomItemId };
     },
-    onSuccess: () => {
-      // Invalidate all raw-material-costs queries
-      queryClient.invalidateQueries({
-        queryKey: ['raw-material-costs'],
-        exact: false,
-      });
+    onSuccess: (_data, { bomItemId }) => {
+      // Invalidate raw material queries
+      queryClient.invalidateQueries({ queryKey: ['raw-material-costs'], exact: false });
+      // Cost summary and route comparison depend on material — must re-fetch so the
+      // machine selector and process estimates reflect the removed material.
+      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'cost-summary'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'route-comparison'], exact: false });
       toast.success('Raw material cost deleted successfully');
     },
     onError: (error: any) => {

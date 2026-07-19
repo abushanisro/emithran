@@ -43,7 +43,7 @@ export interface CreateProcessCostDto extends ProcessCostInput {
   supplierId?: string;
   supplierLocationId?: string;
   mhrId?: string;
-  lsrId?: string;
+  lhrId?: string;
   isActive?: boolean;
   notes?: string;
 }
@@ -56,7 +56,17 @@ export interface ProcessCostRecord {
   processRoute?: string;
   operation?: string;
   mhrId?: string;
-  lsrId?: string;
+  lhrId?: string;
+  /** Machine name resolved from the linked MHR record */
+  machineName?: string;
+  /** Labour type resolved from the linked LHR record */
+  laborType?: string;
+  /** Factory location recorded at time of route application */
+  location?: string;
+  /** false = engine-generated; true = engineer manually overrode */
+  isOverride?: boolean;
+  /** Provenance of the cycle time: 'calculator' | 'feature_geometry' | 'machining_rules' | 'ai_hint' | 'geometry_estimate' | 'default' */
+  timingSource?: string;
   directRate: number;
   indirectRate: number;
   fringeRate: number;

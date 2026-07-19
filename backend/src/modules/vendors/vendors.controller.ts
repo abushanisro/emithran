@@ -11,6 +11,7 @@ import {
   UploadedFile,
   UseInterceptors,
   ParseUUIDPipe,
+  HttpCode,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
@@ -26,6 +27,7 @@ import {
   CreateVendorContactDto,
   UpdateVendorContactDto,
 } from './dto/vendor.dto';
+import { MatchVendorsDto } from './dto/match-vendors.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 
@@ -68,6 +70,14 @@ export class VendorsController {
   @ApiResponse({ status: 200, description: 'Equipment types retrieved successfully' })
   async getEquipmentTypes(@CurrentUser() user: User, @AccessToken() token: string) {
     return this.vendorsService.getEquipmentTypes(user.id, token);
+  }
+
+  @Post('match')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Match vendors for a set of manufacturing processes' })
+  @ApiResponse({ status: 200, description: 'Ranked vendor groups returned' })
+  async matchForPart(@Body() dto: MatchVendorsDto, @CurrentUser() user: User, @AccessToken() token: string) {
+    return this.vendorsService.matchForPart(dto, user.id, token);
   }
 
   // ============================================================================

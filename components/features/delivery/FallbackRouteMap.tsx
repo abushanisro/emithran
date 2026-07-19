@@ -819,7 +819,7 @@ export default function FallbackRouteMap({
               </div>
             </div>
             <div className="text-center p-3 bg-background rounded-lg border">
-              <div className="text-2xl font-bold text-emerald-500">₹{routeInfo.cost.toLocaleString('en-IN')}</div>
+              <div className="text-2xl font-bold text-emerald-500">${routeInfo.cost.toLocaleString('en-IN')}</div>
               <div className="text-xs text-muted-foreground mt-1">Total Est. Cost</div>
             </div>
             <div className="text-center p-3 bg-background rounded-lg border">
@@ -852,30 +852,30 @@ export default function FallbackRouteMap({
 
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Transport ({routeInfo.distance} km × ₹{selectedTransport?.costPerKm}/km)</span>
-                    <span>₹{routeInfo.costBreakdown.transportBase.toLocaleString('en-IN')}</span>
+                    <span className="text-muted-foreground">Transport ({routeInfo.distance} km × ${selectedTransport?.costPerKm}/km)</span>
+                    <span>${routeInfo.costBreakdown.transportBase.toLocaleString('en-IN')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Loading & Unloading</span>
-                    <span>₹{routeInfo.costBreakdown.loadingUnloading.toLocaleString('en-IN')}</span>
+                    <span>${routeInfo.costBreakdown.loadingUnloading.toLocaleString('en-IN')}</span>
                   </div>
                   {routeInfo.costBreakdown.materialSurcharge > 0 && activeMaterial && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
                         {activeMaterial.label} surcharge (×{activeMaterial.multiplier} − 1)
                       </span>
-                      <span>₹{routeInfo.costBreakdown.materialSurcharge.toLocaleString('en-IN')}</span>
+                      <span>${routeInfo.costBreakdown.materialSurcharge.toLocaleString('en-IN')}</span>
                     </div>
                   )}
                   {routeInfo.costBreakdown.fuelTollSurcharge > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Fuel & Toll (6%)</span>
-                      <span>₹{routeInfo.costBreakdown.fuelTollSurcharge.toLocaleString('en-IN')}</span>
+                      <span>${routeInfo.costBreakdown.fuelTollSurcharge.toLocaleString('en-IN')}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-semibold border-t pt-1 mt-1">
                     <span>Total</span>
-                    <span className="text-emerald-500">₹{routeInfo.cost.toLocaleString('en-IN')}</span>
+                    <span className="text-emerald-500">${routeInfo.cost.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               </div>

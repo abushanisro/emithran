@@ -408,7 +408,7 @@ export function ProcessBasedToolingSection({ bomItemId, bomItem }: ProcessBasedT
         <div className="flex items-center justify-between">
           <h6 className="m-0 font-semibold text-primary-foreground">Process-Based Tooling & Fixtures</h6>
           <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground">
-            Total: ₹{calculateGrandTotal().toFixed(2)}
+            Total: ${calculateGrandTotal().toFixed(2)}
           </Badge>
         </div>
       </div>
@@ -448,7 +448,7 @@ export function ProcessBasedToolingSection({ bomItemId, bomItem }: ProcessBasedT
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary" className="text-xs">
-                          ₹{calculateProcessTotal(processKey).toFixed(2)}
+                          ${calculateProcessTotal(processKey).toFixed(2)}
                         </Badge>
                         <Button
                           variant="ghost"
@@ -483,7 +483,7 @@ export function ProcessBasedToolingSection({ bomItemId, bomItem }: ProcessBasedT
                                 </Badge>
                                 {subProcessTotal > 0 && (
                                   <Badge variant="secondary" className="text-xs">
-                                    ₹{subProcessTotal.toFixed(2)}
+                                    ${subProcessTotal.toFixed(2)}
                                   </Badge>
                                 )}
                               </div>
@@ -516,9 +516,9 @@ export function ProcessBasedToolingSection({ bomItemId, bomItem }: ProcessBasedT
                                         <p className="text-xs text-muted-foreground">{item.description}</p>
                                         <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                                           <span>Qty: {item.quantity}</span>
-                                          <span>Cost: ₹{item.unitCost.toFixed(2)}</span>
+                                          <span>Cost: ${item.unitCost.toFixed(2)}</span>
                                           <span>Usage: {item.usagePercentage}%</span>
-                                          <span className="font-medium">Total: ₹{item.totalCost.toFixed(2)}</span>
+                                          <span className="font-medium">Total: ${item.totalCost.toFixed(2)}</span>
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-1">

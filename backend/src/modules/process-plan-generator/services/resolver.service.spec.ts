@@ -12,7 +12,7 @@ const candidates: CandidateSet = {
     { candidateId: 'mc-1', dbId: 'mhr-1', machineName: 'ASC Lathe 320', commodityCode: 'LATHE', description: 'CNC Lathe', rateInrPerHour: 540, location: 'India-Bangalore', processFamily: 'cnc_turned', score: 0.9 },
   ],
   labour: [
-    { candidateId: 'lb-1', dbId: 'lsr-1', labourType: 'Skilled', labourCode: 'SKL', lhrInrPerHour: 62, location: 'India-Bangalore', score: 0.9 },
+    { candidateId: 'lb-1', dbId: 'lhr-1', labourType: 'Skilled', labourCode: 'SKL', lhrInrPerHour: 62, location: 'India-Bangalore', score: 0.9 },
   ],
   processes: [
     { candidateId: 'op-1', dbId: 'proc-1', processGroup: 'CNC Machining', processRoute: 'Turning', operation: 'Turning', calculatorId: null, score: 0.9, referenceTables: [] },
@@ -68,7 +68,7 @@ describe('ResolverService', () => {
     const proc = out.draftLines.find((l) => l.kind === 'process')!;
     expect((proc.data as any).processId).toBe('proc-1');
     expect((proc.data as any).mhrId).toBe('mhr-1');
-    expect((proc.data as any).lsrId).toBe('lsr-1');
+    expect((proc.data as any).lhrId).toBe('lhr-1');
     expect((proc.data as any).machineRate).toBe(540);
     expect((proc.data as any).labourRate).toBe(62);
     expect((proc.data as any).directRate).toBe(540 + 62 * 1);

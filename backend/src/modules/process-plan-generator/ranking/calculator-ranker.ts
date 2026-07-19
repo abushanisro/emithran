@@ -17,9 +17,10 @@ interface CalculatorRow {
 }
 
 const FAMILY_CALC_KEYWORDS: Record<Exclude<PartFamily, 'out_of_scope'>, string[]> = {
-  cnc_turned: ['turn', 'lathe', 'cnc', 'machining', 'process', 'drill', 'tap'],
-  cnc_milled: ['mill', 'machining', 'cnc', 'process', 'thread mill', 'drill', 'tap'],
-  sheet_metal: ['sheet metal', 'laser', 'punch', 'bend', 'sheet', 'cutting'],
+  cnc_turned:       ['turn', 'lathe', 'cnc', 'machining', 'process', 'drill', 'tap'],
+  cnc_milled:       ['mill', 'machining', 'cnc', 'process', 'thread mill', 'drill', 'tap'],
+  sheet_metal:      ['sheet metal', 'laser', 'punch', 'bend', 'sheet', 'cutting'],
+  injection_molded: ['injection', 'mold', 'mould', 'plastic', 'im', 'plastics', 'molding'],
 };
 
 const norm = (s: string | null | undefined): string => (s ?? '').toLowerCase().trim();

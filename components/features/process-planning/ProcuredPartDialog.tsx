@@ -126,7 +126,7 @@ export function ProcuredPartDialog({
             {/* Unit Cost and No Off */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Unit Cost (₹)</Label>
+                <Label>Unit Cost ($)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -188,8 +188,8 @@ export function ProcuredPartDialog({
               <CardContent className="pt-4 pb-4">
                 <Label className="block mb-2">Total Cost</Label>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">INR</span>
-                  <span className="text-2xl font-bold text-primary">₹{totalCost.toFixed(2)}</span>
+                  <span className="text-sm font-medium">USD</span>
+                  <span className="text-2xl font-bold text-primary">${totalCost.toFixed(2)}</span>
                 </div>
               </CardContent>
             </Card>

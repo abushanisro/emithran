@@ -3,6 +3,7 @@
 import { motion, useDragControls } from 'framer-motion';
 import { MessageSquareText, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 
 import { useEchoAlerts } from '@/lib/echo/useEchoApi';
 import { cn } from '@/lib/utils';
@@ -13,7 +14,7 @@ export function EchoFloatingButton() {
   const { isOpen, toggle, buttonPos, setButtonPos } = useEchoUi();
   const dragControls = useDragControls();
   const draggedRef = useRef(false);
-
+  const pathname = usePathname();
   const { data: alerts } = useEchoAlerts();
   const alertCount = Array.isArray(alerts) ? alerts.length : 0;
 
@@ -30,6 +31,9 @@ export function EchoFloatingButton() {
     return () => { window.removeEventListener('resize', clamp); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Hide on Manufacturing Intelligence page — Copilot lives in the Analysis panel there
+  if (pathname?.includes('/manufacturing-intelligence')) return null;
 
   return (
     <motion.div

@@ -50,7 +50,7 @@ CREATE TABLE process_plan_generations (
     brief JSONB NOT NULL DEFAULT '{}'::jsonb,
 
     -- CandidateSet snapshot at generation time
-    -- (top-N raw_materials, mhr_records, lsr_records, processes, calculators)
+    -- (top-N raw_materials, mhr_records, lhr_records, processes, calculators)
     candidates JSONB NOT NULL DEFAULT '{}'::jsonb,
 
     -- Append-only log of LLM tool calls + results (for replay + audit)

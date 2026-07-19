@@ -375,7 +375,7 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
               {isDraftReady && !isApplied && (
                 <Button size="sm" onClick={handleApply} disabled={apply.isPending}>
                   {apply.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                  Apply All · ₹{draft?.costPreview.total.toFixed(2)}
+                  Apply All · ${draft?.costPreview.total.toFixed(2)}
                 </Button>
               )}
               {isApplied && (

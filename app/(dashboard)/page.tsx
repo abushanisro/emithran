@@ -11,10 +11,12 @@ import {
   Plus,
   ArrowRight,
   BarChart3,
+  Package,
+  Layers,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useProjects, useVendors, useRawMaterials, useMHRRecords, useLSR } from '@/lib/api/hooks';
+import { useProjects, useVendors, useRawMaterials, useMHRRecords, useLHR } from '@/lib/api/hooks';
 import dynamic from 'next/dynamic';
 
 // Lazy load heavy chart components
@@ -57,8 +59,8 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => ['draft', 'active'].includes(p.status)).length,
       total: projects.length,
-      value: projects.reduce((sum, p) => sum + (Number(p.targetPrice) || 0), 0)
-    }
+      value: projects.reduce((sum, p) => sum + (Number(p.targetBomCost) || 0), 0),
+    },
   },
   {
     id: 'process-planning',
@@ -68,8 +70,8 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => p.status === 'active').length,
       total: projects.length,
-      value: projects.reduce((sum, p) => sum + (Number(p.shouldCost) || 0), 0)
-    }
+      value: projects.reduce((sum, p) => sum + (Number(p.actualCost) || 0), 0),
+    },
   },
   {
     id: 'supplier-evaluation',
@@ -79,8 +81,8 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => p.status === 'active').length,
       total: projects.length,
-      value: projects.reduce((sum, p) => sum + (Math.abs(Number(p.targetPrice) - Number(p.shouldCost)) || 0), 0)
-    }
+      value: projects.reduce((sum, p) => sum + Math.max(0, (Number(p.targetBomCost) || 0) - (Number(p.actualCost) || 0)), 0),
+    },
   },
   {
     id: 'supplier-nomination',
@@ -90,8 +92,8 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => ['active', 'on_hold'].includes(p.status)).length,
       total: projects.length,
-      value: projects.filter(p => p.status === 'active').reduce((sum, p) => sum + (Number(p.targetPrice) || 0), 0)
-    }
+      value: projects.filter(p => p.status === 'active').reduce((sum, p) => sum + (Number(p.targetBomCost) || 0), 0),
+    },
   },
   {
     id: 'production-planning',
@@ -101,8 +103,8 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => ['active', 'completed'].includes(p.status)).length,
       total: projects.length,
-      value: projects.filter(p => p.status === 'completed').reduce((sum, p) => sum + (Number(p.targetPrice) || 0), 0)
-    }
+      value: projects.filter(p => p.status === 'completed').reduce((sum, p) => sum + (Number(p.targetBomCost) || 0), 0),
+    },
   },
   {
     id: 'quality-control',
@@ -112,8 +114,8 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => ['active', 'completed'].includes(p.status)).length,
       total: projects.length,
-      value: projects.filter(p => p.status === 'completed').reduce((sum, p) => sum + (Number(p.shouldCost) || 0), 0)
-    }
+      value: projects.filter(p => p.status === 'completed').reduce((sum, p) => sum + (Number(p.actualCost) || 0), 0),
+    },
   },
   {
     id: 'delivery',
@@ -123,86 +125,87 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => p.status === 'completed').length,
       total: projects.length,
-      value: projects.filter(p => p.status === 'completed').reduce((sum, p) => sum + (Number(p.targetPrice) || 0), 0)
-    }
-  }
+      value: projects.filter(p => p.status === 'completed').reduce((sum, p) => sum + (Number(p.targetBomCost) || 0), 0),
+    },
+  },
 ];
 
-
-
-const statusCounts = [
-  { status: 'draft', label: 'Draft', count: 0 },
-  { status: 'active', label: 'Active', count: 0 },
-  { status: 'completed', label: 'Completed', count: 0 },
-  { status: 'on_hold', label: 'On Hold', count: 0 },
-  { status: 'cancelled', label: 'Cancelled', count: 0 },
-];
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  active: 'Active',
+  completed: 'Completed',
+  on_hold: 'On Hold',
+  cancelled: 'Cancelled',
+};
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { data: projectsData } = useProjects();
-  const { data: vendorsData } = useVendors(); // Use default pagination to see total count
+  const { data: projectsData } = useProjects({ limit: 100 });
+  const { data: vendorsData } = useVendors();
   const { data: rawMaterialsData } = useRawMaterials();
   const { data: mhrData } = useMHRRecords();
-  const { data: lsrData } = useLSR();
+  const { data: lhrData } = useLHR();
 
   const projects = projectsData?.projects || [];
   const vendors = vendorsData?.vendors || [];
   const rawMaterials = rawMaterialsData?.items || [];
   const mhrRecords = mhrData?.records || [];
-  const lsrRecords = lsrData?.records ?? [];
+  const lhrRecords = lhrData?.records ?? [];
 
-  // Get dynamic modules with real data
   const manufacturingModules = getManufacturingModules(projects);
 
-  // Calculate real status distribution
-  const statusDistribution = statusCounts.map((s) => ({
-    ...s,
-    count: projects.filter((p) => p.status === s.status).length,
-  })).filter((s) => s.count > 0);
+  // Status distribution (non-zero statuses only)
+  const statusDistribution = Object.keys(STATUS_LABELS)
+    .map(s => ({
+      status: s,
+      label: STATUS_LABELS[s],
+      count: projects.filter(p => p.status === s).length,
+    }))
+    .filter(s => s.count > 0);
 
+  // Cost summary — target = targetBomCost (the field actually set on creation)
+  //                should  = actualCost (derived from BOM item costs via enrichment)
+  const totalTarget = projects.reduce((sum, p) => sum + (Number(p.targetBomCost) || 0), 0);
+  const totalActual = projects.reduce((sum, p) => sum + (Number(p.actualCost) || 0), 0);
+  const totalBomItems = projects.reduce((sum, p) => sum + (Number(p.bomItemCount) || 0), 0);
+  const savings = totalTarget - totalActual;
+  const savingsPercent = totalTarget > 0 ? ((savings / totalTarget) * 100).toFixed(1) : '0';
 
-  // Real cost summary in Rupees
-  const totalQuoted = projects.reduce((sum, p) => sum + (Number(p.targetPrice) || 0), 0);
-  const totalShould = projects.reduce((sum, p) => sum + (Number(p.shouldCost) || 0), 0);
-  const savings = totalQuoted - totalShould;
-  const savingsPercent = totalQuoted > 0 ? ((savings / totalQuoted) * 100).toFixed(1) : '0';
+  // System efficiency — reflects how thoroughly the manufacturing data is populated.
+  // Components:
+  //   40% BOM cost coverage  — fraction of BOM items that have at least one cost record
+  //   30% Resource readiness — vendors + raw materials + MHR + LHR data present (max 30)
+  //   30% Project maturity   — draft=0.1, active=0.6, completed=1.0 weighted average
+  const totalBomItemsForEff = totalBomItems; // already computed above
+  const itemsWithCost = projects.reduce((s, p) => s + Math.min(Number(p.bomItemCount) || 0, (Number(p.actualCost) || 0) > 0 ? Number(p.bomItemCount) : 0), 0);
+  const costCoverage = totalBomItemsForEff > 0
+    ? Math.min(100, (itemsWithCost / totalBomItemsForEff) * 100) * 0.4
+    : (totalBomItemsForEff === 0 && projects.length > 0 ? 0 : 0);
 
-  // Calculate real efficiency metrics
+  const resourceScore = Math.min(30,
+    (vendors.length > 0 ? 8 : 0) +
+    (rawMaterials.length > 0 ? 8 : 0) +
+    (mhrRecords.length > 0 ? 7 : 0) +
+    (lhrRecords.length > 0 ? 7 : 0)
+  );
 
-  const completedProjects = projects.filter(p => p.status === 'completed').length;
-  const progressiveProjects = projects.filter(p => ['active', 'completed'].includes(p.status)).length;
-  
-  // Manufacturing System efficiency: composite metric
+  const maturityWeightMap: Record<string, number> = {
+    draft: 0.1, active: 0.6, completed: 1.0, on_hold: 0.3, cancelled: 0.0,
+  };
+  const maturityScore = projects.length > 0
+    ? (projects.reduce((s, p) => s + (maturityWeightMap[p.status] ?? 0.1), 0) / projects.length) * 30
+    : 0;
+
   let systemEfficiency = 0;
   if (projects.length > 0) {
-    // Component 1: Project completion rate (40% weight)
-    const completionRate = (completedProjects / projects.length) * 40;
-    
-    // Component 2: Active project ratio (30% weight) - shows system utilization
-    const activeRate = (progressiveProjects / projects.length) * 30;
-    
-    // Component 3: Resource utilization (20% weight) - based on vendors, materials, equipment
-    const resourceCount = vendors.length + rawMaterials.length + mhrRecords.length;
-    const resourceUtilization = Math.min(100, resourceCount / 10) * 0.2; // Scale to 20%
-    
-    // Component 4: Data connectivity health (10% weight)
-    const dataHealthScore = (
-      (vendors.length > 0 ? 25 : 0) +
-      (rawMaterials.length > 0 ? 25 : 0) +
-      (mhrRecords.length > 0 ? 25 : 0) +
-      (lsrRecords.length > 0 ? 25 : 0)
-    ) * 0.1;
-    
-    systemEfficiency = completionRate + activeRate + resourceUtilization + dataHealthScore;
-    
-    // Minimum baseline: if system has active projects and resources, show at least 15%
-    if (systemEfficiency < 15 && progressiveProjects > 0 && resourceCount > 0) {
-      systemEfficiency = 15 + (progressiveProjects / projects.length) * 10;
+    systemEfficiency = costCoverage + resourceScore + maturityScore;
+    // Ensure a floor of 10% when there is any data at all
+    if (systemEfficiency < 10 && (vendors.length + rawMaterials.length + mhrRecords.length + lhrRecords.length + totalBomItemsForEff) > 0) {
+      systemEfficiency = 10;
     }
   }
 
-  // Generate real project trend data (last 7 periods)
+  // Project trend data (last 30 days, daily buckets for x-axis)
   const projectTrendData = Array.from({ length: 7 }, (_, index) => {
     const baseDate = new Date();
     baseDate.setDate(baseDate.getDate() - (6 - index) * 7);
@@ -212,6 +215,13 @@ export default function DashboardPage() {
     });
     return { value: weekProjects.length, period: index };
   });
+
+  // Enrich projects for chart — map actualCost → shouldCost for chart components
+  const projectsForCharts = projects.map(p => ({
+    ...p,
+    targetPrice: p.targetBomCost ?? 0,
+    shouldCost: p.actualCost ?? 0,
+  }));
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -240,7 +250,7 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="text-center">
                 <p className="text-3xl font-bold text-primary">{projects.length}</p>
-                <p className="text-sm text-muted-foreground">Active Projects</p>
+                <p className="text-sm text-muted-foreground">Total Projects</p>
                 <div className="mt-2 h-12">
                   <div className="flex items-end justify-center space-x-1 h-full">
                     {projectTrendData.map((data, i) => (
@@ -249,7 +259,7 @@ export default function DashboardPage() {
                         className="bg-primary/60 rounded-sm"
                         style={{
                           height: `${Math.max(8, (data.value / Math.max(...projectTrendData.map(d => d.value), 1)) * 48)}px`,
-                          width: '8px'
+                          width: '8px',
                         }}
                       />
                     ))}
@@ -259,59 +269,68 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+
         <Card className="border-border/50 bg-card">
           <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-green-600">{systemEfficiency.toFixed(1)}%</p>
-                <p className="text-sm text-muted-foreground">System Efficiency</p>
-                <div className="mt-2">
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${systemEfficiency}%` }}
-                    />
-                  </div>
+            <div className="text-center space-y-2">
+              <p className="text-3xl font-bold text-green-600">{systemEfficiency.toFixed(1)}%</p>
+              <p className="text-sm text-muted-foreground">System Efficiency</p>
+              <div className="w-full bg-secondary rounded-full h-2">
+                <div
+                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${systemEfficiency}%` }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs mt-2">
+                <div className="text-center">
+                  <p className="font-semibold text-primary">{totalBomItems}</p>
+                  <p className="text-muted-foreground">BOM Items</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-purple-600">
+                    {projects.reduce((s, p) => s + (p.bomCount || 0), 0)}
+                  </p>
+                  <p className="text-muted-foreground">BOMs</p>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
+
         <Card className="border-border/50 bg-card">
           <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-purple-600">{vendorsData?.total || vendors.length}</p>
-                <p className="text-sm text-muted-foreground">Total Vendors</p>
-                <div className="mt-2 grid grid-cols-3 gap-1 text-xs">
-                  <div className="text-center">
-                    <p className="font-semibold">{vendorsData?.total || vendors.filter(v => v.status === 'active').length}</p>
-                    <p className="text-muted-foreground">Active</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-semibold">{vendors.filter(v => v.status === 'pending').length}</p>
-                    <p className="text-muted-foreground">Pending</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-semibold">{vendors.filter(v => v.status === 'inactive').length}</p>
-                    <p className="text-muted-foreground">Inactive</p>
-                  </div>
+            <div className="text-center space-y-2">
+              <p className="text-3xl font-bold text-purple-600">{vendorsData?.total || vendors.length}</p>
+              <p className="text-sm text-muted-foreground">Total Vendors</p>
+              <div className="grid grid-cols-3 gap-1 text-xs mt-2">
+                <div className="text-center">
+                  <p className="font-semibold">{vendorsData?.total || vendors.filter(v => v.status === 'active').length}</p>
+                  <p className="text-muted-foreground">Active</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold">{vendors.filter(v => v.status === 'pending').length}</p>
+                  <p className="text-muted-foreground">Pending</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold">{vendors.filter(v => v.status === 'inactive').length}</p>
+                  <p className="text-muted-foreground">Inactive</p>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
+
         <Card className="border-border/50 bg-card">
           <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-green-600">₹{savings.toLocaleString('en-IN')}</p>
-                <p className="text-sm text-muted-foreground">Cost Savings</p>
-                <div className="mt-2">
-                  <p className="text-lg font-semibold text-green-600">{savingsPercent}%</p>
-                  <p className="text-xs text-muted-foreground">Savings Rate</p>
-                </div>
-              </div>
+            <div className="text-center space-y-2">
+              <p className="text-3xl font-bold text-green-600">
+                {savings >= 0 ? '+' : ''}{savings.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-sm text-muted-foreground">Cost Savings</p>
+              <p className="text-lg font-semibold text-green-600">{savingsPercent}%</p>
+              <p className="text-xs text-muted-foreground">
+                Target vs Actual BOM Cost
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -329,12 +348,11 @@ export default function DashboardPage() {
               {manufacturingModules.length} Active Modules
             </Badge>
             <Badge variant="outline" className="px-3 py-1">
-              ₹{(manufacturingModules.reduce((sum, m) => sum + m.stats.value, 0) / 100000).toFixed(1)}L Portfolio Value
+              {(totalTarget / 1000).toFixed(0)}K Portfolio Value
             </Badge>
           </div>
         </div>
-        
-        {/* Performance Chart */}
+
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold">
@@ -348,12 +366,7 @@ export default function DashboardPage() {
             <ManufacturingPerformanceChart modules={manufacturingModules} />
           </CardContent>
         </Card>
-
-        {/* Analytics Module Grid */}
-
       </div>
-
-
 
       {/* Advanced Analytics Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -362,47 +375,35 @@ export default function DashboardPage() {
           <Card className="border-border/50 bg-card">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">
-                  Project Trend Analysis
-                </CardTitle>
-                <Badge variant="outline" className="px-3 py-1">
-                  Last 30 Days
-                </Badge>
+                <CardTitle className="text-lg font-semibold">Project Trend Analysis</CardTitle>
+                <Badge variant="outline" className="px-3 py-1">Last 30 Days</Badge>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Project creation trends and volume analytics
-              </p>
+              <p className="text-sm text-muted-foreground">Project creation trends and volume analytics</p>
             </CardHeader>
             <CardContent>
               <ProjectTrendChart projects={projects} />
             </CardContent>
           </Card>
-          
+
           <Card className="border-border/50 bg-card">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold">
-                Cost Savings Analysis
-              </CardTitle>
+              <CardTitle className="text-lg font-semibold">Cost Savings Analysis</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Project-wise cost optimization and savings identification
+                Project-wise cost optimization — target BOM cost vs actual BOM cost
               </p>
             </CardHeader>
             <CardContent>
-              <CostSavingsChart projects={projects} />
+              <CostSavingsChart projects={projectsForCharts} />
             </CardContent>
           </Card>
         </div>
-        
+
         {/* Status & Pipeline Overview */}
         <div className="space-y-6">
           <Card className="border-border/50 bg-card">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold">
-                Project Status Distribution
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Current project status breakdown with percentage distribution
-              </p>
+              <CardTitle className="text-lg font-semibold">Project Status Distribution</CardTitle>
+              <p className="text-sm text-muted-foreground">Current project status breakdown with percentage distribution</p>
             </CardHeader>
             <CardContent>
               {statusDistribution.length > 0 ? (
@@ -419,13 +420,11 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
-          
+
           <Card className="border-border/50 bg-card">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">
-                  Active Project Pipeline
-                </CardTitle>
+                <CardTitle className="text-lg font-semibold">Active Project Pipeline</CardTitle>
                 <Link href="/projects" className="text-sm text-primary hover:underline flex items-center gap-1">
                   View all <ArrowRight className="h-3 w-3" />
                 </Link>
@@ -433,7 +432,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {projects.length > 0 ? (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
+                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                   {projects.slice(0, 4).map((project) => (
                     <div
                       key={project.id}
@@ -448,18 +447,31 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div>
                             <span className="text-muted-foreground">Target: </span>
-                            <span className="font-semibold">₹{(Number(project.targetPrice) / 100000 || 0).toFixed(1)}L</span>
+                            <span className="font-semibold">
+                              {(Number(project.targetBomCost) || 0).toLocaleString('en-US', { style: 'currency', currency: project.targetBomCostCurrency || 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Should: </span>
-                            <span className="font-semibold">₹{(Number(project.shouldCost) / 100000 || 0).toFixed(1)}L</span>
+                            <span className="text-muted-foreground">Actual: </span>
+                            <span className="font-semibold">
+                              {(Number(project.actualCost) || 0).toLocaleString('en-US', { style: 'currency', currency: project.targetBomCostCurrency || 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
                           </div>
                         </div>
-                        <div className="text-xs">
-                          <span className="text-muted-foreground">Savings: </span>
-                          <span className="font-semibold text-green-600">
-                            ₹{(((Number(project.targetPrice) || 0) - (Number(project.shouldCost) || 0)) / 100000).toFixed(1)}L
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Layers className="h-3 w-3" />
+                            {project.bomCount ?? 0} BOMs
                           </span>
+                          <span className="flex items-center gap-1">
+                            <Package className="h-3 w-3" />
+                            {project.bomItemCount ?? 0} items
+                          </span>
+                          {(project.targetBomCost ?? 0) > 0 && (
+                            <span className="font-semibold text-green-600 ml-auto">
+                              {(((Number(project.targetBomCost) - Number(project.actualCost)) / Number(project.targetBomCost)) * 100).toFixed(1)}% saved
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -485,45 +497,46 @@ export default function DashboardPage() {
       {/* Cost Analysis Overview */}
       <Card className="border-border/50 bg-card">
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-semibold">
-            Manufacturing Cost Analysis (₹ Rupees)
-          </CardTitle>
+          <CardTitle className="text-lg font-semibold">Manufacturing Cost Analysis</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Target BOM cost vs actual BOM cost derived from process-planned items
+          </p>
         </CardHeader>
         <CardContent>
           {projects.length > 0 ? (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center p-6 rounded-xl bg-primary/5 border border-primary/20">
-                  <p className="text-sm text-primary mb-1 uppercase tracking-wider font-bold">Total Quoted</p>
+                  <p className="text-sm text-primary mb-1 uppercase tracking-wider font-bold">Total Target</p>
                   <p className="text-2xl font-bold text-foreground">
-                    ₹{totalQuoted.toLocaleString('en-IN')}
+                    {totalTarget.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1">from {projects.filter(p => (p.targetBomCost ?? 0) > 0).length} projects with targets</p>
                 </div>
                 <div className="text-center p-6 rounded-xl bg-purple-500/5 border border-purple-500/20">
-                  <p className="text-sm text-purple-400 mb-1 uppercase tracking-wider font-bold">Should Cost</p>
+                  <p className="text-sm text-purple-400 mb-1 uppercase tracking-wider font-bold">Actual BOM Cost</p>
                   <p className="text-2xl font-bold text-foreground">
-                    ₹{totalShould.toLocaleString('en-IN')}
+                    {totalActual.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1">{totalBomItems} items across all BOMs</p>
                 </div>
                 <div className="text-center p-6 rounded-xl bg-success/5 border border-success/20">
                   <p className="text-sm text-success mb-1 uppercase tracking-wider font-bold">Savings</p>
                   <p className="text-2xl font-bold text-success">
-                    ₹{savings.toLocaleString('en-IN')}
+                    {savings.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                    {savingsPercent}% reduction
-                  </p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">{savingsPercent}% reduction</p>
                 </div>
               </div>
-              <CostChart projects={projects} />
+              <CostChart projects={projectsForCharts} />
             </div>
           ) : (
             <div className="h-72 flex items-center justify-center text-muted-foreground">
               <div className="text-center">
                 <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-950/20 flex items-center justify-center mx-auto mb-4">
-                  <div className="text-2xl font-bold text-green-600">₹</div>
+                  <div className="text-2xl font-bold text-green-600">$</div>
                 </div>
-                <p className="text-sm mb-3">Add projects to see cost analysis</p>
+                <p className="text-sm mb-3">Add projects with BOM items to see cost analysis</p>
                 <Link href="/projects">
                   <Button variant="outline" size="sm" className="rounded-full">
                     <Plus className="h-3 w-3 mr-2" />

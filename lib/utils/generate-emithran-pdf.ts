@@ -1,8 +1,8 @@
 import type { BomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
 
-// jsPDF built-in Helvetica does not render ₹ — use Rs. which is universally safe in PDFs
+// jsPDF built-in Helvetica does not render $ — use Rs. which is universally safe in PDFs
 const rs = (v: number) =>
-  `Rs.${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `Rs.${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const pct = (v: number, total: number) =>
   total > 0 ? `${((v / total) * 100).toFixed(1)}%` : '0.0%';
@@ -61,7 +61,7 @@ export async function generateEMithranPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...C.muted);
-  const today = new Date().toLocaleDateString('en-IN', {
+  const today = new Date().toLocaleDateString('en-US', {
     day: '2-digit', month: 'short', year: 'numeric',
   });
   doc.text(today, pageW - M, y, { align: 'right' });

@@ -20,6 +20,10 @@ export type Project = {
   targetBomCostCurrency?: string;
   createdAt: string;
   updatedAt: string;
+  // Enriched aggregate fields from BOM data
+  bomCount?: number;
+  bomItemCount?: number;
+  actualCost?: number;
 };
 
 export type CreateProjectData = {

@@ -9,6 +9,7 @@ export type PartFamily =
   | 'cnc_turned'
   | 'cnc_milled'
   | 'sheet_metal'
+  | 'injection_molded'
   | 'out_of_scope';
 
 export interface PartFamilyDecision {
@@ -37,6 +38,12 @@ export interface BriefBomItem {
   heatTreatment: string | null;
   hardnessHrc: number | null;
   materialHint: string | null;
+  /** Resolved from raw_materials.material_family via DB lookup before scope classification.
+   *  Values: polymer_thermoplastic | polymer_thermoset | elastomer | ferrous_mild_steel |
+   *          ferrous_alloy_steel | ferrous_stainless | ferrous_cast_iron |
+   *          non_ferrous_aluminum | non_ferrous_copper | non_ferrous_titanium | superalloy
+   *  Null/undefined when materialHint had no match in raw_materials. */
+  materialFamily?: string | null;
   coating: string | null;             // from bom_items.coating (drawing-confirmed)
   tightestToleranceMm: number | null; // from bom_items.tightest_tolerance_mm
 }

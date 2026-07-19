@@ -34,3 +34,6 @@ anthropic==0.18.1
 
 # AI Copilot - Groq (OpenAI-compatible client)
 openai>=1.35.0
+
+# SolidWorks COM automation (Windows only — silently skipped on Linux/Railway)
+pywin32>=306; sys_platform == "win32"

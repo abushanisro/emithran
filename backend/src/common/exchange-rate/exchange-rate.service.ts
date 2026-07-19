@@ -4,7 +4,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 /**
  * Loads the active budget exchange rates from the `exchange_rates` table and
  * provides cost conversion between currencies. Shared by every module that
- * prices in a non-INR currency (MHR, LSR, process-plan-generator) so there is
+ * prices in a non-INR currency (MHR, LHR, process-plan-generator) so there is
  * exactly one FX source of truth in the app — the DB table an admin maintains,
  * not a hardcoded constant that drifts out of date in code.
  *

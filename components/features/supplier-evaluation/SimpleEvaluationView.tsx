@@ -250,7 +250,7 @@ export function SimpleEvaluationView({ groupId, onBack }: SimpleEvaluationViewPr
                     {mainProcess ? (
                       <div className="flex flex-col">
                         <span className="text-white font-medium">{mainProcess.processRoute || mainProcess.operation}</span>
-                        <span className="text-[10px] text-teal-500/70">₹{mainProcess.totalCostPerPart?.toLocaleString()}</span>
+                        <span className="text-[10px] text-teal-500/70">${mainProcess.totalCostPerPart?.toLocaleString()}</span>
                       </div>
                     ) : (
                       <span className="italic text-gray-600 italic">No process</span>

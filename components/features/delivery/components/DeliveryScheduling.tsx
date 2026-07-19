@@ -134,7 +134,7 @@ export default function DeliveryScheduling({ projectId, batches, onScheduleUpdat
                       <span>{batch.itemCount} items</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span>Value: ₹{batch.totalValue?.toLocaleString() || '0'}</span>
+                      <span>Value: ${batch.totalValue?.toLocaleString() || '0'}</span>
                     </div>
                     {batch.expectedCompletion && (
                       <div className="flex items-center gap-1">

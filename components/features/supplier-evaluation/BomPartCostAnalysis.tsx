@@ -329,7 +329,7 @@ export function BomPartCostAnalysis({
               <Card className="bg-purple-900/30 border-purple-500/50">
                 <CardContent className="p-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-300">₹{dashboardData.totalValue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-purple-300">${dashboardData.totalValue.toFixed(2)}</div>
                     <div className="text-sm text-purple-200">Total Project Value</div>
                   </div>
                 </CardContent>
@@ -377,8 +377,8 @@ export function BomPartCostAnalysis({
                             <span className="font-medium text-green-400">{result.winner?.name}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-white">₹{result.unitCost.toFixed(2)}</TableCell>
-                        <TableCell className="text-yellow-400 font-medium">₹{result.totalCost.toFixed(2)}</TableCell>
+                        <TableCell className="text-white">${result.unitCost.toFixed(2)}</TableCell>
+                        <TableCell className="text-yellow-400 font-medium">${result.totalCost.toFixed(2)}</TableCell>
                         <TableCell className="text-white">{result.leadTime} days</TableCell>
                         <TableCell>
                           <Badge className="bg-green-600 text-white">#1 🏆</Badge>
@@ -542,9 +542,9 @@ export function BomPartCostAnalysis({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Vendor</TableHead>
-                      <TableHead>Net Price/Unit (₹)</TableHead>
+                      <TableHead>Net Price/Unit ($)</TableHead>
                       <TableHead>Lead Time (Days)</TableHead>
-                      <TableHead>Development Cost (₹)</TableHead>
+                      <TableHead>Development Cost ($)</TableHead>
                       <TableHead>Cost Rank</TableHead>
                       <TableHead>Lead Time Rank</TableHead>
                       <TableHead>Dev Cost Rank</TableHead>
@@ -576,7 +576,7 @@ export function BomPartCostAnalysis({
                                 step="0.01"
                               />
                             ) : (
-                              <span>₹{cost.toFixed(2)}</span>
+                              <span>${cost.toFixed(2)}</span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -602,7 +602,7 @@ export function BomPartCostAnalysis({
                                 step="0.01"
                               />
                             ) : (
-                              <span>₹{devCost.toFixed(2)}</span>
+                              <span>${devCost.toFixed(2)}</span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -671,7 +671,7 @@ export function BomPartCostAnalysis({
                         </p>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold">₹{vendorCosts[selectedPartId]?.[winnerVendor.id]?.toFixed(2) || '0.00'}</div>
+                        <div className="text-lg font-bold">${vendorCosts[selectedPartId]?.[winnerVendor.id]?.toFixed(2) || '0.00'}</div>
                         <div className="text-sm text-green-600">Net Price per Unit</div>
                       </div>
                     </div>

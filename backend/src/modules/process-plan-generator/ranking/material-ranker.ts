@@ -39,9 +39,10 @@ const COMPATIBLE_FORMS: Partial<Record<Exclude<PartFamily, 'out_of_scope'>, stri
 };
 
 const PREFERRED_MATERIALS_BY_FAMILY: Record<Exclude<PartFamily, 'out_of_scope'>, string[]> = {
-  cnc_turned: ['aluminium', 'aluminum', 'mild steel', 'ms', 'en8', 'en24', 'stainless', 'ss304', 'ss316', 'brass', 'copper', 'free cutting steel'],
-  cnc_milled: ['aluminium', 'aluminum', 'mild steel', 'en8', 'en19', 'en24', 'stainless', 'ss304', 'ss316', 'p20', 'h13', 'tool steel'],
-  sheet_metal: ['mild steel', 'ms', 'cold rolled', 'crca', 'galvanized', 'galvanised', 'gi', 'stainless', 'ss304', 'aluminium sheet', 'aluminum sheet', 'aluminium 5052', 'aluminium 6061', 'aluminium 1100', 'aluminium 3003', 'aluminum 5052', 'aluminum 6061'],
+  cnc_turned:       ['aluminium', 'aluminum', 'mild steel', 'ms', 'en8', 'en24', 'stainless', 'ss304', 'ss316', 'brass', 'copper', 'free cutting steel'],
+  cnc_milled:       ['aluminium', 'aluminum', 'mild steel', 'en8', 'en19', 'en24', 'stainless', 'ss304', 'ss316', 'p20', 'h13', 'tool steel'],
+  sheet_metal:      ['mild steel', 'ms', 'cold rolled', 'crca', 'galvanized', 'galvanised', 'gi', 'stainless', 'ss304', 'aluminium sheet', 'aluminum sheet', 'aluminium 5052', 'aluminium 6061', 'aluminium 1100', 'aluminium 3003', 'aluminum 5052', 'aluminum 6061'],
+  injection_molded: ['abs', 'pp', 'polypropylene', 'pc', 'polycarbonate', 'nylon', 'pa6', 'pa66', 'pom', 'acetal', 'delrin', 'hdpe', 'ldpe', 'peek', 'tpu', 'tpe', 'plastic'],
 };
 
 const EXCLUDED_MATERIALS_BY_FAMILY: Partial<Record<Exclude<PartFamily, 'out_of_scope'>, string[]>> = {
@@ -351,7 +352,23 @@ export function rankMaterials(
 
   scored.sort((a, b) => b.score - a.score || a.row.id.localeCompare(b.row.id));
 
-  const topSlice = scored.slice(0, topN);
+  // Deduplicate by (material, grade) keeping the highest-scoring row per group.
+  // The DB has one USD/GL row and one INR/IN row for every material; both score
+  // similarly and without this step both appear as candidates for the same slot.
+  // Normalise dashes so "Martensitic - Round Bar" and "Martensitic Round Bar"
+  // collapse to the same key — a grade-string inconsistency between migration 154
+  // and 175 that migration 347 corrects at the DB level.
+  const seenMaterialGrade = new Set<string>();
+  const deduped = scored.filter(({ row }) => {
+    const key =
+      `${(row.material ?? '').toLowerCase().trim()}|` +
+      `${(row.material_grade ?? '').toLowerCase().trim().replace(/\s*-\s*/g, ' ')}`;
+    if (seenMaterialGrade.has(key)) return false;
+    seenMaterialGrade.add(key);
+    return true;
+  });
+
+  const topSlice = deduped.slice(0, topN);
 
   // Normalise so the best candidate ≈ 0.92 (realistic spread, never 100%).
   const maxScore = topSlice[0]?.score ?? 1;

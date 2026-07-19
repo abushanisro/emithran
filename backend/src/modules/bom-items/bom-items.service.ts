@@ -8,8 +8,12 @@ import {
   computeCNCMilledCostSummary, computeCNCTurnedCostSummary,
   checkCNCCapability, computeRouteComplexityScore,
   requiredMilledMachineClass, meetsRequiredMilledClass, pickRecommendedRoute,
+  detectMaterialClass,
 } from './costing/cost-cnc-engine';
 import type { CNCCostInput, CNCMachineClass } from './costing/cost-cnc-engine';
+import { BlankOptimizerService } from './costing/blank-optimizer.service';
+import { buildOperationSequence, injectDrawingIntelligence } from './costing/operation-sequencer';
+import type { OperationLine } from './costing/operation-sequencer';
 import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT, recommendCavityCount } from './costing/cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from './costing/cost-injection-molding-engine';
 import { isPlasticGrade } from './costing/injection-molding/process-tree';
@@ -33,7 +37,9 @@ import { computeTurretPunchCost } from './costing/turret-punch-engine';
 import { computeWaterjetCost } from './costing/waterjet-engine';
 import { checkMachineCapability } from './costing/machine-capability';
 import type { PartGeometryForCapability } from './costing/machine-capability';
-import type { CostSummaryDto, ProcessLineCost } from './dto/cost-breakdown.dto';
+import type { CostSummaryDto, ProcessLineCost, FeatureOp } from './dto/cost-breakdown.dto';
+import type { BlankSpecDto } from './dto/blank-spec.dto';
+import type { CandidateRouteComparisonDto, CandidateRouteDto } from './dto/candidate-route.dto';
 import type { RouteComparisonDto, RouteResultDto, RouteId, RouteCapability } from './dto/route-comparison.dto';
 import { deriveGdtSeverity, resolveInspectionRule, SEVERITY_RANK } from './costing/gdt-severity';
 import type { GdtSeverity, InspectionMethod, InspectionRuleRow } from './costing/gdt-severity';
@@ -47,8 +53,8 @@ import {
 } from './costing/machine-selection/physics';
 import type { MachineRequirement } from './costing/machine-selection/physics';
 import { fetchMachinePool, selectMachine } from './costing/machine-selection/selector';
-import { lookupSeedCapability } from './costing/machine-selection/seed-registry';
-import type { MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
+import { EMPTY_CAPABILITY, MACHINE_CLASS_DEFAULTS, lookupSeedCapability } from './costing/machine-selection/seed-registry';
+import type { MachineCandidate, MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
 import {
   shapeRankForFamily,
   isDiscouragedShapeForFamily,
@@ -107,6 +113,7 @@ export class BOMItemsService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly inspectionKnowledge: InspectionKnowledgeService,
+    private readonly blankOptimizer: BlankOptimizerService,
   ) { }
 
   /**
@@ -1309,6 +1316,9 @@ export class BOMItemsService {
     cncMillTurn: MHRRateInput;
     injectionMolding: MHRRateInput;
   }> {
+    // Kick off LHR benchmark lookup immediately so it overlaps with the MHR DB round-trip
+    const lhrRatesPromise = this.resolveLHRRates(accessToken, location);
+
     const locationMHR = (LOCATION_MHR_DEFAULTS as Record<string, Partial<Record<MachineClass, number>>>)[location];
     const makeDefault = (cls: MachineClass): MHRRateInput => ({
       rate: locationMHR?.[cls] ?? MACHINE_REGISTRY[cls].defaultRate,
@@ -1318,28 +1328,116 @@ export class BOMItemsService {
       commodityCode: null,
     });
 
+    // When the DB resolves a machine rate that is anomalously low (< 50% of benchmark)
+    // or anomalously high (> 300% of benchmark) for the requested location, the rate
+    // is almost certainly a data import error:
+    //   - Too low:  a cross-location record stored in the wrong local currency
+    //               (e.g. India's ₹3,200/hr Salvagnini surfacing in a USA run)
+    //   - Too high: an INR rate treated as USD during Excel import and ×83.5 inflated
+    //               (e.g. ₹1,138/hr laser read as $1,138 → stored as ₹95,023/hr)
+    // Override to the location benchmark in both cases; mark the source so
+    // appendRateWarnings() surfaces a single info note rather than per-line footnotes.
+    const applyBenchmarkOverrideIfNeeded = (input: MHRRateInput, cls: MachineClass): MHRRateInput => {
+      if (input.source !== 'mhr_database') return input;
+      const benchmark = locationMHR?.[cls] ?? 0;
+      if (benchmark <= 0) return input;
+
+      const override = (reason: string): MHRRateInput => {
+        this.logger.warn(
+          `resolveMHRRates: ${input.machineName ?? cls} rate ${input.rate}/hr — ${reason}. ` +
+          `Overriding to ${location} benchmark (${benchmark}/hr). Fix the MHR record to suppress this.`,
+          'BOMItemsService',
+        );
+        // Preserve physics selection — machine choice stays; only the bad rate is replaced.
+        return {
+          rate: benchmark,
+          source: 'benchmark_override',
+          machineClass: cls,
+          machineName: input.machineName,
+          commodityCode: input.commodityCode,
+          selection: input.selection,
+        };
+      };
+
+      if (input.rate < benchmark * 0.50) {
+        return override('below 50% of location benchmark — likely a cross-location currency mismatch');
+      }
+      if (input.rate > benchmark * 3.0) {
+        return override('over 3× the location benchmark — likely an INR rate double-converted via USD import');
+      }
+      return input;
+    };
+
+    // When the physics path didn't run (or caught an exception and fell through),
+    // synthesize a minimal MachineSelectionResult so MachineSelector always renders.
+    // The candidate uses the actual resolved rate so the panel shows the right number.
+    const ensureSelection = (rate: MHRRateInput, cls: MachineClass): MHRRateInput => {
+      if (rate.selection) return rate;
+      const cand: MachineCandidate = {
+        machineId: null,
+        machineName: rate.machineName,
+        commodityCode: rate.commodityCode,
+        machineClass: cls,
+        hourlyRate: rate.rate,
+        utilizationPct: 75,
+        scheduledLoadPct: null,
+        availabilityStatus: 'available',
+        nextAvailableAt: null,
+        maintenanceWindowStart: null,
+        maintenanceWindowEnd: null,
+        capability: { ...EMPTY_CAPABILITY, ...MACHINE_CLASS_DEFAULTS[cls] },
+        capabilitySource: 'default_class',
+        capabilityVersion: null,
+      };
+      const reason = rate.source === 'mhr_database'
+        ? 'Selected by commodity-code lookup — import the MHR database for capability-based selection'
+        : `No machine on file for ${location} — using class default rate`;
+      const rec: MachineRecommendation = { candidate: cand, score: 0.4, reasons: [reason] };
+      const selection: MachineSelectionResult = {
+        balanced: rec, cheapest: rec, fastest: rec,
+        alternatives: [],
+        confidence: 40,
+        requirement: { kind: 'generic' },
+        allowOverride: true,
+        overridden: false,
+      };
+      return { ...rate, selection };
+    };
+
     const allClasses: MachineClass[] = [
       'fiber_laser', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet',
       'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn',
       'injection_molding',
     ];
 
-    const buildOutput = (resolved: Map<MachineClass, MHRRateInput>) => ({
-      laser:        resolved.get('fiber_laser')    ?? makeDefault('fiber_laser'),
-      pressBrake:   resolved.get('press_brake')    ?? makeDefault('press_brake'),
-      deburring:    resolved.get('deburring')      ?? makeDefault('deburring'),
-      tapping:      resolved.get('tapping')        ?? makeDefault('tapping'),
-      inspection:   resolved.get('cmm')            ?? makeDefault('cmm'),
-      turret:       resolved.get('turret_punch')   ?? makeDefault('turret_punch'),
-      waterjet:     resolved.get('waterjet')       ?? makeDefault('waterjet'),
-      cnc3ax:       resolved.get('cnc_3ax_vmc')    ?? makeDefault('cnc_3ax_vmc'),
-      cnc4ax:       resolved.get('cnc_4ax_vmc')    ?? makeDefault('cnc_4ax_vmc'),
-      cnc5ax:       resolved.get('cnc_5ax_mc')     ?? makeDefault('cnc_5ax_mc'),
-      cncLathe:     resolved.get('cnc_lathe')      ?? makeDefault('cnc_lathe'),
-      cncLatheLive: resolved.get('cnc_lathe_live') ?? makeDefault('cnc_lathe_live'),
-      cncMillTurn:  resolved.get('cnc_mill_turn')  ?? makeDefault('cnc_mill_turn'),
-      injectionMolding: resolved.get('injection_molding') ?? makeDefault('injection_molding'),
-    });
+    // Await LHR data — started at the top, runs concurrently with the synchronous setup above
+    const lhrRates = await lhrRatesPromise.catch(() => new Map<string, number>());
+
+    const buildOutput = (resolved: Map<MachineClass, MHRRateInput>) => {
+      const get = (cls: MachineClass) => {
+        const raw = resolved.get(cls) ?? makeDefault(cls);
+        const r = ensureSelection(applyBenchmarkOverrideIfNeeded(raw, cls), cls);
+        // Attach LHR from benchmark table — already included in r.rate (fully burdened),
+        // surfaced here so the UI can show a transparent machine / labour rate breakdown.
+        return { ...r, labourRate: lhrRates.get(cls) ?? null };
+      };
+      return {
+        laser:            get('fiber_laser'),
+        pressBrake:       get('press_brake'),
+        deburring:        get('deburring'),
+        tapping:          get('tapping'),
+        inspection:       get('cmm'),
+        turret:           get('turret_punch'),
+        waterjet:         get('waterjet'),
+        cnc3ax:           get('cnc_3ax_vmc'),
+        cnc4ax:           get('cnc_4ax_vmc'),
+        cnc5ax:           get('cnc_5ax_mc'),
+        cncLathe:         get('cnc_lathe'),
+        cncLatheLive:     get('cnc_lathe_live'),
+        cncMillTurn:      get('cnc_mill_turn'),
+        injectionMolding: get('injection_molding'),
+      };
+    };
 
     // ── Physics-based capability selection (new engine) ───────────────────────
     // Selects by physical capability + fit/utilization/cost scoring instead of
@@ -1534,6 +1632,91 @@ export class BOMItemsService {
     }
   }
 
+  /**
+   * Resolves labour hour rates (local currency/hr) keyed by machine class.
+   *
+   * Priority:  user's imported `lhr_records` (avg per process_group) → `lhr_benchmark_rates`
+   * This mirrors how MHR resolves: DB records first, benchmark/defaults as fallback.
+   * Non-critical: any DB failure returns an empty map so cost totals are never blocked.
+   */
+  private async resolveLHRRates(accessToken: string, location: string): Promise<Map<string, number>> {
+    const LHR_GROUP: Record<string, string> = {
+      fiber_laser: 'Sheet Metal',
+      press_brake: 'Sheet Metal',
+      turret_punch: 'Sheet Metal',
+      waterjet: 'Sheet Metal',
+      deburring: 'Sheet Metal',
+      tapping: 'CNC Machining',
+      cmm: 'Quality',
+      cnc_3ax_vmc: 'CNC Machining',
+      cnc_4ax_vmc: 'CNC Machining',
+      cnc_5ax_mc: 'CNC Machining',
+      cnc_lathe: 'CNC Machining',
+      cnc_lathe_live: 'CNC Machining',
+      cnc_mill_turn: 'CNC Machining',
+      injection_molding: 'Plastics',
+    };
+
+    const result = new Map<string, number>();
+    const pgRate = new Map<string, number>();
+
+    try {
+      const client = this.supabaseService.getClient(accessToken);
+
+      // ── Pass 1: user-imported lhr_records (exact location match) ───────────
+      // lhr column is local currency/hr — same unit as mhrRates so no FX needed.
+      // Average across skill levels per process group; skip zero/null rows.
+      const { data: userRows } = await client
+        .from('lhr_records')
+        .select('process_group, lhr')
+        .eq('location', location)
+        .gt('lhr', 0)
+        .not('process_group', 'is', null);
+
+      if (userRows?.length) {
+        const pgSum = new Map<string, { sum: number; count: number }>();
+        for (const row of userRows as any[]) {
+          const rate = Number((row as any).lhr ?? 0);
+          const pg = ((row as any).process_group as string | null)?.trim();
+          if (rate <= 0 || !pg) continue;
+          const acc = pgSum.get(pg) ?? { sum: 0, count: 0 };
+          pgSum.set(pg, { sum: acc.sum + rate, count: acc.count + 1 });
+        }
+        for (const [pg, { sum, count }] of pgSum) {
+          pgRate.set(pg, sum / count);
+        }
+      }
+
+      // ── Pass 2: lhr_benchmark_rates fills any process group still missing ──
+      const allGroups = [...new Set(Object.values(LHR_GROUP))];
+      const missingGroups = allGroups.filter((pg) => !pgRate.has(pg));
+
+      if (missingGroups.length > 0) {
+        const { data: benchRows } = await client
+          .from('lhr_benchmark_rates')
+          .select('process_group, lhr')
+          .eq('location', location)
+          .in('process_group', missingGroups);
+
+        for (const row of (benchRows ?? []) as any[]) {
+          const rate = Number((row as any).lhr ?? 0);
+          const pg = ((row as any).process_group as string | null)?.trim();
+          if (rate > 0 && pg) pgRate.set(pg, rate);
+        }
+      }
+
+      // ── Map machine classes to resolved process-group rates ──────────────
+      for (const [cls, pg] of Object.entries(LHR_GROUP)) {
+        const rate = pgRate.get(pg);
+        if (rate != null) result.set(cls, rate);
+      }
+    } catch {
+      // Non-critical — LHR display degrades gracefully; cost totals are unaffected
+    }
+
+    return result;
+  }
+
   // Family-aware material resolution — shared by cost summary and route
   // comparison so both price the SAME raw-material row. Candidate rows are
   // ranked by product form for the part family (a machined billet part must
@@ -1607,10 +1790,18 @@ export class BOMItemsService {
       try {
         const client = this.supabaseService.getClient(accessToken);
         const g = grade.trim();
+        // Tokenize compound grade strings so partial-standard matches succeed.
+        // "IS2062 E250 CRCA" splits to ["IS2062","E250","CRCA"]; the DB stores
+        // "Mild Steel IS2062" and "CRCA Steel" as separate rows — neither matches
+        // the full compound string, but each token matches at least one row.
+        const tokens = g.split(/[\s\-\/]+/).filter((t) => t.length >= 3);
+        const orClause = (tokens.length > 1 ? tokens : [g])
+          .flatMap((t) => [`material_grade.ilike.%${t}%`, `material.ilike.%${t}%`])
+          .join(',');
         const { data } = await client
           .from('raw_materials')
           .select(`${materialCol}, cost_india, cost, density, density_kg_m3, shape, material_grade`)
-          .or(`material_grade.ilike.%${g}%,material.ilike.%${g}%`)
+          .or(orClause)
           .limit(12);
 
         // Cast via unknown: the select() column list is dynamic (location column),
@@ -1691,6 +1882,7 @@ export class BOMItemsService {
   ): void {
     const seen = new Set<string>();
     const benchmarkPriced: string[] = [];
+    const benchmarkOverridden: string[] = [];
     for (const line of result.processLines) {
       if (line.hourlyRate <= 0) continue;
       const key = `${line.machineClass}:${line.hourlyRate}:${line.rateSource}`;
@@ -1699,10 +1891,21 @@ export class BOMItemsService {
       if (line.rateSource === 'mhr_database') {
         const warning = benchmarkRateWarning(line.machineClass, location, line.hourlyRate, line.machineName);
         if (warning && !result.warnings.includes(warning)) result.warnings.push(warning);
+      } else if (line.rateSource === 'benchmark_override') {
+        // DB rate was anomalously low (< 50% of benchmark) — overridden to location benchmark.
+        // Surface as a single consolidated info note, not per-line noise.
+        benchmarkOverridden.push(line.machineClass.replace(/_/g, ' '));
       } else if (line.rateSource !== 'tier_synthetic') {
         // 'tier_synthetic' = route comparison benchmark slot with no DB machine — expected, suppress
         benchmarkPriced.push(line.machineClass.replace(/_/g, ' '));
       }
+    }
+    if (benchmarkOverridden.length > 0) {
+      result.warnings.push(
+        `Using ${location} benchmark MHR rates for: ${[...new Set(benchmarkOverridden)].join(', ')} — ` +
+        `DB rates were more than 50% below benchmark (likely entered for a different region). ` +
+        `Verify MHR records for ${location} to quote on actual shop rates.`,
+      );
     }
     if (benchmarkPriced.length > 0) {
       result.warnings.push(
@@ -1786,6 +1989,93 @@ export class BOMItemsService {
     return { bendCount, bendSource, flatPatternAreaMm2, blankAreaSource, warnings };
   }
 
+  // ── aPriori-style feature-level breakdown helpers ─────────────────────────────
+
+  /** Convert raw operation-sequencer output into grouped FeatureOp[] for the UI. */
+  private buildCNCFeatureBreakdown(featureOps: OperationLine[]): FeatureOp[] {
+    const excluded = new Set(['Face Mill', 'Deburr']);
+    type Acc = { timeSec: number; instanceCount: number };
+    const groups = new Map<string, Acc>();
+
+    for (const op of featureOps) {
+      if (excluded.has(op.name)) continue;
+      // Collapse the 3-line pocket family and 2-line slot family into one entry each
+      let key = op.name;
+      if (op.name.startsWith('Pocket')) key = 'Pocket Mill';
+      else if (op.name.startsWith('Slot')) key = 'Slot Mill';
+      else if (op.name === 'Rigid Tap') key = 'Tapping';
+      const g = groups.get(key);
+      if (g) { g.timeSec += op.timeSec; g.instanceCount++; }
+      else groups.set(key, { timeSec: op.timeSec, instanceCount: 1 });
+    }
+
+    const result: FeatureOp[] = [];
+    for (const [key, { timeSec }] of groups) {
+      // Infer count from fixed unit times where possible (Spot Drill=5s, Chamfer=4-5s)
+      let count = 1;
+      if (key === 'Spot Drill') count = Math.max(1, Math.round(timeSec / 5));
+      else if (key === 'Chamfer') count = Math.max(1, Math.round(timeSec / 4.5));
+      const label = count > 1 ? `${key} ×${count}` : key;
+      result.push({ name: label, timeSec: Math.round(timeSec), featureType: key.toLowerCase().replace(/\s+/g, '_'), count });
+    }
+    return result;
+  }
+
+  /** Build Laser Cutting feature breakdown from sheet metal geometry inputs. */
+  private buildLaserFeatureBreakdown(
+    cutLengthMm: number,
+    pierceCount: number,
+    sheetThicknessMm: number,
+    grade: string | null,
+  ): FeatureOp[] {
+    const result: FeatureOp[] = [];
+    if (cutLengthMm > 0) {
+      // Find the nearest thickness key in the lookup table
+      const tKeys = Object.keys(LASER_SPEED_MM_PER_MIN).map(Number).sort((a, b) => a - b);
+      const tKey = tKeys.reduce((prev, cur) => Math.abs(cur - sheetThicknessMm) < Math.abs(prev - sheetThicknessMm) ? cur : prev, tKeys[0] ?? 2);
+      const speed = (LASER_SPEED_MM_PER_MIN[tKey] ?? 2000) * laserSpeedFactor(grade);
+      const cuttingTimeSec = (cutLengthMm / speed) * 60;
+      result.push({ name: `Cut path ${(cutLengthMm / 1000).toFixed(2)}m`, timeSec: Math.round(cuttingTimeSec), featureType: 'laser_cut', count: 1 });
+    }
+    if (pierceCount > 0) {
+      const tKeys = Object.keys(LASER_PIERCE_SEC).map(Number).sort((a, b) => a - b);
+      const tKey = tKeys.reduce((prev, cur) => Math.abs(cur - sheetThicknessMm) < Math.abs(prev - sheetThicknessMm) ? cur : prev, tKeys[0] ?? 2);
+      const pierceSec = (LASER_PIERCE_SEC[tKey] ?? 1.5) * pierceCount;
+      result.push({ name: `Pierces ×${pierceCount}`, timeSec: Math.round(pierceSec), featureType: 'pierce', count: pierceCount });
+    }
+    return result;
+  }
+
+  /** Build Press Brake feature breakdown from bend count and radii. */
+  private buildPressBrakeFeatureBreakdown(
+    bendCount: number,
+    bendRadii: number[],
+    sheetThicknessMm: number,
+  ): FeatureOp[] {
+    if (bendCount <= 0) return [];
+    // Find the nearest thickness key for press brake time
+    const tKeys = Object.keys(PRESS_BRAKE_SEC_PER_BEND).map(Number).sort((a, b) => a - b);
+    const tKey = tKeys.reduce((prev, cur) => Math.abs(cur - sheetThicknessMm) < Math.abs(prev - sheetThicknessMm) ? cur : prev, tKeys[0] ?? 2);
+    const secPerBend = PRESS_BRAKE_SEC_PER_BEND[tKey] ?? 15;
+
+    if (bendRadii.length === 0) {
+      return [{ name: `Bends ×${bendCount}`, timeSec: Math.round(bendCount * secPerBend), featureType: 'bend', count: bendCount }];
+    }
+
+    // Group by radius (0.5mm buckets)
+    const groups = new Map<number, number>();
+    for (const r of bendRadii) {
+      const rBucket = Math.round(r * 2) / 2;
+      groups.set(rBucket, (groups.get(rBucket) ?? 0) + 1);
+    }
+    return [...groups.entries()].map(([radius, count]) => ({
+      name: `Bend R${radius}mm ×${count}`,
+      timeSec: Math.round(count * secPerBend),
+      featureType: 'bend',
+      count,
+    }));
+  }
+
   async getCostSummary(
     id: string,
     userId: string,
@@ -1802,8 +2092,42 @@ export class BOMItemsService {
 
     // Drawing analysis material always wins — it reads the title block directly.
     // Auto-fill material (from geometry heuristics) is a fallback only.
-    const drawingGrade = ((item.drawingIntelligence as any)?.material ?? null) as string | null;
-    const grade = (drawingGrade?.trim() || null) ?? item.materialGrade ?? item.material ?? null;
+    // Drawing intelligence returns structured fields: { value, confidence } or plain string.
+    const rawDiMaterial = (item.drawingIntelligence as any)?.material;
+    const drawingGrade = (
+      typeof rawDiMaterial === 'string' ? rawDiMaterial :
+      rawDiMaterial != null && typeof rawDiMaterial === 'object' ? (rawDiMaterial.value ?? null) :
+      null
+    ) as string | null;
+    const grade = (drawingGrade?.trim() || null) ?? item.materialGrade ?? (item as any).material ?? null;
+
+    // Scenario gate: refuse to cost without a material grade. Silently defaulting to
+    // mild steel produces numbers the engineer might quote; a blocked state forces the
+    // explicit Apply action and eliminates ambiguous estimates.
+    if (!grade) {
+      const locI = LOCATION_INFO[location] ?? LOCATION_INFO[DEFAULT_COSTING_LOCATION];
+      return {
+        scenarioReady: false,
+        missingInputs: ['materialGrade'],
+        materialCost: 0, materialGrade: '', grossWeightKg: 0,
+        materialCostPerKg: 0, materialSource: 'default' as const,
+        processLines: [], totalProcessCost: 0, totalCost: 0,
+        cycleTimes: { laserMin: 0, pressBrakeMin: 0, tappingMin: 0, deburrMin: 0, totalMin: 0 },
+        batchSize, family: 'unknown',
+        warnings: [],
+        ratesSource: 'none',
+        currency: locI.code, currencySymbol: locI.symbol, toUsdRate: 1,
+        sustainability: {
+          netWeightKg: 0, scrapKg: 0, wasteCostInr: 0, materialUtilizationPct: 0,
+          materialCo2Kg: 0, materialCo2PerKg: 0, materialCo2Source: 'default' as const,
+          processCo2Breakdown: [], totalProcessEnergyKwh: 0, totalProcessCo2Kg: 0,
+          totalCo2Kg: 0, co2PerKgPart: 0, co2Contributors: [], recyclabilityPct: 0,
+          sustainabilityScore: 0,
+          scoreBreakdown: { materialEfficiency: 0, carbonIntensity: 0, recyclability: 0, processEnergy: 0 },
+          opportunities: [], factorsSource: 'default',
+        },
+      } as unknown as CostSummaryDto;
+    }
 
     // Override > material > geometry — one precedence chain for both costing
     // endpoints (see resolveEffectiveFamily).
@@ -1814,8 +2138,20 @@ export class BOMItemsService {
     const pierceCount = (summary.pierceCount ?? item.pierceCount ?? 0) as number;
     const geoBendCount = (summary.bendCount ?? item.bendCount ?? 0) as number;
     const measuredFlatAreaMm2 = (summary.flatPatternAreaMm2 ?? item.flatPatternAreaMm2 ?? 0) as number;
-    const holeCount = (summary.holeCount ?? item.holeCount ?? 0) as number;
-    const threads = ((item.drawingIntelligence as any)?.threads ?? []) as Array<{ size: string; count: number }>;
+    // Fix 1: For CNC parts, prefer the feature recognizer's breakdown (through + blind holes)
+    // over the raw cylinder count from manufacturing_features.holes.count which includes
+    // all cylindrical faces (OD steps, groove IDs) — not just machined holes.
+    const cncFeatureSummary = fg?.cnc_features?.feature_summary ?? null;
+    const holeCount = (
+      cncFeatureSummary !== null && (family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn')
+        ? ((cncFeatureSummary.through_hole ?? 0) + (cncFeatureSummary.blind_hole ?? 0))
+        : (summary.holeCount ?? item.holeCount ?? 0)
+    ) as number;
+    // Drawing analysis returns threads as [{ spec, count }] or [{ size, count }] — normalise to { size, count }
+    const threads = ((item.drawingIntelligence as any)?.threads ?? []).map((t: any) => ({
+      size: String(t.size ?? t.spec ?? '').trim(),
+      count: Number(t.count) || 1,
+    })) as Array<{ size: string; count: number }>;
 
     // Reconcile bend count + blank area across CAD / drawing / route before costing
     const geo = family === 'sheet_metal'
@@ -1877,12 +2213,81 @@ export class BOMItemsService {
     if (family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn') {
       const inspectionRules = await this.inspectionKnowledge.getInspectionRules(accessToken);
       const samplingPolicy = await this.resolveSamplingPolicy(item, accessToken);
+
+      // Fix 2: Blank optimizer — select near-net stock (round bar / rectangular bar)
+      // instead of bbox billet. Runs async but non-blocking: failure → billet fallback.
+      const bbox = {
+        length: ((item as any).maxLength ?? 0) as number,
+        width:  ((item as any).maxWidth  ?? 0) as number,
+        height: ((item as any).maxHeight ?? 0) as number,
+      };
+      const blankResult = await this.blankOptimizer.selectOptimalBlank(
+        bbox,
+        (item.volume ?? 0) as number,
+        family as 'cnc_milled' | 'cnc_turned' | 'mill_turn',
+        accessToken,
+      );
+
+      // Fix 3 + 4: Feature-based cycle time from feature_graph_v2.
+      // machinabilityRating from cnc_features.material_machinability or raw_materials.
+      const matClass = detectMaterialClass(grade);
+      const machinabilityRating = (fg?.cnc_features?.material_machinability ?? null) as number | null;
+      const machinabilityFactor = machinabilityRating != null ? machinabilityRating / 75 : 1.0;
+
+      // Normalize FGV2 once — auto-fill stores it at root-level (featureGraph.feature_graph_v2)
+      // AND it is embedded inside cnc_features. Resolve once and use the single variable
+      // everywhere so every consumer is consistent and this fallback chain isn't duplicated.
+      const normalizedFGV2 = fg?.feature_graph_v2 ?? fg?.cnc_features?.feature_graph_v2 ?? null;
+      const fgv2Features = (normalizedFGV2?.features ?? null) as unknown[] | null;
+
+      // Stage 2 pipeline log — confirms which storage path had the data
+      this.logger.debug(
+        `[fgv2] root=${fg?.feature_graph_v2 ? 'present' : 'null'} ` +
+        `nested=${fg?.cnc_features?.feature_graph_v2 ? 'present' : 'null'} ` +
+        `features=${fgv2Features?.length ?? 'null'} ` +
+        `cncKeys=${Object.keys(fg?.cnc_features ?? {}).join(',')}`,
+      );
+
+      const rawFeatureOps = buildOperationSequence(fgv2Features, matClass, machinabilityFactor);
+      // Fix 5: inject drawing intelligence overrides into the operation list
+      const allFeatureOps = injectDrawingIntelligence(
+        rawFeatureOps,
+        item.drawingIntelligence as Record<string, any> | null,
+      );
+
+      // Stage 3 pipeline log — confirms what the operation sequencer produced
+      this.logger.debug(
+        `[ops] count=${allFeatureOps.length} seq=${
+          allFeatureOps.length > 0
+            ? allFeatureOps.map(o => `${o.name}(${o.timeSec.toFixed(0)}s)`).join('→')
+            : 'empty'
+        }`,
+      );
+
+      // Safety net: if all machining ops (excluding Face Mill + Deburr) sum to < 30s,
+      // material_removed_mm3 is missing from the CAD engine response and the feature
+      // path would produce a wildly low cycle time. Fall back to bbox formula instead.
+      const featureMachiningTimeSec = allFeatureOps
+        .filter(o => o.name !== 'Face Mill' && o.name !== 'Deburr')
+        .reduce((s, o) => s + o.timeSec, 0);
+      const featureOps = (allFeatureOps.length > 0 && featureMachiningTimeSec >= 30)
+        ? allFeatureOps
+        : undefined;
+
+      // Stage 4 pipeline log — confirms what the cost engine receives
+      this.logger.debug(
+        `[CNC cost] grade=${grade ?? 'null'} family=${family} blank=${blankResult.sizeLabel} ` +
+        `util=${blankResult.utilizationPct?.toFixed(1)}% featureOps=${featureOps?.length ?? 'bbox-fallback'} ` +
+        `machiningTimeSec=${featureMachiningTimeSec.toFixed(1)} threads=${JSON.stringify(threads)} ` +
+        `surface=${this.resolveSurfaceTreatment(item) ?? 'none'}`,
+      );
+
       const baseCncInput: Omit<CNCCostInput, 'mhrRate' | 'tappingRate'> = {
         volume: (item.volume ?? 0) as number,
         surfaceArea: (item.surfaceArea ?? 0) as number,
-        maxLength: ((item as any).maxLength ?? 0) as number,
-        maxWidth: ((item as any).maxWidth ?? 0) as number,
-        maxHeight: ((item as any).maxHeight ?? 0) as number,
+        maxLength: bbox.length,
+        maxWidth:  bbox.width,
+        maxHeight: bbox.height,
         holeCount,
         holeGroups: (summary.holeGroups ?? []) as Array<{ diameter_mm: number; count: number }>,
         pocketCount: (fg?.cnc_features?.feature_summary?.pockets ?? 0) as number,
@@ -1903,6 +2308,9 @@ export class BOMItemsService {
         samplingPolicy,
         gdtFeatures: this.extractGdtFeatures(item, inspectionRules),
         location,
+        blankResult,
+        machinabilityRating: machinabilityRating ?? undefined,
+        featureOps: featureOps,
       };
 
       // Single source of truth with Route Comparison: cost every feasible route
@@ -1952,6 +2360,16 @@ export class BOMItemsService {
       }
       cncResult.warnings.push(...materialWarnings);
       this.attachMachineSelections(cncResult.processLines, mhrRates);
+      // Attach aPriori-style feature-level breakdown to the CNC Milling process line
+      if (featureOps && featureOps.length > 0) {
+        const breakdown = this.buildCNCFeatureBreakdown(featureOps);
+        if (breakdown.length > 0) {
+          const millLine = cncResult.processLines.find(
+            (l) => l.process === 'CNC Milling' || l.process.includes('Milling') || l.process.includes('Turning'),
+          );
+          if (millLine) millLine.featureBreakdown = breakdown;
+        }
+      }
       // Inherited tapping runs on the recommended route's machine — surface
       // THAT machine on the Tapping line's selector, not the class default.
       if (mhrRates.tapping.source !== 'mhr_database') {
@@ -1964,6 +2382,22 @@ export class BOMItemsService {
       this.appendRateWarnings(cncResult, location);
       this.applyCostOverrides(cncResult, costOverrides);
       if (costOverrides.size > 0) cncResult.costOverrides = Object.fromEntries(costOverrides);
+      if (materialDensityKgM3 > 0 && blankResult.billetVolMm3 > 0) {
+        const blankGrossKg  = blankResult.billetVolMm3 / 1e9 * materialDensityKgM3;
+        const blankNetKg    = ((item as any).weight ?? 0) as number;
+        const blankWasteKg  = Math.max(0, blankGrossKg - blankNetKg);
+        const blankUtilPct  = blankResult.utilizationPct ??
+          (blankGrossKg > 0 ? (blankNetKg / blankGrossKg) * 100 : 0);
+        cncResult.blankSpec = {
+          form:           blankResult.form as BlankSpecDto['form'],
+          sizeLabel:      blankResult.sizeLabel,
+          grossWeightKg:  Math.round(blankGrossKg * 1000) / 1000,
+          netWeightKg:    Math.round(blankNetKg * 1000) / 1000,
+          utilizationPct: Math.round(blankUtilPct * 10) / 10,
+          wasteKg:        Math.round(blankWasteKg * 1000) / 1000,
+          wasteCost:      this.r2(blankWasteKg * materialCostPerKg),
+        };
+      }
       return cncResult;
     }
 
@@ -2066,9 +2500,41 @@ export class BOMItemsService {
       smResult.geometryProvenance = { bendSource: geo.bendSource, blankAreaSource: geo.blankAreaSource };
     }
     this.attachMachineSelections(smResult.processLines, mhrRates);
+    // Attach aPriori-style feature breakdowns to laser + press brake lines
+    {
+      const bendRadii = (fg?.summary?.bendRadii ?? []) as number[];
+      const laserLine = smResult.processLines.find((l) => l.process === 'Laser Cutting');
+      if (laserLine) {
+        laserLine.featureBreakdown = this.buildLaserFeatureBreakdown(
+          cutLengthMm, pierceCount, sheetThicknessMm, grade,
+        );
+      }
+      const pbLine = smResult.processLines.find((l) => l.process === 'Press Brake');
+      if (pbLine) {
+        pbLine.featureBreakdown = this.buildPressBrakeFeatureBreakdown(
+          bendCount, bendRadii, sheetThicknessMm,
+        );
+      }
+    }
     this.appendRateWarnings(smResult, location);
     this.applyCostOverrides(smResult, costOverrides);
     if (costOverrides.size > 0) smResult.costOverrides = Object.fromEntries(costOverrides);
+    if (flatPatternAreaMm2 > 0 && sheetThicknessMm > 0 && materialDensityKgM3 > 0) {
+      const blankLMm = ((item as any).maxLength ?? 0) as number;
+      const blankWMm = blankLMm > 0
+        ? flatPatternAreaMm2 / blankLMm
+        : Math.sqrt(flatPatternAreaMm2);
+      const effL = blankLMm > 0 ? blankLMm : Math.sqrt(flatPatternAreaMm2);
+      smResult.blankSpec = {
+        form:           'sheet',
+        sizeLabel:      `${Math.round(effL)}×${Math.round(blankWMm)}×${sheetThicknessMm}mm`,
+        grossWeightKg:  smResult.grossWeightKg,
+        netWeightKg:    smResult.sustainability.netWeightKg,
+        utilizationPct: smResult.sustainability.materialUtilizationPct,
+        wasteKg:        Math.max(0, smResult.grossWeightKg - smResult.sustainability.netWeightKg),
+        wasteCost:      smResult.sustainability.wasteCostInr,
+      };
+    }
     return smResult;
   }
 
@@ -2085,8 +2551,13 @@ export class BOMItemsService {
     const summary = fg?.summary ?? {};
 
     const sheetThicknessMm = (summary.sheetThicknessMm ?? item.sheetThicknessMm ?? 0) as number;
-    const drawingGradeRC = ((item.drawingIntelligence as any)?.material ?? null) as string | null;
-    const grade = (drawingGradeRC?.trim() || null) ?? item.materialGrade ?? item.material ?? null;
+    const rawDiMaterialRC = (item.drawingIntelligence as any)?.material;
+    const drawingGradeRC = (
+      typeof rawDiMaterialRC === 'string' ? rawDiMaterialRC :
+      rawDiMaterialRC != null && typeof rawDiMaterialRC === 'object' ? (rawDiMaterialRC.value ?? null) :
+      null
+    ) as string | null;
+    const grade = (drawingGradeRC?.trim() || null) ?? item.materialGrade ?? (item as any).material ?? null;
 
     // Override > material > geometry — same resolver as getCostSummary, by
     // construction (summary ≡ route invariant).
@@ -2097,7 +2568,14 @@ export class BOMItemsService {
     const pierceCount     = (summary.pierceCount       ?? item.pierceCount      ?? 0) as number;
     const geoBendCount    = (summary.bendCount         ?? item.bendCount        ?? 0) as number;
     const measuredFlatAreaMm2 = (summary.flatPatternAreaMm2 ?? item.flatPatternAreaMm2 ?? 0) as number;
-    const holeCount       = (summary.holeCount         ?? item.holeCount        ?? 0) as number;
+    // Fix 1 (route comparison): same CNC hole-count logic as getCostSummary — prefer
+    // feature recognizer counts over raw cylinder count to keep summary ≡ route invariant.
+    const cncFeatureSummaryRC = fg?.cnc_features?.feature_summary ?? null;
+    const holeCount = (
+      cncFeatureSummaryRC !== null && (family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn')
+        ? ((cncFeatureSummaryRC.through_hole ?? 0) + (cncFeatureSummaryRC.blind_hole ?? 0))
+        : (summary.holeCount ?? item.holeCount ?? 0)
+    ) as number;
 
     // Same geometry reconciliation as getCostSummary — the two endpoints must
     // price identical inputs or the summary and comparison diverge silently.
@@ -2111,7 +2589,10 @@ export class BOMItemsService {
       : null;
     const bendCount = geo?.bendCount ?? geoBendCount;
     const flatPatternAreaMm2 = geo?.flatPatternAreaMm2 ?? measuredFlatAreaMm2;
-    const threads = ((item.drawingIntelligence as any)?.threads ?? []) as Array<{ size: string; count: number }>;
+    const threads = ((item.drawingIntelligence as any)?.threads ?? []).map((t: any) => ({
+      size: String(t.size ?? t.spec ?? '').trim(),
+      count: Number(t.count) || 1,
+    })) as Array<{ size: string; count: number }>;
 
     // Flat pattern dimensions — from bom_items.max_length / max_width (set by CAD pipeline).
     // Access both camelCase and snake_case to handle FIELD_MAPPING variations safely.
@@ -2690,6 +3171,308 @@ export class BOMItemsService {
     });
   }
 
+  async getCandidateRoutes(
+    id: string,
+    userId: string,
+    accessToken: string,
+    batchSize = 1,
+    location = DEFAULT_COSTING_LOCATION,
+  ): Promise<CandidateRouteComparisonDto> {
+    // Phase 1: primary routes from existing comparison + item geometry (parallel)
+    const [comparison, item] = await Promise.all([
+      this.getRouteComparison(id, userId, accessToken, batchSize, location),
+      this.findOne(id, userId, accessToken),
+    ]);
+
+    const fg      = item.featureGraph as any;
+    const summary = fg?.summary ?? {};
+    const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO[DEFAULT_COSTING_LOCATION];
+
+    const sheetThicknessMm   = (summary.sheetThicknessMm  ?? item.sheetThicknessMm  ?? 0) as number;
+    const flatPatternAreaMm2 = (summary.flatPatternAreaMm2 ?? item.flatPatternAreaMm2 ?? 0) as number;
+    const volume             = (item.volume ?? 0) as number;
+    const maxLength          = ((item as any).maxLength ?? 0) as number;
+    const maxWidth           = ((item as any).maxWidth  ?? 0) as number;
+    const maxHeight          = ((item as any).maxHeight ?? 0) as number;
+    const finishedWeightKg   = ((item as any).weight ?? 0) as number;
+    const surfaceArea        = (item.surfaceArea ?? 0) as number;
+
+    const rawDiMaterial = (item.drawingIntelligence as any)?.material;
+    const drawingGrade = (
+      typeof rawDiMaterial === 'string' ? rawDiMaterial :
+      rawDiMaterial != null && typeof rawDiMaterial === 'object' ? (rawDiMaterial.value ?? null) : null
+    ) as string | null;
+    const grade = (drawingGrade?.trim() || null) ?? item.materialGrade ?? (item as any).material ?? null;
+    const { family } = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
+
+    const isCNC = family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn';
+    const bbox  = { length: maxLength, width: maxWidth, height: maxHeight };
+
+    // Phase 2: material density + MHR rates (parallel)
+    const exchangeRates = await this.fetchExchangeRates(accessToken);
+    const locInrRate = exchangeRates.get(locInfo.code) ?? locInfo.defaultInrRate;
+
+    const [{ materialDensityKgM3 }, mhrRates] = await Promise.all([
+      this.resolveMaterialForFamily({
+        accessToken, grade, family,
+        materialCol: locInfo.materialCol,
+        locInrRate,
+        warnings: [],
+      }),
+      this.resolveMHRRates(accessToken, location),
+    ]);
+
+    // Phase 3: blank optimizer for CNC primary routes (conditional)
+    const blankResult = isCNC
+      ? await this.blankOptimizer.selectOptimalBlank(
+          bbox, volume, family as 'cnc_milled' | 'cnc_turned' | 'mill_turn', accessToken,
+        )
+      : null;
+
+    // Blank spec shared by all primary routes (same stock across machine class variants)
+    const primaryBlankSpec = this.buildCandidateBlankSpec({
+      family, sheetThicknessMm, flatPatternAreaMm2,
+      grossWeightKg: comparison.grossWeightKg,
+      finishedWeightKg, maxLength, maxWidth,
+      blankResult, materialDensityKgM3,
+      materialCostPerKg: comparison.materialCostPerKg,
+    });
+
+    // Convert primary routes from route comparison
+    const candidates: CandidateRouteDto[] = comparison.routes.map((route) => ({
+      candidateId:      route.routeId,
+      blankSpec:        primaryBlankSpec,
+      routeLabel:       route.routeLabel,
+      routeId:          route.routeId,
+      processLines:     route.processLines,
+      totalCost:        route.totalCost ?? 0,
+      materialCost:     route.materialCost,
+      totalProcessCost: route.totalProcessCost,
+      cycleTimes:       { totalMin: route.cycleTimes.totalMin },
+      isFeasible:       route.isFeasible,
+      feasibilityNotes: route.capability.warnings,
+      isPrimary:        true,
+      badges:           { lowestCost: route.badges.lowestCost, fastest: route.badges.fastest, lowestWaste: false },
+    }));
+
+    const materialCostPerKg = comparison.materialCostPerKg;
+    const materialSource    = comparison.materialSource;
+
+    // Cross-family: SM primary → CNC milled alternative (always feasible, typically higher cost)
+    if (family === 'sheet_metal') {
+      const cncAlt = this.buildCNCMilledAlternativeCandidate({
+        volume, surfaceArea, maxLength, maxWidth, maxHeight, finishedWeightKg,
+        holeCount: (summary.holeCount ?? item.holeCount ?? 0) as number,
+        materialCostPerKg, materialDensityKgM3, materialSource, batchSize, mhrRates, location,
+      });
+      if (cncAlt) candidates.push(cncAlt);
+    }
+
+    // Cross-family: CNC milled primary → SM alternative (only if flat pattern detected)
+    if (family === 'cnc_milled' && sheetThicknessMm > 0 && flatPatternAreaMm2 > 0) {
+      const smAlt = this.buildSMAlternativeCandidate({
+        flatPatternAreaMm2, sheetThicknessMm, finishedWeightKg,
+        cutLengthMm: (summary.cutLengthMm ?? item.cutLengthMm ?? 0) as number,
+        pierceCount:  (summary.pierceCount ?? item.pierceCount ?? 0) as number,
+        bendCount:    (summary.bendCount   ?? item.bendCount   ?? 0) as number,
+        holeCount:    (summary.holeCount   ?? item.holeCount   ?? 0) as number,
+        threads: ((item.drawingIntelligence as any)?.threads ?? []).map((t: any) => ({
+          size: String(t.size ?? t.spec ?? '').trim(), count: Number(t.count) || 1,
+        })),
+        grade, materialCostPerKg, materialDensityKgM3, materialSource, batchSize, mhrRates,
+      });
+      if (smAlt) candidates.push(smAlt);
+    }
+
+    // lowestWaste badge — highest material utilization among feasible candidates
+    const feasible = candidates.filter((c) => c.isFeasible);
+    if (feasible.length > 0) {
+      feasible.reduce((m, c) =>
+        c.blankSpec.utilizationPct > m.blankSpec.utilizationPct ? c : m,
+      ).badges.lowestWaste = true;
+    }
+
+    return {
+      bomItemId: id, batchSize, location,
+      currency: locInfo.code, currencySymbol: locInfo.symbol,
+      candidates,
+    };
+  }
+
+  private buildCandidateBlankSpec(args: {
+    family: string;
+    sheetThicknessMm: number;
+    flatPatternAreaMm2: number;
+    grossWeightKg: number;
+    finishedWeightKg: number;
+    maxLength: number;
+    maxWidth: number;
+    blankResult: import('./costing/blank-optimizer.service').BlankResult | null;
+    materialDensityKgM3: number;
+    materialCostPerKg: number;
+  }): BlankSpecDto {
+    const { family, sheetThicknessMm, flatPatternAreaMm2, grossWeightKg, finishedWeightKg,
+            maxLength, maxWidth, blankResult, materialDensityKgM3, materialCostPerKg } = args;
+
+    if (family === 'sheet_metal' && flatPatternAreaMm2 > 0 && sheetThicknessMm > 0) {
+      const blankL  = maxLength > 0 ? maxLength : Math.sqrt(flatPatternAreaMm2);
+      const blankW  = blankL > 0 ? flatPatternAreaMm2 / blankL : Math.sqrt(flatPatternAreaMm2);
+      const wasteKg = Math.max(0, grossWeightKg - finishedWeightKg);
+      return {
+        form:           'sheet',
+        sizeLabel:      `${Math.round(blankL)}×${Math.round(blankW)}×${sheetThicknessMm}mm`,
+        grossWeightKg,
+        netWeightKg:    finishedWeightKg,
+        utilizationPct: grossWeightKg > 0 ? Math.min(100, (finishedWeightKg / grossWeightKg) * 100) : 0,
+        wasteKg,
+        wasteCost:      this.r2(wasteKg * materialCostPerKg),
+      };
+    }
+
+    if (blankResult && materialDensityKgM3 > 0 && blankResult.billetVolMm3 > 0) {
+      const blankGrossKg = blankResult.billetVolMm3 / 1e9 * materialDensityKgM3;
+      const wasteKg      = Math.max(0, blankGrossKg - finishedWeightKg);
+      return {
+        form:           blankResult.form as BlankSpecDto['form'],
+        sizeLabel:      blankResult.sizeLabel,
+        grossWeightKg:  Math.round(blankGrossKg * 1000) / 1000,
+        netWeightKg:    finishedWeightKg,
+        utilizationPct: blankResult.utilizationPct ??
+          (blankGrossKg > 0 ? Math.min(100, (finishedWeightKg / blankGrossKg) * 100) : 0),
+        wasteKg:        Math.round(wasteKg * 1000) / 1000,
+        wasteCost:      this.r2(wasteKg * materialCostPerKg),
+      };
+    }
+
+    const wasteKg = Math.max(0, grossWeightKg - finishedWeightKg);
+    return {
+      form:           'billet',
+      sizeLabel:      'Stock blank',
+      grossWeightKg,
+      netWeightKg:    finishedWeightKg,
+      utilizationPct: grossWeightKg > 0 ? Math.min(100, (finishedWeightKg / grossWeightKg) * 100) : 0,
+      wasteKg,
+      wasteCost:      this.r2(wasteKg * materialCostPerKg),
+    };
+  }
+
+  private buildCNCMilledAlternativeCandidate(args: {
+    volume: number; surfaceArea: number;
+    maxLength: number; maxWidth: number; maxHeight: number;
+    finishedWeightKg: number; holeCount: number;
+    materialCostPerKg: number; materialDensityKgM3: number;
+    materialSource: 'db' | 'default'; batchSize: number;
+    mhrRates: Awaited<ReturnType<typeof this.resolveMHRRates>>;
+    location: string;
+  }): CandidateRouteDto | null {
+    const { volume, surfaceArea, maxLength, maxWidth, maxHeight, finishedWeightKg,
+            holeCount, materialCostPerKg, materialDensityKgM3, materialSource,
+            batchSize, mhrRates, location } = args;
+
+    const allow     = 6;
+    const billetVol = (maxLength + allow) * (maxWidth + allow) * (maxHeight + allow);
+    const blankResult = {
+      form:         'billet',
+      sizeLabel:    `${Math.round(maxLength + allow)}×${Math.round(maxWidth + allow)}×${Math.round(maxHeight + allow)} billet`,
+      billetVolMm3: billetVol,
+      utilizationPct: billetVol > 0 && volume > 0 ? Math.min(100, (volume / billetVol) * 100) : null,
+    };
+    const blankGrossKg = materialDensityKgM3 > 0 ? billetVol / 1e9 * materialDensityKgM3 : 0;
+    const wasteKg      = Math.max(0, blankGrossKg - finishedWeightKg);
+
+    const cncInput: CNCCostInput = {
+      volume, surfaceArea, maxLength, maxWidth, maxHeight,
+      holeCount, holeGroups: [], pocketCount: 0,
+      materialGrade: null, materialCostPerKg, materialDensityKgM3, materialSource,
+      threads: [], tightestToleranceMm: null, gdtFeatureCount: 0,
+      batchSize, family: 'cnc_milled', finishedWeightKg,
+      deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
+      surfaceTreatment: null, samplingPerN: undefined, samplingPolicy: undefined,
+      gdtFeatures: [], location, blankResult,
+      machinabilityRating: undefined, featureOps: undefined,
+      mhrRate: mhrRates.cnc3ax, tappingRate: mhrRates.tapping,
+    };
+
+    const cost = computeCNCMilledCostSummary(cncInput, 'cnc_3ax_vmc');
+    const blankSpec: BlankSpecDto = {
+      form:           'billet',
+      sizeLabel:      blankResult.sizeLabel,
+      grossWeightKg:  Math.round(blankGrossKg * 1000) / 1000,
+      netWeightKg:    finishedWeightKg,
+      utilizationPct: blankResult.utilizationPct ?? 0,
+      wasteKg:        Math.round(wasteKg * 1000) / 1000,
+      wasteCost:      this.r2(wasteKg * materialCostPerKg),
+    };
+
+    return {
+      candidateId:      'alt-cnc-3ax',
+      blankSpec,
+      routeLabel:       '3-Axis Milling (from billet)',
+      routeId:          'cnc-3ax',
+      processLines:     cost.processLines,
+      totalCost:        cost.totalCost,
+      materialCost:     cost.materialCost,
+      totalProcessCost: cost.totalProcessCost,
+      cycleTimes:       { totalMin: cost.cycleTimes.totalMin },
+      isFeasible:       true,
+      feasibilityNotes: ['Alternative: machine from solid billet — higher material waste, typically 1.5–3× more expensive'],
+      isPrimary:        false,
+      badges:           { lowestCost: false, fastest: false, lowestWaste: false },
+    };
+  }
+
+  private buildSMAlternativeCandidate(args: {
+    flatPatternAreaMm2: number; sheetThicknessMm: number; finishedWeightKg: number;
+    cutLengthMm: number; pierceCount: number; bendCount: number; holeCount: number;
+    threads: Array<{ size: string; count: number }>;
+    grade: string | null; materialCostPerKg: number; materialDensityKgM3: number;
+    materialSource: 'db' | 'default'; batchSize: number;
+    mhrRates: Awaited<ReturnType<typeof this.resolveMHRRates>>;
+  }): CandidateRouteDto | null {
+    const { flatPatternAreaMm2, sheetThicknessMm, finishedWeightKg, cutLengthMm, pierceCount,
+            bendCount, holeCount, threads, grade, materialCostPerKg, materialDensityKgM3,
+            materialSource, batchSize, mhrRates } = args;
+
+    if (flatPatternAreaMm2 <= 0 || sheetThicknessMm <= 0) return null;
+
+    const cost = computeCostSummary({
+      sheetThicknessMm, cutLengthMm, pierceCount, bendCount,
+      flatPatternAreaMm2, holeCount, threads,
+      materialGrade: grade,
+      materialCostPerKg, materialDensityKgM3, materialSource,
+      batchSize, family: 'sheet_metal',
+      mhrRates,
+    });
+
+    const grossKg = flatPatternAreaMm2 * sheetThicknessMm / 1e9 * materialDensityKgM3;
+    const wasteKg = Math.max(0, grossKg - finishedWeightKg);
+    const blankSpec: BlankSpecDto = {
+      form:           'sheet',
+      sizeLabel:      `${sheetThicknessMm}mm sheet blank`,
+      grossWeightKg:  Math.round(grossKg * 1000) / 1000,
+      netWeightKg:    finishedWeightKg,
+      utilizationPct: grossKg > 0 ? Math.min(100, (finishedWeightKg / grossKg) * 100) : 0,
+      wasteKg:        Math.round(wasteKg * 1000) / 1000,
+      wasteCost:      this.r2(wasteKg * materialCostPerKg),
+    };
+
+    return {
+      candidateId:      'alt-sm-laser',
+      blankSpec,
+      routeLabel:       'Laser Cut + Press Brake (from sheet)',
+      routeId:          'sm-laser',
+      processLines:     cost.processLines,
+      totalCost:        cost.totalCost,
+      materialCost:     cost.materialCost,
+      totalProcessCost: cost.totalProcessCost,
+      cycleTimes:       { totalMin: cost.cycleTimes.totalMin },
+      isFeasible:       true,
+      feasibilityNotes: ['Alternative: form from constant-thickness sheet stock — requires flat pattern geometry'],
+      isPrimary:        false,
+      badges:           { lowestCost: false, fastest: false, lowestWaste: false },
+    };
+  }
+
   async getGdtAnalysis(id: string, accessToken: string): Promise<GdtAnalysisDto> {
     const client = this.supabaseService.getClient(accessToken);
     const { data: rows, error } = await client
@@ -2799,7 +3582,7 @@ export class BOMItemsService {
   ): Array<{ size: string; count: number }> {
     const counts: Record<string, number> = {};
     for (const t of threads) {
-      const raw = String(t.size ?? '').trim().toUpperCase();
+      const raw = String(t.size ?? (t as any).spec ?? '').trim().toUpperCase();
       const metric = raw.match(/^M\s*(\d+(?:\.\d+)?)/);
       const key = metric ? `M${metric[1]}` : (raw || 'M3');
       const count = Number(t.count) || 0;
@@ -2849,10 +3632,17 @@ export class BOMItemsService {
     return (await this.inspectionKnowledge.getQualityPlan(accessToken, planKey.trim())) ?? undefined;
   }
 
-  // Surface treatment: drawing intelligence key, falling back to the promoted coating column
+  // Surface treatment resolution precedence (Fix 5 — drawing intelligence injection):
+  //  1. drawingIntelligence.surface_treatment  (legacy field name)
+  //  2. drawingIntelligence.coating.value       (drawing analysis API returns {value, confidence})
+  //  3. drawingIntelligence.coating             (flat string fallback)
+  //  4. item.coating                            (manually set or auto-filled column)
   private resolveSurfaceTreatment(item: any): string | null {
+    const di = item?.drawingIntelligence as any;
     return (
-      ((item?.drawingIntelligence as any)?.surface_treatment as string | undefined) ??
+      (di?.surface_treatment as string | undefined) ??
+      (typeof di?.coating === 'object' ? (di.coating?.value as string | undefined) : undefined) ??
+      (typeof di?.coating === 'string' ? di.coating : undefined) ??
       (item?.coating as string | undefined) ??
       null
     );
@@ -2874,8 +3664,15 @@ export class BOMItemsService {
     location: string = DEFAULT_COSTING_LOCATION,
     inspection?: { rules: InspectionRuleRow[]; policy?: InspectionStagePolicy },
   ): RouteComparisonDto {
-    const holeCount = (summary.holeCount ?? item.holeCount ?? 0) as number;
-    const threads = ((item.drawingIntelligence as any)?.threads ?? []) as Array<{ size: string; count: number }>;
+    // Fix 1: milled parts always use feature recognizer hole count (not raw cylinder count)
+    const milledCncSummary = fg?.cnc_features?.feature_summary ?? null;
+    const holeCount = milledCncSummary !== null
+      ? ((milledCncSummary.through_hole ?? 0) + (milledCncSummary.blind_hole ?? 0))
+      : (summary.holeCount ?? item.holeCount ?? 0) as number;
+    const threads = ((item.drawingIntelligence as any)?.threads ?? []).map((t: any) => ({
+      size: String(t.size ?? t.spec ?? '').trim(),
+      count: Number(t.count) || 1,
+    })) as Array<{ size: string; count: number }>;
     const maxLength = ((item as any).maxLength ?? 0) as number;
     const maxWidth  = ((item as any).maxWidth  ?? 0) as number;
     const maxHeight = ((item as any).maxHeight ?? 0) as number;
@@ -3028,8 +3825,15 @@ export class BOMItemsService {
     location: string = DEFAULT_COSTING_LOCATION,
     inspection?: { rules: InspectionRuleRow[]; policy?: InspectionStagePolicy },
   ): RouteComparisonDto {
-    const holeCount = (summary.holeCount ?? item.holeCount ?? 0) as number;
-    const drawingThreads = ((item.drawingIntelligence as any)?.threads ?? []) as Array<{ size: string; count: number }>;
+    // Fix 1: turned parts also use feature recognizer hole count
+    const turnedCncSummary = fg?.cnc_features?.feature_summary ?? null;
+    const holeCount = turnedCncSummary !== null
+      ? ((turnedCncSummary.through_hole ?? 0) + (turnedCncSummary.blind_hole ?? 0))
+      : (summary.holeCount ?? item.holeCount ?? 0) as number;
+    const drawingThreads = ((item.drawingIntelligence as any)?.threads ?? []).map((t: any) => ({
+      size: String(t.size ?? t.spec ?? '').trim(),
+      count: Number(t.count) || 1,
+    })) as Array<{ size: string; count: number }>;
     const maxLength = ((item as any).maxLength ?? 0) as number;
     const maxWidth  = ((item as any).maxWidth  ?? 0) as number;
     const maxHeight = ((item as any).maxHeight ?? 0) as number;

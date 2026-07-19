@@ -36,7 +36,7 @@ import { mhrFormSchema, type MHRFormData } from '@/lib/validations/mhrValidation
 
 function getCurrencyInfo(location: string): { currency: string; symbol: string; fxRate: number } {
   const loc = (location || '').toLowerCase();
-  if (loc.includes('india')) return { currency: 'INR', symbol: '₹', fxRate: 84.5 };
+  if (loc.includes('india')) return { currency: 'INR', symbol: '$', fxRate: 84.5 };
   if (loc.includes('china')) return { currency: 'CNY', symbol: '¥', fxRate: 7.25 };
   if (loc.includes('usa') || loc.includes('united states') || loc.includes('america'))
     return { currency: 'USD', symbol: '$', fxRate: 1.0 };
@@ -76,7 +76,7 @@ const LOCATION_COST_DEFAULTS: Record<string, {
 // costing). 'semi_skilled' and 'unskilled' scale that baseline by a multiplier
 // derived from two verified anchors:
 //   - India statutory minimum wage (Delhi, effective 2025-04-01): unskilled
-//     ₹18,456 : semi-skilled ₹20,371 : skilled ₹22,411/month ≈ 0.82 : 0.91 : 1.00
+//     $18,456 : semi-skilled $20,371 : skilled $22,411/month ≈ 0.82 : 0.91 : 1.00
 //     (a wage-FLOOR ratio — compressed by law, narrower than real shop-floor pay)
 //   - US BLS OEWS (May 2024): machine feeders/offbearers $18.12/hr vs
 //     machinists $27.00/hr ≈ 0.67 : 1.00; CNC operators $24.02/hr ≈ 0.89 : 1.00

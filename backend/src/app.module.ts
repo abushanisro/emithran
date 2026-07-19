@@ -16,7 +16,7 @@ import { ChildPartsModule } from './modules/child-parts/child-parts.module';
 import { PackagingLogisticsModule } from './modules/packaging-logistics/packaging-logistics.module';
 import { ProcuredPartsModule } from './modules/procured-parts/procured-parts.module';
 import { MHRModule } from './modules/mhr/mhr.module';
-import { LSRModule } from './modules/lsr/lsr.module';
+import { LHRModule } from './modules/lhr/lhr.module';
 import { CalculatorsModule } from './modules/calculators/calculators.module';
 import { HealthModule } from './modules/health/health.module';
 import { SupplierEvaluationModule } from './modules/supplier-evaluation/supplier-evaluation.module';
@@ -40,6 +40,7 @@ import { ManufacturingKnowledgeModule } from './modules/manufacturing-knowledge/
 import { ShouldCostModule } from './modules/should-cost/should-cost.module';
 import { CostingModule } from './modules/costing/costing.module';
 import { EchoModule } from './modules/echo/echo.module';
+import { ManufacturingRulesModule } from './modules/manufacturing-rules/manufacturing-rules.module';
 import { RequestLogInterceptor } from './modules/developer/interceptors/request-log.interceptor';
 import { LoggerModule } from './common/logger/logger.module';
 import { SupabaseService } from './common/supabase/supabase.service';
@@ -88,7 +89,7 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     PackagingLogisticsModule,
     ProcuredPartsModule,
     MHRModule,
-    LSRModule,
+    LHRModule,
     CalculatorsModule,
     HealthModule,
     SupplierEvaluationModule,
@@ -112,6 +113,7 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     ShouldCostModule,
     CostingModule,
     EchoModule,
+    ManufacturingRulesModule,
   ],
   controllers: [AppController],
   providers: [

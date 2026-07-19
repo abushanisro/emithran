@@ -12,6 +12,13 @@ import {
   AutoFillCostsDto,
   AutoFillConfidenceDto,
 } from '../dto/auto-fill.dto';
+import {
+  LASER_SPEED_MM_PER_MIN,
+  LASER_PIERCE_SEC,
+  PRESS_BRAKE_SEC_PER_BEND,
+  laserSpeedFactor,
+} from '../costing/default-rates';
+import { computeCycleTime } from '../costing/injection-molding/cycle-time';
 
 export interface RawGeometry {
   volume: number;
@@ -59,8 +66,10 @@ export class AutoFillService {
     fileName: string,
     userId: string,
     accessToken: string,
+    location?: string,
   ): Promise<AutoFillResponseDto> {
     let cadEngineAvailable = false;
+    let cadEngineError: string | undefined;
     let rawGeometry: RawGeometry;
     let cadFamilyClassification: { family: string | null; confidence: number | null; sheetMetalVetoed: boolean } =
       { family: null, confidence: null, sheetMetalVetoed: false };
@@ -73,7 +82,9 @@ export class AutoFillService {
       rawGeometry = this.sanitizeGeometry(this.extractGeometryFromCADResult(cadResult));
       cadFamilyClassification = this.extractFamilyClassification(cadResult);
     } catch (e) {
-      this.logger.warn(`CAD engine unavailable (${e.message})`);
+      // Capture the CAD engine's detail message (axios 4xx errors carry it in e.response.data.detail)
+      cadEngineError = (e.response?.data?.detail as string | undefined) || e.message;
+      this.logger.warn(`CAD engine unavailable (${cadEngineError})`);
       const ext = path.extname(fileName).toLowerCase();
       rawGeometry = ext === '.stl'
         ? this.sanitizeGeometry(this.extractGeometryFromSTLFallback(fileBuffer))
@@ -137,9 +148,25 @@ export class AutoFillService {
       );
     }
 
+    // 2d. Replace flat heuristic cycle time with physics estimate.
+    // We don't have materialGrade yet (that comes from step 3), so use null — the
+    // physics engine falls back to mild-steel baseline for sheet metal, which is the
+    // most conservative (slowest) speed. Material grade is applied in step 5 costs.
+    const physicsResult = this.computePhysicsCycleTime(
+      processSuggestion.processType,
+      rawGeometry,
+      null, // material grade not yet resolved
+      processSuggestion.estimatedCycleTimeMin,
+    );
+    processSuggestion.estimatedCycleTimeMin = physicsResult.cycleTimeMin;
+    this.logger.log(
+      `[cycle-time] ${processSuggestion.processType} → ` +
+      `${physicsResult.cycleTimeMin.toFixed(2)} min (${physicsResult.source})`,
+    );
+
     // 3. Lookup material
     const materialResult = await this.suggestMaterial(
-      rawGeometry, processSuggestion.processType, effectiveFamily.family ?? '', userId, accessToken,
+      rawGeometry, processSuggestion.processType, effectiveFamily.family ?? '', userId, accessToken, location,
     );
 
     // 4. Calculate weight (volume mm³ → cm³ × density g/cm³ → kg)
@@ -154,7 +181,7 @@ export class AutoFillService {
     // 5. MHR lookup
     const mhrRate = await this.getMHR(processSuggestion.processType, accessToken);
 
-    // 6. LSR/LHR lookup
+    // 6. LHR lookup
     const lhrRate = await this.getLHR(accessToken);
 
     // 7. Calculator execution
@@ -198,15 +225,75 @@ export class AutoFillService {
     // 10. Feature Graph (Phase 1: count-level summary + process recommendations)
     const featureGraph = this.buildFeatureGraph(rawGeometry, processSuggestion, effectiveFamily, cadResult);
 
-    return {
+    const response: AutoFillResponseDto = {
       fileName,
       geometry,
       suggestions,
       costs,
       confidence,
       cadEngineAvailable,
+      ...(cadEngineError ? { cadEngineError } : {}),
       featureGraph,
     };
+
+    // 11. Non-blocking prediction logging for calibration loop.
+    // Never awaited — a logging failure must never fail the main response.
+    this.logPrediction(response, physicsResult.source, userId, accessToken).catch((err) =>
+      this.logger.warn(`[should-cost] Prediction logging failed (non-fatal): ${err?.message}`),
+    );
+
+    return response;
+  }
+
+  private async logPrediction(
+    response: AutoFillResponseDto,
+    cycleTimeSource: 'physics' | 'heuristic',
+    userId: string,
+    accessToken: string,
+  ): Promise<void> {
+    const client = this.supabaseService.getClient(accessToken);
+    const totalUsd = response.costs.estimatedUnitCost
+      ? response.costs.estimatedUnitCost / 84 // approximate INR→USD; exchange rate service is sync-only
+      : null;
+    const materialUsd = response.costs.materialCostPerKg && response.geometry.weight
+      ? (response.costs.materialCostPerKg * response.geometry.weight) / 84
+      : null;
+
+    await client.from('should_cost_predictions').insert({
+      user_id:                    userId,
+      process_family:             response.suggestions.familyClassification ?? 'unknown',
+      location:                   'India', // auto-fill is India-only for now
+      predicted_total_cost_usd:   totalUsd,
+      predicted_material_cost_usd: materialUsd,
+      predicted_cycle_time_min:   response.costs.estimatedCycleTimeMin,
+      cycle_time_source:          cycleTimeSource,
+      mhr_source:                 (response.costs.mhrRate ?? 0) > 0 ? 'db_benchmark' : 'hardcoded_default',
+      lhr_source:                 (response.costs.lhrRate ?? 0) > 0 ? 'db_benchmark' : 'hardcoded_default',
+      material_source:            response.suggestions.materialId ? 'db_global' : 'hardcoded_default',
+      feature_vector: {
+        cut_length_mm:       response.geometry.cutLengthMm,
+        bend_count:          response.geometry.bendCount,
+        hole_count:          response.geometry.holeCount,
+        pierce_count:        response.geometry.pierceCount,
+        volume_mm3:          response.geometry.volume,
+        surface_area_mm2:    response.geometry.surfaceArea,
+        sheet_thickness_mm:  response.geometry.sheetThicknessMm,
+        bbox_length_mm:      response.geometry.boundingBox.length,
+        bbox_width_mm:       response.geometry.boundingBox.width,
+        bbox_height_mm:      response.geometry.boundingBox.height,
+        material_grade:      response.suggestions.materialGrade,
+        detected_family:     response.suggestions.familyClassification,
+        family_confidence:   response.suggestions.familyConfidence,
+      },
+      rate_snapshot: {
+        mhr_rate:             response.costs.mhrRate,
+        lhr_rate:             response.costs.lhrRate,
+        material_cost_per_kg: response.costs.materialCostPerKg,
+        currency:             'INR',
+      },
+      confidence_score:  response.confidence.overall,
+      engine_version:    process.env.COST_ENGINE_VERSION ?? '1.0.0',
+    });
   }
 
   private buildFeatureGraph(
@@ -269,6 +356,10 @@ export class AutoFillService {
       ?? (cadResult as any)?.cnc_features?.feature_graph_v2
       ?? null;
     const cncFeatures: any = (cadResult as any)?.cnc_features ?? null;
+    const imHeatmapFeatures: any =
+      cadResult?.geometry_features?.manufacturing_features
+        ?.manufacturing_intelligence?.features?.heatmap_features
+      ?? null;
 
     // STL ordering verification: compare face_map triangle total to STL header count.
     // STL header count is logged by /convert-step as X-STL-Triangle-Count.
@@ -284,7 +375,7 @@ export class AutoFillService {
     }
 
     const cadMI = cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence;
-    return {
+    const featureGraph = {
       extractedAt: new Date().toISOString(),
       classification: {
         family: family.family ?? 'cnc_milled',
@@ -300,7 +391,10 @@ export class AutoFillService {
         cutLengthMm:        geo.cutLengthMm,
         holeCount:          geo.holeCount,
         sheetThicknessMm:   geo.sheetThicknessMm,
-        slotCount:          0, // populated in Phase 2
+        slotCount:
+          cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence?.features?.slot_count
+          ?? (cadResult as any)?.cnc_features?.slots?.length
+          ?? 0,
         pierceCount:        geo.pierceCount,
         flatPatternAreaMm2: geo.flatPatternAreaMm2,
         costDrivers,
@@ -355,7 +449,16 @@ export class AutoFillService {
       analyzed_at:            new Date().toISOString(),
       ...(cadV2 ? { feature_graph_v2: cadV2 } : {}),
       ...(cncFeatures ? { cnc_features: cncFeatures } : {}),
+      ...(imHeatmapFeatures ? { imHeatmapFeatures } : {}),
+      ...(cadResult?.geometry_features?.manufacturing_features?.component_features
+        ? { component_features: cadResult.geometry_features.manufacturing_features.component_features }
+        : {}),
     };
+    const _cf = (featureGraph as any).component_features;
+    this.logger.log(
+      `[component_features] ${_cf ? `stored in featureGraph (axes=${_cf.setup_axes_candidates?.length ?? 0})` : 'NOT stored — cadResult path returned nothing'}`,
+    );
+    return featureGraph;
   }
 
   private extractManufacturabilityScore(cadResult?: any): number | undefined {
@@ -818,6 +921,14 @@ export class AutoFillService {
       return isFinite(n) ? n : fallback;
     };
 
+    // Fix 1: For CNC parts, use the feature recognizer's breakdown (through + blind holes)
+    // instead of manufacturing_features.holes.count which counts every cylindrical face
+    // (OD steps, groove IDs, etc.) — not just drilled/bored holes.
+    const cncSummary = cadResult?.cnc_features?.feature_summary ?? null;
+    const resolvedHoleCount = cncSummary
+      ? ((cncSummary.through_hole ?? 0) + (cncSummary.blind_hole ?? 0))
+      : safe(smf?.hole_count ?? mf?.holes?.count ?? gf?.feature_detection?.holes_detected, 0);
+
     return {
       volume: safe(gf.volume_mm3 ?? gf.estimated_volume_mm3, 0),
       surfaceArea: safe(gf.surface_area_mm2 ?? gf.surface_area_estimation, 0),
@@ -826,8 +937,8 @@ export class AutoFillService {
         width: safe(bbox.width ?? bbox.y, 0),
         height: safe(bbox.height ?? bbox.z, 0),
       },
-      holeCount: safe(smf?.hole_count ?? mf?.holes?.count ?? gf?.feature_detection?.holes_detected, 0),
-      pocketCount: safe(mf?.pockets?.count, 0),
+      holeCount: resolvedHoleCount,
+      pocketCount: safe(cncSummary?.pockets ?? mf?.pockets?.count, 0),
       thinWallCount: (mf?.thin_walls ?? 0) > 0 || gf?.feature_detection?.thin_walls ? 1 : 0,
       bendCount: safe(smf?.bend_count, 0),
       cutLengthMm: safe(smf?.cut_length_mm, 0),
@@ -840,12 +951,33 @@ export class AutoFillService {
         : Array.isArray(mf?.holes?.all_diameters) && mf.holes.all_diameters.length > 0
           ? mf.holes.all_diameters
           : [],
-      holeGroups: Array.isArray(smf?.hole_groups)
-        ? (smf.hole_groups as Array<{ diameter_mm: number; count: number }>)
-            .filter((g) => typeof g.diameter_mm === 'number' && g.diameter_mm > 0 && g.count > 0)
-        : [],
+      // holeGroups: prefer SMF data for sheet metal; synthesize from CNC feature_graph_v2
+      // for milled/turned parts where smf.hole_groups is always empty.
+      holeGroups: (() => {
+        if (Array.isArray(smf?.hole_groups) && smf.hole_groups.length > 0) {
+          return (smf.hole_groups as Array<{ diameter_mm: number; count: number }>).filter(
+            (g) => typeof g.diameter_mm === 'number' && g.diameter_mm > 0 && g.count > 0,
+          );
+        }
+        // Synthesize from feature_graph_v2 when available (CNC parts)
+        const fgv2Features = cadResult?.cnc_features?.feature_graph_v2?.features;
+        if (Array.isArray(fgv2Features) && fgv2Features.length > 0) {
+          const map = new Map<number, number>();
+          for (const f of fgv2Features as any[]) {
+            const ft: string = (f.feature_type ?? '').toLowerCase();
+            const isHole = ['through_hole', 'blind_hole', 'tapped_hole', 'counterbore'].includes(ft);
+            if (!isHole) continue;
+            const diam = f.diameter_mm as number | undefined;
+            if (!diam || diam <= 0) continue;
+            const rounded = Math.round(diam * 10) / 10; // group by 0.1mm
+            map.set(rounded, (map.get(rounded) ?? 0) + ((f.occurrences as any[])?.length ?? 1));
+          }
+          return Array.from(map.entries()).map(([diameter_mm, count]) => ({ diameter_mm, count }));
+        }
+        return [];
+      })(),
       bendRadii: Array.isArray(smf?.bend_radii_mm) ? smf.bend_radii_mm : [],
-      featureSource: smf?.hole_count != null ? 'step_topology' : 'mesh_inference',
+      featureSource: (cncSummary != null || smf?.hole_count != null) ? 'step_topology' : 'mesh_inference',
     };
   }
 
@@ -976,10 +1108,11 @@ export class AutoFillService {
     const fillRatio = bbVolume > 0 ? volume / bbVolume : 1;
 
     // Geometry fallback: thin flat sheet OR hollow formed frame/enclosure.
-    // Fix: was returning 'Sheet Metal' which has no processMap entry → '1. Manufacturing' bug.
+    // aspectRatio > 1.5: a 250×115 bracket (AR=2.17) is clearly not square; original 3.0 was too tight.
+    // volumeCm3 < 50000: 50 litres covers any realistic sheet metal enclosure; original 5000 was too tight.
     if (
       (minDim < 8 && aspectRatio > 5) ||
-      (fillRatio < 0.12 && aspectRatio > 3 && volumeCm3 < 5000)
+      (fillRatio < 0.12 && aspectRatio > 1.5 && volumeCm3 < 50000)
     ) {
       const processType = (minDim < 8 && geo.bendCount === 0) ? 'Sheet Metal Laser Cutting' : 'Sheet Metal Bending';
       return {
@@ -1035,6 +1168,124 @@ export class AutoFillService {
   }
 
   // ────────────────────────────────────────────────────────────────────────────
+  // PHYSICS-BASED CYCLE TIME
+  // ────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns physics-derived cycle time (minutes) for the process family.
+   * Falls back to the heuristic value already set by classifyProcess() when
+   * geometry is insufficient (e.g. STL mesh-inference fallback with no cut length).
+   *
+   * Returns { cycleTimeMin, source } where source indicates the derivation:
+   *   'physics'   — all required geometry fields were present
+   *   'heuristic' — geometry incomplete, fell back to classifyProcess() flat value
+   */
+  private computePhysicsCycleTime(
+    processType: string,
+    geo: RawGeometry,
+    materialGrade: string | null,
+    heuristicCycleTimeMin: number,
+  ): { cycleTimeMin: number; source: 'physics' | 'heuristic' } {
+    const isSheetMetal = processType.startsWith('Sheet Metal');
+    const isIM = processType === 'Injection Molding' || processType === 'Injection Moulding';
+    const isCNC = processType === 'CNC Machining' || processType === 'CNC Turning';
+
+    // ── Sheet Metal ────────────────────────────────────────────────────────────
+    if (isSheetMetal) {
+      const thickMm = geo.sheetThicknessMm > 0 ? geo.sheetThicknessMm : 2;
+      let totalSec = 0;
+      let hasGeometry = false;
+
+      if (geo.cutLengthMm > 0 || geo.pierceCount > 0) {
+        hasGeometry = true;
+        const pierces = geo.pierceCount + geo.holeCount;
+        const pierceSec = pierces * (lookupByThresholdLocal(LASER_PIERCE_SEC, thickMm) ?? 0.5);
+        const baseSpeed = lookupByThresholdLocal(LASER_SPEED_MM_PER_MIN, thickMm) ?? 3000;
+        const speedMmPerMin = baseSpeed * laserSpeedFactor(materialGrade);
+        const cutSec = geo.cutLengthMm > 0 ? (geo.cutLengthMm / speedMmPerMin) * 60 : 0;
+        totalSec += (pierceSec + cutSec) * 1.25; // +25% rapids overhead
+      }
+
+      if (geo.bendCount > 0) {
+        hasGeometry = true;
+        const thickKey = Object.keys(PRESS_BRAKE_SEC_PER_BEND)
+          .map(Number).sort((a, b) => a - b)
+          .reduce((prev, k) => (thickMm >= k ? k : prev), 1);
+        const secPerBend = PRESS_BRAKE_SEC_PER_BEND[thickKey] ?? 15;
+        totalSec += geo.bendCount * secPerBend;
+      }
+
+      if (!hasGeometry) return { cycleTimeMin: heuristicCycleTimeMin, source: 'heuristic' };
+
+      // Add deburr: 60 s/m of cut edge (if cut length known), else flat 30 s
+      const deburrSec = geo.cutLengthMm > 0 ? (geo.cutLengthMm / 1000) * 60 : 30;
+      totalSec += deburrSec;
+
+      return { cycleTimeMin: Math.max(1, totalSec / 60), source: 'physics' };
+    }
+
+    // ── Injection Molding ─────────────────────────────────────────────────────
+    if (isIM) {
+      const wallMm = geo.sheetThicknessMm > 0
+        ? geo.sheetThicknessMm                // sheet thickness re-used as wall proxy
+        : geo.thinWallCount > 0 ? 2.0 : 3.0; // fallback: 2mm thin-wall, 3mm standard
+      const bb = geo.boundingBox;
+      const dims = [bb.length, bb.width, bb.height].filter((d) => d > 0).sort((a, b) => b - a);
+      if (dims.length < 2) return { cycleTimeMin: heuristicCycleTimeMin, source: 'heuristic' };
+
+      const result = computeCycleTime({
+        wallMm,
+        longestBboxMm: dims[0],
+        bboxMidMm:     dims[1],
+        volumeMm3:     geo.volume,
+        projectedAreaMm2: null, // not available in auto-fill geometry at this stage
+        grade: materialGrade,
+      });
+
+      // +5 s mold-open/close overhead (machine constant, not in Menges formula)
+      const totalSec = result.totalCycleSec + 5;
+      return { cycleTimeMin: Math.max(0.5, totalSec / 60), source: 'physics' };
+    }
+
+    // ── CNC Machining / Turning ───────────────────────────────────────────────
+    // MRR-based estimate: (volume_to_remove / MRR) × overhead_factor.
+    // Volume to remove = bounding-box volume × (1 - fill_ratio).
+    if (isCNC) {
+      const bb = geo.boundingBox;
+      const bbVol = bb.length * bb.width * bb.height;
+      if (bbVol <= 0 || geo.volume <= 0) return { cycleTimeMin: heuristicCycleTimeMin, source: 'heuristic' };
+
+      const fillRatio = Math.min(0.95, Math.max(0.05, geo.volume / bbVol));
+      const removeVol = bbVol * (1 - fillRatio);
+
+      // MRR lookup by material family (mild steel fallback: 12,000 mm³/min for milling)
+      // These are the same constants stored in process_cycle_time_library (migration 182).
+      const mrrTable: Record<string, number> = {
+        aluminum:     processType === 'CNC Turning' ? 70000 : 50000,
+        stainless:    processType === 'CNC Turning' ?  7000 :  5000,
+        carbon_steel: processType === 'CNC Turning' ? 18000 : 12000,
+        unknown:      processType === 'CNC Turning' ? 12000 :  8000,
+      };
+      const family = laserSpeedFactor(materialGrade) > 0.80
+        ? 'aluminum'
+        : laserSpeedFactor(materialGrade) === 0.75
+          ? 'stainless'
+          : 'carbon_steel';
+
+      // Use material classification from classifyMaterialFamily for better accuracy
+      const mrrMm3PerMin = mrrTable[family] ?? mrrTable['unknown'];
+      const machiningMin = removeVol / mrrMm3PerMin;
+      const setupMin = 30; // setup + first-off inspection (constant for now)
+      const totalMin = machiningMin * 1.35 + setupMin; // 35% rapids/ATC/gauging overhead
+
+      if (totalMin < 1) return { cycleTimeMin: heuristicCycleTimeMin, source: 'heuristic' };
+      return { cycleTimeMin: Math.min(totalMin, 480), source: 'physics' }; // cap at 8h
+    }
+
+    return { cycleTimeMin: heuristicCycleTimeMin, source: 'heuristic' };
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
   // MATERIAL LOOKUP
   // ────────────────────────────────────────────────────────────────────────────
 
@@ -1044,15 +1295,26 @@ export class AutoFillService {
     familyHint: string,
     userId: string,
     accessToken: string,
+    location?: string,
   ): Promise<{ id: string; grade: string; density: number; unitCost: number; category: string } | null> {
     try {
       const client = this.supabaseService.getClient(accessToken);
       const isPlastic = processType === 'Injection Molding';
       const isCNCFamily = ['mill_turn', 'cnc_milled', 'cnc_turned'].includes(familyHint);
 
+      // Select the location-appropriate price column so India materials (cost_india)
+      // are not silently zeroed by reading the generic USD cost column.
+      // Matches LOCATION_INFO.materialCol in default-rates.ts.
+      const PRICE_COL: Record<string, string> = {
+        India: 'cost_india', USA: 'cost_usa', Germany: 'cost_germany',
+        France: 'cost_france', 'W. Europe': 'cost_europe', 'E. Europe': 'cost_e_europe',
+        UK: 'cost_uk', China: 'cost_china', Vietnam: 'cost_vietnam', Mexico: 'cost_mexico',
+      };
+      const priceCol = PRICE_COL[location ?? ''] ?? 'cost_india';
+
       let query = client
         .from('raw_materials')
-        .select('id, material, material_grade, density, cost, material_group')
+        .select(`id, material, material_grade, density, ${priceCol}, cost_india, material_group`)
         .ilike('material_group', isPlastic ? '%Plastic%' : '%Ferrous%')
         .not('density', 'is', null)
         .order('density', { ascending: true })
@@ -1081,11 +1343,16 @@ export class AutoFillService {
       const sorted = [...valid].sort((a: any, b: any) => (a.density ?? 0) - (b.density ?? 0));
       const best: any = sorted[Math.floor(sorted.length / 2)];
 
+      // Prefer location-specific column; fall back to cost_india, then generic cost
+      const locPrice = parseFloat((best as any)[priceCol]);
+      const unitCost = (isFinite(locPrice) && locPrice > 0)
+        ? locPrice
+        : (parseFloat((best as any).cost_india) || parseFloat((best as any).cost) || 0);
       return {
         id: best.id,
         grade: best.material_grade ?? best.material ?? '',
         density: parseFloat(best.density) || 2.7,
-        unitCost: parseFloat(best.cost) || 0,
+        unitCost,
         category: (best.material_group ?? '').toLowerCase().includes('plastic') ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS',
       };
     } catch (e) {
@@ -1130,14 +1397,14 @@ export class AutoFillService {
   }
 
   // ────────────────────────────────────────────────────────────────────────────
-  // LHR / LSR LOOKUP
+  // LHR LOOKUP
   // ────────────────────────────────────────────────────────────────────────────
 
   private async getLHR(accessToken: string): Promise<number | null> {
     try {
       const client = this.supabaseService.getClient(accessToken);
       const { data, error } = await client
-        .from('lsr')
+        .from('lhr_records')
         .select('lhr')
         .not('lhr', 'is', null)
         .order('created_at', { ascending: false })
@@ -1338,4 +1605,17 @@ export class AutoFillService {
     const overall = parseFloat(((geometry + material + proc + cost) / 4).toFixed(2));
     return { overall, geometry, material, process: proc, cost };
   }
+}
+
+// Returns the value from a numeric-keyed Record for the largest key ≤ value.
+// Same logic as in deterministic-planner.service.ts — kept local to avoid a
+// shared-utility circular dependency between bom-items and process-plan-generator.
+function lookupByThresholdLocal(table: Record<number, number>, value: number): number | undefined {
+  const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
+  let result: number | undefined;
+  for (const k of keys) {
+    if (value >= k) result = table[k];
+    else break;
+  }
+  return result;
 }

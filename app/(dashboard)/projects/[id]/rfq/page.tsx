@@ -588,7 +588,7 @@ export default function RFQPage() {
                                             <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                                               <span>Type: {bomItem.itemType?.replace('_', ' ')}</span>
                                               {bomItem.unit && <span>Unit: {bomItem.unit}</span>}
-                                              {bomItem.unitCost && <span>Unit Cost: ₹{bomItem.unitCost}</span>}
+                                              {bomItem.unitCost && <span>Unit Cost: ${bomItem.unitCost}</span>}
                                             </div>
                                           )}
                                         </div>

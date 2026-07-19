@@ -233,7 +233,7 @@ export class ProcessCostService {
       process_route: createDto.processRoute,
       operation: createDto.operation,
       mhr_id: createDto.mhrId,
-      lsr_id: createDto.lsrId,
+      lhr_id: createDto.lhrId,
       facility_category_id: createDto.facilityCategoryId,
       facility_type_id: createDto.facilityTypeId,
       supplier_id: createDto.supplierId,
@@ -407,7 +407,7 @@ export class ProcessCostService {
     if (updateDto.processRoute !== undefined) updateData.process_route = updateDto.processRoute;
     if (updateDto.operation !== undefined) updateData.operation = updateDto.operation;
     if (updateDto.mhrId !== undefined) updateData.mhr_id = updateDto.mhrId;
-    if (updateDto.lsrId !== undefined) updateData.lsr_id = updateDto.lsrId;
+    if (updateDto.lhrId !== undefined) updateData.lhr_id = updateDto.lhrId;
     if (updateDto.facilityCategoryId !== undefined) updateData.facility_category_id = updateDto.facilityCategoryId;
     if (updateDto.facilityTypeId !== undefined) updateData.facility_type_id = updateDto.facilityTypeId;
     if (updateDto.supplierId !== undefined) updateData.supplier_id = updateDto.supplierId;
@@ -444,6 +444,9 @@ export class ProcessCostService {
     updateData.scrap_adjustment = calculationResult.scrapAdjustment;
     updateData.total_batch_cost = calculationResult.totalBatchCost;
     updateData.calculation_breakdown = calculationResult;
+
+    // Any manual update via the dialog marks the row as engineer-overridden
+    updateData.is_override = true;
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)

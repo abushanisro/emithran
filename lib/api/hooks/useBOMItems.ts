@@ -353,6 +353,7 @@ export interface AutoFillResponse {
   costs: AutoFillCosts;
   confidence: { overall: number; geometry: number; material: number; process: number; cost: number };
   cadEngineAvailable: boolean;
+  cadEngineError?: string;
   featureGraph?: FeatureGraph;
 }
 
@@ -453,6 +454,13 @@ export interface MachineSelectionResult {
   availabilityWarning?: string;
 }
 
+export interface FeatureOp {
+  name: string;        // e.g. "Spot Drill ×8", "Pocket Mill ×2", "Cut path 0.85m"
+  timeSec: number;
+  featureType: string; // 'spot_drill' | 'drill' | 'pocket_mill' | 'tapping' | 'laser_cut' | 'pierce' | 'bend'
+  count: number;
+}
+
 export interface ProcessLineCost {
   process: string;
   setupCost: number;
@@ -460,11 +468,14 @@ export interface ProcessLineCost {
   totalCost: number;
   cycleTimeMin: number;
   hourlyRate: number;
-  rateSource: 'mhr_database' | 'default_rate' | 'tier_synthetic';
+  rateSource: 'mhr_database' | 'default_rate' | 'tier_synthetic' | 'benchmark_override';
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;
+  /** Labour hour rate from lhr_benchmark_rates (local currency/hr). Already baked into hourlyRate. */
+  labourRate?: number | null;
   machineSelection?: MachineSelectionResult;
+  featureBreakdown?: FeatureOp[];
 }
 
 export interface ProcessCO2 {
@@ -516,6 +527,9 @@ export interface RouteResultSustainability {
 }
 
 export interface CostSummaryDto {
+  // Scenario readiness — false when no material is applied; frontend blocks cost display
+  scenarioReady?: boolean;
+  missingInputs?: string[];
   materialCost: number;
   materialGrade: string;
   grossWeightKg: number;
@@ -550,6 +564,17 @@ export interface CostSummaryDto {
   // hint for the "overridden" badge + reset control, not something to re-apply.
   costOverrides?: Record<string, number>;
   sustainability?: SustainabilitySummaryDto;
+  blankSpec?: BlankSpecDto;
+}
+
+export interface BlankSpecDto {
+  form: 'sheet' | 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'billet' | 'extrusion' | 'casting' | 'granules';
+  sizeLabel: string;
+  grossWeightKg: number;
+  netWeightKg: number;
+  utilizationPct: number;
+  wasteKg: number;
+  wasteCost: number;
 }
 
 export function useCostSummary(itemId: string | undefined, batchSize: number = 1, location = 'USA') {
@@ -639,6 +664,70 @@ export function useRouteComparison(itemId: string | undefined, batchSize: number
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+  });
+}
+
+export interface CandidateRouteDto {
+  candidateId: string;
+  blankSpec: BlankSpecDto;
+  routeLabel: string;
+  routeId: string | null;
+  processLines: ProcessLineCost[];
+  totalCost: number;
+  materialCost: number;
+  totalProcessCost: number;
+  cycleTimes: { totalMin: number };
+  isFeasible: boolean;
+  feasibilityNotes: string[];
+  isPrimary: boolean;
+  badges: { lowestCost: boolean; fastest: boolean; lowestWaste: boolean };
+}
+
+export interface CandidateRouteComparisonDto {
+  bomItemId: string;
+  batchSize: number;
+  location: string;
+  currency?: string;
+  currencySymbol?: string;
+  candidates: CandidateRouteDto[];
+}
+
+export function useCandidateRoutes(
+  itemId: string | undefined,
+  batchSize: number = 1,
+  location = 'USA',
+) {
+  return useQuery({
+    queryKey: ['bom-items', itemId, 'candidate-routes', batchSize, location],
+    queryFn: () =>
+      apiClient.get<CandidateRouteComparisonDto>(
+        `/bom-items/${itemId}/candidate-routes?batchSize=${batchSize}&location=${encodeURIComponent(location)}`,
+      ),
+    enabled: useAuthEnabledWith(!!itemId),
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ── Apply manufacturing route → create process cost records ──────────────────
+// Posts the user-selected routeId to the backend, which re-runs the route
+// comparison engine, validates feasibility, then writes process_cost_records.
+// On success, invalidates process-costs so ManufacturingProcessSection refreshes.
+export function useApplyRoute(bomItemId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { routeId: string; batchSize?: number; location?: string }) =>
+      apiClient.post<{ created: number; operations: string[]; routeLabel: string; routeId: string }>(
+        `/bom-items/${bomItemId}/apply-route`,
+        payload,
+      ),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });
+      toast.success(`${data.created} operations filled from "${data.routeLabel}"`);
+    },
+    onError: (err: Error) => {
+      toast.error(`Route apply failed: ${err.message}`);
+    },
   });
 }
 

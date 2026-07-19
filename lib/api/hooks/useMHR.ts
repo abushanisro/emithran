@@ -8,6 +8,7 @@ import type {
   CreateMHRData,
   UpdateMHRData,
   MHRQuery,
+  MHRBenchmarkEntry,
 } from '../mhr';
 import { ApiError } from '../client';
 import { toast } from 'sonner';
@@ -50,6 +51,26 @@ export function useMHRRecord(id: string, options?: { enabled?: boolean; retry?: 
       return query.state.status !== 'error';
     },
   });
+}
+
+export function useMHRBenchmark(
+  location?: string,
+  options?: { enabled?: boolean },
+): { data: MHRBenchmarkEntry[]; isLoading: boolean; error: unknown } {
+  const query = useQuery({
+    queryKey: [...mhrKeys.all, 'benchmark', location ?? '__all__'],
+    queryFn: () => mhrApi.getBenchmarkRates(location),
+    staleTime: 1000 * 60 * 30, // benchmark data changes rarely — 30 min cache
+    retry: false,
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+    enabled: options?.enabled !== false,
+  });
+  return {
+    data: (query.data ?? []) as MHRBenchmarkEntry[],
+    isLoading: query.isLoading,
+    error: query.error,
+  };
 }
 
 export function useMHRProcessGroups() {

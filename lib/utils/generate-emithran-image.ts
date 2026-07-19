@@ -3,7 +3,7 @@ import type { PartInfo } from './generate-emithran-pdf';
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 const rs = (v: number) =>
-  `Rs.${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `Rs.${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const pct = (v: number, total: number) =>
   total > 0 ? `${((v / total) * 100).toFixed(1)}%` : '0.0%';
@@ -32,7 +32,7 @@ const sectionTitle = (title: string) =>
 
 // ── Build the HTML report string ──────────────────────────────────────────────
 function buildHtml(analysis: BomItemCostAnalysis, part: PartInfo): string {
-  const today = new Date().toLocaleDateString('en-IN', {
+  const today = new Date().toLocaleDateString('en-US', {
     day: '2-digit', month: 'short', year: 'numeric',
   });
   const mfg = analysis.manufacturingCost;

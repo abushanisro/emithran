@@ -63,6 +63,7 @@ def detect_part_family(
     pocket_count: int = 0,
     thin_wall_ratio: float = 0.0,
     draft_face_ratio: float = 0.0,
+    volume_mm3: float = 0.0,
 ) -> Tuple[str, float, List[str]]:
     """
     Heuristic family classification from bounding-box geometry + cylindrical face signals.
@@ -212,13 +213,38 @@ def detect_part_family(
     # Sheet metal is almost entirely planar faces (top, bottom, flanges, webs).
     # CNC milled and turned parts have more diverse surface types (fillets, bosses, pockets).
     # Catches simple bent brackets and channel sections where hole count is low.
-    if not sheet_metal_veto and planar_face_fraction > 0.70 and flatness < 0.35:
-        confidence = min(0.82, 0.62 + (0.35 - flatness) * 0.4 + planar_face_fraction * 0.1)
+    # Threshold relaxed to 0.48: a 300×300×140mm sheet metal box has flatness=0.47 but is
+    # clearly sheet metal — the original 0.35 cutoff was too tight for formed enclosures.
+    if not sheet_metal_veto and planar_face_fraction > 0.70 and flatness < 0.48:
+        confidence = min(0.82, 0.62 + (0.48 - flatness) * 0.4 + planar_face_fraction * 0.1)
         return "sheet_metal", round(confidence, 3), [
             f"Predominantly planar surfaces ({planar_face_fraction:.0%}) "
             f"with flat-ish bbox (flatness={flatness:.2f})",
             "Surface topology consistent with sheet metal",
         ]
+
+    # Gate 1d — fill ratio gate (formed sheet metal bracket / enclosure).
+    # If the part occupies < 10% of its bounding box volume AND its faces are majority
+    # planar AND it is not rotationally symmetric, the part is almost certainly a bent
+    # sheet metal bracket or box — a solid machined block could never have this geometry.
+    # This gate is intentionally NOT blocked by sheet_metal_veto because the veto's
+    # pocket_count heuristic fires incorrectly on formed sheet metal: bends read as
+    # "pockets" to the planar-face detector (the concave inner corner of each bend has
+    # a planar floor face). A fill ratio < 10% is a stronger and more reliable signal
+    # than pocket count for distinguishing formed sheet from machined solid.
+    if volume_mm3 > 0:
+        _bbox_vol = dims[0] * dims[1] * dims[2]
+        _fill_ratio = volume_mm3 / _bbox_vol if _bbox_vol > 0 else 1.0
+        if (_fill_ratio < 0.10
+                and planar_face_fraction > 0.50
+                and not (cyl_axis_alignment > 0.65 and rotational_face_ratio > 0.35)
+                and dims[0] / dims[2] < 0.80):
+            _conf = round(min(0.85, 0.65 + (0.10 - _fill_ratio) * 5.0), 3)
+            return "sheet_metal", _conf, [
+                f"Very low fill ratio ({_fill_ratio:.3f} < 0.10): part occupies "
+                f"{_fill_ratio:.1%} of bounding box — formed sheet metal bracket/enclosure",
+                f"Majority planar faces ({planar_face_fraction:.0%}) confirm non-solid topology",
+            ]
 
     # Disc / flange / ring (lens holders, pulleys, bearing races):
     # rotational_face_ratio > 0.30 guards against round milled housings / pipe manifolds
@@ -346,7 +372,6 @@ class SheetMetalFeatureExtractor:
         )
 
         flatness = sheet_thickness / max(max(bbox_dims), 1.0)
-
         # Use pre-computed cylinder list when available.
         if raw_cylinders is None:
             try:
@@ -1442,7 +1467,7 @@ class SheetMetalFeatureExtractor:
         # Build edge → adjacent faces map for the whole shape (for slot wall lookup)
         try:
             edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
-            topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_face_map)  # type: ignore
+            topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, edge_face_map)  # type: ignore
             has_edge_map = True
         except Exception:
             has_edge_map = False
@@ -1715,7 +1740,12 @@ class InjectionMoldedFeatureExtractor:
         draft.pop("_pull_axis_idx", None)  # extracted but only needed internally
         # DFM face groups with face_ids for 3D highlighting (populated when face_map supplied)
         im_dfm_groups = draft.pop("_dfm_face_groups", None)
+        # All draft face classifications for heatmap (includes drafted/overdrafted, not just DFM groups)
+        all_draft_faces_hm: List[Dict[str, Any]] = []
+        if im_dfm_groups:
+            all_draft_faces_hm = im_dfm_groups.pop("_all_draft_faces", [])
         ribs = self._detect_ribs(wall_planes, modal_thickness)
+        rib_data_hm = ribs.pop("rib_data", [])
 
         logger.info(
             f"[InjectionMolded] wall={modal_thickness:.2f}mm "
@@ -1778,12 +1808,21 @@ class InjectionMoldedFeatureExtractor:
             "parting_complexity": draft["parting_complexity"],
             "pull_axis": draft["pull_axis"],
             "draft_confidence": draft["draft_confidence"],
-            # feature_graph_v2: populated when face_map is supplied (3D DFM highlighting)
+            # feature_graph_v2: always built for IM so the frontend heatmap gate passes
+            # even for simple parts with no undercuts or undrafted faces.
             "feature_graph_v2": self._build_im_feature_graph(
                 im_dfm_groups, face_map or [], face_map_tri_total,
                 inserts.get("insert_candidates", []),
-            ) if im_dfm_groups else None,
-            "extraction_version": "im_v4_phase4",
+            ),
+            # Per-feature spatial data for localized heatmap blobs on the 3D viewer
+            "heatmap_features": self._build_heatmap_features(
+                all_draft_faces=all_draft_faces_hm,
+                blind_feature_data=blind_features.get("blind_feature_data", []),
+                rib_data=rib_data_hm,
+                wall_samples=self._collect_wall_samples(wall_planes, modal_thickness),
+                nominal_wall_mm=modal_thickness,
+            ),
+            "extraction_version": "im_v5_heatmap",
         }
 
     # ── Phase 2: wall uniformity ──────────────────────────────────────────────
@@ -1977,13 +2016,15 @@ class InjectionMoldedFeatureExtractor:
         draft_angles: List[float] = []
 
         # Collect wall face plane equations for reuse in rib detection:
-        # (nx, ny, nz, plane_offset, area) — plane_offset = dot(centroid, normal)
-        wall_face_planes: List[Tuple[float, float, float, float, float]] = []
+        # (nx, ny, nz, plane_offset, area, cx, cy, cz) — 8-tuple with centroid for heatmap placement
+        wall_face_planes: List[Tuple] = []
 
         # DFM face groups for 3D highlighting: track face_index (global ordinal matching
         # face_map from _detect_holes_real) and centroid per classified face.
         undercut_dfm: List[Dict[str, Any]] = []
         undrafted_dfm: List[Dict[str, Any]] = []
+        # All wall face classifications for heatmap source builders (not just undrafted/undercut)
+        all_draft_faces_hm: List[Dict[str, Any]] = []
 
         face_index = 0  # counts ALL faces — matches face_map ordinal from _detect_holes_real
         explorer = TopExp_Explorer(shape, TopAbs_FACE)
@@ -2036,8 +2077,9 @@ class InjectionMoldedFeatureExtractor:
                 draft_angles.append(round(draft_deg, 2))
 
                 # Collect plane equation for rib detection (offset = dot(location, normal))
+                # 8-tuple includes centroid coords for heatmap blob placement in _detect_ribs
                 offset = float(p.X()) * nx + float(p.Y()) * ny + float(p.Z()) * nz
-                wall_face_planes.append((nx, ny, nz, offset, area))
+                wall_face_planes.append((nx, ny, nz, offset, area, centroid[0], centroid[1], centroid[2]))
 
                 # Undercut: face normal has SIGNIFICANT component opposing pull.
                 # Small negative dot = cavity-half draft (valid, not an undercut).
@@ -2045,13 +2087,17 @@ class InjectionMoldedFeatureExtractor:
                 if dot < UNDERCUT_NEG_DOT_THRESHOLD:
                     undercut_count += 1
                     undercut_dfm.append({"face_id": current_face_index, "centroid": centroid, "back_angle_deg": round(draft_deg, 2)})
+                    all_draft_faces_hm.append({"centroid": centroid, "draft_deg": round(draft_deg, 2), "classification": "undercut"})
                 elif abs(dot) < UNDRAFTED_ABS_DOT_THRESHOLD:
                     undrafted_count += 1
                     undrafted_dfm.append({"face_id": current_face_index, "centroid": centroid, "angle_deg": round(draft_deg, 2)})
+                    all_draft_faces_hm.append({"centroid": centroid, "draft_deg": round(draft_deg, 2), "classification": "undrafted"})
                 elif draft_deg <= 5.0:
                     drafted_count += 1
+                    all_draft_faces_hm.append({"centroid": centroid, "draft_deg": round(draft_deg, 2), "classification": "drafted"})
                 else:
                     overdrafted_count += 1
+                    all_draft_faces_hm.append({"centroid": centroid, "draft_deg": round(draft_deg, 2), "classification": "overdrafted"})
             except Exception:
                 pass
             explorer.Next()
@@ -2089,6 +2135,7 @@ class InjectionMoldedFeatureExtractor:
             "_dfm_face_groups": {
                 "undercut": undercut_dfm,
                 "undrafted": undrafted_dfm,
+                "_all_draft_faces": all_draft_faces_hm,
             },
         }
 
@@ -2129,12 +2176,13 @@ class InjectionMoldedFeatureExtractor:
 
         rib_pairs = 0
         rib_separations: List[float] = []
+        rib_data: List[Dict[str, Any]] = []  # per-rib centroid + dims for heatmap placement
         n_faces = len(wall_face_planes)
 
         for i in range(n_faces):
-            nx1, ny1, nz1, off1, _area1 = wall_face_planes[i]
+            nx1, ny1, nz1, off1, _area1, cx1, cy1, cz1 = (*wall_face_planes[i], *([0.0]*3))[:8]
             for j in range(i + 1, n_faces):
-                nx2, ny2, nz2, off2, _area2 = wall_face_planes[j]
+                nx2, ny2, nz2, off2, _area2, cx2, cy2, cz2 = (*wall_face_planes[j], *([0.0]*3))[:8]
 
                 # Must be antiparallel (facing each other)
                 dot_nn = nx1 * nx2 + ny1 * ny2 + nz1 * nz2
@@ -2148,6 +2196,19 @@ class InjectionMoldedFeatureExtractor:
 
                 rib_pairs += 1
                 rib_separations.append(round(sep, 2))
+
+                # Rib centroid = midpoint between the two face centroids.
+                # height estimate: area ≈ height × sep, so height ≈ sqrt(max_area)
+                height_est = round(math.sqrt(max(_area1, _area2, 1.0)), 2)
+                rib_data.append({
+                    "centroid": [
+                        round((cx1 + cx2) / 2, 2),
+                        round((cy1 + cy2) / 2, 2),
+                        round((cz1 + cz2) / 2, 2),
+                    ],
+                    "thickness_mm": round(sep, 2),
+                    "height_mm": height_est,
+                })
 
         # Bin into 0.5 mm groups for DFM reporting
         binned: Dict[float, int] = {}
@@ -2165,6 +2226,7 @@ class InjectionMoldedFeatureExtractor:
             "rib_count": rib_pairs,
             "rib_groups": rib_groups,
             "rib_confidence": confidence,
+            "rib_data": rib_data,
         }
 
     # ── Phase 2: blind feature detection ─────────────────────────────────────
@@ -2246,6 +2308,7 @@ class InjectionMoldedFeatureExtractor:
         through_count = 0
         blind_count = 0
         blind_diameters_mm: List[float] = []  # Phase 3: diameters for insert matching
+        blind_feature_data: List[Dict[str, Any]] = []  # per-boss centroid + dims for heatmap
 
         explorer = TopExp_Explorer(shape, TopAbs_FACE)
         while explorer.More():
@@ -2308,6 +2371,27 @@ class InjectionMoldedFeatureExtractor:
                 if has_cap:
                     blind_count += 1
                     blind_diameters_mm.append(round(radius * 2.0, 2))
+                    # Collect cylinder face centroid + dimensions for heatmap source placement.
+                    # height estimate: area ≈ 2π×r×h → h = area / (2π×r)
+                    try:
+                        cyl_props = GProp_GProps()
+                        brepgprop.SurfaceProperties(face, cyl_props)
+                        cyl_cog = cyl_props.CentreOfMass()
+                        cyl_area = cyl_props.Mass()
+                        h_est = cyl_area / (2 * math.pi * radius) if radius > 0 else 0
+                        slend = round(h_est / (radius * 2.0), 3) if radius > 0 else 0
+                        blind_feature_data.append({
+                            "centroid": [
+                                round(float(cyl_cog.X()), 2),
+                                round(float(cyl_cog.Y()), 2),
+                                round(float(cyl_cog.Z()), 2),
+                            ],
+                            "diameter_mm": round(radius * 2.0, 2),
+                            "height_mm": round(h_est, 2),
+                            "slenderness": slend,
+                        })
+                    except Exception:
+                        pass
                 else:
                     through_count += 1
             except Exception:
@@ -2318,6 +2402,7 @@ class InjectionMoldedFeatureExtractor:
             "through_hole_count": through_count,
             "blind_feature_count": blind_count,
             "blind_feature_diameters_mm": sorted(blind_diameters_mm),
+            "blind_feature_data": blind_feature_data,
             "confidence": 0.60,
         }
 
@@ -2392,50 +2477,49 @@ class InjectionMoldedFeatureExtractor:
           undercut  → severity 'high'   (ejection blocker, must have slide/lifter)
           undrafted → severity 'medium' (draft DFM warning, may stick on ejection)
         """
-        if not dfm_groups:
-            return None
         try:
             features = []
 
-            undercut_faces = dfm_groups.get("undercut", [])
-            if undercut_faces:
-                features.append({
-                    "id": "im_undercuts",
-                    "feature_type": "im_undercut",
-                    "severity": "high",
-                    "label": "Undercuts",
-                    "description": f"{len(undercut_faces)} face(s) with back-angle >5° — require slide or lifter",
-                    "occurrences": [
-                        {
-                            "face_ids": [f["face_id"]],
-                            "centroid": f["centroid"],
-                            "back_angle_deg": f.get("back_angle_deg"),
-                        }
-                        for f in undercut_faces
-                    ],
-                })
+            if dfm_groups:
+                undercut_faces = dfm_groups.get("undercut", [])
+                if undercut_faces:
+                    features.append({
+                        "id": "im_undercuts",
+                        "feature_type": "im_undercut",
+                        "severity": "high",
+                        "label": "Undercuts",
+                        "description": f"{len(undercut_faces)} face(s) with back-angle >5° — require slide or lifter",
+                        "occurrences": [
+                            {
+                                "face_ids": [f["face_id"]],
+                                "centroid": f["centroid"],
+                                "back_angle_deg": f.get("back_angle_deg"),
+                            }
+                            for f in undercut_faces
+                        ],
+                    })
 
-            undrafted_faces = dfm_groups.get("undrafted", [])
-            if undrafted_faces:
-                features.append({
-                    "id": "im_undrafted",
-                    "feature_type": "im_undrafted",
-                    "severity": "medium",
-                    "label": "Undrafted Faces",
-                    "description": f"{len(undrafted_faces)} face(s) with <0.3° draft — ejection risk",
-                    "occurrences": [
-                        {
-                            "face_ids": [f["face_id"]],
-                            "centroid": f["centroid"],
-                            "angle_deg": f.get("angle_deg"),
-                        }
-                        for f in undrafted_faces
-                    ],
-                })
+                undrafted_faces = dfm_groups.get("undrafted", [])
+                if undrafted_faces:
+                    features.append({
+                        "id": "im_undrafted",
+                        "feature_type": "im_undrafted",
+                        "severity": "medium",
+                        "label": "Undrafted Faces",
+                        "description": f"{len(undrafted_faces)} face(s) with <0.3° draft — ejection risk",
+                        "occurrences": [
+                            {
+                                "face_ids": [f["face_id"]],
+                                "centroid": f["centroid"],
+                                "angle_deg": f.get("angle_deg"),
+                            }
+                            for f in undrafted_faces
+                        ],
+                    })
 
-            if not features:
-                return None
-
+            # Always return metadata for IM — enables frontend heatmap even when
+            # no undercuts or undrafted faces exist (simple uniform parts still
+            # benefit from boss/rib/wall-variation heatmaps).
             return {
                 "metadata": {
                     "face_map": face_map,
@@ -2446,3 +2530,1046 @@ class InjectionMoldedFeatureExtractor:
         except Exception as e:
             logger.warning(f"[InjectionMolded] feature_graph_v2 build failed: {e}")
             return None
+
+    # ── Heatmap feature extraction ────────────────────────────────────────────
+
+    def _collect_wall_samples(
+        self,
+        wall_face_planes: List[Tuple],
+        nominal_mm: float,
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract per-location wall thickness samples from antiparallel face pairs
+        at wall-thickness separation using the enriched 8-tuple wall_face_planes
+        (already collected in _analyze_draft_angles).
+
+        Uses adaptive area-based sampling: 1 sample per 1000 mm² of wall area,
+        bounded [5, 300]. When more pairs are found than the target, a spatial
+        voxel grid in the XY plane keeps the highest-deviation sample per cell.
+        This gives coverage proportional to part size rather than a hard cap.
+        """
+        if not wall_face_planes or nominal_mm <= 0:
+            return []
+
+        wall_min = nominal_mm * 0.40
+        wall_max = nominal_mm * 1.80
+        ANTIPARALLEL_THRESHOLD = 0.95
+
+        samples: List[Dict[str, Any]] = []
+        total_area_mm2 = 0.0
+        n = len(wall_face_planes)
+
+        for i in range(n):
+            p1 = (*wall_face_planes[i], *([0.0] * 3))[:8]
+            nx1, ny1, nz1, off1, area1, cx1, cy1, cz1 = p1
+            for j in range(i + 1, n):
+                p2 = (*wall_face_planes[j], *([0.0] * 3))[:8]
+                nx2, ny2, nz2, off2, area2, cx2, cy2, cz2 = p2
+
+                dot_nn = nx1 * nx2 + ny1 * ny2 + nz1 * nz2
+                if dot_nn > -ANTIPARALLEL_THRESHOLD:
+                    continue
+
+                sep = abs(off1 + off2)
+                if not (wall_min <= sep <= wall_max):
+                    continue
+
+                pair_area = min(area1, area2) if area1 > 0 and area2 > 0 else 0.0
+                total_area_mm2 += pair_area
+                delta = round(abs(sep - nominal_mm) / nominal_mm, 3)
+                samples.append({
+                    "centroid": [
+                        round((cx1 + cx2) / 2, 2),
+                        round((cy1 + cy2) / 2, 2),
+                        round((cz1 + cz2) / 2, 2),
+                    ],
+                    "thickness_mm": round(sep, 2),
+                    "delta_from_nominal": delta,
+                })
+
+        if not samples:
+            return []
+
+        # Adaptive target: 1 sample per 1000 mm² of wall surface area, bounded [5, 300]
+        target = max(5, min(300, int(total_area_mm2 / 1000) if total_area_mm2 > 0 else len(samples)))
+
+        if len(samples) <= target:
+            return samples
+
+        # Spatial voxel-grid subsampling: keep highest-deviation sample per cell.
+        # Grid sized to approximate the target count, proportional to XY extents.
+        cx_vals = [s["centroid"][0] for s in samples]
+        cy_vals = [s["centroid"][1] for s in samples]
+        x_min, x_max = min(cx_vals), max(cx_vals)
+        y_min, y_max = min(cy_vals), max(cy_vals)
+        span_x = max(x_max - x_min, 1.0)
+        span_y = max(y_max - y_min, 1.0)
+
+        cells_side = max(1, int(math.sqrt(target)))
+        cells_x = max(1, round(cells_side * span_x / max(span_x, span_y)))
+        cells_y = max(1, round(cells_side * span_y / max(span_x, span_y)))
+
+        grid: Dict[Tuple[int, int], Dict[str, Any]] = {}
+        for s in samples:
+            ix = min(int((s["centroid"][0] - x_min) / span_x * cells_x), cells_x - 1)
+            iy = min(int((s["centroid"][1] - y_min) / span_y * cells_y), cells_y - 1)
+            key = (ix, iy)
+            existing = grid.get(key)
+            # Prefer the highest-deviation sample in each cell: it dominates heatmap amplitude
+            if existing is None or s["delta_from_nominal"] > existing["delta_from_nominal"]:
+                grid[key] = s
+
+        return list(grid.values())
+
+    def _build_heatmap_features(
+        self,
+        all_draft_faces: List[Dict[str, Any]],
+        blind_feature_data: List[Dict[str, Any]],
+        rib_data: List[Dict[str, Any]],
+        wall_samples: List[Dict[str, Any]],
+        nominal_wall_mm: float,
+    ) -> Dict[str, Any]:
+        """
+        Assemble per-feature spatial data for the frontend IM heatmap engine.
+        All centroids are in OCC global coordinates (same frame as STL export).
+
+        bosses:       blind cylindrical features (bosses + blind holes lumped)
+        ribs:         antiparallel wall-face pairs at rib-thickness separation
+        wall_samples: antiparallel face pairs at wall-thickness separation (up to 30)
+        draft_faces:  all classified wall faces (undrafted/drafted/overdrafted/undercut)
+        """
+        return {
+            "bosses": [
+                {
+                    "centroid": f["centroid"],
+                    "diameter_mm": f["diameter_mm"],
+                    "height_mm": f["height_mm"],
+                    "wall_mm": round(nominal_wall_mm, 2),
+                    "slenderness": f["slenderness"],
+                }
+                for f in blind_feature_data
+            ],
+            "ribs": rib_data,
+            "wall_samples": wall_samples,
+            "draft_faces": all_draft_faces,
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Component Feature Analyzer — aPriori-style decomposition
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class ComponentFeatureAnalyzer:
+    """
+    aPriori-style geometry decomposition for any detected part family.
+
+    Produces:
+      blank            — largest planar face (sheet metal blank / datum face)
+      main_surfaces    — top-5 planar faces by area
+      setup_axes       — 6 orthogonal accessibility candidates (±X, ±Y, ±Z)
+      sides            — inside / outside classification of feature instances
+      gcd_relations    — spatial relations between feature instances
+
+    Uses only OCC APIs already imported elsewhere in this module.
+    All coordinates are Three.js-centered (origin at bbox centroid).
+    """
+
+    _ORTHO_DIRS: List[Tuple[str, Tuple[float, float, float]]] = [
+        ("+Z", (0.0, 0.0, 1.0)),
+        ("-Z", (0.0, 0.0, -1.0)),
+        ("+Y", (0.0, 1.0, 0.0)),
+        ("-Y", (0.0, -1.0, 0.0)),
+        ("+X", (1.0, 0.0, 0.0)),
+        ("-X", (-1.0, 0.0, 0.0)),
+    ]
+
+    @staticmethod
+    def _normalize_mfg_features(mfg_features: Dict[str, Any]) -> Dict[str, Any]:
+        """Flatten AdvancedCADMemoryOptimizer's nested layout for sub-method access.
+
+        The optimizer stores all family-specific features under:
+          manufacturing_features["manufacturing_intelligence"]["features"]
+
+        Every ComponentFeatureAnalyzer sub-method expects feature_graph_v2 and flat
+        metrics (cut_length_mm, pierce_count, flat_pattern_area_mm2, …) at the TOP
+        LEVEL of the dict it receives.
+
+        This method produces a shallow-merged copy so all sub-methods work without
+        knowing about the nesting.  The caller's dict is never mutated.
+        """
+        # Already flat (test path or future layout change) — return as-is
+        if mfg_features.get("feature_graph_v2"):
+            return mfg_features
+
+        mi = mfg_features.get("manufacturing_intelligence")
+        mi_feats = mi.get("features") if isinstance(mi, dict) else None
+        if not isinstance(mi_feats, dict):
+            return mfg_features
+
+        # Shallow-merge mi_feats into a copy; top-level keys take priority so we
+        # never clobber 'holes', 'pockets', 'thin_walls', etc.
+        normalized = {**mi_feats, **mfg_features}
+        return normalized
+
+    def analyze(
+        self,
+        shape: Any,
+        mfg_features: Dict[str, Any],
+        bbox_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Return the full ComponentFeatureAnalysis dict."""
+        # Normalise once here — all sub-methods receive a flat dict
+        mfg = self._normalize_mfg_features(mfg_features)
+        face_data = self._collect_planar_faces(shape, bbox_data)
+        blank = self._extract_blank(face_data, mfg)
+        main_surfaces = self._extract_main_surfaces(face_data, blank)
+        setup_axes = self._compute_setup_axes(face_data, mfg, bbox_data)
+        sides = self._classify_sides(mfg, blank)
+        gcd_relations = self._compute_gcd_relations(shape, mfg, blank, setup_axes)
+        return {
+            "blank": blank,
+            "main_surfaces": main_surfaces,
+            "setup_axes_candidates": setup_axes,
+            "sides": sides,
+            "gcd_relations": gcd_relations,
+        }
+
+    # ── Face collection ────────────────────────────────────────────────────
+
+    def _collect_planar_faces(
+        self,
+        shape: Any,
+        bbox_data: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_FACE      # type: ignore
+        from OCC.Core.TopoDS import topods           # type: ignore
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Plane   # type: ignore
+        from OCC.Core.BRepGProp import brepgprop     # type: ignore
+        from OCC.Core.GProp import GProp_GProps      # type: ignore
+
+        bcx = (bbox_data.get("xmin", 0.0) + bbox_data.get("xmax", 0.0)) / 2
+        bcy = (bbox_data.get("ymin", 0.0) + bbox_data.get("ymax", 0.0)) / 2
+        bcz = (bbox_data.get("zmin", 0.0) + bbox_data.get("zmax", 0.0)) / 2
+
+        faces: List[Dict[str, Any]] = []
+        exp = TopExp_Explorer(shape, TopAbs_FACE)
+        idx = 0
+        while exp.More():
+            face = topods.Face(exp.Current())
+            try:
+                surf = BRepAdaptor_Surface(face, True)
+                if surf.GetType() == GeomAbs_Plane:
+                    props = GProp_GProps()
+                    brepgprop.SurfaceProperties(face, props)
+                    area = props.Mass()
+                    if area >= 1.0:
+                        pln = surf.Plane()
+                        nx, ny, nz = pln.Axis().Direction().XYZ().Coord()
+                        cx, cy, cz = props.CentreOfMass().Coord()
+                        faces.append({
+                            "face_id": idx,
+                            "area_mm2": round(area, 1),
+                            "normal": {"x": round(nx, 4), "y": round(ny, 4), "z": round(nz, 4)},
+                            "centroid": {
+                                "x": round(cx - bcx, 2),
+                                "y": round(cy - bcy, 2),
+                                "z": round(cz - bcz, 2),
+                            },
+                        })
+            except Exception:
+                pass
+            exp.Next()
+            idx += 1
+
+        return sorted(faces, key=lambda f: f["area_mm2"], reverse=True)
+
+    # ── Blank ──────────────────────────────────────────────────────────────
+
+    def _extract_blank(
+        self,
+        face_data: List[Dict[str, Any]],
+        mfg_features: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        if not face_data:
+            return {
+                "id": "blank_1", "face_id": 0, "volume_mm3": 0.0,
+                "area_mm2": 0.0, "edge_count": 0, "edge_segments": [],
+                "centroid": {"x": 0.0, "y": 0.0, "z": 0.0},
+            }
+        bf = face_data[0]
+        volume = mfg_features.get("volume_mm3") or 0.0
+        cut_length = mfg_features.get("cut_length_mm") or 0.0
+        pierce_count = mfg_features.get("pierce_count") or 4
+        seg_len = round(cut_length / max(pierce_count, 1), 1)
+        return {
+            "id": "blank_1",
+            "face_id": bf["face_id"],
+            "volume_mm3": round(float(volume), 2),
+            "area_mm2": bf["area_mm2"],
+            "edge_count": pierce_count,
+            "edge_segments": [
+                {"id": f"edge_{i}", "length_mm": seg_len}
+                for i in range(min(pierce_count, 20))
+            ],
+            "centroid": bf["centroid"],
+        }
+
+    # ── Main surfaces ──────────────────────────────────────────────────────
+
+    def _extract_main_surfaces(
+        self,
+        face_data: List[Dict[str, Any]],
+        blank: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        return [
+            {
+                "id": f"surface_{i + 1}",
+                "face_id": f["face_id"],
+                "area_mm2": f["area_mm2"],
+                "normal": f["normal"],
+                "is_primary": f["face_id"] == blank["face_id"],
+            }
+            for i, f in enumerate(face_data[:5])
+        ]
+
+    # ── Setup axis candidates ──────────────────────────────────────────────
+
+    def _compute_setup_axes(
+        self,
+        face_data: List[Dict[str, Any]],
+        mfg_features: Dict[str, Any],
+        bbox_data: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        total_area = sum(f["area_mm2"] for f in face_data) or 1.0
+        xmin, xmax = bbox_data.get("xmin", 0.0), bbox_data.get("xmax", 0.0)
+        ymin, ymax = bbox_data.get("ymin", 0.0), bbox_data.get("ymax", 0.0)
+        zmin, zmax = bbox_data.get("zmin", 0.0), bbox_data.get("zmax", 0.0)
+        feature_centroids = self._get_feature_centroids(mfg_features)
+
+        candidates = []
+        slide_idx = 1
+        for label, (dx, dy, dz) in self._ORTHO_DIRS:
+            try:
+                result = self._evaluate_direction(
+                    label, (dx, dy, dz), face_data, total_area,
+                    xmin, xmax, ymin, ymax, zmin, zmax,
+                    feature_centroids, slide_idx,
+                )
+                if result["accessible_surface_area_mm2"] > 0:
+                    candidates.append(result)
+                    slide_idx += 1
+            except Exception as e:
+                logger.debug(f"[ComponentFeatures] setup axis {label} skipped: {e}")
+        return candidates
+
+    def _get_feature_centroids(
+        self, mfg_features: Dict[str, Any]
+    ) -> List[Tuple[float, float, float]]:
+        pts: List[Tuple[float, float, float]] = []
+        fg2 = mfg_features.get("feature_graph_v2") or {}
+        features = fg2.get("features") if isinstance(fg2, dict) else []
+        if not features:
+            return pts
+        for feat in features:
+            for occ in (feat.get("occurrences") or []):
+                c = occ.get("centroid")
+                if c and len(c) == 3:
+                    pts.append((float(c[0]), float(c[1]), float(c[2])))
+        return pts
+
+    def _evaluate_direction(
+        self,
+        label: str,
+        direction: Tuple[float, float, float],
+        face_data: List[Dict[str, Any]],
+        total_area: float,
+        xmin: float, xmax: float,
+        ymin: float, ymax: float,
+        zmin: float, zmax: float,
+        feature_centroids: List[Tuple[float, float, float]],
+        slide_idx: int,
+    ) -> Dict[str, Any]:
+        dx, dy, dz = direction
+
+        accessible: List[Dict[str, Any]] = []
+        has_undercut = False
+        for f in face_data:
+            n = f["normal"]
+            dot = n["x"] * dx + n["y"] * dy + n["z"] * dz
+            if dot > 0.7:
+                accessible.append(f)
+            elif dot < -0.9:
+                has_undercut = True
+
+        acc_area = sum(f["area_mm2"] for f in accessible)
+        shadow_depth = (
+            abs(dx) * (xmax - xmin)
+            + abs(dy) * (ymax - ymin)
+            + abs(dz) * (zmax - zmin)
+        )
+        shadow_area = self._shadow_area(dx, dy, dz, xmin, xmax, ymin, ymax, zmin, zmax)
+        rect = self._parting_rect(dx, dy, dz, xmin, xmax, ymin, ymax, zmin, zmax)
+
+        perp = self._perp_extents(dx, dy, dz, xmin, xmax, ymin, ymax, zmin, zmax)
+        clearance = round(min(perp) / 2, 2) if perp else None
+
+        if accessible:
+            dots = [
+                abs(f["normal"]["x"] * dx + f["normal"]["y"] * dy + f["normal"]["z"] * dz)
+                for f in accessible
+            ]
+            mean_dot = sum(dots) / len(dots)
+            draft_angle = round(math.degrees(math.acos(min(mean_dot, 1.0))), 1)
+        else:
+            draft_angle = 90.0
+
+        tool_reach = 0.0
+        for (cx, cy, cz) in feature_centroids:
+            depth = abs(cx * dx + cy * dy + cz * dz)
+            tool_reach = max(tool_reach, depth)
+        tool_reach = round(min(tool_reach, shadow_depth), 2)
+
+        is_feasible = (not has_undercut) and acc_area > 0
+
+        return {
+            "id": f"slide_{slide_idx}",
+            "direction_label": label,
+            "direction_type": "ORTHOGONAL",
+            "direction_vector": {"x": dx, "y": dy, "z": dz},
+            "tool_reach_mm": tool_reach,
+            "length_mm": round(shadow_depth, 2),
+            "max_rules_deg": round(draft_angle, 1),
+            "wall_corner_diameter_mm": None,
+            "unobstructed_wall_corner_diameter_mm": None,
+            "distance_to_obstruction_mm": None,
+            "distance_to_tool_interference_mm": None,
+            "is_feasible": is_feasible,
+            "is_feasible_for_fillet": is_feasible,
+            "has_parallel_tangent_edges": len(accessible) > 1,
+            "distance_to_solid_shadow_border_mm": None,
+            "parting_projection_start_mm": rect["start"],
+            "parting_projection_end_mm": rect["end"],
+            "rectangle_lower_left": rect["ll"],
+            "rectangle_upper_right": rect["ur"],
+            "clearance_distance_mm": clearance,
+            "accessible_surface_area_mm2": round(acc_area, 1),
+            "has_blocked_volume": has_undercut or acc_area < total_area * 0.1,
+            "oriented_box_center": {
+                "x": round((xmin + xmax) / 2, 2),
+                "y": round((ymin + ymax) / 2, 2),
+                "z": round((zmin + zmax) / 2, 2),
+            },
+            "largest_window_area_mm2": None,
+            "largest_shadow_area_mm2": round(shadow_area, 1),
+            "shadow_depth_mm": round(shadow_depth, 2),
+            "draft_angle_deg": draft_angle,
+            "group_id": label,
+        }
+
+    def _shadow_area(
+        self, dx: float, dy: float, dz: float,
+        xmin: float, xmax: float, ymin: float, ymax: float, zmin: float, zmax: float,
+    ) -> float:
+        extents = self._perp_extents(dx, dy, dz, xmin, xmax, ymin, ymax, zmin, zmax)
+        return extents[0] * extents[1] if len(extents) >= 2 else 0.0
+
+    def _perp_extents(
+        self, dx: float, dy: float, dz: float,
+        xmin: float, xmax: float, ymin: float, ymax: float, zmin: float, zmax: float,
+    ) -> List[float]:
+        extents: List[float] = []
+        if abs(dx) < 0.5:
+            extents.append(xmax - xmin)
+        if abs(dy) < 0.5:
+            extents.append(ymax - ymin)
+        if abs(dz) < 0.5:
+            extents.append(zmax - zmin)
+        return extents
+
+    def _parting_rect(
+        self, dx: float, dy: float, dz: float,
+        xmin: float, xmax: float, ymin: float, ymax: float, zmin: float, zmax: float,
+    ) -> Dict[str, Any]:
+        extents: List[Tuple[float, float]] = []
+        if abs(dx) < 0.5:
+            extents.append((xmin, xmax))
+        if abs(dy) < 0.5:
+            extents.append((ymin, ymax))
+        if abs(dz) < 0.5:
+            extents.append((zmin, zmax))
+        if len(extents) >= 2:
+            a_min, a_max = extents[0]
+            b_min, b_max = extents[1]
+            ca, cb = (a_min + a_max) / 2, (b_min + b_max) / 2
+            ll = {"x": round(a_min - ca, 2), "y": round(b_min - cb, 2)}
+            ur = {"x": round(a_max - ca, 2), "y": round(b_max - cb, 2)}
+            return {"start": ll, "end": ur, "ll": ll, "ur": ur}
+        return {"start": None, "end": None, "ll": None, "ur": None}
+
+    # ── Sides ──────────────────────────────────────────────────────────────
+
+    def _classify_sides(
+        self,
+        mfg_features: Dict[str, Any],
+        blank: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        blank_z = blank["centroid"]["z"]
+        inside: List[Dict[str, Any]] = []
+        outside: List[Dict[str, Any]] = []
+
+        fg2 = mfg_features.get("feature_graph_v2") or {}
+        features = fg2.get("features") if isinstance(fg2, dict) else []
+        if not features:
+            return {"inside": [], "outside": []}
+
+        for feat in features:
+            feat_id = feat.get("id", "")
+            for occ in (feat.get("occurrences") or []):
+                c = occ.get("centroid", [0, 0, 0])
+                oz = float(c[2]) if len(c) > 2 else 0.0
+                face_ids = occ.get("face_ids", [])
+                entry = {"feature_id": feat_id, "face_ids": face_ids}
+                if oz < blank_z:
+                    inside.append(entry)
+                else:
+                    outside.append(entry)
+        return {"inside": inside, "outside": outside}
+
+    # ── GCD relations ──────────────────────────────────────────────────────
+
+    def _compute_gcd_relations(
+        self,
+        shape: Any,
+        mfg_features: Dict[str, Any],
+        blank: Dict[str, Any],
+        setup_axes: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """
+        Compute all 9 aPriori GCD relation types between feature instances.
+
+        Relation taxonomy (matches aPriori Geometric Cost Drivers panel):
+          adjacent         — faces share a boundary edge (OCC topology)
+          ends_on          — bend fold-line terminates on blank boundary edge
+          intersects       — sphere volumes overlap, or blank contains a non-bend feature
+          is_accessible_from — feature reachable from a setup axis direction
+          is_orthogonal    — feature normals perpendicular (dot ≈ 0, within 5° of 90°)
+          lies_near        — within 2× effective radius without volume overlap
+          lies_on          — feature centroid lies within another feature's face bounds
+          lies_outside     — distant with no normal alignment
+          parallel         — feature normals co-directional (abs(dot) > 0.95)
+
+        All coordinates are Three.js-centred (bbox centroid = origin).
+        face_id values match the TopExp_Explorer(shape, TopAbs_FACE) walk order used
+        by both _collect_planar_faces and memory_optimizer._detect_holes_real.
+        """
+        fg2 = mfg_features.get("feature_graph_v2") or {}
+        features = fg2.get("features") if isinstance(fg2, dict) else []
+        if not features:
+            return []
+
+        # ── Build feature instance list ────────────────────────────────────
+        instances: List[Dict[str, Any]] = []
+        for feat in features:
+            ftype = feat.get("feature_type", "")
+            diam = feat.get("diameter_mm")
+            radius = (float(diam) / 2.0) if diam else (feat.get("radius_mm") or 5.0)
+            raw_n = feat.get("normal")
+            # Normalise the stored normal vector (list/tuple [x, y, z])
+            normal: Optional[Tuple[float, float, float]] = None
+            if isinstance(raw_n, (list, tuple)) and len(raw_n) >= 3:
+                nx, ny, nz = float(raw_n[0]), float(raw_n[1]), float(raw_n[2])
+                mag = math.sqrt(nx * nx + ny * ny + nz * nz)
+                if mag > 1e-9:
+                    normal = (nx / mag, ny / mag, nz / mag)
+            for i, occ in enumerate(feat.get("occurrences") or []):
+                c = occ.get("centroid", [0, 0, 0])
+                instances.append({
+                    "id": self._feature_label(ftype, diam, i),
+                    "ftype": ftype,
+                    "cx": float(c[0]) if len(c) > 0 else 0.0,
+                    "cy": float(c[1]) if len(c) > 1 else 0.0,
+                    "cz": float(c[2]) if len(c) > 2 else 0.0,
+                    "radius": float(radius),
+                    "normal": normal,
+                    "face_ids": list(occ.get("face_ids") or []),
+                })
+
+        if not instances:
+            return []
+
+        # ── face_id → feature_id lookup ────────────────────────────────────
+        face_to_feature: Dict[int, str] = {}
+        feature_to_faces: Dict[str, List[int]] = {}
+        for inst in instances:
+            for fid in inst["face_ids"]:
+                face_to_feature[fid] = inst["id"]
+                feature_to_faces.setdefault(inst["id"], []).append(fid)
+
+        blank_face_id: Optional[int] = blank.get("face_id")
+
+        # Diagnostic log — remove once adjacent relations are confirmed working
+        all_face_ids_in_instances = [fid for inst in instances for fid in inst["face_ids"]]
+        logger.info(
+            f"[GCD-adj] blank_face_id={blank_face_id} "
+            f"instances={len(instances)} "
+            f"face_to_feature keys={sorted(face_to_feature.keys())[:20]} "
+            f"all_face_ids={sorted(set(all_face_ids_in_instances))[:30]}"
+        )
+
+        # ── OCC face adjacency ─────────────────────────────────────────────
+        # Global edge-midpoint matching across ALL faces.
+        # Two faces sharing a geometrically coincident edge midpoint (within
+        # _EDGE_TOL) are adjacent — this is immune to pythonocc 7.7.x
+        # identity-comparison bugs (FindIndex/IsPartner/IsSame all fail for
+        # faces from different traversal paths in disconnected STEP compounds).
+        #
+        # Produces raw_adjacent_pairs (face-level, aPriori-style labelling)
+        # for GCD emission, plus blank_adjacent_features / feature_adjacent_pairs
+        # for the downstream ends_on / intersects / lies_near derivations.
+        blank_adjacent_features: set = set()
+        feature_adjacent_pairs: set = set()
+        raw_adjacent_pairs: List[Dict[str, Any]] = []
+
+        try:
+            from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+            from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE  # type: ignore
+            from OCC.Core.TopTools import TopTools_IndexedMapOfShape  # type: ignore
+            from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve  # type: ignore
+            from OCC.Core.GeomAbs import GeomAbs_Plane, GeomAbs_Cylinder  # type: ignore
+
+            # Build face ordinal map — same walk order as memory_optimizer
+            face_ordinal_map = TopTools_IndexedMapOfShape()
+            _exp = TopExp_Explorer(shape, TopAbs_FACE)
+            while _exp.More():
+                face_ordinal_map.Add(_exp.Current())
+                _exp.Next()
+
+            total_faces = face_ordinal_map.Size()
+            logger.info(f"[GCD-adj] OCC face walk: {total_faces} total faces, "
+                        f"blank_face_id={blank_face_id} "
+                        f"(valid: {blank_face_id is not None and blank_face_id < total_faces})")
+
+            # aPriori merges co-planar OCC faces into a single "planarFace" entity before
+            # computing adjacency — so a blank plate represented as 8 separate OCC faces
+            # becomes 1 entity, and edges between those 8 faces disappear (same entity,
+            # not adjacent to itself).  Cylinders stay as individual entities.
+            # Entity label: "planarFace:N" (shared across co-planar faces) or "curvedWall:N".
+            _plane_entity_counter: List[int] = [0]
+            _plane_key_to_entity: Dict[tuple, str] = {}
+            _face_entity_cache: Dict[int, str] = {}
+            # Representative face ordinal for each entity (for face_ids in output)
+            _entity_repr_face: Dict[str, int] = {}
+            # Canonical (nx, ny, nz) stored per planarFace entity for fold-line detection
+            _entity_normal: Dict[str, tuple] = {}
+
+            def _face_entity(fi: int) -> str:
+                if fi in _face_entity_cache:
+                    return _face_entity_cache[fi]
+                label = f"face:{fi}"
+                try:
+                    s = BRepAdaptor_Surface(face_ordinal_map.FindKey(fi + 1), True)
+                    t = s.GetType()
+                    if t == GeomAbs_Cylinder:
+                        # aPriori groups all cylinder faces of the same feature into
+                        # one entity (one "simpleHole" or "straightBend" entity, not
+                        # one curvedWall per OCC face). This collapses 15 curvedWall
+                        # entities → 8 feature entities and reduces adjacent pairs
+                        # from ~55 to ~18, leaving budget for planarFace fold-lines.
+                        feat_id = face_to_feature.get(fi)
+                        if feat_id:
+                            label = feat_id
+                        else:
+                            n = _plane_entity_counter[0]
+                            _plane_entity_counter[0] += 1
+                            label = f"curvedWall:{n}"
+                    elif t == GeomAbs_Plane:
+                        pln = s.Plane()
+                        nx = pln.Axis().Direction().X()
+                        ny = pln.Axis().Direction().Y()
+                        nz = pln.Axis().Direction().Z()
+                        # Signed distance from world origin to the plane
+                        loc = pln.Axis().Location()
+                        d_raw = loc.X() * nx + loc.Y() * ny + loc.Z() * nz
+                        # Canonical normal: first non-zero component positive
+                        if nx < -1e-6 or (abs(nx) < 1e-6 and ny < -1e-6) \
+                                or (abs(nx) < 1e-6 and abs(ny) < 1e-6 and nz < -1e-6):
+                            nx, ny, nz, d_raw = -nx, -ny, -nz, -d_raw
+                        key = (round(nx, 2), round(ny, 2), round(nz, 2), round(d_raw, 1))
+                        if key not in _plane_key_to_entity:
+                            n = _plane_entity_counter[0]
+                            _plane_entity_counter[0] += 1
+                            _plane_key_to_entity[key] = f"planarFace:{n}"
+                        label = _plane_key_to_entity[key]
+                        if label not in _entity_normal:
+                            _entity_normal[label] = (nx, ny, nz)
+                    else:
+                        n = _plane_entity_counter[0]
+                        _plane_entity_counter[0] += 1
+                        label = f"face:{n}"
+                except Exception:
+                    pass
+                _face_entity_cache[fi] = label
+                if label not in _entity_repr_face:
+                    _entity_repr_face[label] = fi
+                return label
+
+            # Build entity labels for all faces up-front
+            for fi in range(total_faces):
+                _face_entity(fi)
+
+            num_entities = _plane_entity_counter[0]
+            logger.info(f"[GCD-adj] entities after plane-merging: {num_entities} "
+                        f"(from {total_faces} OCC faces)")
+
+            # Collect (face_ordinal, edge_midpoint) for every edge of every face
+            _EDGE_TOL = 0.1  # mm
+            all_face_edges: List[tuple] = []
+            for fi in range(total_faces):
+                _ee = TopExp_Explorer(face_ordinal_map.FindKey(fi + 1), TopAbs_EDGE)
+                while _ee.More():
+                    try:
+                        c = BRepAdaptor_Curve(_ee.Current())
+                        mid = c.Value((c.FirstParameter() + c.LastParameter()) / 2.0)
+                        all_face_edges.append((fi, mid))
+                    except Exception:
+                        pass
+                    _ee.Next()
+
+            # Cluster edge midpoints by physical location (greedy O(N×G))
+            edge_clusters: List[List[tuple]] = []
+            for fi, mid in all_face_edges:
+                placed = False
+                for cluster in edge_clusters:
+                    if cluster[0][1].Distance(mid) < _EDGE_TOL:
+                        cluster.append((fi, mid))
+                        placed = True
+                        break
+                if not placed:
+                    edge_clusters.append([(fi, mid)])
+
+            # Emit one entity-pair adjacency per unique cluster.
+            # Skip clusters where all faces belong to the same entity (internal
+            # edges within a merged planar entity — aPriori ignores these).
+            seen_ent_pairs: set = set()
+            for cluster in edge_clusters:
+                face_ords = list(dict.fromkeys(fi for fi, _ in cluster))
+                if len(face_ords) < 2:
+                    continue
+                entities = [_face_entity(fi) for fi in face_ords]
+                # Unique entities at this edge location
+                uniq_ents = list(dict.fromkeys(entities))
+                if len(uniq_ents) < 2:
+                    continue  # all faces on same merged entity — skip
+                # Prefer feature/curvedWall → planarFace as the canonical pair.
+                # After cylinder-grouping, cylinder entities carry feat_id labels
+                # (simpleHole_N, straightBend_N) rather than curvedWall:N, so we
+                # check the inverse: not-planar source, planar target.
+                best_ea: str = ""
+                best_eb: str = ""
+                best_fia: int = face_ords[0]
+                best_fib: int = face_ords[1]
+                found_feature_planar = False
+                for ea in uniq_ents:
+                    for eb in uniq_ents:
+                        if ea == eb:
+                            continue
+                        if not ea.startswith("planarFace") and eb.startswith("planarFace"):
+                            best_ea, best_eb = ea, eb
+                            best_fia = _entity_repr_face.get(ea, face_ords[0])
+                            best_fib = _entity_repr_face.get(eb, face_ords[1])
+                            found_feature_planar = True
+                            break
+                    if found_feature_planar:
+                        break
+                if not found_feature_planar:
+                    best_ea, best_eb = uniq_ents[0], uniq_ents[1]
+                    best_fia = _entity_repr_face.get(best_ea, face_ords[0])
+                    best_fib = _entity_repr_face.get(best_eb, face_ords[1])
+
+                ek = (min(best_ea, best_eb), max(best_ea, best_eb))
+                if ek in seen_ent_pairs:
+                    continue
+                seen_ent_pairs.add(ek)
+                raw_adjacent_pairs.append({
+                    "fi": best_fia, "fj": best_fib,
+                    "li": best_ea, "lj": best_eb,
+                })
+                # Populate feature-level sets for ends_on / intersects derivation
+                for fi_c in face_ords:
+                    if fi_c == blank_face_id:
+                        for fj_c in face_ords:
+                            if fj_c != fi_c:
+                                feat = face_to_feature.get(fj_c)
+                                if feat:
+                                    blank_adjacent_features.add(feat)
+                    else:
+                        fa_f = face_to_feature.get(fi_c)
+                        if fa_f:
+                            for fj_c in face_ords:
+                                fb_f = face_to_feature.get(fj_c)
+                                if fb_f and fb_f != fa_f:
+                                    feature_adjacent_pairs.add((min(fa_f, fb_f), max(fa_f, fb_f)))
+
+            logger.info(
+                f"[GCD-adj] OCC result: raw_pairs={len(raw_adjacent_pairs)} "
+                f"blank_adjacent={blank_adjacent_features} "
+                f"feature_pairs={len(feature_adjacent_pairs)}"
+            )
+
+        except Exception as e:
+            logger.info(f"[GCD-adj] OCC face adjacency FAILED: {type(e).__name__}: {e}")
+
+        relations: List[Dict[str, Any]] = []
+
+        # ── 1. adjacent ────────────────────────────────────────────────────
+        # aPriori emits two kinds of adjacent:
+        #   a) curvedWall:N — planarFace:M  (cylinder meets flat face)
+        #   b) planarFace:A — planarFace:B  only at the BLANK BOUNDARY
+        #      (equivalent to aPriori's edge:N — edge:M fold-line pairs)
+        # All-against-all planarFace pairs at non-parallel angles gives 88 pairs —
+        # far too many. Restricting (b) to pairs where one entity IS the blank
+        # entity keeps the count close to aPriori's ~18 fold-line pairs.
+        import math as _math
+
+        blank_entity = _face_entity_cache.get(blank_face_id) if blank_face_id is not None else None
+
+        def _is_planar(ea: str) -> bool:
+            return ea.startswith("planarFace")
+
+        def _planar_angle_deg(ea: str, eb: str):
+            na = _entity_normal.get(ea)
+            nb = _entity_normal.get(eb)
+            if na is None or nb is None:
+                return None
+            dot = abs(na[0]*nb[0] + na[1]*nb[1] + na[2]*nb[2])
+            try:
+                return round(_math.degrees(_math.acos(min(1.0, dot))), 1)
+            except Exception:
+                return None
+
+        def _is_fold_line(ea: str, eb: str) -> bool:
+            """Both are planarFace with normals at ≥45° — structural fold / corner edges.
+            aPriori's edge:N—edge:M pairs map to these non-parallel planar adjacencies."""
+            if not (_is_planar(ea) and _is_planar(eb)):
+                return False
+            angle = _planar_angle_deg(ea, eb)
+            return angle is not None and angle >= 45.0
+
+        # Feature entities after cylinder grouping: simpleHole_N, complexHole_N,
+        # straightBend_N, curvedWall:N (unrecognized), planarFace:N, face:N.
+        # Include a pair when: at least one entity is non-planar (feature/curvedWall)
+        # OR both are planarFace at a non-parallel angle (fold-line pair).
+        _emit_pairs = [
+            p for p in raw_adjacent_pairs
+            if not (_is_planar(p["li"]) and _is_planar(p["lj"]))
+            or _is_fold_line(p["li"], p["lj"])
+        ]
+        logger.info(
+            f"[GCD-adj] emit pairs: {len(_emit_pairs)} "
+            f"(feature+fold / {len(raw_adjacent_pairs)} total, "
+            f"blank_entity={blank_entity})"
+        )
+        def _expand_fids(repr_face: int) -> List[int]:
+            """Return all OCC face ordinals for the feature that owns repr_face.
+            Falls back to [repr_face] when the face isn't part of a named feature
+            (e.g. blank, edge strips)."""
+            feat_id = face_to_feature.get(repr_face)
+            if feat_id:
+                return feature_to_faces.get(feat_id, [repr_face])
+            return [repr_face]
+
+        for p in _emit_pairs:
+            angle = None
+            if p["li"].startswith("planarFace") and p["lj"].startswith("planarFace"):
+                angle = _planar_angle_deg(p["li"], p["lj"])
+            # Expand to all faces of each entity's feature so the full feature
+            # geometry (e.g. both semicircles of a rounded slot) gets highlighted.
+            all_fi = _expand_fids(p["fi"])
+            all_fj = _expand_fids(p["fj"])
+            face_ids = list(dict.fromkeys(all_fi + all_fj))
+            rel: Dict[str, Any] = {
+                "type": "adjacent",
+                "source_id": p["li"],
+                "target_id": p["lj"],
+                "face_ids": face_ids,
+                "distance_mm": 0.0,
+            }
+            if angle is not None:
+                rel["angle_deg"] = angle
+            relations.append(rel)
+
+        # ── 2. ends_on ─────────────────────────────────────────────────────
+        # Bends whose faces share an edge with the blank face (fold line = shared edge).
+        # Domain-rule fallback: every sheet-metal bend always ends on blank_1.
+        seen_ends_on: set = set()
+        for feat_id in blank_adjacent_features:
+            inst_match = next((i for i in instances if i["id"] == feat_id), None)
+            if inst_match and inst_match["ftype"] == "bend":
+                seen_ends_on.add(feat_id)
+                relations.append({
+                    "type": "ends_on",
+                    "source_id": feat_id,
+                    "target_id": "blank_1",
+                })
+        if not seen_ends_on:
+            # Fallback: OCC adjacency didn't resolve (face_ids absent or STEP topology variant)
+            for inst in instances:
+                if inst["ftype"] == "bend":
+                    seen_ends_on.add(inst["id"])
+                    relations.append({
+                        "type": "ends_on",
+                        "source_id": inst["id"],
+                        "target_id": "blank_1",
+                    })
+
+        # ── 3. intersects ──────────────────────────────────────────────────
+        # blank_1 contains every non-bend feature (holes, slots drill through blank plane)
+        for inst in instances:
+            if inst["ftype"] != "bend":
+                relations.append({
+                    "type": "intersects",
+                    "source_id": "blank_1",
+                    "target_id": inst["id"],
+                })
+        # Feature-to-feature volume overlap (sphere proxy)
+        n = len(instances)
+        for i in range(n):
+            a = instances[i]
+            for j in range(i + 1, n):
+                b = instances[j]
+                dist = math.sqrt(
+                    (a["cx"] - b["cx"]) ** 2
+                    + (a["cy"] - b["cy"]) ** 2
+                    + (a["cz"] - b["cz"]) ** 2
+                )
+                sum_r = a["radius"] + b["radius"]
+                max_r = max(a["radius"], b["radius"])
+                an, bn = a["normal"], b["normal"]
+                has_normals = isinstance(an, tuple) and isinstance(bn, tuple)
+
+                if dist < sum_r:
+                    # ── 3. intersects (cont.) ──────────────────────────────
+                    relations.append({
+                        "type": "intersects",
+                        "source_id": a["id"],
+                        "target_id": b["id"],
+                        "distance_mm": round(dist, 2),
+                    })
+
+                elif dist < 2 * max_r:
+                    # ── 6. lies_near ──────────────────────────────────────
+                    relations.append({
+                        "type": "lies_near",
+                        "source_id": a["id"],
+                        "target_id": b["id"],
+                        "distance_mm": round(dist, 2),
+                    })
+
+                else:
+                    # Classify by normal relationship for distant features
+                    if has_normals:
+                        dot = an[0] * bn[0] + an[1] * bn[1] + an[2] * bn[2]
+                        abs_dot = abs(dot)
+                        if abs_dot > 0.95:
+                            # ── 9. parallel ───────────────────────────────
+                            relations.append({
+                                "type": "parallel",
+                                "source_id": a["id"],
+                                "target_id": b["id"],
+                                "distance_mm": round(dist, 2),
+                                "angle_deg": round(
+                                    math.degrees(math.acos(min(abs_dot, 1.0))), 1
+                                ),
+                            })
+                        elif abs_dot < 0.087:
+                            # cos(85°) ≈ 0.087 — within 5° of perpendicular
+                            # ── 5. is_orthogonal ──────────────────────────
+                            relations.append({
+                                "type": "is_orthogonal",
+                                "source_id": a["id"],
+                                "target_id": b["id"],
+                                "distance_mm": round(dist, 2),
+                                "angle_deg": round(
+                                    math.degrees(math.acos(min(abs_dot, 1.0))), 1
+                                ),
+                            })
+                        else:
+                            # ── 8. lies_outside ───────────────────────────
+                            relations.append({
+                                "type": "lies_outside",
+                                "source_id": a["id"],
+                                "target_id": b["id"],
+                                "distance_mm": round(dist, 2),
+                            })
+                    else:
+                        relations.append({
+                            "type": "lies_outside",
+                            "source_id": a["id"],
+                            "target_id": b["id"],
+                            "distance_mm": round(dist, 2),
+                        })
+
+        # ── 4. is_accessible_from ──────────────────────────────────────────
+        # Feature is reachable from a setup axis when its normal faces that direction
+        # (dot > 0.3) or, for features without normals, from any feasible axis.
+        for inst in instances:
+            for axis in setup_axes:
+                dv = axis.get("direction_vector") or {}
+                dx, dy, dz = float(dv.get("x", 0)), float(dv.get("y", 0)), float(dv.get("z", 0))
+                accessible = False
+                if inst["normal"]:
+                    nx, ny, nz = inst["normal"]
+                    accessible = (nx * dx + ny * dy + nz * dz) > 0.3
+                elif axis.get("is_feasible"):
+                    accessible = True
+                if accessible:
+                    relations.append({
+                        "type": "is_accessible_from",
+                        "source_id": inst["id"],
+                        "target_id": axis["id"],
+                        "area_mm2": round(axis.get("accessible_surface_area_mm2") or 0.0, 1),
+                    })
+
+        # ── 7. lies_on ─────────────────────────────────────────────────────
+        # Feature centroid lies within the footprint of the blank face.
+        # Approximation: blank boundary radius ≈ sqrt(area / π); a feature
+        # lies_on the blank when its centroid distance from blank centroid < blank_r
+        # (i.e. it is inside the blank perimeter, as all sheet-metal features are).
+        blank_cx = blank["centroid"]["x"]
+        blank_cy = blank["centroid"]["y"]
+        blank_r = math.sqrt(max(blank.get("area_mm2") or 1.0, 1.0) / math.pi)
+        for inst in instances:
+            dist_to_blank_centre = math.sqrt(
+                (inst["cx"] - blank_cx) ** 2 + (inst["cy"] - blank_cy) ** 2
+            )
+            if dist_to_blank_centre < blank_r:
+                relations.append({
+                    "type": "lies_on",
+                    "source_id": inst["id"],
+                    "target_id": "blank_1",
+                    "distance_mm": round(dist_to_blank_centre, 2),
+                    "area_mm2": round(math.pi * inst["radius"] ** 2, 1),
+                })
+
+        return relations[:300]  # 300 entries: ~9 types × richer per-feature data
+
+    @staticmethod
+    def _feature_label(
+        ftype: str,
+        diam: Optional[Any],
+        occurrence_idx: int,
+    ) -> str:
+        idx = occurrence_idx + 1
+        if ftype == "hole":
+            d = float(diam) if diam is not None else 0.0
+            return f"complexHole_{idx}" if d > 10.0 else f"simpleHole_{idx}"
+        if ftype == "bend":
+            return f"straightBend_{idx}"
+        if ftype == "slot":
+            return f"slot_{idx}"
+        if ftype == "pocket":
+            return f"pocket_{idx}"
+        return f"feature_{idx}"

@@ -177,7 +177,7 @@ export default function ProjectProductionPlanningPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ₹{lots.reduce((sum: number, lot: ProductionLot) => sum + lot.totalEstimatedCost, 0).toLocaleString()}
+                ${lots.reduce((sum: number, lot: ProductionLot) => sum + lot.totalEstimatedCost, 0).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
                 Estimated production value

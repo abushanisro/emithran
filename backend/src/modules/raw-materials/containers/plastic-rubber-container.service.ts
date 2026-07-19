@@ -76,7 +76,9 @@ export class PlasticRubberContainerService {
     const materialData = {
       material_group: this.ensurePlasticRubberCategory(createDto.materialGroup),
       material: createDto.material,
+      material_type: createDto.materialType,
       material_grade: createDto.materialGrade,
+      material_description: createDto.materialDescription,
       stock_form: createDto.stockForm,
       matl_state: createDto.matlState,
       application: createDto.application,
@@ -87,10 +89,23 @@ export class PlasticRubberContainerService {
       melting_temp_c: createDto.meltingTempC,
       mold_temp_c: createDto.moldTempC,
       density_kg_m3: createDto.densityKgM3,
+      density: createDto.density,
       specific_heat_melt: createDto.specificHeatMelt,
       thermal_conductivity_melt: createDto.thermalConductivityMelt,
       location: createDto.location,
-      cost: createDto.cost,
+      currency: createDto.currency || 'USD',
+      cost: createDto.costIndia ?? createDto.cost ?? createDto.unitCost,
+      cost_france: createDto.costFrance,
+      cost_germany: createDto.costGermany,
+      cost_w_europe: createDto.costWEurope,
+      cost_usa: createDto.costUsa,
+      cost_india: createDto.costIndia,
+      cost_e_europe: createDto.costEEurope,
+      cost_china: createDto.costChina,
+      cost_mexico: createDto.costMexico,
+      hardness: createDto.hardness,
+      hardness_system: createDto.hardnessSystem,
+      cut_code: createDto.cutCode,
       user_id: userId,
     };
 
@@ -204,7 +219,7 @@ export class PlasticRubberContainerService {
     }
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `material.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
+        `material_type.ilike.%${query.search}%,material.ilike.%${query.search}%,application.ilike.%${query.search}%`
       );
     }
     return queryBuilder;
@@ -218,11 +233,15 @@ export class PlasticRubberContainerService {
 
   private buildUpdateData(updateDto: UpdateRawMaterialDto): any {
     const updateData: any = {};
-    
+
     Object.entries(updateDto).forEach(([key, value]) => {
       if (value !== undefined) {
-        const dbField = this.camelToSnakeCase(key);
-        updateData[dbField] = value;
+        // unitCost is an alias for the `cost` column — not a separate DB column.
+        if (key === 'unitCost') {
+          updateData.cost = value;
+          return;
+        }
+        updateData[this.camelToSnakeCase(key)] = value;
       }
     });
 

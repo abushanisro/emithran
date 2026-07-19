@@ -63,6 +63,7 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
         machineClass: rate.machineClass,
         machineName: rate.machineName,
         commodityCode: rate.commodityCode,
+        labourRate: rate.labourRate ?? null,
       },
     ],
     cuttingMin,

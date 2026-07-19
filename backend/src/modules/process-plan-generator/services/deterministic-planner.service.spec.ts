@@ -93,8 +93,17 @@ const candidates: CandidateSet = {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
+// Minimal stub so the planner falls through to default-rates.ts constants
+// (same behaviour as before CycleTimeLibraryService was introduced).
+const ctLibStub = {
+  getLaserSpeed: () => 3000,
+  getLaserPierceSec: () => 0.5,
+  getBrakeSecPerBend: () => 15,
+  getCncMrr: () => null,
+} as any;
+
 describe('DeterministicPlannerService — mandatoryOps merge', () => {
-  const svc = new DeterministicPlannerService();
+  const svc = new DeterministicPlannerService(ctLibStub);
 
   it('appends Tapping / Cleaning / Surface Treatment / CMM missing from the template, in manufacturing order', () => {
     const plan = svc.plan(makeBrief(), candidates);
@@ -166,7 +175,7 @@ describe('DeterministicPlannerService — mandatoryOps merge', () => {
 });
 
 describe('DeterministicPlannerService — conditional template steps', () => {
-  const svc = new DeterministicPlannerService();
+  const svc = new DeterministicPlannerService(ctLibStub);
 
   it('matches condition_feature case-insensitively (the "bend" vs BEND seed bug)', () => {
     const steps: RouteStep[] = [
@@ -198,7 +207,7 @@ describe('DeterministicPlannerService — conditional template steps', () => {
 });
 
 describe('DeterministicPlannerService — template order preservation', () => {
-  const svc = new DeterministicPlannerService();
+  const svc = new DeterministicPlannerService(ctLibStub);
 
   it('never reorders template steps relative to each other, even out of canonical order', () => {
     // Deliberately unusual template: inspection before deburr (user-authored)

@@ -123,11 +123,9 @@ export class RawMaterialCostCalculationEngine {
       normalized.reclaimRate
     );
 
-    // Step 2: Apply scrap adjustment
-    const scrapAdjusted = this.applyScrapAdjustment(
-      materialCosts.netMaterialCost,
-      normalized.scrap
-    );
+    // scrapAdjustment is intentionally skipped: scrap% derives gross from net,
+    // applying it again as a cost multiplier would double-count the yield loss.
+    const scrapAdjusted = { scrapAdjustment: 0, subtotal: materialCosts.netMaterialCost };
 
     // Step 3: Apply overhead
     const withOverhead = this.applyOverhead(
@@ -229,8 +227,8 @@ export class RawMaterialCostCalculationEngine {
     // Calculate scrap amount (material that doesn't end up in finished part)
     const scrapAmount = grossUsage - netUsage;
 
-    // Calculate value recovered from scrap material (₹)
-    const reclaimValue = scrapAmount * reclaimRate;
+    // Reclaim value — clamped to gross cost so net never goes negative
+    const reclaimValue = Math.min(scrapAmount * reclaimRate, grossMaterialCost);
 
     // Net material cost after reclaim (₹)
     const netMaterialCost = grossMaterialCost - reclaimValue;

@@ -55,6 +55,19 @@ export class ProjectsService {
 
       const projects = result.data.map(row => ProjectResponseDto.fromDatabase(row));
 
+      if (projects.length > 0) {
+        const projectIds = projects.map(p => p.id);
+        const statsMap = await this.computeProjectsAggregates(client, projectIds);
+        for (const p of projects) {
+          const stats = statsMap.get(p.id);
+          if (stats) {
+            p.bomCount = stats.bomCount;
+            p.bomItemCount = stats.bomItemCount;
+            p.actualCost = stats.actualCost;
+          }
+        }
+      }
+
       return {
         projects,
         total: result.total,
@@ -90,8 +103,14 @@ export class ProjectsService {
       
       const client = this.supabase.getClient(accessToken);
       const project = await this.projectsRepository.findById(client, id);
-
-      return ProjectResponseDto.fromDatabase(project);
+      const dto = ProjectResponseDto.fromDatabase(project);
+      const stats = (await this.computeProjectsAggregates(client, [id])).get(id);
+      if (stats) {
+        dto.bomCount = stats.bomCount;
+        dto.bomItemCount = stats.bomItemCount;
+        dto.actualCost = stats.actualCost;
+      }
+      return dto;
     } catch (error) {
       this.logger.error(`Error fetching project ${id}:`, error.message);
       
@@ -316,7 +335,7 @@ export class ProjectsService {
       }
 
       const targetCost = project.target_bom_cost || 0;
-      const actualCost = bomData?.total_material_cost || 0;
+      const actualCost = (await this.computeProjectsAggregates(client, [id])).get(id)?.actualCost || 0;
       const currency = project.target_bom_cost_currency || 'USD';
 
       return {
@@ -347,6 +366,124 @@ export class ProjectsService {
       
       throw new InternalServerErrorException('Unable to retrieve cost analysis. Please try again or contact support if the problem persists.');
     }
+  }
+
+  private async computeProjectsAggregates(client: any, projectIds: string[]): Promise<Map<string, { bomCount: number; bomItemCount: number; actualCost: number }>> {
+    const resultMap = new Map<string, { bomCount: number; bomItemCount: number; actualCost: number }>();
+    if (!projectIds.length) return resultMap;
+
+    for (const pid of projectIds) {
+      resultMap.set(pid, { bomCount: 0, bomItemCount: 0, actualCost: 0 });
+    }
+
+    const { data: bomRows } = await client
+      .from('boms')
+      .select('id, project_id, bom_items(id, make_buy, unit_cost, quantity, parent_item_id)')
+      .in('project_id', projectIds);
+
+    if (!bomRows || bomRows.length === 0) return resultMap;
+
+    const allItemIds: string[] = [];
+    for (const bom of bomRows) {
+      const items: any[] = (bom as any).bom_items ?? [];
+      for (const item of items) {
+        allItemIds.push(item.id);
+      }
+    }
+
+    const recordCostMap = new Map<string, number>();
+    const tableCostMap = new Map<string, number>();
+
+    if (allItemIds.length > 0) {
+      const { data: rmRows } = await client
+        .from('raw_material_cost_records')
+        .select('bom_item_id, gross_usage, unit_cost, overhead')
+        .in('bom_item_id', allItemIds)
+        .eq('is_active', true);
+
+      for (const r of rmRows ?? []) {
+        const grossUsage = parseFloat(r.gross_usage) || 0;
+        const unitCost   = parseFloat(r.unit_cost)   || 0;
+        const overhead   = parseFloat(r.overhead)    || 0;
+        const cost = grossUsage * unitCost * (1 + overhead / 100);
+        recordCostMap.set(r.bom_item_id, (recordCostMap.get(r.bom_item_id) || 0) + cost);
+      }
+
+      const { data: pcRows } = await client
+        .from('process_cost_records')
+        .select('bom_item_id, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
+        .in('bom_item_id', allItemIds)
+        .eq('is_active', true);
+
+      for (const r of pcRows ?? []) {
+        const machineRate  = parseFloat(r.machine_rate)    || 0;
+        const laborRate    = parseFloat(r.labor_rate)      || 0;
+        const setupManning = parseFloat(r.setup_manning)   || 0;
+        const setupTimeMin = parseFloat(r.setup_time)      || 0;
+        const batchSize    = parseFloat(r.batch_size)      || 1;
+        const heads        = parseFloat(r.heads)           || 0;
+        const cycleTimeSec = parseFloat(r.cycle_time)      || 0;
+        const ppc          = parseFloat(r.parts_per_cycle) || 1;
+        const scrap        = parseFloat(r.scrap)           || 0;
+        const setupCost = batchSize > 0
+          ? (setupTimeMin / 60) * (machineRate + laborRate * setupManning) / batchSize : 0;
+        const cycleCost = ppc > 0
+          ? (cycleTimeSec / 3600) * (machineRate + laborRate * heads) / ppc : 0;
+        const cost = (setupCost + cycleCost) * (1 + scrap / 100);
+        recordCostMap.set(r.bom_item_id, (recordCostMap.get(r.bom_item_id) || 0) + cost);
+      }
+
+      const { data: bcRows } = await client
+        .from('bom_item_costs')
+        .select('bom_item_id, total_cost')
+        .in('bom_item_id', allItemIds);
+
+      for (const r of bcRows ?? []) {
+        const tc = parseFloat(r.total_cost) || 0;
+        if (tc > 0) tableCostMap.set(r.bom_item_id, tc);
+      }
+    }
+
+    for (const bom of bomRows) {
+      const pid = (bom as any).project_id as string;
+      const stats = resultMap.get(pid);
+      if (!stats) continue;
+
+      const items: any[] = (bom as any).bom_items ?? [];
+      stats.bomCount += 1;
+      stats.bomItemCount += items.length;
+
+      const parentIds = new Set<string>();
+      for (const item of items) {
+        if (item.parent_item_id) parentIds.add(item.parent_item_id);
+      }
+
+      let leafSum = 0;
+      let rootSum = 0;
+      let allSum = 0;
+
+      for (const item of items) {
+        const qty = parseFloat(item.quantity) || 1;
+        const recCost = recordCostMap.get(item.id) || 0;
+        const tblCost = tableCostMap.get(item.id) || 0;
+        const unitCost = parseFloat(item.unit_cost) || 0;
+        const bestUnitCost = recCost > 0 ? recCost : (tblCost > 0 ? tblCost : unitCost);
+        const itemTotal = bestUnitCost * qty;
+
+        allSum += itemTotal;
+        if (!parentIds.has(item.id)) {
+          leafSum += itemTotal;
+        }
+        if (!item.parent_item_id) {
+          rootSum += itemTotal;
+        }
+      }
+
+      const bomCost = Math.max(leafSum, rootSum) > 0 ? Math.max(leafSum, rootSum) : allSum;
+      stats.actualCost += bomCost;
+    }
+
+    return resultMap;
   }
 
   async getTeamMembers(id: string, userId: string, accessToken?: string): Promise<TeamMembersListResponseDto> {

@@ -33,7 +33,7 @@ function MaterialDetails({ data }: { data: any }) {
       <BRow label="Grade / spec" value={data.grade ?? '—'} />
       <Divider />
       <BRow label="Density" value={data.densityKgPerM3 != null ? `${data.densityKgPerM3} kg/m³` : '—'} />
-      <BRow label="Unit cost" value={data.unitCostInrPerKg != null ? `₹${data.unitCostInrPerKg}/kg` : '—'} />
+      <BRow label="Unit cost" value={data.unitCostInrPerKg != null ? `$${data.unitCostInrPerKg}/kg` : '—'} />
       <BRow label="Location" value={data.location ?? 'India-Bangalore'} />
     </div>
   );
@@ -63,7 +63,7 @@ export function ProposedMasterCard({ master, approved, onChange }: Props) {
 
   const meta = isProcess
     ? 'New process mapping'
-    : `${data.densityKgPerM3 ?? '—'} kg/m³ · ₹${data.unitCostInrPerKg ?? '—'}/kg`;
+    : `${data.densityKgPerM3 ?? '—'} kg/m³ · $${data.unitCostInrPerKg ?? '—'}/kg`;
 
   return (
     <div className={`rounded border bg-card transition-colors ${approved ? 'border-green-500/50' : 'border-border'}`}>

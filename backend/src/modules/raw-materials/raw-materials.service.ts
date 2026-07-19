@@ -36,10 +36,15 @@ export class RawMaterialsService {
 
 
 
-    // Search across multiple fields
+    // Search across multiple fields.
+    // Wrap pattern in double quotes so PostgREST treats commas and parentheses
+    // inside the search term as literal characters, not filter-syntax tokens.
+    // e.g. "Generic Stainless Steel, Alloy (X10CrNi18-8) Wrought/AM" would
+    // otherwise split on the comma and be misread as nested grouping.
     if (query.search) {
+      const safe = query.search.replace(/"/g, '\\"'); // escape any literal double quotes
       queryBuilder = queryBuilder.or(
-        `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_grade.ilike.%${query.search}%`
+        `material.ilike."%${safe}%",material_group.ilike."%${safe}%",material_grade.ilike."%${safe}%"`
       );
     }
 
@@ -123,7 +128,6 @@ export class RawMaterialsService {
         material_description: createRawMaterialDto.materialDescription,
         stock_form: createRawMaterialDto.stockForm,
         matl_state: createRawMaterialDto.matlState,
-        application: createRawMaterialDto.application,
         regrinding: createRawMaterialDto.regrinding,
         regrinding_percentage: createRawMaterialDto.regrindingPercentage,
         clamping_pressure_mpa: createRawMaterialDto.clampingPressureMpa,
@@ -187,7 +191,6 @@ export class RawMaterialsService {
       material_description: dto.materialDescription,
       stock_form: dto.stockForm,
       matl_state: dto.matlState,
-      application: dto.application,
       regrinding: dto.regrinding,
       regrinding_percentage: dto.regrindingPercentage,
       clamping_pressure_mpa: dto.clampingPressureMpa,
@@ -213,6 +216,9 @@ export class RawMaterialsService {
       ultimate_tensile_strength: dto.ultimate_tensile_strength,
       yield_tensile_strength: dto.yield_tensile_strength,
       shearing_strength: dto.shearing_strength,
+      hardness: dto.hardness,
+      hardness_system: dto.hardnessSystem,
+      cut_code: dto.cutCode,
       astm_standard: dto.astm_standard,
       din_standard: dto.din_standard,
       en_standard: dto.en_standard,
@@ -265,7 +271,6 @@ export class RawMaterialsService {
     if (updateRawMaterialDto.materialDescription !== undefined) updateData.material_description = handleStringField(updateRawMaterialDto.materialDescription);
     if (updateRawMaterialDto.stockForm !== undefined) updateData.stock_form = handleStringField(updateRawMaterialDto.stockForm);
     if (updateRawMaterialDto.matlState !== undefined) updateData.matl_state = handleStringField(updateRawMaterialDto.matlState);
-    if (updateRawMaterialDto.application !== undefined) updateData.application = handleStringField(updateRawMaterialDto.application);
     if (updateRawMaterialDto.regrinding !== undefined) updateData.regrinding = handleStringField(updateRawMaterialDto.regrinding);
     if (updateRawMaterialDto.regrindingPercentage !== undefined) updateData.regrinding_percentage = handleNumberField(updateRawMaterialDto.regrindingPercentage);
     if (updateRawMaterialDto.clampingPressureMpa !== undefined) updateData.clamping_pressure_mpa = handleNumberField(updateRawMaterialDto.clampingPressureMpa);
@@ -329,32 +334,32 @@ export class RawMaterialsService {
   }
 
   async removeAll(userId: string, accessToken: string) {
-    this.logger.log(`Deleting all raw materials for user: ${userId}`, 'RawMaterialsService');
+    this.logger.log(`Deleting all raw materials`, 'RawMaterialsService');
 
-    // First, get count of materials to be deleted
+    // Get count of all materials to be deleted
     const { count } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+      .not('id', 'is', null);
 
     if (count === 0) {
       return { message: 'No materials to delete', deleted: 0 };
     }
 
-    // Delete all materials for this user
+    // Delete all materials globally
     const { error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
       .delete()
-      .eq('user_id', userId);
+      .not('id', 'is', null);
 
     if (error) {
       this.logger.error(`Error deleting all raw materials: ${error.message}`, 'RawMaterialsService');
       throw new InternalServerErrorException(`Failed to delete all raw materials: ${error.message}`);
     }
 
-    this.logger.log(`Successfully deleted ${count} raw materials`, 'RawMaterialsService');
+    this.logger.log(`Successfully deleted ${count} raw materials (global)`, 'RawMaterialsService');
     return { message: `Successfully deleted ${count} raw material(s)`, deleted: count };
   }
 
@@ -485,7 +490,7 @@ export class RawMaterialsService {
   }
 
   async importFerrousDataFromExcel(
-    excelData: any[],
+    excelData: CreateRawMaterialDto[],
     userId: string,
     accessToken: string
   ): Promise<{ imported: number; errors: string[] }> {

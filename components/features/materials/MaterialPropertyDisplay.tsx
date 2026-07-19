@@ -81,7 +81,7 @@ export function MaterialPropertyDisplay({
 
   const formatCurrency = (value?: number) => {
     if (!value) return '—';
-    return `₹${value.toFixed(2)}`;
+    return `$${value.toFixed(2)}`;
   };
 
   const isPlastic = material.category_code === 'PLASTIC' || 

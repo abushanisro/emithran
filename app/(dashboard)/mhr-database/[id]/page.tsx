@@ -19,7 +19,7 @@ function getCurrencyFromLocation(location: string): { currency: string; symbol: 
   const loc = (location || '').toLowerCase();
   if (!loc || loc.includes('india') || loc.includes('bangalore') || loc.includes('pune') ||
       loc.includes('chennai') || loc.includes('mumbai') || loc.includes('delhi') ||
-      loc.includes('hyderabad')) return { currency: 'INR', symbol: '₹' };
+      loc.includes('hyderabad')) return { currency: 'INR', symbol: '$' };
   if (loc.includes('china') || loc.includes('shenzhen') || loc.includes('shanghai') ||
       loc.includes('beijing') || loc.includes('guangzhou')) return { currency: 'CNY', symbol: '¥' };
   if (loc.includes('germany') || loc.includes('france') || loc.includes('europe') ||
@@ -46,7 +46,7 @@ function getCurrencyFromLocation(location: string): { currency: string; symbol: 
   if (loc.includes('turkey')) return { currency: 'TRY', symbol: '₺' };
   if (loc.includes('uae') || loc.includes('dubai')) return { currency: 'AED', symbol: 'AED' };
   if (loc.includes('saudi')) return { currency: 'SAR', symbol: 'SR' };
-  return { currency: 'INR', symbol: '₹' };
+  return { currency: 'INR', symbol: '$' };
 }
 import { useMHRRecord, useUpdateMHR } from '@/lib/api/hooks';
 import { formatCurrency, formatNumber } from '@/lib/utils';
@@ -183,7 +183,7 @@ export default function MHRDetailPage() {
       ['Manufacturer Country', record.manufacturerCountry || '-'],
       ['Location', record.location],
       ['Machine Price (USD)', record.machinePriceUsd ? `$${record.machinePriceUsd}` : '-'],
-      ['LHR (₹/hr)', record.lhrInrPerHr || '-'],
+      ['LHR ($/hr)', record.lhrInrPerHr || '-'],
       ['USD LHR Total', record.usdLhrTotal ? `$${record.usdLhrTotal}` : '-'],
       [], ['Machine Operating Hours'],
       ['Shifts per Day', record.shiftsPerDay], ['Hours per Shift', record.hoursPerShift],
@@ -192,12 +192,12 @@ export default function MHRDetailPage() {
       ['Capacity Utilization (%)', record.capacityUtilizationRate],
       ['Effective Hours per Year', calc.effectiveHoursPerYear],
       [], ['Cost per Hour'],
-      ['Depreciation (₹/hr)', calc.depreciationPerHour], ['Interest (₹/hr)', calc.interestPerHour],
-      ['Insurance (₹/hr)', calc.insurancePerHour], ['Rent (₹/hr)', calc.rentPerHour],
-      ['Maintenance (₹/hr)', calc.maintenancePerHour], ['Electricity (₹/hr)', calc.electricityPerHour],
-      ['Total MHR (₹/hr)', calc.totalMachineHourRate],
+      ['Depreciation ($/hr)', calc.depreciationPerHour], ['Interest ($/hr)', calc.interestPerHour],
+      ['Insurance ($/hr)', calc.insurancePerHour], ['Rent ($/hr)', calc.rentPerHour],
+      ['Maintenance ($/hr)', calc.maintenancePerHour], ['Electricity ($/hr)', calc.electricityPerHour],
+      ['Total MHR ($/hr)', calc.totalMachineHourRate],
       [], ['Annual'],
-      ['Total Annual Cost (₹)', calc.totalAnnualCost],
+      ['Total Annual Cost ($)', calc.totalAnnualCost],
     ].map(row => row.map(c => `"${c}"`).join(',')).join('\n');
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
@@ -228,7 +228,7 @@ export default function MHRDetailPage() {
   const calc = liveCalculations || record.calculations;
 
   // Currency-aware formatter: uses record's actual currency symbol
-  const currSym = record.currencySymbol ?? (record.currency === 'INR' ? '₹' : '$');
+  const currSym = record.currencySymbol ?? (record.currency === 'INR' ? '$' : '$');
   const fmtLocal = (v: number) =>
     `${currSym}${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
   const isPreCalc = record.isManualEntry && !!record.mhrUsdPerHour;

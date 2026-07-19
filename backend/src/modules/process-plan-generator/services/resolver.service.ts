@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 
 import type { AbstractPlan } from '../dto/abstract-plan.dto';
 import type { CandidateSet } from '../dto/candidate-set.dto';
@@ -14,6 +14,7 @@ import type {
 import type { RouteIssue } from '../../manufacturing-knowledge/dto/kb.dto';
 import { executeCalculator, type BriefGeometry } from './calculator-executor';
 import { featureGroupFromType } from '../utils/feature-group.util';
+import { ManufacturingRulesService } from '../../manufacturing-rules/manufacturing-rules.service';
 
 /**
  * Stage 3 — resolves the LLM's AbstractPlan to a DraftPackage.
@@ -33,6 +34,8 @@ import { featureGroupFromType } from '../utils/feature-group.util';
 @Injectable()
 export class ResolverService {
   private readonly logger = new Logger(ResolverService.name);
+
+  constructor(@Optional() private readonly manufacturingRules?: ManufacturingRulesService) {}
 
   resolve(plan: AbstractPlan, candidates: CandidateSet, brief?: EngineeringBrief): DraftPackage {
     const briefGeometry: BriefGeometry | undefined = brief ? (() => {
@@ -141,9 +144,20 @@ export class ResolverService {
         newMasterRefs: newRef ? [newRef] : [],
       };
 
-      // Timing resolution priority: calculator > feature geometry > AI hint > bounding-box estimate > default
+      // Timing resolution priority:
+      //   calculator > feature geometry > planner_physics > AI/LLM hint > bbox estimate > default
+      // 'planner_physics' is emitted by DeterministicPlannerService with timingSource = 'planner_physics'.
+      // It sits above 'ai_hint' because AI hints are LLM guesses; physics values are derived from
+      // CAD geometry and calibrated constants.
       const aiSetupMin = (line.setupMin != null && line.setupMin > 0) ? line.setupMin : null;
-      const aiCycleSec = (line.cycleSec != null && line.cycleSec > 0) ? line.cycleSec : null;
+      const plannerPhysicsSec =
+        (line.timingSource === 'planner_physics' && line.cycleSec != null && line.cycleSec > 0)
+          ? line.cycleSec
+          : null;
+      const aiCycleSec =
+        (line.timingSource !== 'planner_physics' && line.cycleSec != null && line.cycleSec > 0)
+          ? line.cycleSec
+          : null;
       const resolvedSetupManning = line.setupManning ?? 1;
 
       // Build full operation context for geometry estimate gating
@@ -196,7 +210,7 @@ export class ResolverService {
         60;
 
       const resolvedSetupMin = aiSetupMin ?? defaultSetupMin;
-      const resolvedCycleSec = featureCycleSec ?? aiCycleSec ?? geoCycleSec ?? defaultCycleSec;
+      const resolvedCycleSec = featureCycleSec ?? plannerPhysicsSec ?? aiCycleSec ?? geoCycleSec ?? defaultCycleSec;
 
       // When a bench/inspection op falls back to the wrong machine (no bench MHR in DB),
       // zero out the machine rate so we only charge labour. A laser cutter at ₹4800/hr
@@ -253,7 +267,7 @@ export class ResolverService {
           processId: opCand?.dbId ?? null,
           newMasterRef: newRef,
           mhrId: macCand.dbId,
-          lsrId: labCand.dbId,
+          lhrId: labCand.dbId,
           machineName: macCand.machineName,
           labourType: labCand.labourType,
           machineRate: effectiveMachineRate,
@@ -416,6 +430,102 @@ export class ResolverService {
       templateUsed: brief?.routingTemplate?.template_name ?? null,
       costPreview: roundCostPreview(costPreview),
     };
+  }
+
+  /**
+   * Post-processing step: replaces `timingSource: 'ai_hint'` cycle times with
+   * physics-based values from the ManufacturingRulesService (machining_parameters DB).
+   *
+   * Called by OrchestratorService AFTER resolve() completes. Designed as a separate
+   * async step so the synchronous resolve() path remains unchanged (and testable).
+   *
+   * A process line is upgraded when:
+   *   - timingSource is 'ai_hint' or 'default'
+   *   - featureType or operation can be mapped to a registered calculator
+   *   - materialGrade is available on the brief
+   */
+  async patchWithRulesEngine(
+    pkg: ReturnType<ResolverService['resolve']>,
+    brief?: EngineeringBrief,
+  ): Promise<ReturnType<ResolverService['resolve']>> {
+    if (!this.manufacturingRules || !brief) return pkg;
+
+    const rulesEngine = this.manufacturingRules; // capture before async context
+    const materialGrade = (brief as any).bomItem?.materialGrade ?? (brief as any).dfm?.materialGrade ?? 'IS2062 E250';
+
+    const patchedLines = await Promise.all(
+      pkg.draftLines.map(async (line) => {
+        if (line.kind !== 'process') return line;
+        const data = line.data as DraftProcessPayload;
+        if (!['ai_hint', 'default'].includes(data.timingSource ?? '')) return line;
+
+        const operation = data.operation ?? data.processRoute ?? '';
+        const featureId = data.featureId;
+        const feat = featureId
+          ? (brief as any).featureGraph?.features?.find((f: any) => f.id === featureId)
+          : null;
+
+        // Build geometry from feature record where available
+        const geometry = feat
+          ? {
+              diameterMm: feat.diameter ?? 0,
+              depthMm: feat.depth ?? 0,
+              holeCount: feat.count ?? 1,
+              majorDiameterMm: feat.diameter ?? 0,
+              pitchMm: 1.25, // thread pitch default; should come from feature.spec
+              threadSpec: feat.spec ?? 'M8×1.25',
+              lengthMm: (brief as any).dfm?.boundingBox?.lengthMm ?? 100,
+              materialRemovalMm: 2,
+              cutterDiameterMm: feat.diameter ?? 12,
+              cuttingLengthMm: (brief as any).dfm?.perimeterMm ?? 500,
+              widthMm: (brief as any).dfm?.boundingBox?.widthMm ?? 50,
+            }
+          : {
+              lengthMm: (brief as any).dfm?.boundingBox?.lengthMm ?? 100,
+              materialRemovalMm: 3,
+              diameterMm: (brief as any).dfm?.boundingBox?.widthMm ?? 50,
+              cutterDiameterMm: 10,
+              cuttingLengthMm: (brief as any).dfm?.perimeterMm ?? 200,
+              widthMm: (brief as any).dfm?.boundingBox?.widthMm ?? 50,
+              depthMm: 5,
+            };
+
+        try {
+          const result = await rulesEngine.evaluate({
+            operation,
+            materialGrade,
+            featureGeometry: geometry,
+          });
+
+          if (result.timingSource === 'machining_rules' && result.totalCycleTimeSec > 0) {
+            // Recompute cost with new cycle time — preserve existing rates
+            const machineRatePerSec = (data.machineRate ?? 0) / 3600;
+            const labourRatePerSec = (data.labourRate ?? 0) / 3600;
+            const heads = (data as any).heads ?? 1;
+            const batchSize = data.batchSize ?? 1;
+            const newCycleSec = result.totalCycleTimeSec;
+            const newEstCost = (machineRatePerSec + labourRatePerSec * heads) * newCycleSec
+              * (1 + ((data as any).scrapPercentage ?? 0) / 100) / batchSize;
+
+            return {
+              ...line,
+              data: {
+                ...data,
+                cycleTimeSeconds: newCycleSec,
+                timingSource: 'machining_rules' as const,
+              },
+              estimatedCost: newEstCost > 0 ? newEstCost : line.estimatedCost,
+            };
+          }
+        } catch {
+          // Non-critical — keep original timing if rules engine fails
+        }
+
+        return line;
+      }),
+    );
+
+    return { ...pkg, draftLines: patchedLines };
   }
 }
 

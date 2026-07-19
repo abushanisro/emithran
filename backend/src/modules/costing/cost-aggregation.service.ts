@@ -91,7 +91,7 @@ export class CostAggregationService {
         .eq('is_active', true),
       client
         .from('process_cost_records')
-        .select('op_nbr, operation, process_group, process_route, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap, mhr_id, lsr_id, feature_type')
+        .select('op_nbr, operation, process_group, process_route, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap, mhr_id, lhr_id, feature_type')
         .eq('bom_item_id', bomItemId)
         .eq('is_active', true)
         .order('op_nbr', { ascending: true }),
@@ -251,8 +251,8 @@ export class CostAggregationService {
         pctOfMfgCost: manufacturingCost > 0 ? (d.costPerPart / manufacturingCost) * 100 : 0,
       }));
 
-    // ── Confidence — proxy: mhr_id/lsr_id presence for rate quality, routing completeness
-    const hasRates    = (processRows ?? []).some(r => r.mhr_id || r.lsr_id);
+    // ── Confidence — proxy: mhr_id/lhr_id presence for rate quality, routing completeness
+    const hasRates    = (processRows ?? []).some(r => r.mhr_id || r.lhr_id);
     const hasRouting  = (processRows ?? []).length > 0
       && (processRows ?? []).every(r => r.process_group && r.operation);
 

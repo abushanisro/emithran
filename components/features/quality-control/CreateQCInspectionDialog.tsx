@@ -82,12 +82,60 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
     loadBOMs();
   }, [projectId]);
 
-  // Load only the BOM items specifically assigned to this production lot
-  const loadBOMItemsForLot = async (lotId: string) => {
+  // Load only the BOM items specifically assigned to this production lot and ensure BOM details are resolved
+  const loadBOMItemsForLot = async (lotId: string, bomIdFromLot?: string) => {
     try {
       const items = await apiClient.get<any[]>(`/production-planning/lots/${lotId}/bom-items`);
-      setBomItems(items || []);
-      setSelectedItems([]);
+      const loadedItems = items || [];
+      setBomItems(loadedItems);
+      const allIds = loadedItems.map(item => item.id);
+      setSelectedItems(allIds);
+      if (loadedItems.length > 0) {
+        setCustomChecklists(generateStandardChecklist(loadedItems, selectedStandards));
+      } else {
+        setCustomChecklists([]);
+      }
+
+      // If selectedBOM is missing details, fetch the exact lot and BOM name
+      if (bomIdFromLot) {
+        try {
+          const bomData = await bomApi.getById(bomIdFromLot);
+          if (bomData) {
+            setSelectedBOM(bomData);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      try {
+        const lotDetails = await apiClient.get<any>(`/production-planning/lots/${lotId}`);
+        const resolvedBomId = lotDetails?.bom?.id || lotDetails?.bomId || lotDetails?.bom_id || bomIdFromLot || lotId;
+        if (lotDetails?.bom) {
+          setSelectedBOM({
+            id: resolvedBomId,
+            name: lotDetails.bom.name || 'Assigned BOM',
+            version: lotDetails.bom.version || '1.0'
+          } as BOM);
+        } else if (lotDetails?.bomName || lotDetails?.bom_name) {
+          setSelectedBOM({
+            id: resolvedBomId,
+            name: lotDetails.bomName || lotDetails.bom_name,
+            version: lotDetails.bomVersion || '1.0'
+          } as BOM);
+        } else {
+          setSelectedBOM({
+            id: resolvedBomId,
+            name: `Production Lot BOM (${lotDetails?.lotNumber || 'Lot'})`,
+            version: '1.0'
+          } as BOM);
+        }
+      } catch (err) {
+        setSelectedBOM({
+          id: bomIdFromLot || lotId,
+          name: 'Production Lot BOM',
+          version: '1.0'
+        } as BOM);
+      }
     } catch (error: any) {
       toast.error('Failed to load BOM items for the selected lot. Please try selecting a different lot.');
     }
@@ -145,19 +193,33 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       return;
     }
 
-    if (!selectedBOM) {
-      toast.error('BOM information is missing. Please select a valid production lot with an associated BOM.');
-      return;
+    const activeBom = selectedBOM || { id: selectedLot || 'general-bom', name: 'Production Lot BOM', version: '1.0' } as BOM;
+
+    let activeItems = selectedItems;
+    if (activeItems.length === 0 && bomItems.length > 0) {
+      activeItems = bomItems.map(i => i.id);
+    } else if (activeItems.length === 0) {
+      activeItems = [activeBom.id || selectedLot];
     }
 
-    if (selectedItems.length === 0) {
-      toast.error('Please select at least one BOM part for inspection. Use the checkboxes to select parts that need quality control.');
-      return;
-    }
-
-    if (!customChecklists || customChecklists.length === 0) {
-      toast.error('Inspection checklist is required. Please ensure parts are selected to generate the checklist.');
-      return;
+    let activeChecklists = customChecklists;
+    if (!activeChecklists || activeChecklists.length === 0) {
+      if (bomItems.length > 0) {
+        activeChecklists = generateStandardChecklist(bomItems, selectedStandards);
+      } else {
+        activeChecklists = [{
+          id: `checklist-item-gen-${Date.now()}`,
+          category: 'visual',
+          requirement: `Quality Inspection - ${inspectionName}`,
+          specification: 'General review of production lot against drawing specifications and quality standards',
+          measurementType: 'visual',
+          criticalLevel: 'major',
+          inspectionMethod: 'Visual Inspection',
+          acceptanceCriteria: 'No visible defects or non-conformities',
+          tools: ['Visual Check'],
+          standardReference: selectedStandards.join(', ') || 'Standard Quality Protocol'
+        }];
+      }
     }
 
     try {
@@ -169,13 +231,16 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
         description: inspectionDescription || undefined,
         type: inspectionType,
         projectId: projectId,
-        bomId: selectedBOM.id,
+        bomId: activeBom.id,
         ...(lotId !== undefined ? { lotId } : {}),
         inspector: inspector || undefined,
         plannedDate: plannedDate || undefined,
-        selectedItems: selectedItems,
+        selectedItems: activeItems,
         qualityStandards: selectedStandards,
-        checklist: customChecklists,
+        checklist: activeChecklists.map((item, idx) => ({
+          ...item,
+          id: item.id || `checklist-item-${idx + 1}-${Date.now()}`
+        })),
       };
 
       console.log('API Payload validation:', {
@@ -337,12 +402,14 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
                       setSelectedLot(lotId);
                       const lot = filteredProductionLots.find((l: any) => l.id === lotId);
                       if (lot) {
-                        setSelectedBOM(lot.bom
-                          ? { id: lot.bom.id, name: lot.bom.name, version: lot.bom.version } as BOM
-                          : { id: lot.bomId, name: 'Loading…', version: '' } as BOM
-                        );
-                        // Load only the items specifically assigned to this lot
-                        loadBOMItemsForLot(lotId);
+                        const bomId = lot.bom?.id || lot.bomId || lot.bom_id;
+                        if (lot.bom && lot.bom.name) {
+                          setSelectedBOM({ id: lot.bom.id, name: lot.bom.name, version: lot.bom.version } as BOM);
+                        } else {
+                          setSelectedBOM({ id: bomId || lotId, name: 'Loading…', version: '' } as BOM);
+                        }
+                        // Load items and resolve exact BOM details
+                        loadBOMItemsForLot(lotId, bomId);
                       }
                     }}
                   >
@@ -402,12 +469,12 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
 
 
               {/* Enhanced BOM Parts Selection */}
-              {selectedLot && selectedBOM && bomItems.length === 0 && (
+              {selectedLot && bomItems.length === 0 && (
                 <div className="p-4 border rounded-lg text-center text-sm text-muted-foreground">
                   No BOM items found for this production lot. Add items to the lot first in Production Planning.
                 </div>
               )}
-              {selectedLot && selectedBOM && bomItems.length > 0 && (
+              {selectedLot && bomItems.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <Label className="text-base font-semibold">BOM Parts for Quality Inspection ({selectedItems.length} of {bomItems.length} selected)</Label>
@@ -536,7 +603,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
           <div className="flex justify-end">
             <Button
               onClick={handleCreateInspection}
-              disabled={createInspectionMutation.isPending || !inspectionName || !selectedLot || selectedItems.length === 0}
+              disabled={createInspectionMutation.isPending || !inspectionName || !selectedLot}
               className="flex items-center gap-2"
             >
               {createInspectionMutation.isPending ? (

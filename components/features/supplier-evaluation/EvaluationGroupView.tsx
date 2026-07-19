@@ -619,7 +619,7 @@ We look forward to your competitive proposal and establishing a successful partn
                       <td className="p-4">
                         <div className="text-white">{part.description}</div>
                         {part.price && (
-                          <div className="text-sm text-teal-400 font-medium">₹{part.price.toFixed(3)}</div>
+                          <div className="text-sm text-teal-400 font-medium">${part.price.toFixed(3)}</div>
                         )}
                       </td>
                       <td className="p-4">
@@ -993,7 +993,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                             <div className="text-green-400 text-xs">
                                               <div>✓ Responded</div>
                                               {vendor.quoteAmount && (
-                                                <div>₹{vendor.quoteAmount}</div>
+                                                <div>${vendor.quoteAmount}</div>
                                               )}
                                               {vendor.leadTimeDays && (
                                                 <div>{vendor.leadTimeDays} days</div>
@@ -1434,7 +1434,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                 {vendor.quoteAmount && (
                                   <div>
                                     <div className="text-gray-400">Quote Amount</div>
-                                    <div className="font-medium text-green-400">₹{vendor.quoteAmount}</div>
+                                    <div className="font-medium text-green-400">${vendor.quoteAmount}</div>
                                   </div>
                                 )}
                                 {vendor.leadTimeDays && (

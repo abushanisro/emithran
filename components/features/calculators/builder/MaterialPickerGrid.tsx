@@ -158,7 +158,7 @@ export function MaterialPickerGrid({
           } else if (fieldLabel.includes('Pressure')) {
             displayValue = fieldValue ? `${fieldValue} MPa` : '';
           } else if (fieldLabel.includes('Cost') || fieldLabel.includes('Price')) {
-            displayValue = fieldValue ? `₹${fieldValue}/kg` : '';
+            displayValue = fieldValue ? `$${fieldValue}/kg` : '';
           } else if (fieldLabel.includes('%')) {
             displayValue = fieldValue ? `${fieldValue}%` : '';
           } else if (fieldLabel.includes('(MPa)')) {

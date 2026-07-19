@@ -15,6 +15,9 @@ import {
 interface ToolingSectionProps {
   bomItemId?: string;
   bomItem?: any;
+  compact?: boolean;
+  currencySymbol?: string; // e.g. '₹', '$', '€' — default '$'
+  conversionRate?: number; // multiply stored USD values by this to get factory currency — default 1
 }
 
 // Manufacturing Process Hierarchy (simplified version)
@@ -53,7 +56,7 @@ const MANUFACTURING_PROCESSES = {
   }
 };
 
-export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
+export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '$', conversionRate = 1 }: ToolingSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTooling, setEditTooling] = useState<any | null>(null);
   const [selectedProcess, setSelectedProcess] = useState<string | null>(null);
@@ -168,6 +171,72 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
     return tooling.reduce((sum, item) => sum + computeToolCost(item), 0);
   };
 
+  if (compact) {
+    return (
+      <div>
+        <div className="divide-y divide-border">
+          {isLoading ? (
+            <div className="px-3 py-3 text-center text-xs text-muted-foreground">Loading…</div>
+          ) : tooling.length === 0 ? (
+            <div className="px-3 py-3 text-center">
+              <p className="text-xs text-muted-foreground">No tooling items</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">Add jigs, fixtures, dies, and molds with amortization</p>
+            </div>
+          ) : (
+            <>
+              {tooling.map((item: any) => {
+                const processData = item.manufacturingProcess
+                  ? MANUFACTURING_PROCESSES[item.manufacturingProcess as keyof typeof MANUFACTURING_PROCESSES]
+                  : null;
+                return (
+                  <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{item.toolingType?.replace(/_/g, ' ') || 'Tooling'}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {[
+                          processData?.label,
+                          item.amortizationParts ? `${item.amortizationParts.toLocaleString()} pcs` : null,
+                          `${item.usagePercentage ?? 100}% usage`,
+                        ].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold tabular-nums shrink-0">{currencySymbol}{(computeToolCost(item) * conversionRate).toFixed(4)}</span>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleEditTooling(item)} title="Edit">
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive hover:text-destructive" onClick={() => handleDeleteTooling(item.id)} title="Delete" disabled={deleteMutation.isPending}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex justify-between items-center px-3 py-1.5 bg-muted/20">
+                <span className="text-[11px] font-semibold text-muted-foreground">Total</span>
+                <span className="text-xs font-bold tabular-nums">{currencySymbol}{(calculateTotal() * conversionRate).toFixed(2)}</span>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="px-3 pt-2 pb-1">
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleAddTooling()} disabled={createMutation.isPending}>
+            {createMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />}
+            Add Tooling
+          </Button>
+        </div>
+        <ToolingCostDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSubmit={handleDialogSubmit}
+          initialData={editTooling}
+          bomItem={bomItem}
+          selectedProcess={selectedProcess}
+          selectedSubProcess={selectedSubProcess}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
@@ -178,7 +247,7 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
           </h6>
           <div className="flex items-center gap-3">
             <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground">
-              Total: ₹{calculateTotal().toFixed(2)}
+              Total: {currencySymbol}{(calculateTotal() * conversionRate).toFixed(2)}
             </Badge>
           </div>
         </div>
@@ -207,7 +276,7 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
                           Process
                         </th>
                         <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
-                          Unit Cost (₹)
+                          Unit Cost ($)
                         </th>
                         <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
                           Quantity
@@ -219,7 +288,7 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
                           Usage %
                         </th>
                         <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
-                          Total Cost (₹)
+                          Total Cost ($)
                         </th>
                         <th className="p-3 text-center text-xs font-semibold w-24">
                           Actions
@@ -280,7 +349,7 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
                                   </div>
                                 </td>
                                 <td className="p-3 border-r border-border text-xs text-right">
-                                  ₹{item.unitCost.toFixed(2)}
+                                  {currencySymbol}{(item.unitCost * conversionRate).toFixed(2)}
                                 </td>
                                 <td className="p-3 border-r border-border text-xs text-right">
                                   {item.quantity.toFixed(2)}
@@ -292,7 +361,7 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
                                   {item.usagePercentage}%
                                 </td>
                                 <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                                  ₹{computeToolCost(item).toFixed(2)}
+                                  {currencySymbol}{(computeToolCost(item) * conversionRate).toFixed(2)}
                                 </td>
                                 <td className="p-3 text-center">
                                   <div className="flex items-center justify-center gap-2">
@@ -330,7 +399,7 @@ export function ToolingSection({ bomItemId, bomItem }: ToolingSectionProps) {
                               Total:
                             </td>
                             <td className="p-3 border-r border-border text-xs text-right">
-                              ₹{calculateTotal().toFixed(2)}
+                              {currencySymbol}{(calculateTotal() * conversionRate).toFixed(2)}
                             </td>
                             <td className="p-3"></td>
                           </tr>

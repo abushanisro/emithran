@@ -3,8 +3,9 @@ import {
   Controller, Get, Post, Put, Delete,
   Query, Param, Body, HttpCode, HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { ShouldCostService } from './should-cost.service';
+import { CalibrationService } from './calibration.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import {
@@ -28,7 +29,45 @@ import {
 @ApiBearerAuth()
 @Controller({ path: 'api/should-cost', version: '1' })
 export class ShouldCostController {
-  constructor(private readonly service: ShouldCostService) {}
+  constructor(
+    private readonly service: ShouldCostService,
+    private readonly calibration: CalibrationService,
+  ) {}
+
+  // ── Calibration ──────────────────────────────────────────────────────────────
+
+  @Post('calibration/run')
+  @ApiOperation({
+    summary: 'Run a ridge-regression calibration pass over all (process_family, location) cells',
+    description:
+      'Reads matched prediction/actual pairs, computes a correction multiplier per cell ' +
+      '(minimum 5 samples), updates BENCHMARK MHR rates, and logs results to rate_calibration_history. ' +
+      'Returns one result object per calibrated cell.',
+  })
+  @ApiResponse({ status: 201, description: 'Calibration results per cell' })
+  runCalibration() {
+    return this.calibration.runCalibration();
+  }
+
+  @Get('calibration/history')
+  @ApiOperation({ summary: 'Return past calibration run history, most recent first' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Max rows to return (default 50)' })
+  @ApiResponse({ status: 200, description: 'Calibration history rows from rate_calibration_history' })
+  getCalibrationHistory(@Query('limit') limit?: string) {
+    return this.calibration.getHistory(limit ? parseInt(limit, 10) : 50);
+  }
+
+  @Post('calibration/actuals')
+  @ApiOperation({
+    summary: 'Record a supplier actual cost against a should-cost prediction',
+    description:
+      'Inserts a row into should_cost_actuals. ' +
+      'Link to a prediction via predictionId to enable calibration pairing.',
+  })
+  @ApiResponse({ status: 201, description: 'Created should_cost_actuals row' })
+  recordActual(@Body() dto: any) {
+    return this.calibration.recordActual(dto);
+  }
 
   // ── Analytics views (before parameterised routes to prevent routing conflict) ─
 

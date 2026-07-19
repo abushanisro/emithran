@@ -52,38 +52,56 @@ export function VendorRatingEngine({ vendorId, vendorName, nominationId, onScore
   const [isSaving, setIsSaving] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
 
-  // ENTERPRISE OPTIMIZATION: Load data on mount with request deduplication
+  // ENTERPRISE OPTIMIZATION: Load data on mount with request deduplication and timeout safety
   useEffect(() => {
     if (!nominationId || !vendorId) {
       return;
     }
     
+    let isMounted = true;
+    const safetyTimeoutId = setTimeout(() => {
+      if (isMounted && isLoading) {
+        setIsLoading(false);
+      }
+    }, 8000); // 8 second safety timeout to prevent infinite spinner
+
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // SINGLE API CALL - Get existing data first, minimize requests
-        let data = await getVendorRatingMatrix(nominationId, vendorId);
+        // BATCH LOAD: Get matrix data and scores concurrently to minimize latency
+        let [matrix, scores] = await Promise.all([
+          getVendorRatingMatrix(nominationId, vendorId).catch(() => []),
+          getVendorRatingOverallScores(nominationId, vendorId).catch(() => ({
+            sectionWiseCapability: 0,
+            riskMitigation: 0,
+            totalMinorNC: 0,
+            totalMajorNC: 0,
+            totalRecords: 0
+          }))
+        ]);
         
         // If no data exists, try to initialize it
-        if (!data || data.length === 0) {
+        if (!matrix || matrix.length === 0) {
           try {
-            await initializeVendorRatingMatrix(nominationId, vendorId);
-            data = await getVendorRatingMatrix(nominationId, vendorId);
+            const initData = await initializeVendorRatingMatrix(nominationId, vendorId);
+            if (Array.isArray(initData) && initData.length > 0) {
+              matrix = initData;
+            } else {
+              matrix = await getVendorRatingMatrix(nominationId, vendorId).catch(() => []);
+            }
+            // Re-fetch scores after initialization
+            scores = await getVendorRatingOverallScores(nominationId, vendorId).catch(() => scores);
           } catch (initError) {
-            
             // Continue with empty data - user will see "no data available"
           }
         }
         
-        // BATCH LOAD: Get scores and data together to minimize API calls
-        const [scores] = await Promise.all([
-          getVendorRatingOverallScores(nominationId, vendorId)
-        ]);
-        
-        setRatingData(data || []);
-        setOverallScores(scores);
-        
+        if (isMounted) {
+          setRatingData(matrix || []);
+          setOverallScores(scores);
+        }
       } catch (error) {
+        if (!isMounted) return;
         // Handle different error types professionally
         const errorMessage = error instanceof Error ? error.message : String(error);
         
@@ -100,18 +118,25 @@ export function VendorRatingEngine({ vendorId, vendorName, nominationId, onScore
         } else if (errorMessage.includes('Missing required parameters')) {
           toast.error('Invalid page parameters. Please refresh and try again.');
         } else {
-          // Only show generic error for truly unexpected cases
           toast.error('Failed to load rating data. Please refresh the page.');
         }
         
         // Always set empty data to prevent UI breaking
         setRatingData([]);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          clearTimeout(safetyTimeoutId);
+        }
       }
     };
     
     loadData();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeoutId);
+    };
   }, [nominationId, vendorId]);
 
   // Enterprise debouncing for optimal performance

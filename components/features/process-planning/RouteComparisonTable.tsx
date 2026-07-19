@@ -76,7 +76,7 @@ export function RouteComparisonTable({ alternatives, selectedRouteId, onSelectRo
                 {/* Metrics */}
                 <div className="text-right space-y-0.5">
                   <div className="text-slate-200 font-semibold">
-                    ₹{alt.costPreview.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    ${alt.costPreview.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                   <div className="text-slate-500">{alt.estimatedLeadTimeHours.toFixed(1)} hrs</div>
                   <span className={cn('inline-block px-1.5 py-0.5 rounded border', riskColor(alt.riskScore))}>

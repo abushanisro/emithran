@@ -63,6 +63,7 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
         machineClass: rate.machineClass,
         machineName: rate.machineName,
         commodityCode: rate.commodityCode,
+        labourRate: rate.labourRate ?? null,
       },
     ],
     cuttingMin,

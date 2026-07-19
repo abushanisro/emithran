@@ -30,7 +30,35 @@ export class ScopeClassifierService {
       );
     }
 
-    // 1b. CAD engine's own topology-based family decision — highest-confidence signal
+    // 1b. DB-backed material family — positive paths from raw_materials.material_family.
+    //     This fires BEFORE the CAD topology check because material evidence is always
+    //     more reliable than CAD shape analysis for the polymer vs metal distinction.
+    //     The materialFamily field is populated by retrieval.service.ts via a DB lookup
+    //     and is null when the material hint had no match in raw_materials.
+    if (bom.materialFamily) {
+      if (bom.materialFamily === 'elastomer') {
+        return this.outOfScope(
+          `Material family "elastomer" (resolved from DB for "${bom.materialHint}") — ` +
+          `rubber/elastomer moulding is not in Phase-1 scope`,
+          0.90,
+        );
+      }
+      if (bom.materialFamily === 'ferrous_cast_iron') {
+        return this.outOfScope(
+          `Material family "ferrous_cast_iron" (resolved from DB for "${bom.materialHint}") — ` +
+          `cast iron requires casting routes, not Phase-1 machining scope`,
+          0.90,
+        );
+      }
+      if (bom.materialFamily === 'polymer_thermoplastic' || bom.materialFamily === 'polymer_thermoset') {
+        this.logger.log(
+          `[classify] DB material_family "${bom.materialFamily}" for "${bom.materialHint}" → injection_molded`,
+        );
+        return this.inScope('injection_molded', `Material family "${bom.materialFamily}" resolved from DB → injection moulding`, 0.92);
+      }
+    }
+
+    // 1d. CAD engine's own topology-based family decision — highest-confidence signal
     //     The Python OCC engine computes flatness, hole density, and planar face fraction
     //     directly from geometry. Trust it over any BOM/name heuristic.
     //     CAVEAT: detected_family is persisted in geometry_analysis at upload time, so it
@@ -40,10 +68,11 @@ export class ScopeClassifierService {
     //     rules below, which will re-derive the family with their own reasons.
     if (dfm.cadDetectedFamily && dfm.cadDetectedFamily !== 'unknown') {
       const familyMap: Record<string, PartFamily | null> = {
-        sheet_metal: 'sheet_metal',
-        cnc_turned:  'cnc_turned',
-        cnc_milled:  'cnc_milled',
-        mill_turn:   'cnc_turned',
+        sheet_metal:       'sheet_metal',
+        cnc_turned:        'cnc_turned',
+        cnc_milled:        'cnc_milled',
+        mill_turn:         'cnc_turned',
+        injection_molded:  'injection_molded',
       };
       const mapped = familyMap[dfm.cadDetectedFamily];
       if (mapped) {
@@ -58,11 +87,22 @@ export class ScopeClassifierService {
           ((fill < 0.10 && storedMinDim < 200) ||
             (dfm.sheetThicknessMm > 0 && dfm.sheetThicknessMm < 10) ||
             (dfm.bendCount > 0 && fill < 0.30));
-        if (sheetContradiction) {
+        // Guard against injection_molded being assigned to a ferrous/non-ferrous metal part.
+        // Thin-walled metal enclosures (e.g. IS2062 sheet brackets) can be misread as
+        // polymer shells by the OCC topology classifier. Use DB material_family first;
+        // fall back to regex when DB lookup returned null.
+        const isDefinitelyMetal = bom.materialFamily
+          ? !bom.materialFamily.startsWith('polymer') && bom.materialFamily !== 'elastomer'
+          : /(steel|iron|alumin|brass|copper|titanium|inox|ss\s*3|is\s*2|is\s*1|en\s*[0-9]|crca|gi\s+sheet|galv|mild\s+steel|stainless|\bms\b|\bhr\b|\bcr\b)/i.test(
+              bom.materialHint ?? '',
+            );
+        const imContradiction = mapped === 'injection_molded' && isDefinitelyMetal;
+        if (sheetContradiction || imContradiction) {
           this.logger.warn(
-            `[classify] Stored CAD family "cnc_milled" contradicted by sheet-metal geometry ` +
-            `(fill ${(fill * 100).toFixed(1)}%, sheetThickness ${dfm.sheetThicknessMm}mm, ` +
-            `bends ${dfm.bendCount}) — ignoring stored family, using geometry rules`,
+            `[classify] Stored CAD family "${dfm.cadDetectedFamily}" contradicted by ` +
+            (imContradiction
+              ? `metal material hint "${bom.materialHint}" — ignoring stored family, using geometry rules`
+              : `sheet-metal geometry (fill ${(fill * 100).toFixed(1)}%, sheetThickness ${dfm.sheetThicknessMm}mm, bends ${dfm.bendCount}) — ignoring stored family, using geometry rules`),
           );
         } else {
           this.logger.log(`[classify] CAD engine detected family "${dfm.cadDetectedFamily}" → ${mapped}`);

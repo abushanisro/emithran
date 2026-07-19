@@ -200,6 +200,8 @@ export interface FeatureGraph {
   analyzed_at?: string;
   /** Per-instance occurrence data — added in Feature Graph v2 */
   feature_graph_v2?: FeatureGraphV2;
+  /** Per-feature spatial data for injection molding heatmap (bosses, ribs, wall samples, draft faces) */
+  imHeatmapFeatures?: import('@/lib/heatmap/types').IMHeatmapFeatures;
 }
 
 export interface FeatureSelection {

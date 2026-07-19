@@ -142,7 +142,10 @@ export class CostEngineeringService {
     return this.fetch(token, 'material_price_library', (q) => {
       if (query.materialForm) q = q.ilike('material_form', `%${query.materialForm}%`);
       if (query.region) q = q.ilike('region', `%${query.region}%`);
-      if (query.search) q = q.or(`material_name.ilike.%${query.search}%,material_grade.ilike.%${query.search}%`);
+      if (query.search) {
+        const safe = query.search.replace(/"/g, '\\"');
+        q = q.or(`material_name.ilike."%${safe}%",material_grade.ilike."%${safe}%"`);
+      }
       return q.order('material_name').order('region');
     }, pag);
   }

@@ -7,7 +7,7 @@ export * from './useVendors';
 export * from './useBOM';
 export * from './useBOMItems';
 export * from './useMHR';
-export * from './useLSR';
+export * from './useLHR';
 
 export * from './useCalculators';
 export * from './usePackagingLogisticsCosts';

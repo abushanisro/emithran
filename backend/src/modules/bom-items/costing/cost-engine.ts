@@ -17,12 +17,15 @@ import type { CostSummaryDto, ProcessLineCost, ProcessCO2, SustainabilitySummary
 
 export interface MHRRateInput {
   rate: number;
-  source: 'mhr_database' | 'default_rate' | 'tier_synthetic';
+  source: 'mhr_database' | 'default_rate' | 'tier_synthetic' | 'benchmark_override';
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;
   // Full physics-based selection result; present when the capability selector ran
   selection?: import('../dto/machine-selection.dto').MachineSelectionResult;
+  // Labour Hour Rate from lhr_benchmark_rates for the resolved location + process group.
+  // Already factored into `rate` (fully burdened) — shown separately for transparency.
+  labourRate?: number | null;
 }
 
 export interface CostEngineInput {
@@ -224,6 +227,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineClass: laserRate.machineClass,
       machineName: laserRate.machineName,
       commodityCode: laserRate.commodityCode,
+      labourRate: laserRate.labourRate ?? null,
     });
   }
 
@@ -248,6 +252,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineClass: pbRate.machineClass,
       machineName: pbRate.machineName,
       commodityCode: pbRate.commodityCode,
+      labourRate: pbRate.labourRate ?? null,
     });
   }
 
@@ -268,6 +273,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineClass: deburrRate.machineClass,
       machineName: deburrRate.machineName,
       commodityCode: deburrRate.commodityCode,
+      labourRate: deburrRate.labourRate ?? null,
     });
   }
 
@@ -289,6 +295,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineClass: tappingRate.machineClass,
       machineName: tappingRate.machineName,
       commodityCode: tappingRate.commodityCode,
+      labourRate: tappingRate.labourRate ?? null,
     });
   }
 

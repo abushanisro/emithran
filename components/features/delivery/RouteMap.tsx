@@ -136,7 +136,7 @@ export default function RouteMap({ fromAddress, toAddress, transportMode, materi
             startAddress: leg.start_address,
             endAddress: leg.end_address,
             optimizationScore: 85, // Google routes are well optimized
-            cost: Math.round(leg.distance.value / 1000 * 8) // ₹8 per km for car
+            cost: Math.round(leg.distance.value / 1000 * 8) // $8 per km for car
           };
 
           setRouteInfo(routeData);
@@ -322,7 +322,7 @@ export default function RouteMap({ fromAddress, toAddress, transportMode, materi
             </div>
           </div>
           <div className="text-center p-3 bg-background rounded-lg border">
-            <div className="text-2xl font-bold text-green-600">₹{routeInfo.cost}</div>
+            <div className="text-2xl font-bold text-green-600">${routeInfo.cost}</div>
             <div className="text-sm text-muted-foreground">Est. Cost</div>
           </div>
           <div className="text-center p-3 bg-background rounded-lg border">

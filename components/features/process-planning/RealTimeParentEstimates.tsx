@@ -129,42 +129,42 @@ const CostTreeNode: React.FC<CostTreeNodeProps> = ({ item, depth, isCurrentItem 
                   <span className={cn(
                     "font-medium font-mono",
                     item.rawMaterialCost === 0 ? "text-muted-foreground" : "text-foreground"
-                  )}>₹{item.rawMaterialCost.toFixed(2)}</span>
+                  )}>${item.rawMaterialCost.toFixed(2)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Process: </span>
                   <span className={cn(
                     "font-medium font-mono",
                     item.processCost === 0 ? "text-muted-foreground" : "text-foreground"
-                  )}>₹{item.processCost.toFixed(2)}</span>
+                  )}>${item.processCost.toFixed(2)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Packaging: </span>
                   <span className={cn(
                     "font-medium font-mono",
                     item.packagingLogisticsCost === 0 ? "text-muted-foreground" : "text-foreground"
-                  )}>₹{item.packagingLogisticsCost.toFixed(2)}</span>
+                  )}>${item.packagingLogisticsCost.toFixed(2)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Procured: </span>
                   <span className={cn(
                     "font-medium font-mono",
                     item.procuredPartsCost === 0 ? "text-muted-foreground" : "text-foreground"
-                  )}>₹{item.procuredPartsCost.toFixed(2)}</span>
+                  )}>${item.procuredPartsCost.toFixed(2)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Children: </span>
                   <span className={cn(
                     "font-medium font-mono",
                     item.directChildrenCost === 0 ? "text-muted-foreground" : "text-blue-600 font-semibold"
-                  )}>₹{item.directChildrenCost.toFixed(2)}</span>
+                  )}>${item.directChildrenCost.toFixed(2)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Total Cost: </span>
                   <span className={cn(
                     "font-semibold font-mono text-sm",
                     item.totalCost > 0 ? "text-green-600" : "text-muted-foreground"
-                  )}>₹{item.totalCost.toFixed(2)}</span>
+                  )}>${item.totalCost.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -222,7 +222,7 @@ export const RealTimeParentEstimates: React.FC<RealTimeParentEstimatesProps> = (
           Cost Hierarchy
         </h6>
         <div className="text-primary-foreground/90 text-sm font-mono">
-          Total: ₹{totalBomCost.toFixed(2)}
+          Total: ${totalBomCost.toFixed(2)}
         </div>
       </div>
 

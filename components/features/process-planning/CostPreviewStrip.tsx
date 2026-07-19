@@ -28,7 +28,7 @@ export function CostPreviewStrip({ costPreview, removedCount }: Props) {
       {/* Total headline */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Estimated unit cost</span>
-        <span className="font-bold tabular-nums text-primary text-lg">₹{costPreview.total.toFixed(2)}</span>
+        <span className="font-bold tabular-nums text-primary text-lg">${costPreview.total.toFixed(2)}</span>
       </div>
 
       {/* Section breakdown */}
@@ -46,7 +46,7 @@ export function CostPreviewStrip({ costPreview, removedCount }: Props) {
                 />
               </div>
               <span className="text-[10px] tabular-nums text-foreground w-20 text-right">
-                ₹{val.toFixed(2)}
+                ${val.toFixed(2)}
                 <span className="text-muted-foreground ml-1">({pct.toFixed(0)}%)</span>
               </span>
             </div>
@@ -57,7 +57,7 @@ export function CostPreviewStrip({ costPreview, removedCount }: Props) {
       {/* Composition formula */}
       {nonZero.length > 1 && (
         <p className="text-[9px] font-mono text-muted-foreground leading-snug border-t pt-1.5">
-          {nonZero.map((s) => `${s.abbr} ₹${costPreview[s.key].toFixed(2)}`).join(' + ')} = ₹{costPreview.total.toFixed(2)}
+          {nonZero.map((s) => `${s.abbr} $${costPreview[s.key].toFixed(2)}`).join(' + ')} = ${costPreview.total.toFixed(2)}
         </p>
       )}
 

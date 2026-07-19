@@ -648,10 +648,10 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Material Cost</CardTitle>
-            <div className="text-green-600">₹</div>
+            <div className="text-green-600">$</div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{totalActualCost.toLocaleString()}</div>
+            <div className="text-2xl font-bold">${totalActualCost.toLocaleString()}</div>
             <p className={`text-xs ${totalActualCost <= totalEstimatedCost ? 'text-green-600' : 'text-red-600'}`}>
               {totalActualCost > 0 && totalEstimatedCost > 0 ?
                 `${((totalActualCost - totalEstimatedCost) / totalEstimatedCost * 100).toFixed(1)}% vs estimate` :
@@ -899,9 +899,9 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
                                   <div>
                                     <h4 className="font-medium mb-2">Cost</h4>
                                     <div className="space-y-1 text-sm">
-                                      <div>Estimated: ₹{(item.estimated_cost || 0).toLocaleString()}</div>
+                                      <div>Estimated: ${(item.estimated_cost || 0).toLocaleString()}</div>
                                       {item.actual_cost && (
-                                        <div>Actual: ₹{item.actual_cost.toLocaleString()}</div>
+                                        <div>Actual: ${item.actual_cost.toLocaleString()}</div>
                                       )}
                                     </div>
                                   </div>

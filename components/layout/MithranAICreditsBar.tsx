@@ -111,7 +111,7 @@ export function MithranAICreditsBar() {
         <div className="flex items-center gap-3 shrink-0">
           {totalSavingsL > 0 && (
             <span className="hidden sm:block text-[10px] font-semibold tabular-nums text-green-500">
-              ₹{totalSavingsL.toFixed(1)}L identified
+              ${totalSavingsL.toFixed(1)}L identified
             </span>
           )}
           <span className="text-[10px] text-muted-foreground/50 select-none">
@@ -180,7 +180,7 @@ export function MithranAICreditsBar() {
               <div className="space-y-0.5">
                 <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50">Cost Savings</p>
                 <p className="text-base font-bold tabular-nums" style={{ color: 'hsl(140 60% 50%)' }}>
-                  {totalSavingsL > 0 ? `₹${totalSavingsL.toFixed(1)}L` : '—'}
+                  {totalSavingsL > 0 ? `$${totalSavingsL.toFixed(1)}L` : '—'}
                 </p>
               </div>
               <div className="space-y-0.5">

@@ -229,7 +229,7 @@ export class OrchestratorService {
       abstractPlan = this.deterministicPlanner.plan(brief, candidates);
       this.logger.log(`[orchestrator] Deterministic plan built for ${bomItemId} via "${brief.routingTemplate.template_name}"`);
     } catch (planErr: any) {
-      // Planner throws when master data (MHR/LSR) is missing — not a routing problem.
+      // Planner throws when master data (MHR/LHR) is missing — not a routing problem.
       await client
         .from('process_plan_generations')
         .update({
@@ -245,7 +245,9 @@ export class OrchestratorService {
     }
 
     // ── Stage 3 — resolver ────────────────────────────────────────────────
-    const draftPackage = this.resolver.resolve(abstractPlan, candidatesAfterExpansion, brief);
+    const rawDraftPackage = this.resolver.resolve(abstractPlan, candidatesAfterExpansion, brief);
+    // Upgrade ai_hint cycle times with physics-based values from ManufacturingRulesService
+    const draftPackage = await this.resolver.patchWithRulesEngine(rawDraftPackage, brief);
 
     // ── Route validation against KB rules ────────────────────────────────
     let kbCapabilities: any[] = [];

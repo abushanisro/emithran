@@ -7,8 +7,8 @@ export const safeNum = (v: number | string | null | undefined): number =>
 export const formatPrice = (price: number | string | null | undefined): string => {
   const n = safeNum(price);
   if (n === 0) return "No price set";
-  if (n >= 100_000) return `₹${(n / 100_000).toFixed(1)}L`;
-  return `₹${n.toLocaleString("en-IN")}`;
+  if (n >= 100_000) return `$${(n / 100_000).toFixed(1)}L`;
+  return `$${n.toLocaleString("en-IN")}`;
 };
 
 export const formatDate = (dateString: string): string =>

@@ -214,9 +214,9 @@ export function ProductionLotsTable({ lots, isLoading }: ProductionLotsTableProp
               
               <TableCell>
                 <div className="flex flex-col">
-                  <span className="font-semibold">₹{lot.totalEstimatedCost.toLocaleString()}</span>
+                  <span className="font-semibold">${lot.totalEstimatedCost.toLocaleString()}</span>
                   <span className="text-xs text-muted-foreground">
-                    Material: ₹{lot.totalMaterialCost.toLocaleString()}
+                    Material: ${lot.totalMaterialCost.toLocaleString()}
                   </span>
                 </div>
               </TableCell>

@@ -1,7 +1,7 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,14 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useMHRRecords, useMHRRecord } from '@/lib/api/hooks/useMHR';
-import { useLSR, useLSRById } from '@/lib/api/hooks/useLSR';
+import { useMHRRecords, useMHRRecord, useMHRBenchmark } from '@/lib/api/hooks/useMHR';
+import { useLHR, useLHRById, useLHRBenchmark } from '@/lib/api/hooks/useLHR';
 import { useProcessHierarchy, useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+
 
 interface ProcessCostDialogProps {
   open: boolean;
@@ -35,6 +36,8 @@ interface ProcessCostDialogProps {
   editData?: any;
   bomItemData?: any;
   existingProcesses?: any[];
+  defaultLocation?: string | undefined;
+  currencySymbol?: string;
 }
 
 export function ProcessCostDialog({
@@ -44,6 +47,8 @@ export function ProcessCostDialog({
   editData,
   bomItemData,
   existingProcesses = [],
+  defaultLocation,
+  currencySymbol = '$',
 }: ProcessCostDialogProps) {
   const [opNbr, setOpNbr] = useState<number>(0);
   const [location, setLocation] = useState<string>('');
@@ -55,7 +60,7 @@ export function ProcessCostDialog({
 
   // Resource selections
   const [selectedMHRId, setSelectedMHRId] = useState<string>('');
-  const [selectedLSRId, setSelectedLSRId] = useState<string>('');
+  const [selectedLHRId, setSelectedLHRId] = useState<string>('');
   const [setupManning, setSetupManning] = useState<number | string>('');
   const [setupTime, setSetupTime] = useState<number | string>('');
   const [batchSize, setBatchSize] = useState<number | string>('');
@@ -64,7 +69,19 @@ export function ProcessCostDialog({
   const [partsPerCycle, setPartsPerCycle] = useState<number | string>('');
   const [scrap, setScrap] = useState<number | string>('');
   const [machineValue, setMachineValue] = useState<number | string>('');
-  const [totalCost, setTotalCost] = useState<number>(0);
+  // Manual rate fallback — used when MHR/LHR dropdown has no records
+  const [manualMhrRate, setManualMhrRate] = useState<number | ''>('');
+  const [manualLhrRate, setManualLhrRate] = useState<number | ''>('');
+
+  // Track whether the engineer explicitly chose a rate — prevents auto-select from overriding a manual pick
+  const [userOverrodeMHR, setUserOverrodeMHR] = useState(false);
+  const [userOverrodeLHR, setUserOverrodeLHR] = useState(false);
+
+  // Prevents the full pickers from flashing empty before the load effect fires in edit mode.
+  // false = load effect hasn't run yet for this open; true = fields are populated from editData.
+  const [editDataApplied, setEditDataApplied] = useState(false);
+  // When true, show hierarchy pickers instead of read-only "Saved process" panel (after Re-select click)
+  const [reSelectMode, setReSelectMode] = useState(false);
 
   // Preserve facilityId and facilityRateId from editData for updates
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined);
@@ -93,27 +110,26 @@ export function ProcessCostDialog({
   );
 
   const { data: mhrData, isLoading: isLoadingMHR, error: mhrError } = useMHRRecords({ limit: 100 });
-  // When editing, fetch the specific saved MHR/LSR so they always appear in their lists
+  // Benchmark MHR from DB — global table, no user_id, seeded by migration 345
+  const { data: benchmarkMHR } = useMHRBenchmark(undefined, { enabled: open });
+  // When editing, fetch the specific saved MHR/LHR so they always appear in their lists
   const savedMHRId = editData?.mhrId || editData?.machineId || '';
-  const savedLSRId = editData?.lsrId ? String(editData.lsrId) : '';
+  const savedLHRId = editData?.lhrId ? String(editData.lhrId) : '';
   const { data: savedMHRRecord } = useMHRRecord(savedMHRId, { enabled: !!savedMHRId && open });
-  const { data: savedLSRRecord } = useLSRById(savedLSRId);
-  const { data: lsrData, isLoading: isLoadingLSR, error: lsrError } = useLSR();
+  const { data: savedLHRRecord } = useLHRById(savedLHRId && open ? savedLHRId : '');
+  const { data: lhrData, isLoading: isLoadingLHR, error: lhrError } = useLHR();
+  const { data: benchmarkLHR } = useLHRBenchmark();
   const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators();
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
   const executeCalculator = useExecuteCalculator();
 
   // Check for errors
-  const hasErrors = mhrError || lsrError || hierarchyError || calculatorsError;
+  const hasErrors = mhrError || lhrError || hierarchyError || calculatorsError;
 
-  // Function to suggest next operation number (but user can change it)
   const getSuggestedOpNbr = () => {
-    if (!existingProcesses || existingProcesses.length === 0) {
-      return 1; // Start with 1
-    }
-    
+    if (!existingProcesses || existingProcesses.length === 0) return 10;
     const maxOpNbr = Math.max(...existingProcesses.map(p => p.opNbr || 0));
-    return maxOpNbr + 1; // Next sequential number
+    return maxOpNbr + 10;
   };
 
   // Get process groups from hierarchy
@@ -154,48 +170,106 @@ export function ProcessCostDialog({
     return processCalculatorMappings.mappings;
   }, [processCalculatorMappings]);
 
-  // Get unique locations from MHR and LSR data
-  const locations = useMemo(() => {
-    const locs = new Set<string>();
-    mhrData?.records?.forEach(record => {
-      if (record.location) locs.add(record.location);
-    });
-    lsrData?.records?.forEach((record: any) => {
-      if (record.location) locs.add(record.location);
-    });
-    return Array.from(locs).sort();
-  }, [mhrData, lsrData]);
-
-  // Filter MHR by location — always include the saved record so it shows when editing
+  // ─── filteredMHR ─────────────────────────────────────────────────────────────
+  // Priority: 1) user's own mhr_records (exact location+group)
+  //           2) user's own mhr_records (location only)
+  //           3) mhr_benchmark_rates DB table (migration 345) — location+group
+  //           4) mhr_benchmark_rates DB table — location only
+  // Never falls back across locations; never uses hardcoded constants.
   const filteredMHR = useMemo(() => {
     const base = mhrData?.records ?? [];
-    const filtered = !location ? base : base.filter(r => r.location === location);
-    if (savedMHRRecord && !filtered.some(r => r.id === savedMHRRecord.id)) {
-      return [savedMHRRecord, ...filtered];
+    const bm   = benchmarkMHR ?? [];
+    const locLower = location.toLowerCase();
+
+    const byLoc = (arr: any[]) =>
+      !location ? arr : arr.filter(r => (r.location ?? '').toLowerCase() === locLower);
+    const byGroup = (arr: any[]) =>
+      selectedGroup ? arr.filter(r => r.processGroup === selectedGroup) : arr;
+
+    // 1 & 2 — user's own records
+    const dbLoc   = byLoc(base);
+    const dbMatch = byGroup(dbLoc);
+    const dbResult = dbMatch.length > 0 ? dbMatch : (dbLoc.length > 0 ? dbLoc : null);
+    if (dbResult && dbResult.length > 0) {
+      if (savedMHRRecord && !dbResult.some((r: any) => String(r.id) === String(savedMHRRecord.id))) {
+        return [savedMHRRecord, ...dbResult] as any[];
+      }
+      return dbResult as any[];
     }
-    return filtered;
-  }, [mhrData, location, savedMHRRecord]);
 
-  // Filter LSR by location
-  const filteredLSR = useMemo(() => {
-    const records = lsrData?.records ?? [];
-    if (!location) return records;
-    return records.filter((r: any) => r.location === location);
-  }, [lsrData, location]);
+    // 3 & 4 — DB benchmark table (mhr_benchmark_rates)
+    const bmLoc   = byLoc(bm);
+    const bmMatch = byGroup(bmLoc);
+    const bmResult = bmMatch.length > 0 ? bmMatch : (bmLoc.length > 0 ? bmLoc : bm);
+    if (savedMHRRecord && !bmResult.some((r: any) => String(r.id) === String(savedMHRRecord.id))) {
+      return [savedMHRRecord, ...bmResult] as any[];
+    }
+    return bmResult as any[];
+  }, [mhrData, benchmarkMHR, location, selectedGroup, savedMHRRecord]);
 
-  // Get selected MHR and LSR
+  // ─── filteredLHR ─────────────────────────────────────────────────────────────
+  // Priority: 1) user's own lsr_records (location+group)
+  //           2) user's own lsr_records (location only)
+  //           3) lhr_benchmark_rates DB table (migration 345) — location+group
+  //           4) lhr_benchmark_rates DB table — location only
+  const filteredLHR = useMemo(() => {
+    const records = lhrData?.records ?? [];
+    const bm      = benchmarkLHR ?? [];
+    const locLower = location.toLowerCase();
+
+    const byLoc = (arr: any[]) =>
+      !location ? arr : arr.filter((r: any) => (r.location ?? '').toLowerCase() === locLower);
+    const byGroup = (arr: any[]) =>
+      selectedGroup ? arr.filter((r: any) => r.processGroup === selectedGroup) : arr;
+
+    // 1 & 2 — user's own records
+    const userLoc   = byLoc(records);
+    const userMatch = byGroup(userLoc);
+    const userResult = userMatch.length > 0 ? userMatch : (userLoc.length > 0 ? userLoc : null);
+    const withSaved = (base: any[]) => {
+      if (savedLHRRecord && !base.some((r: any) => String(r.id) === String((savedLHRRecord as any).id))) {
+        return [savedLHRRecord, ...base] as any[];
+      }
+      return base as any[];
+    };
+    if (userResult && userResult.length > 0) return withSaved(userResult);
+
+    // 3 & 4 — DB benchmark table (lhr_benchmark_rates)
+    const bmLoc   = byLoc(bm);
+    const bmMatch = byGroup(bmLoc);
+    const bmResult = bmMatch.length > 0 ? bmMatch : (bmLoc.length > 0 ? bmLoc : bm);
+    return withSaved(bmResult as any[]);
+  }, [lhrData, benchmarkLHR, location, selectedGroup, savedLHRRecord]);
+
+  // Get selected MHR and LHR — both use String() to avoid number/string type mismatch
   const selectedMHR = useMemo(() => {
-    return filteredMHR.find(r => r.id === selectedMHRId);
+    return filteredMHR.find(r => String(r.id) === String(selectedMHRId));
   }, [filteredMHR, selectedMHRId]);
 
-  const selectedLSR = useMemo(() => {
-    return filteredLSR.find((r: any) => String(r.id) === String(selectedLSRId));
-  }, [filteredLSR, selectedLSRId]);
+  const selectedLHR = useMemo(() => {
+    return filteredLHR.find((r: any) => String(r.id) === String(selectedLHRId));
+  }, [filteredLHR, selectedLHRId]);
 
   useEffect(() => {
     if (hierarchyError) {
     }
   }, [hierarchyError]);
+
+  // Auto-select top MHR match when process group changes — skip if the engineer already picked one explicitly
+  useEffect(() => {
+    if (!selectedGroup || userOverrodeMHR) return;
+    if (filteredMHR.length > 0 && !selectedMHRId) {
+      setSelectedMHRId(String(filteredMHR[0].id));
+    }
+  }, [selectedGroup, filteredMHR, userOverrodeMHR, selectedMHRId]);
+
+  // Auto-select top LHR match when process group changes — skip if the engineer already picked one explicitly
+  useEffect(() => {
+    if (!selectedGroup || userOverrodeLHR) return;
+    if (filteredLHR.length > 0 && !selectedLHRId) {
+      setSelectedLHRId(String((filteredLHR[0] as any).id));
+    }
+  }, [selectedGroup, filteredLHR, userOverrodeLHR, selectedLHRId]);
 
   // Calculator handlers
   const handleCalculatorValue = (value: number | string) => {
@@ -426,10 +500,12 @@ export function ProcessCostDialog({
 
   // Load edit data (wait for data to be loaded before populating)
   useEffect(() => {
-    if (editData && open && !isLoadingHierarchy && !isLoadingMHR && !isLoadingLSR) {
-      
+    if (!open) { setEditDataApplied(false); setReSelectMode(false); return; }
+
+    if (editData && open && !isLoadingHierarchy && !isLoadingMHR && !isLoadingLHR) {
+      setEditDataApplied(true);
       setOpNbr(editData.opNbr || 0);
-      setLocation(editData.location || '');
+      setLocation(editData.location || defaultLocation || '');
       setSelectedGroup(editData.processGroup || '');
       setSelectedRoute(editData.processRoute || '');
       setSelectedOperation(editData.operation || '');
@@ -437,10 +513,10 @@ export function ProcessCostDialog({
       
       // Use the actual field names from the process data
       const mhrId = editData.mhrId || editData.machineId || '';
-      const lsrId = editData.lsrId ? String(editData.lsrId) : (editData.laborId ? String(editData.laborId) : '');
+      const lhrId = editData.lhrId ? String(editData.lhrId) : (editData.laborId ? String(editData.laborId) : '');
       
       setSelectedMHRId(mhrId);
-      setSelectedLSRId(lsrId);
+      setSelectedLHRId(lhrId);
       
       setSetupManning(editData.setupManning || 1);
       setSetupTime(editData.setupTime || 0);
@@ -450,18 +526,21 @@ export function ProcessCostDialog({
       setPartsPerCycle(editData.partsPerCycle || 1);
       setScrap(editData.scrap || 0);
       setMachineValue(editData.machineValue || 0);
+      setManualMhrRate(editData.machineRate || '');
+      setManualLhrRate(editData.laborRate  || '');
       setFacilityId(editData.facilityId);
       setFacilityRateId(editData.facilityRateId);
     } else if (!editData && open) {
+      setEditDataApplied(false);
       // Reset for new entry - suggest next operation number but user can change it
       setOpNbr(getSuggestedOpNbr()); // Suggest next operation number but user can enter any number
-      setLocation('');
+      setLocation(defaultLocation ?? '');
       setSelectedGroup('');
       setSelectedRoute('');
       setSelectedOperation('');
       setSelectedProcessCalculatorId('');
       setSelectedMHRId('');
-      setSelectedLSRId('');
+      setSelectedLHRId('');
       setSetupManning('');
       setSetupTime('');
       setBatchSize('');
@@ -470,58 +549,58 @@ export function ProcessCostDialog({
       setPartsPerCycle('');
       setScrap('');
       setMachineValue('');
+      setManualMhrRate('');
+      setManualLhrRate('');
       setFacilityId(undefined);
       setFacilityRateId(undefined);
+      setUserOverrodeMHR(false);
+      setUserOverrodeLHR(false);
+      setReSelectMode(false);
     }
-  }, [editData, open, isLoadingHierarchy, isLoadingMHR, isLoadingLSR, mhrData, lsrData, existingProcesses]);
+  }, [editData, open, isLoadingHierarchy, isLoadingMHR, isLoadingLHR, mhrData, lhrData, existingProcesses]);
 
-  // Calculate total cost using MHR and LSR or default rates
-  useEffect(() => {
-    const cycleTimeNum = parseFloat(cycleTime as string) || 0;
-    const batchSizeNum = parseFloat(batchSize as string) || 0;
+  // Effective rates: dropdown selection → manual input → editData stored fallback
+  const effectiveMachineRate = selectedMHR
+    ? selectedMHR.calculations.totalMachineHourRate
+    : (typeof manualMhrRate === 'number' && manualMhrRate > 0 ? manualMhrRate : (Number(editData?.machineRate) || 0));
+  // For benchmark records lhr is already in USD (= lhrUsdEffective). For user records
+  // lhrUsdEffective is the correct USD value; fall back to lhr when it is missing.
+  const effectiveLaborRate = selectedLHR
+    ? (Number((selectedLHR as any).lhrUsdEffective) || Number((selectedLHR as any).lhr) || 0)
+    : (typeof manualLhrRate === 'number' && manualLhrRate > 0 ? manualLhrRate : (Number(editData?.laborRate) || 0));
+
+  // Derived — no extra re-render per keystroke
+  const totalCost = useMemo(() => {
+    const cycleTimeNum     = parseFloat(cycleTime     as string) || 0;
+    const batchSizeNum     = parseFloat(batchSize     as string) || 0;
     const partsPerCycleNum = parseFloat(partsPerCycle as string) || 0;
-    const setupManningNum = parseFloat(setupManning as string) || 0;
-    const setupTimeNum = parseFloat(setupTime as string) || 0;
-    const headsNum = parseFloat(heads as string) || 0;
-    const scrapNum = parseFloat(scrap as string) || 0;
-    
-    if (cycleTimeNum > 0 && batchSizeNum > 0 && partsPerCycleNum > 0) {
-      // Get rates - prefer live selection, then stored editData rates, then 0
-      const machineRate = selectedMHR
-        ? selectedMHR.calculations.totalMachineHourRate
-        : (editData?.machineRate || 0);
-      const labourRate = selectedLSR
-        ? selectedLSR.lhr
-        : (editData?.laborRate || 0);
+    const setupManningNum  = parseFloat(setupManning  as string) || 0;
+    const setupTimeNum     = parseFloat(setupTime     as string) || 0;
+    const headsNum         = parseFloat(heads         as string) || 0;
+    const scrapNum         = parseFloat(scrap         as string) || 0;
 
-      // Setup cost: both machine + labour amortised over batch (matches section formula)
-      const setupCostPerPart = ((setupTimeNum / 60) * (machineRate + labourRate * setupManningNum)) / Math.max(batchSizeNum, 1);
+    if (cycleTimeNum <= 0 || batchSizeNum <= 0 || partsPerCycleNum <= 0) return 0;
 
-      // Cycle cost
-      const cycleTimeHours = cycleTimeNum / 3600; // Convert seconds to hours
-      const labourCostPerCycle = cycleTimeHours * labourRate * headsNum;
-      const machineCostPerCycle = cycleTimeHours * machineRate;
-      const totalCycleCostPerPart = (labourCostPerCycle + machineCostPerCycle) / partsPerCycleNum;
+    const setupCostPerPart = ((setupTimeNum / 60) * (effectiveMachineRate + effectiveLaborRate * setupManningNum)) / Math.max(batchSizeNum, 1);
+    const cycleTimeHours   = cycleTimeNum / 3600;
+    const cycleCostPerPart = (cycleTimeHours * (effectiveMachineRate + effectiveLaborRate * headsNum)) / partsPerCycleNum;
+    const baseCost         = setupCostPerPart + cycleCostPerPart;
+    return Math.max(0, baseCost * (1 + scrapNum / 100));
+  }, [effectiveMachineRate, effectiveLaborRate, setupManning, setupTime, batchSize, heads, cycleTime, partsPerCycle, scrap]);
 
-      // Total before scrap
-      const baseCost = setupCostPerPart + totalCycleCostPerPart;
-
-      // Add scrap
-      const scrapCost = (baseCost * scrapNum) / 100;
-      const total = baseCost + scrapCost;
-
-      setTotalCost(Math.max(0, total));
-    } else {
-      setTotalCost(0);
-    }
-  }, [selectedMHR, selectedLSR, setupManning, setupTime, batchSize, heads, cycleTime, partsPerCycle, scrap]);
+  // Benchmark LHR/MHR records use synthetic IDs (e.g. "bm-USA-Sheet Metal") that are not
+  // UUIDs. The backend DTO validates @IsUUID() when the field is non-empty, so we must strip
+  // non-UUID IDs before submitting. The actual rates (machineRate/laborRate) are already
+  // included in the payload, so the row stays correct — it just won't have an FK reference.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const toUUID = (id: string) => (id && UUID_RE.test(id) ? id : undefined);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const cycleTimeNum = parseFloat(cycleTime as string) || 0;
     const batchSizeNum = parseFloat(batchSize as string) || 0;
-    
+
     if (cycleTimeNum <= 0) {
       alert('Please enter a valid Cycle Time (greater than 0)');
       return;
@@ -540,13 +619,13 @@ export function ProcessCostDialog({
       processRoute: selectedRoute,
       operation: selectedOperation,
       processCalculatorId: selectedProcessCalculatorId,
-      mhrId: selectedMHRId,
-      lsrId: selectedLSRId,
+      mhrId: toUUID(selectedMHRId),
+      lhrId: toUUID(selectedLHRId),
       machineName: selectedMHR?.machineName || '',
       operationName: selectedOperation || '',
       processRouteName: selectedRoute || '',
-      machineRate: selectedMHR?.calculations.totalMachineHourRate || editData?.machineRate || 0,
-      laborRate: selectedLSR?.lhr || editData?.laborRate || 0,
+      machineRate: effectiveMachineRate,
+      laborRate: effectiveLaborRate,
       setupManning: parseFloat(setupManning as string) || 0,
       setupTime: parseFloat(setupTime as string) || 0,
       batchSize: parseFloat(batchSize as string) || 0,
@@ -615,14 +694,14 @@ export function ProcessCostDialog({
               )}
 
               {/* Loading State */}
-              {!hasErrors && (isLoadingMHR || isLoadingLSR || isLoadingHierarchy || isLoadingCalculators) && (
+              {!hasErrors && (isLoadingMHR || isLoadingLHR || isLoadingHierarchy || isLoadingCalculators) && (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <span className="ml-2 text-muted-foreground">Loading data...</span>
                 </div>
               )}
 
-              {!hasErrors && !isLoadingMHR && !isLoadingLSR && !isLoadingHierarchy && !isLoadingCalculators && (
+              {!hasErrors && !isLoadingMHR && !isLoadingLHR && !isLoadingHierarchy && !isLoadingCalculators && (
                 <>
                   {/* HIERARCHICAL SECTION */}
                   <Card className="border-primary/50 bg-primary/5">
@@ -633,26 +712,42 @@ export function ProcessCostDialog({
                       {/* When editing a record with saved hierarchy values that don't exist in
                           calculator mappings, show them as read-only text to avoid confusing
                           "no routes" errors. The user can clear all three to re-pick. */}
-                      {editData && (selectedGroup || selectedRoute || selectedOperation) &&
-                        (!processGroups.includes(selectedGroup) || processRoutes.length === 0) && (
+                      {/* Loading state — editData present but effect hasn't fired yet */}
+                      {editData && !editDataApplied && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading process data…
+                        </div>
+                      )}
+
+                      {/* In edit mode, always show saved values as read-only text once loaded.
+                          Never try to match the saved route against the hierarchy — that causes
+                          false-positives when the DB has legacy underscore routes. The engineer
+                          must explicitly click "Re-select" to swap to the picker. */}
+                      {editData && editDataApplied && !reSelectMode && (selectedGroup || selectedRoute || selectedOperation) && (
                         <div className="rounded-md bg-muted/60 border p-3 space-y-2">
-                          <p className="text-xs text-muted-foreground font-medium">Saved process (from AI plan)</p>
+                          <p className="text-xs text-muted-foreground font-medium">Saved process</p>
                           {selectedGroup && <div className="text-sm"><span className="text-muted-foreground">Group: </span><span className="font-medium">{selectedGroup}</span></div>}
                           {selectedRoute && <div className="text-sm"><span className="text-muted-foreground">Route: </span><span className="font-medium">{selectedRoute}</span></div>}
                           {selectedOperation && <div className="text-sm"><span className="text-muted-foreground">Operation: </span><span className="font-medium">{selectedOperation}</span></div>}
                           <button
                             type="button"
                             className="text-xs text-primary underline"
-                            onClick={() => { setSelectedGroup(''); setSelectedRoute(''); setSelectedOperation(''); setSelectedProcessCalculatorId(''); }}
+                            onClick={() => {
+                              // Keep selectedGroup so the Route dropdown is immediately usable
+                              setSelectedRoute('');
+                              setSelectedOperation('');
+                              setSelectedProcessCalculatorId('');
+                              setReSelectMode(true);
+                            }}
                           >
                             Re-select from hierarchy
                           </button>
                         </div>
                       )}
 
-                      {/* Show full pickers only when creating, or when user clears to re-select */}
-                      {(!editData || (!selectedGroup && !selectedRoute && !selectedOperation) ||
-                        (processGroups.includes(selectedGroup) && processRoutes.length > 0)) && (
+                      {/* Full pickers: always for new entry; after Re-select (reSelectMode); or if all cleared */}
+                      {(!editData || reSelectMode || (!selectedGroup && !selectedRoute && !selectedOperation)) && (
                         <>
                       {/* 1. Group Selection */}
                       <div className="space-y-2">
@@ -793,17 +888,29 @@ export function ProcessCostDialog({
                       {/* Location Filter */}
                       <div className="space-y-2">
                         <Label>Location <span className="text-muted-foreground text-xs">(Optional)</span></Label>
-                        <Select value={location} onValueChange={setLocation}>
+                        <Select
+                          value={location || '__all__'}
+                          onValueChange={(v) => {
+                            setLocation(v === '__all__' ? '' : v);
+                            setSelectedMHRId('');
+                            setSelectedLHRId('');
+                          }}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="All locations" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">All locations</SelectItem>
-                            {locations.map((loc) => (
-                              <SelectItem key={loc} value={loc}>
-                                {loc}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="__all__">🌍 All locations</SelectItem>
+                            <SelectItem value="India">🇮🇳 India</SelectItem>
+                            <SelectItem value="USA">🇺🇸 USA</SelectItem>
+                            <SelectItem value="China">🇨🇳 China</SelectItem>
+                            <SelectItem value="Germany">🇩🇪 Germany</SelectItem>
+                            <SelectItem value="France">🇫🇷 France</SelectItem>
+                            <SelectItem value="W. Europe">🇪🇺 W. Europe</SelectItem>
+                            <SelectItem value="E. Europe">🇪🇺 E. Europe</SelectItem>
+                            <SelectItem value="UK">🇬🇧 UK</SelectItem>
+                            <SelectItem value="Vietnam">🇻🇳 Vietnam</SelectItem>
+                            <SelectItem value="Mexico">🇲🇽 Mexico</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -841,81 +948,174 @@ export function ProcessCostDialog({
                       {/* Machine (MHR) Selection */}
                       <div className="space-y-2">
                         <Label>Machine</Label>
-                        <Select value={selectedMHRId} onValueChange={setSelectedMHRId} required>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select machine" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {filteredMHR.map((mhr) => (
-                              <SelectItem key={mhr.id} value={mhr.id}>
-                                {mhr.machineName} - ₹{mhr.calculations.totalMachineHourRate.toFixed(2)}/hr
-                                {mhr.location ? ` (${mhr.location})` : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {filteredMHR.length > 0 ? (
+                          <>
+                          <Select value={selectedMHRId} onValueChange={(v) => { setSelectedMHRId(v); setUserOverrodeMHR(true); }}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select machine" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {filteredMHR.map((mhr: any) => (
+                                <SelectItem key={mhr.id} value={String(mhr.id)}>
+                                  {mhr.machineName} - ${mhr.calculations.totalMachineHourRate.toFixed(2)}/hr
+                                  {mhr.location ? ` (${mhr.location})` : ''}
+                                  {mhr.isBenchmark ? ' ★' : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {filteredMHR.some((r: any) => r.isBenchmark) && (
+                            <p className="text-xs text-muted-foreground">
+                              ★ Benchmark rates — add custom rates in HR Rates to override
+                            </p>
+                          )}
+                          </>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">$/hr</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={manualMhrRate}
+                                onChange={(e) => setManualMhrRate(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                                placeholder="Enter machine rate ($/hr)"
+                                className="flex-1"
+                              />
+                            </div>
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              No MHR records{location ? ` for ${location}` : ''}. Enter rate manually or add in HR Rates.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Labour (LSR) Selection */}
+                      {/* Labour (LHR) Selection */}
                       <div className="space-y-2">
                         <Label>Labour Type</Label>
-                        <Select
-                          value={selectedLSRId}
-                          onValueChange={setSelectedLSRId}
-                          required
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select labour type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {filteredLSR.map((lsr: any) => (
-                              <SelectItem key={lsr.id} value={String(lsr.id)}>
-                                {lsr.labourType} - ₹{lsr.lhr.toFixed(2)}/hr
-                                {lsr.location ? ` (${lsr.location})` : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {filteredLHR.length > 0 ? (
+                          <>
+                            <Select value={selectedLHRId} onValueChange={(v) => { setSelectedLHRId(v); setUserOverrodeLHR(true); }}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select labour type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {filteredLHR.map((lhrRecord: any) => {
+                                  const pg = lhrRecord.processGroup;
+                                  const lt = lhrRecord.labourType;
+                                  // Only append process group when it adds info (avoids "Sheet Metal Operator — Sheet Metal")
+                                  const showPg = pg && pg !== lt && !lt?.includes(pg);
+                                  const rate = Number(lhrRecord.lhrUsdEffective || lhrRecord.lhr).toFixed(2);
+                                  return (
+                                    <SelectItem key={String(lhrRecord.id)} value={String(lhrRecord.id)}>
+                                      {lt}{showPg ? ` — ${pg}` : ''} — ${rate}/hr
+                                      {lhrRecord.location ? ` (${lhrRecord.location})` : ''}
+                                      {lhrRecord.isBenchmark ? ' ★' : ''}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                            {filteredLHR.some((r: any) => r.isBenchmark) && (
+                              <p className="text-xs text-muted-foreground">
+                                ★ Benchmark rates — add custom rates in HR Rates to override
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">$/hr</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={manualLhrRate}
+                                onChange={(e) => setManualLhrRate(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                                placeholder="Enter labour rate ($/hr)"
+                                className="flex-1"
+                              />
+                            </div>
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              No LHR records{location ? ` for ${location}` : ''}. Enter rate manually or add in HR Rates.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
                 </>
               )}
 
-              {/* Rate Information */}
-              {selectedMHR && selectedLSR ? (
-                <Card className="bg-secondary/20">
-                  <CardHeader>
-                    <CardTitle className="text-sm">Selected Rates</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Machine Rate:</span>
-                      <span className="ml-2 font-bold">₹{selectedMHR.calculations.totalMachineHourRate.toFixed(2)}/hr</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Labour Rate:</span>
-                      <span className="ml-2 font-bold">₹{selectedLSR.lhr.toFixed(2)}/hr</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card className="bg-secondary/20">
-                  <CardHeader>
-                    <CardTitle className="text-sm">Selected Rates</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Machine Rate:</span>
-                      <span className="ml-2 font-bold">₹113.10/hr</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Labour Rate:</span>
-                      <span className="ml-2 font-bold">₹327.89/hr</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Rate Information — always shows effective rates being used for calculation */}
+              <Card className="bg-secondary/20">
+                <CardHeader>
+                  <CardTitle className="text-sm">Active Rates</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {/* Machine */}
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide">Machine (MHR)</span>
+                    {effectiveMachineRate > 0 ? (
+                      <>
+                        <span className="font-semibold">
+                          {selectedMHR
+                            ? selectedMHR.machineName
+                            : editData?.machineName
+                              ? editData.machineName
+                              : manualMhrRate
+                                ? 'Manual entry'
+                                : 'Stored (AI route)'}
+                          {selectedMHR?.location
+                            ? ` · ${selectedMHR.location}`
+                            : editData?.location
+                              ? ` · ${editData.location}`
+                              : location
+                                ? ` · ${location}`
+                                : ''}
+                        </span>
+                        <span className="text-primary font-bold">${effectiveMachineRate.toFixed(2)}/hr</span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground italic">Not set</span>
+                    )}
+                  </div>
+                  {/* Labour */}
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide">Labour (LHR)</span>
+                    {effectiveLaborRate > 0 ? (
+                      <>
+                        <span className="font-semibold">
+                          {selectedLHR
+                            ? (() => {
+                                const lt = (selectedLHR as any).labourType;
+                                const pg = (selectedLHR as any).processGroup;
+                                const showPg = pg && pg !== lt && !lt?.includes(pg);
+                                return `${lt}${showPg ? ` — ${pg}` : ''}`;
+                              })()
+                            : editData?.processGroup
+                              ? editData.processGroup
+                              : manualLhrRate
+                                ? 'Manual entry'
+                                : 'Stored (AI route)'}
+                          {selectedLHR
+                            ? ((selectedLHR as any).location ? ` · ${(selectedLHR as any).location}` : '')
+                            : editData?.location
+                              ? ` · ${editData.location}`
+                              : location
+                                ? ` · ${location}`
+                                : ''}
+                          {(selectedLHR as any)?.isBenchmark ? ' ★' : ''}
+                        </span>
+                        <span className="text-primary font-bold">${effectiveLaborRate.toFixed(2)}/hr</span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground italic">Not set</span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -1043,8 +1243,7 @@ export function ProcessCostDialog({
                 <CardContent className="pt-6">
                   <Label className="block mb-2">Total Cost</Label>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">INR</span>
-                    <span className="text-2xl font-bold text-primary">₹{totalCost.toFixed(2)}</span>
+                    <span className="text-2xl font-bold text-primary">{currencySymbol}{totalCost.toFixed(2)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1056,7 +1255,7 @@ export function ProcessCostDialog({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={cycleTime <= 0 || batchSize <= 0}
+                  disabled={Number(cycleTime) <= 0 || Number(batchSize) <= 0}
                 >
                   {editData ? 'Update Process' : 'Add Process'}
                 </Button>

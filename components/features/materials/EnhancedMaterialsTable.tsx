@@ -138,7 +138,7 @@ export function EnhancedMaterialsTable() {
   // Format currency
   const formatCurrency = (value?: number, unit = 'kg') => {
     if (!value) return '—';
-    return `₹${value.toFixed(2)}/${unit}`;
+    return `$${value.toFixed(2)}/${unit}`;
   };
 
   // Format decimal

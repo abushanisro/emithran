@@ -148,7 +148,7 @@ async function bootstrap() {
     .addTag('Projects')
     .addTag('Vendors')
     .addTag('MHR', 'Machine Hour Rate calculations')
-    .addTag('LSR', 'Labour Standard Rate database')
+    .addTag('LHR', 'Labour Hour Rate database')
     .addTag('Health')
     .build();
 

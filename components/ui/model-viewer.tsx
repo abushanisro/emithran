@@ -131,6 +131,7 @@ interface ModelViewerProps {
   faceMap?: FaceMapEntry[] | null;
   sheetThickness?: number;
   dfmOccurrenceScores?: Array<{ occurrenceIndex: number; riskLevel: string }>;
+  heatmapActive?: boolean;
   heatmapSources?: HeatmapSource[];
   heatmapNormalization?: HeatmapNormalization;
   onHeatmapInspect?: (worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void;
@@ -163,6 +164,7 @@ export function ModelViewer({
   faceMap,
   sheetThickness,
   dfmOccurrenceScores,
+  heatmapActive,
   heatmapSources,
   heatmapNormalization,
   onHeatmapInspect,
@@ -270,6 +272,7 @@ export function ModelViewer({
               {...(faceMap !== undefined ? { faceMap } : {})}
               {...(sheetThickness !== undefined ? { sheetThickness } : {})}
               {...(dfmOccurrenceScores !== undefined ? { dfmOccurrenceScores } : {})}
+              {...(heatmapActive !== undefined ? { heatmapActive } : {})}
               {...(heatmapSources !== undefined ? { heatmapSources } : {})}
               {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
@@ -404,6 +407,7 @@ export function ModelViewer({
               {...(faceMap !== undefined ? { faceMap } : {})}
               {...(sheetThickness !== undefined ? { sheetThickness } : {})}
               {...(dfmOccurrenceScores !== undefined ? { dfmOccurrenceScores } : {})}
+              {...(heatmapActive !== undefined ? { heatmapActive } : {})}
               {...(heatmapSources !== undefined ? { heatmapSources } : {})}
               {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}

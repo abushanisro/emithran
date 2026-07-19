@@ -244,18 +244,18 @@ export function ChildPartsSection({ bomItemId, bomId }: ChildPartsSectionProps) 
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right">
                         {part.makeBuy === 'buy'
-                          ? `₹${(part.unitCost || 0).toFixed(2)}`
-                          : `₹${((part.rawMaterialCost || 0) + (part.processCost || 0)).toFixed(2)}`
+                          ? `$${(part.unitCost || 0).toFixed(2)}`
+                          : `$${((part.rawMaterialCost || 0) + (part.processCost || 0)).toFixed(2)}`
                         }
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right">
                         {part.scrap}%
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right font-semibold text-primary">
-                        ₹{part.totalCost.toFixed(2)}
+                        ${part.totalCost.toFixed(2)}
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                        ₹{part.extendedCost.toFixed(2)}
+                        ${part.extendedCost.toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-2">
@@ -286,7 +286,7 @@ export function ChildPartsSection({ bomItemId, bomId }: ChildPartsSectionProps) 
                       Total Extended Cost:
                     </td>
                     <td className="p-3 border-r border-border text-xs text-right">
-                      ₹{calculateTotal()}
+                      ${calculateTotal()}
                     </td>
                     <td className="p-3"></td>
                   </tr>

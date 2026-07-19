@@ -9,6 +9,12 @@ import type {
   PartFamilyHint,
 } from '../dto/abstract-plan.dto';
 import type { RouteStep } from '../../manufacturing-knowledge/dto/kb.dto';
+import {
+  DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE, TAP_CYCLE_SEC,
+  classifyMaterialFamily, INSPECTION_SAMPLING_DEFAULT,
+} from '../../bom-items/costing/default-rates';
+import { computeCycleTime } from '../../bom-items/costing/injection-molding/cycle-time';
+import { CycleTimeLibraryService } from './cycle-time-library.service';
 
 /**
  * Builds an AbstractPlan deterministically from the routing template + candidate set.
@@ -32,6 +38,8 @@ import type { RouteStep } from '../../manufacturing-knowledge/dto/kb.dto';
 export class DeterministicPlannerService {
   private readonly logger = new Logger(DeterministicPlannerService.name);
 
+  constructor(private readonly ctLib: CycleTimeLibraryService) {}
+
   plan(brief: EngineeringBrief, candidates: CandidateSet): AbstractPlan {
     const template = brief.routingTemplate;
     if (!template) {
@@ -42,7 +50,7 @@ export class DeterministicPlannerService {
       throw new Error('No machine (MHR) candidates — add machine hour rate records to enable deterministic planning');
     }
     if (candidates.labour.length === 0) {
-      throw new Error('No labour (LSR) candidates — add labour hour rate records to enable deterministic planning');
+      throw new Error('No labour (LHR) candidates — add labour hour rate records to enable deterministic planning');
     }
 
     const proposedMasters: AbstractProposedMaster[] = [];
@@ -52,6 +60,10 @@ export class DeterministicPlannerService {
     let pmCounter = 0;
 
     const steps: RouteStep[] = [...(template.routing_sequence ?? [])].sort((a, b) => a.step - b.step);
+
+    // Pre-compute IM cycle phases once (Menges formula) — shared across all IM op steps.
+    // Lazy-evaluated to avoid import overhead for non-IM routes.
+    const imCycleCache: IMCycleCache = {};
 
     // What the route already covers — template steps first, merged ops appended.
     // mergeMandatoryOps dedups against this so rule-engine ops never duplicate steps.
@@ -97,17 +109,12 @@ export class DeterministicPlannerService {
         this.logger.debug(`[planner] Op ${step.step} "${step.process}" → no match, proposed master ${proposedMasterId}`);
       }
 
-      // Compute laser cycle time from geometry when cut_length is available
-      let cycleSec: number | undefined;
-      if (step.machine_type === 'laser_cut' && brief.dfm.cutLengthMm > 0) {
-        const pierces = brief.dfm.holeCount + brief.dfm.slotCount;
-        const pierceSec = pierces * 1.5;
-        // Use lookup-table speed if machine candidate carries it (P1 enhancement);
-        // fall back to 250 mm/sec = 15 m/min (6kW fiber laser, mild steel 2mm baseline).
-        const speedMmPerSec = (macCand as any).cuttingSpeedMmPerSec ?? 250;
-        const cutSec = brief.dfm.cutLengthMm / speedMmPerSec;
-        cycleSec = Math.max(10, Math.round((pierceSec + cutSec) * 1.25)); // +25% rapids
-      }
+      // Compute physics-based cycle time for each machine type.
+      // All physics ops are tagged timingSource = 'planner_physics' so the resolver
+      // promotes them above the geometry-heuristic tier.
+      const physicsResult = computePhysicsCycleSec(step.machine_type, step.process, brief, imCycleCache, this.ctLib);
+      const cycleSec    = physicsResult?.sec;
+      const timingSource = physicsResult ? 'planner_physics' : undefined;
 
       processLines.push({
         opNbr: step.step,
@@ -122,6 +129,7 @@ export class DeterministicPlannerService {
         partsPerCycle: 1,
         scrapPct: 3,
         cycleSec,
+        timingSource,
         reason: step.description || `${step.process} — Op ${step.step} per ${template.template_name}`,
       });
       coverage.push({ text: `${step.process} ${step.description ?? ''}`, machineType: step.machine_type });
@@ -479,6 +487,189 @@ function monthlyBatch(brief: EngineeringBrief): number {
   const annual = brief.bomItem.annualVolume ?? 0;
   return Math.max(10, Math.min(Math.round(annual / 12), 500));
 }
+
+// ── IM cycle-time cache ───────────────────────────────────────────────────────
+// Avoids re-running the Menges formula for every IM op in the same route.
+
+interface IMCycleCache {
+  fillSec?:  number;
+  packSec?:  number;
+  coolSec?:  number;
+  ejectSec?: number;
+}
+
+// ── Per-machine-type physics cycle-time dispatch ──────────────────────────────
+// Returns { sec } when physics can be computed from brief geometry, or null
+// to let the resolver fall back to its geometry heuristic / default tier.
+
+function computePhysicsCycleSec(
+  machineType: string,
+  stepProcess: string,
+  brief: EngineeringBrief,
+  imCache: IMCycleCache,
+  ctLib?: CycleTimeLibraryService,
+): { sec: number } | null {
+  const dfm = brief.dfm;
+  const mat = brief.bomItem.materialHint ?? null;
+  // DB-resolved material family (set by retrieval.service.ts before plan() is called).
+  // Falls back to the regex classifier for parts where DB lookup returned null.
+  const matFamily = brief.bomItem.materialFamily ?? classifyToSimpleFamily(mat);
+
+  switch (machineType) {
+
+    // ── Laser cutting — DB-backed speed + pierce time ─────────────────────────
+    // Speed source priority: (1) process_cycle_time_library by mat + thickness,
+    // (2) default-rates.ts LASER_SPEED_MM_PER_MIN × laserSpeedFactor (fallback).
+    case 'laser_cut': {
+      if (dfm.cutLengthMm <= 0) return null;
+      const pierces = dfm.holeCount + dfm.slotCount;
+      const thickMm = dfm.sheetThicknessMm > 0 ? dfm.sheetThicknessMm : 2;
+      const pierceSec = pierces * (ctLib ? ctLib.getLaserPierceSec(thickMm) : 0.5);
+      const speedMmPerMin = ctLib
+        ? ctLib.getLaserSpeed(matFamily, thickMm)
+        : 3000;
+      const cutSec = (dfm.cutLengthMm / speedMmPerMin) * 60;
+      return { sec: Math.max(10, Math.round((pierceSec + cutSec) * 1.25)) };
+    }
+
+    // ── Press brake — DB-backed seconds-per-bend ──────────────────────────────
+    case 'press_brake': {
+      if (dfm.bendCount <= 0) return null;
+      const thickMm = dfm.sheetThicknessMm > 0 ? dfm.sheetThicknessMm : 2;
+      const secPerBend = ctLib ? ctLib.getBrakeSecPerBend(thickMm) : 15;
+      return { sec: Math.max(10, dfm.bendCount * secPerBend) };
+    }
+
+    // ── Deburring / bench manual ──────────────────────────────────────────────
+    case 'bench_manual': {
+      const isTap = /tap|thread/i.test(stepProcess);
+      if (isTap) return null; // tapping handled separately below
+      const edgeSec  = dfm.cutLengthMm > 0 ? (dfm.cutLengthMm / 1000) * DEBURR_SEC_PER_METRE : 30;
+      const pierceSec = dfm.holeCount * DEBURR_SEC_PER_PIERCE;
+      return { sec: Math.max(15, Math.round(edgeSec + pierceSec)) };
+    }
+
+    // ── CNC milling — DB-backed MRR (mm³/min) ────────────────────────────────
+    // MRR source priority: (1) process_cycle_time_library rough-pass value,
+    // (2) hardcoded baseline in CycleTimeLibraryService.getCncMrr fallback.
+    case 'cnc_mill': {
+      const bb    = dfm.boundingBox;
+      const bbVol = bb ? (bb.lengthMm * bb.widthMm * bb.heightMm) : 0;
+      if (bbVol <= 0 || dfm.volumeMm3 <= 0) return null;
+      const fillRatio = Math.min(0.95, Math.max(0.05, dfm.volumeMm3 / bbVol));
+      const removeVol = bbVol * (1 - fillRatio);
+      const mrrMm3PerMin = ctLib
+        ? (ctLib.getCncMrr('mill', matFamily) ?? 8000)
+        : (classifyMaterialFamily(mat) === 'aluminum' ? 50000 : classifyMaterialFamily(mat) === 'stainless' ? 5000 : 12000);
+      const machMin = removeVol / mrrMm3PerMin;
+      return { sec: Math.max(30, Math.round((machMin * 1.35 + 30) * 60)) }; // 35% overhead + 30min setup
+    }
+
+    // ── CNC turning — DB-backed MRR (mm³/min) ────────────────────────────────
+    case 'cnc_lathe': {
+      const bb    = dfm.boundingBox;
+      const bbVol = bb ? (bb.lengthMm * bb.widthMm * bb.heightMm) : 0;
+      if (bbVol <= 0 || dfm.volumeMm3 <= 0) return null;
+      const fillRatio = Math.min(0.95, Math.max(0.05, dfm.volumeMm3 / bbVol));
+      const removeVol = bbVol * (1 - fillRatio);
+      const mrrMm3PerMin = ctLib
+        ? (ctLib.getCncMrr('turn', matFamily) ?? 12000)
+        : (classifyMaterialFamily(mat) === 'aluminum' ? 70000 : classifyMaterialFamily(mat) === 'stainless' ? 7000 : 18000);
+      const machMin = removeVol / mrrMm3PerMin;
+      return { sec: Math.max(30, Math.round((machMin * 1.25 + 20) * 60)) }; // 25% overhead + 20min setup
+    }
+
+    // ── CMM / first-article inspection ────────────────────────────────────────
+    case 'cmm':
+    case 'inspection_bench': {
+      const isFai = /first.*art|fai|dimension.*insp|cmm/i.test(stepProcess);
+      if (isFai) return { sec: 300 }; // 5 min FAI: program recall + datum alignment + measure
+      // In-process visual / go-no-go check — 2 min per part
+      void INSPECTION_SAMPLING_DEFAULT; // referenced to prevent unused import
+      return { sec: 120 };
+    }
+
+    // ── Cleaning / wash ───────────────────────────────────────────────────────
+    case 'cleaning': {
+      return { sec: 120 }; // 2 min takt: ultrasonic or solvent wipe
+    }
+
+    // ── Surface treatment (anodize, powder coat, zinc plate) ──────────────────
+    case 'surface_treatment': {
+      const areaMm2 = dfm.surfaceAreaMm2 > 0 ? dfm.surfaceAreaMm2 : 5000;
+      const areaM2  = areaMm2 / 1e6;
+      // Anodize rack: 300 s/m² treatment contact time (immersion + rinse cycles)
+      return { sec: Math.max(60, Math.round(areaM2 * 300 + 60)) };
+    }
+
+    // ── IM — individual phase ops ─────────────────────────────────────────────
+    case 'injection': {
+      if (!imCache.fillSec) populateIMCache(imCache, dfm, mat);
+      return imCache.fillSec != null ? { sec: Math.max(1, imCache.fillSec) } : null;
+    }
+    case 'packing_holding':
+    case 'pack': {
+      if (!imCache.packSec) populateIMCache(imCache, dfm, mat);
+      return imCache.packSec != null ? { sec: Math.max(2, imCache.packSec) } : null;
+    }
+    case 'cooling': {
+      if (!imCache.coolSec) populateIMCache(imCache, dfm, mat);
+      return imCache.coolSec != null ? { sec: Math.max(3, imCache.coolSec) } : null;
+    }
+    case 'ejection': {
+      return { sec: 3 }; // mold open + ejector stroke + part drop
+    }
+    case 'mold_setup': {
+      return { sec: 3600 }; // 60 min mold change + purge + first-shot setup
+    }
+
+    default: {
+      // Tapping — check if this step is a tap op even if machineType is cnc_mill/cnc_lathe
+      if (/\btap|thread/i.test(stepProcess)) {
+        // Default to M6 if no specific size detected (TAP_CYCLE_SEC is per-hole)
+        const mSizeHit = stepProcess.match(/\bM(\d+)/i)?.[1];
+        const mKey = mSizeHit ? `M${mSizeHit}` : 'M6';
+        const secPerHole = TAP_CYCLE_SEC[mKey] ?? 10;
+        const holeCount  = dfm.holeCount > 0 ? dfm.holeCount : 1;
+        return { sec: Math.max(5, secPerHole * holeCount) };
+      }
+      return null;
+    }
+  }
+}
+
+// Populates IM cache once per plan call using Menges formula
+function populateIMCache(cache: IMCycleCache, dfm: EngineeringBrief['dfm'], mat: string | null): void {
+  // sheetThicknessMm is repurposed as wall thickness proxy for IM parts (the CAD engine
+  // sets it from the uniform-wall analysis). Fall back to 2.5mm (typical consumer plastic).
+  const wallMm   = dfm.sheetThicknessMm > 0 ? dfm.sheetThicknessMm : 2.5;
+  const bb       = dfm.boundingBox;
+  if (!bb) return;
+  const dims     = [bb.lengthMm, bb.widthMm, bb.heightMm].filter((d) => d > 0).sort((a, b) => b - a);
+  if (dims.length < 2) return;
+  const result = computeCycleTime({
+    wallMm,
+    longestBboxMm:  dims[0],
+    bboxMidMm:      dims[1],
+    volumeMm3:      dfm.volumeMm3,
+    projectedAreaMm2: null,
+    grade: mat,
+  });
+  cache.fillSec  = result.fillSec;
+  cache.packSec  = result.packSec;
+  cache.coolSec  = result.coolSec;
+  cache.ejectSec = result.ejectSec;
+}
+
+/**
+ * Maps the DB `material_family` value (from raw_materials.material_family) or
+ * falls back to the classifyMaterialFamily() regex classifier when materialFamily
+ * is null. Used to pick the correct MRR and laser-speed band.
+ */
+function classifyToSimpleFamily(mat: string | null | undefined): string {
+  return classifyMaterialFamily(mat);
+}
+
 
 function machineTypeForFeatureType(featureType: string, family: string): string | null {
   switch (featureType) {

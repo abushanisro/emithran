@@ -13,9 +13,12 @@ import {
 
 interface ProcuredPartsSectionProps {
   bomItemId: string;
+  compact?: boolean;
+  currencySymbol?: string; // e.g. '₹', '$', '€' — default '$'
+  conversionRate?: number; // multiply stored USD values by this to get factory currency — default 1
 }
 
-export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
+export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$', conversionRate = 1 }: ProcuredPartsSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItemId, setEditItemId] = useState<string | null>(null);
 
@@ -95,6 +98,62 @@ export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
     return procuredParts.reduce((sum, p) => sum + computePartCost(p), 0).toFixed(2);
   };
 
+  if (compact) {
+    return (
+      <div>
+        <div className="divide-y divide-border">
+          {isLoading ? (
+            <div className="px-3 py-3 text-center text-xs text-muted-foreground">Loading…</div>
+          ) : procuredParts.length === 0 ? (
+            <div className="px-3 py-3 text-center">
+              <p className="text-xs text-muted-foreground">No procured parts</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">Add bought-in components with unit cost, quantity, and overhead</p>
+            </div>
+          ) : (
+            <>
+              {procuredParts.map((part) => (
+                <div key={part.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{part.partName}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      qty {part.quantity} · {currencySymbol}{(part.unitCost * conversionRate).toFixed(2)}/ea
+                      {part.scrapPercentage ? ` · ${part.scrapPercentage}% scrap` : ''}
+                      {part.overheadPercentage ? ` · ${part.overheadPercentage}% OH` : ''}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold tabular-nums shrink-0">{currencySymbol}{(computePartCost(part) * conversionRate).toFixed(4)}</span>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleEditProcuredPart(part.id)} title="Edit">
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive hover:text-destructive" onClick={() => handleDeleteProcuredPart(part.id)} title="Delete">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between items-center px-3 py-1.5 bg-muted/20">
+                <span className="text-[11px] font-semibold text-muted-foreground">Total</span>
+                <span className="text-xs font-bold tabular-nums">{currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}</span>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="px-3 pt-2 pb-1">
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAddProcuredPart}>
+            <Plus className="h-3 w-3 mr-1" /> Add Procured Part
+          </Button>
+        </div>
+        <ProcuredPartDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSubmit={handleDialogSubmit}
+          editData={editItem ? { ...editItem, part: editItem.partName, noOff: editItem.quantity } : null}
+        />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
@@ -122,7 +181,7 @@ export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
                   Part
                 </th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
-                  Unit Cost (₹)
+                  Unit Cost ($)
                 </th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
                   Quantity
@@ -134,7 +193,7 @@ export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
                   Overhead %
                 </th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
-                  Total Cost (₹)
+                  Total Cost ($)
                 </th>
                 <th className="p-3 text-center text-xs font-semibold">
                   Actions
@@ -157,7 +216,7 @@ export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
                         {part.partName}
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right">
-                        ₹{part.unitCost.toFixed(2)}
+                        {currencySymbol}{(part.unitCost * conversionRate).toFixed(2)}
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right">
                         {part.quantity}
@@ -169,7 +228,7 @@ export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
                         {part.overheadPercentage}%
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                        ₹{computePartCost(part).toFixed(2)}
+                        {currencySymbol}{(computePartCost(part) * conversionRate).toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-2">
@@ -200,7 +259,7 @@ export function ProcuredPartsSection({ bomItemId }: ProcuredPartsSectionProps) {
                       Total:
                     </td>
                     <td className="p-3 border-r border-border text-xs text-right">
-                      ₹{calculateTotal()}
+                      {currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}
                     </td>
                     <td className="p-3"></td>
                   </tr>

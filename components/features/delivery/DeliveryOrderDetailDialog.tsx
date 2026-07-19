@@ -313,7 +313,7 @@ export const DeliveryOrderDetailDialog: React.FC<DeliveryOrderDetailDialogProps>
                           )}
                           {item.totalValueInr && (
                             <p className="text-sm text-success font-medium">
-                              ₹{item.totalValueInr.toLocaleString()}
+                              ${item.totalValueInr.toLocaleString()}
                             </p>
                           )}
                         </div>
@@ -480,25 +480,25 @@ export const DeliveryOrderDetailDialog: React.FC<DeliveryOrderDetailDialogProps>
                     {(order.deliveryCostInr !== null && order.deliveryCostInr !== undefined) && (
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Delivery Cost:</span>
-                        <span className="text-sm text-foreground">₹{order.deliveryCostInr.toLocaleString()}</span>
+                        <span className="text-sm text-foreground">${order.deliveryCostInr.toLocaleString()}</span>
                       </div>
                     )}
                     {(order.insuranceCostInr !== null && order.insuranceCostInr !== undefined) && (
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Insurance Cost:</span>
-                        <span className="text-sm text-foreground">₹{order.insuranceCostInr.toLocaleString()}</span>
+                        <span className="text-sm text-foreground">${order.insuranceCostInr.toLocaleString()}</span>
                       </div>
                     )}
                     {(order.handlingCostInr !== null && order.handlingCostInr !== undefined) && (
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Handling Cost:</span>
-                        <span className="text-sm text-foreground">₹{order.handlingCostInr.toLocaleString()}</span>
+                        <span className="text-sm text-foreground">${order.handlingCostInr.toLocaleString()}</span>
                       </div>
                     )}
                     {(order.totalDeliveryCostInr !== null && order.totalDeliveryCostInr !== undefined) && (
                       <div className="flex justify-between font-medium pt-2 border-t">
                         <span className="text-foreground">Total Cost:</span>
-                        <span className="text-foreground">₹{order.totalDeliveryCostInr.toLocaleString()}</span>
+                        <span className="text-foreground">${order.totalDeliveryCostInr.toLocaleString()}</span>
                       </div>
                     )}
                     {(order.deliveryCostInr === null || order.deliveryCostInr === undefined) &&
@@ -592,19 +592,19 @@ export const DeliveryOrderDetailDialog: React.FC<DeliveryOrderDetailDialogProps>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {order.transportCostInr && (
                         <div className="text-center">
-                          <p className="text-lg font-bold text-primary">₹{order.transportCostInr.toLocaleString()}</p>
+                          <p className="text-lg font-bold text-primary">${order.transportCostInr.toLocaleString()}</p>
                           <p className="text-sm text-muted-foreground">Transport Base</p>
                         </div>
                       )}
                       {order.loadingCostInr && (
                         <div className="text-center">
-                          <p className="text-lg font-bold text-warning">₹{order.loadingCostInr.toLocaleString()}</p>
+                          <p className="text-lg font-bold text-warning">${order.loadingCostInr.toLocaleString()}</p>
                           <p className="text-sm text-muted-foreground">Loading/Unloading</p>
                         </div>
                       )}
                       {order.fuelTollCostInr && (
                         <div className="text-center">
-                          <p className="text-lg font-bold text-success">₹{order.fuelTollCostInr.toLocaleString()}</p>
+                          <p className="text-lg font-bold text-success">${order.fuelTollCostInr.toLocaleString()}</p>
                           <p className="text-sm text-muted-foreground">Fuel & Toll Surcharge</p>
                         </div>
                       )}

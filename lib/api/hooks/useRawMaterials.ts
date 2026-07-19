@@ -58,6 +58,9 @@ export interface RawMaterial {
   stockForm?: string;
   matlState?: string;
   country?: Country;
+  hardness?: number;
+  hardnessSystem?: string;
+  cutCode?: number;
 
   // Plastic-specific properties
   regrinding?: string;
@@ -290,6 +293,7 @@ export function useUploadRawMaterialsExcel() {
         created: number;
         failed: number;
         errors?: any[];
+        dataWarnings?: string[];
       }>('/raw-materials/upload-excel', formData, {
         timeout: 300000, // 5 minutes timeout
       });
@@ -324,6 +328,11 @@ export function useUploadRawMaterialsExcel() {
         toast.error(
           `Upload completed: ${data.created} created, ${data.failed} failed.\n${errorMsg}\nCheck browser console (F12) for full details.`,
           { duration: 10000 }
+        );
+      } else if (data.dataWarnings && data.dataWarnings.length > 0) {
+        toast.warning(
+          `Imported ${data.created} materials. ${data.dataWarnings.length} rows have missing density or cost — check your Excel source.\nFirst: ${data.dataWarnings[0]}`,
+          { duration: 12000 }
         );
       } else {
         toast.success(`Successfully imported ${data.created} materials`);

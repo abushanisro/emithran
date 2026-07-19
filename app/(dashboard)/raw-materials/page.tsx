@@ -82,8 +82,8 @@ export default function RawMaterialsPage() {
   const [editingMaterial, setEditingMaterial] = useState<RawMaterial | null>(null);
   const [visibleSections, setVisibleSections] = useState({
     basic: true,
-    properties: false,
-    standards: false,
+    properties: true,
+    standards: true,
   });
   const [costRegion, setCostRegion] = useState<'india' | 'usa' | 'china' | 'france' | 'germany' | 'w_europe' | 'e_europe'>('india');
   const [subTypeFilter, setSubTypeFilter] = useState('');
@@ -1137,7 +1137,7 @@ export default function RawMaterialsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
-                    Unit Cost ({CURRENCY_SYMBOLS[newMaterial.currency] || '₹'})
+                    Unit Cost ({CURRENCY_SYMBOLS[newMaterial.currency] || '$'})
                   </label>
                   <input
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1248,15 +1248,15 @@ export default function RawMaterialsPage() {
                 <TableHeader className="sticky top-0 z-30">
                   <TableRow className="bg-card hover:bg-card border-b-2 border-border">
                     {/* Always Visible - Sticky Basic Info */}
-                    <TableHead className="cursor-pointer h-10 px-2 text-xs sticky left-0 bg-card z-20 min-w-[72px] w-[72px] border-r-2 border-border shadow-lg" onClick={() => toggleSort('material_group')}>
+                    <TableHead className="cursor-pointer h-10 px-2 text-xs sticky left-0 bg-card z-20 min-w-[72px] w-[72px] border-r-2 border-border shadow-lg" onClick={() => toggleSort('material_type')}>
                       <div className="flex items-center font-semibold">
-                        Group
-                        <SortIcon column="material_group" />
+                        Material
+                        <SortIcon column="material_type" />
                       </div>
                     </TableHead>
                     <TableHead className="cursor-pointer h-10 px-2 text-xs sticky left-[72px] bg-card z-20 min-w-[90px] w-[90px] max-w-[90px] border-r-2 border-border shadow-lg" onClick={() => toggleSort('material')}>
                       <div className="flex items-center font-semibold">
-                        Material
+                        Grade
                         <SortIcon column="material" />
                       </div>
                     </TableHead>
@@ -1264,9 +1264,8 @@ export default function RawMaterialsPage() {
                     {/* Conditional Basic Info Columns */}
                     {activeContainer === 'ferrous-non-ferrous' && visibleSections.basic && (
                       <>
-                        <TableHead className="h-10 px-1 text-xs min-w-[52px] w-[52px] max-w-[52px]">Type</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[52px] w-[52px] max-w-[52px]">State</TableHead>
                         <TableHead className="h-10 px-1 text-xs min-w-[56px] w-[56px] max-w-[56px]">Form</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px] max-w-[48px]">Grade</TableHead>
                       </>
                     )}
 
@@ -1296,6 +1295,12 @@ export default function RawMaterialsPage() {
                             <div className="text-[9px] text-muted-foreground">MPa</div>
                           </div>
                         </TableHead>
+                        <TableHead className="h-10 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[46px] w-[46px]">
+                          <div className="leading-tight">
+                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">Hard.</div>
+                            <div className="text-[9px] text-muted-foreground">HB/HRC</div>
+                          </div>
+                        </TableHead>
                       </>
                     )}
 
@@ -1322,6 +1327,12 @@ export default function RawMaterialsPage() {
                     {activeContainer === 'plastic-rubber' && (
                       <>
                         <TableHead className="h-10 px-1 text-xs min-w-[46px] w-[46px]">Shape</TableHead>
+                        <TableHead className="h-10 px-1 text-xs min-w-[52px] w-[52px]">
+                          <div className="leading-tight">
+                            <div className="text-[10px]">Hard.</div>
+                            <div className="text-[9px] text-muted-foreground">HB/HRC</div>
+                          </div>
+                        </TableHead>
                         <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px]">Regrind</TableHead>
                         <TableHead className="h-10 px-1 text-xs min-w-[42px] w-[42px]">Rgrd%</TableHead>
                         <TableHead className="h-10 px-1 text-xs min-w-[50px] w-[50px]">Clamp</TableHead>
@@ -1391,13 +1402,10 @@ export default function RawMaterialsPage() {
                         {activeContainer === 'ferrous-non-ferrous' && visibleSections.basic && (
                           <>
                             <TableCell className="px-1 py-2 min-w-[52px] w-[52px] max-w-[52px] overflow-hidden">
-                              <div className="truncate text-[10px] max-w-full" title={material.materialType || ''}>{material.materialType || '-'}</div>
+                              <div className="truncate text-[10px] max-w-full" title={material.matlState || ''}>{material.matlState || '-'}</div>
                             </TableCell>
                             <TableCell className="px-1 py-2 min-w-[56px] w-[56px] max-w-[56px] overflow-hidden">
                               <div className="truncate text-[10px] max-w-full" title={material.stockForm || ''}>{material.stockForm || '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 min-w-[48px] w-[48px] max-w-[48px] overflow-hidden">
-                              <div className="truncate text-[10px] max-w-full" title={material.materialGrade || ''}>{material.materialGrade || '-'}</div>
                             </TableCell>
                           </>
                         )}
@@ -1405,7 +1413,10 @@ export default function RawMaterialsPage() {
                         {activeContainer === 'ferrous-non-ferrous' && visibleSections.properties && (
                           <>
                             <TableCell className="px-1 py-2 text-center border-l-4 border-indigo-400/30 bg-indigo-50/20 min-w-[46px] w-[46px]">
-                              <div className="text-[10px] font-mono">{material.density ? material.density.toFixed(2) : '-'}</div>
+                              {(() => {
+                                const d = material.density ?? (material.densityKgM3 ? material.densityKgM3 / 1000 : null);
+                                return <div className="text-[10px] font-mono">{d ? d.toFixed(2) : '-'}</div>;
+                              })()}
                             </TableCell>
                             <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[42px] w-[42px]">
                               <div className="text-[10px] font-mono">{material.ultimateTensileStrength ? material.ultimateTensileStrength.toFixed(0) : '-'}</div>
@@ -1415,6 +1426,14 @@ export default function RawMaterialsPage() {
                             </TableCell>
                             <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[42px] w-[42px]">
                               <div className="text-[10px] font-mono">{material.shearingStrength ? material.shearingStrength.toFixed(0) : '-'}</div>
+                            </TableCell>
+                            <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[46px] w-[46px]">
+                              {material.hardness ? (
+                                <span className="text-[10px] font-mono" title={material.hardnessSystem || ''}>
+                                  {material.hardness.toFixed(0)}
+                                  {material.hardnessSystem ? <span className="text-[9px] text-muted-foreground ml-0.5">{material.hardnessSystem.slice(0, 3)}</span> : null}
+                                </span>
+                              ) : <span className="text-[10px]">-</span>}
                             </TableCell>
                           </>
                         )}
@@ -1441,6 +1460,14 @@ export default function RawMaterialsPage() {
                             <TableCell className="px-1 py-2 min-w-[46px] w-[46px]">
                               {renderShapeDisplay(material)}
                             </TableCell>
+                            <TableCell className="px-1 py-2 text-right min-w-[52px] w-[52px]">
+                              {material.hardness ? (
+                                <span className="text-[10px] font-mono" title={material.hardnessSystem || ''}>
+                                  {material.hardness.toFixed(0)}
+                                  {material.hardnessSystem ? <span className="text-[9px] text-muted-foreground ml-0.5">{material.hardnessSystem.slice(0, 3)}</span> : null}
+                                </span>
+                              ) : '-'}
+                            </TableCell>
                             <TableCell className="px-1 py-2 min-w-[48px] w-[48px]">
                               {material.regrinding === 'Yes' ? (
                                 <Badge variant="default" className="bg-green-600 text-[9px] px-1 py-0 h-4">Yes</Badge>
@@ -1466,7 +1493,10 @@ export default function RawMaterialsPage() {
                               {material.moldTempC?.toFixed(0) || '-'}
                             </TableCell>
                             <TableCell className="text-right px-1 py-2 text-[10px] min-w-[48px] w-[48px]">
-                              {material.densityKgM3?.toFixed(0) || '-'}
+                              {(() => {
+                                const d = material.densityKgM3 ?? (material.density ? Math.round(material.density * 1000) : null);
+                                return d ? String(d) : '-';
+                              })()}
                             </TableCell>
                             <TableCell className="text-right px-1 py-2 text-[10px] min-w-[48px] w-[48px]">
                               {material.specificHeatMelt?.toFixed(2) || '-'}

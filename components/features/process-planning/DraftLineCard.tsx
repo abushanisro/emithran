@@ -26,7 +26,7 @@ const EDITABLE_FIELDS_BY_KIND: Record<DraftLineKind, Array<{ path: string; label
     { path: 'netUsage', label: 'Net usage (kg)', type: 'number' },
     { path: 'scrapPercentage', label: 'Scrap %', type: 'number' },
     { path: 'overheadPercentage', label: 'Overhead %', type: 'number' },
-    { path: 'unitCost', label: '₹/kg', type: 'number' },
+    { path: 'unitCost', label: '$/kg', type: 'number' },
   ],
   process: [
     { path: 'opNbr', label: 'Op #', type: 'number' },
@@ -39,19 +39,19 @@ const EDITABLE_FIELDS_BY_KIND: Record<DraftLineKind, Array<{ path: string; label
   ],
   tooling: [
     { path: 'description', label: 'Description', type: 'string' },
-    { path: 'unitCost', label: 'Unit cost (₹)', type: 'number' },
+    { path: 'unitCost', label: 'Unit cost ($)', type: 'number' },
     { path: 'quantity', label: 'Qty', type: 'number' },
     { path: 'amortizationParts', label: 'Amort. parts', type: 'number' },
     { path: 'usagePercentage', label: 'Usage %', type: 'number' },
   ],
   logistics: [
     { path: 'costName', label: 'Cost name', type: 'string' },
-    { path: 'unitCost', label: 'Unit cost (₹)', type: 'number' },
+    { path: 'unitCost', label: 'Unit cost ($)', type: 'number' },
     { path: 'quantity', label: 'Qty', type: 'number' },
   ],
   procured_part: [
     { path: 'partName', label: 'Part name', type: 'string' },
-    { path: 'unitCost', label: 'Unit cost (₹)', type: 'number' },
+    { path: 'unitCost', label: 'Unit cost ($)', type: 'number' },
     { path: 'quantity', label: 'Qty', type: 'number' },
     { path: 'scrapPercentage', label: 'Scrap %', type: 'number' },
   ],
@@ -128,7 +128,7 @@ function RawMaterialBreakdown({ d }: { d: Record<string, any> }) {
       {d.materialGrade && d.materialGrade !== d.materialName && (
         <BRow label="Grade" value={d.materialGrade} source="db" />
       )}
-      <BRow label="Unit cost (from DB)" value={`₹${unitCost.toFixed(2)}/kg`} source="db" />
+      <BRow label="Unit cost (from DB)" value={`$${unitCost.toFixed(2)}/kg`} source="db" />
       <Divider />
       <BRow
         label="Net usage"
@@ -144,24 +144,24 @@ function RawMaterialBreakdown({ d }: { d: Record<string, any> }) {
       <Divider />
       <BRow
         label="Material cost"
-        value={`₹${materialCost.toFixed(4)}`}
-        sub={`= ${gross.toFixed(4)} kg × ₹${unitCost.toFixed(2)}/kg`}
+        value={`$${materialCost.toFixed(4)}`}
+        sub={`= ${gross.toFixed(4)} kg × $${unitCost.toFixed(2)}/kg`}
         source="formula"
       />
       <BRow
         label={`Overhead (${overhead}%)`}
-        value={`₹${overheadAmt.toFixed(4)}`}
-        sub={`= ₹${materialCost.toFixed(4)} × ${overhead}%`}
+        value={`$${overheadAmt.toFixed(4)}`}
+        sub={`= $${materialCost.toFixed(4)} × ${overhead}%`}
         source="formula"
       />
-      <BRow label="Total per part" value={`₹${total.toFixed(4)}`} highlight />
+      <BRow label="Total per part" value={`$${total.toFixed(4)}`} highlight />
     </div>
   );
 }
 
 function ProcessBreakdown({ d }: { d: Record<string, any> }) {
-  const machineRate = Number(d.machineRate ?? 0);   // ₹/hr — from MHR DB
-  const labourRate  = Number(d.labourRate ?? 0);    // ₹/hr — from LHR DB
+  const machineRate = Number(d.machineRate ?? 0);   // $/hr — from MHR DB
+  const labourRate  = Number(d.labourRate ?? 0);    // $/hr — from LHR DB
   const setupMin    = Number(d.setupTimeMinutes ?? 0);
   const cycleSec    = Number(d.cycleTimeSeconds ?? 0);
   const batch       = Number(d.batchSize ?? 1);
@@ -203,9 +203,9 @@ function ProcessBreakdown({ d }: { d: Record<string, any> }) {
       <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Cost Breakdown</p>
 
       {/* Master rates from DB */}
-      <BRow label={`MHR — ${d.machineName ?? 'machine'}`} value={`₹${machineRate.toFixed(2)}/hr`} source="db" />
-      <BRow label={`LHR — ${d.labourType ?? 'labour'}`} value={`₹${labourRate.toFixed(2)}/hr`} source="db" />
-      <BRow label="Direct rate (MHR + LHR×heads)" value={`₹${directRate.toFixed(2)}/hr`} source="formula" />
+      <BRow label={`MHR — ${d.machineName ?? 'machine'}`} value={`$${machineRate.toFixed(2)}/hr`} source="db" />
+      <BRow label={`LHR — ${d.labourType ?? 'labour'}`} value={`$${labourRate.toFixed(2)}/hr`} source="db" />
+      <BRow label="Direct rate (MHR + LHR×heads)" value={`$${directRate.toFixed(2)}/hr`} source="formula" />
       <BRow label="Timing source" value={timingLabel} source={timingSourceIcon} />
 
       <Divider />
@@ -214,11 +214,11 @@ function ProcessBreakdown({ d }: { d: Record<string, any> }) {
       <p className="text-[9px] text-muted-foreground font-medium mt-1">Setup cost / part</p>
       <BRow label="Setup time" value={`${setupMin} min = ${setupHrs.toFixed(4)} hr`} />
       <BRow label="Manning" value={`${manning} operator(s)`} />
-      <BRow label="Combined setup rate" value={`₹${machineRate.toFixed(2)} + ₹${labourRate.toFixed(2)} × ${manning} = ₹${combinedSetup.toFixed(2)}/hr`} source="formula" />
-      <BRow label="Setup cost (total)" value={`${setupHrs.toFixed(4)} hr × ₹${combinedSetup.toFixed(2)} = ₹${setupTotal.toFixed(4)}`} source="formula" />
+      <BRow label="Combined setup rate" value={`$${machineRate.toFixed(2)} + $${labourRate.toFixed(2)} × ${manning} = $${combinedSetup.toFixed(2)}/hr`} source="formula" />
+      <BRow label="Setup cost (total)" value={`${setupHrs.toFixed(4)} hr × $${combinedSetup.toFixed(2)} = $${setupTotal.toFixed(4)}`} source="formula" />
       <BRow
         label={`Amortised over batch (${batch} pcs)`}
-        value={`₹${setupTotal.toFixed(4)} ÷ ${batch} = ₹${setupPerPart.toFixed(4)}/part`}
+        value={`$${setupTotal.toFixed(4)} ÷ ${batch} = $${setupPerPart.toFixed(4)}/part`}
         source="formula"
       />
 
@@ -229,30 +229,30 @@ function ProcessBreakdown({ d }: { d: Record<string, any> }) {
       <BRow label="Cycle time" value={`${cycleSec} s = ${cycleHrs.toFixed(6)} hr`} />
       <BRow label="Heads" value={`${heads} operator(s)`} />
       <BRow label="Parts per cycle" value={`${ppc}`} />
-      <BRow label="Combined cycle rate" value={`₹${machineRate.toFixed(2)} + ₹${labourRate.toFixed(2)} × ${heads} = ₹${combinedCycle.toFixed(2)}/hr`} source="formula" />
+      <BRow label="Combined cycle rate" value={`$${machineRate.toFixed(2)} + $${labourRate.toFixed(2)} × ${heads} = $${combinedCycle.toFixed(2)}/hr`} source="formula" />
       <BRow
         label="Cycle cost / part"
-        value={`(${cycleHrs.toFixed(6)} × ₹${combinedCycle.toFixed(2)}) ÷ ${ppc} = ₹${cyclePerPart.toFixed(4)}`}
+        value={`(${cycleHrs.toFixed(6)} × $${combinedCycle.toFixed(2)}) ÷ ${ppc} = $${cyclePerPart.toFixed(4)}`}
         source="formula"
       />
 
       <Divider />
 
-      <BRow label="Subtotal (setup + cycle)" value={`₹${setupPerPart.toFixed(4)} + ₹${cyclePerPart.toFixed(4)} = ₹${subtotal.toFixed(4)}`} source="formula" />
-      <BRow label={`Scrap allowance (${scrap}%)`} value={`₹${scrapAmt.toFixed(4)}`} source="formula" />
+      <BRow label="Subtotal (setup + cycle)" value={`$${setupPerPart.toFixed(4)} + $${cyclePerPart.toFixed(4)} = $${subtotal.toFixed(4)}`} source="formula" />
+      <BRow label={`Scrap allowance (${scrap}%)`} value={`$${scrapAmt.toFixed(4)}`} source="formula" />
 
       {usedCalc && (
         <>
           <Divider />
           <BRow label="Calculator (assigned)" value={d.calculatorName ?? ''} source="calc" />
           {timingSource === 'calculator'
-            ? <BRow label="Calculator result" value={`₹${total.toFixed(4)}`} source="calc" />
+            ? <BRow label="Calculator result" value={`$${total.toFixed(4)}`} source="calc" />
             : <BRow label="Calculator returned no result" value="formula fallback used" source="formula" />
           }
         </>
       )}
 
-      <BRow label="Total per part" value={`₹${total.toFixed(4)}`} highlight />
+      <BRow label="Total per part" value={`$${total.toFixed(4)}`} highlight />
     </div>
   );
 }
@@ -269,15 +269,15 @@ function ToolingBreakdown({ d }: { d: Record<string, any> }) {
     <div className="space-y-0">
       <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Cost Breakdown</p>
       <BRow label="Type" value={d.toolingType ?? '—'} />
-      <BRow label="Unit cost" value={`₹${unitCost.toFixed(2)}`} />
+      <BRow label="Unit cost" value={`$${unitCost.toFixed(2)}`} />
       <BRow label="Quantity" value={`${qty}`} />
       <BRow label="Usage %" value={`${usagePct}%`} />
       <BRow label="Amortise over" value={`${amort} parts`} />
       <Divider />
       <BRow
         label="Per part"
-        value={`₹${perPart.toFixed(4)}`}
-        sub={`= (₹${unitCost} × ${qty} × ${usagePct}%) ÷ ${amort}`}
+        value={`$${perPart.toFixed(4)}`}
+        sub={`= ($${unitCost} × ${qty} × ${usagePct}%) ÷ ${amort}`}
         highlight
         source="formula"
       />
@@ -295,10 +295,10 @@ function LogisticsBreakdown({ d }: { d: Record<string, any> }) {
       <BRow label="Cost name" value={d.costName ?? '—'} />
       <BRow label="Type" value={`${d.logisticsType ?? '—'} · ${d.modeOfTransport ?? '—'}`} />
       <BRow label="Basis" value={d.costBasis ?? '—'} />
-      <BRow label="Unit cost" value={`₹${unitCost.toFixed(2)}`} />
+      <BRow label="Unit cost" value={`$${unitCost.toFixed(2)}`} />
       <BRow label="Quantity" value={`${qty}`} />
       <Divider />
-      <BRow label="Total" value={`₹${total.toFixed(4)}`} sub={`= ₹${unitCost} × ${qty}`} highlight source="formula" />
+      <BRow label="Total" value={`$${total.toFixed(4)}`} sub={`= $${unitCost} × ${qty}`} highlight source="formula" />
     </div>
   );
 }
@@ -315,11 +315,11 @@ function ProcuredPartBreakdown({ d }: { d: Record<string, any> }) {
       <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Cost Breakdown</p>
       <BRow label="Part" value={`${d.partName ?? '—'}${d.partNumber ? ` (${d.partNumber})` : ''}`} />
       {d.supplierName && <BRow label="Supplier" value={d.supplierName} source="db" />}
-      <BRow label="Unit cost" value={`₹${unitCost.toFixed(2)}`} source="db" />
+      <BRow label="Unit cost" value={`$${unitCost.toFixed(2)}`} source="db" />
       <BRow label="Quantity" value={`${qty}`} />
-      <BRow label="Base cost" value={`₹${base.toFixed(4)}`} sub={`= ₹${unitCost} × ${qty}`} source="formula" />
-      <BRow label={`Scrap (${scrap}%) + Overhead (${overhead}%)`} value={`₹${(total - base).toFixed(4)}`} source="formula" />
-      <BRow label="Total" value={`₹${total.toFixed(4)}`} highlight />
+      <BRow label="Base cost" value={`$${base.toFixed(4)}`} sub={`= $${unitCost} × ${qty}`} source="formula" />
+      <BRow label={`Scrap (${scrap}%) + Overhead (${overhead}%)`} value={`$${(total - base).toFixed(4)}`} source="formula" />
+      <BRow label="Total" value={`$${total.toFixed(4)}`} highlight />
     </div>
   );
 }
@@ -395,7 +395,7 @@ export function DraftLineCard({ line, removed, override, onFieldChange, onRemove
           <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{line.reason}</p>
           {line.estimatedCost !== null && (
             <p className="text-[11px] text-primary tabular-nums mt-0.5 font-semibold">
-              ₹{line.estimatedCost.toFixed(4)}/part
+              ${line.estimatedCost.toFixed(4)}/part
             </p>
           )}
           {explainOpen && feat && (
@@ -425,7 +425,7 @@ export function DraftLineCard({ line, removed, override, onFieldChange, onRemove
                   : 'text-muted-foreground hover:text-foreground'
                   }`}
               >
-                {t === 'breakdown' ? '₹ Breakdown' : t === 'edit' ? 'Edit' : 'Candidates'}
+                {t === 'breakdown' ? '$ Breakdown' : t === 'edit' ? 'Edit' : 'Candidates'}
               </button>
             ))}
           </div>

@@ -83,9 +83,16 @@ function ModelScene({
   });
 
   return (
-    <mesh ref={meshRef} geometry={geometry}>
-      <meshStandardMaterial color="#4b7fc4" roughness={0.45} metalness={0.25} />
-    </mesh>
+    <group>
+      {/* Main solid — steel blue with metallic shading */}
+      <mesh ref={meshRef} geometry={geometry}>
+        <meshStandardMaterial color="#2e6db4" roughness={0.3} metalness={0.55} />
+      </mesh>
+      {/* Wire-frame overlay for crisp engineering outline */}
+      <mesh geometry={geometry}>
+        <meshBasicMaterial color="#7ab8f5" wireframe transparent opacity={0.08} />
+      </mesh>
+    </group>
   );
 }
 
@@ -202,12 +209,17 @@ interface PartDimensionViewerProps {
   maxLength?: number | null;
   maxWidth?: number | null;
   maxHeight?: number | null;
+  canvasWidth?: number;
+  canvasHeight?: number;
 }
 
-const CANVAS_W = 210;
-const CANVAS_H = 158;
+const DEFAULT_W = 210;
+const DEFAULT_H = 158;
 
-export function PartDimensionViewer({ fileUrl, maxLength, maxWidth, maxHeight }: PartDimensionViewerProps) {
+export function PartDimensionViewer({
+  fileUrl, maxLength, maxWidth, maxHeight,
+  canvasWidth = DEFAULT_W, canvasHeight = DEFAULT_H,
+}: PartDimensionViewerProps) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [screenBBox, setScreenBBox] = useState<ScreenBBox | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -233,13 +245,10 @@ export function PartDimensionViewer({ fileUrl, maxLength, maxWidth, maxHeight }:
         geo.boundingBox!.getSize(s3);
 
         if (s3.y < s3.x && s3.y < s3.z) {
-          // Y is thinnest (Z-up STL, front face in XZ plane) — rotate so Y aligns to Z
           geo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
         } else if (s3.x < s3.y && s3.x < s3.z) {
-          // X is thinnest — rotate so X aligns to Z
           geo.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
         }
-        // else Z is thinnest (Y-up STL, front face in XY plane) — no rotation needed
 
         setGeometry(geo);
       })
@@ -253,7 +262,7 @@ export function PartDimensionViewer({ fileUrl, maxLength, maxWidth, maxHeight }:
   if (loadError) {
     return (
       <div
-        style={{ width: CANVAS_W, height: CANVAS_H }}
+        style={{ width: canvasWidth, height: canvasHeight }}
         className="flex items-center justify-center text-[10px] text-muted-foreground"
       >
         Unable to load 3D model
@@ -262,29 +271,25 @@ export function PartDimensionViewer({ fileUrl, maxLength, maxWidth, maxHeight }:
   }
 
   return (
-    <div style={{ position: 'relative', width: CANVAS_W, height: CANVAS_H }}>
+    <div style={{ position: 'relative', width: canvasWidth, height: canvasHeight }}>
       {geometry && (
         <Canvas
           orthographic
-          camera={{
-            position: [0, 0, 5000],
-            near: 0.1,
-            far: 100000,
-            zoom: 1,
-          }}
-          style={{ width: CANVAS_W, height: CANVAS_H, background: '#111827' }}
+          camera={{ position: [0, 0, 5000], near: 0.1, far: 100000, zoom: 1 }}
+          style={{ width: canvasWidth, height: canvasHeight, background: '#0d1520' }}
           gl={{ antialias: true, alpha: false }}
         >
-          <ambientLight intensity={0.55} />
-          <directionalLight position={[5, 8, 10]} intensity={0.9} />
-          <directionalLight position={[-5, -4, -6]} intensity={0.3} />
+          <ambientLight intensity={0.6} />
+          <directionalLight position={[5, 8, 10]} intensity={1.1} />
+          <directionalLight position={[-4, -3, -6]} intensity={0.35} />
+          <directionalLight position={[0, -6, 4]} intensity={0.2} />
           <ModelScene geometry={geometry} onBBox={handleBBox} />
         </Canvas>
       )}
 
       {!geometry && (
         <div
-          style={{ width: CANVAS_W, height: CANVAS_H, background: '#111827' }}
+          style={{ width: canvasWidth, height: canvasHeight, background: '#0d1520' }}
           className="animate-pulse flex items-center justify-center"
         >
           <span className="text-[10px] text-muted-foreground">Loading model…</span>
@@ -294,11 +299,11 @@ export function PartDimensionViewer({ fileUrl, maxLength, maxWidth, maxHeight }:
       {screenBBox && (
         <DimOverlay
           bbox={screenBBox}
-          canvasW={CANVAS_W}
-          canvasH={CANVAS_H}
-          maxLength={maxLength}
-          maxWidth={maxWidth}
-          maxHeight={maxHeight}
+          canvasW={canvasWidth}
+          canvasH={canvasHeight}
+          {...(maxLength != null ? { maxLength } : {})}
+          {...(maxWidth  != null ? { maxWidth  } : {})}
+          {...(maxHeight != null ? { maxHeight } : {})}
         />
       )}
     </div>

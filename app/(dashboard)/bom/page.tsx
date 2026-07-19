@@ -275,7 +275,7 @@ function BOMManagementContent() {
             <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{stats.totalValue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">${stats.totalValue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Combined cost estimate</p>
           </CardContent>
         </Card>
@@ -374,7 +374,7 @@ function BOMManagementContent() {
                       </TableCell>
                       <TableCell className="text-right">{bom.totalItems}</TableCell>
                       <TableCell className="text-right">
-                        ₹{(bom.totalCost || 0).toLocaleString()}
+                        ${(bom.totalCost || 0).toLocaleString()}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">

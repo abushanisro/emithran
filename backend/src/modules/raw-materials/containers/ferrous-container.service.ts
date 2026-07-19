@@ -76,16 +76,38 @@ export class FerrousContainerService {
     const materialData = {
       material_group: this.ensureFerrousCategory(createDto.materialGroup),
       material: createDto.material,
+      material_type: createDto.materialType,
       material_grade: createDto.materialGrade,
+      material_description: createDto.materialDescription,
       stock_form: createDto.stockForm,
       matl_state: createDto.matlState,
       application: createDto.application,
       density_kg_m3: createDto.densityKgM3,
+      density: createDto.density,
       specific_heat_melt: createDto.specificHeatMelt,
       thermal_conductivity_melt: createDto.thermalConductivityMelt,
       melting_temp_c: createDto.meltingTempC,
       location: createDto.location,
-      cost: createDto.cost,
+      currency: createDto.currency || 'USD',
+      cost: createDto.costIndia ?? createDto.cost ?? createDto.unitCost,
+      cost_france: createDto.costFrance,
+      cost_germany: createDto.costGermany,
+      cost_w_europe: createDto.costWEurope,
+      cost_usa: createDto.costUsa,
+      cost_india: createDto.costIndia,
+      cost_e_europe: createDto.costEEurope,
+      cost_china: createDto.costChina,
+      cost_mexico: createDto.costMexico,
+      ultimate_tensile_strength: createDto.ultimate_tensile_strength,
+      yield_tensile_strength: createDto.yield_tensile_strength,
+      shearing_strength: createDto.shearing_strength,
+      hardness: createDto.hardness,
+      hardness_system: createDto.hardnessSystem,
+      cut_code: createDto.cutCode,
+      astm_standard: createDto.astm_standard,
+      din_standard: createDto.din_standard,
+      en_standard: createDto.en_standard,
+      jis_standard: createDto.jis_standard,
       user_id: userId,
     };
 
@@ -186,8 +208,12 @@ export class FerrousContainerService {
     };
   }
 
+  // Excel import is handled by RawMaterialsController → RawMaterialsService.createBatch()
+  // which does full field mapping including regional costs and standards.
+  // This method is kept for the RawMaterialsService.importFerrousDataFromExcel() call
+  // site but delegates to createFerrousMaterial so all field mapping stays in one place.
   async importFerrousDataFromExcel(
-    excelData: any[],
+    excelData: CreateRawMaterialDto[],
     userId: string,
     accessToken: string
   ): Promise<{ imported: number; errors: string[] }> {
@@ -196,10 +222,9 @@ export class FerrousContainerService {
     const errors: string[] = [];
     let imported = 0;
 
-    for (const row of excelData) {
+    for (const dto of excelData) {
       try {
-        const materialDto = this.mapExcelRowToDto(row);
-        await this.createFerrousMaterial(materialDto, userId, accessToken);
+        await this.createFerrousMaterial(dto, userId, accessToken);
         imported++;
       } catch (error) {
         errors.push(`Row ${imported + errors.length + 1}: ${error.message}`);
@@ -226,36 +251,13 @@ export class FerrousContainerService {
     return 'Ferrous Materials';
   }
 
-  private mapExcelRowToDto(row: any): CreateRawMaterialDto {
-    return {
-      materialGroup: 'Ferrous Materials',
-      material: row.Material || row.material || '',
-      materialGrade: row.Grade || row.grade || '',
-      stockForm: row.StockForm || row.stock_form || '',
-      matlState: row.State || row.state || '',
-      application: row.Application || row.application || '',
-      densityKgM3: this.parseNumber(row.Density || row.density),
-      specificHeatMelt: this.parseNumber(row.SpecificHeat || row.specific_heat),
-      thermalConductivityMelt: this.parseNumber(row.ThermalConductivity || row.thermal_conductivity),
-      meltingTempC: this.parseNumber(row.MeltingPoint || row.melting_point),
-      location: row.Location || row.location || '',
-      cost: this.parseNumber(row.Cost || row.cost || row.unit_cost),
-    };
-  }
-
-  private parseNumber(value: any): number | undefined {
-    if (value === null || value === undefined || value === '') return undefined;
-    const parsed = parseFloat(value);
-    return isNaN(parsed) ? undefined : parsed;
-  }
-
   private applyFilters(queryBuilder: any, query: QueryRawMaterialsDto) {
     if (query.material) {
       queryBuilder = queryBuilder.eq('material', query.material);
     }
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `material.ilike.%${query.search}%,material_grade.ilike.%${query.search}%,application.ilike.%${query.search}%`
+        `material_type.ilike.%${query.search}%,material.ilike.%${query.search}%,astm_standard.ilike.%${query.search}%,din_standard.ilike.%${query.search}%`
       );
     }
     return queryBuilder;
@@ -269,11 +271,15 @@ export class FerrousContainerService {
 
   private buildUpdateData(updateDto: UpdateRawMaterialDto): any {
     const updateData: any = {};
-    
+
     Object.entries(updateDto).forEach(([key, value]) => {
       if (value !== undefined) {
-        const dbField = this.camelToSnakeCase(key);
-        updateData[dbField] = value;
+        // unitCost is an alias for the `cost` column — not a separate DB column.
+        if (key === 'unitCost') {
+          updateData.cost = value;
+          return;
+        }
+        updateData[this.camelToSnakeCase(key)] = value;
       }
     });
 

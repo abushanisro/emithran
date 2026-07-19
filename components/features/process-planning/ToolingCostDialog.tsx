@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -18,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import {
   Sheet,
@@ -594,7 +592,7 @@ export function ToolingCostDialog({
           {/* Cost and Quantity */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="unitCost">Unit Cost (₹) *</Label>
+              <Label htmlFor="unitCost">Unit Cost ($) *</Label>
               <div className="flex gap-2">
                 <Input
                   id="unitCost"
@@ -663,57 +661,6 @@ export function ToolingCostDialog({
             </p>
           </div>
 
-          {/* Custom Tooling Checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="isCustom"
-              checked={formData.isCustom}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isCustom: checked as boolean }))}
-            />
-            <Label htmlFor="isCustom" className="text-sm">
-              Custom/Special Purpose Tooling
-            </Label>
-          </div>
-
-          {/* Supplier and Lead Time (for custom tooling) */}
-          {formData.isCustom && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="supplier">Supplier</Label>
-                <Input
-                  id="supplier"
-                  value={formData.supplier}
-                  onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
-                  placeholder="Supplier name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="leadTime">Lead Time (Days)</Label>
-                <Input
-                  id="leadTime"
-                  type="number"
-                  min="0"
-                  value={formData.leadTime}
-                  onChange={(e) => setFormData(prev => ({ ...prev, leadTime: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Additional Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="Special requirements, maintenance notes, etc."
-              rows={3}
-            />
-          </div>
-
-
           {/* Cost Calculation Summary */}
           {formData.unitCost && formData.amortizationParts && (
             <div className="bg-muted/30 p-4 rounded-lg border">
@@ -722,13 +669,13 @@ export function ToolingCostDialog({
                 <div>
                   <span className="text-muted-foreground">Total Tooling Investment:</span>
                   <div className="font-semibold">
-                    ₹{totalToolingCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    ${totalToolingCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Cost per Part:</span>
                   <div className="font-bold text-green-700">
-                    ₹{costPerPart.toLocaleString('en-IN', { minimumFractionDigits: 4 })}
+                    ${costPerPart.toLocaleString('en-IN', { minimumFractionDigits: 4 })}
                   </div>
                 </div>
               </div>

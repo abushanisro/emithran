@@ -10,7 +10,7 @@ interface BomCostReportProps {
   bomId: string | null;
 }
 
-const formatCurrency = (value: number) => `₹${value.toFixed(2)}`;
+const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
 const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
 export const BomCostReport: React.FC<BomCostReportProps> = ({ bomId }) => {

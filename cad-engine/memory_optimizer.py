@@ -344,7 +344,9 @@ class AdvancedCADMemoryOptimizer:
 
         feature_count = self._count_topological_features(shape)
         complexity_score = self._calculate_complexity_score(shape, feature_count, volume, surface_area)
-        manufacturing_features = self._analyze_manufacturing_features(shape, bounding_box)
+        manufacturing_features = self._analyze_manufacturing_features(
+            shape, bounding_box, volume_mm3=round(float(volume), 4)
+        )
 
         return GeometryFeatures(
             volume=round(float(volume), 4),  # type: ignore
@@ -356,7 +358,7 @@ class AdvancedCADMemoryOptimizer:
             manufacturing_features=manufacturing_features
         )
 
-    def _analyze_manufacturing_features(self, shape: TopoDS_Shape, bounding_box: dict) -> dict:
+    def _analyze_manufacturing_features(self, shape: TopoDS_Shape, bounding_box: dict, volume_mm3: float = 0.0) -> dict:
         """Real manufacturing feature analysis using OpenCASCADE topology."""
         # Mesh the shape before any topology queries so BRep_Tool.Triangulation returns
         # face data for face_map.  Same deflection params as ShapeMesher in services.py
@@ -441,7 +443,37 @@ class AdvancedCADMemoryOptimizer:
                 # draft_face_ratio left at its 0.0 default — no draft-angle detector
                 # yet (see InjectionMoldedFeatureExtractor docstring); the gate falls
                 # back to pocket_count when draft isn't available.
+                volume_mm3=volume_mm3,
             )
+
+            # ── Post-classification SMF cross-check ───────────────────────────
+            # When the classifier returns cnc_milled but the fill ratio is very
+            # low (< 15%), there is still a chance the part is sheet metal that
+            # slipped through all topology gates (e.g. a deep box where flatness
+            # exceeds 0.48 but bends produce a valid gauge). Run the antiparallel-
+            # face-pair gauge detector; if it finds a plausible gauge that is
+            # small relative to the smallest bbox dimension, override to sheet_metal.
+            if detected_family == 'cnc_milled' and volume_mm3 > 0:
+                _pos_dims_chk = [d for d in dims_list if d > 0]
+                _bbox_vol_chk = dims_list[0] * dims_list[1] * dims_list[2] if len(dims_list) >= 3 else 0
+                _fill_ratio_chk = volume_mm3 / _bbox_vol_chk if _bbox_vol_chk > 0 else 1.0
+                if _fill_ratio_chk < 0.15 and sheet_geometry is not None:
+                    try:
+                        _gauge_chk = float(sheet_geometry[0] or 0)
+                        _min_bbox_chk = min(_pos_dims_chk) if _pos_dims_chk else 0.0
+                        # Valid gauge must be small relative to min bbox dimension:
+                        # a true sheet gauge is << the smallest forming dimension.
+                        # Threshold: gauge < 45% of min bbox dim (e.g. 2mm gauge, 60mm depth is fine).
+                        if _gauge_chk > 0 and _gauge_chk < _min_bbox_chk * 0.45:
+                            detected_family = 'sheet_metal'
+                            family_confidence = max(family_confidence, 0.72)
+                            classification_reasons.append(
+                                f"smf_override: gauge={_gauge_chk:.2f}mm < "
+                                f"{_min_bbox_chk * 0.45:.1f}mm (45% of min bbox {_min_bbox_chk:.1f}mm), "
+                                f"fill_ratio={_fill_ratio_chk:.3f}"
+                            )
+                    except Exception as _e:
+                        logger.debug(f"[mfg_intel] SMF cross-check failed: {_e}")
             # ── Sheet-metal impossibility veto ────────────────────────────────
             # Sheet stock has ONE gauge everywhere, so a sheet part's smallest
             # bbox dimension is either ≈1× the gauge (flat blank) or ≥~4× the

@@ -563,7 +563,14 @@ class ApiClient {
       try {
         const startTime = Date.now();
 
-        const response = await fetch(requestConfig.url, requestInit);
+        const fetchPromise = fetch(requestConfig.url, requestInit);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new DOMException(`Request timeout after ${timeout}ms`, 'AbortError'));
+          }, timeout + 50);
+        });
+
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
         const responseTime = Date.now() - startTime;
         clearTimeout(timeoutId);
 
@@ -1001,11 +1008,18 @@ class ApiClient {
       ? executeRequest()
       : this.circuitBreaker.execute(() => executeRequest());
 
-    // Cache the promise for GET requests
+    // Cache the promise for GET requests with safety TTL
     if (method === 'GET') {
       const cacheKey = this.getCacheKey(endpoint, options);
       this.pendingRequests.set(cacheKey, requestPromise);
+      
+      const safetyTtlMs = this.getTimeout(endpoint, method, options.timeout) + 5000;
+      const safetyTtlTimer = setTimeout(() => {
+        this.pendingRequests.delete(cacheKey);
+      }, safetyTtlMs);
+
       requestPromise.finally(() => {
+        clearTimeout(safetyTtlTimer);
         this.pendingRequests.delete(cacheKey);
       });
     }

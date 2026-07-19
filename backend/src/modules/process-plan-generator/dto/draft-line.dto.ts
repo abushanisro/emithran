@@ -59,11 +59,11 @@ export interface DraftProcessPayload {
   processId: string | null;
   newMasterRef: string | null;
   mhrId: string | null;          // process_cost_records.mhr_id
-  lsrId: string | null;          // process_cost_records.lsr_id
+  lhrId: string | null;          // process_cost_records.lhr_id
   machineName: string | null;    // denormalised display name
   labourType: string | null;     // denormalised display name
   machineRate: number;           // INR/hr from MHR candidate
-  labourRate: number;            // INR/hr from LSR candidate
+  labourRate: number;            // INR/hr from LHR candidate
   directRate: number;            // machine + labour combined; REQUIRED by process_cost_records
   opNbr: number;
   setupManning: number;
@@ -77,7 +77,7 @@ export interface DraftProcessPayload {
   processRoute: string | null;   // → process_route (machine type)
   operation: string | null;      // → operation (from processName)
   calculatorName: string | null; // name of calculator used, null if formula fallback
-  timingSource: 'calculator' | 'geometry_estimate' | 'ai_hint' | 'feature_geometry' | 'default'; // where setup/cycle time came from
+  timingSource: 'calculator' | 'geometry_estimate' | 'ai_hint' | 'feature_geometry' | 'default' | 'machining_rules'; // where setup/cycle time came from
   featureId?:    string | null;  // "F4" — AI's feature reference
   featureType?:  string | null;  // "CROSS_HOLE" — stable type vocabulary
   featureGroup?: string | null;  // "HOLE" — stable routing key for 3D highlight

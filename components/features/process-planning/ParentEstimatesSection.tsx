@@ -181,7 +181,7 @@ export function ParentEstimatesSection() {
                                 setParentEstimates(updated);
                               }}
                               className="h-9 text-sm"
-                              placeholder="INR"
+                              placeholder="USD"
                             />
                           </div>
 
@@ -253,7 +253,7 @@ export function ParentEstimatesSection() {
                                   placeholder="0.00"
                                 />
                                 <Badge variant="outline" className="text-xs">
-                                  {estimate.currency || 'INR'}
+                                  {estimate.currency || 'USD'}
                                 </Badge>
                               </div>
                             </div>

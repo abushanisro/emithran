@@ -360,10 +360,10 @@ const LotDetailPage = ({ params }: LotDetailPageProps) => {
           </CardHeader>
           <CardContent>
             <div className="space-y-1">
-              <div className="text-2xl font-bold">₹{(lot.totalCost || 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold">${(lot.totalCost || 0).toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
                 {lot.totalCost > 0 
-                  ? `Material: ₹${(lot.materialCost || 0).toLocaleString()}`
+                  ? `Material: $${(lot.materialCost || 0).toLocaleString()}`
                   : 'Cost calculation in progress'
                 }
               </p>

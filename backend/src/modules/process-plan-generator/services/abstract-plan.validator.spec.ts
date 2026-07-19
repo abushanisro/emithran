@@ -9,7 +9,7 @@ const candidates: CandidateSet = {
     { candidateId: 'mc-1', dbId: 'mhr-abc', machineName: 'ASC Lathe 320', commodityCode: 'LATHE', description: 'CNC Lathe', rateInrPerHour: 540, location: 'India-Bangalore', processFamily: 'cnc_turned', score: 0.9 },
   ],
   labour: [
-    { candidateId: 'lb-1', dbId: 'lsr-abc', labourType: 'Skilled', labourCode: 'SKL-01', lhrInrPerHour: 62, location: 'India-Bangalore', score: 0.9 },
+    { candidateId: 'lb-1', dbId: 'lhr-abc', labourType: 'Skilled', labourCode: 'SKL-01', lhrInrPerHour: 62, location: 'India-Bangalore', score: 0.9 },
   ],
   processes: [
     { candidateId: 'op-1', dbId: 'proc-abc', processGroup: 'CNC Machining', processRoute: 'Turning', operation: 'Turning', calculatorId: null, score: 0.9, referenceTables: [] },

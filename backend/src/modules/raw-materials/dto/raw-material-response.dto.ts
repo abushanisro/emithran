@@ -93,6 +93,15 @@ export class RawMaterialResponseDto {
   @ApiProperty({ required: false })
   country?: string;
 
+  @ApiProperty({ required: false })
+  hardness?: number;
+
+  @ApiProperty({ required: false })
+  hardnessSystem?: string;
+
+  @ApiProperty({ required: false })
+  cutCode?: number;
+
   // Plastic-specific properties
 
   @ApiProperty({ required: false })
@@ -164,6 +173,9 @@ export class RawMaterialResponseDto {
       stockForm: row.stock_form,
       matlState: row.matl_state,
       country: row.country,
+      hardness: row.hardness ? parseFloat(row.hardness) : undefined,
+      hardnessSystem: row.hardness_system,
+      cutCode: row.cut_code ? parseFloat(row.cut_code) : undefined,
       // Plastic-specific properties
       regrinding: row.regrinding,
       regrindingPercentage: row.regrinding_percentage ? parseFloat(row.regrinding_percentage) : undefined,

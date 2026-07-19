@@ -364,16 +364,36 @@ export default function InteractiveBalloonAnnotator({
                     setSelectedBalloon(balloon.id);
                   }}
                 >
-                  {/* Balloon Circle */}
+                  {/* Balloon Outline Shape */}
                   <div className="relative">
-                    <div
-                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shadow-lg transition-all ${selectedBalloon === balloon.id
-                        ? 'bg-red-600 border-red-700 text-white scale-110'
-                        : 'bg-red-500 border-red-700 text-white hover:bg-red-600'
-                        }`}
-                    >
-                      {balloon.number}
-                    </div>
+                    {((balloon as any).shape || 'circle') === 'square' ? (
+                      <div
+                        className={`w-6 h-6 rounded-[2px] border-2 border-red-600 bg-white/95 flex items-center justify-center text-[11px] font-bold shadow-md transition-all ${selectedBalloon === balloon.id
+                          ? 'bg-red-50 text-red-600 scale-110 ring-2 ring-red-500/30'
+                          : 'text-red-600 hover:bg-red-50'
+                          }`}
+                      >
+                        {balloon.number}
+                      </div>
+                    ) : ((balloon as any).shape || 'circle') === 'diamond' ? (
+                      <div
+                        className={`w-8 h-8 flex items-center justify-center relative transition-all ${selectedBalloon === balloon.id ? 'scale-110' : ''}`}
+                      >
+                        <div
+                          className={`absolute inset-0 w-7 h-7 m-auto rotate-45 rounded-[2px] border-2 border-red-600 bg-white/95 shadow-md transition-all ${selectedBalloon === balloon.id ? 'bg-red-50 ring-2 ring-red-500/30' : 'hover:bg-red-50'}`}
+                        />
+                        <span className="relative z-10 text-xs font-bold text-red-600">{balloon.number}</span>
+                      </div>
+                    ) : (
+                      <div
+                        className={`w-8 h-8 rounded-full border-2 border-red-600 bg-white/95 flex items-center justify-center text-xs font-bold shadow-md transition-all ${selectedBalloon === balloon.id
+                          ? 'bg-red-50 text-red-600 scale-110 ring-2 ring-red-500/30'
+                          : 'text-red-600 hover:bg-red-50'
+                          }`}
+                      >
+                        {balloon.number}
+                      </div>
+                    )}
 
                     {/* Delete button for selected balloon */}
                     {selectedBalloon === balloon.id && (
@@ -382,7 +402,7 @@ export default function InteractiveBalloonAnnotator({
                           e.stopPropagation();
                           deleteBalloon(balloon.id);
                         }}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-gray-800 text-white rounded-full flex items-center justify-center text-xs hover:bg-gray-900"
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-gray-800 text-white rounded-full flex items-center justify-center text-xs hover:bg-gray-900 z-20"
                       >
                         ×
                       </button>
@@ -433,7 +453,7 @@ export default function InteractiveBalloonAnnotator({
                           onClick={() => setSelectedBalloon(balloon.id)}
                         >
                           <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-red-500 border border-red-700 flex items-center justify-center text-xs font-bold text-white">
+                            <div className="w-6 h-6 rounded-full bg-white border-2 border-red-600 flex items-center justify-center text-xs font-bold text-red-600 shadow-sm">
                               {balloon.number}
                             </div>
                             <div>

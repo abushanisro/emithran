@@ -159,6 +159,16 @@ export type MHRListResponse = {
   limit: number;
 };
 
+export type MHRBenchmarkEntry = {
+  id: string;
+  machineName: string;
+  processGroup: string;
+  location: string;
+  machineRef?: string;
+  isBenchmark: true;
+  calculations: { totalMachineHourRate: number };
+};
+
 export const mhrApi = {
   /**
    * Get all MHR records
@@ -236,6 +246,14 @@ export const mhrApi = {
    */
   deleteAll: async (): Promise<{ deleted: number }> => {
     return apiClient.delete<{ deleted: number }>('/mhr') ?? { deleted: 0 };
+  },
+
+  getBenchmarkRates: async (location?: string, processGroup?: string): Promise<MHRBenchmarkEntry[]> => {
+    const params = new URLSearchParams();
+    if (location) params.append('location', location);
+    if (processGroup) params.append('processGroup', processGroup);
+    const qs = params.toString();
+    return (await apiClient.get<MHRBenchmarkEntry[]>(`/mhr/benchmark${qs ? `?${qs}` : ''}`, { silent: true, retry: false })) ?? [];
   },
 
   /**

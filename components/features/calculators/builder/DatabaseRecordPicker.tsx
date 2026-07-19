@@ -164,18 +164,18 @@ export function DatabaseRecordPicker({
               id: item.id,
               displayLabel: `${item.machineName || 'Unknown'}${item.manufacturer ? ` - ${item.manufacturer}` : ''}`,
               metadata: {
-                rate: `₹${item.calculations?.totalMachineHourRate?.toFixed(2) || 'N/A'}/hr`,
+                rate: `$${item.calculations?.totalMachineHourRate?.toFixed(2) || 'N/A'}/hr`,
                 location: item.location || 'N/A'
               },
             });
             break;
           case 'lhr':
-            endpoint = '/lsr';
+            endpoint = '/lhr';
             mapFunction = (item: any) => ({
               id: item.id,
               displayLabel: `${item.labourCode || 'Unknown'}${item.labourType ? ` - ${item.labourType}` : ''}`,
               metadata: {
-                rate: `₹${item.lhr?.toFixed(2) || 'N/A'}/hr`,
+                rate: `$${item.lhr?.toFixed(2) || 'N/A'}/hr`,
                 type: item.labourType || 'N/A'
               },
             });
@@ -198,7 +198,7 @@ export function DatabaseRecordPicker({
         const response = await apiClient.get<any>(endpoint);
 
         // Handle different response structures
-        // MHR/LSR return { records: [], total, page, limit }
+        // MHR/LHR return { records: [], total, page, limit }
         // Others may return { items: [], total } or flat array
         let data: any[] = [];
 

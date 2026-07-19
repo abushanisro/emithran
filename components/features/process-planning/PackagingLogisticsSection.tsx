@@ -15,9 +15,12 @@ import {
 
 interface PackagingLogisticsSectionProps {
   bomItemId: string;
+  compact?: boolean;
+  currencySymbol?: string; // e.g. '₹', '$', '€' — default '$'
+  conversionRate?: number; // multiply stored USD values by this to get factory currency — default 1
 }
 
-export function PackagingLogisticsSection({ bomItemId }: PackagingLogisticsSectionProps) {
+export function PackagingLogisticsSection({ bomItemId, compact, currencySymbol = '$', conversionRate = 1 }: PackagingLogisticsSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItemId, setEditItemId] = useState<string | null>(null);
 
@@ -116,6 +119,60 @@ export function PackagingLogisticsSection({ bomItemId }: PackagingLogisticsSecti
     return basisMap[basis] || basis;
   };
 
+  if (compact) {
+    return (
+      <div>
+        <div className="divide-y divide-border">
+          {isLoading ? (
+            <div className="px-3 py-3 text-center text-xs text-muted-foreground">Loading…</div>
+          ) : logisticsItems.length === 0 ? (
+            <div className="px-3 py-3 text-center">
+              <p className="text-xs text-muted-foreground">No packaging or logistics items</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">Added automatically on material SET, or add manually</p>
+            </div>
+          ) : (
+            <>
+              {logisticsItems.map((item) => (
+                <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{item.costName}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatLogisticsType(item.logisticsType)} · {formatCostBasis(item.costBasis)} · qty {item.quantity}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold tabular-nums shrink-0">{currencySymbol}{(item.totalCost * conversionRate).toFixed(2)}</span>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleEditLogisticsItem(item.id)} title="Edit">
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive hover:text-destructive" onClick={() => handleDeleteLogisticsItem(item.id)} title="Delete">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between items-center px-3 py-1.5 bg-muted/20">
+                <span className="text-[11px] font-semibold text-muted-foreground">Total</span>
+                <span className="text-xs font-bold tabular-nums">{currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}</span>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="px-3 pt-2 pb-1">
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAddLogisticsItem}>
+            <Plus className="h-3 w-3 mr-1" /> Add Logistics Item
+          </Button>
+        </div>
+        <LogisticsDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSubmit={handleDialogSubmit}
+          editData={editItem}
+        />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="card border-l-4 border-l-primary shadow-md mb-4 mt-3 rounded-lg overflow-hidden">
@@ -155,13 +212,13 @@ export function PackagingLogisticsSection({ bomItemId }: PackagingLogisticsSecti
                   Cost Basis
                 </th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
-                  Unit Cost (₹)
+                  Unit Cost ($)
                 </th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-24">
                   Quantity
                 </th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
-                  Total Cost (₹)
+                  Total Cost ($)
                 </th>
                 <th className="p-3 text-center text-xs font-semibold w-24">
                   Actions
@@ -196,13 +253,13 @@ export function PackagingLogisticsSection({ bomItemId }: PackagingLogisticsSecti
                         {formatCostBasis(item.costBasis)}
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right">
-                        ₹{item.unitCost.toFixed(2)}
+                        {currencySymbol}{(item.unitCost * conversionRate).toFixed(2)}
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right">
                         {item.quantity}
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right font-semibold">
-                        ₹{item.totalCost.toFixed(2)}
+                        {currencySymbol}{(item.totalCost * conversionRate).toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-2">
@@ -234,7 +291,7 @@ export function PackagingLogisticsSection({ bomItemId }: PackagingLogisticsSecti
                       Total:
                     </td>
                     <td className="p-3 border-r border-border text-xs text-right">
-                      ₹{calculateTotal()}
+                      {currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}
                     </td>
                     <td className="p-3"></td>
                   </tr>

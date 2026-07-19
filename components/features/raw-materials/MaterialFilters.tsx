@@ -368,8 +368,8 @@ export const MaterialFilters: React.FC<MaterialFiltersProps> = ({
                         />
                       </div>
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>₹{costRange.min}</span>
-                        <span>₹{costRange.max}</span>
+                        <span>${costRange.min}</span>
+                        <span>${costRange.max}</span>
                       </div>
                     </div>
                   </div>

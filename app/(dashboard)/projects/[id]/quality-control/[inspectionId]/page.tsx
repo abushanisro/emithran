@@ -10,7 +10,7 @@ declare global {
 
 
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 // useBOMItems and useBOMs imported but unused - kept for future use
 // import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
@@ -213,14 +213,20 @@ function TableDisplayField({
 // Inline PDF Viewer Component
 function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDatabaseSilently, onTableDataExtracted }: { bomItem: any; onBalloonsChanged?: (balloons: any[]) => void; inspectionId: string; onSaveToDatabaseSilently?: () => void; onTableDataExtracted?: (tableData: any) => void }) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const lastScrollTimeRef = useRef<number>(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAnnotationMode, setIsAnnotationMode] = useState(false);
+  const [activeShape, setActiveShape] = useState<'circle' | 'square' | 'diamond'>('circle');
   const [balloons, setBalloons] = useState<Array<{
     id: string,
     number: number,
     x: number,
-    y: number
+    y: number,
+    shape?: 'circle' | 'square' | 'diamond',
+    page?: number
   }>>([]);
   const [selectedBalloon, setSelectedBalloon] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -302,12 +308,14 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
     const y = ((event.clientY - rect.top) / rect.height) * 100; // Convert to percentage
 
     const balloonId = `balloon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const nextNumber = balloons.length + 1; // Always use next sequential number
+    const nextNumber = balloons.length + 1; // Always use next sequential number across all sheets
     const newBalloon = {
       id: balloonId,
       number: nextNumber,
       x,
-      y
+      y,
+      shape: activeShape,
+      page: currentPage
     };
 
     const updatedBalloons = [...balloons, newBalloon];
@@ -332,6 +340,15 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
   const updateBalloonPosition = (balloonId: string, x: number, y: number) => {
     const updatedBalloons = balloons.map(balloon =>
       balloon.id === balloonId ? { ...balloon, x, y } : balloon
+    );
+    setBalloons(updatedBalloons);
+    if (onBalloonsChanged) onBalloonsChanged(updatedBalloons);
+  };
+
+  // Update balloon shape
+  const updateBalloonShape = (balloonId: string, shape: 'circle' | 'square' | 'diamond') => {
+    const updatedBalloons = balloons.map(balloon =>
+      balloon.id === balloonId ? { ...balloon, shape } : balloon
     );
     setBalloons(updatedBalloons);
     if (onBalloonsChanged) onBalloonsChanged(updatedBalloons);
@@ -464,79 +481,96 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
       const existingPdfBytes = await response.arrayBuffer();
       const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
-      // Get the first page (assuming single page for now)
+      // Get all pages
       const pages = pdfDoc.getPages();
       if (pages.length === 0) {
         throw new Error('PDF has no pages');
       }
 
-      const firstPage = pages[0];
-      if (!firstPage) throw new Error('PDF has no pages');
-      const { width, height } = firstPage.getSize();
-
-
       // Get the PDF container element that holds the iframe
       const pdfContainer = document.querySelector('[data-pdf-container]') as HTMLElement;
-      const iframeElement = document.querySelector('iframe[title="2D Technical Drawing"]') as HTMLIFrameElement;
-      
       if (!pdfContainer) {
         throw new Error('PDF container not found');
       }
-
-      // Calculate the actual PDF display dimensions considering the PDF viewer's scaling
       const containerRect = pdfContainer.getBoundingClientRect();
-      
-      // Account for PDF viewer's internal scaling due to view=Fit&zoom=page-fit
-      // The PDF viewer scales the content to fit the container, so we need to 
-      // calculate the actual displayed PDF dimensions within the iframe
-      const containerAspectRatio = containerRect.width / containerRect.height;
-      const pdfAspectRatio = width / height;
-      
-      let displayedPDFWidth, displayedPDFHeight;
-      
-      if (containerAspectRatio > pdfAspectRatio) {
-        // Container is wider than PDF - PDF fits to height
-        displayedPDFHeight = containerRect.height;
-        displayedPDFWidth = displayedPDFHeight * pdfAspectRatio;
-      } else {
-        // Container is taller than PDF - PDF fits to width
-        displayedPDFWidth = containerRect.width;
-        displayedPDFHeight = displayedPDFWidth / pdfAspectRatio;
-      }
-      
-      // Calculate the offset if PDF is centered in container
-      const offsetX = (containerRect.width - displayedPDFWidth) / 2;
-      const offsetY = (containerRect.height - displayedPDFHeight) / 2;
 
-      // Draw balloons on the PDF with exact screen alignment
+      // Draw balloons on each specific sheet of the PDF with exact screen alignment
       balloons.forEach(balloon => {
-        // Convert balloon percentage coordinates to actual PDF coordinates
-        // Account for the displayed PDF size and centering offset
+        const pageNumber = balloon.page || 1;
+        const pageIndex = Math.min(pages.length - 1, Math.max(0, pageNumber - 1));
+        const targetPage = pages[pageIndex];
+        if (!targetPage) return;
+
+        const { width, height } = targetPage.getSize();
+
+        // Calculate actual displayed PDF dimensions considering view=Fit scaling
+        const containerAspectRatio = containerRect.width / containerRect.height;
+        const pdfAspectRatio = width / height;
+
+        let displayedPDFWidth, displayedPDFHeight;
+
+        if (containerAspectRatio > pdfAspectRatio) {
+          displayedPDFHeight = containerRect.height;
+          displayedPDFWidth = displayedPDFHeight * pdfAspectRatio;
+        } else {
+          displayedPDFWidth = containerRect.width;
+          displayedPDFHeight = displayedPDFWidth / pdfAspectRatio;
+        }
+
+        const offsetX = (containerRect.width - displayedPDFWidth) / 2;
+        const offsetY = (containerRect.height - displayedPDFHeight) / 2;
+
+        // Convert balloon percentage coordinates to actual PDF coordinates for targetPage
         const relativeX = (balloon.x / 100) * containerRect.width - offsetX;
         const relativeY = (balloon.y / 100) * containerRect.height - offsetY;
-        
-        // Scale to actual PDF coordinates
+
         const pdfX = (relativeX / displayedPDFWidth) * width;
         const pdfY = height - ((relativeY / displayedPDFHeight) * height); // PDF coordinates are bottom-up
 
+        // Draw outline shape with exact positioning on targetPage
+        const shape = (balloon as any).shape || 'circle';
+        const redColor = rgb(0.85, 0.15, 0.15); // Crisp red outline & text (#DC2626)
+        const whiteColor = rgb(1, 1, 1); // White background so drawing lines don't bleed through text
 
-        // Draw balloon circle with exact positioning
-        firstPage.drawCircle({
-          x: pdfX,
-          y: pdfY,
-          size: 8, // Radius to match screen
-          color: rgb(0.937, 0.267, 0.267), // Red color (#EF4444)
-          borderColor: rgb(0.725, 0.110, 0.110), // Dark red border (#B91C1C)
-          borderWidth: 1,
-        });
+        if (shape === 'square') {
+          const size = 12.5;
+          targetPage.drawRectangle({
+            x: pdfX - size / 2,
+            y: pdfY - size / 2,
+            width: size,
+            height: size,
+            color: whiteColor,
+            borderColor: redColor,
+            borderWidth: 1.5,
+          });
+        } else if (shape === 'diamond') {
+          const r = 9;
+          targetPage.drawSvgPath(`M 0 -${r} L ${r} 0 L 0 ${r} L -${r} 0 Z`, {
+            x: pdfX,
+            y: pdfY,
+            color: whiteColor,
+            borderColor: redColor,
+            borderWidth: 1.5,
+          });
+        } else {
+          // Circle outline
+          targetPage.drawCircle({
+            x: pdfX,
+            y: pdfY,
+            size: 8, // Radius to match screen
+            color: whiteColor,
+            borderColor: redColor,
+            borderWidth: 1.5,
+          });
+        }
 
-        // Draw balloon number with exact centering
+        // Draw balloon number centered inside the outline shape on targetPage
         const numberText = balloon.number.toString();
-        firstPage.drawText(numberText, {
-          x: pdfX - (numberText.length > 1 ? 3 : 1.5), // Center the text
-          y: pdfY - 2.5, // Center vertically in circle
-          size: 6, // Font size to match screen
-          color: rgb(1, 1, 1), // White text
+        targetPage.drawText(numberText, {
+          x: pdfX - (numberText.length > 1 ? 3.2 : 1.8), // Center the text horizontally
+          y: pdfY - 2.5, // Center vertically
+          size: 6.5, // Font size to match screen
+          color: redColor, // Red text inside white outline
         });
       });
 
@@ -646,6 +680,21 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
           // Route through the same-origin proxy so the iframe src is localhost:3000.
           const proxyUrl = `/api/file-proxy?url=${encodeURIComponent(signedUrl)}`;
           setPdfUrl(proxyUrl);
+          setCurrentPage(1);
+
+          // Detect total pages in PDF using pdf-lib
+          try {
+            const { PDFDocument } = await import('pdf-lib');
+            const pdfResp = await fetch(proxyUrl, { credentials: 'include' });
+            if (pdfResp.ok) {
+              const pdfBuf = await pdfResp.arrayBuffer();
+              const doc = await PDFDocument.load(pdfBuf);
+              const count = doc.getPageCount();
+              if (count && count > 0) setTotalPages(count);
+            }
+          } catch (e) {
+            console.error('Failed to detect PDF page count:', e);
+          }
         } else {
           throw new Error(`No URL returned from server. Response: ${JSON.stringify(data)}`);
         }
@@ -724,12 +773,104 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                   </Button>
                 )}
                 {isAnnotationMode && (
+                  <div className="flex items-center gap-1 bg-muted/50 border rounded-md p-1">
+                    <span className="text-[11px] font-semibold text-muted-foreground px-1 hidden sm:inline">Shape:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveShape('circle');
+                        if (selectedBalloon) updateBalloonShape(selectedBalloon, 'circle');
+                      }}
+                      className={`px-2 py-0.5 rounded text-xs flex items-center gap-1 font-medium transition-all ${
+                        activeShape === 'circle'
+                          ? 'bg-red-50 text-red-600 border border-red-300 font-bold shadow-sm'
+                          : 'hover:bg-muted text-foreground'
+                      }`}
+                      title="Circle Outline"
+                    >
+                      <span className="w-3 h-3 rounded-full border-2 border-red-600 inline-block bg-white" />
+                      <span className="hidden sm:inline">Circle</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveShape('square');
+                        if (selectedBalloon) updateBalloonShape(selectedBalloon, 'square');
+                      }}
+                      className={`px-2 py-0.5 rounded text-xs flex items-center gap-1 font-medium transition-all ${
+                        activeShape === 'square'
+                          ? 'bg-red-50 text-red-600 border border-red-300 font-bold shadow-sm'
+                          : 'hover:bg-muted text-foreground'
+                      }`}
+                      title="Square Outline"
+                    >
+                      <span className="w-3 h-3 rounded-[2px] border-2 border-red-600 inline-block bg-white" />
+                      <span className="hidden sm:inline">Square</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveShape('diamond');
+                        if (selectedBalloon) updateBalloonShape(selectedBalloon, 'diamond');
+                      }}
+                      className={`px-2 py-0.5 rounded text-xs flex items-center gap-1 font-medium transition-all ${
+                        activeShape === 'diamond'
+                          ? 'bg-red-50 text-red-600 border border-red-300 font-bold shadow-sm'
+                          : 'hover:bg-muted text-foreground'
+                      }`}
+                      title="Diamond Outline"
+                    >
+                      <span className="w-3 h-3 rotate-45 border-2 border-red-600 inline-block bg-white transform scale-90" />
+                      <span className="hidden sm:inline">Diamond</span>
+                    </button>
+                  </div>
+                )}
+                {pdfUrl && (
+                  <div className="flex items-center gap-1 bg-blue-50/80 border border-blue-200 rounded-md px-2 py-0.5 shadow-sm">
+                    <span className="text-[11px] font-bold text-blue-900 hidden sm:inline">Sheet:</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 font-bold hover:bg-blue-100 text-blue-900"
+                      disabled={currentPage <= 1}
+                      onClick={() => {
+                        setCurrentPage(prev => Math.max(1, prev - 1));
+                        setSelectedBalloon(null);
+                      }}
+                      title="Previous Sheet"
+                    >
+                      ‹
+                    </Button>
+                    <span className="text-xs font-extrabold px-2 py-0.5 bg-white border border-blue-300 rounded text-blue-900 shadow-inner">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 font-bold hover:bg-blue-100 text-blue-900"
+                      onClick={() => {
+                        setCurrentPage(prev => {
+                          const next = prev + 1;
+                          if (next > totalPages) setTotalPages(next);
+                          return next;
+                        });
+                        setSelectedBalloon(null);
+                      }}
+                      title="Next Sheet"
+                    >
+                      ›
+                    </Button>
+                  </div>
+                )}
+                {isAnnotationMode && (
                   <span className="hidden xl:inline text-xs text-red-600 font-medium">
-                    {isDragging ? 'Dragging…' : 'Click to add • Drag to move'}
+                    {isDragging ? 'Dragging…' : `Click to add • Sheet ${currentPage}`}
                   </span>
                 )}
                 <Button
-                  onClick={() => window.open(pdfUrl, '_blank')}
+                  onClick={() => window.open(`${pdfUrl}#page=${currentPage}`, '_blank')}
                   variant="outline"
                   size="sm"
                   title="Open Full Size"
@@ -779,11 +920,29 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
+              onWheel={(e) => {
+                const now = Date.now();
+                if (now - lastScrollTimeRef.current < 400) return; // 400ms cooldown between flips
+                if (Math.abs(e.deltaY) < 40) return;
+                lastScrollTimeRef.current = now;
+                if (e.deltaY > 0) {
+                  setCurrentPage(prev => {
+                    const next = prev + 1;
+                    if (next > totalPages) setTotalPages(next);
+                    return next;
+                  });
+                  setSelectedBalloon(null);
+                } else if (e.deltaY < 0 && currentPage > 1) {
+                  setCurrentPage(prev => Math.max(1, prev - 1));
+                  setSelectedBalloon(null);
+                }
+              }}
               data-pdf-container
             >
-              {/* PDF iframe — src is always the same-origin proxy, never a raw Supabase URL */}
+              {/* PDF iframe — src is always the same-origin proxy with exact page parameter */}
               <iframe
-                src={`${pdfUrl}#view=Fit&zoom=page-fit&scrollbar=0&toolbar=0&navpanes=0&statusbar=0&messages=0&page=1`}
+                key={`pdf-page-${currentPage}`}
+                src={`${pdfUrl}#view=Fit&zoom=page-fit&scrollbar=0&toolbar=0&navpanes=0&statusbar=0&messages=0&page=${currentPage}`}
                 title="2D Technical Drawing"
                 className="absolute inset-0 w-full h-full border-0"
                 style={{
@@ -800,10 +959,10 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                 marginWidth="0"
               />
 
-              {/* Balloon Overlays */}
+              {/* Balloon Overlays filtered for currentPage */}
               {(isAnnotationMode || balloons.length > 0) && (
                 <>
-                  {balloons.map((balloon) => (
+                  {balloons.filter(balloon => (balloon.page || 1) === currentPage).map((balloon) => (
                     <div
                       key={balloon.id}
                       className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all select-none ${isAnnotationMode
@@ -821,34 +980,95 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                       }}
                     >
                       <div className="relative">
-                        <div
-                          className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shadow-lg transition-all ${selectedBalloon === balloon.id && isAnnotationMode
-                            ? 'bg-red-600 border-red-700 text-white scale-110'
-                            : `bg-red-500 border-red-700 text-white ${isAnnotationMode ? 'hover:bg-red-600' : ''}`
-                            } ${isDragging && selectedBalloon === balloon.id ? 'shadow-2xl' : ''
-                            }`}
-                        >
-                          {editingNumber === balloon.id ? (
-                            <input
-                              type="number"
-                              value={tempNumber}
-                              onChange={(e) => setTempNumber(parseInt(e.target.value) || 0)}
-                              onBlur={saveEditedNumber}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') saveEditedNumber();
-                                if (e.key === 'Escape') cancelEditNumber();
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              autoFocus
-                              className="w-6 h-6 text-xs text-center bg-transparent text-white border-0 outline-0 appearance-none"
-                              min="1" max="99"
+                        {((balloon as any).shape || 'circle') === 'square' ? (
+                          <div
+                            className={`w-6 h-6 rounded-[2px] border-2 flex items-center justify-center text-[11px] font-bold shadow-md transition-all ${
+                              selectedBalloon === balloon.id && isAnnotationMode
+                                ? 'border-red-600 bg-red-50 text-red-600 scale-110 ring-2 ring-red-500/30'
+                                : `border-red-600 bg-white/95 text-red-600 ${isAnnotationMode ? 'hover:bg-red-50' : ''}`
+                            } ${isDragging && selectedBalloon === balloon.id ? 'shadow-2xl scale-110' : ''}`}
+                          >
+                            {editingNumber === balloon.id ? (
+                              <input
+                                type="number"
+                                value={tempNumber}
+                                onChange={(e) => setTempNumber(parseInt(e.target.value) || 0)}
+                                onBlur={saveEditedNumber}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') saveEditedNumber();
+                                  if (e.key === 'Escape') cancelEditNumber();
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                autoFocus
+                                className="w-6 h-6 text-xs text-center bg-transparent text-red-600 border-0 outline-0 appearance-none font-bold"
+                                min="1" max="99"
+                              />
+                            ) : balloon.number}
+                          </div>
+                        ) : ((balloon as any).shape || 'circle') === 'diamond' ? (
+                          <div
+                            className={`w-8 h-8 flex items-center justify-center relative transition-all ${
+                              selectedBalloon === balloon.id && isAnnotationMode ? 'scale-110' : ''
+                            } ${isDragging && selectedBalloon === balloon.id ? 'shadow-2xl scale-110' : ''}`}
+                          >
+                            <div
+                              className={`absolute inset-0 w-7 h-7 m-auto rotate-45 rounded-[2px] border-2 shadow-md transition-all ${
+                                selectedBalloon === balloon.id && isAnnotationMode
+                                  ? 'border-red-600 bg-red-50 ring-2 ring-red-500/30'
+                                  : `border-red-600 bg-white/95 ${isAnnotationMode ? 'hover:bg-red-50' : ''}`
+                              }`}
                             />
-                          ) : balloon.number}
-                        </div>
+                            <div className="relative z-10 flex items-center justify-center">
+                              {editingNumber === balloon.id ? (
+                                <input
+                                  type="number"
+                                  value={tempNumber}
+                                  onChange={(e) => setTempNumber(parseInt(e.target.value) || 0)}
+                                  onBlur={saveEditedNumber}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEditedNumber();
+                                    if (e.key === 'Escape') cancelEditNumber();
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  autoFocus
+                                  className="w-6 h-6 text-xs text-center bg-transparent text-red-600 border-0 outline-0 appearance-none font-bold"
+                                  min="1" max="99"
+                                />
+                              ) : (
+                                <span className="text-xs font-bold text-red-600">{balloon.number}</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shadow-md transition-all ${
+                              selectedBalloon === balloon.id && isAnnotationMode
+                                ? 'border-red-600 bg-red-50 text-red-600 scale-110 ring-2 ring-red-500/30'
+                                : `border-red-600 bg-white/95 text-red-600 ${isAnnotationMode ? 'hover:bg-red-50' : ''}`
+                            } ${isDragging && selectedBalloon === balloon.id ? 'shadow-2xl scale-110' : ''}`}
+                          >
+                            {editingNumber === balloon.id ? (
+                              <input
+                                type="number"
+                                value={tempNumber}
+                                onChange={(e) => setTempNumber(parseInt(e.target.value) || 0)}
+                                onBlur={saveEditedNumber}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') saveEditedNumber();
+                                  if (e.key === 'Escape') cancelEditNumber();
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                autoFocus
+                                className="w-6 h-6 text-xs text-center bg-transparent text-red-600 border-0 outline-0 appearance-none font-bold"
+                                min="1" max="99"
+                              />
+                            ) : balloon.number}
+                          </div>
+                        )}
                         {selectedBalloon === balloon.id && isAnnotationMode && (
                           <button
                             onClick={(e) => { e.stopPropagation(); deleteBalloon(balloon.id); }}
-                            className="absolute -top-1 -right-1 w-4 h-4 bg-gray-800 text-white rounded-full flex items-center justify-center text-xs hover:bg-gray-900"
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-gray-800 text-white rounded-full flex items-center justify-center text-xs hover:bg-gray-900 z-20"
                           >
                             ×
                           </button>
@@ -857,16 +1077,90 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                     </div>
                   ))}
 
-                  {balloons.length === 0 && isAnnotationMode && (
+                  {balloons.filter(b => (b.page || 1) === currentPage).length === 0 && isAnnotationMode && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/10" style={{ zIndex: 5 }}>
-                      <div className="bg-white/90 rounded-lg p-4 text-center border border-red-200 shadow-lg">
-                        <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-2">
-                          <span className="text-white font-bold text-sm">1</span>
+                      <div className="bg-white/95 rounded-lg p-4 text-center border border-red-200 shadow-lg">
+                        <div className="w-8 h-8 bg-white rounded-full border-2 border-red-600 flex items-center justify-center mx-auto mb-2 shadow-sm">
+                          <span className="text-red-600 font-bold text-sm">{balloons.length + 1}</span>
                         </div>
-                        <p className="text-sm font-semibold text-gray-800">Click anywhere to place balloon #1</p>
+                        <p className="text-sm font-semibold text-gray-800">Click anywhere on Sheet {currentPage} to place balloon #{balloons.length + 1}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Choose shape (Circle, Square, Diamond) or Sheet above</p>
                       </div>
                     </div>
                   )}
+                </>
+              )}
+
+              {/* Always-visible Left and Right edge navigation arrows & bottom sheet bar for seamless page switching even during balloon placement */}
+              {pdfUrl && (
+                <>
+                  {currentPage > 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentPage(prev => Math.max(1, prev - 1));
+                        setSelectedBalloon(null);
+                      }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 z-40 bg-white/95 hover:bg-blue-50 border border-blue-300 text-blue-900 rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition-all text-lg font-extrabold hover:scale-105 select-none"
+                      title="Previous Sheet (Scroll up)"
+                    >
+                      ‹
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentPage(prev => {
+                        const next = prev + 1;
+                        if (next > totalPages) setTotalPages(next);
+                        return next;
+                      });
+                      setSelectedBalloon(null);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-40 bg-white/95 hover:bg-blue-50 border border-blue-300 text-blue-900 rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition-all text-lg font-extrabold hover:scale-105 select-none"
+                    title="Next Sheet (Scroll down)"
+                  >
+                    ›
+                  </button>
+
+                  {/* Floating sheet switcher badge */}
+                  <div className="absolute bottom-4 right-4 z-40 bg-white/95 backdrop-blur border border-blue-200 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 select-none">
+                    <span className="text-xs font-bold text-gray-700">Sheet {currentPage} of {totalPages}</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-xs font-bold"
+                        disabled={currentPage <= 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentPage(prev => Math.max(1, prev - 1));
+                          setSelectedBalloon(null);
+                        }}
+                      >‹</Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-xs font-bold"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentPage(prev => {
+                            const next = prev + 1;
+                            if (next > totalPages) setTotalPages(next);
+                            return next;
+                          });
+                          setSelectedBalloon(null);
+                        }}
+                      >›</Button>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground ml-1 font-medium">
+                      ({balloons.filter(b => (b.page || 1) === currentPage).length} on this sheet)
+                    </span>
+                  </div>
                 </>
               )}
             </div>
@@ -982,6 +1276,64 @@ export default function QualityInspectionPage() {
   const [balloonDrawingEditMode, setBalloonDrawingEditMode] = useState(false);
   const [finalInspectionEditMode, setFinalInspectionEditMode] = useState(false);
   const [inspectionTableEditMode, setInspectionTableEditMode] = useState(false);
+
+  // Single-part report switcher state
+  const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
+  const [partReports, setPartReports] = useState<Record<string, any>>({});
+
+  const activeBomItem = useMemo(() => {
+    if (!bomItems || bomItems.length === 0) return null;
+    return bomItems.find((item: any, idx: number) => (item.id || item.partNumber || `item-${idx}`) === selectedPartId) || bomItems[0];
+  }, [bomItems, selectedPartId]);
+
+  const handlePartSwitch = (targetId: string) => {
+    if (selectedPartId === targetId) return;
+    const currentId = selectedPartId || bomItems[0]?.id || bomItems[0]?.partNumber || 'item-0';
+
+    // Save current part data into cache before switching
+    setPartReports(prev => ({
+      ...prev,
+      [currentId]: {
+        partName,
+        material,
+        surfaceTreatment,
+        drawingTitle,
+        drawingSize,
+        rawMaterial,
+        inspectionRows,
+        generalRemarks
+      }
+    }));
+
+    setSelectedPartId(targetId);
+
+    const targetItem = bomItems.find((i: any, idx: number) => (i.id || i.partNumber || `item-${idx}`) === targetId) || bomItems[0];
+    if (targetItem) {
+      setPartReports(prev => {
+        const cached = prev[targetId];
+        if (cached) {
+          setPartName(cached.partName || targetItem.partNumber || targetItem.name || '');
+          setMaterial(cached.material || targetItem.materialGrade || targetItem.material || '');
+          setSurfaceTreatment(cached.surfaceTreatment || '');
+          setDrawingTitle(cached.drawingTitle || (targetItem.partNumber || targetItem.name || '').toUpperCase());
+          setDrawingSize(cached.drawingSize || 'A4');
+          setRawMaterial(cached.rawMaterial || targetItem.materialGrade || targetItem.material || '');
+          setInspectionRows(cached.inspectionRows || []);
+          setGeneralRemarks(cached.generalRemarks || '');
+        } else {
+          setPartName(targetItem.partNumber || targetItem.name || '');
+          setMaterial(targetItem.materialGrade || targetItem.material || '');
+          setSurfaceTreatment('');
+          setDrawingTitle((targetItem.partNumber || targetItem.name || '').toUpperCase());
+          setDrawingSize('A4');
+          setRawMaterial(targetItem.materialGrade || targetItem.material || '');
+          setInspectionRows([]);
+          setGeneralRemarks('');
+        }
+        return prev;
+      });
+    }
+  };
 
   // 1.3 BALLOON DRAWING fields
   const [partName, setPartName] = useState('');
@@ -1103,16 +1455,21 @@ export default function QualityInspectionPage() {
     persistenceKey
   ]);
 
-  // Auto-populate fields when BOM items are available
+  // Auto-populate fields when BOM items are available or active part changes
   useEffect(() => {
-    if (bomItems.length > 0 && !partName) {
-      const firstItem = bomItems[0];
-      setPartName(firstItem.partNumber || firstItem.name || '');
-      setMaterial(firstItem.materialGrade || firstItem.material || '');
-      setRawMaterial(firstItem.materialGrade || firstItem.material || '');
-      setDrawingTitle((firstItem.partNumber || firstItem.name || '').toUpperCase());
+    if (bomItems.length > 0) {
+      if (!selectedPartId) {
+        const initialId = bomItems[0].id || bomItems[0].partNumber || 'item-0';
+        setSelectedPartId(initialId);
+      }
+      if (!partName && activeBomItem) {
+        setPartName(activeBomItem.partNumber || activeBomItem.name || '');
+        setMaterial(activeBomItem.materialGrade || activeBomItem.material || '');
+        setRawMaterial(activeBomItem.materialGrade || activeBomItem.material || '');
+        setDrawingTitle((activeBomItem.partNumber || activeBomItem.name || '').toUpperCase());
+      }
     }
-  }, [bomItems, partName]);
+  }, [bomItems, activeBomItem, selectedPartId, partName]);
 
   // Load existing report data from database when available (handle 404 gracefully)
   useEffect(() => {
@@ -1470,12 +1827,12 @@ export default function QualityInspectionPage() {
       const pageHeight = doc.internal.pageSize.getHeight();
 
       // Title and header
-      doc.setFontSize(20);
-      doc.text('QC INSPECTION REPORT', pageWidth / 2, 20, { align: 'center' });
+      doc.setFontSize(18);
+      doc.text(`QC INSPECTION REPORT — PART: ${activeBomItem?.partNumber || activeBomItem?.name || partName || 'N/A'}`, pageWidth / 2, 20, { align: 'center' });
 
-      doc.setFontSize(12);
-      doc.text(`Inspection ID: ${inspectionId}`, 20, 35);
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 45);
+      doc.setFontSize(11);
+      doc.text(`Part Name: ${partName || activeBomItem?.name || 'N/A'} | Inspection ID: ${inspectionId}`, 20, 32);
+      doc.text(`Generated: ${new Date().toLocaleString()} | Single-Part Report Mode`, 20, 40);
 
       let yPos = 60;
 
@@ -1706,11 +2063,12 @@ export default function QualityInspectionPage() {
         doc.text('Generated by Mithran QC System', 20, pageHeight - 10);
       }
 
-      // Save the PDF
-      const filename = `QC-Inspection-Report-${partName || inspectionId}-${new Date().toISOString().split('T')[0]}.pdf`;
+      // Save the PDF specifically for this 1 part
+      const safePartName = (activeBomItem?.partNumber || activeBomItem?.name || partName || inspectionId).replace(/[^a-zA-Z0-9-_]/g, '_');
+      const filename = `QC-Part-Report-${safePartName}-${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(filename);
 
-      toast.success('Complete inspection report downloaded successfully!');
+      toast.success(`QC Report exported for ${activeBomItem?.partNumber || activeBomItem?.name || 'this part'}!`);
 
     } catch (error) {
       toast.error('Failed to generate PDF report');
@@ -1816,16 +2174,84 @@ export default function QualityInspectionPage() {
                   <p className="text-sm text-muted-foreground">Loading BOM items...</p>
                 </div>
               ) : bomItems?.length > 0 ? (
-                <div className="grid gap-3">
-                  {bomItems.map((bomItem: any, index: number) => (
-                    <div key={bomItem.id || index} className="border rounded-lg overflow-hidden">
-                      <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b">
-                        <h4 className="font-medium text-sm">{bomItem.partNumber || bomItem.name || `Item ${index + 1}`}</h4>
-                        <Badge variant="secondary" className="text-xs">{bomItem.itemType || 'Component'}</Badge>
+                <div className="space-y-4 p-3 sm:p-4">
+                  {/* Sleek Part Selector Bar & Tabs */}
+                  {bomItems.length > 1 && (
+                    <div className="bg-muted/30 border rounded-xl p-3 sm:p-4 shadow-sm space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                            Select Part to Inspect & Report (Single-Part Mode)
+                          </h4>
+                          <p className="text-xs text-muted-foreground">
+                            Each part has its own separate 2D drawing, balloon table, and inspection report ({bomItems.length} parts available).
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="w-fit font-mono text-xs bg-primary/10 text-primary border-primary/30">
+                          Active: {activeBomItem?.partNumber || activeBomItem?.name || 'Selected Part'}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
+                        {bomItems.map((item: any, idx: number) => {
+                          const itemId = item.id || item.partNumber || `item-${idx}`;
+                          const isSelected = (selectedPartId || (bomItems[0]?.id || bomItems[0]?.partNumber || 'item-0')) === itemId;
+                          return (
+                            <button
+                              key={itemId}
+                              type="button"
+                              onClick={() => handlePartSwitch(itemId)}
+                              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-medium transition-all shrink-0 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-primary text-primary-foreground border-primary shadow-md ring-2 ring-primary/20 scale-[1.02]'
+                                  : 'bg-background hover:bg-muted/70 text-foreground border-border'
+                              }`}
+                            >
+                              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                                isSelected ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {idx + 1}
+                              </span>
+                              <span className="truncate max-w-[160px]">
+                                {item.partNumber || item.name || `Part ${idx + 1}`}
+                              </span>
+                              {item.quantity && (
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                                  isSelected ? 'bg-primary-foreground/15 text-primary-foreground' : 'bg-muted text-muted-foreground'
+                                }`}>
+                                  {item.quantity} {item.unitOfMeasure || item.unit || 'pcs'}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Single Active Part Display */}
+                  {activeBomItem && (
+                    <div className="border rounded-lg overflow-hidden bg-card shadow-sm">
+                      <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/50 border-b">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-sm text-foreground">
+                            {activeBomItem.partNumber || activeBomItem.name || 'Selected Part'}
+                          </h4>
+                          <Badge variant="secondary" className="text-xs font-mono">
+                            {activeBomItem.itemType || 'Component'}
+                          </Badge>
+                        </div>
+                        {bomItems.length > 1 && (
+                          <span className="text-xs text-muted-foreground font-mono bg-background px-2 py-0.5 rounded border">
+                            Part {bomItems.indexOf(activeBomItem) + 1} of {bomItems.length}
+                          </span>
+                        )}
                       </div>
 
                       <InlinePDFViewer
-                        bomItem={bomItem}
+                        key={activeBomItem.id || activeBomItem.partNumber || `viewer-${bomItems.indexOf(activeBomItem)}`}
+                        bomItem={activeBomItem}
                         onBalloonsChanged={setBalloons}
                         inspectionId={inspectionId}
                         onSaveToDatabaseSilently={saveToDatabaseSilently}
@@ -1836,11 +2262,11 @@ export default function QualityInspectionPage() {
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-muted/30 border-t">
                         <div>
                           <p className="text-xs font-medium text-muted-foreground">Material</p>
-                          <p className="text-sm font-mono">{bomItem.materialGrade || bomItem.material || 'Not specified'}</p>
+                          <p className="text-sm font-mono">{activeBomItem.materialGrade || activeBomItem.material || 'Not specified'}</p>
                         </div>
                         <div>
                           <p className="text-xs font-medium text-muted-foreground">Quantity</p>
-                          <p className="text-sm font-mono">{bomItem.quantity || 'N/A'} {bomItem.unitOfMeasure || bomItem.unit || 'pcs'}</p>
+                          <p className="text-sm font-mono">{activeBomItem.quantity || 'N/A'} {activeBomItem.unitOfMeasure || activeBomItem.unit || 'pcs'}</p>
                         </div>
                         <div>
                           <p className="text-xs font-medium text-muted-foreground">Drawing Type</p>
@@ -1848,11 +2274,11 @@ export default function QualityInspectionPage() {
                         </div>
                         <div>
                           <p className="text-xs font-medium text-muted-foreground">Description</p>
-                          <p className="text-sm font-mono truncate">{bomItem.description || 'N/A'}</p>
+                          <p className="text-sm font-mono truncate">{activeBomItem.description || 'N/A'}</p>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
               ) : bomsError || bomItemsError ? (
                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
@@ -2314,11 +2740,11 @@ export default function QualityInspectionPage() {
                 variant="outline"
                 size="sm"
                 onClick={generateComprehensivePDF}
-                className="flex items-center gap-2 text-xs sm:text-sm"
+                className="flex items-center gap-2 text-xs sm:text-sm bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary font-medium"
               >
                 <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Download Full Report</span>
-                <span className="sm:hidden">Download</span>
+                <span className="hidden sm:inline">Export Part PDF ({activeBomItem?.partNumber || activeBomItem?.name || '1 Part'})</span>
+                <span className="sm:hidden">Export Part PDF</span>
               </Button>
               <Button
                 variant="outline"

@@ -683,6 +683,13 @@ export function BOMItemDialog({
         setActiveFileId(item.id);
         populateFormFromResult(result);
       }
+      // Surface CAD engine errors (e.g. FreeCAD not installed for SLDPRT)
+      if (!result.cadEngineAvailable && result.cadEngineError) {
+        toast.warning('Geometry extraction unavailable', {
+          description: result.cadEngineError,
+          duration: 10000,
+        });
+      }
     } catch (e: any) {
       updatePendingFileStatus(item.id, 'error', e?.message ?? 'Analysis failed');
       toast.error(`Could not analyze ${item.file.name}`, {
@@ -744,7 +751,10 @@ export function BOMItemDialog({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleFileDrop,
-    accept: { 'application/octet-stream': ['.step', '.stp', '.stl', '.iges', '.igs', '.obj', '.dxf', '.dwg'] },
+    accept: {
+      'application/octet-stream': ['.step', '.stp', '.stl', '.iges', '.igs', '.obj', '.dxf', '.dwg', '.sldprt'],
+      'application/x-sldprt': ['.sldprt'],
+    },
     maxSize: 100 * 1024 * 1024,
     multiple: true,
     noClick: false,
@@ -1405,7 +1415,7 @@ export function BOMItemDialog({
               <div className="flex items-center justify-between">
                 <Label className="flex items-center gap-2">
                   <Package className="h-4 w-4" />
-                  3D Models / CAD (STEP, STL, IGES, OBJ, DXF, DWG)
+                  3D Models / CAD (STEP, STL, IGES, OBJ, DXF, DWG, SLDPRT)
                   {pendingFiles.length > 0 && (
                     <Badge variant="secondary" className="text-xs ml-1">
                       {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''}
@@ -1431,9 +1441,9 @@ export function BOMItemDialog({
                   <div className="flex flex-col items-center gap-2 text-muted-foreground py-2">
                     <Package className="h-7 w-7 opacity-50" />
                     <p className="text-sm font-medium">
-                      {isDragActive ? 'Drop files here…' : 'Drop STEP / STL / IGES / DXF / DWG files, or click to browse'}
+                      {isDragActive ? 'Drop files here…' : 'Drop STEP / STL / IGES / SLDPRT / DXF / DWG files, or click to browse'}
                     </p>
-                    <p className="text-xs">Multiple files supported · 100 MB max each · DXF/DWG saved as drawing · STEP/STL auto-fills form</p>
+                    <p className="text-xs">Multiple files supported · 100 MB max each · DXF/DWG saved as drawing · STEP/STL/SLDPRT auto-fills form</p>
                   </div>
                 ) : (
                   <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
@@ -1509,33 +1519,35 @@ export function BOMItemDialog({
                     {activeResult.costs.materialCostPerKg !== null && (
                       <>
                         <span className="text-muted-foreground">Material cost/kg</span>
-                        <span className="font-mono">₹ {activeResult.costs.materialCostPerKg?.toFixed(2)}</span>
+                        <span className="font-mono">$ {activeResult.costs.materialCostPerKg?.toFixed(2)}</span>
                       </>
                     )}
                     {activeResult.costs.mhrRate !== null && (
                       <>
                         <span className="text-muted-foreground">Machine hour rate</span>
-                        <span className="font-mono">₹ {activeResult.costs.mhrRate?.toFixed(2)}/hr</span>
+                        <span className="font-mono">$ {activeResult.costs.mhrRate?.toFixed(2)}/hr</span>
                       </>
                     )}
                     {activeResult.costs.lhrRate !== null && (
                       <>
                         <span className="text-muted-foreground">Labour hour rate</span>
-                        <span className="font-mono">₹ {activeResult.costs.lhrRate?.toFixed(2)}/hr</span>
+                        <span className="font-mono">$ {activeResult.costs.lhrRate?.toFixed(2)}/hr</span>
                       </>
                     )}
                     {activeResult.costs.estimatedUnitCost !== null && (
                       <>
                         <span className="text-muted-foreground font-medium">Est. unit cost</span>
                         <span className="font-mono font-semibold text-primary">
-                          ₹ {activeResult.costs.estimatedUnitCost?.toFixed(2)}
+                          $ {activeResult.costs.estimatedUnitCost?.toFixed(2)}
                         </span>
                       </>
                     )}
                   </div>
                   {!activeResult.cadEngineAvailable && (
                     <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                      ⚠ CAD engine offline — geometry from bounding-box estimate
+                      {activeResult.cadEngineError?.includes('FreeCAD')
+                        ? '⚠ SolidWorks files need FreeCAD installed, or export as STEP from SolidWorks.'
+                        : '⚠ CAD engine offline — geometry from bounding-box estimate'}
                     </p>
                   )}
                 </div>
@@ -1713,7 +1725,7 @@ export function BOMItemDialog({
                               </div>
                               <div className="text-xs text-muted-foreground text-right shrink-0 ml-2">
                                 {gradeInfo.density && `${gradeInfo.density} g/cm³`}
-                                {gradeInfo.cost && <div>₹{gradeInfo.cost.toFixed(2)}</div>}
+                                {gradeInfo.cost && <div>${gradeInfo.cost.toFixed(2)}</div>}
                                 {gradeInfo.ultimateTensileStrength && (
                                   <div>UTS: {gradeInfo.ultimateTensileStrength} MPa</div>
                                 )}
@@ -1831,7 +1843,7 @@ export function BOMItemDialog({
                 <div className="grid gap-2 mt-2 p-4 border rounded-lg bg-muted/30">
                   <Label htmlFor="unitCost" className="flex items-center gap-2">
                     Unit Cost (Purchasing)
-                    <span className="text-xs text-muted-foreground font-normal">(₹)</span>
+                    <span className="text-xs text-muted-foreground font-normal">($)</span>
                   </Label>
                   <Input
                     id="unitCost"

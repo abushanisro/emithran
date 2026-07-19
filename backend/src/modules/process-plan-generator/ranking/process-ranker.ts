@@ -20,9 +20,10 @@ interface ProcessRow {
 
 // Keywords checked against the full "group route operation" haystack
 const FAMILY_KEYWORDS: Record<Exclude<PartFamily, 'out_of_scope'>, string[]> = {
-  cnc_turned: ['turn', 'lathe', 'face', 'thread', 'chamfer', 'parting', 'groove', 'bore', 'tap', 'drill'],
-  cnc_milled: ['mill', 'machin', 'pocket', 'profile', 'slot', 'contour', 'tap', 'drill'],
-  sheet_metal: ['sheet', 'metal', 'laser', 'punch', 'bend', 'form', 'shear', 'cut', 'press'],
+  cnc_turned:       ['turn', 'lathe', 'face', 'thread', 'chamfer', 'parting', 'groove', 'bore', 'tap', 'drill'],
+  cnc_milled:       ['mill', 'machin', 'pocket', 'profile', 'slot', 'contour', 'tap', 'drill'],
+  sheet_metal:      ['sheet', 'metal', 'laser', 'punch', 'bend', 'form', 'shear', 'cut', 'press'],
+  injection_molded: ['injection', 'mold', 'mould', 'plastic', 'im ', 'molding', 'casting', 'trim', 'deflash'],
 };
 
 // Groups that are almost always relevant (assembly, finishing, inspection)

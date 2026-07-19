@@ -11,11 +11,12 @@ import {
 } from 'lucide-react';
 import { useBomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
 import { useCostData } from '@/lib/providers/cost-data-provider';
+import { LocationComparisonPanel } from './LocationComparisonPanel';
 import { useEffect } from 'react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const fmt = (v: number) => `₹${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (v: number) => `$${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (v: number) => `${v.toFixed(1)}%`;
 
 const COLORS = {
@@ -70,6 +71,7 @@ interface CostAnalysisEngineProps {
   partNumber?: string;
   partName?: string;
   material?: string;
+  location?: string;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -83,6 +85,7 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
   partNumber,
   partName,
   material,
+  location,
 }) => {
   const { calculateBomCosts, getCostData, isCalculating } = useCostData();
   const costData = getCostData(bomId);
@@ -232,7 +235,7 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-1.5 text-muted-foreground font-medium">Cost Element</th>
-                  <th className="text-right py-1.5 text-muted-foreground font-medium">₹ / Part</th>
+                  <th className="text-right py-1.5 text-muted-foreground font-medium">$ / Part</th>
                   <th className="text-right py-1.5 text-muted-foreground font-medium w-16">%</th>
                 </tr>
               </thead>
@@ -364,11 +367,11 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
                         </div>
                       </td>
                       <td className="py-1.5 px-2 text-right tabular-nums">{pl.cycleTimeSec.toFixed(0)}</td>
-                      <td className="py-1.5 px-2 text-right tabular-nums">₹{pl.machineRate.toFixed(0)}</td>
-                      <td className="py-1.5 px-2 text-right tabular-nums">₹{pl.laborRate.toFixed(0)}</td>
-                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">₹{pl.setupCostPerPart.toFixed(4)}</td>
-                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">₹{pl.cycleCostPerPart.toFixed(4)}</td>
-                      <td className="py-1.5 px-4 text-right tabular-nums font-mono font-semibold">₹{pl.totalCostPerPart.toFixed(4)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums">${pl.machineRate.toFixed(0)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums">${pl.laborRate.toFixed(0)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">${pl.setupCostPerPart.toFixed(4)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">${pl.cycleCostPerPart.toFixed(4)}</td>
+                      <td className="py-1.5 px-4 text-right tabular-nums font-mono font-semibold">${pl.totalCostPerPart.toFixed(4)}</td>
                     </tr>
                   ))}
                   <tr className="border-t-2 border-border bg-muted/20 font-semibold">
@@ -382,7 +385,10 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
         </Card>
       )}
 
-      {/* ── 6. Raw Material Breakdown ────────────────────────────────────── */}
+      {/* ── 6. Location Cost Comparison ─────────────────────────────────── */}
+      <LocationComparisonPanel bomItemId={bomItemId} bomId={bomId} location={location} />
+
+      {/* ── 7. Raw Material Breakdown ────────────────────────────────────── */}
       {analysis.materialLines.length > 0 && (
         <Card>
           <CardHeader className="py-3 px-4">
@@ -398,7 +404,7 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
                     <th className="text-right py-2 px-2 font-medium text-muted-foreground">Net (kg)</th>
                     <th className="text-right py-2 px-2 font-medium text-muted-foreground">Gross (kg)</th>
                     <th className="text-right py-2 px-2 font-medium text-muted-foreground">Scrap %</th>
-                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">₹/kg</th>
+                    <th className="text-right py-2 px-2 font-medium text-muted-foreground">$/kg</th>
                     <th className="text-right py-2 px-4 font-medium text-muted-foreground">Total/part</th>
                   </tr>
                 </thead>
@@ -410,8 +416,8 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
                       <td className="py-1.5 px-2 text-right tabular-nums font-mono">{ml.netUsage.toFixed(4)}</td>
                       <td className="py-1.5 px-2 text-right tabular-nums font-mono">{ml.grossUsage.toFixed(4)}</td>
                       <td className="py-1.5 px-2 text-right tabular-nums">{ml.scrap}%</td>
-                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">₹{ml.unitCost.toFixed(2)}</td>
-                      <td className="py-1.5 px-4 text-right tabular-nums font-mono font-semibold">₹{ml.totalCost.toFixed(4)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-mono">${ml.unitCost.toFixed(2)}</td>
+                      <td className="py-1.5 px-4 text-right tabular-nums font-mono font-semibold">${ml.totalCost.toFixed(4)}</td>
                     </tr>
                   ))}
                   <tr className="border-t-2 border-border bg-muted/20 font-semibold">

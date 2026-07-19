@@ -3,6 +3,7 @@
 
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsString, IsOptional, IsNumber, IsEnum, IsUUID, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   IsProjectName,
   IsOptionalString,
@@ -98,11 +99,13 @@ export class QueryProjectsDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   page?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   limit?: number;
 }

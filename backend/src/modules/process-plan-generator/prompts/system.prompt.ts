@@ -449,7 +449,7 @@ export function formatBriefAndCandidates(brief: EngineeringBrief, candidates: Ca
     lines.push(`  ${c.candidateId}: ${c.machineName} (${c.commodityCode ?? '—'}, ₹${c.rateInrPerHour}/hr, location ${c.location ?? '—'}) [score ${c.score}]`);
   }
   lines.push('');
-  lines.push('## Labour bands (LSR)');
+  lines.push('## Labour bands (LHR)');
   for (const c of candidates.labour) {
     lines.push(`  ${c.candidateId}: ${c.labourType} (₹${c.lhrInrPerHour}/hr, location ${c.location ?? '—'}) [score ${c.score}]`);
   }

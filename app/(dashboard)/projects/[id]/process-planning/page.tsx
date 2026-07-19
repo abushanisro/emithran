@@ -11,11 +11,15 @@ import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useProcessPlanningSpecsByBomItem } from '@/lib/api/hooks/useProcessPlanningSpecs';
 import { ModelViewer } from '@/components/ui/model-viewer';
+import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
 import { Viewer2D } from '@/components/ui/viewer-2d';
 import { apiClient } from '@/lib/api/client';
 import { bomItemsApi } from '@/lib/api/bom-items';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon, Loader2, ChevronRight, Zap, Trophy, TrendingDown, CheckCircle2, Ruler } from 'lucide-react';
+import { useRouteComparison, useApplyRoute } from '@/lib/api/hooks/useBOMItems';
+import type { RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 
 // Reset circuit breaker on page load if it's stuck
 if (typeof window !== 'undefined') {
@@ -27,7 +31,6 @@ if (typeof window !== 'undefined') {
 }
 import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
 import { usePageContext } from '@/lib/echo/PageContextProvider';
-import { GenerateProcessPlanButton } from '@/components/features/process-planning/GenerateProcessPlanButton';
 import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
 import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
 import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
@@ -43,6 +46,137 @@ import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavig
 import { toViewerFeature, FEATURE_GROUP_META } from '@/lib/utils/feature-colors';
 import type { FeatureGroup } from '@/lib/utils/feature-colors';
 
+// ── Dimension Validation Dialog ───────────────────────────────────────────────
+// Shows the actual 3D CAD model with live-extracted measurements (aPriori-style).
+
+function DimMetricCard({ label, value, unit, accent }: { label: string; value: string; unit?: string; accent?: string }) {
+  return (
+    <div className="flex flex-col gap-0.5 bg-[#1a2235] rounded-lg p-2.5">
+      <span className="text-[9px] uppercase tracking-widest font-medium" style={{ color: accent ?? '#6b7280' }}>{label}</span>
+      <span className="text-sm font-mono font-bold text-[#f0f4ff] leading-tight">{value}</span>
+      {unit && <span className="text-[9px] text-[#4b5563]">{unit}</span>}
+    </div>
+  );
+}
+
+
+function DimensionValidationDialog({
+  open, onClose,
+  fileUrl, fileType, screenshot,
+  dims, volumeMm3, surfaceAreaMm2,
+  material, weight, tolerance, surfaceFinish, densityGcm3 = 7.85,
+}: {
+  open: boolean;
+  onClose: () => void;
+  fileUrl: string | null;
+  fileType: string;
+  screenshot: string | null;
+  dims: { x: number; y: number; z: number } | null;
+  volumeMm3: number | null;
+  surfaceAreaMm2: number | null;
+  material?: string;
+  weight?: string;
+  tolerance?: string;
+  surfaceFinish?: string;
+  densityGcm3?: number;
+}) {
+  const volMm3 = volumeMm3 ?? 0;
+  const saMm2 = surfaceAreaMm2 ?? 0;
+  const volCm3 = volMm3 / 1000;
+  const calcWeightKg = volCm3 * densityGcm3 / 1000;
+
+  const displaySA  = saMm2 > 0    ? `${saMm2.toFixed(0)} mm²`    : '—';
+  const displayVol = volMm3 > 0   ? `${volCm3.toFixed(3)} cm³`   : '—';
+  const displayWt  = calcWeightKg > 0
+    ? `${calcWeightKg.toFixed(4)} kg`
+    : weight && parseFloat(weight) > 0 ? `${parseFloat(weight).toFixed(4)} kg` : '—';
+
+  const isStl = fileType?.toLowerCase() === 'stl';
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-[640px] p-0 overflow-hidden border border-[#1a2540] bg-[#0b0f1a]">
+        <DialogHeader className="px-5 pt-4 pb-3 border-b border-[#1a2540]">
+          <DialogTitle className="text-sm font-semibold text-[#c9d8f0] flex items-center gap-2">
+            <Ruler className="h-4 w-4 text-emerald-400" />
+            Part Dimension Validation
+          </DialogTitle>
+          <DialogDescription className="text-[10px] text-[#4a6080]">
+            Bounding envelope extracted from CAD geometry
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-0 overflow-y-auto" style={{ maxHeight: '85vh' }}>
+
+          {/* ── Part Envelope: full-width PartDimensionViewer ── */}
+          <div className="relative bg-[#0d1520] border-b border-[#1a2540] flex justify-center overflow-hidden" style={{ height: 320 }}>
+
+            {/* Isometric thumbnail — top-right corner if screenshot available */}
+            {screenshot && (
+              <div className="absolute top-2 right-2 z-10 rounded overflow-hidden border border-[#1a2540]" style={{ width: 80, height: 60 }}>
+                <img src={screenshot} alt="iso" style={{ width: 80, height: 60, objectFit: 'cover', background: '#0d1117' }} />
+                <span className="absolute bottom-0 left-0 right-0 text-center text-[7px] font-mono text-[#4a6080] bg-[#0b0f1a]/80 py-0.5">ISO</span>
+              </div>
+            )}
+
+            {/* Depth badge — top-left */}
+            {dims?.z != null && (
+              <div className="absolute top-2 left-2 z-10 flex items-center gap-1 bg-[#0b0f1a]/90 border border-[#2a3f60] rounded px-2 py-1">
+                <span className="text-[8px] uppercase tracking-widest text-[#4a6080]">D</span>
+                <span className="text-[11px] font-mono font-bold text-[#f59e0b]">{dims.z.toFixed(2)}</span>
+                <span className="text-[8px] text-[#4a6080]">mm</span>
+              </div>
+            )}
+
+            {isStl && fileUrl ? (
+              /* STL — full-width orthographic render with auto-fitted model + projected dim arrows */
+              <PartDimensionViewer
+                fileUrl={fileUrl}
+                {...(dims?.x != null ? { maxLength: dims.x } : {})}
+                {...(dims?.y != null ? { maxWidth: dims.y } : {})}
+                {...(dims?.z != null ? { maxHeight: dims.z } : {})}
+                canvasWidth={580}
+                canvasHeight={320}
+              />
+            ) : screenshot ? (
+              <img
+                src={screenshot}
+                alt="Part 3D"
+                style={{ display: 'block', width: '100%', height: 320, objectFit: 'contain', background: '#0d1520' }}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-2 text-[#3a5070]" style={{ height: 320 }}>
+                <Ruler className="h-10 w-10 opacity-20" />
+                <p className="text-xs">Load a 3D model in the viewer first.</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── Metrics — 3 columns in one row ── */}
+          <div className="px-5 py-4 grid grid-cols-3 gap-3 border-b border-[#1a2540]">
+            <DimMetricCard label="Width (X)"    value={dims?.x ? dims.x.toFixed(2) : '—'} unit="mm" accent="#60a5fa" />
+            <DimMetricCard label="Height (Y)"   value={dims?.y ? dims.y.toFixed(2) : '—'} unit="mm" accent="#34d399" />
+            <DimMetricCard label="Depth (Z)"    value={dims?.z ? dims.z.toFixed(2) : '—'} unit="mm" accent="#f59e0b" />
+          </div>
+
+          <div className="px-5 py-4 grid grid-cols-3 gap-3 border-b border-[#1a2540]">
+            <DimMetricCard label="Surface Area" value={displaySA}  accent="#a78bfa" />
+            <DimMetricCard label="Volume"        value={displayVol} accent="#38bdf8" />
+            <DimMetricCard label="Calc. Weight"  value={displayWt}  accent="#34d399" />
+          </div>
+
+          <div className="px-5 py-4 grid grid-cols-4 gap-3">
+            <DimMetricCard label="Material"       value={material || '—'}                                              accent="#fb923c" />
+            <DimMetricCard label="Density"        value={densityGcm3 > 0 ? `${densityGcm3.toFixed(2)} g/cm³` : '—'}  accent="#64748b" />
+            <DimMetricCard label="Tolerance"      value={tolerance || '—'}                                             accent="#64748b" />
+            <DimMetricCard label="Surface Finish" value={surfaceFinish || '—'}                                         accent="#64748b" />
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function getMaterialDensityGcm3(material: string): number {
   const m = material.toLowerCase();
   if (m.includes('stainless') || m.includes('ss ') || /\b(304|316|202|410|430)\b/.test(m)) return 7.93;
@@ -56,6 +190,195 @@ function getMaterialDensityGcm3(material: string): number {
   return 7.85;
 }
 
+// ── Route badge chips ─────────────────────────────────────────────────────────
+function RouteBadge({ label, icon }: { label: string; icon: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white/90">
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+// ── Route card inside the dialog ──────────────────────────────────────────────
+function RouteCard({
+  route,
+  currencySymbol,
+  onSelect,
+  isApplying,
+}: {
+  route: RouteResultDto;
+  currencySymbol: string;
+  onSelect: (routeId: string) => void;
+  isApplying: boolean;
+}) {
+  const infeasible = !route.isFeasible;
+  return (
+    <div
+      className={[
+        'rounded-lg border p-4 transition-all',
+        infeasible
+          ? 'border-border bg-muted/30 opacity-50'
+          : 'border-border bg-card hover:border-primary/50 hover:shadow-sm',
+      ].join(' ')}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-sm text-foreground">{route.routeLabel}</p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {route.badges.lowestCost && (
+              <RouteBadge label="Lowest Cost" icon={<TrendingDown className="h-2.5 w-2.5" />} />
+            )}
+            {route.badges.fastest && (
+              <RouteBadge label="Fastest" icon={<Zap className="h-2.5 w-2.5" />} />
+            )}
+            {route.badges.bestQuality && (
+              <RouteBadge label="Best Quality" icon={<Trophy className="h-2.5 w-2.5" />} />
+            )}
+          </div>
+          <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
+            <span>
+              <span className="font-medium text-foreground">
+                {infeasible ? '—' : `${currencySymbol}${route.totalCost?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </span>{' '}
+              total/pc
+            </span>
+            <span>
+              <span className="font-medium text-foreground">
+                {route.cycleTimes.totalMin.toFixed(1)} min
+              </span>{' '}
+              cycle
+            </span>
+            <span>
+              <span className="font-medium text-foreground">
+                {route.processLines.length}
+              </span>{' '}
+              ops
+            </span>
+          </div>
+          {infeasible && route.warnings[0] && (
+            <p className="mt-1.5 text-[11px] text-destructive">{route.warnings[0]}</p>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant={infeasible ? 'ghost' : 'default'}
+          disabled={infeasible || isApplying}
+          onClick={() => onSelect(route.routeId)}
+          className="h-8 shrink-0 gap-1 text-xs"
+        >
+          {isApplying ? <Loader2 className="h-3 w-3 animate-spin" /> : <ChevronRight className="h-3 w-3" />}
+          Select
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Route Selection Button + Dialog ──────────────────────────────────────────
+function RouteSelectionButton({ bomItemId, location }: { bomItemId: string | null; location: string }) {
+  const [open, setOpen] = useState(false);
+  const [applyingRouteId, setApplyingRouteId] = useState<string | null>(null);
+
+  const routes = useRouteComparison(bomItemId ?? undefined, 1, location);
+  const applyRoute = useApplyRoute(bomItemId ?? undefined);
+
+  const handleSelect = (routeId: string) => {
+    if (!bomItemId || applyRoute.isPending) return;
+    setApplyingRouteId(routeId);
+    applyRoute.mutate(
+      { routeId, batchSize: 1, location },
+      {
+        onSettled: () => {
+          setApplyingRouteId(null);
+          setOpen(false);
+        },
+      },
+    );
+  };
+
+  const feasibleRoutes = routes.data?.routes.filter((r) => r.isFeasible) ?? [];
+  const infeasibleRoutes = routes.data?.routes.filter((r) => !r.isFeasible) ?? [];
+  const symbol = routes.data?.currencySymbol ?? '$';
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => bomItemId && setOpen(true)}
+        disabled={!bomItemId}
+        className="h-6 px-2 text-xs text-white hover:bg-white/20 disabled:opacity-50"
+      >
+        Auto-Fill from CAD
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Select Manufacturing Route</DialogTitle>
+            <DialogDescription>
+              Choose a route — operations and cycle times will be written to the Process Cost table.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-1">
+            {routes.isLoading && (
+              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading routes…
+              </div>
+            )}
+
+            {routes.isError && (
+              <p className="py-6 text-center text-sm text-destructive">
+                Failed to load routes. Ensure a CAD file has been analyzed first.
+              </p>
+            )}
+
+            {routes.isSuccess && feasibleRoutes.length === 0 && infeasibleRoutes.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No routes available for this part family. Run Auto-Fill on the CAD file first.
+              </p>
+            )}
+
+            {feasibleRoutes.length > 0 && (
+              <div className="space-y-2">
+                {feasibleRoutes.map((route) => (
+                  <RouteCard
+                    key={route.routeId}
+                    route={route}
+                    currencySymbol={symbol}
+                    onSelect={handleSelect}
+                    isApplying={applyingRouteId === route.routeId && applyRoute.isPending}
+                  />
+                ))}
+              </div>
+            )}
+
+            {infeasibleRoutes.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-0.5">
+                  Not feasible for this part
+                </p>
+                {infeasibleRoutes.map((route) => (
+                  <RouteCard
+                    key={route.routeId}
+                    route={route}
+                    currencySymbol={symbol}
+                    onSelect={handleSelect}
+                    isApplying={false}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function ProcessPlanningPageContent() {
   const params = useParams();
   const router = useRouter();
@@ -64,6 +387,7 @@ function ProcessPlanningPageContent() {
   const queryClient = useQueryClient();
   const [isExporting, setIsExporting] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [validationDialogOpen, setValidationDialogOpen] = useState(false);
 
   usePageContext({
     entityType: 'project',
@@ -75,6 +399,7 @@ function ProcessPlanningPageContent() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [location, setLocation] = useState<string>('USA');
   const [file3dUrl, setFile3dUrl] = useState<string | null>(null);
   const [file2dUrl, setFile2dUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -108,6 +433,9 @@ function ProcessPlanningPageContent() {
 
   const modelViewerRef = useRef<HTMLDivElement>(null);
   const [cadVolumeMm3, setCadVolumeMm3] = useState<number | null>(null);
+  const [cadSurfaceArea, setCadSurfaceArea] = useState<number | null>(null);
+  const [cadDimensions, setCadDimensions] = useState<{ x: number; y: number; z: number } | null>(null);
+  const [localScreenshot, setLocalScreenshot] = useState<string | null>(null);
   const [manufacturingFeatures, setManufacturingFeatures] = useState<any[]>([]);
   const [selectedFeature, setSelectedFeature] = useState<any | null>(null);
 
@@ -138,9 +466,9 @@ function ProcessPlanningPageContent() {
   const activeCameraPreset = activeGroup ? (FEATURE_GROUP_META[activeGroup]?.cameraPreset ?? null) : null;
 
   const handleModelMeasurements = (data: any) => {
-    if (data?.volume && data.volume > 0) {
-      setCadVolumeMm3(data.volume);
-    }
+    if (data?.volume && data.volume > 0) setCadVolumeMm3(data.volume);
+    if (data?.surfaceArea && data.surfaceArea > 0) setCadSurfaceArea(data.surfaceArea);
+    if (data?.dimensions) setCadDimensions(data.dimensions);
   };
 
   // Fetch data with loading and error states - force fresh data with higher limit
@@ -194,6 +522,9 @@ function ProcessPlanningPageContent() {
   const { data: exportAnalysis } = useBomItemCostAnalysis(selectedItem?.id);
 
   const handleScreenshotReady = useCallback(async (dataUrl: string) => {
+    // Keep a full-res copy locally for the Validation dialog overlay
+    setLocalScreenshot(dataUrl);
+
     const itemId = selectedItem?.id;
     if (!itemId) return;
     if (selectedItem?.thumbnailUrl && selectedItem.thumbnailUrl.length > 100) return;
@@ -794,12 +1125,23 @@ function ProcessPlanningPageContent() {
                         Complete BOM Details & Process Planning
                       </CardTitle>
                       <div className="flex items-center gap-2">
-                        <GenerateProcessPlanButton
-                          bomItemId={selectedItem?.id ?? null}
-                          hasGeometry={!!selectedItem?.file3dPath}
-                          onFeatureHighlight={handleFeatureHighlight}
-                          onFeatureFocus={handleFeatureFocus}
-                        />
+                        <select
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          className="h-6 text-xs bg-white text-gray-800 font-medium border border-green-300 rounded px-1.5 focus:outline-none focus:ring-2 focus:ring-white/60 shadow-sm [&>option]:bg-white [&>option]:text-gray-800"
+                        >
+                          <option value="India">India</option>
+                          <option value="USA">USA</option>
+                          <option value="China">China</option>
+                          <option value="Germany">Germany</option>
+                          <option value="France">France</option>
+                          <option value="W. Europe">W. Europe</option>
+                          <option value="E. Europe">E. Europe</option>
+                          <option value="UK">UK</option>
+                          <option value="Vietnam">Vietnam</option>
+                          <option value="Mexico">Mexico</option>
+                        </select>
+                        <RouteSelectionButton bomItemId={selectedItem?.id ?? null} location={location} />
                         {!isEditingPartDetails ? (
                           <Button
                             variant="ghost"
@@ -1089,7 +1431,7 @@ function ProcessPlanningPageContent() {
                         <h4 className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">Cost</h4>
                         <div className="space-y-1">
                           <div>
-                            <label className="text-xs text-muted-foreground">Unit Cost (₹)</label>
+                            <label className="text-xs text-muted-foreground">Unit Cost ($)</label>
                             {isEditingPartDetails ? (
                               <Input
                                 value={editablePartData.unitCost}
@@ -1097,7 +1439,7 @@ function ProcessPlanningPageContent() {
                                 className="h-7 text-xs"
                               />
                             ) : (
-                              <p className="text-xs font-medium">₹{editablePartData.unitCost || '—'}</p>
+                              <p className="text-xs font-medium">${editablePartData.unitCost || '—'}</p>
                             )}
                           </div>
                         </div>
@@ -1156,11 +1498,20 @@ function ProcessPlanningPageContent() {
                 <div ref={modelViewerRef} className="border border-border rounded-lg overflow-hidden shadow-md">
                   <div className="bg-primary p-3 flex items-center justify-between">
                     <h2 className="text-sm font-semibold text-primary-foreground">3D Model Viewer</h2>
-                    {selectedItem.file3dPath && (
-                      <span className="text-xs text-primary-foreground/70 font-mono">
-                        {selectedItem.file3dPath.split('.').pop()?.toUpperCase()}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {selectedItem.file3dPath && (
+                        <span className="text-xs text-primary-foreground/70 font-mono">
+                          {selectedItem.file3dPath.split('.').pop()?.toUpperCase()}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => setValidationDialogOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-colors"
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                        Validation
+                      </button>
+                    </div>
                   </div>
                   <div className="bg-card h-[calc(100vh-220px)] min-h-[600px]">
                     {selectedItem.file3dPath && file3dUrl ? (
@@ -1183,6 +1534,23 @@ function ProcessPlanningPageContent() {
                     )}
                   </div>
                 </div>
+
+                {/* Dimension Validation Dialog — thumbnail + live measurements from the 3D viewer */}
+                <DimensionValidationDialog
+                  open={validationDialogOpen}
+                  onClose={() => setValidationDialogOpen(false)}
+                  fileUrl={file3dUrl}
+                  fileType={selectedItem.file3dPath?.split('.').pop() ?? ''}
+                  screenshot={localScreenshot}
+                  dims={cadDimensions}
+                  volumeMm3={cadVolumeMm3}
+                  surfaceAreaMm2={cadSurfaceArea}
+                  material={editablePartData.material}
+                  weight={editablePartData.unitWeight}
+                  tolerance={editablePartData.toleranceGrade}
+                  surfaceFinish={editablePartData.surfaceFinish}
+                  densityGcm3={getMaterialDensityGcm3(editablePartData.material)}
+                />
 
                 {/* 2D DRAWING VIEWER */}
                 {selectedItem.file2dPath && (
@@ -1217,12 +1585,13 @@ function ProcessPlanningPageContent() {
                 )}
 
                 {/* Raw Materials Section */}
-                <RawMaterialsSection bomItemId={selectedItem.id} bomItem={selectedItem} />
+                <RawMaterialsSection bomItemId={selectedItem.id} bomItem={selectedItem} location={location} />
 
                 {/* Manufacturing Process Section */}
                 <ManufacturingProcessSection
                   bomItemId={selectedItem.id}
                   bomItem={selectedItem}
+                  location={location}
                   onFeatureHighlight={handleFeatureHighlight}
                   onFeatureFocus={handleFeatureFocus}
                 />
@@ -1306,6 +1675,7 @@ function ProcessPlanningPageContent() {
                         bomId={targetBom.id}
                         bomName={targetBom.name || "Assembly"}
                         itemCount={currentBomItems.length || 2}
+                        location={location}
                         {...(selectedItem?.id ? { bomItemId: selectedItem.id } : {})}
                         {...(selectedItem?.thumbnailUrl ? { thumbnailUrl: selectedItem.thumbnailUrl } : {})}
                         {...(selectedItem?.partNumber ? { partNumber: String(selectedItem.partNumber) } : {})}

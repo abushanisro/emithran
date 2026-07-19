@@ -440,7 +440,7 @@ export default function CreateDeliveryOrderDialog({
                           <p className="text-sm text-muted-foreground">{item.bomItem.description}</p>
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span>Available: {item.approvedQuantity} {item.bomItem.unitOfMeasure}</span>
-                            <span>Value: ₹{item.bomItem.unitCost?.toLocaleString() || 0}</span>
+                            <span>Value: ${item.bomItem.unitCost?.toLocaleString() || 0}</span>
                             {item.qcCertificateNumber && (
                               <span>Cert: {item.qcCertificateNumber}</span>
                             )}
@@ -1153,7 +1153,7 @@ export default function CreateDeliveryOrderDialog({
             {/* Cost Breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="deliveryCost">Delivery Cost (₹)</Label>
+                <Label htmlFor="deliveryCost">Delivery Cost ($)</Label>
                 <Input
                   type="number"
                   min="0"
@@ -1164,7 +1164,7 @@ export default function CreateDeliveryOrderDialog({
               </div>
 
               <div>
-                <Label htmlFor="insuranceCost">Insurance Cost (₹)</Label>
+                <Label htmlFor="insuranceCost">Insurance Cost ($)</Label>
                 <Input
                   type="number"
                   min="0"
@@ -1175,7 +1175,7 @@ export default function CreateDeliveryOrderDialog({
               </div>
 
               <div>
-                <Label htmlFor="handlingCost">Handling Cost (₹)</Label>
+                <Label htmlFor="handlingCost">Handling Cost ($)</Label>
                 <Input
                   type="number"
                   min="0"
@@ -1207,7 +1207,7 @@ export default function CreateDeliveryOrderDialog({
                     <p className="text-sm text-muted-foreground">Total Quantity</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-purple-600">₹{totalValue.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-purple-600">${totalValue.toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground">Items Value</p>
                   </div>
                 </div>
@@ -1216,11 +1216,11 @@ export default function CreateDeliveryOrderDialog({
                   <div className="border-t pt-4">
                     <div className="flex justify-between items-center">
                       <span>Delivery Charges:</span>
-                      <span>₹{totalCost.toLocaleString()}</span>
+                      <span>${totalCost.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center font-bold text-lg">
                       <span>Total Cost:</span>
-                      <span>₹{(totalValue + totalCost).toLocaleString()}</span>
+                      <span>${(totalValue + totalCost).toLocaleString()}</span>
                     </div>
                   </div>
                 )}
@@ -1243,7 +1243,7 @@ export default function CreateDeliveryOrderDialog({
                       <div className="text-right">
                         <p className="font-medium">Qty: {item.deliveryQuantity}</p>
                         <p className="text-sm text-muted-foreground">
-                          ₹{((item.unitValueInr || 0) * item.deliveryQuantity).toLocaleString()}
+                          ${((item.unitValueInr || 0) * item.deliveryQuantity).toLocaleString()}
                         </p>
                       </div>
                     </div>

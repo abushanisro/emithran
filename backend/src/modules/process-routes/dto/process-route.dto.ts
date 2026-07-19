@@ -11,6 +11,7 @@ import {
   Max,
   IsArray,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum WorkflowState {
   DRAFT = 'draft',
@@ -133,12 +134,14 @@ export class QueryProcessRoutesDto {
 
   @ApiPropertyOptional({ example: 1, minimum: 1 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
   @ApiPropertyOptional({ example: 50, minimum: 1, maximum: 100 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(100)

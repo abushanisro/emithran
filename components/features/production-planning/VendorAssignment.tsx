@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,7 @@ import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
 import { useAuth, useAuthReady } from '@/lib/providers/auth';
 import { getApprovedVendorsByBomPart, type ApprovedVendor } from '@/lib/api/supplier-nominations';
+import { useVendors } from '@/lib/api/hooks/useVendors';
 
 interface LotBOMItem {
   id: string;
@@ -84,6 +85,14 @@ interface VendorAssignmentProps {
   lotId: string;
 }
 
+const extractVendorsList = (data: any): any[] => {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.vendors)) return data.vendors;
+  if (Array.isArray(data.data)) return data.data;
+  return [];
+};
+
 export const VendorAssignment = ({ lotId }: VendorAssignmentProps) => {
   const [lotBOMItems, setLotBOMItems] = useState<LotBOMItem[]>([]);
   const [vendorAssignments, setVendorAssignments] = useState<VendorAssignment[]>([]);
@@ -102,6 +111,8 @@ export const VendorAssignment = ({ lotId }: VendorAssignmentProps) => {
 
   const { } = useAuth(); // User unused
   const isAuthReady = useAuthReady();
+  const { data: rawNetworkVendors } = useVendors();
+  const networkVendorsList = useMemo(() => extractVendorsList(rawNetworkVendors), [rawNetworkVendors]);
   const hasFetchedRef = React.useRef(false);
 
   useEffect(() => {
@@ -147,26 +158,53 @@ export const VendorAssignment = ({ lotId }: VendorAssignmentProps) => {
 
         setApprovedVendorsByPart(approvedVendorsMap);
 
-        // Convert approved vendors to vendor format for dropdown
-        const allApprovedVendors: Vendor[] = [];
+        // Fetch all vendors from vendor database directly as fallback/sync
+        let dbVendorsList: any[] = [];
+        try {
+          const vendorsResponse: any = await apiClient.get('/vendors');
+          dbVendorsList = extractVendorsList(vendorsResponse);
+        } catch (e) {
+          dbVendorsList = [];
+        }
+
+        // Combine all approved vendors and general database vendors
+        const combinedVendorsMap = new Map<string, Vendor>();
+        
+        // Add general database vendors first
+        dbVendorsList.forEach((v: any) => {
+          if (v && (v.id || v.vendorId)) {
+            const vid = v.id || v.vendorId;
+            combinedVendorsMap.set(vid, {
+              id: vid,
+              name: v.name || v.vendorName || 'Unnamed Vendor',
+              supplier_code: v.supplierCode || v.supplier_code || '',
+              contact_person: v.contactPerson || v.contact_person || '',
+              contact_email: v.companyEmail || v.email || '',
+              contact_phone: v.companyPhone || v.phone || '',
+              city: v.city || '',
+              isApproved: false,
+            });
+          }
+        });
+
+        // Upgrade/add approved vendors from supplier nominations
         Object.values(approvedVendorsMap).forEach(vendors => {
           vendors.forEach(vendor => {
-            if (!allApprovedVendors.find(v => v.id === vendor.vendorId)) {
-              allApprovedVendors.push({
-                id: vendor.vendorId,
-                name: vendor.vendorName,
-                supplier_code: vendor.supplierCode || '',
-                nominationId: vendor.nominationId,
-                nominationName: vendor.nominationName,
-                overallScore: vendor.overallScore,
-                isApproved: true
-              });
-            }
+            const existing = combinedVendorsMap.get(vendor.vendorId);
+            combinedVendorsMap.set(vendor.vendorId, {
+              id: vendor.vendorId,
+              name: vendor.vendorName || existing?.name || 'Approved Vendor',
+              supplier_code: vendor.supplierCode || existing?.supplier_code || '',
+              nominationId: vendor.nominationId,
+              nominationName: vendor.nominationName,
+              overallScore: vendor.overallScore,
+              isApproved: true,
+            });
           });
         });
 
-        // Only use approved vendors
-        setAvailableVendors(allApprovedVendors);
+        // Set available vendors
+        setAvailableVendors(Array.from(combinedVendorsMap.values()));
 
         // Process vendor assignments - get existing assignments for this lot
         let assignments: VendorAssignment[] = [];
@@ -195,20 +233,57 @@ setVendorAssignments(assignments);
     }
   }, [lotId, isAuthReady]);
 
+  // Keep availableVendors synced whenever networkVendorsList from useVendors updates
+  useEffect(() => {
+    if (!networkVendorsList || networkVendorsList.length === 0) return;
+    setAvailableVendors(prev => {
+      const combined = new Map<string, Vendor>();
+      prev.forEach(v => combined.set(v.id, v));
+      
+      networkVendorsList.forEach((v: any) => {
+        if (v && (v.id || v.vendorId)) {
+          const vid = v.id || v.vendorId;
+          const existing = combined.get(vid);
+          if (!existing) {
+            combined.set(vid, {
+              id: vid,
+              name: v.name || v.vendorName || 'Unnamed Vendor',
+              supplier_code: v.supplierCode || (v as any).supplier_code || '',
+              contact_person: v.contactPerson || '',
+              contact_email: v.companyEmail || '',
+              contact_phone: v.companyPhone || '',
+              city: v.city || '',
+              isApproved: false,
+            });
+          }
+        }
+      });
+      return Array.from(combined.values());
+    });
+  }, [networkVendorsList]);
+
   // Reset vendor selection when BOM item changes
   useEffect(() => {
     setSelectedVendor('');
   }, [selectedBOMItem]);
 
-  // Get only approved vendors for the selected BOM item
+  // Get all vendors for assignment, prioritizing approved vendors for the selected BOM item
   const getVendorsForSelectedBOMItem = (): Vendor[] => {
     if (!selectedBOMItem) return availableVendors;
 
     const approvedForThisPart = approvedVendorsByPart[selectedBOMItem] || [];
     const approvedVendorIds = approvedForThisPart.map(v => v.vendorId);
 
-    // Only show vendors that are approved for this specific BOM part
-    return availableVendors.filter(v => approvedVendorIds.includes(v.id));
+    // Return all vendors from network + nominations, sorted with part-approved vendors at the top
+    return [...availableVendors].sort((a, b) => {
+      const aApproved = approvedVendorIds.includes(a.id);
+      const bApproved = approvedVendorIds.includes(b.id);
+      if (aApproved && !bApproved) return -1;
+      if (!aApproved && bApproved) return 1;
+      if (a.isApproved && !b.isApproved) return -1;
+      if (!a.isApproved && b.isApproved) return 1;
+      return a.name.localeCompare(b.name);
+    });
   };
 
   // Filter assignments based on search term
@@ -382,21 +457,21 @@ await apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, as
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved Vendors</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium">Available Vendors</CardTitle>
+            <Users className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-blue-600">
+              {availableVendors.length}
+            </div>
+            <p className="text-xs text-muted-foreground">
               {(() => {
                 const uniqueApprovedVendors = new Set();
                 Object.values(approvedVendorsByPart).forEach(vendors => {
                   vendors.forEach(v => uniqueApprovedVendors.add(v.vendorId));
                 });
-                return uniqueApprovedVendors.size;
+                return `${uniqueApprovedVendors.size} approved from nominations`;
               })()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              From supplier nominations
             </p>
           </CardContent>
         </Card>
@@ -420,7 +495,7 @@ await apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, as
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{vendorAssignments.reduce((sum, a) => sum + (a.quoted_price || 0), 0).toLocaleString()}</div>
+            <div className="text-2xl font-bold">${vendorAssignments.reduce((sum, a) => sum + (a.quoted_price || 0), 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               Total quoted amount
             </p>
@@ -461,14 +536,14 @@ await apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, as
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select a BOM part" />
                       </SelectTrigger>
-                      <SelectContent className="max-w-[400px]">
+                      <SelectContent className="max-w-[460px] max-h-[280px]">
                         {lotBOMItems.map(item => {
                           const partName = item.bom_item_name !== item.description ? item.bom_item_name : '';
                           const label = partName ? `${item.part_number} - ${partName}` : item.part_number;
 
                           return (
-                            <SelectItem key={item.bom_item_id} value={item.bom_item_id}>
-                              <span className="truncate block" title={label}>
+                            <SelectItem key={item.bom_item_id} value={item.bom_item_id} className="py-2">
+                              <span className="truncate block pr-2 text-sm" title={label}>
                                 {label}
                               </span>
                             </SelectItem>
@@ -485,25 +560,44 @@ await apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, as
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select a vendor" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {getVendorsForSelectedBOMItem().map(vendor => (
-                          <SelectItem key={vendor.id} value={vendor.id}>
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                              <span>
-                                {vendor.name} - {vendor.supplier_code || 'No Code'}
-                              </span>
-                              <Badge variant="outline" className="text-xs text-green-600 border-green-600">
-                                Approved
-                              </Badge>
-                              {vendor.overallScore && (
-                                <Badge variant="outline" className="text-xs">
-                                  {vendor.overallScore.toFixed(1)}%
-                                </Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="max-w-[460px] max-h-[280px]">
+                        {getVendorsForSelectedBOMItem().map(vendor => {
+                          const approvedForPart = selectedBOMItem && (approvedVendorsByPart[selectedBOMItem] || []).some(av => av.vendorId === vendor.id);
+                          const isApprovedGenerally = vendor.isApproved || approvedForPart;
+                          const displayName = `${vendor.name} ${vendor.supplier_code ? `(${vendor.supplier_code})` : ''}`;
+                          return (
+                            <SelectItem key={vendor.id} value={vendor.id} className="py-2">
+                              <div className="flex items-center justify-between w-full min-w-0 gap-3 pr-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  {isApprovedGenerally ? (
+                                    <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                                  ) : (
+                                    <Users className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                                  )}
+                                  <span className="truncate text-sm font-medium" title={displayName}>
+                                    {displayName}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {approvedForPart ? (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 text-green-600 border-green-600 bg-green-500/10 shrink-0 font-medium">
+                                      Approved
+                                    </Badge>
+                                  ) : isApprovedGenerally ? (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 text-emerald-600 border-emerald-600 bg-emerald-500/10 shrink-0 font-medium">
+                                      Nominated
+                                    </Badge>
+                                  ) : null}
+                                  {vendor.overallScore !== undefined && vendor.overallScore > 0 && (
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-5 shrink-0">
+                                      {vendor.overallScore.toFixed(0)}%
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -636,21 +730,25 @@ return (
                             </div>
                             {(() => {
                               const bomApprovedVendors = approvedVendorsByPart[assignment.bom_item_id] || [];
-                              const isApproved = bomApprovedVendors.some(av => av.vendorId === assignment.vendor_id);
+                              const isApprovedForPart = bomApprovedVendors.some(av => av.vendorId === assignment.vendor_id);
+                              const netVendor = availableVendors.find(v => v.id === assignment.vendor_id);
+                              const isNominated = netVendor?.isApproved || isApprovedForPart;
 
-                              if (isApproved) {
+                              if (isApprovedForPart) {
                                 return (
-                                  <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                                  <Badge variant="outline" className="text-xs text-green-600 border-green-600 bg-green-500/10">
                                     <CheckCircle className="h-3 w-3 mr-1" />
-                                    Approved
+                                    Approved for Part
+                                  </Badge>
+                                );
+                              } else if (isNominated) {
+                                return (
+                                  <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-600 bg-emerald-500/10">
+                                    Nominated
                                   </Badge>
                                 );
                               } else {
-                                return (
-                                  <Badge variant="outline" className="text-xs text-gray-600">
-                                    Not Approved
-                                  </Badge>
-                                );
+                                return null;
                               }
                             })()}
                           </div>
@@ -662,7 +760,7 @@ return (
                               if (approvedVendor) {
                                 return `From: ${approvedVendor.nominationName} (Score: ${approvedVendor.overallScore.toFixed(1)}%)`;
                               } else {
-                                return 'Assigned directly';
+                                return 'Assigned via Vendor Network';
                               }
                             })()}
                           </div>
@@ -671,7 +769,7 @@ return (
                       <TableCell>
                         <div className="space-y-1">
                           <div className="font-medium">
-                            ₹{(assignment.unit_cost || 0).toLocaleString()}
+                            ${(assignment.unit_cost || 0).toLocaleString()}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             Total for {bomItem?.quantity || 1} units

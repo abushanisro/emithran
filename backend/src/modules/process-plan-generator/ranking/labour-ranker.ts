@@ -1,14 +1,14 @@
 import type { LabourCandidate } from '../dto/candidate-set.dto';
 
 /**
- * Scores LSR (Labour Standard Rate) rows for fit.
+ * Scores LHR (Labour Hour Rate) rows for fit.
  *
  * We return all available labour bands ranked by location fit + rate
  * sanity, since the LLM may pick different bands per operation
  * (e.g., Skilled for turning, Semi-Skilled for deburring).
  */
 
-interface LsrRow {
+interface LhrRow {
   id: string;
   labour_type: string | null;
   labour_code: string | null;
@@ -25,7 +25,7 @@ const toNumber = (v: number | string | null | undefined): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-function locationFitScore(row: LsrRow, orgLocation: string): number {
+function locationFitScore(row: LhrRow, orgLocation: string): number {
   const orgLoc = norm(orgLocation);
   const rowLoc = norm(row.location);
   if (!rowLoc) return 0.6;
@@ -34,7 +34,7 @@ function locationFitScore(row: LsrRow, orgLocation: string): number {
   return 0.4;
 }
 
-function rateSanityScore(row: LsrRow): number {
+function rateSanityScore(row: LhrRow): number {
   // Prefer lhr_inr (already converted) — fall back to raw value.
   const rate = row.lhr_inr ?? toNumber(row.lhr);
   if (rate <= 0) return 0;
@@ -45,7 +45,7 @@ function rateSanityScore(row: LsrRow): number {
 }
 
 export function rankLabour(
-  rows: LsrRow[],
+  rows: LhrRow[],
   orgLocation: string,
   topN: number,
 ): LabourCandidate[] {

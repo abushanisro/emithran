@@ -138,7 +138,7 @@ export function RawMaterialCostCalculator({
                 Overhead %
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-black">
-                Total Cost (₹)
+                Total Cost ($)
               </th>
               <th className="px-4 py-3 text-center text-sm font-semibold text-black">
                 Actions
@@ -320,7 +320,7 @@ export function RawMaterialCostCalculator({
                   Total:
                 </td>
                 <td className="px-4 py-3 text-sm font-semibold text-white">
-                  ₹{totalCost.toFixed(2)}
+                  ${totalCost.toFixed(2)}
                 </td>
                 <td className="px-4 py-3"></td>
               </tr>

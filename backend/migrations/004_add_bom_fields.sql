@@ -5,7 +5,7 @@
 
 -- Add missing columns to boms table
 ALTER TABLE boms
-ADD COLUMN IF NOT EAXISTS version VARCHAR(50) DEFAULT '1.0' NOT NULL,
+ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT '1.0' NOT NULL,
 ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'draft' NOT NULL
   CHECK (status IN ('draft', 'approved', 'released', 'obsolete')),
 ADD COLUMN IF NOT EXISTS total_items INTEGER DEFAULT 0 NOT NULL,

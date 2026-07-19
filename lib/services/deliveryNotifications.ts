@@ -427,7 +427,7 @@ Best regards,
       companyName: 'Mithran Manufacturing',
       trackingUrl: `https://track.mithran.com/${update.orderId}`,
       deliveryTime: update.actualDelivery ? 
-        new Date(update.actualDelivery).toLocaleString('en-IN', { timeZone: preferences.timezone }) :
+        new Date(update.actualDelivery).toLocaleString('en-US', { timeZone: preferences.timezone }) :
         'Pending',
       ...this.getStatusSpecificVariables(update)
     };

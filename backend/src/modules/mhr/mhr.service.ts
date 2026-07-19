@@ -154,6 +154,41 @@ export class MHRService {
   }
 
   /**
+   * Returns global MHR benchmark rates from mhr_benchmark_rates (no user_id — shared).
+   * Used as a fallback when the user has no custom MHR records for the selected location.
+   * Response shape mirrors the subset of MHRRecord that the Process Cost dialog needs.
+   */
+  async getBenchmarkRates(location?: string, processGroup?: string) {
+    let query = this.supabaseService
+      .getAdminClient()
+      .from('mhr_benchmark_rates')
+      .select('id, machine_name, process_group, location, mhr_usd, machine_ref')
+      .order('location', { ascending: true })
+      .order('process_group', { ascending: true })
+      .order('machine_name', { ascending: true });
+
+    if (location) query = query.ilike('location', location);
+    if (processGroup) query = query.eq('process_group', processGroup);
+
+    const { data, error } = await query;
+
+    if (error) {
+      this.logger.error(`Error fetching MHR benchmark rates: ${error.message}`, 'MHRService');
+      throw new InternalServerErrorException('Failed to fetch MHR benchmark rates');
+    }
+
+    return (data ?? []).map(row => ({
+      id: `bm-mhr-${row.id}`,
+      machineName:   row.machine_name,
+      processGroup:  row.process_group,
+      location:      row.location,
+      machineRef:    row.machine_ref,
+      isBenchmark:   true,
+      calculations:  { totalMachineHourRate: parseFloat(row.mhr_usd) || 0 },
+    }));
+  }
+
+  /**
    * Calculate all MHR metrics based on input parameters
    * Uses the calculation engine for clean separation of concerns
    */

@@ -4,7 +4,7 @@
  * Based on ISO 31000 and APQP guidelines
  */
 
-// FX conversion for MHR/LSR pricing is sourced live from the `exchange_rates`
+// FX conversion for MHR/LHR pricing is sourced live from the `exchange_rates`
 // table via common/exchange-rate/exchange-rate.service.ts (ExchangeRateService),
 // not a hardcoded constant here — a hardcoded rate table drifts out of date and
 // was the root cause of a currency-conversion bug that silently mispriced

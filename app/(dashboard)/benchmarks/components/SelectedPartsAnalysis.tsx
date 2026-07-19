@@ -305,7 +305,7 @@ function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: Resolve
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={70} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => [`₹${Number(v).toFixed(0)}`, "Total Cost"]} />
+                <Tooltip formatter={(v) => [`$${Number(v).toFixed(0)}`, "Total Cost"]} />
                 <Bar dataKey="cost" fill="hsl(220, 70%, 45%)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -352,7 +352,7 @@ function CostWeightContent({ filteredBomMetrics }: { filteredBomMetrics: Resolve
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={70} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => [`₹${Number(v).toFixed(0)}/kg`, "Cost per Kg"]} />
+                <Tooltip formatter={(v) => [`$${Number(v).toFixed(0)}/kg`, "Cost per Kg"]} />
                 <Area
                   type="monotone"
                   dataKey="costPerKg"
@@ -599,7 +599,7 @@ function MaterialsContent({ filteredBomMetrics }: { filteredBomMetrics: Resolved
                           <div>
                             <p className="text-sm font-medium">{item.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              Qty: {item.quantity ?? 1} · ₹{itemCost(item).toFixed(0)}
+                              Qty: {item.quantity ?? 1} · ${itemCost(item).toFixed(0)}
                             </p>
                           </div>
                           <Badge
@@ -754,7 +754,7 @@ function AssemblyContent({ filteredBomMetrics }: { filteredBomMetrics: ResolvedB
                             </div>
                             <div className="flex gap-1">
                               <Badge variant="outline" className="text-xs">
-                                ₹{itemCost(item).toFixed(0)}
+                                ${itemCost(item).toFixed(0)}
                               </Badge>
                               <Badge
                                 variant={item.makeBuy === "make" ? "default" : "secondary"}
@@ -800,7 +800,7 @@ function VAVEContent({ filteredBomMetrics }: { filteredBomMetrics: ResolvedBOMMe
       <Card key="high-cost" className="p-4 bg-red-900/20 border-red-600">
         <h4 className="text-sm font-semibold mb-2 text-red-100">High Cost Parts Review</h4>
         <p className="text-xs text-red-200 mb-3">
-          {highCostParts.length} parts with cost &gt; ₹500
+          {highCostParts.length} parts with cost &gt; $500
         </p>
         <div className="space-y-2">
           {highCostParts.slice(0, 3).map((part, idx) => (

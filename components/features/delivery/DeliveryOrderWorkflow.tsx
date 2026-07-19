@@ -810,7 +810,7 @@ export default function DeliveryOrderWorkflow({
                           </div>
                           <div>
                             <span className="text-muted-foreground">Value:</span>
-                            <p className="font-medium">₹{item.bomItem.unitCost}</p>
+                            <p className="font-medium">${item.bomItem.unitCost}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Cert:</span>
@@ -866,7 +866,7 @@ export default function DeliveryOrderWorkflow({
                       <div className="flex justify-between items-center">
                         <span className="font-medium">Calculated Value:</span>
                         <span className="text-lg font-semibold text-muted-foreground">
-                          ₹{selectedItems.reduce((sum, item) => {
+                          ${selectedItems.reduce((sum, item) => {
                             const unitCost = item.bomItem.unitCost || 0;
                             const quantity = item.deliveryQuantity || 1;
                             return sum + (unitCost * quantity);
@@ -878,7 +878,7 @@ export default function DeliveryOrderWorkflow({
                         <Label htmlFor="estimatedCost" className="font-medium whitespace-nowrap">Total Estimated Value:</Label>
                         <div className="flex-1 max-w-xs">
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
                             <Input
                               id="estimatedCost"
                               type="number"
@@ -2106,17 +2106,17 @@ export default function DeliveryOrderWorkflow({
   <div class="metrics-row">
     <div class="metric-box"><div class="metric-val">${routeData.distance} km</div><div class="metric-lbl">${routeData.isEstimated ? 'Est. Distance' : 'Road Distance'}</div></div>
     <div class="metric-box"><div class="metric-val">${(routeData.duration ?? 0) >= 60 ? `${Math.floor((routeData.duration ?? 0) / 60)}h ${(routeData.duration ?? 0) % 60}m` : `${routeData.duration ?? 0}m`}</div><div class="metric-lbl">${routeData.isEstimated ? 'Est. Time' : 'Travel Time'}</div></div>
-    <div class="metric-box"><div class="metric-val green">₹${(routeData.cost ?? 0).toLocaleString('en-IN')}</div><div class="metric-lbl">Shipping Cost</div></div>
+    <div class="metric-box"><div class="metric-val green">$${(routeData.cost ?? 0).toLocaleString('en-IN')}</div><div class="metric-lbl">Shipping Cost</div></div>
     <div class="metric-box"><div class="metric-val sky">${routeData.dataQualityScore ?? '—'}%</div><div class="metric-lbl">Data Quality</div></div>
   </div>
   ${routeData.costBreakdown ? `
   <div class="breakdown-header">Cost Breakdown</div>
   <div class="breakdown-body">
-    <div class="breakdown-row"><span class="breakdown-muted">Transport (${routeData.distance} km)</span><span>₹${(routeData.costBreakdown.transportBase ?? 0).toLocaleString('en-IN')}</span></div>
-    <div class="breakdown-row"><span class="breakdown-muted">Loading & Unloading</span><span>₹${(routeData.costBreakdown.loadingUnloading ?? 0).toLocaleString('en-IN')}</span></div>
-    ${(routeData.costBreakdown.materialSurcharge ?? 0) > 0 ? `<div class="breakdown-row"><span class="breakdown-muted">Material Surcharge (${formData.materialType || 'general'})</span><span>₹${routeData.costBreakdown.materialSurcharge.toLocaleString('en-IN')}</span></div>` : ''}
-    ${(routeData.costBreakdown.fuelTollSurcharge ?? 0) > 0 ? `<div class="breakdown-row"><span class="breakdown-muted">Fuel & Toll (6%)</span><span>₹${routeData.costBreakdown.fuelTollSurcharge.toLocaleString('en-IN')}</span></div>` : ''}
-    <div class="breakdown-row"><span>Total Shipping</span><span style="color:#16a34a">₹${(routeData.cost ?? 0).toLocaleString('en-IN')}</span></div>
+    <div class="breakdown-row"><span class="breakdown-muted">Transport (${routeData.distance} km)</span><span>$${(routeData.costBreakdown.transportBase ?? 0).toLocaleString('en-IN')}</span></div>
+    <div class="breakdown-row"><span class="breakdown-muted">Loading & Unloading</span><span>$${(routeData.costBreakdown.loadingUnloading ?? 0).toLocaleString('en-IN')}</span></div>
+    ${(routeData.costBreakdown.materialSurcharge ?? 0) > 0 ? `<div class="breakdown-row"><span class="breakdown-muted">Material Surcharge (${formData.materialType || 'general'})</span><span>$${routeData.costBreakdown.materialSurcharge.toLocaleString('en-IN')}</span></div>` : ''}
+    ${(routeData.costBreakdown.fuelTollSurcharge ?? 0) > 0 ? `<div class="breakdown-row"><span class="breakdown-muted">Fuel & Toll (6%)</span><span>$${routeData.costBreakdown.fuelTollSurcharge.toLocaleString('en-IN')}</span></div>` : ''}
+    <div class="breakdown-row"><span>Total Shipping</span><span style="color:#16a34a">$${(routeData.cost ?? 0).toLocaleString('en-IN')}</span></div>
   </div>
   <div class="chips">
     ${formData.transportMode ? `<span class="chip">🚛 ${formData.transportMode}</span>` : ''}
@@ -2135,14 +2135,14 @@ export default function DeliveryOrderWorkflow({
           <td><b>${item.bomItem.partNumber}</b></td>
           <td style="color:#555">${item.bomItem.description || ''}</td>
           <td class="center">${item.deliveryQuantity}</td>
-          <td class="right">₹${(item.bomItem.unitCost || 0).toLocaleString('en-IN')}</td>
-          <td class="right">₹${((item.bomItem.unitCost || 0) * item.deliveryQuantity).toLocaleString('en-IN')}</td>
+          <td class="right">$${(item.bomItem.unitCost || 0).toLocaleString('en-IN')}</td>
+          <td class="right">$${((item.bomItem.unitCost || 0) * item.deliveryQuantity).toLocaleString('en-IN')}</td>
         </tr>`).join('')}
     </tbody>
     <tfoot>
-      <tr><td colspan="4" class="right">Parts Total</td><td class="right">₹${partsTotal.toLocaleString('en-IN')}</td></tr>
-      ${routeData?.cost ? `<tr><td colspan="4" class="right">Shipping Cost</td><td class="right" style="color:#16a34a">₹${(routeData.cost).toLocaleString('en-IN')}</td></tr>` : ''}
-      <tr><td colspan="4" class="right">Grand Total</td><td class="right">₹${grandTotal.toLocaleString('en-IN')}</td></tr>
+      <tr><td colspan="4" class="right">Parts Total</td><td class="right">$${partsTotal.toLocaleString('en-IN')}</td></tr>
+      ${routeData?.cost ? `<tr><td colspan="4" class="right">Shipping Cost</td><td class="right" style="color:#16a34a">$${(routeData.cost).toLocaleString('en-IN')}</td></tr>` : ''}
+      <tr><td colspan="4" class="right">Grand Total</td><td class="right">$${grandTotal.toLocaleString('en-IN')}</td></tr>
     </tfoot>
   </table>
 
@@ -2364,7 +2364,7 @@ export default function DeliveryOrderWorkflow({
                           <div className="text-xs text-muted-foreground mt-1">{routeData.isEstimated ? 'Est. Time' : 'Travel Time'}</div>
                         </div>
                         <div className="text-center p-3 bg-muted/40 rounded-lg border">
-                          <div className="text-xl font-bold text-emerald-500">₹{(routeData.cost ?? 0).toLocaleString('en-IN')}</div>
+                          <div className="text-xl font-bold text-emerald-500">${(routeData.cost ?? 0).toLocaleString('en-IN')}</div>
                           <div className="text-xs text-muted-foreground mt-1">Shipping Cost</div>
                         </div>
                         <div className="text-center p-3 bg-muted/40 rounded-lg border">
@@ -2380,29 +2380,29 @@ export default function DeliveryOrderWorkflow({
                           <div className="divide-y">
                             <div className="flex justify-between px-3 py-2 text-sm">
                               <span className="text-muted-foreground">Transport ({routeData.distance} km)</span>
-                              <span>₹{(routeData.costBreakdown.transportBase ?? 0).toLocaleString('en-IN')}</span>
+                              <span>${(routeData.costBreakdown.transportBase ?? 0).toLocaleString('en-IN')}</span>
                             </div>
                             <div className="flex justify-between px-3 py-2 text-sm">
                               <span className="text-muted-foreground">Loading & Unloading</span>
-                              <span>₹{(routeData.costBreakdown.loadingUnloading ?? 0).toLocaleString('en-IN')}</span>
+                              <span>${(routeData.costBreakdown.loadingUnloading ?? 0).toLocaleString('en-IN')}</span>
                             </div>
                             {(routeData.costBreakdown.materialSurcharge ?? 0) > 0 && (
                               <div className="flex justify-between px-3 py-2 text-sm">
                                 <span className="text-muted-foreground">
                                   Material Surcharge ({formData.materialType || 'general'})
                                 </span>
-                                <span>₹{routeData.costBreakdown.materialSurcharge.toLocaleString('en-IN')}</span>
+                                <span>${routeData.costBreakdown.materialSurcharge.toLocaleString('en-IN')}</span>
                               </div>
                             )}
                             {(routeData.costBreakdown.fuelTollSurcharge ?? 0) > 0 && (
                               <div className="flex justify-between px-3 py-2 text-sm">
                                 <span className="text-muted-foreground">Fuel & Toll (6%)</span>
-                                <span>₹{routeData.costBreakdown.fuelTollSurcharge.toLocaleString('en-IN')}</span>
+                                <span>${routeData.costBreakdown.fuelTollSurcharge.toLocaleString('en-IN')}</span>
                               </div>
                             )}
                             <div className="flex justify-between px-3 py-2 text-sm font-semibold bg-muted/20">
                               <span>Total Shipping</span>
-                              <span className="text-emerald-500">₹{(routeData.cost ?? 0).toLocaleString('en-IN')}</span>
+                              <span className="text-emerald-500">${(routeData.cost ?? 0).toLocaleString('en-IN')}</span>
                             </div>
                           </div>
                         </div>
@@ -2445,7 +2445,7 @@ export default function DeliveryOrderWorkflow({
                       </CardTitle>
                       <div className="text-right">
                         <div className="text-sm text-muted-foreground">Parts Value</div>
-                        <div className="font-bold text-primary">₹{selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0).toLocaleString('en-IN')}</div>
+                        <div className="font-bold text-primary">${selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0).toLocaleString('en-IN')}</div>
                       </div>
                     </div>
                   </CardHeader>
@@ -2467,8 +2467,8 @@ export default function DeliveryOrderWorkflow({
                               <td className="border border-border px-3 py-2 font-mono font-medium">{item.bomItem.partNumber}</td>
                               <td className="border border-border px-3 py-2 text-muted-foreground">{item.bomItem.description}</td>
                               <td className="border border-border px-3 py-2 text-center">{item.deliveryQuantity}</td>
-                              <td className="border border-border px-3 py-2 text-right">₹{(item.bomItem.unitCost || 0).toLocaleString('en-IN')}</td>
-                              <td className="border border-border px-3 py-2 text-right font-medium">₹{((item.bomItem.unitCost || 0) * item.deliveryQuantity).toLocaleString('en-IN')}</td>
+                              <td className="border border-border px-3 py-2 text-right">${(item.bomItem.unitCost || 0).toLocaleString('en-IN')}</td>
+                              <td className="border border-border px-3 py-2 text-right font-medium">${((item.bomItem.unitCost || 0) * item.deliveryQuantity).toLocaleString('en-IN')}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2476,21 +2476,21 @@ export default function DeliveryOrderWorkflow({
                           <tr className="bg-muted/40 font-semibold">
                             <td colSpan={4} className="border border-border px-3 py-2 text-right">Parts Total</td>
                             <td className="border border-border px-3 py-2 text-right text-primary">
-                              ₹{selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0).toLocaleString('en-IN')}
+                              ${selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0).toLocaleString('en-IN')}
                             </td>
                           </tr>
                           {routeData?.cost && (
                             <tr className="bg-muted/40 font-semibold">
                               <td colSpan={4} className="border border-border px-3 py-2 text-right">Shipping Cost</td>
                               <td className="border border-border px-3 py-2 text-right text-emerald-500">
-                                ₹{(routeData.cost).toLocaleString('en-IN')}
+                                ${(routeData.cost).toLocaleString('en-IN')}
                               </td>
                             </tr>
                           )}
                           <tr className="bg-primary/5 font-bold text-base">
                             <td colSpan={4} className="border border-border px-3 py-2 text-right">Grand Total</td>
                             <td className="border border-border px-3 py-2 text-right text-primary">
-                              ₹{(selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0) + (routeData?.cost ?? 0)).toLocaleString('en-IN')}
+                              ${(selectedItems.reduce((s, i) => s + (i.bomItem.unitCost || 0) * i.deliveryQuantity, 0) + (routeData?.cost ?? 0)).toLocaleString('en-IN')}
                             </td>
                           </tr>
                         </tfoot>
@@ -2932,7 +2932,7 @@ export default function DeliveryOrderWorkflow({
                         {order.totalDeliveryCostInr && (
                           <div className="text-right">
                             <div className="text-sm text-muted-foreground">Total Cost</div>
-                            <div className="font-semibold">₹{order.totalDeliveryCostInr.toLocaleString()}</div>
+                            <div className="font-semibold">${order.totalDeliveryCostInr.toLocaleString()}</div>
                           </div>
                         )}
                         <div className="flex gap-2">

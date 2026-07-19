@@ -1,4 +1,9 @@
-import type { HeatmapSource, HeatmapLayerType } from './types';
+import type {
+  HeatmapSource,
+  HeatmapLayerType,
+  IMHeatmapFeatures,
+  IMHeatmapSignals,
+} from './types';
 import type { DFMScoresResponse, FeatureGraph } from '@/lib/types/manufacturing';
 
 type RawSignal = {
@@ -393,4 +398,357 @@ export function buildCostDensitySources(
     ...gridCluster(holeSignals, 20, 'cost_density', 'hole'),
     ...gridCluster(bendSignals, 10, 'cost_density', 'bend'),
   ];
+}
+
+// ─── Injection Molding Heatmap Sources ────────────────────────────────────────
+//
+// Each layer emits per-feature Gaussian blobs anchored at the physical centroid
+// of the contributing feature (boss, rib, wall sample, draft face). When per-
+// feature data is absent (old cached CAD analysis), layers fall back to a single
+// low-amplitude globalBlob so the layer renders a hint rather than empty.
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
+function globalBlob(
+  amplitude: number,
+  sigma: number,
+  layer: HeatmapLayerType,
+): HeatmapSource {
+  return {
+    centroid: [0, 0, 0],
+    amplitude: clamp(amplitude, 0, 1),
+    sigma: Math.max(sigma, 5),
+    layer,
+  };
+}
+
+function featureBlobs<T extends { centroid: [number, number, number] }>(
+  items: T[],
+  ampFn: (item: T) => number,
+  sigmaFn: (item: T) => number,
+  layer: HeatmapLayerType,
+  reasonFn?: (item: T) => string,
+): HeatmapSource[] {
+  const out: HeatmapSource[] = [];
+  for (const item of items) {
+    const amplitude = clamp(ampFn(item), 0, 1);
+    if (amplitude <= 0) continue;
+    const src: HeatmapSource = { centroid: item.centroid, amplitude, sigma: Math.max(sigmaFn(item), 2), layer };
+    if (reasonFn) src.reason = reasonFn(item);
+    out.push(src);
+  }
+  return out;
+}
+
+function imV2Occurrences(
+  fg: FeatureGraph,
+  featureType: 'im_undercut' | 'im_undrafted',
+  amplitude: number,
+  sigma: number,
+  layer: HeatmapLayerType,
+): HeatmapSource[] {
+  const v2 = fg.feature_graph_v2;
+  if (!v2) return [];
+  const out: HeatmapSource[] = [];
+  for (const feat of v2.features) {
+    if (feat.feature_type !== featureType) continue;
+    for (let i = 0; i < feat.occurrences.length; i++) {
+      const occ = feat.occurrences[i];
+      if (!occ?.centroid) continue;
+      out.push({ centroid: occ.centroid, amplitude: clamp(amplitude, 0, 1), sigma, layer, featureId: feat.id, occurrenceIndex: i });
+    }
+  }
+  return out;
+}
+
+// Manufacturing Risk — spatial breakdown of all major IM DFM failure modes
+function buildIMManufacturingRisk(
+  fg: FeatureGraph,
+  f: IMHeatmapFeatures | null,
+  wn: number,
+  bboxMm: [number, number, number],
+): HeatmapSource[] {
+  const layer: HeatmapLayerType = 'manufacturing_risk';
+  const maxBbox = Math.max(...bboxMm, 10);
+  const out: HeatmapSource[] = [];
+
+  if (f) {
+    // 0.25 wall thickness variation
+    out.push(...featureBlobs(f.wall_samples,
+      s => clamp(s.delta_from_nominal, 0, 1) * 0.25, () => wn * 4, layer,
+      s => `Wall variation +${Math.round(s.delta_from_nominal * 100)}% (${s.thickness_mm.toFixed(1)}mm)`));
+    // 0.20 undrafted faces
+    out.push(...featureBlobs(
+      f.draft_faces.filter(d => d.classification === 'undrafted'),
+      d => clamp((1.5 - d.draft_deg) / 1.5, 0, 1) * 0.20, () => wn * 5, layer,
+      d => `Undrafted face (${d.draft_deg.toFixed(1)}°)`));
+    // 0.10 ribs thicker than 0.6× nominal → sink risk
+    out.push(...featureBlobs(f.ribs,
+      r => clamp(r.thickness_mm / (0.6 * wn) - 1, 0, 1) * 0.10, () => wn * 5, layer,
+      r => `Rib ${r.thickness_mm.toFixed(1)}mm (${Math.round(r.thickness_mm / wn * 100)}% of wall)`));
+    // 0.10 boss slenderness (ejection + sink indicator)
+    out.push(...featureBlobs(f.bosses,
+      b => clamp(b.slenderness / 4, 0, 1) * 0.10, b => b.diameter_mm * 1.5, layer,
+      b => `Boss slenderness ×${b.slenderness.toFixed(1)} (Ø${b.diameter_mm.toFixed(1)}mm)`));
+    // 0.05 thin wall (< 0.70× nominal)
+    out.push(...featureBlobs(
+      f.wall_samples.filter(s => s.thickness_mm < wn * 0.70),
+      s => clamp(1 - s.thickness_mm / (wn * 0.70), 0, 1) * 0.05, () => wn * 3, layer,
+      s => `Thin wall ${s.thickness_mm.toFixed(1)}mm (${Math.round(s.thickness_mm / wn * 100)}% of nominal)`));
+  }
+
+  // 0.15 undercuts from feature_graph_v2
+  out.push(...imV2Occurrences(fg, 'im_undercut', 0.15, wn * 4, layer));
+  // 0.10 corner radius — global until per-corner topology is extracted
+  out.push(globalBlob(f && f.ribs.length > 0 ? 0.07 : 0.03, maxBbox * 0.20, layer));
+  // 0.05 flow length ratio (L/T)
+  const LT = Math.hypot(bboxMm[0], bboxMm[1]) / wn;
+  out.push(globalBlob(clamp(LT / 200, 0, 1) * 0.05, maxBbox * 0.40, layer));
+
+  if (!f || (f.wall_samples.length === 0 && f.bosses.length === 0 && f.ribs.length === 0)) {
+    out.push(globalBlob(0.40, maxBbox * 0.35, layer));
+  }
+  return out;
+}
+
+// Thermal — heat concentration at thick sections, boss bases, and rib junctions
+function buildIMThermal(
+  fg: FeatureGraph,
+  f: IMHeatmapFeatures | null,
+  wn: number,
+  bboxMm: [number, number, number],
+): HeatmapSource[] {
+  const layer: HeatmapLayerType = 'thermal';
+  const maxBbox = Math.max(...bboxMm, 10);
+  const out: HeatmapSource[] = [];
+
+  if (f) {
+    // Cooling time ∝ thickness² — thicker wall = exponentially hotter
+    out.push(...featureBlobs(f.wall_samples,
+      s => clamp((s.thickness_mm / 3.5) ** 2, 0, 1), s => s.thickness_mm * 3, layer,
+      s => `Thick wall ${s.thickness_mm.toFixed(1)}mm → slow cooling`));
+    // Boss bases are the hottest points in IM (thermal mass × height)
+    out.push(...featureBlobs(f.bosses,
+      b => clamp((b.height_mm * b.diameter_mm) / (wn ** 2 * 6), 0, 1), b => b.diameter_mm * 2, layer,
+      b => `Boss Ø${b.diameter_mm.toFixed(1)}mm × h${b.height_mm.toFixed(1)}mm — heat mass`));
+    // Rib-to-wall junctions — stress concentration AND heat sink
+    out.push(...featureBlobs(f.ribs,
+      r => clamp((r.thickness_mm / wn) ** 2 * 0.70, 0, 0.85), r => r.thickness_mm * 2.5, layer,
+      r => `Rib junction ${r.thickness_mm.toFixed(1)}mm — heat trap`));
+  }
+
+  if (!f || (f.wall_samples.length === 0 && f.bosses.length === 0 && f.ribs.length === 0)) {
+    // Tight sigma: heat is localized at thick sections, not distributed across the whole part
+    out.push(globalBlob(0.45, maxBbox * 0.18, layer));
+  }
+  // fg unused in this layer but kept in signature for uniformity
+  void fg;
+  return out;
+}
+
+// Tool Wear — core pin stress, side-action wear, injection pressure
+function buildIMToolWear(
+  fg: FeatureGraph,
+  f: IMHeatmapFeatures | null,
+  wn: number,
+  bboxMm: [number, number, number],
+): HeatmapSource[] {
+  const layer: HeatmapLayerType = 'tool_wear';
+  const maxBbox = Math.max(...bboxMm, 10);
+  const out: HeatmapSource[] = [];
+
+  if (f) {
+    // 0.30 core pin slenderness — tall thin bosses stress the core pin
+    out.push(...featureBlobs(f.bosses, b => clamp(b.slenderness / 5, 0, 1) * 0.30, b => b.diameter_mm * 1.5, layer));
+    // 0.20 thin core pins (d < 4mm = fragile)
+    out.push(...featureBlobs(
+      f.bosses.filter(b => b.diameter_mm < 4),
+      b => clamp(1 - b.diameter_mm / 4, 0, 1) * 0.20, b => b.diameter_mm * 2, layer));
+    // 0.15 deep rib inserts
+    out.push(...featureBlobs(f.ribs, r => clamp(r.height_mm / (3 * wn), 0, 1) * 0.15, r => r.thickness_mm * 2, layer));
+  }
+
+  // 0.20 undercuts → side action / slide wear
+  out.push(...imV2Occurrences(fg, 'im_undercut', 0.20, wn * 5, layer));
+  // 0.15 injection pressure proxy (L/T)
+  const LT = Math.hypot(bboxMm[0], bboxMm[1]) / wn;
+  out.push(globalBlob(clamp(LT / 200, 0, 1) * 0.15, maxBbox * 0.38, layer));
+
+  if (!f || (f.bosses.length === 0 && f.ribs.length === 0)) {
+    // Intermediate sigma: tool stress concentrates at core pins, not distributed like cost
+    out.push(globalBlob(0.35, maxBbox * 0.28, layer));
+  }
+  return out;
+}
+
+// Cost Density — cooling time, tool complexity, material volume, slide cost
+function buildIMCostDensity(
+  fg: FeatureGraph,
+  f: IMHeatmapFeatures | null,
+  wn: number,
+  bboxMm: [number, number, number],
+): HeatmapSource[] {
+  const layer: HeatmapLayerType = 'cost_density';
+  const maxBbox = Math.max(...bboxMm, 10);
+  const out: HeatmapSource[] = [];
+
+  if (f) {
+    // 0.30 cooling time ∝ thickness²
+    out.push(...featureBlobs(f.wall_samples, s => clamp((s.thickness_mm / 4) ** 2, 0, 1) * 0.30, s => s.thickness_mm * 3.5, layer));
+    // 0.20 tool complexity: boss slenderness → longer core machining
+    out.push(...featureBlobs(f.bosses, b => clamp(b.slenderness / 5, 0, 1) * 0.20, b => b.diameter_mm * 2, layer));
+    // 0.20 material volume: boss volume adds direct material + cycle time cost
+    out.push(...featureBlobs(
+      f.bosses,
+      b => clamp((b.height_mm * Math.PI * (b.diameter_mm / 2) ** 2) / (wn ** 3 * 50), 0, 1) * 0.20,
+      b => b.diameter_mm * 2.5, layer));
+    // 0.05 cycle time: undrafted faces need longer ejection
+    out.push(...featureBlobs(
+      f.draft_faces.filter(d => d.classification === 'undrafted'),
+      d => clamp((1.5 - d.draft_deg) / 1.5, 0, 0.60) * 0.05, () => wn * 4, layer));
+  }
+
+  // 0.10 slide cost for undercuts
+  out.push(...imV2Occurrences(fg, 'im_undercut', 0.10, wn * 5, layer));
+
+  if (!f || (f.wall_samples.length === 0 && f.bosses.length === 0)) {
+    // Wide sigma: cost is distributed across the whole part (cooling, material volume)
+    out.push(globalBlob(0.40, maxBbox * 0.50, layer));
+  }
+  return out;
+}
+
+// Tolerance Risk — warpage, differential shrinkage, ejection distortion
+function buildIMToleranceRisk(
+  fg: FeatureGraph,
+  f: IMHeatmapFeatures | null,
+  wn: number,
+  bboxMm: [number, number, number],
+): HeatmapSource[] {
+  const layer: HeatmapLayerType = 'tolerance_risk';
+  const maxBbox = Math.max(...bboxMm, 10);
+  const out: HeatmapSource[] = [];
+
+  if (f) {
+    // 0.25 differential shrinkage from thickness variation
+    out.push(...featureBlobs(f.wall_samples, s => s.delta_from_nominal * 0.25, () => wn * 5, layer));
+    // 0.20 ejection distortion from undrafted faces
+    out.push(...featureBlobs(
+      f.draft_faces.filter(d => d.classification === 'undrafted'),
+      d => clamp((1.5 - d.draft_deg) / 1.5, 0, 1) * 0.20, () => wn * 5, layer));
+    // 0.20 unsupported wall deflection during packing (tall ribs)
+    out.push(...featureBlobs(f.ribs, r => clamp(r.height_mm / (2 * wn), 0, 1) * 0.20, r => r.thickness_mm * 3, layer));
+  }
+
+  // 0.20 parting line mismatch from undercuts
+  out.push(...imV2Occurrences(fg, 'im_undercut', 0.20, wn * 4, layer));
+  // 0.35 flow length / pressure gradient → warp (global: no gate location yet)
+  const LT = Math.hypot(bboxMm[0], bboxMm[1]) / wn;
+  out.push(globalBlob(clamp(LT / 200, 0, 1) * 0.35, maxBbox * 0.40, layer));
+
+  if (!f || (f.wall_samples.length === 0 && f.ribs.length === 0)) {
+    // Widest sigma: warp / shrinkage affects the whole part span
+    out.push(globalBlob(0.40, maxBbox * 0.55, layer));
+  }
+  return out;
+}
+
+// Sustainability — cooling energy, material volume, regrind complexity
+function buildIMSustainability(
+  fg: FeatureGraph,
+  f: IMHeatmapFeatures | null,
+  wn: number,
+  bboxMm: [number, number, number],
+): HeatmapSource[] {
+  const layer: HeatmapLayerType = 'sustainability';
+  const maxBbox = Math.max(...bboxMm, 10);
+  const out: HeatmapSource[] = [];
+
+  if (f) {
+    // 0.30 cooling energy ∝ thickness²
+    out.push(...featureBlobs(f.wall_samples, s => clamp((s.thickness_mm / 4) ** 2, 0, 1) * 0.30, s => s.thickness_mm * 3.5, layer));
+    // 0.30 boss material volume → embodied energy
+    out.push(...featureBlobs(
+      f.bosses,
+      b => clamp((b.height_mm * Math.PI * (b.diameter_mm / 2) ** 2) / (wn ** 3 * 40), 0, 1) * 0.30,
+      b => b.diameter_mm * 2, layer));
+  }
+
+  // 0.20 regrind difficulty from undercuts (complex scrap geometry)
+  out.push(...imV2Occurrences(fg, 'im_undercut', 0.20, wn * 4, layer));
+  // 0.20 gate distance proxy — no gate location yet, static global contribution
+  out.push(globalBlob(0.10, maxBbox * 0.40, layer));
+
+  if (!f || (f.wall_samples.length === 0 && f.bosses.length === 0)) {
+    // Broad sigma: cooling energy and material volume affect the whole part
+    out.push(globalBlob(0.40, maxBbox * 0.42, layer));
+  }
+  return out;
+}
+
+// Sink Mark Risk — rib/boss/wall-transition probability using 60% rule
+// Score 0→green (no risk), 1→red (near-certain sink mark visible on A-surface)
+function buildIMSinkMarkSources(
+  fg: FeatureGraph,
+  f: IMHeatmapFeatures | null,
+  wn: number,
+  bboxMm: [number, number, number],
+): HeatmapSource[] {
+  const layer: HeatmapLayerType = 'sink_mark';
+  const maxBbox = Math.max(...bboxMm, 10);
+  const out: HeatmapSource[] = [];
+
+  if (f) {
+    // Ribs: "Rule of 60%" — rib thickness should be ≤ 60% of wall nominal
+    // Score ramps from 0 at 0.5× to 1.0 at 1.0× (beyond that, guaranteed sink)
+    out.push(...featureBlobs(f.ribs,
+      r => clamp((r.thickness_mm / wn - 0.5) / 0.5, 0, 1),
+      r => r.thickness_mm * 1.5, layer,
+      r => `Rib/wall = ${(r.thickness_mm / wn).toFixed(2)}× (threshold: 0.60×)`));
+
+    // Bosses: large-diameter bosses concentrate material at the base → sink on back face
+    // Score ramps 0 at 1×wall, 1 at 4×wall
+    out.push(...featureBlobs(f.bosses,
+      b => clamp((b.diameter_mm / wn - 1) / 3, 0, 1),
+      b => b.diameter_mm * 1.2, layer,
+      b => `Boss Ø${b.diameter_mm.toFixed(1)}mm (${(b.diameter_mm / wn).toFixed(1)}× wall) — base sink risk`));
+
+    // Wall thick spots: excess material → sink on opposite surface
+    // Only thick spots (above nominal) cause sink; thin spots cause flow hesitation instead
+    out.push(...featureBlobs(
+      f.wall_samples.filter(s => s.thickness_mm > wn),
+      s => clamp(s.delta_from_nominal * 2, 0, 1),
+      () => wn * 3, layer,
+      s => `Thick zone ${s.thickness_mm.toFixed(1)}mm (+${Math.round(s.delta_from_nominal * 100)}%)`));
+  }
+
+  // fg is unused in this layer — no feature_graph_v2 features contribute to sink marks
+  void fg;
+
+  if (!f || (f.ribs.length === 0 && f.bosses.length === 0 && f.wall_samples.length === 0)) {
+    // Very tight sigma: sink marks are highly localized surface defects
+    out.push(globalBlob(0.30, maxBbox * 0.14, layer));
+  }
+  return out;
+}
+
+export function buildIMHeatmapSources(
+  fg: FeatureGraph,
+  signals: IMHeatmapSignals,
+  features: IMHeatmapFeatures | null,
+  layer: HeatmapLayerType,
+): HeatmapSource[] {
+  const wn = Math.max(signals.wallThicknessNominalMm, 0.5);
+  const bbox = signals.bboxMm;
+  const f = features;
+  switch (layer) {
+    case 'manufacturing_risk': return buildIMManufacturingRisk(fg, f, wn, bbox);
+    case 'thermal':            return buildIMThermal(fg, f, wn, bbox);
+    case 'tool_wear':          return buildIMToolWear(fg, f, wn, bbox);
+    case 'cost_density':       return buildIMCostDensity(fg, f, wn, bbox);
+    case 'tolerance_risk':     return buildIMToleranceRisk(fg, f, wn, bbox);
+    case 'sustainability':     return buildIMSustainability(fg, f, wn, bbox);
+    case 'sink_mark':          return buildIMSinkMarkSources(fg, f, wn, bbox);
+    default:                   return [];
+  }
 }

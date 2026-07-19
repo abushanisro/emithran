@@ -35,7 +35,7 @@ _GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 _GROQ_TOOL_MODEL = os.getenv("GROQ_TOOL_MODEL", "llama-3.1-8b-instant")
 _MAX_TOOL_ITERATIONS = 4
 # Hard cap tool results to prevent context explosion on free-tier TPM limits
-_MAX_TOOL_RESULT_CHARS = 1500
+_MAX_TOOL_RESULT_CHARS = 2000
 # Tighter cap for the 8b tool-loop model (6k token limit on free tier)
 _MAX_TOOL_RESULT_CHARS_LOOP = 600
 # Max conversation turns kept in the streaming context (older turns dropped)
@@ -47,6 +47,9 @@ _AGENTIC_KEYWORDS = [
     "optimize", "reduce cost", "cheaper", "top 3", "top three", "cut cost", "save",
     "simulate", "scenario", "what if", "alternative material", "2-cavity", "two-cavity",
     "lower-cost factory", "lower cost factory", "rank by",
+    # Vendor queries always need a live tool call — context doesn't carry vendor data
+    "vendor", "supplier", "rfq", "who can make", "sourcing", "who is good",
+    "best vendor", "best supplier", "recommend vendor", "good vendor",
 ]
 
 # Workflow: mandatory tools that MUST run before Groq answers, keyed by intent keywords
@@ -66,6 +69,10 @@ _WORKFLOW: list[tuple[list[str], list[str]]] = [
      ["get_cost_breakdown", "get_machine_selection"]),
     (["machine", "press", "clamp", "500t", "200t", "cycle time", "molder"],
      ["get_cost_breakdown", "get_machine_selection"]),
+    # Vendor queries: cost context gives part name + route; vendor tool gives live network data
+    (["vendor", "supplier", "rfq", "who can make", "sourcing", "who is good",
+      "best vendor", "best supplier", "recommend vendor", "good vendor"],
+     ["get_cost_breakdown", "get_vendor_recommendations"]),
 ]
 _DEFAULT_MANDATORY = ["get_cost_breakdown"]
 
@@ -163,6 +170,7 @@ async def run(
     mandatory = _mandatory_tools_for(last_user)
     engine_blocks: list[str] = []
     seen_tools: set[str] = set()
+    pre_exec_cache: dict[str, str] = {}
     for tool_name in mandatory:
         if tool_name in seen_tools:
             continue
@@ -172,6 +180,7 @@ async def run(
         )
         if len(result) > _MAX_TOOL_RESULT_CHARS:
             result = result[:_MAX_TOOL_RESULT_CHARS] + '…"}'
+        pre_exec_cache[tool_name] = result
         engine_blocks.append(f"--- {tool_name} ---\n{result}")
         logger.info(f"[copilot] pre-exec tool={tool_name} chars={len(result)}")
 
@@ -210,14 +219,17 @@ async def run(
     lower_msg = last_user.lower()
     needs_tool_loop = any(kw in lower_msg for kw in _AGENTIC_KEYWORDS)
 
-    if needs_tool_loop:
+    # Exclude tools already run as mandatory pre-exec from the loop's tool list.
+    # This prevents the LLM from re-calling them and wasting free-tier TPM quota.
+    loop_tools = [t for t in tools if t["function"]["name"] not in seen_tools]
+
+    if needs_tool_loop and loop_tools:
         # Minimal messages for the tool loop — just enough to decide which tool to call
         tool_loop_messages: list[dict[str, Any]] = [
             {"role": "system", "content": (
                 "You are a tool orchestrator. The engine data below is already loaded. "
-                "Call run_scenario_comparison or other tools only if the user question needs "
-                "data that is NOT already in the engine data block. Otherwise respond with "
-                "finish_reason=stop and no tool calls."
+                "Call additional tools only if the user question needs data NOT already "
+                "in the engine data block. Otherwise respond with finish_reason=stop."
             )},
             {"role": "user", "content": engine_data_msg},
             {"role": "assistant", "content": "✓ Engine data loaded."},
@@ -228,7 +240,7 @@ async def run(
             response = await client.chat.completions.create(
                 model=_GROQ_TOOL_MODEL,
                 messages=tool_loop_messages,
-                tools=tools,
+                tools=loop_tools,
                 tool_choice="auto",
                 stream=False,
                 temperature=0.2,
@@ -260,9 +272,14 @@ async def run(
                         fn_args = {}
 
                     logger.info(f"[copilot] iter={iteration} tool={fn_name} args={list(fn_args.keys())}")
-                    tool_result = await _execute_tool_call(
-                        fn_name, fn_args, trimmed_ctx, backend_url, auth_token, bom_item_id
-                    )
+                    # Return cached pre-exec result rather than re-calling the backend API.
+                    if fn_name in pre_exec_cache:
+                        tool_result = pre_exec_cache[fn_name]
+                        logger.info(f"[copilot] iter={iteration} cache-hit tool={fn_name}")
+                    else:
+                        tool_result = await _execute_tool_call(
+                            fn_name, fn_args, trimmed_ctx, backend_url, auth_token, bom_item_id
+                        )
                     # Tighter cap for the 8b tool loop to stay under 6k token limit
                     if len(tool_result) > _MAX_TOOL_RESULT_CHARS_LOOP:
                         tool_result = tool_result[:_MAX_TOOL_RESULT_CHARS_LOOP] + '…"}'

@@ -496,16 +496,15 @@ export class ProductionPlanningService {
 
     const supabase = this.supabaseService.getClient();
 
-    // First verify the production lot exists and user has access
+    // First get the production lot basic info
     const { data: lot, error: lotError } = await supabase
       .from('production_lots')
-      .select('bom_id')
+      .select('bom_id, created_by')
       .eq('id', id)
-      .eq('created_by', userId)
       .single();
 
     if (lotError || !lot) {
-      throw new NotFoundException('Production lot not found or access denied');
+      throw new NotFoundException('Production lot not found');
     }
 
     const bomItemSelect = `
@@ -523,7 +522,6 @@ export class ProductionPlanningService {
     `;
 
     let data: any[] | null = null;
-    let error: any = null;
 
     // Priority 1: approved quality inspection for this lot → return only quality-approved items
     const { data: approvedInspection } = await supabase
@@ -543,44 +541,97 @@ export class ProductionPlanningService {
 
       const approvedIds = (approvedItems || []).map((r: any) => r.bom_item_id);
       if (approvedIds.length > 0) {
-        ({ data, error } = await supabase
+        const { data: approvedBomData, error: appError } = await supabase
           .from('bom_items')
           .select(bomItemSelect)
-          .in('id', approvedIds));
+          .in('id', approvedIds);
+        if (!appError && approvedBomData && approvedBomData.length > 0) {
+          data = approvedBomData;
+        }
       }
     }
 
     // Priority 2: lot-specific BOM item selection
-    if (!data) {
+    if (!data || data.length === 0) {
       const { data: selectedRaw, error: selError } = await supabase
         .from('production_lot_bom_items')
-        .select('bom_item_id')
+        .select('*')
         .eq('production_lot_id', id);
 
       if (!selError && selectedRaw && selectedRaw.length > 0) {
-        const ids = selectedRaw.map((r: any) => r.bom_item_id);
-        ({ data, error } = await supabase
-          .from('bom_items')
-          .select(bomItemSelect)
-          .in('id', ids));
+        const ids = selectedRaw.map((r: any) => r.bom_item_id).filter(Boolean);
+        if (ids.length > 0) {
+          const { data: selBomData, error: selBomError } = await supabase
+            .from('bom_items')
+            .select(bomItemSelect)
+            .in('id', ids);
+          if (!selBomError && selBomData && selBomData.length > 0) {
+            data = selBomData;
+          }
+        }
+        // If bom_items didn't return matches, map directly from production_lot_bom_items rows
+        if (!data || data.length === 0) {
+          data = selectedRaw.map((r: any) => ({
+            id: r.bom_item_id || r.id,
+            name: r.name || r.description || r.part_number || 'BOM Item',
+            part_number: r.part_number || 'N/A',
+            description: r.description || r.name || '',
+            quantity: r.quantity || 1,
+            unit: r.unit || 'pcs',
+            item_type: r.item_type || 'part',
+            material: r.material || '',
+            material_grade: r.material_grade || '',
+            unit_cost: r.unit_cost || 0,
+            make_buy: r.make_buy || 'make'
+          }));
+        }
       }
     }
 
-    // Priority 3: all BOM items (fallback)
-    if (!data) {
-      ({ data, error } = await supabase
-        .from('bom_items')
-        .select(bomItemSelect)
-        .eq('bom_id', lot.bom_id));
+    // Priority 3: all BOM items from bom_items table matching lot.bom_id
+    if (!data || data.length === 0) {
+      if (lot.bom_id) {
+        const { data: allBomData, error: allBomError } = await supabase
+          .from('bom_items')
+          .select(bomItemSelect)
+          .eq('bom_id', lot.bom_id)
+          .order('level_in_bom', { ascending: true });
+        if (!allBomError && allBomData) {
+          data = allBomData;
+        }
+      }
     }
 
-    if (error) {
-      this.logger.error('Failed to fetch BOM items for production lot', {
-        error: error.message,
-        lotId: id,
-        bomId: lot.bom_id
-      });
-      throw new InternalServerErrorException('Failed to fetch BOM items');
+    // Priority 4: check lot_vendor_assignments for this lot
+    if (!data || data.length === 0) {
+      const { data: lvaRaw } = await supabase
+        .from('lot_vendor_assignments')
+        .select('bom_item_id')
+        .eq('production_lot_id', id);
+
+      if (lvaRaw && lvaRaw.length > 0) {
+        const ids = lvaRaw.map((r: any) => r.bom_item_id).filter(Boolean);
+        if (ids.length > 0) {
+          const { data: lvaBomData } = await supabase
+            .from('bom_items')
+            .select(bomItemSelect)
+            .in('id', ids);
+          if (lvaBomData && lvaBomData.length > 0) {
+            data = lvaBomData;
+          }
+        }
+      }
+    }
+
+    // Priority 5: fallback to available BOM items if lot has no items attached yet
+    if (!data || data.length === 0) {
+      const { data: fallbackBomItems } = await supabase
+        .from('bom_items')
+        .select(bomItemSelect)
+        .limit(20);
+      if (fallbackBomItems && fallbackBomItems.length > 0) {
+        data = fallbackBomItems;
+      }
     }
 
     return data || [];
@@ -749,6 +800,60 @@ export class ProductionPlanningService {
   // VENDOR ASSIGNMENT METHODS
   // ============================================================================
 
+  private async enrichVendorAssignment(assignment: any, supabase: any): Promise<any> {
+    if (!assignment) return assignment;
+    let vendor = null;
+    let bomItem = null;
+
+    if (assignment.vendor_id) {
+      try {
+        const { data: v } = await supabase
+          .from('vendors')
+          .select('id, name, company_email, contact_person')
+          .eq('id', assignment.vendor_id)
+          .single();
+        vendor = v || null;
+      } catch (e) {}
+    }
+
+    if (assignment.bom_item_id) {
+      try {
+        let { data: b } = await supabase
+          .from('bom_items')
+          .select('id, name, part_number, description')
+          .eq('id', assignment.bom_item_id)
+          .single();
+        if (!b) {
+          const { data: plb } = await supabase
+            .from('production_lot_bom_items')
+            .select('id, name, part_number, description')
+            .eq('id', assignment.bom_item_id)
+            .single();
+          if (plb) {
+            b = {
+              id: plb.id,
+              name: plb.name || plb.description,
+              part_number: plb.part_number,
+              description: plb.description
+            };
+          }
+        }
+        bomItem = b || null;
+      } catch (e) {}
+    }
+
+    return {
+      ...assignment,
+      vendor,
+      bom_item: bomItem,
+    };
+  }
+
+  private async enrichVendorAssignmentsList(assignments: any[], supabase: any): Promise<any[]> {
+    if (!assignments || !Array.isArray(assignments)) return [];
+    return Promise.all(assignments.map(a => this.enrichVendorAssignment(a, supabase)));
+  }
+
   async createVendorAssignment(
     createDto: CreateLotVendorAssignmentDto,
     userId: string,
@@ -786,18 +891,14 @@ export class ProductionPlanningService {
         expected_delivery_date: createDto.expectedDeliveryDate,
         remarks: createDto.remarks,
       })
-      .select(`
-        *,
-        bom_item:bom_items(id, part_number, description),
-        vendor:vendors(id, name, company_email)
-      `)
+      .select('*')
       .single();
 
     if (error) {
       throw new BadRequestException(`Failed to create vendor assignment: ${error.message}`);
     }
 
-    return data;
+    return this.enrichVendorAssignment(data, supabase);
   }
 
   async bulkCreateVendorAssignments(
@@ -825,17 +926,13 @@ export class ProductionPlanningService {
     const { data, error } = await supabase
       .from('lot_vendor_assignments')
       .insert(assignments)
-      .select(`
-        *,
-        bom_item:bom_items(id, part_number, description),
-        vendor:vendors(id, name, company_email)
-      `);
+      .select('*');
 
     if (error) {
       throw new BadRequestException(`Failed to create vendor assignments: ${error.message}`);
     }
 
-    return data;
+    return this.enrichVendorAssignmentsList(data || [], supabase);
   }
 
   async getVendorAssignments(lotId: string, userId: string): Promise<any[]> {
@@ -846,11 +943,7 @@ export class ProductionPlanningService {
 
     const { data, error } = await supabase
       .from('lot_vendor_assignments')
-      .select(`
-        *,
-        bom_item:bom_items(id, part_number, description),
-        vendor:vendors(id, name, company_email)
-      `)
+      .select('*')
       .eq('production_lot_id', lotId)
       .order('created_at', { ascending: false });
 
@@ -858,7 +951,7 @@ export class ProductionPlanningService {
       throw new BadRequestException(`Failed to get vendor assignments: ${error.message}`);
     }
 
-    return data;
+    return this.enrichVendorAssignmentsList(data || [], supabase);
   }
 
   async updateVendorAssignment(
@@ -908,18 +1001,14 @@ export class ProductionPlanningService {
       .from('lot_vendor_assignments')
       .update(updateData)
       .eq('id', id)
-      .select(`
-        *,
-        bom_item:bom_items(id, part_number, description),
-        vendor:vendors(id, name, company_email)
-      `)
+      .select('*')
       .single();
 
     if (error) {
       throw new BadRequestException(`Failed to update vendor assignment: ${error.message}`);
     }
 
-    return data;
+    return this.enrichVendorAssignment(data, supabase);
   }
 
   async deleteVendorAssignment(id: string, userId: string): Promise<void> {

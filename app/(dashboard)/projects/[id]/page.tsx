@@ -157,7 +157,7 @@ export default function ProjectDetail() {
               <div>
                 <p className="text-xs text-muted-foreground font-medium">Target Cost</p>
                 <p className="text-xl font-bold text-foreground">
-                  {project.targetPrice ? `₹${Number(project.targetPrice).toLocaleString()}` : '-'}
+                  {project.targetPrice ? `$${Number(project.targetPrice).toLocaleString()}` : '-'}
                 </p>
               </div>
             </div>

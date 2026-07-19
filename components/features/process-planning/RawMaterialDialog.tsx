@@ -19,13 +19,58 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useRawMaterials, useRawMaterialFilterOptions } from '@/lib/api/hooks/useRawMaterials';
+import { useRawMaterials, useRawMaterialFilterOptions, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
-import { useExchangeRates, convertToInr } from '@/lib/api/hooks/useExchangeRates';
-import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
+import { useExchangeRates } from '@/lib/api/hooks/useExchangeRates';
+import { Loader2, Calculator as CalculatorIcon, Play, Eye, Box, FileText } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ModelViewer } from '@/components/ui/model-viewer';
+import { apiClient } from '@/lib/api/client';
+
+// Static lookup — defined outside component so it is never recreated on re-render
+const CALCULATOR_PROPERTY_MAPPINGS: Record<string, string> = {
+  meltingTempCelsius: 'meltingTempC',
+  densityKgM3: 'densityKgM3',
+  costPerKg: 'cost',
+  costPerUnit: 'unitCost',
+  utsMpa: 'ultimateTensileStrength',
+  ytsMpa: 'yieldTensileStrength',
+  thermalConductivityWMK: 'thermalConductivityMelt',
+  specificHeatJGK: 'specificHeatMelt',
+  moldTempCelsiusMin: 'moldTempC',
+  moldTempCelsiusMax: 'moldTempC',
+  ejectDeflectionTempCelsius: 'ejectDeflectionTempC',
+  material: 'material',
+  materialGrade: 'materialGrade',
+  materialGroup: 'materialGroup',
+  materialType: 'materialType',
+  materialDescription: 'materialDescription',
+  application: 'application',
+  density: 'densityKgM3',
+  ultimateTensileStrength: 'ultimateTensileStrength',
+  yieldTensileStrength: 'yieldTensileStrength',
+  shearingStrength: 'shearingStrength',
+  meltingTempC: 'meltingTempC',
+  moldTempC: 'moldTempC',
+  ejectDeflectionTempC: 'ejectDeflectionTempC',
+  thermalConductivityMelt: 'thermalConductivityMelt',
+  specificHeatMelt: 'specificHeatMelt',
+  clampingPressureMpa: 'clampingPressureMpa',
+  regrindingPercentage: 'regrindingPercentage',
+  regrinding: 'regrinding',
+  cost: 'cost',
+  unitCost: 'unitCost',
+  currency: 'currency',
+  location: 'location',
+  country: 'country',
+  shape: 'shape',
+  astmStandard: 'astmStandard',
+  dinStandard: 'dinStandard',
+  enStandard: 'enStandard',
+  jisStandard: 'jisStandard',
+};
 
 interface RawMaterialDialogProps {
   open: boolean;
@@ -34,6 +79,7 @@ interface RawMaterialDialogProps {
   estimateId?: string;
   editData?: any;
   bomItemData?: any;
+  location?: string; // pre-selects pricing region (India / USA / Germany …)
 }
 
 export function RawMaterialDialog({
@@ -42,6 +88,7 @@ export function RawMaterialDialog({
   onSubmit,
   editData,
   bomItemData,
+  location,
 }: RawMaterialDialogProps) {
   const [materialGroup, setMaterialGroup] = useState<string>('');
   const [country, setCountry] = useState<string>('');
@@ -51,8 +98,16 @@ export function RawMaterialDialog({
   const [netUsage, setNetUsage] = useState<number | ''>('');
   const [scrap, setScrap] = useState<number | ''>('');
   const [overhead, setOverhead] = useState<number | ''>('');
-  const [totalCost, setTotalCost] = useState<number>(0);
   const [manualUnitCost, setManualUnitCost] = useState<number>(0);
+  const [reclaimRate, setReclaimRate] = useState<number | ''>(0);
+  // true when netUsage was auto-derived from CAD volume × material density
+  const [cadFilled, setCadFilled] = useState(false);
+
+  // Part viewer state
+  const [activeView, setActiveView] = useState<'3d' | '2d'>('3d');
+  const [file3dUrl, setFile3dUrl] = useState<string | null>(null);
+  const [file2dUrl, setFile2dUrl] = useState<string | null>(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
 
   // Calculator state
   const [calculatorOpen, setCalculatorOpen] = useState<boolean>(false);
@@ -144,6 +199,42 @@ export function RawMaterialDialog({
     }
   }, [open, selectedCalculatorId, bomItemData?.id]);
 
+  // Fetch signed URLs for 3D/2D part viewer when dialog opens
+  useEffect(() => {
+    if (!open || !bomItemData?.id) {
+      setFile3dUrl(null);
+      setFile2dUrl(null);
+      return;
+    }
+    if (!bomItemData?.file3dPath && !bomItemData?.file2dPath) return;
+
+    setViewerLoading(true);
+    const fetches: Promise<void>[] = [];
+
+    if (bomItemData.file3dPath) {
+      fetches.push(
+        apiClient.get(`/bom-items/${bomItemData.id}/file-url/3d`)
+          .then((res: any) => { if (res?.url) setFile3dUrl(res.url); })
+          .catch(() => {})
+      );
+    }
+    if (bomItemData.file2dPath) {
+      fetches.push(
+        apiClient.get(`/bom-items/${bomItemData.id}/file-url/2d`)
+          .then(async (res: any) => {
+            if (!res?.url) return;
+            // Fetch as blob to bypass Supabase X-Frame-Options header
+            const resp = await fetch(res.url);
+            const blob = await resp.blob();
+            setFile2dUrl(URL.createObjectURL(blob));
+          })
+          .catch(() => {})
+      );
+    }
+
+    Promise.all(fetches).finally(() => setViewerLoading(false));
+  }, [open, bomItemData?.id, bomItemData?.file3dPath, bomItemData?.file2dPath]);
+
   // Handle calculator value selection
   const handleUseCalculatorValue = (value: number) => {
     if (calculatorTarget === 'grossUsage') {
@@ -202,8 +293,8 @@ export function RawMaterialDialog({
             const fieldPropertyMap = {
               'meltingTempCelsius': 'Melting Temp (°C)',
               'densityKgM3': 'Density (kg/m³)',
-              'costPerKg': 'Cost per kg (₹)',
-              'costPerUnit': 'Cost per unit (₹)',
+              'costPerKg': 'Cost per kg ($)',
+              'costPerUnit': 'Cost per unit ($)',
               'utsMpa': 'UTS (MPa)',
               'ytsMpa': 'YTS (MPa)',
               'thermalConductivityWMK': 'Thermal Conductivity (W/mK)',
@@ -383,18 +474,12 @@ export function RawMaterialDialog({
     return filterOptions?.countries || [];
   }, [filterOptions]);
 
-  // Get materials filtered by selected group and country
+  // Get materials filtered by selected group only.
+  // Pricing location (country) only affects which cost column is shown — it does NOT filter the list.
   const materials = useMemo(() => {
     if (!rawMaterialsData?.items || !materialGroup) return [];
-    let filtered = rawMaterialsData.items.filter(m => m.materialGroup === materialGroup);
-
-    // Apply country filter if selected
-    if (country) {
-      filtered = filtered.filter(m => m.country === country);
-    }
-
-    return filtered;
-  }, [rawMaterialsData, materialGroup, country]);
+    return rawMaterialsData.items.filter(m => m.materialGroup === materialGroup);
+  }, [rawMaterialsData, materialGroup]);
 
   // Get selected material details
   const selectedMaterial = useMemo(() => {
@@ -402,276 +487,205 @@ export function RawMaterialDialog({
     return materials.find(m => m.id === selectedMaterialId);
   }, [selectedMaterialId, materials]);
 
+  // ── Smart Fill ──────────────────────────────────────────────────────────────
+  // Derives net usage directly from CAD volume × material density without going
+  // through the DB-driven calculator template system.
+  const cadVolumeMm3   = bomItemData?.volume         ?? null;
+  const matDensityKgM3 = selectedMaterial?.densityKgM3 ?? null;
+  const smartFillAvailable = cadVolumeMm3 != null && cadVolumeMm3 > 0 && matDensityKgM3 != null && matDensityKgM3 > 0;
+
+  const handleSmartFill = () => {
+    if (!cadVolumeMm3 || !matDensityKgM3) return;
+    // mass_kg = volume_mm³ × density_kg/m³ / 1,000,000,000
+    const net = parseFloat(((cadVolumeMm3 * matDensityKgM3) / 1e9).toFixed(6));
+    setNetUsage(net);
+    setCadFilled(true);
+  };
+
+  // Auto-trigger Smart Fill when material is selected for the first time on a new
+  // entry and the user has not manually typed a net usage yet.
+  useEffect(() => {
+    if (!editData && open && smartFillAvailable && !cadFilled && (netUsage === 0 || netUsage === '')) {
+      handleSmartFill();
+    }
+    // Only on material selection or dialog open — not on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMaterialId, open]);
+
+  // Finds a material by name OR grade (grade match covers auto-created records where
+  // materialName = "IS2062 E250 CRCA" but DB has material.material = "CRCA Steel").
+  const findMaterialByEditData = (pool: RawMaterial[] | null | undefined, ed: any) => {
+    if (!pool || !ed) return undefined;
+    return pool.find(m =>
+      m.material === ed.materialName ||
+      (m as any).materialName === ed.materialName ||
+      m.materialGrade === ed.materialName ||
+      m.id === ed.materialId,
+    );
+  };
 
   // Load edit data first (wait for data to be loaded AND options to be available)
   useEffect(() => {
     if (editData && open && !isLoading && !isLoadingOptions && materialGroups.length > 0) {
-      // Always set the usage data first
-      setGrossUsage(editData.grossUsage || 0);
-      setNetUsage(editData.netUsage || 0);
-      setScrap(editData.scrap ?? 0);
-      setOverhead(editData.overhead ?? 0);
-      setTotalCost(editData.totalCost || 0);
-      setManualUnitCost(editData.unitCost || 0);
-      
-      // Find the material in all materials (not filtered) to get correct group
       const allMaterials = rawMaterialsData?.items || [];
-      
-      // First try to find by materialName (more reliable than ID)
-      let materialToUse = allMaterials.find(m => 
-        m.material === editData.materialName || 
-        m.materialName === editData.materialName
-      );
-      
-      // If not found by name, try by ID as fallback
-      if (!materialToUse) {
-        materialToUse = allMaterials.find(m => m.id === editData.materialId);
-      }
-      
+      const materialToUse = findMaterialByEditData(allMaterials, editData);
+
       if (materialToUse) {
-        // Set the correct material group and country from the found material
         setMaterialGroup(materialToUse.materialGroup || '');
-        setCountry(materialToUse.country || '');
+        // Prefer saved country; fall back to location prop
+        setCountry(editData.country || (materialToUse as any).country || location || '');
       } else {
-        // Fallback to edit data values if no material found
         setMaterialGroup(editData.materialGroup || '');
-        setCountry(editData.country || '');
+        setCountry(editData.country || location || '');
         setSelectedMaterialId('');
       }
-      
+
+      setScrap(editData.scrap ?? 0);
+      setOverhead(editData.overhead ?? 0);
+      setManualUnitCost(editData.unitCost || 0);
       setSelectedQuarter(editData.quarter || 'q1');
+
+      // Seed net/gross from CAD weight when the auto-created record has zero usage
+      const savedNet = Number(editData.netUsage ?? 0);
+      const savedGross = Number(editData.grossUsage ?? 0);
+      const cadWeight = Number(bomItemData?.weight ?? 0);
+      if (!savedNet && !savedGross && cadWeight > 0) {
+        const scrapVal = Number(editData.scrap ?? 10);
+        const net = parseFloat(cadWeight.toFixed(6));
+        setNetUsage(net);
+        setGrossUsage(parseFloat((net / (1 - scrapVal / 100)).toFixed(6)));
+        setCadFilled(true);
+      } else {
+        setNetUsage(savedNet);
+        setGrossUsage(savedGross);
+      }
     } else if (!editData && open) {
-      // Reset for new entry
+      // Reset for new entry — pre-select pricing location from parent context
       setMaterialGroup('');
-      setCountry('');
+      setCountry(location || '');
       setSelectedQuarter('q1');
       setSelectedMaterialId('');
       setGrossUsage(0);
       setNetUsage(0);
       setScrap(0);
       setOverhead(0);
-      setTotalCost(0);
       setManualUnitCost(0);
+      setReclaimRate(0);
+      setCadFilled(false);
     }
   }, [editData, open, isLoading, isLoadingOptions, materialGroups, rawMaterialsData]);
 
-  // Set selected material ID after filters are applied (separate effect for edit mode)
+  // Set selected material ID after material group filter is applied (separate effect for edit mode)
   useEffect(() => {
     if (editData && open && !isLoading && !isLoadingOptions && materials.length > 0 && materialGroup) {
-      // First try to find by materialName (more reliable than ID)
-      let materialToUse = materials.find(m => 
-        m.material === editData.materialName || 
-        m.materialName === editData.materialName
-      );
-      
-      // If not found by name, try by ID as fallback
-      if (!materialToUse) {
-        materialToUse = materials.find(m => m.id === editData.materialId);
-      }
-      
-      console.log('Setting material selection:', { 
-        editDataMaterialName: editData.materialName,
-        editDataMaterialId: editData.materialId,
-        foundByName: !!materials.find(m => m.material === editData.materialName || m.materialName === editData.materialName),
-        foundById: !!materials.find(m => m.id === editData.materialId),
-        materialToUseId: materialToUse?.id,
-        materialToUseName: materialToUse?.material,
-        materialGroupSet: !!materialGroup,
-        materialsCount: materials.length 
-      });
-      
-      if (materialToUse) {
-        setSelectedMaterialId(materialToUse.id);
-      } else {
-        setSelectedMaterialId('');
-      }
+      const materialToUse = findMaterialByEditData(materials, editData);
+      setSelectedMaterialId(materialToUse?.id ?? '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, materials, materialGroup]);
 
-  // Reset material selection when filters change (but not during initial load with editData)
+  // Reset material selection when material group changes (pricing location change does not reset)
   useEffect(() => {
     if (!editData) {
       setSelectedMaterialId('');
     }
-  }, [materialGroup, country, editData]);
+  }, [materialGroup, editData]);
 
-  // Calculate total cost based on unit cost
-  useEffect(() => {
-    if ((selectedMaterial || editData) && grossUsage > 0) {
-      // Get unit cost from material - check all possible cost fields, or use manual input
-      let unitCost = 0;
-      const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
+  // ── Live cost preview ────────────────────────────────────────────────────
+  const { previewCost, previewBreakdown } = useMemo(() => {
+    const zero = { previewCost: 0, previewBreakdown: null as null | Record<string, number> };
+    if (!((selectedMaterial || editData) && (grossUsage > 0 || (netUsage as number) > 0))) return zero;
+    const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
+    let unitCostUsd = 0;
 
-      if (selectedMaterial) {
-        // Pick regional cost based on selected country
-        const countryLower = (country || '').toLowerCase();
-        const regionalCost =
-          countryLower.includes('france')   ? selectedMaterial.costFrance :
-          countryLower.includes('germany')  ? selectedMaterial.costGermany :
-          countryLower.includes('w. europe') || countryLower.includes('western europe') ? selectedMaterial.costWEurope :
-          countryLower.includes('usa') || countryLower.includes('united states') ? selectedMaterial.costUsa :
-          countryLower.includes('india')    ? selectedMaterial.costIndia :
-          countryLower.includes('e. europe') || countryLower.includes('eastern europe') ? selectedMaterial.costEEurope :
-          countryLower.includes('china')    ? selectedMaterial.costChina :
-          undefined;
+    if (selectedMaterial) {
+      const cl = (country || '').toLowerCase();
+      let localAmount = 0;
+      let localCurrency = 'USD';
 
-        const rawCost = regionalCost ||
-                        selectedMaterial.costIndia ||
-                        selectedMaterial.unitCost ||
-                        selectedMaterial.cost ||
-                        0;
+      if (cl.includes('india'))                                            { localAmount = selectedMaterial.costIndia   ?? 0; localCurrency = 'INR'; }
+      else if (cl.includes('usa') || cl.includes('united states'))        { localAmount = selectedMaterial.costUsa     ?? 0; localCurrency = 'USD'; }
+      else if (cl.includes('germany'))                                    { localAmount = selectedMaterial.costGermany ?? 0; localCurrency = 'EUR'; }
+      else if (cl.includes('france'))                                     { localAmount = selectedMaterial.costFrance  ?? 0; localCurrency = 'EUR'; }
+      else if (cl.includes('w. europe') || cl.includes('western europe')) { localAmount = selectedMaterial.costWEurope ?? 0; localCurrency = 'EUR'; }
+      else if (cl.includes('e. europe') || cl.includes('eastern europe')) { localAmount = selectedMaterial.costEEurope ?? 0; localCurrency = 'EUR'; }
+      else if (cl.includes('china'))                                      { localAmount = selectedMaterial.costChina   ?? 0; localCurrency = 'CNY'; }
+      else { localAmount = selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0; localCurrency = selectedMaterial.currency || 'USD'; }
 
-        // Convert to INR using the exchange_rates table
-        unitCost = convertToInr(rawCost, selectedMaterial.currency, rates);
+      if (!localAmount) {
+        if (selectedMaterial.costIndia) { localAmount = selectedMaterial.costIndia; localCurrency = 'INR'; }
+        else { localAmount = selectedMaterial.unitCost || selectedMaterial.cost || 0; localCurrency = selectedMaterial.currency || 'USD'; }
       }
-
-      // If no cost from material, use manual input
-      const finalUnitCost = unitCost || manualUnitCost || 0;
-      const grossUsageNum = typeof grossUsage === 'number' ? grossUsage : 0;
-
-      // Debug logging
-      console.log('Cost Calculation Debug:', {
-        selectedMaterial: selectedMaterial ? {
-          id: selectedMaterial.id,
-          material: selectedMaterial.material,
-          unitCost: selectedMaterial.unitCost,
-          cost: selectedMaterial.cost,
-          costPerUnit: selectedMaterial.costPerUnit,
-          price: selectedMaterial.price
-        } : null,
-        manualUnitCost,
-        finalUnitCost,
-        grossUsage,
-        scrap,
-        overhead,
-        calculations: {
-          materialCost: grossUsageNum * finalUnitCost,
-          scrapCost: (grossUsageNum * finalUnitCost * (typeof scrap === 'number' ? scrap : 0)) / 100,
-          overheadCost: (grossUsageNum * finalUnitCost * (typeof overhead === 'number' ? overhead : 0)) / 100
-        }
-      });
-
-      if (!finalUnitCost) {
-        setTotalCost(0);
-        return;
-      }
-      const materialCost = grossUsageNum * finalUnitCost;
-      const scrapPercent = typeof scrap === 'number' ? scrap : 0;
-      const overheadPercent = typeof overhead === 'number' ? overhead : 0;
-      const scrapCost = (materialCost * scrapPercent) / 100;
-      const overheadCost = (materialCost * overheadPercent) / 100;
-      const total = materialCost + scrapCost + overheadCost;
-      setTotalCost(Math.max(0, total));
-    } else {
-      setTotalCost(0);
+      unitCostUsd = (localAmount * (rates[localCurrency] ?? 1)) / (rates['USD'] ?? 83.5);
     }
-  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, editData, country, exchangeRates]);
+
+    const finalUnitCost = unitCostUsd || manualUnitCost || 0;
+    if (!finalUnitCost) return zero;
+
+    const net        = typeof netUsage  === 'number' ? netUsage  : 0;
+    const scrapPct   = typeof scrap     === 'number' ? scrap     : 0;
+    const overheadPct = typeof overhead  === 'number' ? overhead  : 0;
+    const reclaimPct  = typeof reclaimRate === 'number' ? reclaimRate : 0;
+
+    // gross = net ÷ (1 − scrap%), fallback to manual grossUsage
+    const gross = net > 0
+      ? net / Math.max(1 - scrapPct / 100, 0.001)
+      : (typeof grossUsage === 'number' ? grossUsage : 0);
+
+    const grossMaterialCost = gross * finalUnitCost;
+    const scrapAmount       = gross - net;
+    // reclaimRate must not exceed unitCost — same rule the backend validates
+    const reclaimRateInvalid = reclaimPct > finalUnitCost;
+    // clamp so preview never goes negative even on bad input
+    const reclaimValue    = Math.min(scrapAmount * reclaimPct, grossMaterialCost);
+    const netMaterialCost = grossMaterialCost - reclaimValue;
+    // no scrapAdjustment — scrap% is already encoded in the gross/net ratio
+    const overheadCost    = netMaterialCost * (overheadPct / 100);
+    const totalCostVal    = Math.max(0, netMaterialCost + overheadCost);
+
+    const utilRate   = gross > 0 ? (net / gross) * 100 : 0;
+    const effPerUnit = net   > 0 ? totalCostVal / net   : 0;
+
+    return {
+      previewCost: totalCostVal,
+      previewBreakdown: { gross, grossMaterialCost, scrapAmount, reclaimValue, netMaterialCost, scrapAdjustment: 0, subtotal: netMaterialCost, overheadCost, totalCostVal, utilRate, effPerUnit, reclaimRateInvalid: reclaimRateInvalid ? 1 : 0 },
+    };
+  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, reclaimRate, editData, country, exchangeRates]);
+
+  const totalCost = previewCost;
+
+  // Auto-derive Gross Usage from Net Usage + Scrap % for display
+  useEffect(() => {
+    const net = typeof netUsage === 'number' ? netUsage : 0;
+    if (net > 0) {
+      const s = typeof scrap === 'number' ? Math.min(scrap, 99.9) : 0;
+      setGrossUsage(parseFloat((net / Math.max(1 - s / 100, 0.001)).toFixed(4)));
+    }
+  }, [netUsage, scrap]);
 
   // Auto-populate calculator fields when material is selected
   useEffect(() => {
-    if (selectedMaterial && selectedCalculator) {
-      const updatedInputs = { ...calculatorInputs };
-      let hasUpdates = false;
-      
-      console.log('Auto-populating fields for material:', selectedMaterial);
-      console.log('Available material properties:', Object.keys(selectedMaterial));
-      console.log('Selected calculator:', selectedCalculator);
-      console.log('Calculator fields:', selectedCalculator.fields);
-      
-      // Find fields configured with raw materials database lookup
-      const rawMaterialFields = selectedCalculator.fields
-        ?.filter((field: any) => 
-          field.fieldType === 'database_lookup' && 
-          field.dataSource === 'raw_materials' && 
-          (field.sourceProperty || field.sourceField)  // Support both sourceProperty and sourceField
-        );
-      
-      console.log('Raw materials fields found:', rawMaterialFields);
-      
-      rawMaterialFields?.forEach((field: any) => {
-          // Use sourceProperty if available, fallback to sourceField
-          const sourceProperty = field.sourceProperty || field.sourceField;
-          console.log(`Looking for property "${sourceProperty}" in material for field "${field.fieldName}"`);
-          
-          // Map calculator sourceProperty to actual API field names - Complete mapping for all raw material fields
-          const propertyMappings = {
-            // Legacy API mappings
-            'meltingTempCelsius': 'meltingTempC',
-            'densityKgM3': 'densityKgM3',
-            'costPerKg': 'cost',
-            'costPerUnit': 'unitCost',
-            'utsMpa': 'ultimateTensileStrength',
-            'ytsMpa': 'yieldTensileStrength',
-            'thermalConductivityWMK': 'thermalConductivityMelt',
-            'specificHeatJGK': 'specificHeatMelt',
-            'moldTempCelsiusMin': 'moldTempC',
-            'moldTempCelsiusMax': 'moldTempC',
-            'ejectDeflectionTempCelsius': 'ejectDeflectionTempC',
-            
-            // Basic Material Info - Direct mappings
-            'material': 'material',
-            'materialGrade': 'materialGrade',
-            'materialGroup': 'materialGroup',
-            'materialType': 'materialType',
-            'materialDescription': 'materialDescription',
-            'application': 'application',
-            
-            // Physical Properties
-            'density': 'densityKgM3',
-            
-            // Mechanical Properties - Direct mappings for all existing fields
-            'ultimateTensileStrength': 'ultimateTensileStrength',
-            'yieldTensileStrength': 'yieldTensileStrength',
-            'shearingStrength': 'shearingStrength',
-            
-            // Thermal Properties
-            'meltingTempC': 'meltingTempC',
-            'moldTempC': 'moldTempC',
-            'ejectDeflectionTempC': 'ejectDeflectionTempC',
-            'thermalConductivityMelt': 'thermalConductivityMelt',
-            'specificHeatMelt': 'specificHeatMelt',
-            
-            // Processing Properties
-            'clampingPressureMpa': 'clampingPressureMpa',
-            'regrindingPercentage': 'regrindingPercentage',
-            'regrinding': 'regrinding',
-            
-            // Commercial Properties
-            'cost': 'cost',
-            'unitCost': 'unitCost',
-            'currency': 'currency',
-            'location': 'location',
-            'country': 'country',
-            'shape': 'shape',
-            
-            // Standards
-            'astmStandard': 'astmStandard',
-            'dinStandard': 'dinStandard',
-            'enStandard': 'enStandard',
-            'jisStandard': 'jisStandard'
-          };
-          
-          // Get the correct API field name
-          const actualPropertyName = propertyMappings[sourceProperty] || sourceProperty;
-          
-          // Get the property value using the correct API field name
-          const propertyValue = selectedMaterial[actualPropertyName];
-          
-          console.log(`Property mapping: "${sourceProperty}" -> "${actualPropertyName}" = ${propertyValue}`);
-          
-          if (propertyValue !== undefined && propertyValue !== null && propertyValue > 0) {
-            updatedInputs[field.fieldName] = propertyValue;
-            hasUpdates = true;
-            console.log(`Updated field "${field.fieldName}" with value ${propertyValue} from property "${actualPropertyName}"`);
-          }
-        });
-      
-      if (hasUpdates) {
-        console.log('Updating calculator inputs:', updatedInputs);
-        setCalculatorInputs(updatedInputs);
+    if (!selectedMaterial || !selectedCalculator) return;
+    const updatedInputs = { ...calculatorInputs };
+    let hasUpdates = false;
+
+    const rawMaterialFields = selectedCalculator.fields?.filter((field: any) =>
+      field.fieldType === 'database_lookup' &&
+      field.dataSource === 'raw_materials' &&
+      (field.sourceProperty || field.sourceField),
+    );
+
+    rawMaterialFields?.forEach((field: any) => {
+      const sourceProperty   = field.sourceProperty || field.sourceField;
+      const actualPropertyName = CALCULATOR_PROPERTY_MAPPINGS[sourceProperty] || sourceProperty;
+      const propertyValue    = selectedMaterial[actualPropertyName];
+      if (propertyValue !== undefined && propertyValue !== null && propertyValue > 0) {
+        updatedInputs[field.fieldName] = propertyValue;
+        hasUpdates = true;
       }
-    }
+    });
+
+    if (hasUpdates) setCalculatorInputs(updatedInputs);
   }, [selectedMaterial, selectedCalculator]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -700,11 +714,12 @@ export function RawMaterialDialog({
         materialDescription: materialInfo.materialDescription || '',
         country: materialInfo.country || '',
         quarter: selectedQuarter,
-        unitCost: editData.unitCost || manualUnitCost || (selectedMaterial?.unitCost || selectedMaterial?.cost || 0), // Use the best available cost
+        unitCost: editData.unitCost || manualUnitCost || (selectedMaterial?.unitCost || selectedMaterial?.cost || 0),
         grossUsage,
         netUsage,
         scrap,
         overhead,
+        reclaimRate: Number(reclaimRate) || 0,
         totalCost,
       });
     } else {
@@ -719,24 +734,36 @@ export function RawMaterialDialog({
         return;
       }
       
-      // Get unit cost from material based on selected country, then convert to INR
+      // Get unit cost in USD for the selected country (mirrors getRegionalRate + INR pivot)
       const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
       const countryLowerSubmit = (country || '').toLowerCase();
-      const regionalCostSubmit =
-        countryLowerSubmit.includes('france')   ? selectedMaterial.costFrance :
-        countryLowerSubmit.includes('germany')  ? selectedMaterial.costGermany :
-        countryLowerSubmit.includes('w. europe') || countryLowerSubmit.includes('western europe') ? selectedMaterial.costWEurope :
-        countryLowerSubmit.includes('usa') || countryLowerSubmit.includes('united states') ? selectedMaterial.costUsa :
-        countryLowerSubmit.includes('india')    ? selectedMaterial.costIndia :
-        countryLowerSubmit.includes('e. europe') || countryLowerSubmit.includes('eastern europe') ? selectedMaterial.costEEurope :
-        countryLowerSubmit.includes('china')    ? selectedMaterial.costChina :
-        undefined;
-      const rawMaterialCost = regionalCostSubmit ||
-                               selectedMaterial.costIndia ||
-                               selectedMaterial.unitCost ||
-                               selectedMaterial.cost ||
-                               0;
-      const materialUnitCost = convertToInr(rawMaterialCost, selectedMaterial.currency, rates);
+      let submitLocalAmount = 0;
+      let submitLocalCurrency = 'USD';
+
+      if (countryLowerSubmit.includes('india')) {
+        submitLocalAmount = selectedMaterial.costIndia ?? 0; submitLocalCurrency = 'INR';
+      } else if (countryLowerSubmit.includes('usa') || countryLowerSubmit.includes('united states')) {
+        submitLocalAmount = selectedMaterial.costUsa ?? 0; submitLocalCurrency = 'USD';
+      } else if (countryLowerSubmit.includes('germany')) {
+        submitLocalAmount = selectedMaterial.costGermany ?? 0; submitLocalCurrency = 'EUR';
+      } else if (countryLowerSubmit.includes('france')) {
+        submitLocalAmount = selectedMaterial.costFrance ?? 0; submitLocalCurrency = 'EUR';
+      } else if (countryLowerSubmit.includes('w. europe') || countryLowerSubmit.includes('western europe')) {
+        submitLocalAmount = selectedMaterial.costWEurope ?? 0; submitLocalCurrency = 'EUR';
+      } else if (countryLowerSubmit.includes('e. europe') || countryLowerSubmit.includes('eastern europe')) {
+        submitLocalAmount = selectedMaterial.costEEurope ?? 0; submitLocalCurrency = 'EUR';
+      } else if (countryLowerSubmit.includes('china')) {
+        submitLocalAmount = selectedMaterial.costChina ?? 0; submitLocalCurrency = 'CNY';
+      } else {
+        submitLocalAmount = selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0;
+        submitLocalCurrency = selectedMaterial.currency || 'USD';
+      }
+      if (!submitLocalAmount) {
+        if (selectedMaterial.costIndia) { submitLocalAmount = selectedMaterial.costIndia; submitLocalCurrency = 'INR'; }
+        else { submitLocalAmount = selectedMaterial.unitCost || selectedMaterial.cost || 0; submitLocalCurrency = selectedMaterial.currency || 'USD'; }
+      }
+      // Convert to USD via INR pivot
+      const materialUnitCost = (submitLocalAmount * (rates[submitLocalCurrency] ?? 1)) / (rates['USD'] ?? 83.5);
       
       if (!materialUnitCost && !manualUnitCost) {
         alert('Please enter a unit cost. The selected material has no cost data available.');
@@ -764,28 +791,30 @@ export function RawMaterialDialog({
         material: selectedMaterial.material,
         materialType: selectedMaterial.materialType || '',
         materialDescription: selectedMaterial.materialDescription || '',
-        country: selectedMaterial.country || '',
+        country: country || selectedMaterial.country || '',
         quarter: selectedQuarter,
         unitCost: finalUnitCost,
         grossUsage,
         netUsage,
         scrap,
         overhead,
+        reclaimRate: Number(reclaimRate) || 0,
         totalCost,
       });
     }
 
     // Reset form
     setMaterialGroup('');
-    setCountry('');
+    setCountry(location || '');
     setSelectedQuarter('q1');
     setSelectedMaterialId('');
     setGrossUsage(0);
     setNetUsage(0);
     setScrap(0);
     setOverhead(0);
-    setTotalCost(0);
     setManualUnitCost(0);
+    setReclaimRate(0);
+    setCadFilled(false);
     onOpenChange(false);
   };
 
@@ -870,28 +899,27 @@ export function RawMaterialDialog({
                     </Select>
                   </div>
 
-                  {/* Country Filter */}
+                  {/* Pricing Location */}
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">
-                      Country <span className="text-muted-foreground text-xs">(Optional)</span>
+                      Pricing Location <span className="text-muted-foreground text-xs">(Optional)</span>
                     </label>
                     <div className="flex gap-2">
                       <Select value={country} onValueChange={setCountry}>
                         <SelectTrigger>
-                          <SelectValue placeholder="All countries" />
+                          <SelectValue placeholder="Global (base price)" />
                         </SelectTrigger>
                         <SelectContent>
-                          {countries.length > 0 ? (
-                            countries.map((countryItem) => (
-                              <SelectItem key={countryItem} value={countryItem}>
-                                {countryItem}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem key="no-countries" value="none" disabled>
-                              No countries available
-                            </SelectItem>
-                          )}
+                          <SelectItem value="India">🇮🇳 India</SelectItem>
+                          <SelectItem value="USA">🇺🇸 USA</SelectItem>
+                          <SelectItem value="China">🇨🇳 China</SelectItem>
+                          <SelectItem value="Germany">🇩🇪 Germany</SelectItem>
+                          <SelectItem value="France">🇫🇷 France</SelectItem>
+                          <SelectItem value="W. Europe">🇪🇺 W. Europe</SelectItem>
+                          <SelectItem value="E. Europe">🇪🇺 E. Europe</SelectItem>
+                          <SelectItem value="UK">🇬🇧 UK</SelectItem>
+                          <SelectItem value="Vietnam">🇻🇳 Vietnam</SelectItem>
+                          <SelectItem value="Mexico">🇲🇽 Mexico</SelectItem>
                         </SelectContent>
                       </Select>
                       {country && (
@@ -946,67 +974,150 @@ export function RawMaterialDialog({
               </>
             )}
 
-            {/* Material Details and Quarter Selection */}
-            {selectedMaterial && (
-              <div className="space-y-2 bg-secondary/20 p-4 rounded-lg">
-                <label className="text-sm font-semibold block">Material Details</label>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Material:</span>
-                    <span className="ml-2 font-medium">{selectedMaterial.material}</span>
-                  </div>
-                  {selectedMaterial.materialType && (
-                    <div>
-                      <span className="text-muted-foreground">Type:</span>
-                      <span className="ml-2 font-medium">{selectedMaterial.materialType}</span>
-                    </div>
-                  )}
-                  {selectedMaterial.materialDescription && (
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">Description:</span>
-                      <span className="ml-2 font-medium">{selectedMaterial.materialDescription}</span>
-                    </div>
-                  )}
-                  {selectedMaterial.country && (
-                    <div>
-                      <span className="text-muted-foreground">Country:</span>
-                      <span className="ml-2 font-medium">{selectedMaterial.country}</span>
-                    </div>
-                  )}
-                  {selectedMaterial.densityKgM3 && (
-                    <div>
-                      <span className="text-muted-foreground">Density:</span>
-                      <span className="ml-2 font-medium">{selectedMaterial.densityKgM3} kg/m³</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Current Cost Display */}
+            {/* Material Details + Location Price Matrix + Unit Cost (single guard) */}
             {selectedMaterial && (() => {
+              // ── Rate calculations ──────────────────────────────────────────────
               const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
-              const rawCost = selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0;
-              const inrCost = convertToInr(rawCost, selectedMaterial.currency, rates);
-              const currSymbol = selectedMaterial.currency === 'USD' ? '$'
-                : selectedMaterial.currency === 'EUR' ? '€'
-                : selectedMaterial.currency === 'GBP' ? '£'
-                : '₹';
-              const isNonInr = selectedMaterial.currency && selectedMaterial.currency !== 'INR';
+              const countryLower = (country || '').toLowerCase();
+
+              const getRegionalRate = (): [number, string, string] => {
+                if (countryLower.includes('india'))
+                  return [selectedMaterial.costIndia ?? 0, 'INR', '₹'];
+                if (countryLower.includes('usa') || countryLower.includes('united states'))
+                  return [selectedMaterial.costUsa ?? 0, 'USD', '$'];
+                if (countryLower.includes('germany'))
+                  return [selectedMaterial.costGermany ?? 0, 'EUR', '€'];
+                if (countryLower.includes('france'))
+                  return [selectedMaterial.costFrance ?? 0, 'EUR', '€'];
+                if (countryLower.includes('w. europe') || countryLower.includes('western europe'))
+                  return [selectedMaterial.costWEurope ?? 0, 'EUR', '€'];
+                if (countryLower.includes('e. europe') || countryLower.includes('eastern europe'))
+                  return [selectedMaterial.costEEurope ?? 0, 'EUR', '€'];
+                if (countryLower.includes('china'))
+                  return [selectedMaterial.costChina ?? 0, 'CNY', '¥'];
+                const base = selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0;
+                const sym =
+                  selectedMaterial.currency === 'EUR' ? '€' :
+                  selectedMaterial.currency === 'GBP' ? '£' :
+                  selectedMaterial.currency === 'INR' ? '₹' : '$';
+                return [base, selectedMaterial.currency || 'USD', sym];
+              };
+
+              const [localCost, localCurrency, localSymbol] = getRegionalRate();
+              const hasRegionalCost = !!country && localCost > 0;
+              const rawLocalCost = hasRegionalCost ? localCost
+                : (selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0);
+              const effectiveCurrency = hasRegionalCost ? localCurrency : (selectedMaterial.currency || 'USD');
+              const inrAmount  = rawLocalCost * (rates[effectiveCurrency] ?? 1);
+              const usdPrice   = inrAmount / (rates['USD'] ?? 83.5);
+              const showLocalLine = effectiveCurrency !== 'USD' && rawLocalCost > 0;
+
+              // ── Price matrix ───────────────────────────────────────────────────
+              const locationPrices: Array<{ flag: string; label: string; cost: number | undefined; currency: string; symbol: string }> = [
+                { flag: '🇮🇳', label: 'India',     cost: selectedMaterial.costIndia,   currency: 'INR', symbol: '₹'   },
+                { flag: '🇺🇸', label: 'USA',       cost: selectedMaterial.costUsa,     currency: 'USD', symbol: '$'   },
+                { flag: '🇨🇳', label: 'China',     cost: selectedMaterial.costChina,   currency: 'CNY', symbol: '¥'   },
+                { flag: '🇩🇪', label: 'Germany',   cost: selectedMaterial.costGermany, currency: 'EUR', symbol: '€'   },
+                { flag: '🇫🇷', label: 'France',    cost: selectedMaterial.costFrance,  currency: 'EUR', symbol: '€'   },
+                { flag: '🇪🇺', label: 'W. Europe', cost: selectedMaterial.costWEurope, currency: 'EUR', symbol: '€'   },
+                { flag: '🇪🇺', label: 'E. Europe', cost: selectedMaterial.costEEurope, currency: 'EUR', symbol: '€'   },
+                { flag: '🇲🇽', label: 'Mexico',    cost: selectedMaterial.costMexico,  currency: 'MXN', symbol: 'MX$' },
+              ].filter(p => p.cost && p.cost > 0);
+
+              const toUsdPrice = (lc: number, curr: string) =>
+                (lc * (rates[curr] ?? 1)) / (rates['USD'] ?? 83.5);
+
               return (
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Unit Cost</label>
-                  <div className="p-4 border-2 border-primary/20 bg-primary/5 rounded-lg space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-primary">Price (INR):</span>
-                      <span className="text-lg font-bold text-primary">₹{inrCost.toFixed(2)}</span>
+                <div className="space-y-3">
+                  {/* Material Details */}
+                  <div className="bg-secondary/20 p-4 rounded-lg space-y-3">
+                    <label className="text-sm font-semibold block">Material Details</label>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Material:</span>
+                        <span className="ml-2 font-medium">{selectedMaterial.material}</span>
+                      </div>
+                      {selectedMaterial.materialType && (
+                        <div>
+                          <span className="text-muted-foreground">Type:</span>
+                          <span className="ml-2 font-medium">{selectedMaterial.materialType}</span>
+                        </div>
+                      )}
+                      {selectedMaterial.materialDescription && (
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">Description:</span>
+                          <span className="ml-2 font-medium">{selectedMaterial.materialDescription}</span>
+                        </div>
+                      )}
+                      {selectedMaterial.densityKgM3 && (
+                        <div>
+                          <span className="text-muted-foreground">Density:</span>
+                          <span className="ml-2 font-medium">{selectedMaterial.densityKgM3} kg/m³</span>
+                        </div>
+                      )}
                     </div>
-                    {isNonInr && (
-                      <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-primary/10 pt-1">
-                        <span>Master price ({selectedMaterial.currency}):</span>
-                        <span>{currSymbol}{rawCost.toFixed(2)} × {(rates[(selectedMaterial.currency ?? '').toUpperCase()] ?? 1).toFixed(2)} = ₹{inrCost.toFixed(2)}</span>
+
+                    {/* Location price matrix */}
+                    {locationPrices.length > 0 && (
+                      <div className="border-t border-border pt-3">
+                        <p className="text-xs text-muted-foreground mb-2 font-medium">Price data available for this material:</p>
+                        <div className="grid grid-cols-2 gap-1">
+                          {locationPrices.map(p => {
+                            const isSelected = country === p.label;
+                            const locUsd = toUsdPrice(p.cost!, p.currency);
+                            return (
+                              <button
+                                key={p.label}
+                                type="button"
+                                onClick={() => setCountry(p.label)}
+                                className={`flex items-center justify-between text-xs px-2 py-1 rounded transition-colors text-left ${
+                                  isSelected
+                                    ? 'bg-primary text-primary-foreground font-semibold'
+                                    : 'bg-background hover:bg-primary/10 border border-border'
+                                }`}
+                              >
+                                <span>{p.flag} {p.label}</span>
+                                <div className="text-right ml-2">
+                                  <div className="font-mono tabular-nums">${locUsd.toFixed(2)}</div>
+                                  {p.currency !== 'USD' && (
+                                    <div className={`text-[9px] tabular-nums ${isSelected ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                                      {p.symbol}{p.cost!.toFixed(2)} {p.currency}
+                                    </div>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1.5">Click a location to use that price · All prices in USD</p>
                       </div>
                     )}
+                  </div>
+
+                  {/* Unit Cost */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Unit Cost</label>
+                    <div className="p-4 border-2 border-primary/20 bg-primary/5 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-primary">
+                          Price (USD){country ? ` · ${country}` : ''}:
+                        </span>
+                        <span className="text-lg font-bold text-primary">
+                          ${usdPrice.toFixed(2)} / kg
+                        </span>
+                      </div>
+                      {showLocalLine && (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-primary/10 pt-1">
+                          <span>Local rate ({effectiveCurrency}):</span>
+                          <span>{localSymbol}{rawLocalCost.toFixed(2)} / kg</span>
+                        </div>
+                      )}
+                      {country && !hasRegionalCost && (
+                        <div className="text-xs text-amber-600 border-t border-primary/10 pt-1">
+                          No {country}-specific price in database — showing base rate
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1021,7 +1132,7 @@ export function RawMaterialDialog({
                 </label>
                 <div className="p-4 border-2 border-orange-200 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm">₹</span>
+                    <span className="text-sm">$</span>
                     <Input
                       type="number"
                       step="0.01"
@@ -1042,24 +1153,86 @@ export function RawMaterialDialog({
               </div>
             )}
 
+            {/* ── CAD Geometry Banner ────────────────────────────────────────── */}
+            {cadVolumeMm3 != null && cadVolumeMm3 > 0 && (
+              <div className="rounded-lg border border-cyan-200 bg-cyan-50 dark:border-cyan-800 dark:bg-cyan-950/30 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wider text-cyan-700 dark:text-cyan-400 font-semibold mb-1.5">From CAD Analysis</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-cyan-800 dark:text-cyan-300">
+                  <span>Volume: <strong>{cadVolumeMm3.toLocaleString(undefined, { maximumFractionDigits: 2 })} mm³</strong></span>
+                  {bomItemData?.weight && <span>Weight: <strong>{Number(bomItemData.weight).toFixed(4)} kg</strong></span>}
+                  {bomItemData?.materialGrade && <span>Grade: <strong>{bomItemData.materialGrade}</strong></span>}
+                  {matDensityKgM3 && <span>Density: <strong>{matDensityKgM3} kg/m³</strong></span>}
+                </div>
+                {smartFillAvailable && (
+                  <Button type="button" size="sm" variant="outline"
+                    className="mt-2 h-7 text-xs border-cyan-400 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900"
+                    onClick={handleSmartFill}>
+                    Smart Fill — net usage from geometry
+                  </Button>
+                )}
+              </div>
+            )}
+
             {/* Usage and Cost Fields */}
             {!selectedMaterialId && !editData && (
               <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-xs text-blue-700 dark:text-blue-300">
                 Select a material above to enable usage and cost fields
               </div>
             )}
+
+            {/* Net Usage + Gross Usage */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-semibold">
-                  Gross Usage 
-                  <span className="text-muted-foreground text-xs ml-1">
-                    (Unit Reference: kg)
-                  </span>
+                <label className="text-sm font-semibold flex items-center gap-2">
+                  Net Usage
+                  <span className="text-muted-foreground text-xs font-normal">(kg · finished part)</span>
+                  {cadFilled && (
+                    <span className="text-[10px] bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded font-semibold">CAD</span>
+                  )}
                 </label>
                 <div className="flex gap-2">
                   <Input
                     type="number"
-                    step="0.01"
+                    step="0.000001"
+                    value={netUsage === '' ? '' : netUsage.toString()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNetUsage(val === '' ? '' : parseFloat(val) || 0);
+                      setCadFilled(false);
+                    }}
+                    placeholder="Enter net usage"
+                    className="flex-1"
+                    disabled={!selectedMaterialId && !editData}
+                  />
+                  <Button
+                    type="button" variant="outline" size="icon"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); setCalculatorTarget('netUsage'); setCalculatorOpen(true); }}
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    title="Use DB Calculator"
+                    disabled={!selectedMaterialId && !editData}
+                  >
+                    <CalculatorIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+                {cadFilled && cadVolumeMm3 && matDensityKgM3 ? (
+                  <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                    {cadVolumeMm3.toLocaleString(undefined, { maximumFractionDigits: 2 })} mm³ × {matDensityKgM3.toLocaleString()} kg/m³ ÷ 1,000,000,000
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">weight of finished part in the material</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold flex items-center gap-2">
+                  Gross Usage
+                  <span className="text-muted-foreground text-xs font-normal">(kg · auto-calculated)</span>
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    step="0.000001"
                     value={grossUsage === '' ? '' : grossUsage.toString()}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -1070,122 +1243,163 @@ export function RawMaterialDialog({
                     disabled={!selectedMaterialId && !editData}
                   />
                   <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.nativeEvent?.stopImmediatePropagation?.();
-                      setCalculatorTarget('grossUsage');
-                      setCalculatorOpen(true);
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.nativeEvent?.stopImmediatePropagation?.();
-                    }}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    title="Use Calculator"
+                    type="button" variant="outline" size="icon"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); setCalculatorTarget('grossUsage'); setCalculatorOpen(true); }}
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    title="Use DB Calculator"
                     disabled={!selectedMaterialId && !editData}
                   >
                     <CalculatorIcon className="h-4 w-4" />
                   </Button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">
-                  Net Usage
-                  <span className="text-muted-foreground text-xs ml-1">
-                    (Unit Reference: kg)
-                  </span>
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={netUsage === '' ? '' : netUsage.toString()}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNetUsage(val === '' ? '' : parseFloat(val) || 0);
-                    }}
-                    placeholder="Enter net usage"
-                    className="flex-1"
-                    disabled={!selectedMaterialId && !editData}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.nativeEvent?.stopImmediatePropagation?.();
-                      setCalculatorTarget('netUsage');
-                      setCalculatorOpen(true);
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.nativeEvent?.stopImmediatePropagation?.();
-                    }}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    title="Use Calculator"
-                    disabled={!selectedMaterialId && !editData}
-                  >
-                    <CalculatorIcon className="h-4 w-4" />
-                  </Button>
-                </div>
+                {typeof netUsage === 'number' && netUsage > 0 ? (
+                  <p className="text-[11px] text-muted-foreground font-mono">
+                    {netUsage} ÷ (1 − {typeof scrap === 'number' ? scrap : 0}% / 100)
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">net ÷ (1 − scrap%) — includes material lost in process</p>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Scrap, Reclaim Rate, Overhead */}
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-semibold">Scrap %</label>
+                <label className="text-sm font-semibold" title="% of gross lost as chips/trim/yield — drives Gross = Net ÷ (1 − scrap%)">
+                  Scrap / Yield Loss %
+                </label>
                 <Input
-                  type="number"
-                  step="0.01"
+                  type="number" step="0.01"
                   value={scrap === '' ? '' : scrap.toString()}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setScrap(val === '' ? '' : parseFloat(val) || 0);
-                  }}
-                  placeholder="Enter scrap percentage"
+                  onChange={(e) => { const v = e.target.value; setScrap(v === '' ? '' : parseFloat(v) || 0); }}
+                  placeholder="e.g. 10.5"
                   disabled={!selectedMaterialId && !editData}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold" title="Scrap metal reclaim value per kg (e.g. chip buy-back rate). Must not exceed unit cost.">
+                  Reclaim Rate ($/kg)
+                </label>
+                <Input
+                  type="number" step="0.001"
+                  value={reclaimRate === '' ? '' : reclaimRate.toString()}
+                  onChange={(e) => { const v = e.target.value; setReclaimRate(v === '' ? '' : parseFloat(v) || 0); }}
+                  placeholder="e.g. 0.30"
+                  disabled={!selectedMaterialId && !editData}
+                  className={previewBreakdown?.reclaimRateInvalid ? 'border-destructive focus-visible:ring-destructive' : ''}
+                />
+                {previewBreakdown?.reclaimRateInvalid ? (
+                  <p className="text-xs text-destructive">Must be less than unit cost (${(previewBreakdown.grossMaterialCost / (previewBreakdown.gross || 1)).toFixed(3)}/kg)</p>
+                ) : null}
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold">Overhead %</label>
                 <Input
-                  type="number"
-                  step="0.01"
+                  type="number" step="0.01"
                   value={overhead === '' ? '' : overhead.toString()}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setOverhead(val === '' ? '' : parseFloat(val) || 0);
-                  }}
-                  placeholder="Enter overhead percentage"
+                  onChange={(e) => { const v = e.target.value; setOverhead(v === '' ? '' : parseFloat(v) || 0); }}
+                  placeholder="e.g. 5.0"
                   disabled={!selectedMaterialId && !editData}
                 />
               </div>
             </div>
 
-            {/* Total Cost Display */}
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-              <label className="text-sm font-semibold block mb-2">Total Cost</label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">INR</span>
-                <span className="text-lg font-bold">₹{totalCost.toFixed(2)}</span>
-              </div>
-            </div>
+            {/* ── Live 8-Step Cost Breakdown — always visible ───────────────── */}
+            {(() => {
+              const b = previewBreakdown;
+              const dim = 'text-muted-foreground/40';
+              const val = (n: number | undefined, d = 4) => b ? `$${(n ?? 0).toFixed(d)}` : '—';
+              const unitCostDisplay = b ? `$${((b.grossMaterialCost ?? 0) / (b.gross || 1)).toFixed(3)}/kg` : '—';
+              const grossKg = b ? `${(b.gross ?? 0).toFixed(4)} kg` : '— kg';
+              const scrapKg = b ? `${(b.scrapAmount ?? 0).toFixed(4)} kg` : '— kg';
+              const reclaimRateDisplay = b ? `$${Number(reclaimRate || 0).toFixed(3)}/kg` : '—';
+              return (
+                <div className="rounded-lg border border-border bg-muted/20 overflow-hidden">
+                  {/* header */}
+                  <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Live Cost Breakdown</span>
+                    <span className={`text-xl font-bold tabular-nums ${b ? 'text-foreground' : dim}`}>
+                      {b ? `$${(b.totalCostVal ?? 0).toFixed(4)}` : '$0.0000'}
+                    </span>
+                  </div>
+
+                  {/* rows */}
+                  <div className="px-4 py-3 space-y-1.5 text-xs">
+
+                    {/* Gross material cost */}
+                    <div className={`flex items-baseline justify-between gap-4 ${b ? 'text-foreground' : dim}`}>
+                      <span className="shrink-0">Gross material cost</span>
+                      <span className={`font-mono text-muted-foreground text-[11px] flex-1 text-right truncate`}>
+                        {grossKg} × {unitCostDisplay}
+                      </span>
+                      <span className="tabular-nums font-mono shrink-0">{val(b?.grossMaterialCost)}</span>
+                    </div>
+
+                    {/* Reclaim value */}
+                    <div className={`flex items-baseline justify-between gap-4 ${b && (b.reclaimValue ?? 0) > 0 ? 'text-emerald-600 dark:text-emerald-400' : dim}`}>
+                      <span className="shrink-0">− Reclaim value</span>
+                      <span className="font-mono text-[11px] flex-1 text-right truncate">
+                        {scrapKg} × {reclaimRateDisplay}
+                      </span>
+                      <span className="tabular-nums font-mono shrink-0">
+                        {b ? `−$${(b.reclaimValue ?? 0).toFixed(4)}` : '—'}
+                      </span>
+                    </div>
+
+                    {/* Net material cost */}
+                    <div className={`flex items-baseline justify-between gap-4 ${b ? 'text-foreground' : dim}`}>
+                      <span className="shrink-0">= Net material cost</span>
+                      <span className="font-mono text-[11px] flex-1 text-right text-muted-foreground/60">
+                        gross − reclaim
+                      </span>
+                      <span className="tabular-nums font-mono shrink-0">{val(b?.netMaterialCost)}</span>
+                    </div>
+
+                    {/* Overhead */}
+                    <div className={`flex items-baseline justify-between gap-4 ${b && (b.overheadCost ?? 0) > 0 ? 'text-foreground' : dim}`}>
+                      <span className="shrink-0">+ Overhead</span>
+                      <span className="font-mono text-[11px] flex-1 text-right text-muted-foreground/60">
+                        net × {Number(overhead || 0)}%
+                      </span>
+                      <span className="tabular-nums font-mono shrink-0">
+                        {b ? `+$${(b.overheadCost ?? 0).toFixed(4)}` : '—'}
+                      </span>
+                    </div>
+
+                    {/* Total */}
+                    <div className="border-t border-border mt-1 pt-2 flex items-baseline justify-between font-bold">
+                      <span>Total cost</span>
+                      <span className={`tabular-nums font-mono text-sm ${b ? 'text-foreground' : dim}`}>
+                        {b ? `$${(b.totalCostVal ?? 0).toFixed(4)}` : '$0.0000'}
+                      </span>
+                    </div>
+
+                    {/* Efficiency row */}
+                    <div className={`flex gap-6 pt-0.5 text-[11px] ${b ? 'text-muted-foreground' : dim}`}>
+                      <span>
+                        Utilization:{' '}
+                        <strong className={!b ? '' : (b.utilRate ?? 0) < 50 ? 'text-destructive' : (b.utilRate ?? 0) < 75 ? 'text-amber-500' : 'text-emerald-500'}>
+                          {b ? `${(b.utilRate ?? 0).toFixed(1)}%` : '—'}
+                        </strong>
+                      </span>
+                      <span>
+                        Eff. $/kg:{' '}
+                        <strong>{b ? `$${(b.effPerUnit ?? 0).toFixed(3)}` : '—'}</strong>
+                      </span>
+                    </div>
+
+                    {!b && (
+                      <p className="text-[11px] text-muted-foreground/50 pt-0.5 italic">
+                        Select a material and enter net usage to see live numbers
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
             </div>
 
             <DialogFooter className="mt-6">
@@ -1195,9 +1409,10 @@ export function RawMaterialDialog({
               <Button
                 type="submit"
                 disabled={
-                  editData
+                  !!previewBreakdown?.reclaimRateInvalid ||
+                  (editData
                     ? grossUsage <= 0
-                    : !materialGroup || !selectedMaterialId || grossUsage <= 0
+                    : !materialGroup || !selectedMaterialId || grossUsage <= 0)
                 }
               >
                 {editData ? 'Update Material' : 'Add Material'}

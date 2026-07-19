@@ -109,6 +109,7 @@ export class RetrievalService {
       heatTreatment: bomRow.heat_treatment ?? null,
       hardnessHrc: numberOr(bomRow.hardness, null),
       materialHint: bomRow.material ?? bomRow.material_grade ?? null,
+      materialFamily: null, // populated below after drawing-field promotion
       coating: bomRow.coating ?? null,
       tightestToleranceMm: bomRow.tightest_tolerance_mm != null
         ? parseFloat(bomRow.tightest_tolerance_mm)
@@ -227,15 +228,47 @@ export class RetrievalService {
       );
     }
 
-    // ── Run scope classifier (now with drawing-promoted fields) ────────────
-    // If the user has pinned a manufacturing family, skip the classifier entirely.
+    // ── Resolve materialFamily from DB (before scope classifier) ─────────────
+    // Looks up raw_materials by materialHint to get a DB-backed material_family value.
+    // This replaces regex-based family detection in the scope classifier for the
+    // polymer vs metal decision (most critical) while keeping regex as a fallback
+    // when the DB lookup returns null.
+    bomBrief.materialFamily = await this.resolveMaterialFamilyFromDb(client, bomBrief.materialHint);
+    if (bomBrief.materialFamily) {
+      this.logger.debug(
+        `[assemble] material_family="${bomBrief.materialFamily}" resolved from DB for "${bomBrief.materialHint}"`,
+      );
+    }
+
+    // ── Run scope classifier (now with drawing-promoted fields + DB materialFamily) ──
+    // If the user has pinned a manufacturing family, skip the classifier —
+    // UNLESS the override is injection_molded but the material is clearly a
+    // ferrous/non-ferrous metal (physically impossible — always a stale DB value).
     const familyOverride = bomRow.manufacturing_family_override as string | null | undefined;
-    const scope = familyOverride
+    // DB-backed stale-override detection: prefer materialFamily from DB; fall back to regex.
+    const isDefinitelyMetal = bomBrief.materialFamily
+      ? !bomBrief.materialFamily.startsWith('polymer') && bomBrief.materialFamily !== 'elastomer'
+      : /(steel|iron|alumin|brass|copper|titanium|inox|ss\s*3|is\s*2|is\s*1|en\s*[0-9]|crca|gi\s+sheet|galv|mild\s+steel|stainless|\bms\b)/i.test(
+          bomBrief.materialHint ?? '',
+        );
+    const staleImOverride = familyOverride === 'injection_molded' && isDefinitelyMetal;
+    const scope = (familyOverride && !staleImOverride)
       ? (() => {
           this.logger.log(`[assemble] Manual family override "${familyOverride}" for ${bomItemId} — skipping classifier`);
           return { family: familyOverride as any, inScope: true, reason: `Manual override: user set family to "${familyOverride}"`, confidence: 1.0 };
         })()
-      : this.scopeClassifier.classify(bomBrief, dfm);
+      : (() => {
+          if (staleImOverride) {
+            this.logger.warn(
+              `[assemble] manufacturing_family_override="injection_molded" contradicted by ` +
+              (bomBrief.materialFamily
+                ? `DB material_family "${bomBrief.materialFamily}"`
+                : `metal keyword in "${bomBrief.materialHint}"`) +
+              ` on ${bomItemId} — override ignored, running classifier`,
+            );
+          }
+          return this.scopeClassifier.classify(bomBrief, dfm);
+        })();
 
     // ── Sheet metal volume correction ─────────────────────────────────────────
     // When no CAD volume exists, extractDfm uses 0.45 fill (calibrated for milled
@@ -317,10 +350,10 @@ export class RetrievalService {
     const family = scope.family as Exclude<typeof scope.family, 'out_of_scope'>;
 
     // ── Query masters in parallel ──────────────────────────────────────────
-    const [materialsRaw, mhrRaw, lsrRaw, processesRaw, calculatorsRaw, toolingRaw] = await Promise.all([
+    const [materialsRaw, mhrRaw, lhrRaw, processesRaw, calculatorsRaw, toolingRaw] = await Promise.all([
       this.queryRawMaterials(client, userId, family),
-      this.queryMhr(client, userId),
-      this.queryLsr(client, userId),
+      this.queryMhr(client, userId, orgLocation),
+      this.queryLhr(client, userId, orgLocation),
       this.queryProcesses(client, userId, family),
       this.queryCalculators(client, userId),
       this.queryTooling(client, userId),
@@ -343,7 +376,7 @@ export class RetrievalService {
         coating: bomBrief.coating ?? null,
       }),
       machines: rankMachines(mhrRaw, family, orgLocation, RetrievalService.TOP_N_MACHINES),
-      labour: rankLabour(lsrRaw, orgLocation, RetrievalService.TOP_N_LABOUR),
+      labour: rankLabour(lhrRaw, orgLocation, RetrievalService.TOP_N_LABOUR),
       processes: rankedProcesses,
       calculators: rankCalculators(calculatorsRaw, family, RetrievalService.TOP_N_CALCULATORS),
       tooling: rankTooling(toolingRaw, family, RetrievalService.TOP_N_TOOLING),
@@ -386,40 +419,61 @@ export class RetrievalService {
     }));
   }
 
-  private async queryMhr(client: any, userId: string) {
-    const { data, error } = await client
+  private async queryMhr(client: any, userId: string, orgLocation: string) {
+    // All BENCHMARK rows across all locations — the machine-ranker's locationFitScore
+    // scores them: same location = 1.0, off-location = 0.4. This ensures:
+    // (a) India gets routes even before India BENCHMARK rows are seeded (fallback to off-location).
+    // (b) Once India BENCHMARK rows land (migration 183+), they automatically rank first.
+    const { data: benchmark, error: benchErr } = await client
+      .from('mhr_records')
+      .select('id, machine_name, machine_description, commodity_code, total_machine_hour_rate, mhr_usd_per_hour, currency_code, location, process_family')
+      .eq('source_type', 'BENCHMARK')
+      .not('total_machine_hour_rate', 'is', null)
+      .limit(120);
+
+    if (benchErr) this.logger.warn(`mhr_records BENCHMARK query failed: ${benchErr.message}`);
+
+    // User-entered MHR records: include NULL source_type (Excel imports) and any
+    // non-BENCHMARK value. neq() excludes NULLs in SQL, so use or() explicitly.
+    const { data: userRows } = await client
       .from('mhr_records')
       .select('id, machine_name, machine_description, commodity_code, total_machine_hour_rate, currency_code, location, process_family')
+      .or('source_type.is.null,source_type.neq.BENCHMARK')
       .not('total_machine_hour_rate', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(80);
-    if (error) {
-      this.logger.warn(`mhr_records query failed: ${error.message}`);
-      return [];
-    }
+      .limit(50);
 
-    // Convert to INR using the row's declared currency (defaults to INR for existing rows).
-    // Today all rows are INR → passthrough. Future: Germany EUR, China CNY will convert correctly.
-    return (data ?? []).map((row: any) => ({
+    const merged = [...(benchmark ?? []), ...(userRows ?? [])];
+    this.logger.log(`[queryMhr] ${benchmark?.length ?? 0} BENCHMARK + ${userRows?.length ?? 0} user rows for orgLocation="${orgLocation}"`);
+    return merged.map((row: any) => ({
       ...row,
       rate_inr: this.fx.convertToInr(Number(row.total_machine_hour_rate ?? 0), row.currency_code ?? 'INR'),
     }));
   }
 
-  private async queryLsr(client: any, userId: string) {
-    const { data, error } = await client
-      .from('lsr_records')
+  private async queryLhr(client: any, userId: string, orgLocation: string) {
+    // All BENCHMARK LHR rows — ranker sorts by location fit.
+    const { data: benchmark, error: benchErr } = await client
+      .from('lhr_records')
       .select('id, labour_type, labour_code, lhr, currency_code, location')
+      .eq('source_type', 'BENCHMARK')
+      .not('lhr', 'is', null)
+      .limit(60);
+
+    if (benchErr) this.logger.warn(`lhr_records BENCHMARK query failed: ${benchErr.message}`);
+
+    // User-entered LHR records: include NULL source_type (Excel imports) and any
+    // non-BENCHMARK value. Same NULL-safety pattern as MHR query above.
+    const { data: userRows } = await client
+      .from('lhr_records')
+      .select('id, labour_type, labour_code, lhr, currency_code, location')
+      .or('source_type.is.null,source_type.neq.BENCHMARK')
       .not('lhr', 'is', null)
       .order('lhr', { ascending: true })
-      .limit(40);
-    if (error) {
-      this.logger.warn(`lsr_records query failed: ${error.message}`);
-      return [];
-    }
+      .limit(20);
 
-    // Convert to INR using the row's declared currency (defaults to INR for existing rows).
-    return (data ?? []).map((row: any) => ({
+    const merged = [...(benchmark ?? []), ...(userRows ?? [])];
+    return merged.map((row: any) => ({
       ...row,
       lhr_inr: this.fx.convertToInr(Number(row.lhr ?? 0), row.currency_code ?? 'INR'),
     }));
@@ -618,6 +672,53 @@ export class RetrievalService {
     return 'child_part';
   }
 
+  /**
+   * Resolves a free-text material hint (e.g. "Mild Steel IS2062 E250A") to
+   * the `material_family` enum stored in the `raw_materials` table.
+   *
+   * Strategy: try ILIKE on `material_grade`, `material`, and `material_group`
+   * using the first 30 characters of the hint (to avoid ILIKE bloat on long
+   * drawing callouts). Returns null on miss — the scope-classifier then falls
+   * back to its regex patterns.
+   */
+  private async resolveMaterialFamilyFromDb(client: any, hint: string | null): Promise<string | null> {
+    if (!hint?.trim()) return null;
+    const clean = hint.replace(/'/g, '').slice(0, 30).trim();
+    if (clean.length < 3) return null;
+    try {
+      const { data } = await client
+        .from('raw_materials')
+        .select('material_family')
+        .or(
+          `material_grade.ilike.%${clean}%,` +
+          `material.ilike.%${clean}%,` +
+          `material_group.ilike.%${clean}%`,
+        )
+        .not('material_family', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      if ((data as any)?.material_family) return (data as any).material_family as string;
+    } catch (e: any) {
+      this.logger.debug(`[resolveMaterialFamily] DB lookup failed for "${hint}": ${e.message}`);
+    }
+    // Second pass: try individual keywords (handles long drawing callouts like "Mild Steel IS2062 E250A - Sheet")
+    const keywords = hint.split(/\s+/).filter((k) => k.length >= 4).slice(0, 4);
+    for (const kw of keywords) {
+      const kClean = kw.replace(/'/g, '');
+      try {
+        const { data: kd } = await client
+          .from('raw_materials')
+          .select('material_family')
+          .or(`material_grade.ilike.%${kClean}%,material.ilike.%${kClean}%`)
+          .not('material_family', 'is', null)
+          .limit(1)
+          .maybeSingle();
+        if ((kd as any)?.material_family) return (kd as any).material_family as string;
+      } catch (_) { /* ignore */ }
+    }
+    return null;
+  }
+
   private async resolveOrgLocation(client: any, userId: string, bomRow: any): Promise<string> {
     // Try organizations table first (the workspace table introduced in 125)
     try {
@@ -667,4 +768,21 @@ function estimateDensityKgPerM3(materialHint: string | null): number {
   // Pure aluminium alloys — only after all copper/bronze variants are excluded above
   if (/alumin|al\s*6|al\s*7|7050|7075|6061|6082|2024|5083|5052/i.test(h)) return 2700;
   return 7850; // default: mild/alloy steel (EN8, EN24, EN36, H13, P20, ...)
+}
+
+/** Normalise UI location strings to the canonical values stored in mhr_records/lhr_records. */
+function normaliseLocation(loc: string): string {
+  const map: Record<string, string> = {
+    'united states': 'USA', 'us': 'USA', 'usa': 'USA',
+    'germany': 'Germany', 'de': 'Germany',
+    'china': 'China', 'cn': 'China',
+    'united kingdom': 'UK', 'uk': 'UK', 'gb': 'UK',
+    'france': 'France', 'fr': 'France',
+    'vietnam': 'Vietnam', 'vn': 'Vietnam',
+    'mexico': 'Mexico', 'mx': 'Mexico',
+    'india': 'India', 'in': 'India', 'india-bangalore': 'India', 'india-pune': 'India', 'india-chennai': 'India',
+    'w. europe': 'W. Europe', 'western europe': 'W. Europe', 'w europe': 'W. Europe',
+    'e. europe': 'E. Europe', 'eastern europe': 'E. Europe', 'e europe': 'E. Europe',
+  };
+  return map[loc.toLowerCase()] ?? loc;
 }

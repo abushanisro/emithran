@@ -197,7 +197,7 @@ export const bomsGroup: ResourceGroup = {
       method: 'POST',
       path: '/v1/api/boms/{id}/recalculate-all-costs',
       summary: 'Recalculate all BOM costs',
-      description: 'Triggers a full recalculation of all cost components across all items in the BOM. Use this after updating material prices, MHR, or LSR rates.',
+      description: 'Triggers a full recalculation of all cost components across all items in the BOM. Use this after updating material prices, MHR, or LHR rates.',
       parameters: [
         { name: 'id', in: 'path', type: 'string', required: true, description: 'BOM UUID', format: 'uuid', example: 'bom-uuid' },
       ],

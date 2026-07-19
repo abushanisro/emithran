@@ -42,6 +42,9 @@ export interface AbstractProcessLine {
   setupMin?: number;
   setupManning?: number;
   cycleSec?: number;
+  // When set to 'planner_physics' the resolver elevates this above the geometry heuristic
+  // tier and writes timing_source = 'physics' to the cost record.
+  timingSource?: 'planner_physics' | 'ai_hint' | string;
 }
 
 export interface AbstractToolingLine {

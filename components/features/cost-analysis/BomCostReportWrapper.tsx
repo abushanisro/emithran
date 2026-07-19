@@ -16,8 +16,8 @@ interface BomCostReportWrapperProps {
 }
 
 const formatCurrency = (value: number | undefined | null) => {
-  if (value === undefined || value === null || isNaN(value)) return '₹0.00';
-  return `₹${value.toFixed(2)}`;
+  if (value === undefined || value === null || isNaN(value)) return '$0.00';
+  return `$${value.toFixed(2)}`;
 };
 const formatPercentage = (value: number | undefined | null) => {
   if (value === undefined || value === null || isNaN(value)) return '0.0%';

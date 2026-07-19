@@ -66,6 +66,20 @@ export interface CNCCostInput {
   // Digital Factory location — localizes fixture/tooling cost. Defaults to the
   // shared costing default so a missing value never silently prices in the wrong country.
   location?: string;
+  // Blank optimizer result — when provided, overrides the bounding-box billet volume.
+  // Improves material utilization from ~17% (raw bbox) to 55–65% (near-net stock).
+  blankResult?: {
+    form: string;          // 'round_bar' | 'rectangular_bar' | 'billet'
+    sizeLabel: string;
+    billetVolMm3: number;  // pre-computed optimized blank volume
+    utilizationPct: number | null;
+  };
+  // machinability_rating from raw_materials DB (75 = mild steel baseline).
+  // Scales MRR: Al 6061 ≈ 150 → 2× faster; SS316 ≈ 35 → 0.47× slower.
+  machinabilityRating?: number;
+  // Feature volumes from feature_graph_v2 — enables per-feature cycle time instead
+  // of (billetVol − partVol) / MRR. When absent, falls back to the bbox formula.
+  featureOps?: Array<{ name: string; timeSec: number; source: string }>;
 }
 
 export interface CNCCapabilityResult {
@@ -198,6 +212,7 @@ function makeLine(
     machineClass: rate.machineClass,
     machineName: rate.machineName,
     commodityCode: rate.commodityCode,
+    labourRate: rate.labourRate ?? null,
   };
 }
 
@@ -378,15 +393,16 @@ export function computeCNCMilledCostSummary(
   const location = input.location ?? DEFAULT_COSTING_LOCATION;
 
   // ── Billet ────────────────────────────────────────────────────────────────
-  // Bounding box + saw/skim stock allowance per side. A billet exactly the size
-  // of the finished part cannot be machined — the old bbox-only billet both
-  // understated material and let inconsistent CAD data (weight > bbox volume)
-  // produce silent >100% utilization.
+  // Prefer blank optimizer result (round bar / rectangular bar selected from stock
+  // profiles table) over the raw bounding-box billet. The optimizer raises material
+  // utilization from ~17% to 55–65% for typical prismatic/turned parts. Falls back
+  // to bbox + allowance when the optimizer found no matching stock or was not called.
   const allow = 2 * CNC_STOCK_ALLOWANCE_PER_SIDE_MM;
-  const billetVolMm3 =
+  const rawBilletVol =
     maxLength > 0 && maxWidth > 0 && maxHeight > 0
       ? (maxLength + allow) * (maxWidth + allow) * (maxHeight + allow)
       : 0;
+  const billetVolMm3 = input.blankResult?.billetVolMm3 ?? rawBilletVol;
   const billetWeightKg = r3((billetVolMm3 / 1e9) * materialDensityKgM3);
   const materialCost = r2(billetWeightKg * materialCostPerKg * 1.05);
 
@@ -398,44 +414,49 @@ export function computeCNCMilledCostSummary(
     );
   }
 
-  // ── Setup (amortised over batchSize) ─────────────────────────────────────
+  // ── Setup (amortised over batchSize, includes fixture amortization) ────────
+  // Fixture cost is folded into Setup rather than emitted as a separate 0-rate
+  // phantom process — fixture hardware is a one-time setup charge, not a machine step.
   const setupCount = SETUP_COUNT[machineClass];
   const setupMin = (setupCount * BASE_SETUP_MIN[machineClass]) / Math.max(batchSize, 1);
-  const setupCostVal = r2((setupMin / 60) * mhrRate.rate);
+  const fixtureCost = r2(localizeFixtureCost(machineClass, location) / Math.max(batchSize, 1));
+  const setupCostVal = r2((setupMin / 60) * mhrRate.rate) + fixtureCost;
   processLines.push(makeLine('Setup', setupCostVal, 0, setupMin, mhrRate));
 
-  // ── Fixture (amortised, localized) ───────────────────────────────────────
-  const fixtureCost = r2(localizeFixtureCost(machineClass, location) / Math.max(batchSize, 1));
-  processLines.push({
-    process: 'Fixture',
-    setupCost: fixtureCost,
-    runCost: 0,
-    totalCost: fixtureCost,
-    cycleTimeMin: 0,
-    hourlyRate: 0,
-    rateSource: 'default_rate',
-    machineClass,
-    machineName: null,
-    commodityCode: null,
-  });
-
   // ── CNC Milling (roughing + all hole operations on the same machine) ─────
-  // Roughing: material removal × 1.3 (30% finish-pass buffer already included)
-  // Drilling: holes drilled on the same VMC — no separate machine or setup
-  const materialRemovalMm3 = Math.max(0, billetVolMm3 - volume);
-  const mrr = MILLING_MRR[matClass];
-  const roughingMin = materialRemovalMm3 > 0 ? (materialRemovalMm3 / mrr) * 1.3 : 0;
+  // When feature_graph_v2 data is available (featureOps), use per-feature cycle
+  // times from the operation sequencer — this is Fix 3 + Fix 4. The sequencer
+  // already breaks out Drill, Tap, Pocket Rough/Finish per occurrence so we sum
+  // all machining ops and bill them against the VMC rate.
+  // Fallback: (billetVol − partVol) / MRR × 1.3 for parts without feature data.
+  //
+  // machinabilityRating scales MRR: Al 6061 ≈ 150 (2× mild steel baseline of 75).
+  const machinabilityFactor = (input.machinabilityRating ?? 75) / 75;
+  const mrr = MILLING_MRR[matClass] * machinabilityFactor;
 
-  let drillingMin = 0;
-  if (holeGroups.length > 0) {
-    drillingMin = holeGroups.reduce(
-      (sum, g) => sum + g.count * DRILL_CYCLE_SEC[drillDiamClass(g.diameter_mm)] / 60, 0,
-    );
-  } else if (holeCount > 0) {
-    drillingMin = (holeCount * DRILL_CYCLE_SEC.medium) / 60;
+  let cncMillingMin = 0;
+  if (Array.isArray(input.featureOps) && input.featureOps.length > 0) {
+    // Feature-based path: sum all operation times from the sequencer.
+    // 15% rapids/ATC overhead added on top of pure cutting time.
+    const totalFeatureSec = input.featureOps.reduce((s, o) => s + o.timeSec, 0);
+    cncMillingMin = (totalFeatureSec / 60) * 1.15;
+  } else {
+    // Bbox-subtraction fallback (used when CAD engine did not return feature_graph_v2)
+    const materialRemovalMm3 = Math.max(0, billetVolMm3 - volume);
+    const roughingMin = materialRemovalMm3 > 0 ? (materialRemovalMm3 / mrr) * 1.3 : 0;
+
+    let drillingMin = 0;
+    if (holeGroups.length > 0) {
+      drillingMin = holeGroups.reduce(
+        (sum, g) => sum + (g.count * DRILL_CYCLE_SEC[drillDiamClass(g.diameter_mm)]) / 60,
+        0,
+      );
+    } else if (holeCount > 0) {
+      drillingMin = (holeCount * DRILL_CYCLE_SEC.medium) / 60;
+    }
+
+    cncMillingMin = roughingMin + drillingMin;
   }
-
-  const cncMillingMin = roughingMin + drillingMin;
   if (cncMillingMin > 0) {
     processLines.push(makeLine('CNC Milling', 0, r2((cncMillingMin / 60) * mhrRate.rate), cncMillingMin, mhrRate));
   } else {
@@ -558,9 +579,13 @@ export function computeCNCTurnedCostSummary(
   const location = input.location ?? DEFAULT_COSTING_LOCATION;
 
   // ── Bar stock ────────────────────────────────────────────────────────────
-  const barDiamMm = Math.max(maxWidth, maxHeight) * 1.1;
-  const barLengthMm = maxLength * 1.1;
-  const barVolMm3 = Math.PI * (barDiamMm / 2) ** 2 * barLengthMm;
+  // Prefer blank optimizer result when available (Fix 2). For turned parts the
+  // optimizer selects a round bar that fits the part's cross-section with 3%
+  // clearance. Fallback: inscribed circle × 1.1 (original heuristic).
+  const fallbackDiamMm = Math.max(maxWidth, maxHeight) * 1.1;
+  const fallbackBarLenMm = maxLength * 1.1;
+  const fallbackBarVolMm3 = Math.PI * (fallbackDiamMm / 2) ** 2 * fallbackBarLenMm;
+  const barVolMm3 = input.blankResult?.billetVolMm3 ?? fallbackBarVolMm3;
   const barWeightKg = r3((barVolMm3 / 1e9) * materialDensityKgM3);
   const materialCost = r2(barWeightKg * materialCostPerKg * 1.05);
 
@@ -571,30 +596,20 @@ export function computeCNCTurnedCostSummary(
     );
   }
 
-  // ── Setup (amortised) ────────────────────────────────────────────────────
+  // ── Setup (amortised, includes fixture amortization) ────────────────────
+  // Fixture cost folded into Setup — same rationale as the milling path.
   const setupCount = SETUP_COUNT[machineClass];
   const setupMin = (setupCount * BASE_SETUP_MIN[machineClass]) / Math.max(batchSize, 1);
-  const setupCostVal = r2((setupMin / 60) * mhrRate.rate);
+  const fixtureCost = r2(localizeFixtureCost(machineClass, location) / Math.max(batchSize, 1));
+  const setupCostVal = r2((setupMin / 60) * mhrRate.rate) + fixtureCost;
   processLines.push(makeLine('Setup', setupCostVal, 0, setupMin, mhrRate));
 
-  // ── Fixture (amortised, localized) ───────────────────────────────────────
-  const fixtureCost = r2(localizeFixtureCost(machineClass, location) / Math.max(batchSize, 1));
-  processLines.push({
-    process: 'Fixture',
-    setupCost: fixtureCost,
-    runCost: 0,
-    totalCost: fixtureCost,
-    cycleTimeMin: 0,
-    hourlyRate: 0,
-    rateSource: 'default_rate',
-    machineClass,
-    machineName: null,
-    commodityCode: null,
-  });
-
   // ── OD Turning ───────────────────────────────────────────────────────────
+  // machinabilityRating (Fix 4): 75 = mild steel baseline; Al 6061 ≈ 150 → 2× MRR.
+  const machinabilityFactor = (input.machinabilityRating ?? 75) / 75;
+  const effectiveTurningMrr = TURNING_MRR[matClass] * machinabilityFactor;
   const materialRemovalMm3 = Math.max(0, barVolMm3 - volume);
-  const turningMin = materialRemovalMm3 > 0 ? (materialRemovalMm3 / TURNING_MRR[matClass]) * 1.2 : 0;
+  const turningMin = materialRemovalMm3 > 0 ? (materialRemovalMm3 / effectiveTurningMrr) * 1.2 : 0;
   if (turningMin > 0) {
     processLines.push(makeLine('OD Turning', 0, r2((turningMin / 60) * mhrRate.rate), turningMin, mhrRate));
   }

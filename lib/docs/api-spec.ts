@@ -10,7 +10,7 @@ import { vendorsGroup } from './specs/vendors';
 import { rawMaterialsGroup } from './specs/raw-materials';
 import { processesGroup } from './specs/processes';
 import { processRoutesGroup } from './specs/process-routes';
-import { lsrGroup } from './specs/lsr';
+import { lhrGroup } from './specs/lhr';
 import { mhrGroup } from './specs/mhr';
 import { costAnalysisGroup } from './specs/cost-analysis';
 import { calculatorsGroup } from './specs/calculators';
@@ -53,7 +53,7 @@ export const API_SPEC: ApiSpec = {
     rawMaterialsGroup,
     processesGroup,
     processRoutesGroup,
-    lsrGroup,
+    lhrGroup,
     mhrGroup,
     costAnalysisGroup,
     calculatorsGroup,

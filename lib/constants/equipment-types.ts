@@ -251,7 +251,7 @@ export const CATEGORY_FIELD_CONFIGS: Record<EquipmentCategory, FieldConfig[]> = 
     { name: 'bedSizeWidthMm', label: 'Width (mm)', type: 'number', placeholder: '500', group: 'bedSize' },
     { name: 'tonnage', label: 'Tonnage (tons)', type: 'number', placeholder: '40', group: 'selectionCriteria', groupLabel: 'Selection Criteria' },
     { name: 'process', label: 'Process', type: 'text', placeholder: 'Bending', group: 'selectionCriteria' },
-    { name: 'marketPrice', label: 'Price (₹)', type: 'number', placeholder: '500000' },
+    { name: 'marketPrice', label: 'Price ($)', type: 'number', placeholder: '500000' },
   ],
   [EQUIPMENT_CATEGORIES.CASTING]: [
     { name: 'manufacturer', label: 'Manufacturer', type: 'text', placeholder: 'Enter manufacturer' },
@@ -272,7 +272,7 @@ export const CATEGORY_FIELD_CONFIGS: Record<EquipmentCategory, FieldConfig[]> = 
     { name: 'bedSizeHeightMm', label: 'Height (mm)', type: 'number', placeholder: '600', group: 'bedSize' },
     { name: 'tonnage', label: 'Tonnage (tons)', type: 'number', placeholder: '40', group: 'selectionCriteria', groupLabel: 'Selection Criteria' },
     { name: 'process', label: 'Process', type: 'text', placeholder: 'Milling', group: 'selectionCriteria' },
-    { name: 'marketPrice', label: 'Price (₹)', type: 'number', placeholder: '5000000' },
+    { name: 'marketPrice', label: 'Price ($)', type: 'number', placeholder: '5000000' },
   ],
   [EQUIPMENT_CATEGORIES.CUTTING]: [
     { name: 'manufacturer', label: 'Manufacturer', type: 'text', placeholder: 'Enter manufacturer' },

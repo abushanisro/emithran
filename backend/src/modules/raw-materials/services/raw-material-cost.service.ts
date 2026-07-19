@@ -170,6 +170,16 @@ export class RawMaterialCostService {
   ): Promise<RawMaterialCostResponseDto> {
     this.logger.log('Creating raw material cost record', 'RawMaterialCostService');
 
+    // Auto-populate unit cost from raw_materials DB when the caller sends 0 and a material name.
+    // This happens when the material is applied from the BOM item grade without a manual price entry.
+    // Looks up the location-specific price column so India materials (cost_india) aren't silently zeroed.
+    let resolvedUnitCost = createDto.unitCost ?? 0;
+    if (resolvedUnitCost === 0 && createDto.materialName) {
+      resolvedUnitCost = await this.lookupMaterialPrice(
+        accessToken, createDto.materialName, createDto.country ?? '',
+      );
+    }
+
     // Prepare input for calculation engine
     const calculationInput: RawMaterialCostInput = {
       materialId: createDto.materialId,
@@ -178,7 +188,7 @@ export class RawMaterialCostService {
       materialType: createDto.materialType,
       materialCostId: createDto.materialCostId,
       costName: createDto.costName,
-      unitCost: createDto.unitCost,
+      unitCost: resolvedUnitCost,
       reclaimRate: createDto.reclaimRate || 0,
       uom: createDto.uom || 'KG',
       grossUsage: createDto.grossUsage,
@@ -212,7 +222,7 @@ export class RawMaterialCostService {
       // Cost Information
       material_cost_id: createDto.materialCostId,
       cost_name: createDto.costName || '',
-      unit_cost: createDto.unitCost,
+      unit_cost: resolvedUnitCost,
       reclaim_rate: createDto.reclaimRate || 0,
       uom: createDto.uom || 'KG',
 
@@ -503,5 +513,52 @@ export class RawMaterialCostService {
       totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + computed;
     }
     return totals;
+  }
+
+  /**
+   * Look up the location-specific unit cost (local currency/kg) for a material grade string.
+   * Uses tokenized ILIKE search so compound grades like "IS2062 E250 CRCA" find
+   * "Mild Steel IS2062" and "CRCA Steel" even when no row stores the full compound string.
+   * Returns 0 on no match or any error — caller decides whether to surface the gap.
+   */
+  private async lookupMaterialPrice(
+    accessToken: string,
+    materialName: string,
+    country: string,
+  ): Promise<number> {
+    // Maps digital-factory country strings to raw_materials price columns
+    const PRICE_COL: Record<string, string> = {
+      India: 'cost_india', USA: 'cost_usa', Germany: 'cost_germany',
+      France: 'cost_france', 'W. Europe': 'cost_europe', 'E. Europe': 'cost_e_europe',
+      UK: 'cost_uk', China: 'cost_china', Vietnam: 'cost_vietnam', Mexico: 'cost_mexico',
+    };
+    const priceCol = PRICE_COL[country] ?? 'cost_india';
+    try {
+      const g = materialName.trim();
+      const tokens = g.split(/[\s\-\/]+/).filter((t) => t.length >= 3);
+      // Double-quote each token value so PostgREST treats commas and parens inside
+      // the value as literals, not OR separators / grouping operators.
+      // e.g. "Steel," in a token would break .or() without quoting.
+      const q = (t: string) => `"${t.replace(/"/g, '\\"')}"`;
+      const orClause = (tokens.length > 1 ? tokens : [g])
+        .flatMap((t) => [`material_grade.ilike.%${q(t)}%`, `material.ilike.%${q(t)}%`])
+        .join(',');
+      const { data } = await this.supabaseService
+        .getClient(accessToken)
+        .from('raw_materials')
+        .select(`${priceCol}, cost_india, density`)
+        .or(orClause)
+        .not('density', 'is', null)
+        .limit(5);
+      for (const row of (data ?? []) as any[]) {
+        const locPrice = parseFloat(row[priceCol]);
+        if (isFinite(locPrice) && locPrice > 0) return locPrice;
+        const indiaPrice = parseFloat(row.cost_india);
+        if (isFinite(indiaPrice) && indiaPrice > 0) return indiaPrice;
+      }
+    } catch {
+      // Non-critical — caller falls back to $0 display with a prompt to enter manually
+    }
+    return 0;
   }
 }

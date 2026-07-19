@@ -51,6 +51,12 @@ BUCKET_KEYWORDS: dict[str, list[str]] = {
         "din", "mil", "astm", "best practice", "guideline", "allowable",
         "recommendation", "why", "explain", "how does", "what is",
     ],
+    "vendor": [
+        "vendor", "supplier", "rfq", "source", "sourcing", "who can make",
+        "who is good", "best vendor", "best supplier", "recommend vendor",
+        "good vendor", "shortlist", "supply chain", "procurement",
+        "capability", "capacity", "lead time",
+    ],
 }
 
 # Always include these buckets regardless of question content

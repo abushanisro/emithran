@@ -354,20 +354,32 @@ function useCopilotChat(
 
 // ── Copilot response renderer ──────────────────────────────────────────────────
 
-function parseInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|\(source:[^)]+\)|Source:[^\n]+)/g);
+function parseInline(text: string, showSources: boolean): React.ReactNode {
+  if (!showSources) {
+    const cleanText = text.replace(/\s*(?:—|-|:)?\s*(?:\(source:[^)]+\)|Source:[^\n]+)/gi, "");
+    const parts = cleanText.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={i} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  }
+
+  const parts = text.split(/(\*\*[^*]+\*\*|\(source:[^)]+\)|Source:[^\n]+)/gi);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return <strong key={i} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
     }
-    if (part.startsWith("(source:") || part.startsWith("Source:")) {
+    const partLower = part.toLowerCase();
+    if (partLower.startsWith("(source:") || partLower.startsWith("source:")) {
       return <span key={i} className="text-[9px] text-muted-foreground/50 ml-1">{part}</span>;
     }
     return part;
   });
 }
 
-function CopilotResponse({ content }: { content: string }) {
+function CopilotResponse({ content, showSources }: { content: string; showSources: boolean }) {
   const lines = content.split("\n");
   const nodes: React.ReactNode[] = [];
   let i = 0;
@@ -405,14 +417,15 @@ function CopilotResponse({ content }: { content: string }) {
           <span className="shrink-0 w-4 h-4 rounded-full bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 text-[8px] font-bold flex items-center justify-center mt-0.5">
             {trimmed[0]}
           </span>
-          <span className="text-[10px] leading-relaxed">{parseInline(rest)}</span>
+          <span className="text-[10px] leading-relaxed">{parseInline(rest, showSources)}</span>
         </div>
       );
       continue;
     }
 
     // Source citation lines (indented)
-    if (/^\s*(Source:|source:)/.test(rawLine)) {
+    if (/^\s*(Source:|source:)/i.test(rawLine)) {
+      if (!showSources) continue;
       nodes.push(
         <div key={i++} className="text-[9px] text-muted-foreground/50 pl-6 -mt-1 mb-0.5">
           {trimmed}
@@ -426,7 +439,7 @@ function CopilotResponse({ content }: { content: string }) {
       nodes.push(
         <div key={i++} className="flex items-start gap-1.5 py-0.5">
           <span className="text-emerald-500 shrink-0 text-[11px] mt-0.5">✓</span>
-          <span className="text-[10px] leading-relaxed">{parseInline(trimmed.slice(1).trim())}</span>
+          <span className="text-[10px] leading-relaxed">{parseInline(trimmed.slice(1).trim(), showSources)}</span>
         </div>
       );
       continue;
@@ -438,7 +451,7 @@ function CopilotResponse({ content }: { content: string }) {
       nodes.push(
         <div key={i++} className="flex gap-1.5 py-0.5 text-[10px]">
           <span className="text-muted-foreground shrink-0">{kvMatch[1]}:</span>
-          <span className="font-medium text-foreground">{parseInline(kvMatch[2])}</span>
+          <span className="font-medium text-foreground">{parseInline(kvMatch[2], showSources)}</span>
         </div>
       );
       continue;
@@ -447,7 +460,7 @@ function CopilotResponse({ content }: { content: string }) {
     // Regular paragraph
     nodes.push(
       <p key={i++} className="text-[10px] leading-relaxed text-foreground/80">
-        {parseInline(trimmed)}
+        {parseInline(trimmed, showSources)}
       </p>
     );
   }
@@ -457,7 +470,7 @@ function CopilotResponse({ content }: { content: string }) {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+function MessageBubble({ msg, showSources }: { msg: ChatMessage; showSources: boolean }) {
   const isUser = msg.role === "user";
   return (
     <div className={cn("flex gap-2 px-3 py-2", isUser ? "flex-row-reverse" : "flex-row")}>
@@ -484,7 +497,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
         {isUser
           ? <span className="text-[11px] leading-relaxed whitespace-pre-wrap">{msg.content}</span>
           : msg.content
-            ? <CopilotResponse content={msg.content} />
+            ? <CopilotResponse content={msg.content} showSources={showSources} />
             : null
         }
         {!msg.content && msg.streaming && (
@@ -635,9 +648,16 @@ export function CopilotPanel({
           </div>
         )}
 
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} msg={msg} />
-        ))}
+        {messages.map((msg) => {
+          const showSources = messages.some(
+            (m) =>
+              m.role === "user" &&
+              /\b(source|citation|cite|reference|where did|where from|provenance|grounding)\b/i.test(m.content)
+          );
+          return (
+            <MessageBubble key={msg.id} msg={msg} showSources={showSources} />
+          );
+        })}
 
         {error && (
           <div className="mx-3 mb-2 p-2 rounded bg-destructive/10 text-destructive text-[10px]">

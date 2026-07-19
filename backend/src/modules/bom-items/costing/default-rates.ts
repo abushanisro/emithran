@@ -364,6 +364,30 @@ export const LOCATION_MHR_DEFAULTS = {
   'Mexico':    { fiber_laser:860,  press_brake:470, turret_punch:760,  waterjet:920,  tapping:220,  deburring:155, cmm:560,  cnc_3ax_vmc:705,  cnc_4ax_vmc:970,  cnc_5ax_mc:1340, cnc_lathe:545,  cnc_lathe_live:845,  cnc_mill_turn:1045, injection_molding:705  },
 } as const satisfies Record<string, Record<MachineClass, number>>;
 
+// ── LHR defaults by location + process group ─────────────────────────────────
+// Labour Hour Rate ($/hr or local-currency/hr) — direct operator cost only.
+// Used as fallback when no lhr_records exist for the requested location.
+// Sources: BLS OES 2025 (USA), Eurostat LCS 2025, CMIE India 2026.
+// Groups mirror deriveProcessGroupFromMachineClass() output.
+export const LOCATION_LHR_DEFAULTS: Readonly<Record<string, Record<string, number>>> = {
+  'India':     { 'Plastics': 95,   'Quality': 80,   'CNC Machining': 110,  'Sheet Metal': 95,   '__default__': 85   },
+  'USA':       { 'Plastics': 22,   'Quality': 20,   'CNC Machining': 26,   'Sheet Metal': 23,   '__default__': 20   },
+  'China':     { 'Plastics': 28,   'Quality': 24,   'CNC Machining': 32,   'Sheet Metal': 28,   '__default__': 26   },
+  'Germany':   { 'Plastics': 30,   'Quality': 28,   'CNC Machining': 35,   'Sheet Metal': 32,   '__default__': 30   },
+  'France':    { 'Plastics': 26,   'Quality': 24,   'CNC Machining': 30,   'Sheet Metal': 27,   '__default__': 26   },
+  'W. Europe': { 'Plastics': 28,   'Quality': 26,   'CNC Machining': 32,   'Sheet Metal': 29,   '__default__': 27   },
+  'E. Europe': { 'Plastics': 10,   'Quality': 9,    'CNC Machining': 12,   'Sheet Metal': 10,   '__default__': 10   },
+  'UK':        { 'Plastics': 22,   'Quality': 20,   'CNC Machining': 26,   'Sheet Metal': 22,   '__default__': 20   },
+  'Vietnam':   { 'Plastics': 3,    'Quality': 2.5,  'CNC Machining': 3.5,  'Sheet Metal': 3,    '__default__': 3    },
+  'Mexico':    { 'Plastics': 280,  'Quality': 230,  'CNC Machining': 340,  'Sheet Metal': 290,  '__default__': 260  },
+  '__default__':{ 'Plastics': 22,  'Quality': 20,   'CNC Machining': 26,   'Sheet Metal': 23,   '__default__': 20   },
+} as const;
+
+export function defaultLHRRate(location: string, processGroup: string): number {
+  const byLocation = (LOCATION_LHR_DEFAULTS[location] ?? LOCATION_LHR_DEFAULTS['__default__'])!;
+  return byLocation[processGroup] ?? byLocation['__default__'] ?? 20;
+}
+
 // ── Rate plausibility guard ────────────────────────────────────────────────────
 // A DB machine rate far outside the location benchmark band almost always means a
 // broken import (currency not converted, overhead-only rate, benchmark-sheet noise)

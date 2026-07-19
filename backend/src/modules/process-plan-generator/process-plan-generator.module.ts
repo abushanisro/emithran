@@ -16,15 +16,17 @@ import { FeatureGraphService } from './services/feature-graph.service';
 import { RuleEngineService } from './services/rule-engine.service';
 import { DeterministicPlannerService } from './services/deterministic-planner.service';
 import { AlternativeRoutePlannerService } from './services/alternative-route-planner.service';
+import { CycleTimeLibraryService } from './services/cycle-time-library.service';
 
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.module';
 import { BOMItemsModule } from '../bom-items/bom-items.module';
 import { ManufacturingKnowledgeModule } from '../manufacturing-knowledge/manufacturing-knowledge.module';
+import { ManufacturingRulesModule } from '../manufacturing-rules/manufacturing-rules.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule, ConfigModule, ExchangeRateModule, BOMItemsModule, ManufacturingKnowledgeModule],
+  imports: [SupabaseModule, LoggerModule, ConfigModule, ExchangeRateModule, BOMItemsModule, ManufacturingKnowledgeModule, ManufacturingRulesModule],
   controllers: [ProcessPlanGeneratorController],
   providers: [
     OrchestratorService,
@@ -38,6 +40,7 @@ import { ManufacturingKnowledgeModule } from '../manufacturing-knowledge/manufac
     ExpandCandidatesTool,
     FeatureGraphService,
     RuleEngineService,
+    CycleTimeLibraryService,
     DeterministicPlannerService,
     AlternativeRoutePlannerService,
   ],

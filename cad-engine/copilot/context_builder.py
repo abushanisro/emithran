@@ -17,6 +17,8 @@ BUCKET_FIELDS: dict[str, list[str]] = {
     "invest":   ["investment", "cost"],
     "scenario": ["cost", "routes", "production", "part"],
     "knowledge": ["part", "geometry", "dfm"],
+    # vendor tool needs process names (from cost.processLines) + material (from part/cost)
+    "vendor":   ["cost", "part", "production"],
 }
 
 # Maximum warnings and process lines to include (avoid context explosion)

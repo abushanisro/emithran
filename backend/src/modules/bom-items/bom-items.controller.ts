@@ -12,8 +12,11 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  NotFoundException,
   Logger,
   Patch,
+  Optional,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { gunzip } from 'zlib';
@@ -28,7 +31,8 @@ import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-respo
 import { AutoFillResponseDto } from './dto/auto-fill.dto';
 import { MachineOverrideDto } from './dto/machine-selection.dto';
 import { CostOverrideDto } from './dto/cost-override.dto';
-import { DEFAULT_COSTING_LOCATION } from './costing/default-rates';
+import { ApplyRouteDto, type ApplyRouteResult } from './dto/apply-route.dto';
+import { DEFAULT_COSTING_LOCATION, defaultLHRRate, LOCATION_INFO } from './costing/default-rates';
 import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -38,6 +42,8 @@ import { CADAnalysisService } from './services/cad-analysis.service';
 import { AutoFillService } from './services/auto-fill.service';
 import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService, type MaterialCandidate } from './services/material-intelligence.service';
+import { ManufacturingRulesService } from '../manufacturing-rules/manufacturing-rules.service';
+import { SupabaseService } from '../../common/supabase/supabase.service';
 import axios from 'axios';
 
 // Define User type if not available
@@ -61,6 +67,8 @@ export class BOMItemsController {
     private readonly autoFillService: AutoFillService,
     private readonly dfmScoringService: DFMScoringService,
     private readonly materialIntelligenceService: MaterialIntelligenceService,
+    @Optional() private readonly manufacturingRules: ManufacturingRulesService | undefined,
+    private readonly supabaseService: SupabaseService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -78,11 +86,12 @@ export class BOMItemsController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: User,
     @AccessToken() token: string,
+    @Query('location') location?: string,
   ): Promise<AutoFillResponseDto> {
     if (!file) {
       throw new BadRequestException('file is required');
     }
-    const allowedExts = ['.step', '.stp', '.stl', '.iges', '.igs', '.obj'];
+    const allowedExts = ['.step', '.stp', '.stl', '.iges', '.igs', '.obj', '.sldprt'];
     const ext = path.extname(file.originalname ?? '').toLowerCase();
     if (!allowedExts.includes(ext)) {
       throw new BadRequestException(`Unsupported file type: ${ext || '(none)'}. Allowed: ${allowedExts.join(', ')}`);
@@ -90,7 +99,7 @@ export class BOMItemsController {
     if (!user?.id) {
       throw new BadRequestException('User authentication required');
     }
-    return this.autoFillService.analyzeAndSuggest(file.buffer, file.originalname, user.id, token);
+    return this.autoFillService.analyzeAndSuggest(file.buffer, file.originalname, user.id, token, location);
   }
 
   @Get()
@@ -465,7 +474,7 @@ export class BOMItemsController {
           );
 
           // Upload converted STL file
-          const stlFilename = file3d.originalname.replace(/\.(step|stp|iges|igs)$/i, '.stl');
+          const stlFilename = file3d.originalname.replace(/\.(step|stp|iges|igs|sldprt)$/i, '.stl');
           const stlUploadResult = await this.fileStorageService.uploadFile(
             {
               fieldname: 'file3d_converted',
@@ -1864,6 +1873,27 @@ export class BOMItemsController {
     );
   }
 
+  @Get(':id/candidate-routes')
+  @ApiOperation({
+    summary: 'Compare feasible manufacturing routes across blank types (sheet, bar, billet)',
+  })
+  @ApiResponse({ status: 200, description: 'Candidate route comparison returned' })
+  async getCandidateRoutes(
+    @Param('id') id: string,
+    @Query('batchSize') batchSize: string,
+    @Query('location') location: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    return this.bomItemsService.getCandidateRoutes(
+      id,
+      user.id,
+      token,
+      batchSize ? parseInt(batchSize, 10) : 1,
+      location || DEFAULT_COSTING_LOCATION,
+    );
+  }
+
   @Get(':id/gdt-analysis')
   @ApiOperation({ summary: 'GD&T severity analysis derived from drawing intelligence' })
   @ApiResponse({ status: 200, description: 'GD&T analysis returned' })
@@ -1914,5 +1944,289 @@ export class BOMItemsController {
       dto.value ?? null,
       dto.location || DEFAULT_COSTING_LOCATION,
     );
+  }
+
+  @Post(':id/auto-fill-processes')
+  @ApiOperation({ summary: 'Deterministically map CAD features → process cost records using the rules engine (no AI, no credits)' })
+  @ApiResponse({ status: 201, description: 'Auto-filled process records created' })
+  async autoFillProcesses(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<{ created: number; operations: string[] }> {
+    if (!this.manufacturingRules) {
+      throw new InternalServerErrorException('ManufacturingRulesService not available');
+    }
+
+    const item = await this.bomItemsService.findOne(id, user.id, token);
+    const db = this.supabaseService.getClient(token);
+
+    const materialGrade = item.materialGrade ?? 'IS2062 E250';
+    const family = (item.familyClassification ?? 'machined').toLowerCase();
+    const isSheetMetal = family.includes('sheet') || family.includes('metal');
+    const isPlastic = family.includes('plastic') || family.includes('injection') || family.includes('polymer');
+
+    // Build operation list from CAD features
+    const ops: Array<{ operation: string; processGroup: string; geometry: Record<string, unknown> }> = [];
+
+    if (isSheetMetal) {
+      const t = item.sheetThicknessMm ?? 2;
+      const cutLen = item.cutLengthMm ?? Math.sqrt(item.flatPatternAreaMm2 ?? 50000) * 4;
+      const pierces = (item.pierceCount ?? 0) + (item.holeCount ?? 0) + 1;
+      ops.push({ operation: 'laser_cutting', processGroup: 'Sheet Metal', geometry: { thicknessMm: t, cutLengthMm: cutLen, pierceCount: pierces } });
+      if ((item.bendCount ?? 0) > 0) {
+        ops.push({ operation: 'press_brake', processGroup: 'Sheet Metal', geometry: { bendCount: item.bendCount, materialThicknessMm: t, bendLengthMm: 300, tensileStrengthMpa: 400 } });
+      }
+      if ((item.holeCount ?? 0) > 0) {
+        ops.push({ operation: 'drilling', processGroup: 'Sheet Metal', geometry: { diameterMm: 6, depthMm: t, holeCount: item.holeCount } });
+      }
+    } else if (isPlastic) {
+      const vol = item.volume ?? 10000;
+      ops.push({ operation: 'injection_molding', processGroup: 'Plastics', geometry: { polymerId: materialGrade, wallThicknessMm: 2.5, projectedAreaMm2: item.flatPatternAreaMm2 ?? Math.pow(vol / 50, 0.67) * 100, shotVolumeCm3: (vol / 1000) * 1.2 } });
+    } else {
+      const vol = item.volume ?? 100000;
+      const sizeMm = Math.cbrt(vol);
+      ops.push({ operation: 'milling', processGroup: 'CNC Machining', geometry: { cutterDiameterMm: 16, cuttingLengthMm: sizeMm * 3, widthMm: sizeMm * 0.5, depthMm: sizeMm * 0.4 } });
+      if ((item.holeCount ?? 0) > 0) {
+        ops.push({ operation: 'drilling', processGroup: 'CNC Machining', geometry: { diameterMm: 8, depthMm: sizeMm * 0.5, holeCount: item.holeCount } });
+      }
+      ops.push({ operation: 'turning', processGroup: 'CNC Machining', geometry: { diameterMm: sizeMm, lengthMm: sizeMm * 1.5, materialRemovalMm: sizeMm * 0.05 } });
+    }
+
+    ops.push({ operation: 'inspection', processGroup: 'Quality', geometry: {} });
+
+    // Delete previous auto-fill records for this item
+    await db.from('process_cost_records').delete().eq('bom_item_id', id).eq('notes', 'auto_fill_from_cad');
+
+    const insertedOps: string[] = [];
+    let opNbr = 10;
+
+    for (const op of ops) {
+      let cycleTimeSec = 300; // 5-minute default for inspection / fallback
+      let machineRate = 0;
+      let mhrId: string | null = null;
+      let machineName: string | null = null;
+
+      if (op.operation !== 'inspection') {
+        try {
+          const result = await this.manufacturingRules!.evaluate({
+            operation: op.operation,
+            materialGrade,
+            featureGeometry: op.geometry,
+          });
+          cycleTimeSec = result.totalCycleTimeSec;
+
+          // Look up best matching MHR by machine category hint
+          const hint = result.machineRequirements?.machineCategoryHint ?? op.operation;
+          const searchTerm = this.getMhrSearchTerm(hint);
+          const { data: mhrRows } = await db
+            .from('mhr_records')
+            .select('id, machine_name, total_machine_hour_rate')
+            .or(`process_group.ilike.%${searchTerm}%,machine_name.ilike.%${searchTerm}%`)
+            .not('total_machine_hour_rate', 'is', null)
+            .order('total_machine_hour_rate', { ascending: true })
+            .limit(1);
+
+          if (mhrRows && mhrRows.length > 0) {
+            const mhr = mhrRows[0] as { id: string; machine_name: string | null; total_machine_hour_rate: number };
+            mhrId = mhr.id;
+            machineName = mhr.machine_name;
+            machineRate = (Number(mhr.total_machine_hour_rate) / 3600) * cycleTimeSec;
+          }
+        } catch (err) {
+          this.logger.warn(`[auto-fill] Rules engine failed for ${op.operation}: ${(err as Error).message}`);
+        }
+      }
+
+      const { error } = await db.from('process_cost_records').insert({
+        bom_item_id: id,
+        user_id: user.id,
+        mhr_id: mhrId,
+        machine_name: machineName,
+        op_nbr: opNbr,
+        machine_rate: machineRate,
+        labor_rate: 0,
+        setup_manning: 1,
+        setup_time: 15,
+        batch_size: 1,
+        heads: 1,
+        cycle_time: cycleTimeSec,
+        parts_per_cycle: 1,
+        scrap: 0,
+        currency: 'INR',
+        is_active: true,
+        process_group: op.processGroup,
+        operation: op.operation,
+        notes: 'auto_fill_from_cad',
+      });
+
+      if (error) {
+        this.logger.error(`[auto-fill] Insert failed for ${op.operation}: ${error.message}`);
+      } else {
+        insertedOps.push(op.operation);
+        opNbr += 10;
+      }
+    }
+
+    return { created: insertedOps.length, operations: insertedOps };
+  }
+
+  // ── Apply a selected manufacturing route → write process_cost_records ─────────
+  @Post(':id/apply-route')
+  @ApiOperation({
+    summary: 'Write process cost records from a user-selected manufacturing route',
+    description:
+      'Re-runs the route comparison engine (deterministic, no AI), validates the chosen ' +
+      'routeId is feasible for this part, then replaces any previous auto-fill records with ' +
+      'one process_cost_record per processLine in the selected route.',
+  })
+  @ApiResponse({ status: 201, description: 'Process cost records written for the selected route' })
+  async applyRoute(
+    @Param('id') id: string,
+    @Body() dto: ApplyRouteDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<ApplyRouteResult> {
+    const batchSize = dto.batchSize ?? 1;
+    const location  = dto.location  ?? 'USA';
+
+    // 1. Fetch the authoritative route comparison from the engine
+    const comparison = await this.bomItemsService.getRouteComparison(
+      id, user.id, token, batchSize, location,
+    );
+
+    // 2. Find the requested route
+    const route = comparison.routes.find((r) => r.routeId === dto.routeId);
+    if (!route) {
+      throw new NotFoundException(
+        `Route '${dto.routeId}' not available for this part. ` +
+        `Available: ${comparison.routes.map((r) => r.routeId).join(', ')}`,
+      );
+    }
+
+    // 3. Reject infeasible routes — the engine already did the capability check
+    if (!route.isFeasible) {
+      const reason = route.warnings?.[0] ?? 'machine capability constraints not met';
+      throw new BadRequestException(
+        `Route '${dto.routeId}' (${route.routeLabel}) is not feasible for this part: ${reason}`,
+      );
+    }
+
+    if (!route.processLines?.length) {
+      throw new BadRequestException(
+        `Route '${dto.routeId}' returned no process lines — cannot create cost records`,
+      );
+    }
+
+    const db = this.supabaseService.getClient(token);
+
+    // 4. Idempotent: remove ALL previous auto-fill records so re-applying is safe
+    await db.from('process_cost_records').delete().eq('bom_item_id', id).eq('notes', 'auto_fill_from_cad');
+    await db.from('process_cost_records').delete().eq('bom_item_id', id).ilike('notes', 'auto_fill_from_route:%');
+
+    // 5. Insert one record per process line from the selected route
+    // process_cost_records.machine_rate is always stored in USD — convert from local currency here.
+    // LHR (lhr_usd_effective) is already in USD from lhr_benchmark_rates; machine rate is not.
+    const locInfo     = LOCATION_INFO[location] ?? LOCATION_INFO['USA']!;
+    const INR_PER_USD = 83.5;
+    const toUsd = (localRate: number) => localRate * locInfo.defaultInrRate / INR_PER_USD;
+
+    const insertedOps: string[] = [];
+    let opNbr = 10;
+
+    // Pre-fetch benchmark labour rates for this location from the global shared table.
+    // lhr_benchmark_rates has no user_id — readable by all authenticated users without RLS workarounds.
+    // lhr_usd_effective is always stored so the rate is location-agnostic for cost comparison.
+    const { data: benchmarkRows } = await db
+      .from('lhr_benchmark_rates')
+      .select('id, lhr, lhr_usd_effective, currency, process_group')
+      .eq('location', location)
+      .order('lhr', { ascending: true });
+
+    // Build group-keyed lookup: processGroup → benchmark LHR for that group.
+    // Falls back to defaultLHRRate() (static table in default-rates.ts) if the DB table is empty.
+    const lhrByGroup = new Map<string, number>();
+    for (const row of benchmarkRows ?? []) {
+      const group = row.process_group as string;
+      if (!lhrByGroup.has(group)) {
+        const effectiveLhr =
+          row.currency && row.currency !== 'USD' && Number(row.lhr_usd_effective) > 0
+            ? Number(row.lhr_usd_effective)
+            : Number(row.lhr);
+        lhrByGroup.set(group, effectiveLhr);
+      }
+    }
+    const pickLHR = (group: string): { id: null; lhr: number } =>
+      ({ id: null, lhr: lhrByGroup.get(group) ?? defaultLHRRate(location, group) });
+
+    for (const line of route.processLines) {
+      const operation    = line.process.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      const processGroup = this.deriveProcessGroupFromMachineClass(line.machineClass);
+      // Store machine_rate in USD always. line.hourlyRate is in the selected location's local
+      // currency (INR for India, USD for USA, EUR for Germany, etc.).
+      // toUsd() normalises via the INR pivot: localRate × defaultInrRate / 83.5
+      const machineRate  = toUsd(line.hourlyRate);
+      const cycleTimeSec = Math.round(line.cycleTimeMin * 60);
+      const lhr = pickLHR(processGroup);
+
+      const { error } = await db.from('process_cost_records').insert({
+        bom_item_id:    id,
+        user_id:        user.id,
+        op_nbr:         opNbr,
+        operation,
+        process_group:  processGroup,
+        machine_name:   line.machineName ?? null,
+        machine_rate:   machineRate,
+        labor_rate:     lhr.lhr,
+        lhr_id:         null,
+        direct_rate:    machineRate + lhr.lhr,
+        setup_manning:  1,
+        setup_time:     15,
+        batch_size:     batchSize,
+        heads:          1,
+        cycle_time:     cycleTimeSec,
+        parts_per_cycle: 1,
+        scrap:          0,
+        currency:       'USD',
+        is_active:      true,
+        notes:          `auto_fill_from_route:${dto.routeId}`,
+      });
+
+      if (error) {
+        this.logger.error(`[apply-route] insert failed op=${operation}: ${error.message}`);
+      } else {
+        insertedOps.push(line.process);
+        opNbr += 10;
+      }
+    }
+
+    this.logger.log(`[apply-route] partId=${id} route=${dto.routeId} wrote ${insertedOps.length} ops`);
+
+    return {
+      created:    insertedOps.length,
+      operations: insertedOps,
+      routeLabel: route.routeLabel,
+      routeId:    dto.routeId,
+    };
+  }
+
+  private getMhrSearchTerm(machineCategoryHint: string): string {
+    const map: Record<string, string> = {
+      laser_6kw: 'laser',
+      press_brake: 'press',
+      vmc_3ax: 'mill',
+      cnc_lathe: 'lathe',
+      im_100t: 'injection',
+      drill_press: 'drill',
+      radial_drill: 'drill',
+    };
+    return map[machineCategoryHint] ?? machineCategoryHint.split('_')[0];
+  }
+
+  private deriveProcessGroupFromMachineClass(machineClass: string): string {
+    if (['fiber_laser', 'turret_punch', 'waterjet', 'press_brake'].includes(machineClass)) return 'Sheet Metal';
+    if (machineClass.startsWith('im_') || machineClass === 'injection_molding') return 'Plastics';
+    if (['cmm', 'inspection'].includes(machineClass)) return 'Quality';
+    return 'CNC Machining';
   }
 }

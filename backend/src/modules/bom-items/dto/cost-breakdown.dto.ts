@@ -48,6 +48,15 @@ export interface RouteResultSustainability {
 }
 
 import type { MachineSelectionResult } from './machine-selection.dto';
+import type { BlankSpecDto } from './blank-spec.dto';
+
+/** One operation in a feature-level breakdown (aPriori-style sub-operations). */
+export interface FeatureOp {
+  name: string;        // "Drill Ø8.0mm ×3", "Tapping M8 ×2", "Pocket Mill ×2"
+  timeSec: number;     // physics-computed cycle seconds for this group
+  featureType: string; // 'drill' | 'tapping' | 'pocket' | 'laser_cut' | 'pierce' | 'bend' | …
+  count: number;       // number of occurrences collapsed into this entry
+}
 
 export interface ProcessLineCost {
   process: string;       // "Laser Cutting", "Press Brake", "Tapping", "Deburring"
@@ -55,17 +64,28 @@ export interface ProcessLineCost {
   runCost: number;       // INR — pure cycle cost per piece
   totalCost: number;     // setupCost + runCost
   cycleTimeMin: number;  // machine cycle time in minutes (setup excluded)
-  hourlyRate: number;    // INR/hr — MHR applied to this line
-  rateSource: 'mhr_database' | 'default_rate' | 'tier_synthetic';
+  hourlyRate: number;    // local currency/hr — fully burdened MHR (machine + labour)
+  rateSource: 'mhr_database' | 'default_rate' | 'tier_synthetic' | 'benchmark_override';
   machineClass: string;        // e.g. 'fiber_laser' — maps to MACHINE_REGISTRY key
   machineName: string | null;  // DB machine_name; null when source is 'default_rate'
   commodityCode: string | null; // DB commodity_code; null when source is 'default_rate'
+  // Labour hour rate from lhr_benchmark_rates for this location + process group.
+  // Already included in hourlyRate (fully burdened) — surfaced for display transparency.
+  labourRate?: number | null;
   // Physics-based selection result (recommendation + alternatives + profiles).
   // Attached by BOMItemsService when ENABLE_PHYSICS_MACHINE_SELECTION is on.
   machineSelection?: MachineSelectionResult;
+  // aPriori-style per-feature operation breakdown. Present on CNC Milling (per hole/pocket/tap),
+  // Laser Cutting (cut path + pierces), and Press Brake (per bend group). Absent on Setup/Deburr/Inspect.
+  featureBreakdown?: FeatureOp[];
 }
 
 export interface CostSummaryDto {
+  // Scenario readiness gate — explicitly false when required inputs are missing.
+  // Absent (undefined) or true means ready. Frontend blocks cost display on false.
+  scenarioReady?: boolean;
+  missingInputs?: string[];  // e.g. ['materialGrade']
+
   // Material
   materialCost: number;
   materialGrade: string;
@@ -93,6 +113,11 @@ export interface CostSummaryDto {
   batchSize: number;
   family: string;
   setupCount?: number;  // CNC: number of machine setups (1 = 5-axis, 2 = 4-axis, 3 = 3-axis)
+
+  // Blank stock selected for this part — visible in the Cost Guide Panel.
+  // CNC: round bar / rectangular bar / billet (from BlankOptimizerService).
+  // Sheet metal: flat blank area × thickness.
+  blankSpec?: BlankSpecDto;
 
   // CNC: billet/bar stock vs finish weight breakdown
   materialRemoval?: {

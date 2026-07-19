@@ -13,8 +13,41 @@ import type {
   VendorContact,
 } from '../vendors';
 export type { Vendor } from '../vendors';
+import { apiClient } from '../client';
 import { ApiError } from '../client';
 import { toast } from 'sonner';
+
+// ── Vendor match types (mirrored from backend DTO) ────────────────────────────
+export interface RankedVendor {
+  id: string;
+  name: string;
+  supplierCode: string;
+  city: string;
+  country: string;
+  overallScore: number;
+  scoreBreakdown: {
+    capability: number; quality: number; delivery: number;
+    cost: number; certifications: number; proximity: number; bonusPoints: number;
+  };
+  confidenceScore: number;
+  whyBest: string[];
+  qualityRating: number | null;
+  deliveryRating: number | null;
+  costRating: number | null;
+  certifications: string[];
+  email: string | null;
+  classification: string;
+  processTermsMatched: string[];
+  materialMatch: boolean;
+  coveredCategoriesCount: number;
+}
+export interface RankedProcessGroup {
+  processName: string;
+  categoryLabel: string;
+  mergedProcessNames: string[];
+  vendors: RankedVendor[];
+  totalFound: number;
+}
 
 
 export const vendorKeys = {
@@ -499,6 +532,21 @@ export function useDeleteVendorContact() {
         toast.error('Unable to delete contact. Please try again or contact support.');
       }
     },
+  });
+}
+
+// ── Vendor matching ───────────────────────────────────────────────────────────
+
+export const vendorMatchKeys = {
+  match: (processes: string[], material?: string) => ['vendor-match', processes, material] as const,
+};
+
+export function useVendorMatch(processes: string[], material?: string) {
+  return useQuery<RankedProcessGroup[]>({
+    queryKey: vendorMatchKeys.match(processes, material),
+    queryFn: () => apiClient.post<RankedProcessGroup[]>('/vendors/match', { processes, material }),
+    enabled: processes.length > 0,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

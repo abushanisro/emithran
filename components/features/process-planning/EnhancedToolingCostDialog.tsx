@@ -335,7 +335,7 @@ export function EnhancedToolingCostDialog({
           {/* Cost and Quantity */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="unitCost">Unit Cost (₹) *</Label>
+              <Label htmlFor="unitCost">Unit Cost ($) *</Label>
               <Input
                 id="unitCost"
                 type="number"
@@ -392,11 +392,11 @@ export function EnhancedToolingCostDialog({
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Total Tooling Investment:</span>
-                  <div className="font-semibold">₹{totalToolingCost.toFixed(2)}</div>
+                  <div className="font-semibold">${totalToolingCost.toFixed(2)}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Cost per Part:</span>
-                  <div className="font-semibold text-primary">₹{costPerPart.toFixed(4)}</div>
+                  <div className="font-semibold text-primary">${costPerPart.toFixed(4)}</div>
                 </div>
               </div>
             </div>

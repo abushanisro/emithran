@@ -9,6 +9,7 @@ import {
   pickRecommendedRoute,
   type CNCCostInput,
 } from './cost-cnc-engine';
+import { buildOperationSequence } from './operation-sequencer';
 import {
   benchmarkRateWarning,
   classifySurfaceTreatment,
@@ -120,12 +121,17 @@ describe('computeCNCMilledCostSummary — billet and chip loss', () => {
     expect(result.warnings.some((w) => w.includes('Chip loss'))).toBe(true);
   });
 
-  it('prices the fixture in local terms per location', () => {
+  it('folds fixture cost into Setup (no separate Fixture process line)', () => {
     const india = computeCNCMilledCostSummary(milledInput({ location: 'India' }), 'cnc_3ax_vmc');
     const usa = computeCNCMilledCostSummary(milledInput({ location: 'USA' }), 'cnc_3ax_vmc');
-    const fixtureOf = (r: typeof india) => r.processLines.find((l) => l.process === 'Fixture')!.totalCost;
-    expect(fixtureOf(india)).toBeCloseTo(500 / 60, 2);
-    expect(fixtureOf(usa)).toBeCloseTo((500 * (85 / 900)) / 60, 2);
+    // Fixture is no longer a standalone process line
+    expect(india.processLines.find((l) => l.process === 'Fixture')).toBeUndefined();
+    expect(usa.processLines.find((l) => l.process === 'Fixture')).toBeUndefined();
+    // Fixture cost is folded into Setup's setupCost (500 INR / batchSize=60 for India)
+    const indiaSetup = india.processLines.find((l) => l.process === 'Setup')!;
+    const usaSetup = usa.processLines.find((l) => l.process === 'Setup')!;
+    expect(indiaSetup.setupCost).toBeGreaterThan(500 / 60 - 0.1); // includes fixture amortization
+    expect(usaSetup.setupCost).toBeGreaterThan((500 * (85 / 900)) / 60 - 0.01);
   });
 
   it('prices the tapping line at the machine rate it was given (rigid tapping inheritance)', () => {
@@ -434,5 +440,110 @@ describe('material shape ranking (costing lookup)', () => {
   it('prefers sheet/coil stock for sheet-metal parts', () => {
     expect(shapeRankForFamily('sheets', 'sheet_metal')).toBe(0);
     expect(shapeRankForFamily('bars', 'sheet_metal')).toBe(100);
+  });
+});
+
+// ── Sprint 1 regression tests ─────────────────────────────────────────────────
+
+describe('Fix 1 — holeCount: feature-ops path uses correct count, not raw cylinder count', () => {
+  it('billing 19 phantom holes (no holeGroups) costs more than 3 real holes in bbox-subtraction path', () => {
+    // The real demo part has 3 tapped holes, not 19 raw cylinders.
+    // holeGroups must be empty so the fallback holeCount path is used
+    const phantom = computeCNCMilledCostSummary(
+      milledInput({ holeCount: 19, holeGroups: [], featureOps: undefined }),
+      'cnc_3ax_vmc',
+    );
+    const real = computeCNCMilledCostSummary(
+      milledInput({ holeCount: 3, holeGroups: [], featureOps: undefined }),
+      'cnc_3ax_vmc',
+    );
+    const millingPhantom = phantom.processLines.find((l) => l.process === 'CNC Milling')!.cycleTimeMin;
+    const millingReal = real.processLines.find((l) => l.process === 'CNC Milling')!.cycleTimeMin;
+    expect(millingPhantom).toBeGreaterThan(millingReal);
+  });
+});
+
+describe('Fix 2 — blank optimizer: blankResult overrides bbox billet volume', () => {
+  it('uses blankResult billetVolMm3 when provided instead of computing from bbox', () => {
+    // The round bar (Ø30) gives a tighter blank than the full bbox billet
+    const roundBarVol = Math.PI * 15 ** 2 * (83 + 5); // Ø30 × (L+5mm facing)
+    const result = computeCNCMilledCostSummary(
+      milledInput({
+        blankResult: {
+          form: 'round_bar',
+          sizeLabel: 'Ø30 round bar',
+          billetVolMm3: roundBarVol,
+          utilizationPct: 62,
+        },
+      }),
+      'cnc_3ax_vmc',
+    );
+    // Billet weight from round bar volume
+    const expectedBilletKg = (roundBarVol / 1e9) * 2700;
+    expect(result.materialRemoval!.billetWeightKg).toBeCloseTo(expectedBilletKg, 3);
+  });
+
+  it('falls back to bbox billet when blankResult is absent', () => {
+    const allow = 2 * CNC_STOCK_ALLOWANCE_PER_SIDE_MM;
+    const bboxVol = (83 + allow) * (62 + allow) * (32 + allow);
+    const result = computeCNCMilledCostSummary(milledInput(), 'cnc_3ax_vmc');
+    expect(result.materialRemoval!.billetWeightKg).toBeCloseTo((bboxVol / 1e9) * 2700, 3);
+  });
+});
+
+describe('Fix 4 — machinabilityRating: scales MRR in both engines', () => {
+  it('Al 6061 (machinability 150) gives lower roughing cycle time than mild steel (75)', () => {
+    // No holes/holeGroups so milling time = pure roughing from MRR, uncontaminated by
+    // fixed-time drilling ops. That isolates the machinabilityRating scaling.
+    const alPart = computeCNCMilledCostSummary(
+      milledInput({ materialGrade: 'AL6061-T6', machinabilityRating: 150, holeCount: 0, holeGroups: [] }),
+      'cnc_3ax_vmc',
+    );
+    const steelPart = computeCNCMilledCostSummary(
+      milledInput({ materialGrade: 'A36', machinabilityRating: 75, holeCount: 0, holeGroups: [] }),
+      'cnc_3ax_vmc',
+    );
+    const alMilling = alPart.processLines.find((l) => l.process === 'CNC Milling')!.cycleTimeMin;
+    const steelMilling = steelPart.processLines.find((l) => l.process === 'CNC Milling')!.cycleTimeMin;
+    // Al MRR = 60000 × 2 = 120000; mild_steel MRR = 12000 × 1 = 12000 → 10× faster
+    expect(alMilling).toBeLessThan(steelMilling);
+    expect(steelMilling / alMilling).toBeCloseTo(10, 0);
+  });
+
+  it('featureOps path: total time with Al machinability < same ops with mild steel', () => {
+    const fgv2 = [
+      { feature_type: 'pocket', diameter_mm: 0,
+        occurrences: [{ depth_mm: 12, material_removed_mm3: 15_000 }] },
+    ];
+    const alOps = buildOperationSequence(fgv2, 'aluminum', 2.0);
+    const steelOps = buildOperationSequence(fgv2, 'mild_steel', 1.0);
+    const alTime = alOps.find((o) => o.name === 'Pocket Rough')!.timeSec;
+    const steelTime = steelOps.find((o) => o.name === 'Pocket Rough')!.timeSec;
+    expect(alTime).toBeLessThan(steelTime);
+  });
+});
+
+describe('Fix 3 — featureOps path: total time drives CNC Milling line', () => {
+  it('uses featureOps total when provided instead of billet-subtraction formula', () => {
+    const knownOps = [
+      { name: 'Face Mill', timeSec: 45, source: 'fixed' as const },
+      { name: 'Pocket Rough', timeSec: 300, source: 'feature' as const },
+      { name: 'Drill', timeSec: 40, source: 'feature' as const },
+      { name: 'Deburr', timeSec: 90, source: 'fixed' as const },
+    ];
+    // Total = 475s; with 15% overhead → 475 * 1.15 / 60 ≈ 9.10 min
+    const result = computeCNCMilledCostSummary(
+      milledInput({ featureOps: knownOps }),
+      'cnc_3ax_vmc',
+    );
+    const millingMin = result.processLines.find((l) => l.process === 'CNC Milling')!.cycleTimeMin;
+    expect(millingMin).toBeCloseTo((475 * 1.15) / 60, 1);
+  });
+
+  it('falls back to billet-subtraction when featureOps is absent', () => {
+    const without = computeCNCMilledCostSummary(milledInput({ featureOps: undefined }), 'cnc_3ax_vmc');
+    const milling = without.processLines.find((l) => l.process === 'CNC Milling')!;
+    // bbox path: roughingMin = (billetVol - partVol) / MRR * 1.3 + drill
+    expect(milling.cycleTimeMin).toBeGreaterThan(0);
   });
 });

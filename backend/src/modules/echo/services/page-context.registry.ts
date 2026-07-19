@@ -72,9 +72,9 @@ const ENTRIES: Array<{ pattern: RegExp; entry: RouteRegistryEntry }> = [
     pattern: /^\/(raw-materials|hr-rates|mhr-database|calculators)(\/|$)/i,
     entry: {
       displayName: 'Costing rates',
-      helpTopics: ['mhr-setup', 'lsr-setup', 'calculator-inputs'],
+      helpTopics: ['mhr-setup', 'lhr-setup', 'calculator-inputs'],
       suggestions: [
-        s('cost-1', 'Validate rate inputs', 'Echo can check whether MHR/LSR inputs are sane and explain the formula.', 'static'),
+        s('cost-1', 'Validate rate inputs', 'Echo can check whether MHR/LHR inputs are sane and explain the formula.', 'static'),
       ],
     },
   },

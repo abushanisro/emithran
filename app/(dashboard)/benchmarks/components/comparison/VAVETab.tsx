@@ -291,7 +291,7 @@ export function VAVETab({ bomMetrics }: Props) {
       opportunities.push({
         type: "High-Cost Item Review",
         priority: "High",
-        description: `${highCostItems.length} items exceed ₹1000`,
+        description: `${highCostItems.length} items exceed $1000`,
         potential: "High",
         action: "Investigate alternative materials or suppliers",
       });

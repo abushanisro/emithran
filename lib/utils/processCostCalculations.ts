@@ -438,7 +438,7 @@ export function validateProcessCostInput(input: Partial<ProcessCostInput>): stri
 export function formatCurrency(value: number, currency: string = 'USD', decimals: number = 6): string {
   const currencySymbols: Record<string, string> = {
     USD: '$',
-    INR: '₹',
+    INR: '$',
     EUR: '€',
     GBP: '£',
     JPY: '¥',

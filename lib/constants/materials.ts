@@ -36,7 +36,7 @@ export const COUNTRY_LABELS = {
 } as const;
 
 export const CURRENCY_LABELS = {
-  INR: 'Indian Rupee (₹)',
+  INR: 'Indian Rupee ($)',
   USD: 'US Dollar ($)',
   EUR: 'Euro (€)',
   CNY: 'Chinese Yuan (¥)',
@@ -44,7 +44,7 @@ export const CURRENCY_LABELS = {
 } as const;
 
 export const CURRENCY_SYMBOLS = {
-  INR: '₹',
+  INR: '$',
   USD: '$',
   EUR: '€',
   CNY: '¥',

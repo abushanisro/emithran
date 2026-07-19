@@ -463,7 +463,7 @@ if (!open) return null;
                                             <div className="flex items-center gap-4">
                                               <span>RFQs: {vendor.rfqCount}</span>
                                               {vendor.quoteAmount && (
-                                                <span>Quote: ₹{vendor.quoteAmount.toLocaleString()}</span>
+                                                <span>Quote: ${vendor.quoteAmount.toLocaleString()}</span>
                                               )}
                                               {vendor.leadTimeDays && (
                                                 <span>Lead: {vendor.leadTimeDays}d</span>
