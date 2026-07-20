@@ -1124,7 +1124,7 @@ export default function BOMDetailPage() {
             projectId={projectId}
             onAssemblyGenerated={(tree, assemblyData) => {
               if (assemblyData) setUploadedAssembly3D(assemblyData);
-              if (tree?.length) refetchBOMItems();
+              if (assemblyData || tree?.length) refetchBOMItems();
             }}
           />
         </Card>
