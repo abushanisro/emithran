@@ -1,13 +1,30 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useVendorMatch, type RankedVendor, type RankedProcessGroup } from "@/lib/api/hooks/useVendors";
 import { useCreateRfq } from "@/lib/api/hooks/useRfq";
+import { useCreateSupplierNomination, supplierNominationKeys } from "@/lib/api/hooks/useSupplierNominations";
+import { NominationType } from "@/lib/api/supplier-nominations";
+import { createSupplierEvaluationGroup } from "@/lib/api/supplier-evaluation-groups";
 import { type HeatmapLayerType } from "@/lib/heatmap/types";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface VendorNetworkPanelProps {
+  projectId: string;
   itemId: string;
   itemName: string;
   batchSize?: number;
@@ -267,6 +284,7 @@ function buildRfqEmailBody(itemName: string, processNames: string[], material?: 
 }
 
 export function VendorNetworkPanel({
+  projectId,
   itemId,
   itemName,
   batchSize,
@@ -274,13 +292,29 @@ export function VendorNetworkPanel({
   material,
   hotspotContext,
 }: VendorNetworkPanelProps) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [nominationName, setNominationName] = useState('');
+  const [rfqDeadline, setRfqDeadline] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().slice(0, 10);
+  });
+
   const { data: groups, isLoading, error } = useVendorMatch(processNames, material);
   const createRfq = useCreateRfq();
+  const createNomination = useCreateSupplierNomination();
+  const createEvaluationGroup = useMutation({
+    mutationFn: createSupplierEvaluationGroup,
+  });
 
   const hotspotCategories = hotspotContext
     ? (LAYER_PROCESS_HINT[hotspotContext.layer] ?? null)
     : null;
+
+  const isSending = createEvaluationGroup.isPending || createNomination.isPending || createRfq.isPending;
 
   const toggleVendor = (id: string) => {
     setSelectedIds((prev) => {
@@ -291,27 +325,93 @@ export function VendorNetworkPanel({
     });
   };
 
-  const handleSendRfq = () => {
-    if (selectedIds.size === 0) return;
-    const deadline = new Date();
-    deadline.setDate(deadline.getDate() + 14);
+  const openConfirm = () => {
+    setNominationName(`Nomination – ${itemName} – ${new Date().toISOString().slice(0, 10)}`);
+    setConfirmOpen(true);
+  };
 
-    createRfq.mutate(
-      {
-        rfqName: `RFQ – ${itemName} – ${new Date().toISOString().slice(0, 10)}`,
+  const handleConfirmSend = async () => {
+    setConfirmOpen(false);
+    const vendorIds = [...selectedIds];
+    const today = new Date().toISOString().slice(0, 10);
+    let step: 'evaluation' | 'nomination' | 'rfq' = 'evaluation';
+    try {
+      // Step 1: create evaluation group — gives vendors a workspace to manage the RFQ
+      const evalGroup = await createEvaluationGroup.mutateAsync({
+        projectId,
+        name: `${itemName} – Evaluation – ${today}`,
+        description: nominationName,
+        bomItems: [{
+          id: itemId,
+          name: itemName,
+          quantity: batchSize || 1,
+          ...(material ? { material } : {}),
+        }],
+        processes: [], // user adds processes from the evaluation group page
+      });
+      step = 'nomination';
+
+      // Step 2: create nomination linked to the evaluation group
+      await createNomination.mutateAsync({
+        nominationName,
+        nominationType: NominationType.MANUFACTURER,
+        projectId,
+        evaluationGroupId: evalGroup.id,
+        vendorIds,
+        bomParts: [{
+          bomItemId: itemId,
+          bomItemName: itemName,
+          quantity: batchSize || 1,
+          ...(material ? { material } : {}),
+          vendorIds,
+        }],
+      });
+      step = 'rfq';
+
+      // Step 3: create RFQ
+      await createRfq.mutateAsync({
+        rfqName: `RFQ – ${itemName} – ${today}`,
+        projectId,
         bomItemIds: [itemId],
-        vendorIds: [...selectedIds],
+        vendorIds,
         selectionType: 'competitive',
-        quoteDeadline: deadline,
+        quoteDeadline: new Date(rfqDeadline),
         emailBody: buildRfqEmailBody(itemName, processNames, material, batchSize),
-      },
-      {
-        onSuccess: () => {
-          toast.success(`RFQ draft created for ${selectedIds.size} vendor${selectedIds.size > 1 ? 's' : ''} — view in Vendors page`);
-          setSelectedIds(new Set());
+      });
+
+      // Force-refresh both lists so data is ready when user navigates
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: supplierNominationKeys.list(projectId),
+          refetchType: 'all',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['supplier-evaluation-groups', 'project', projectId],
+          refetchType: 'all',
+        }),
+      ]);
+
+      toast.success(`Evaluation group + nomination + RFQ sent to ${vendorIds.length} vendor${vendorIds.length !== 1 ? 's' : ''}`, {
+        action: {
+          label: 'View Evaluation',
+          onClick: () => router.push(`/projects/${projectId}/supplier-evaluation`),
         },
-      },
-    );
+      });
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      const descriptions: Record<typeof step, string> = {
+        evaluation: 'Could not create the evaluation group. No nomination or RFQ was sent.',
+        nomination: 'Evaluation group was created but the nomination failed. No RFQ was sent.',
+        rfq: 'Evaluation group and nomination were created but the RFQ could not be sent.',
+      };
+      toast.error(`${step.charAt(0).toUpperCase() + step.slice(1)} creation failed`, {
+        description: err?.message ?? descriptions[step],
+        action: step !== 'evaluation' ? {
+          label: 'View Evaluation',
+          onClick: () => router.push(`/projects/${projectId}/supplier-evaluation`),
+        } : undefined,
+      });
+    }
   };
 
   // Show all unique process names as chips at the top
@@ -394,22 +494,75 @@ export function VendorNetworkPanel({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-slate-400 flex-1">
-            {selectedIds.size > 0 ? `${selectedIds.size} vendor${selectedIds.size > 1 ? 's' : ''} selected` : 'Select vendors to RFQ'}
+            {selectedIds.size > 0
+              ? `${selectedIds.size} vendor${selectedIds.size > 1 ? 's' : ''} selected`
+              : 'Select vendors to RFQ'}
           </span>
           <button
-            onClick={handleSendRfq}
-            disabled={selectedIds.size === 0 || createRfq.isPending}
+            onClick={openConfirm}
+            disabled={selectedIds.size === 0 || isSending}
             className={cn(
               'text-[10px] font-medium px-3 py-1 rounded transition-colors',
-              selectedIds.size > 0
+              selectedIds.size > 0 && !isSending
                 ? 'bg-violet-600 hover:bg-violet-700 text-white'
                 : 'bg-slate-700 text-slate-500 cursor-not-allowed',
             )}
           >
-            {createRfq.isPending ? 'Creating…' : 'Send RFQ →'}
+            {isSending ? 'Sending…' : `Send RFQ (${selectedIds.size})`}
           </button>
         </div>
       </div>
+
+      {/* Confirmation dialog */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Send RFQ to {selectedIds.size} vendor{selectedIds.size !== 1 ? 's' : ''}
+            </DialogTitle>
+            <DialogDescription>
+              Creates an <strong>Evaluation Group</strong>, a Supplier Nomination, and an RFQ for <strong>{itemName}</strong>.
+              Manage vendor responses and scoring from the Evaluation Group page.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-1">
+              <Label>Nomination name</Label>
+              <Input
+                value={nominationName}
+                onChange={(e) => setNominationName(e.target.value)}
+                placeholder="e.g. Q3 Shortlist – Motor Bracket"
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label>Quote deadline</Label>
+              <Input
+                type="date"
+                value={rfqDeadline}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setRfqDeadline(e.target.value)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Processes: {processChips.slice(0, 3).join(' · ')}
+              {processChips.length > 3 ? ` +${processChips.length - 3} more` : ''}
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!nominationName.trim() || isSending}
+              onClick={handleConfirmSend}
+            >
+              Confirm &amp; Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

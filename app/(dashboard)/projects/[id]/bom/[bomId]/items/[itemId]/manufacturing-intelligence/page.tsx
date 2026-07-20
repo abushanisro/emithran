@@ -6535,9 +6535,11 @@ function CandidateRoutesPanel({ item, batchSize, factory }: { item: BOMItem; bat
 // ── AnalysisTabsPanel (Right) ──────────────────────────────────────────────────
 
 function AnalysisTabsPanel({
+  projectId,
   item, fg, batchSize, productionLife, factory, selectedCNCFeatureKey, onCNCFeatureSelect,
   modelScreenshot, file3dUrl, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
 }: {
+  projectId: string;
   item: BOMItem; fg: FeatureGraph | null;
   batchSize: number; productionLife: number; factory: string;
   selectedCNCFeatureKey?: string | null;
@@ -6706,12 +6708,13 @@ function AnalysisTabsPanel({
 
         {tab === 'vendor_network' && (
           <VendorNetworkPanel
+            projectId={projectId}
             itemId={item.id}
             itemName={item.name ?? 'Part'}
             batchSize={batchSize}
             processNames={treeProcessNames}
-            material={item?.materialGrade ?? undefined}
-            hotspotContext={vendorHotspotContext}
+            {...(item?.materialGrade ? { material: item.materialGrade } : {})}
+            {...(vendorHotspotContext ? { hotspotContext: vendorHotspotContext } : {})}
           />
         )}
 
@@ -8154,6 +8157,7 @@ export default function ManufacturingIntelligencePage() {
     selectedManualRoute,
   };
   const analysisProps = {
+    projectId,
     item, fg, batchSize, productionLife, factory,
     selectedCNCFeatureKey, onCNCFeatureSelect: setSelectedCNCFeatureKey,
     modelScreenshot, file3dUrl,
