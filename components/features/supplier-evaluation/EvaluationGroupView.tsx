@@ -11,7 +11,7 @@ import { Search, MapPin, Clock, Building2, Send, Package, Users, FileText, Trend
 import { toast } from 'sonner';
 import { useVendors, Vendor } from '@/lib/api/hooks/useVendors';
 import { useCreateRfq, useSendRfq } from '@/lib/api/hooks/useRfq';
-import { useRfqTrackingRecords, useRfqTrackingStats, useInvalidateRfqTracking, useUpdateRfqTrackingStatus, useDeleteRfqTracking } from '@/lib/api/hooks/useRfqTracking';
+import { useRfqTrackingRecords, useRfqTrackingStats, useInvalidateRfqTracking, useUpdateRfqTrackingStatus, useDeleteRfqTracking, useCreateRfqTracking } from '@/lib/api/hooks/useRfqTracking';
 import { getRfqSummaryText, formatResponseTime, getStatusText, getStatusColor } from '@/lib/api/rfq-tracking';
 import { analyzeTrackingFeature, getFeatureStatusMessage, TrackingFeatureState } from '@/lib/api/features/tracking-feature';
 import { useProcessCosts } from '@/lib/api/hooks/useProcessCosts';
@@ -49,7 +49,7 @@ export function EvaluationGroupView({ projectId, bomParts, evaluationGroupName, 
   const [partsSearchTerm, setPartsSearchTerm] = useState('');
   const [approveModalOpen, setApproveModalOpen] = useState<string | null>(null);
   const [selectedApproveVendors, setSelectedApproveVendors] = useState<string[]>([]);
-  const [activeBomTab, setActiveBomTab] = useState('overview');
+  const [activeBomTab, setActiveBomTab] = useState('rfq');
   const [partProcesses, setPartProcesses] = useState<Record<string, string[]>>({});
   const [isSubmittingRfq, setIsSubmittingRfq] = useState(false);
   const [selectedVendorForRating, setSelectedVendorForRating] = useState<string | null>(null);
@@ -103,6 +103,7 @@ export function EvaluationGroupView({ projectId, bomParts, evaluationGroupName, 
   // RFQ mutations and cache invalidation
   const createRfqMutation = useCreateRfq();
   const sendRfqMutation = useSendRfq();
+  const createTrackingMutation = useCreateRfqTracking();
   const updateTrackingStatusMutation = useUpdateRfqTrackingStatus(projectId);
   const deleteTrackingMutation = useDeleteRfqTracking(projectId);
   const invalidateRfqTracking = useInvalidateRfqTracking();
@@ -371,12 +372,33 @@ We look forward to your competitive proposal and establishing a successful partn
 
       // Create the RFQ
       const createdRfq = await createRfqMutation.mutateAsync(rfqData);
-      
+
       // Send the RFQ immediately
       await sendRfqMutation.mutateAsync(createdRfq.id);
-      
-      // Cache is automatically updated by the create mutation
-      
+
+      // Create tracking record so RFQ Tracking tab shows data
+      const selectedBomParts = bomParts.filter(p => selectedParts.includes(p.id));
+      await createTrackingMutation.mutateAsync({
+        rfqId: createdRfq.id,
+        projectId,
+        rfqName: rfqData.rfqName,
+        rfqNumber: createdRfq.rfqNumber,
+        vendors: selectedVendorData.map(v => ({
+          id: v.id,
+          name: v.name,
+          email: v.primaryContacts?.[0]?.email || v.companyEmail,
+        })),
+        parts: selectedBomParts.map(p => ({
+          id: p.id,
+          partNumber: p.partNumber,
+          description: p.description,
+          process: p.process,
+          quantity: p.quantity,
+          file2dPath: p.file2dPath,
+          file3dPath: p.file3dPath,
+        })),
+      });
+
       // Show success message
       toast.success(`RFQ sent successfully to ${vendorIds.length} vendor${vendorIds.length !== 1 ? 's' : ''} for ${bomItemIds.length} part${bomItemIds.length !== 1 ? 's' : ''}!`);
       
@@ -542,26 +564,26 @@ We look forward to your competitive proposal and establishing a successful partn
               
               <Tabs value={activeBomTab} onValueChange={setActiveBomTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-4 bg-muted rounded-lg p-1 h-10">
-                  <TabsTrigger 
-                    value="overview" 
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
-                  >
-                    BOM & Vendor
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="cost-analysis" 
-                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
-                  >
-                    Cost Analysis
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="rfq" 
+                  <TabsTrigger
+                    value="rfq"
                     className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
                   >
                     RFQ Tracking
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="evaluation" 
+                  <TabsTrigger
+                    value="overview"
+                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                  >
+                    BOM & Vendor
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="cost-analysis"
+                    className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+                  >
+                    Cost Analysis
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="evaluation"
                     className="text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
                   >
                     Supplier Analysis
@@ -756,6 +778,25 @@ We look forward to your competitive proposal and establishing a successful partn
                     </div>
                   ) : (
                     <>
+                      {selectedVendors.length > 0 && (
+                        <div className="mb-4 flex items-center justify-between">
+                          <span className="text-sm text-gray-400">
+                            {selectedVendors.length} vendor{selectedVendors.length !== 1 ? 's' : ''} selected
+                          </span>
+                          <Button
+                            className="bg-teal-600 hover:bg-teal-700 text-white"
+                            onClick={handleSendRfq}
+                            disabled={isSubmittingRfq || createRfqMutation.isPending || sendRfqMutation.isPending}
+                          >
+                            {(isSubmittingRfq || createRfqMutation.isPending || sendRfqMutation.isPending) ? (
+                              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                            ) : (
+                              <Send className="h-4 w-4 mr-2" />
+                            )}
+                            {(isSubmittingRfq || createRfqMutation.isPending || sendRfqMutation.isPending) ? 'Sending…' : 'Send RFQ'}
+                          </Button>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {matchedVendors.map((vendor) => (
                           <div
@@ -1076,7 +1117,7 @@ We look forward to your competitive proposal and establishing a successful partn
                       <div className="text-center py-8 text-gray-400">
                         <Send className="h-12 w-12 mx-auto mb-4 opacity-50" />
                         <div className="text-sm">No RFQ tracking available</div>
-                        <div className="text-xs mt-1">Send an RFQ from the BOM & Vendor tab to start tracking</div>
+                        <div className="text-xs mt-1">Go to BOM & Vendor tab, select parts and vendors, then click Send RFQ</div>
                       </div>
                     </div>
                   )}
