@@ -44,6 +44,7 @@ RUN conda run -n cad-env pip install \
     anthropic==0.18.1 \
     "openai>=1.35.0" \
     python-magic==0.4.27 \
+    "PyMuPDF>=1.24.0" \
     requests
 
 # Copy all application source (copilot package, feature extractors, converters, knowledge)
