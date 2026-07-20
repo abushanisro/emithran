@@ -36,5 +36,8 @@ anthropic==0.18.1
 # AI Copilot - Groq (OpenAI-compatible client)
 openai>=1.35.0
 
+# PDF rendering for drawing analysis (MuPDF bundled — no system poppler needed)
+PyMuPDF>=1.24.0
+
 # SolidWorks COM automation (Windows only — silently skipped on Linux/Railway)
 pywin32>=306; sys_platform == "win32"

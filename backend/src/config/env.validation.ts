@@ -48,6 +48,10 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CAD_ENGINE_URL: string = 'http://localhost:5000';
+
+  @IsString()
+  @IsOptional()
+  CAD_ENGINE_API_KEY: string = '';
 }
 
 export function validate(config: Record<string, unknown>) {

@@ -47,7 +47,6 @@ import {
   Plus,
   Check,
   X,
-  Cpu,
   DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -60,7 +59,6 @@ import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type MaterialCategory = 'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | '';
 
 interface RawMaterial {
   id?: string;
@@ -97,23 +95,6 @@ interface RawMaterialsResponse {
   items: RawMaterial[];
 }
 
-interface MaterialOption {
-  grade: string;
-  material: string | undefined;
-  materialGroup: string | undefined;
-  materialType: string | undefined;
-  materialDescription: string | undefined;
-  density: number | undefined;
-  cost: number | undefined;
-  currency: string | undefined;
-  ultimateTensileStrength: number | undefined;
-  yieldTensileStrength: number | undefined;
-  shearingStrength: number | undefined;
-  astmStandard: string | undefined;
-  dinStandard: string | undefined;
-  enStandard: string | undefined;
-  jisStandard: string | undefined;
-}
 
 type EnhancedBOMError = {
   category: 'validation' | 'duplication' | 'hierarchy' | 'fileupload' | 'network' | 'permission' | 'business' | 'data';
@@ -275,131 +256,85 @@ export function BOMItemDialog({
 }: BOMItemDialogProps) {
   const queryClient = useQueryClient();
 
-  const [materialGradeOpen, setMaterialGradeOpen] = useState(false);
-  const [materialGradeSearch, setMaterialGradeSearch] = useState('');
-  const [debouncedMaterialGradeSearch, setDebouncedMaterialGradeSearch] = useState('');
-  const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<MaterialCategory>('');
+  const [materialOpen, setMaterialOpen] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState('');
+  const [debouncedMaterialSearch, setDebouncedMaterialSearch] = useState('');
+  const [materialCategory, setMaterialCategory] = useState<'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | ''>('');
   const [activeResult, setActiveResult] = useState<AutoFillResponse | null>(null);
 
-  // Debounce search input
+  // Debounce material name search
   useEffect(() => {
-    if (!materialGradeOpen) return;
-    const timer = setTimeout(() => {
-      setDebouncedMaterialGradeSearch(materialGradeSearch);
-    }, 500);
+    const timer = setTimeout(() => setDebouncedMaterialSearch(materialSearch), 500);
     return () => clearTimeout(timer);
-  }, [materialGradeSearch, materialGradeOpen]);
+  }, [materialSearch]);
 
-  // Fetch raw materials
+  // Shared error handler for raw-materials queries
+  const handleMaterialQueryError = async (
+    error: unknown,
+    endpoint: string,
+    params: Record<string, unknown>,
+  ): Promise<RawMaterialsResponse> => {
+    const err = error as Record<string, unknown>;
+    if (typeof err?.message === 'string' && err.message.includes('failed to parse logic tree') && params.search) {
+      const fallbackParams = { ...params };
+      delete fallbackParams.search;
+      return (await apiClient.get(endpoint, { params: fallbackParams })) as RawMaterialsResponse;
+    }
+    if (typeof err?.message === 'string' &&
+      (err.message.includes('Circuit breaker is OPEN') ||
+        err.message.includes('does not exist') ||
+        err.message.includes('column'))) {
+      return { items: [] };
+    }
+    throw error;
+  };
+
+  const materialQueryRetry = (failureCount: number, error: unknown): boolean => {
+    const err = error as Record<string, unknown>;
+    if (typeof err?.message === 'string' &&
+      (err.message.includes('Circuit breaker is OPEN') ||
+        err.message.includes('does not exist') ||
+        err.message.includes('column'))) {
+      return false;
+    }
+    return failureCount < 2;
+  };
+
+  // Query A — unique material names, filtered by category when selected
   const { data: rawMaterialsData, isLoading: isLoadingMaterials } = useQuery<RawMaterialsResponse>({
-    queryKey: ['raw-materials', selectedMaterialCategory, debouncedMaterialGradeSearch, activeResult?.suggestions.familyClassification],
+    queryKey: ['raw-materials-names', debouncedMaterialSearch, materialCategory],
     queryFn: async (): Promise<RawMaterialsResponse> => {
-      if (!selectedMaterialCategory) return { items: [] };
-
       const endpoint = '/raw-materials/enhanced';
-      const params: Record<string, unknown> = {
-        limit: 1000,
-        category: selectedMaterialCategory === 'PLASTIC_RUBBER' ? 'PLASTIC' : 'FERROUS',
-      };
-
-      if (activeResult?.suggestions.familyClassification) {
-        params.partFamily = activeResult.suggestions.familyClassification;
-      }
-
-      if (debouncedMaterialGradeSearch?.trim()) {
-        const sanitizedSearch = debouncedMaterialGradeSearch
-          .replace(/[,()%]/g, ' ')
-          .trim()
-          .split(/\s+/)
-          .filter((word: string) => word.length > 2)
-          .join(' ');
-        if (sanitizedSearch.length > 0) {
-          params.search = sanitizedSearch;
-        }
-      }
-
+      const params: Record<string, unknown> = { limit: 1000 };
+      if (debouncedMaterialSearch?.trim()) params.search = debouncedMaterialSearch.trim();
+      if (materialCategory === 'PLASTIC_RUBBER') params.category = 'PLASTIC';
+      else if (materialCategory === 'FERROUS_NON_FERROUS') params.category = 'FERROUS';
       try {
-        const response = await apiClient.get(endpoint, { params }) as RawMaterialsResponse;
-
-
-        return response;
+        return (await apiClient.get(endpoint, { params })) as RawMaterialsResponse;
       } catch (error: unknown) {
-        const err = error as Record<string, unknown>;
-        if (typeof err?.message === 'string' && err.message.includes('failed to parse logic tree') && params.search) {
-          delete params.search;
-          return (await apiClient.get(endpoint, { params })) as RawMaterialsResponse;
-        }
-
-        if (typeof err?.message === 'string' && err.message.includes('Circuit breaker is OPEN')) {
-          return { items: [] };
-        }
-
-        if (
-          typeof err?.message === 'string' &&
-          (err.message.includes('does not exist') || err.message.includes('column'))
-        ) {
-          return { items: [] };
-        }
-
-        throw error;
+        return handleMaterialQueryError(error, endpoint, params);
       }
     },
-    enabled: !!selectedMaterialCategory,
+    enabled: true,
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 5,
-    retry: (failureCount: number, error: unknown) => {
-      const err = error as Record<string, unknown>;
-      if (
-        typeof err?.message === 'string' &&
-        (err.message.includes('Circuit breaker is OPEN') ||
-          err.message.includes('does not exist') ||
-          err.message.includes('column'))
-      ) {
-        return false;
-      }
-      return failureCount < 2;
-    },
+    retry: materialQueryRetry,
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  // Derive material options
-  const materialOptions = useMemo((): MaterialOption[] => {
-    if (!rawMaterialsData?.items || !selectedMaterialCategory) return [];
-
-    const gradesWithMaterials: MaterialOption[] = rawMaterialsData.items
-      .map((material: RawMaterial): MaterialOption | null => {
-        const specificGrade = material.materialName?.trim() || material.material?.trim();
-        if (!specificGrade || specificGrade.length === 0) return null;
-
-        return {
-          grade: specificGrade,
-          material: material.materialName ?? material.material,
-          materialGroup: material.materialGroup ?? material.categoryName,
-          materialType: material.materialType,
-          materialDescription: material.materialDescription ?? material.description,
-          density: material.density ?? material.densityKgM3,
-          cost: material.unitCost ?? material.cost,
-          currency: material.currency,
-          ultimateTensileStrength: material.ultimateTensileStrength ?? material.ultimate_tensile_strength,
-          yieldTensileStrength: material.yieldTensileStrength ?? material.yield_tensile_strength,
-          shearingStrength: material.shearingStrength ?? material.shearing_strength,
-          astmStandard: material.astmStandard ?? material.astm_standard,
-          dinStandard: material.dinStandard ?? material.din_standard,
-          enStandard: material.enStandard ?? material.en_standard,
-          jisStandard: material.jisStandard ?? material.jis_standard
-        };
-      })
-      .filter((item: MaterialOption | null): item is MaterialOption => item !== null);
-
+  // Unique material NAME options (for the Material dropdown)
+  const materialNameOptions = useMemo((): string[] => {
+    if (!rawMaterialsData?.items) return [];
     const seen = new Set<string>();
-    return gradesWithMaterials
-      .filter((item: MaterialOption) => {
-        if (seen.has(item.grade)) return false;
-        seen.add(item.grade);
+    return rawMaterialsData.items
+      .map((m: RawMaterial) => (m.materialName ?? m.material ?? '').trim())
+      .filter((name: string) => {
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
         return true;
       })
-      .sort((a: MaterialOption, b: MaterialOption) => a.grade.localeCompare(b.grade));
-  }, [rawMaterialsData, selectedMaterialCategory]);
+      .sort();
+  }, [rawMaterialsData]);
 
   const [loading, setLoading] = useState(false);
   const [autoParentId, setAutoParentId] = useState<string | null>(null);
@@ -427,7 +362,6 @@ export function BOMItemDialog({
     annualVolume: 1000,
     unit: 'pcs',
     material: '',
-    materialCategory: '' as MaterialCategory,
     materialGrade: '',
     makeBuy: 'make' as 'make' | 'buy',
     unitCost: '',
@@ -459,6 +393,7 @@ export function BOMItemDialog({
     file2d: null as File | null,
     file3d: null as File | null,
   });
+
   const formDataRef = useRef(formData);
   formDataRef.current = formData; // keep ref in sync every render so async handlers see latest state
 
@@ -466,7 +401,7 @@ export function BOMItemDialog({
 
   const calculateCompletionPercentage = () => {
     const requiredFields = ['name', 'partNumber', 'quantity', 'annualVolume', 'itemType'];
-    const optionalFields = ['description', 'materialGrade', 'weight'];
+    const optionalFields = ['description', 'material', 'weight'];
     let completed = 0;
     let total = requiredFields.length + optionalFields.length;
 
@@ -548,18 +483,6 @@ export function BOMItemDialog({
     };
   }, [formData]);
 
-  // Sync material category
-  useEffect(() => {
-    if (formData.materialCategory !== selectedMaterialCategory) {
-      setSelectedMaterialCategory(formData.materialCategory);
-    }
-  }, [formData.materialCategory]);
-
-  useEffect(() => {
-    if (formData.materialGrade && selectedMaterialCategory !== formData.materialCategory) {
-      setFormData(prev => ({ ...prev, materialGrade: '' }));
-    }
-  }, [selectedMaterialCategory]);
 
   // ── Auto-fill helpers ─────────────────────────────────────────────────────
 
@@ -591,12 +514,6 @@ export function BOMItemDialog({
       if (geometryAvailable && !prev.maxLength) { patch.maxLength = r.geometry.boundingBox.length; filled.add('maxLength'); }
       if (geometryAvailable && !prev.maxWidth) { patch.maxWidth = r.geometry.boundingBox.width; filled.add('maxWidth'); }
       if (geometryAvailable && !prev.maxHeight) { patch.maxHeight = r.geometry.boundingBox.height; filled.add('maxHeight'); }
-      // Material: process classification is unreliable without geometry — skip when CAD offline
-      if (geometryAvailable && !prev.materialCategory && r.suggestions.materialCategory) {
-        patch.materialCategory = r.suggestions.materialCategory as MaterialCategory;
-        filled.add('materialCategory');
-        setSelectedMaterialCategory(r.suggestions.materialCategory as MaterialCategory);
-      }
       if (geometryAvailable && !prev.materialGrade && r.suggestions.materialGrade) {
         patch.materialGrade = r.suggestions.materialGrade;
         patch.materialSource = 'cad';
@@ -654,7 +571,7 @@ export function BOMItemDialog({
       const geoFields = ['volume','weight','surfaceArea','maxLength','maxWidth','maxHeight','holeCount','bendCount','cutLengthMm','sheetThicknessMm','pierceCount','flatPatternAreaMm2'];
       filled.forEach(f => {
         if (geoFields.includes(f)) next[f] = r.confidence.geometry;
-        else if (f === 'materialCategory' || f === 'materialGrade') next[f] = r.confidence.material;
+        else if (f === 'material' || f === 'materialGrade') next[f] = r.confidence.material;
         else if (f === 'processType') next[f] = r.confidence.process;
         else next[f] = r.confidence.overall;
       });
@@ -662,7 +579,14 @@ export function BOMItemDialog({
     });
     setAutoFilledFields(filled);
     setActiveResult(r);
-  }, []);
+
+    // Auto-set material category from CAD family classification
+    if (r.suggestions.familyClassification) {
+      const fc = r.suggestions.familyClassification;
+      if (/plastic|rubber/i.test(fc)) setMaterialCategory('PLASTIC_RUBBER');
+      else if (/ferrous|metal|steel|alumin|copper|titan|cast/i.test(fc)) setMaterialCategory('FERROUS_NON_FERROUS');
+    }
+  }, [setMaterialCategory]);
 
   const updatePendingFileStatus = useCallback((id: string, status: PendingFile['status'], error?: string) => {
     setPendingFiles(prev => prev.map(pf =>
@@ -723,7 +647,7 @@ export function BOMItemDialog({
 
     if (modelFiles.length > 0) {
       if (isFirstBatch && modelFiles[0]) {
-        setFormData(prev => ({ ...prev, file3d: modelFiles[0] }));
+        setFormData(prev => ({ ...prev, file3d: modelFiles[0] ?? null }));
       }
       await Promise.allSettled(
         modelItems.map((item, i) => analyzeFile(item, isFirstBatch && i === 0))
@@ -784,14 +708,6 @@ export function BOMItemDialog({
 
   useEffect(() => {
     if (item) {
-      let materialCategory: MaterialCategory = '';
-      if (item.materialGrade || item.material) {
-        const materialInfo = (item.materialGrade || item.material || '').toLowerCase();
-        const isPlastic = materialInfo.includes('plastic') || materialInfo.includes('polymer') ||
-          materialInfo.includes('rubber') || materialInfo.includes('elastomer');
-        materialCategory = isPlastic ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS';
-      }
-
       setFormData({
         name: item.name || '',
         partNumber: item.partNumber || '',
@@ -801,7 +717,6 @@ export function BOMItemDialog({
         annualVolume: item.annualVolume || 1000,
         unit: item.unit || 'pcs',
         material: item.material || '',
-        materialCategory,
         materialGrade: item.materialGrade || '',
         makeBuy: item.makeBuy || 'make',
         unitCost: item.unitCost ? item.unitCost.toString() : '',
@@ -832,7 +747,6 @@ export function BOMItemDialog({
         file2d: null,
         file3d: null,
       });
-      setSelectedMaterialCategory(materialCategory);
     } else {
       setFormData({
         name: '',
@@ -843,7 +757,6 @@ export function BOMItemDialog({
         annualVolume: 1000,
         unit: 'pcs',
         material: '',
-        materialCategory: '',
         materialGrade: '',
         makeBuy: 'make',
         unitCost: '',
@@ -874,7 +787,6 @@ export function BOMItemDialog({
         file2d: null,
         file3d: null,
       });
-      setSelectedMaterialCategory('');
     }
     // Reset multi-file state whenever dialog opens fresh
     setPendingFiles([]);
@@ -925,7 +837,15 @@ export function BOMItemDialog({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageBase64, mediaType, partNumber: formData.partNumber }),
         });
-        if (!res.ok) throw new Error(`Drawing analysis failed (${res.status}): ${await res.text()}`);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ error: 'Drawing analysis failed' }));
+          // 422 = known limitation (image upload, scanned PDF) — surface as warning, not error
+          if (res.status === 415 || res.status === 422) {
+            toast.warning('Drawing analysis skipped', { description: body.detail ?? body.error });
+            return;
+          }
+          throw new Error(body.detail ?? body.error ?? `Drawing analysis failed (${res.status})`);
+        }
         const result: DrawingAnalysisResult = await res.json();
 
         const filled = new Set<string>();
@@ -934,17 +854,13 @@ export function BOMItemDialog({
           const patch: Partial<typeof prev> = {};
 
           // Material — drawing is authoritative; always overrides CAD material.
-          // Placeholder strings from the extractor are not grades — never store them.
+          // Placeholder strings from the extractor are not valid — never store them.
           const mat = result.material ?? '';
           if (mat && !/^(unknown|not\s*specified|none|n\/?a)$/i.test(mat.trim())) {
-            patch.materialGrade = mat;
+            patch.material = mat;
             patch.materialSource = 'drawing';
             patch.materialConfidence = result.material_confidence ?? 0.5;
-            filled.add('materialGrade');
-            const isPlastic = /plastic|rubber|polymer|nylon|pvc|abs|pp|pe|pa|pom|peek|ptfe/i.test(mat);
-            patch.materialCategory = isPlastic ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS';
-            filled.add('materialCategory');
-            setSelectedMaterialCategory(isPlastic ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS');
+            filled.add('material');
           }
 
           // Envelope dimensions — supplement only; never overwrite CAD geometry
@@ -999,6 +915,12 @@ export function BOMItemDialog({
           return { ...prev, ...patch };
         });
 
+        // Auto-set material category from the extracted material name
+        if (filled.has('material') && result.material) {
+          const isPlastic = /plastic|rubber|abs|nylon|pom|pp\b|pe\b|pvc|ptfe|pc\b|pa\b|pet\b|pbt|peek|pei|pps|polyprop|polyeth|polysty|polycaRB|epoxy|silicone|urethane|polyurethane/i.test(result.material);
+          setMaterialCategory(isPlastic ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS');
+        }
+
         // Function forms execute after the setFormData updater has populated `filled`
         setAutoFilledFields(prev => {
           const s = new Set(prev);
@@ -1012,7 +934,7 @@ export function BOMItemDialog({
         });
         setFieldConfidences(prev => {
           const next = { ...prev };
-          if (filled.has('materialGrade'))      next['materialGrade']      = result.material_confidence ?? 0.5;
+          if (filled.has('material'))           next['material']           = result.material_confidence ?? 0.5;
           if (filled.has('sheetThicknessMm'))   next['sheetThicknessMm']   = result.sheet_thickness_confidence ?? 0.5;
           if (filled.has('maxLength'))          next['maxLength']          = 0.6;
           if (filled.has('maxWidth'))           next['maxWidth']           = 0.6;
@@ -1051,10 +973,12 @@ export function BOMItemDialog({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.file2d]);
 
-  // Live weight calculation: whenever volume or materialGrade changes, look up density
+  // Live weight calculation: whenever volume, materialGrade, or material changes, look up density
   // and recompute weight = (volume_mm3 / 1e6) * density_g_cm3
+  // Falls back to formData.material for density lookup when no grade is set (e.g. generic plastics)
   useEffect(() => {
-    if (!formData.volume || !formData.materialGrade) return;
+    const densityKey = formData.materialGrade || formData.material;
+    if (!formData.volume || !densityKey) return;
     // Only recalculate if weight hasn't been manually edited (i.e. it's still auto-filled or zero)
     if (formData.weight && !autoFilledFields.has('weight')) return;
 
@@ -1062,7 +986,7 @@ export function BOMItemDialog({
     const recalculate = async () => {
       try {
         const result = await apiClient.get<{ density_g_cm3: number | null }>(
-          `/bom-items/material-density?grade=${encodeURIComponent(formData.materialGrade)}`,
+          `/bom-items/material-density?grade=${encodeURIComponent(densityKey)}`,
         );
         // Reject implausible densities — real engineering materials are > 0.5 g/cm³
         if (!result?.density_g_cm3 || result.density_g_cm3 < 0.5) return;
@@ -1072,7 +996,7 @@ export function BOMItemDialog({
         setAutoFilledFields(prev => { const s = new Set(prev); s.add('weight'); return s; });
         setFieldLineage(prev => ({
           ...prev,
-          weight: { source: 'derived', inputs: ['volume', 'materialGrade'] },
+          weight: { source: 'derived', inputs: ['volume', formData.materialGrade ? 'materialGrade' : 'material'] },
         }));
         const storedWeight = itemRef.current?.weight ?? 0;
         if (storedWeight > 0 && Math.abs(computed - storedWeight) / storedWeight > 0.25) {
@@ -1089,7 +1013,7 @@ export function BOMItemDialog({
     recalculate();
     return () => controller.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.volume, formData.materialGrade]);
+  }, [formData.volume, formData.materialGrade, formData.material]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1124,7 +1048,6 @@ export function BOMItemDialog({
         annualVolume: formData.annualVolume,
         unit: formData.unit,
         material: formData.material || undefined,
-        materialCategory: formData.materialCategory || undefined,
         materialGrade: formData.materialGrade || undefined,
         bomLevel: formData.bomLevel,
         makeBuy: formData.makeBuy,
@@ -1304,7 +1227,6 @@ export function BOMItemDialog({
           quantity: 1,
           annualVolume: 1000,
           unit: 'pcs',
-          materialCategory: r.suggestions.materialCategory || undefined,
           materialGrade: r.suggestions.materialGrade || undefined,
           makeBuy: r.suggestions.makeBuy || 'make',
           weight: r.geometry.weight || undefined,
@@ -1422,8 +1344,7 @@ export function BOMItemDialog({
                     </Badge>
                   )}
                 </Label>
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <Cpu className="h-3 w-3 text-cyan-500" />
+                <span className="text-[11px] text-muted-foreground">
                   Upload to auto-fill BOM fields
                 </span>
               </div>
@@ -1504,52 +1425,14 @@ export function BOMItemDialog({
                   </div>
                 )}
               </div>
-              {activeResult?.costs && activeResult.cadEngineAvailable && (
-                <div className="rounded-md bg-muted/50 border p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="h-3 w-3 text-cyan-500" />
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Cost Preview · review before saving
-                    </p>
-                    <Badge variant="outline" className="text-[10px] px-1 py-0 text-cyan-500 border-cyan-500/40 ml-auto">
-                      {Math.round((activeResult.confidence.overall ?? 0) * 100)}% confidence
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    {activeResult.costs.materialCostPerKg !== null && (
-                      <>
-                        <span className="text-muted-foreground">Material cost/kg</span>
-                        <span className="font-mono">$ {activeResult.costs.materialCostPerKg?.toFixed(2)}</span>
-                      </>
-                    )}
-                    {activeResult.costs.mhrRate !== null && (
-                      <>
-                        <span className="text-muted-foreground">Machine hour rate</span>
-                        <span className="font-mono">$ {activeResult.costs.mhrRate?.toFixed(2)}/hr</span>
-                      </>
-                    )}
-                    {activeResult.costs.lhrRate !== null && (
-                      <>
-                        <span className="text-muted-foreground">Labour hour rate</span>
-                        <span className="font-mono">$ {activeResult.costs.lhrRate?.toFixed(2)}/hr</span>
-                      </>
-                    )}
-                    {activeResult.costs.estimatedUnitCost !== null && (
-                      <>
-                        <span className="text-muted-foreground font-medium">Est. unit cost</span>
-                        <span className="font-mono font-semibold text-primary">
-                          $ {activeResult.costs.estimatedUnitCost?.toFixed(2)}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {!activeResult.cadEngineAvailable && (
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                      {activeResult.cadEngineError?.includes('FreeCAD')
-                        ? '⚠ SolidWorks files need FreeCAD installed, or export as STEP from SolidWorks.'
-                        : '⚠ CAD engine offline — geometry from bounding-box estimate'}
-                    </p>
-                  )}
+              {activeResult?.costs?.estimatedUnitCost != null && activeResult.cadEngineAvailable && (
+                <div className="rounded-md bg-muted/50 border px-3 py-2 flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Est. unit cost
+                  </p>
+                  <span className="font-mono font-semibold text-sm text-primary">
+                    $ {activeResult.costs.estimatedUnitCost.toFixed(2)}
+                  </span>
                 </div>
               )}
             </div>
@@ -1611,59 +1494,48 @@ export function BOMItemDialog({
               />
             </div>
 
-            {/* Material Category + Grade — side by side */}
+            {/* Material Category + Material — side by side */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-              <Label htmlFor="materialCategory" className="flex items-center">Material Category <AutoBadge field="materialCategory" /></Label>
-              <Select
-                value={formData.materialCategory}
-                onValueChange={(value: MaterialCategory) => {
-                  setFormData({ ...formData, materialCategory: value, materialGrade: '' });
-                  setSelectedMaterialCategory(value);
-                  setMaterialGradeSearch('');
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PLASTIC_RUBBER">Plastic &amp; Rubber</SelectItem>
-                  <SelectItem value="FERROUS_NON_FERROUS">Ferrous &amp; Non-Ferrous (Metals)</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {formData.materialCategory === 'PLASTIC_RUBBER' &&
-                  `${rawMaterialsData?.items?.length ?? 0} grades available`
-                }
-                {formData.materialCategory === 'FERROUS_NON_FERROUS' &&
-                  `${rawMaterialsData?.items?.length ?? 0} grades available`
-                }
-                {!formData.materialCategory && 'Select a category first'}
-              </p>
-            </div>
 
-            {/* Material Grade */}
-            {formData.materialCategory ? (
+              {/* Material Category */}
               <div className="grid gap-2">
-                <Label htmlFor="materialGrade">Material Grade</Label>
-                <Popover open={materialGradeOpen} onOpenChange={setMaterialGradeOpen}>
+                <Label>Material Category</Label>
+                <Select
+                  value={materialCategory}
+                  onValueChange={(v) => {
+                    setMaterialCategory(v as typeof materialCategory);
+                    setFormData({ ...formData, material: '' });
+                    setMaterialSearch('');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PLASTIC_RUBBER">Plastic &amp; Rubber</SelectItem>
+                    <SelectItem value="FERROUS_NON_FERROUS">Ferrous &amp; Non-Ferrous</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Material */}
+              <div className="grid gap-2">
+                <Label htmlFor="material" className="flex items-center">Material <AutoBadge field="material" /></Label>
+                <Popover open={materialOpen} onOpenChange={setMaterialOpen}>
                   <PopoverTrigger asChild>
                     <div className="relative">
                       <Input
-                        id="materialGrade"
-                        value={formData.materialGrade || ''}
+                        id="material"
+                        value={formData.material || ''}
                         onChange={(e) => {
                           const value = e.target.value;
-                          setFormData({ ...formData, materialGrade: value });
-                          setMaterialGradeSearch(value);
-                          if (!materialGradeOpen) setMaterialGradeOpen(true);
+                          setFormData({ ...formData, material: value, materialGrade: '' });
+                          setMaterialSearch(value);
+                          if (!materialOpen) setMaterialOpen(true);
                         }}
-                        onFocus={() => {
-                          setMaterialGradeOpen(true);
-                          setMaterialGradeSearch(formData.materialGrade || '');
-                        }}
-                        onClick={(e) => { e.stopPropagation(); setMaterialGradeOpen(true); }}
-                        placeholder={`Type or select ${formData.materialCategory === 'PLASTIC_RUBBER' ? 'plastic/rubber' : 'metal'} grade...`}
+                        onFocus={() => { setMaterialOpen(true); setMaterialSearch(formData.material || ''); }}
+                        onClick={(e) => { e.stopPropagation(); setMaterialOpen(true); }}
+                        placeholder="Type or select material..."
                         className="pr-10"
                       />
                       <span className="absolute right-0 top-0 h-full px-3 flex items-center pointer-events-none">
@@ -1680,83 +1552,46 @@ export function BOMItemDialog({
                     <Command shouldFilter={false}>
                       <CommandList className="max-h-[280px] overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
                         <CommandGroup>
-                          {/* Custom value row — shown when typed text has no exact DB match */}
-                          {materialGradeSearch && !materialOptions.some(o => o.grade.toLowerCase() === materialGradeSearch.toLowerCase()) && (
+                          {/* Custom value row */}
+                          {materialSearch && !materialNameOptions.some(n => n.toLowerCase() === materialSearch.toLowerCase()) && (
                             <div
                               onClick={() => {
-                                setFormData({ ...formData, materialGrade: materialGradeSearch });
-                                setMaterialGradeOpen(false);
+                                setFormData({ ...formData, material: materialSearch, materialGrade: '' });
+                                setMaterialOpen(false);
                               }}
                               className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-secondary border-b border-border"
                             >
                               <Plus className="h-3.5 w-3.5 shrink-0" />
-                              <span>Use <span className="font-medium">&quot;{materialGradeSearch}&quot;</span> as custom grade</span>
+                              <span>Use <span className="font-medium">&quot;{materialSearch}&quot;</span> as custom material</span>
                             </div>
                           )}
-
-                          {/* DB results */}
-                          {materialOptions.map((gradeInfo: MaterialOption) => (
+                          {/* DB material names */}
+                          {materialNameOptions.map((name: string) => (
                             <div
-                              key={gradeInfo.grade}
+                              key={name}
                               onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  materialGrade: gradeInfo.grade === formData.materialGrade ? '' : gradeInfo.grade
-                                });
-                                setMaterialGradeOpen(false);
+                                setFormData({ ...formData, material: name === formData.material ? '' : name, materialGrade: '' });
+                                setMaterialOpen(false);
                               }}
-                              className={`flex cursor-pointer items-center justify-between px-3 py-2 text-sm
-                                ${formData.materialGrade === gradeInfo.grade
+                              className={`flex cursor-pointer items-center px-3 py-2 text-sm ${
+                                formData.material === name
                                   ? 'bg-primary text-primary-foreground font-medium'
                                   : 'text-popover-foreground hover:bg-secondary'
-                                }`}
+                              }`}
                             >
-                              <div className="flex items-center">
-                                <Check className={`mr-2 h-4 w-4 shrink-0 ${formData.materialGrade === gradeInfo.grade ? 'opacity-100' : 'opacity-0'}`} />
-                                <div>
-                                  <span className="font-medium">{gradeInfo.grade}</span>
-                                  {gradeInfo.materialDescription && (
-                                    <div className="text-xs text-muted-foreground">{gradeInfo.materialDescription}</div>
-                                  )}
-                                  {gradeInfo.astmStandard && (
-                                    <div className="text-xs text-muted-foreground/70">ASTM: {gradeInfo.astmStandard}</div>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="text-xs text-muted-foreground text-right shrink-0 ml-2">
-                                {gradeInfo.density && `${gradeInfo.density} g/cm³`}
-                                {gradeInfo.cost && <div>${gradeInfo.cost.toFixed(2)}</div>}
-                                {gradeInfo.ultimateTensileStrength && (
-                                  <div>UTS: {gradeInfo.ultimateTensileStrength} MPa</div>
-                                )}
-                              </div>
+                              <Check className={`mr-2 h-4 w-4 shrink-0 ${formData.material === name ? 'opacity-100' : 'opacity-0'}`} />
+                              <span className="font-medium">{name}</span>
                             </div>
                           ))}
-
-                          {/* Empty states */}
-                          {!isLoadingMaterials && materialOptions.length === 0 && materialGradeSearch && (
+                          {!isLoadingMaterials && materialNameOptions.length === 0 && materialSearch && (
                             <div className="px-3 py-4 text-sm text-muted-foreground text-center">
                               No matches in database — custom value will be saved.
                             </div>
                           )}
-                          {!isLoadingMaterials && materialOptions.length === 0 && !materialGradeSearch && (
-                            <div className="px-3 py-4 text-sm text-muted-foreground text-center space-y-1">
-                              <p>No materials found in this category.</p>
-                              <button
-                                onClick={() => queryClient.invalidateQueries({ queryKey: ['raw-materials'] })}
-                                className="text-primary hover:underline text-xs"
-                              >
-                                Retry
-                              </button>
-                            </div>
-                          )}
                         </CommandGroup>
-
-                        {/* Non-blocking loading indicator */}
                         {isLoadingMaterials && (
                           <div className="flex items-center justify-center gap-2 py-2 border-t border-border text-xs text-muted-foreground">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Searching…
+                            <Loader2 className="h-3 w-3 animate-spin" />Searching…
                           </div>
                         )}
                       </CommandList>
@@ -1764,9 +1599,7 @@ export function BOMItemDialog({
                   </PopoverContent>
                 </Popover>
               </div>
-            ) : (
-              <div />
-            )}
+
             </div>
 
             {/* 2D Drawing + Make/Buy — side by side */}
@@ -1793,7 +1626,7 @@ export function BOMItemDialog({
               {isAnalyzing2d ? (
                 <div className="flex items-center gap-2 text-xs text-blue-600">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>Analyzing drawing with Gemini…</span>
+                  <span>Analysing drawing…</span>
                 </div>
               ) : formData.file2d ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">

@@ -6,6 +6,9 @@
 --
 --   1. FK ON DELETE CASCADE → ON DELETE SET NULL
 --      After 349 made raw_materials a global library, a user deletion must
+
+
+
 --      NULL the audit-trail owner reference, not cascade-delete shared data.
 --
 --   2. pg_trgm GIN index on material_group

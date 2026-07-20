@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
-import { apiConfig } from '@/lib/api/config';
 import { computeHeatmap } from '@/lib/heatmap/engine';
 import { MANUFACTURING_RISK_RAMP } from '@/lib/heatmap/ramps';
 import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
@@ -387,33 +386,64 @@ function computeProjectedFaces(geometry: THREE.BufferGeometry, view: string): nu
   return indices;
 }
 
-function CameraFitter({ onFit, resetKey }: { onFit: (distance: number) => void; resetKey?: string }) {
-  const { scene, camera } = useThree();
+function CameraFitter({
+  onFit,
+  resetKey,
+}: {
+  onFit: (distance: number, center: THREE.Vector3) => void;
+  resetKey?: string;
+}) {
+  const { scene, camera, controls } = useThree();
   const fitted = useRef(false);
 
   useEffect(() => {
     fitted.current = false;
   }, [resetKey]);
 
-  useEffect(() => {
-    if (!fitted.current) {
-      const box = new THREE.Box3();
-      scene.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
-          box.expandByObject(obj);
-        }
-      });
+  // Poll every frame until geometry is in the scene (STL loads async).
+  useFrame(() => {
+    if (fitted.current) return;
 
-      if (!box.isEmpty()) {
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
-        const cameraDistance = Math.abs(maxDim / Math.sin(fov / 2)) * 1.2;
-        onFit(cameraDistance);
-        fitted.current = true;
-      }
+    const box = new THREE.Box3();
+    scene.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) box.expandByObject(obj);
+    });
+
+    if (box.isEmpty()) return; // not loaded yet
+
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const size = box.getSize(new THREE.Vector3());
+
+    // Use bounding-sphere radius so every dimension fits, regardless of aspect ratio.
+    const radius = Math.sqrt(size.x ** 2 + size.y ** 2 + size.z ** 2) / 2;
+
+    // Skip tiny helper objects (measurement points, axes markers) — wait for the real mesh.
+    if (radius < 5) return;
+
+    const perspCam = camera as THREE.PerspectiveCamera;
+    const fov = perspCam.fov * (Math.PI / 180);
+    // 1.9× gives comfortable padding without pushing past the clipping plane.
+    const distance = (radius / Math.tan(fov / 2)) * 1.9;
+
+    // Expand clipping planes to fit this specific model's scale before moving the camera.
+    perspCam.near = Math.max(0.01, distance * 0.001);
+    perspCam.far = distance * 20;
+    perspCam.updateProjectionMatrix();
+
+    // Isometric-ish angle (x=1, y=0.7, z=1 normalised) offset from center.
+    const dir = new THREE.Vector3(1, 0.7, 1).normalize();
+    camera.position.copy(center).addScaledVector(dir, distance);
+    camera.lookAt(center);
+
+    if (controls && 'target' in controls) {
+      (controls as any).target.copy(center);
+      (controls as any).update();
     }
-  }, [scene, camera, onFit]);
+
+    fitted.current = true;
+    onFit(distance, center);
+  });
 
   return null;
 }
@@ -2132,7 +2162,7 @@ function STLModel({
           setLoadingStage('Converting with CAD engine...');
           setLoadingProgress(40);
 
-          const cadResponse = await fetch(`${apiConfig.endpoints.cad}/convert/step-to-stl-base64`, {
+          const cadResponse = await fetch('/api/cad', {
             method: 'POST',
             body: formData,
           });
@@ -2672,16 +2702,24 @@ function STLModel({
 
 // ─── Camera Controller ────────────────────────────────────────────────────────
 
-function CameraController({ viewPosition, autoFit }: { viewPosition: [number, number, number]; autoFit: boolean }) {
+function CameraController({
+  viewPosition,
+  autoFit,
+  fitCenter,
+}: {
+  viewPosition: [number, number, number];
+  autoFit: boolean;
+  fitCenter: [number, number, number];
+}) {
   const { camera, controls } = useThree();
 
   useEffect(() => {
     if (!autoFit && controls && 'target' in controls) {
       camera.position.set(...viewPosition);
-      (controls as any).target.set(0, 0, 0);
+      (controls as any).target.set(...fitCenter);
       (controls as any).update();
     }
-  }, [viewPosition, camera, controls, autoFit]);
+  }, [viewPosition, camera, controls, autoFit, fitCenter]);
 
   return null;
 }
@@ -2689,7 +2727,7 @@ function CameraController({ viewPosition, autoFit }: { viewPosition: [number, nu
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
 function Scene({
-  fileUrl, modelColor, showGrid, viewPosition, autoFit, onFit, onModelLoad,
+  fileUrl, modelColor, showGrid, viewPosition, autoFit, fitCenter, onFit, onModelLoad,
   isAnimating, sectionPlane, isTransparent, isWireframe, isExploded, explodeDistance,
   onMeasurements, onOrientationChange, manufacturingFeatures, selectedFeature,
   onFeatureSelect, showFeatures, selectedBOMItems, showOnlySelected, hoveredBOMItem, onPartsDetected,
@@ -2703,8 +2741,8 @@ function Scene({
   heatmapActive, heatmapSources, heatmapNormalization, heatmapRiskValuesRef, onHeatmapInspect,
 }: {
   fileUrl: string; modelColor: string; showGrid: boolean;
-  viewPosition: [number, number, number]; autoFit: boolean;
-  onFit: (distance: number) => void; onModelLoad: () => void;
+  viewPosition: [number, number, number]; autoFit: boolean; fitCenter: [number, number, number];
+  onFit: (distance: number, center: THREE.Vector3) => void; onModelLoad: () => void;
   isAnimating: boolean; sectionPlane: number; isTransparent: boolean; isWireframe: boolean;
   isExploded?: boolean; explodeDistance?: number;
   onMeasurements?: (data: { volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number; projectedArea?: number }) => void;
@@ -2739,8 +2777,8 @@ function Scene({
 }) {
   return (
 <>
-      <PerspectiveCamera makeDefault position={viewPosition} fov={50} />
-      <CameraController viewPosition={viewPosition} autoFit={autoFit} />
+      <PerspectiveCamera makeDefault position={viewPosition} fov={50} near={0.01} far={10_000_000} />
+      <CameraController viewPosition={viewPosition} autoFit={autoFit} fitCenter={fitCenter} />
       {autoFit && <CameraFitter onFit={onFit} resetKey={fileUrl} />}
       <AutoRotate isAnimating={isAnimating} />
       <AxesOrientation onOrientationChange={onOrientationChange} />
@@ -2868,6 +2906,8 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   const [currentView, setCurrentView] = useState<string>('home');
   const [autoFit, setAutoFit] = useState(true);
   const [viewPosition, setViewPosition] = useState<[number, number, number]>([5, 5, 5]);
+  const [fitCenter, setFitCenter] = useState<[number, number, number]>([0, 0, 0]);
+  const fittedCenterRef = useRef<[number, number, number]>([0, 0, 0]);
   const [isAnimating, setIsAnimating] = useState(false);
   const [sectionPlane, setSectionPlane] = useState(0);
   const [isTransparent, setIsTransparent] = useState(false);
@@ -3407,34 +3447,42 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     });
   }, []);
 
-  const handleFit = (distance: number) => {
+  const handleFit = (distance: number, center: THREE.Vector3) => {
     fittedDistanceRef.current = distance;
-    setViewPosition([distance, distance, distance]);
+    const c: [number, number, number] = [center.x, center.y, center.z];
+    fittedCenterRef.current = c;
+    setFitCenter(c);
+    // Position is already set by CameraFitter directly; we just record it for view presets.
+    const dir = new THREE.Vector3(1, 0.7, 1).normalize().multiplyScalar(distance);
+    setViewPosition([center.x + dir.x, center.y + dir.y, center.z + dir.z]);
     setAutoFit(false);
   };
 
   useEffect(() => {
     if (!cameraPreset) return;
     const d = fittedDistanceRef.current;
+    const [cx, cy, cz] = fittedCenterRef.current;
     const views = getCADViews(d);
     const viewConfig = views[cameraPreset as keyof typeof views];
     if (viewConfig) {
-      setViewPosition(viewConfig.position);
+      const [vx, vy, vz] = viewConfig.position;
+      setViewPosition([cx + vx, cy + vy, cz + vz]);
       setAutoFit(false);
     }
   }, [cameraPreset]);
 
   const handleViewChange = (view: string) => {
     setCurrentView(view);
-    
-    // Use the fitted distance so the model stays fully visible
+
     const fixedDistance = fittedDistanceRef.current;
+    const [cx, cy, cz] = fittedCenterRef.current;
     const viewsWithDistance = getCADViews(fixedDistance);
     const viewConfig = viewsWithDistance[view as keyof typeof viewsWithDistance];
-    
+
     if (viewConfig) {
-      setViewPosition(viewConfig.position);
-      setAutoFit(false); // Disable auto-fit to prevent interference with view switching
+      const [vx, vy, vz] = viewConfig.position;
+      setViewPosition([cx + vx, cy + vy, cz + vz]);
+      setAutoFit(false);
     }
     
     // Recalculate projected area for the new view using mesh data if available
@@ -3593,7 +3641,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
           >
             <Scene
               fileUrl={fileUrl} modelColor={modelColor} showGrid={showGrid}
-              viewPosition={viewPosition} autoFit={autoFit} onFit={handleFit}
+              viewPosition={viewPosition} autoFit={autoFit} fitCenter={fitCenter} onFit={handleFit}
               onModelLoad={handleModelLoad} isAnimating={isAnimating}
               sectionPlane={sectionPlane} isTransparent={isTransparent} isWireframe={isWireframe}
               isExploded={isExploded} explodeDistance={explodeDistance}

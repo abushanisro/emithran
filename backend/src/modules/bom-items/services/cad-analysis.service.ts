@@ -641,6 +641,7 @@ export class CADAnalysisService {
             maxContentLength: 100 * 1024 * 1024,
             headers: {
               ...formData.getHeaders(),
+              ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
             },
           }
         );

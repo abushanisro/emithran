@@ -3325,13 +3325,6 @@ class ComponentFeatureAnalyzer:
         relations: List[Dict[str, Any]] = []
 
         # ── 1. adjacent ────────────────────────────────────────────────────
-        # aPriori emits two kinds of adjacent:
-        #   a) curvedWall:N — planarFace:M  (cylinder meets flat face)
-        #   b) planarFace:A — planarFace:B  only at the BLANK BOUNDARY
-        #      (equivalent to aPriori's edge:N — edge:M fold-line pairs)
-        # All-against-all planarFace pairs at non-parallel angles gives 88 pairs —
-        # far too many. Restricting (b) to pairs where one entity IS the blank
-        # entity keeps the count close to aPriori's ~18 fold-line pairs.
         import math as _math
 
         blank_entity = _face_entity_cache.get(blank_face_id) if blank_face_id is not None else None
@@ -3351,25 +3344,54 @@ class ComponentFeatureAnalyzer:
                 return None
 
         def _is_fold_line(ea: str, eb: str) -> bool:
-            """Both are planarFace with normals at ≥45° — structural fold / corner edges.
-            aPriori's edge:N—edge:M pairs map to these non-parallel planar adjacencies."""
+            """Both are planarFace with normals at ≥45° — structural fold / corner edges."""
             if not (_is_planar(ea) and _is_planar(eb)):
                 return False
             angle = _planar_angle_deg(ea, eb)
             return angle is not None and angle >= 45.0
 
-        # Feature entities after cylinder grouping: simpleHole_N, complexHole_N,
-        # straightBend_N, curvedWall:N (unrecognized), planarFace:N, face:N.
-        # Include a pair when: at least one entity is non-planar (feature/curvedWall)
-        # OR both are planarFace at a non-parallel angle (fold-line pair).
+        # Degree-based significance filter for planarFace→planarFace pairs.
+        # On a sheet metal bracket nearly all adjacent planar faces are at 90°
+        # (flanges to base plate), so the angle threshold alone passes everything.
+        # Instead, count each entity's distinct adjacencies: major structural
+        # surfaces (base plate, large flanges) have high degree; minor faces
+        # (hole annuli, fillet strips, narrow edge bands) have degree 1–3.
+        # Only include planarFace→planarFace pairs where both are high-degree hubs.
+        _entity_degree: Dict[str, int] = {}
+        for p in raw_adjacent_pairs:
+            ea, eb = p["li"], p["lj"]
+            _entity_degree[ea] = _entity_degree.get(ea, 0) + 1
+            _entity_degree[eb] = _entity_degree.get(eb, 0) + 1
+
+        _sorted_ent = sorted(_entity_degree.items(), key=lambda x: -x[1])
+        logger.info(
+            f"[GCD-adj] entity degrees (top-15): "
+            f"{[(e, d) for e, d in _sorted_ent[:15]]}"
+        )
+
+        # Threshold: planarFace entities with fewer than _MIN_PLANAR_DEGREE
+        # neighbours are considered minor (hole annuli, edge strips) and are
+        # excluded from planarFace–planarFace adjacent pairs.
+        _MIN_PLANAR_DEGREE = 4
+
+        def _is_significant_planar(e: str) -> bool:
+            return _is_planar(e) and _entity_degree.get(e, 0) >= _MIN_PLANAR_DEGREE
+
+        # Emit pairs:
+        #   a) feature/curvedWall → anything  (always)
+        #   b) planarFace → planarFace  only when both are significant hubs AND fold-line ≥45°
         _emit_pairs = [
             p for p in raw_adjacent_pairs
             if not (_is_planar(p["li"]) and _is_planar(p["lj"]))
-            or _is_fold_line(p["li"], p["lj"])
+            or (
+                _is_significant_planar(p["li"])
+                and _is_significant_planar(p["lj"])
+                and _is_fold_line(p["li"], p["lj"])
+            )
         ]
         logger.info(
             f"[GCD-adj] emit pairs: {len(_emit_pairs)} "
-            f"(feature+fold / {len(raw_adjacent_pairs)} total, "
+            f"(feature+fold degree≥{_MIN_PLANAR_DEGREE} / {len(raw_adjacent_pairs)} total, "
             f"blank_entity={blank_entity})"
         )
         def _expand_fids(repr_face: int) -> List[int]:

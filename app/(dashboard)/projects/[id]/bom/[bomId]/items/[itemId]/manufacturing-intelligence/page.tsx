@@ -4081,9 +4081,8 @@ function CostGuidePanel({
       };
 
       // 1. Try the search-filtered cache (exact search match, fastest path)
-      // 2. Fall back to the broad validation cache already loaded for the Likely Materials
-      //    section — this data is already in memory and doesn't go through the search
-      //    endpoint, so it works even when the search endpoint rejects special characters.
+      // 2. Fall back to the broad validation cache (already in memory, avoids
+      //    PostgREST special-character issues in the search endpoint).
       // 3. Last resort: direct API call (works after the PostgREST escaping fix is deployed)
       let mat: RawMaterial | undefined =
         allMatsData?.items?.find(exactMatchMat) ??
@@ -4327,7 +4326,7 @@ function CostGuidePanel({
                   <span className="text-xs font-medium leading-tight">Auto (process-computed)</span>
                 </label>
                 <button
-                  onClick={() => { setProcessRouting('auto'); onManualClick(); }}
+                  onClick={() => setProcessRouting('auto')}
                   className="text-[10px] text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5 shrink-0 transition-colors"
                   title="View workflow"
                 >...</button>
@@ -4355,7 +4354,7 @@ function CostGuidePanel({
               )}
             </Section>
 
-            <Section title="Likely Materials">
+            <Section title="Material Grade">
               {/* Combobox input */}
               <div className="relative mb-2">
                 <input
@@ -4451,66 +4450,6 @@ function CostGuidePanel({
                     onClick={() => { updateBOMItem.mutate({ id: item.id, data: { materialGrade: drawingMaterial! } }); autoAddMaterialCost(drawingMaterial!); void autoAddProcessCosts(); void autoAddLogistics(); }}
                     className="text-[9px] font-medium text-violet-400 hover:text-violet-300 shrink-0"
                   >Apply</button>
-                </div>
-              )}
-              {isSheetMetalCAD && cadThicknessMm > 0 && 'IS2062 E250 CRCA' !== item.materialGrade && (
-                <div className="flex items-center gap-1.5 mb-1.5 pb-1.5 border-b border-border/30">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-medium truncate block">IS2062 E250 CRCA</span>
-                    <span className="text-[9px] text-muted-foreground/60 leading-tight">{cadThicknessMm}mm sheet — standard for laser cutting</span>
-                  </div>
-                  <span className="text-[9px] font-semibold text-cyan-400 border border-cyan-500/40 rounded px-1 py-px leading-none shrink-0">CAD</span>
-                  <button
-                    onClick={() => { updateBOMItem.mutate({ id: item.id, data: { materialGrade: 'IS2062 E250 CRCA' } }); autoAddMaterialCost('IS2062 E250 CRCA'); void autoAddProcessCosts(); void autoAddLogistics(); }}
-                    className="text-[9px] font-medium text-violet-400 hover:text-violet-300 shrink-0"
-                  >Apply</button>
-                </div>
-              )}
-              {matLoading ? (
-                <div className="space-y-1.5 py-1">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="h-7 bg-muted/40 rounded animate-pulse" />
-                  ))}
-                </div>
-              ) : dbValidatedCandidates.length === 0 ? (
-                <p className="text-[10px] text-muted-foreground/50 py-1">No recommendations found</p>
-              ) : (
-                <div className="space-y-px">
-                  {dbValidatedCandidates.map((cand: MaterialCandidate, idx) => {
-                    const grade = materialLabel(cand.material, cand.materialGrade);
-                    const isActive = item.materialGrade === grade;
-                    const isHeat = ['stainless', 'ss304', 'ss316', 'inconel', 'titanium'].some((k) =>
-                      cand.material.toLowerCase().includes(k),
-                    );
-                    return (
-                      <button
-                        key={`${cand.material}-${idx}`}
-                        onClick={() => { updateBOMItem.mutate({ id: item.id, data: { materialGrade: grade } }); autoAddMaterialCost(grade); void autoAddProcessCosts(); void autoAddLogistics(); }}
-                        className={cn(
-                          'w-full text-left flex items-start gap-2.5 px-2 py-2 rounded transition-colors',
-                          isActive
-                            ? 'bg-violet-500/10 border border-violet-500/20'
-                            : 'hover:bg-muted/40 border border-transparent',
-                        )}
-                      >
-                        <span className="text-[10px] text-muted-foreground/40 mt-0.5 w-3 shrink-0 tabular-nums">{idx + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span className="text-xs font-semibold leading-tight">{cand.material}</span>
-                            {isHeat && (
-                              <span className="text-[8px] text-amber-400 border border-amber-500/30 rounded px-0.5 leading-none shrink-0">HAZ</span>
-                            )}
-                            {isActive && (
-                              <span className="text-[8px] font-semibold text-emerald-400 border border-emerald-500/40 rounded px-0.5 leading-none shrink-0">SET</span>
-                            )}
-                          </div>
-                          {cand.materialGrade && (
-                            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{cand.materialGrade}</p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
                 </div>
               )}
             </Section>

@@ -2,11 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Upload,
-  Settings,
   Box,
   FileText,
   Loader2,
@@ -16,6 +13,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  UploadCloud,
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/lib/api/client';
@@ -48,6 +46,12 @@ interface AssemblyData {
   bomItemId: string;
 }
 
+interface PipelineStage {
+  title: string;
+  desc: string;
+  optional?: boolean;
+}
+
 interface FileQueueItem {
   id: string;
   file: File;
@@ -56,6 +60,7 @@ interface FileQueueItem {
   assemblyTree: AssemblyNode[];
   error?: string;
   expanded: boolean;
+  pipelineStep: number | null;
 }
 
 interface AssemblyTreeGeneratorProps {
@@ -83,22 +88,16 @@ const PROCESSING_STEPS: string[] = [
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = ['.step', '.stp', '.iges', '.igs', '.stl', '.sldprt'];
 
-interface PipelineStage {
-  title: string;
-  desc: string;
-  highlight?: boolean;
-  optional?: boolean;
-}
-
 const PIPELINE_STAGES: PipelineStage[] = [
-  { title: 'STEP Parse & Geometry', desc: 'STEP file → OpenCascade → volume, surface area, holes, walls' },
-  { title: 'Material DB Lookup',    desc: 'Density, price/kg from material master' },
-  { title: 'Process Classifier',    desc: 'CNC / casting / sheet metal' },
-  { title: 'Cost Formulas',         desc: 'Material + machining + setup' },
-  { title: 'XGBoost Adjustment',    desc: 'Correction factor from cost history' },
-  { title: 'Accurate Cost',         desc: 'Final estimate, ready for quoting', highlight: true },
+  { title: 'STEP Parse & Geometry',       desc: 'STEP file → OpenCascade → volume, surface area, holes, walls' },
+  { title: 'Material DB Lookup',          desc: 'Density, price/kg from material master' },
+  { title: 'Process Classifier',          desc: 'CNC / casting / sheet metal' },
+  { title: 'Cost Formulas',              desc: 'Material + machining + setup' },
+  { title: 'XGBoost Adjustment',         desc: 'Correction factor from cost history' },
+  { title: 'Accurate Cost',              desc: 'Final estimate, ready for quoting' },
   { title: 'LLM Explanation + DFM Advice', desc: 'Runs after costing — never blocks the estimate', optional: true },
 ];
+
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -193,11 +192,11 @@ export function AssemblyTreeGenerator({
   // ── Single-file processing ─────────────────────────────────────────────────
 
   const processSingleFile = useCallback(async (item: FileQueueItem): Promise<boolean> => {
-    updateItem(item.id, { status: 'processing', steps: [] });
+    updateItem(item.id, { status: 'processing', steps: [], pipelineStep: 0, expanded: true });
 
     try {
       addStep(item.id, PROCESSING_STEPS[0]!);
-      await delay(400);
+      await delay(300);
 
       const ext = item.file.name.toLowerCase();
       if (!ACCEPTED_EXTENSIONS.some(e => ext.endsWith(e))) {
@@ -211,29 +210,40 @@ export function AssemblyTreeGenerator({
       }
 
       addStep(item.id, PROCESSING_STEPS[1]!);
-      await delay(600);
 
       const formData = new FormData();
       formData.append('stepFile', item.file);
       formData.append('bomId', bomId);
       if (projectId) formData.append('projectId', projectId);
 
-      const response = await apiClient.uploadFiles<any>(
-        '/bom-items/process-step-file',
-        formData,
-        { timeout: 120_000 },
-      );
+      // Animate pipeline stages while backend processes
+      let animPipelineStep = 1;
+      let animLogStep = 2;
+      const animInterval = setInterval(() => {
+        if (animPipelineStep < PIPELINE_STAGES.length - 1) {
+          updateItem(item.id, { pipelineStep: animPipelineStep });
+          if (animLogStep < PROCESSING_STEPS.length) {
+            addStep(item.id, PROCESSING_STEPS[animLogStep]!);
+            animLogStep++;
+          }
+          animPipelineStep++;
+        }
+      }, 1800);
 
-      for (let i = 2; i < PROCESSING_STEPS.length; i++) {
-        addStep(item.id, PROCESSING_STEPS[i]!);
-        await delay(300);
+      let response: any;
+      try {
+        response = await apiClient.uploadFiles<any>(
+          '/bom-items/process-step-file',
+          formData,
+          { timeout: 120_000 },
+        );
+      } finally {
+        clearInterval(animInterval);
       }
 
       if (response.success) {
-        addStep(item.id, `✓ "${item.file.name}" processed successfully`);
-
-        const assemblyTree: AssemblyNode[] = response.assemblyTree ?? [];
-        updateItem(item.id, { status: 'done', assemblyTree });
+        addStep(item.id, `✓ "${item.file.name}" processed — BOM item created`);
+        updateItem(item.id, { status: 'done', assemblyTree: [], pipelineStep: PIPELINE_STAGES.length - 1 });
 
         if (response.bomItemId) {
           bomItemsApi
@@ -246,22 +256,22 @@ export function AssemblyTreeGenerator({
                 material:  resolveMaterial(response.cadAnalysis),
                 bomItemId: response.bomItemId,
               };
-              onAssemblyGenerated?.(assemblyTree, assemblyData);
+              onAssemblyGenerated?.([], assemblyData);
             })
-            .catch(() => onAssemblyGenerated?.(assemblyTree));
+            .catch(() => onAssemblyGenerated?.([]));
         } else {
-          onAssemblyGenerated?.(assemblyTree);
+          onAssemblyGenerated?.([]);
         }
         return true;
       } else {
         addStep(item.id, `⚠ ${response.message ?? 'CAD engine unavailable'}`);
-        updateItem(item.id, { status: 'error', error: response.message });
+        updateItem(item.id, { status: 'error', error: response.message, pipelineStep: null });
         return false;
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       addStep(item.id, `✗ ${msg}`);
-      updateItem(item.id, { status: 'error', error: msg });
+      updateItem(item.id, { status: 'error', error: msg, pipelineStep: null });
       return false;
     }
   }, [updateItem, addStep, bomId, projectId, onAssemblyGenerated]);
@@ -277,6 +287,7 @@ export function AssemblyTreeGenerator({
       steps: [],
       assemblyTree: [],
       expanded: false,
+      pipelineStep: null,
     }));
     setFileQueue(prev => [...prev, ...newItems]);
 
@@ -378,40 +389,38 @@ export function AssemblyTreeGenerator({
       <div
         {...getRootProps()}
         className={cn(
-          'border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer',
+          'flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed',
+          'cursor-pointer transition-colors duration-200 py-10',
           isDragActive
-            ? 'border-primary bg-primary/5'
-            : 'border-muted-foreground/25 hover:border-primary/50',
+            ? 'border-primary/60 bg-primary/5'
+            : 'border-border hover:border-primary/40 hover:bg-muted/40',
         )}
       >
         <input {...getInputProps()} />
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-            <Upload className="h-8 w-8 text-primary" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold">
-              {isDragActive ? 'Drop files here…' : 'Upload STEP Files'}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {isDragActive
-                ? 'Release to start processing'
-                : 'Drop files here or click to browse — processing starts automatically'}
-            </p>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Supports .step, .stp, .iges, .igs, .stl, .sldprt · Multiple files · 100 MB max each
+        <UploadCloud
+          className={cn(
+            'w-9 h-9 transition-colors duration-200',
+            isDragActive ? 'text-primary' : 'text-muted-foreground',
+          )}
+        />
+        <div className="text-center">
+          <p className="text-sm font-medium text-foreground">
+            {isDragActive ? 'Release to start CAD processing' : 'Drop STEP / STL files here'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            or <span className="text-primary underline underline-offset-2">browse</span> to choose files
           </p>
         </div>
+        <p className="text-[11px] text-muted-foreground/60">.step · .stp · .stl · .iges · .igs · .sldprt</p>
       </div>
 
-      {/* File queue */}
+      {/* Items & Parts */}
       {fileQueue.length > 0 && (
         <div className="space-y-3">
-          {/* Queue header + stats */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 text-sm">
-              <span className="font-medium">{fileQueue.length} file{fileQueue.length !== 1 ? 's' : ''}</span>
+              <span className="font-semibold text-foreground">Items &amp; Parts</span>
+              <span className="text-muted-foreground">({fileQueue.length})</span>
               {pendingCount > 0    && <Badge variant="secondary">{pendingCount} pending</Badge>}
               {processingCount > 0 && <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">{processingCount} processing</Badge>}
               {doneCount > 0       && <Badge className="bg-green-500/10 text-green-600 border-green-500/20">{doneCount} done</Badge>}
@@ -462,15 +471,15 @@ export function AssemblyTreeGenerator({
                     </p>
                   </div>
 
-                  {/* Assembly tree badge */}
-                  {item.assemblyTree.length > 0 && (
-                    <Badge variant="outline" className="shrink-0 text-xs">
-                      {item.assemblyTree.length} node{item.assemblyTree.length !== 1 ? 's' : ''}
+                  {/* Done badge */}
+                  {item.status === 'done' && (
+                    <Badge variant="outline" className="shrink-0 text-xs border-green-500/30 text-green-600">
+                      Assembly created
                     </Badge>
                   )}
 
-                  {/* Expand/collapse for done items with tree */}
-                  {(item.steps.length > 0 || item.assemblyTree.length > 0) && (
+                  {/* Expand/collapse for done items */}
+                  {(item.status === 'done' || item.status === 'error') && item.pipelineStep !== null && (
                     <button
                       type="button"
                       onClick={() => updateItem(item.id, { expanded: !item.expanded })}
@@ -492,41 +501,80 @@ export function AssemblyTreeGenerator({
                   )}
                 </div>
 
-                {/* Expanded: processing log + assembly tree */}
-                {item.expanded && (
-                  <div className="px-4 pb-4 space-y-3 border-t border-border/50 pt-3">
-                    {/* Steps log */}
-                    {item.steps.length > 0 && (
-                      <div className="text-xs space-y-1 text-muted-foreground font-mono">
-                        {item.steps.map((step, i) => (
-                          <p key={i} className={cn(
-                            step.startsWith('✓') && 'text-green-600',
-                            step.startsWith('✗') && 'text-red-600',
-                            step.startsWith('⚠') && 'text-amber-600',
-                          )}>
-                            {step}
-                          </p>
-                        ))}
-                        {item.status === 'processing' && (
-                          <p className="flex items-center gap-2">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Processing…
-                          </p>
-                        )}
-                      </div>
-                    )}
+                {/* Inline pipeline stepper — shown while processing or after */}
+                {item.expanded && item.pipelineStep !== null && (
+                  <div className="px-4 pb-4 pt-3 border-t border-border/50">
+                    <ol className="space-y-0">
+                      {PIPELINE_STAGES.map((stage, i) => {
+                        const isActive   = item.pipelineStep === i;
+                        const isComplete = item.pipelineStep !== null && i < item.pipelineStep;
+                        const isDone     = item.status === 'done';
+                        const allDone    = isDone && i <= (item.pipelineStep ?? -1);
+                        return (
+                          <li key={stage.title} className="flex gap-3 relative">
+                            {/* Vertical connector */}
+                            {i < PIPELINE_STAGES.length - 1 && (
+                              <span
+                                className={cn(
+                                  'absolute left-[9px] top-[22px] bottom-0 w-px',
+                                  (isComplete || allDone) ? 'bg-emerald-500/40' : 'bg-border/40',
+                                )}
+                              />
+                            )}
+                            {/* Step circle */}
+                            <span
+                              className={cn(
+                                'relative z-10 mt-1 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border text-[9px] font-bold transition-colors',
+                                (isActive && !isDone)  && 'border-blue-500 bg-blue-500/15 text-blue-600',
+                                (isComplete || allDone) && 'border-emerald-500 bg-emerald-500/15 text-emerald-600',
+                                !isActive && !isComplete && !allDone && 'border-border bg-background text-muted-foreground/40',
+                              )}
+                            >
+                              {isActive && !isDone
+                                ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                : (isComplete || allDone)
+                                ? <CheckCircle2 className="h-2.5 w-2.5" />
+                                : i + 1}
+                            </span>
+                            {/* Label + desc */}
+                            <div className="pb-3 last:pb-0 min-w-0">
+                              <p className={cn(
+                                'text-xs font-semibold flex items-center gap-1.5',
+                                (isActive && !isDone)   && 'text-blue-600',
+                                (isComplete || allDone) && 'text-emerald-600',
+                                !isActive && !isComplete && !allDone && 'text-muted-foreground/40',
+                              )}>
+                                {stage.title}
+                                {stage.optional && (
+                                  <span className="text-[9px] font-normal opacity-60 border border-current/30 rounded px-1">async</span>
+                                )}
+                              </p>
+                              <p className={cn(
+                                'text-[10px] mt-0.5',
+                                (isActive || isComplete || allDone) ? 'text-muted-foreground' : 'text-muted-foreground/30',
+                              )}>
+                                {stage.desc}
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
 
-                    {/* Assembly tree for this file */}
-                    {item.assemblyTree.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-                          <Box className="h-3 w-3" />Assembly tree ({item.assemblyTree.length} top-level nodes)
-                        </p>
-                        <div className="space-y-0.5 bg-muted/20 rounded-lg p-3">
-                          {item.assemblyTree.map(renderAssemblyNode(item.id))}
-                        </div>
-                      </div>
+                    {/* Final success note */}
+                    {item.status === 'done' && (
+                      <p className="text-xs text-emerald-600 flex items-center gap-1.5 mt-3 pt-3 border-t border-border/40">
+                        <CheckCircle2 className="h-3 w-3 shrink-0" />
+                        BOM item created — open the BOM table to view and edit it
+                      </p>
                     )}
+                  </div>
+                )}
+
+                {/* Error detail */}
+                {item.status === 'error' && item.error && (
+                  <div className="px-4 pb-3 border-t border-border/50 pt-2">
+                    <p className="text-xs text-red-600">{item.error}</p>
                   </div>
                 )}
               </div>
@@ -536,51 +584,6 @@ export function AssemblyTreeGenerator({
         </div>
       )}
 
-      {/* CAD processing pipeline info */}
-      <Card className="bg-muted/30 p-4">
-        <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
-          <Settings className="h-4 w-4" />
-          CAD Processing Pipeline
-        </h4>
-        <ol className="relative">
-          {PIPELINE_STAGES.map((stage, i) => (
-            <li key={stage.title} className="relative flex gap-3 pb-4 last:pb-0">
-              {i < PIPELINE_STAGES.length - 1 && (
-                <span
-                  className="absolute left-[11px] top-6 bottom-0 w-px bg-border"
-                  aria-hidden="true"
-                />
-              )}
-              <span
-                className={cn(
-                  'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold',
-                  stage.highlight
-                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600'
-                    : 'border-border bg-background text-muted-foreground',
-                )}
-              >
-                {i + 1}
-              </span>
-              <div className="min-w-0 pt-0.5">
-                <div
-                  className={cn(
-                    'text-xs font-semibold flex items-center gap-2',
-                    stage.highlight && 'text-emerald-600 uppercase tracking-wide',
-                  )}
-                >
-                  {stage.title}
-                  {stage.optional && (
-                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 uppercase">
-                      Optional · Async
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">{stage.desc}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </Card>
 
     </div>
   );

@@ -39,6 +39,7 @@ from exceptions import (
 )
 import sldprt_converter
 from copilot.router import router as copilot_router
+from drawing_analyzer import router as drawing_router
 
 # ============================================================================
 # CONFIGURATION & LOGGING
@@ -141,6 +142,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Manufacturing Copilot routes (Groq-powered, streaming SSE)
 app.include_router(copilot_router, prefix="/copilot", tags=["copilot"])
+
+# 2D Drawing analysis (Groq vision + PyMuPDF PDF rendering)
+app.include_router(drawing_router, prefix="/drawing", tags=["drawing"])
 
 # ============================================================================
 # API KEY AUTHENTICATION

@@ -126,7 +126,7 @@ export class CADEngineClient {
     formData.append('file', file);
 
     try {
-      const response = await fetch(`${this.baseUrl}/convert/step-to-stl-base64`, {
+      const response = await fetch('/api/cad', {
         method: 'POST',
         body: formData,
       });

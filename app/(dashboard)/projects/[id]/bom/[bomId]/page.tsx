@@ -29,6 +29,7 @@ import {
   AlertCircle,
   Trash2,
   Layers3,
+  UploadCloud,
 } from 'lucide-react';
 import { BOMItemsFlat, BOMItemDialog, BOMTreeView, BOMItemDetailPanel } from '@/components/features/bom';
 import { AssemblyTreeGenerator } from '@/components/features/bom/AssemblyTreeGenerator';
@@ -1109,33 +1110,45 @@ export default function BOMDetailPage() {
         </CardContent>
       </Card>
 
-      {/* STEP / assembly upload */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Assembly Model</CardTitle>
-          <CardDescription>
-            Upload the top-level assembly STEP file — sub-assemblies and child parts are
-            parsed and costed automatically
-          </CardDescription>
-        </CardHeader>
-        <AssemblyTreeGenerator
-          bomId={bomId}
-          projectId={projectId}
-          onAssemblyGenerated={(tree, assemblyData) => {
-            if (assemblyData) setUploadedAssembly3D(assemblyData);
-            if (tree?.length) refetchBOMItems();
-          }}
-        />
-      </Card>
+      {/* STEP / assembly upload — hidden once an assembly is loaded */}
+      {!uploadedAssembly3D && (
+        <Card>
+          <CardHeader>
+            <CardTitle>CAD Processing Pipeline</CardTitle>
+            <CardDescription>
+              Upload a STEP / STL file — geometry is extracted and a BOM item is created ready for costing
+            </CardDescription>
+          </CardHeader>
+          <AssemblyTreeGenerator
+            bomId={bomId}
+            projectId={projectId}
+            onAssemblyGenerated={(tree, assemblyData) => {
+              if (assemblyData) setUploadedAssembly3D(assemblyData);
+              if (tree?.length) refetchBOMItems();
+            }}
+          />
+        </Card>
+      )}
 
       {/* 3D Assembly viewer */}
       {uploadedAssembly3D && (
         <Card>
-          <CardHeader>
-            <CardTitle>Assembly 3D Model</CardTitle>
-            <CardDescription>
-              3D visualization — {uploadedAssembly3D.fileName}
-            </CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle>Assembly 3D Model</CardTitle>
+              <CardDescription>
+                3D visualization — {uploadedAssembly3D.fileName}
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5"
+              onClick={() => setUploadedAssembly3D(null)}
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Re-upload
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-12 gap-6 min-h-[800px]">
