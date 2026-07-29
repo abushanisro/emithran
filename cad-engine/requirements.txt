@@ -2,7 +2,7 @@
 # Production-grade STEP file processing
 
 # OpenCascade Python bindings (Industry standard CAD kernel)
-pythonocc-core==7.7.2
+
 
 # FastAPI for REST API
 fastapi==0.109.0

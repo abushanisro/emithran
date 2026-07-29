@@ -75,7 +75,22 @@ export class CostAggregationService {
 
   async computeBomItemCost(bomItemId: string, accessToken?: string): Promise<BomItemCostDto> {
     this.logger.log(`Computing aggregated cost for BOM item: ${bomItemId}`, 'CostAggregationService');
-    const client = this.supabaseService.getClient(accessToken);
+    const client  = this.supabaseService.getClient(accessToken);
+    const adminDb = this.supabaseService.getAdminClient();
+
+    // Load SGA and profit from costing_settings (no hardcoded percentages)
+    const { data: settingsRows } = await adminDb.from('costing_settings').select('key, value');
+    const settingsMap = new Map<string, number>();
+    for (const s of settingsRows ?? []) settingsMap.set(s.key as string, Number(s.value));
+    const sgaPct    = settingsMap.get('sga_pct')    ?? null;
+    const profitPct = settingsMap.get('profit_pct') ?? null;
+
+    if (sgaPct == null) {
+      this.logger.warn('sga_pct not in costing_settings — SG&A excluded from selling price; deploy migration 364', 'CostAggregationService');
+    }
+    if (profitPct == null) {
+      this.logger.warn('profit_pct not in costing_settings — profit margin excluded from selling price; deploy migration 364', 'CostAggregationService');
+    }
 
     const [
       { data: rawMatRows, error: rmErr },
@@ -209,8 +224,8 @@ export class CostAggregationService {
     }
 
     const manufacturingCost = rawMaterialCost + processCost + toolingCost + packagingCost + procuredPartCost;
-    const sgaCost    = manufacturingCost * 0.125;
-    const profitCost = manufacturingCost * 0.08;
+    const sgaCost    = sgaPct    != null ? manufacturingCost * sgaPct    : 0;
+    const profitCost = profitPct != null ? manufacturingCost * profitPct : 0;
     const sellingPrice = manufacturingCost + sgaCost + profitCost;
 
     // ── Cost drivers — collect all cost items, rank top 5 by value

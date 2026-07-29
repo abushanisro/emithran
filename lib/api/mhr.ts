@@ -95,6 +95,14 @@ export type MHRRecord = {
   updatedAt: string;
 };
 
+// process_cost_records.machine_rate is always stored in USD (see backend's
+// apply-route toUsd() convention) — prefer the USD-normalised field so a
+// non-USA-location machine's local-currency rate isn't misread as a USD
+// number. Shared by every UI that lists real MHR records for picking.
+export function resolveMhrUsdRate(r: MHRRecord): number {
+  return r.mhrUsdPerHour ?? r.fullyBurdenedLocalPerHr ?? r.calculations?.totalMachineHourRate ?? r.manualMHRValue ?? 0;
+}
+
 export type CreateMHRData = {
   location: string;
   commodityCode: string;
@@ -148,6 +156,8 @@ export type MHRQuery = {
   location?: string;
   currency?: string;
   commodityCode?: string;
+  processGroup?: string;
+  machineClass?: string;
   page?: number;
   limit?: number;
 };
@@ -163,6 +173,7 @@ export type MHRBenchmarkEntry = {
   id: string;
   machineName: string;
   processGroup: string;
+  machineClass?: string;
   location: string;
   machineRef?: string;
   isBenchmark: true;
@@ -248,10 +259,11 @@ export const mhrApi = {
     return apiClient.delete<{ deleted: number }>('/mhr') ?? { deleted: 0 };
   },
 
-  getBenchmarkRates: async (location?: string, processGroup?: string): Promise<MHRBenchmarkEntry[]> => {
+  getBenchmarkRates: async (location?: string, processGroup?: string, machineClass?: string): Promise<MHRBenchmarkEntry[]> => {
     const params = new URLSearchParams();
     if (location) params.append('location', location);
-    if (processGroup) params.append('processGroup', processGroup);
+    if (machineClass) params.append('machineClass', machineClass);
+    else if (processGroup) params.append('processGroup', processGroup);
     const qs = params.toString();
     return (await apiClient.get<MHRBenchmarkEntry[]>(`/mhr/benchmark${qs ? `?${qs}` : ''}`, { silent: true, retry: false })) ?? [];
   },

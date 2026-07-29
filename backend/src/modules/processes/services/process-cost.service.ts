@@ -186,6 +186,166 @@ export class ProcessCostService {
   }
 
   /**
+   * Resolve machine_name/machine_class for a process cost record. Single source
+   * of truth for these two denormalized columns — create() and update() both
+   * funnel through here so the values can never drift from whatever machine was
+   * actually selected.
+   *
+   * Two valid sources, checked in order:
+   *   1. mhrId → a real mhr_records row (the common case).
+   *   2. benchmarkMhrId → a mhr_benchmark_rates row. Benchmark rates are shown in
+   *      the dialog (marked ★) whenever the user has no custom MHR data for a
+   *      machine class; their id is a bigint, never a UUID, so it can never be
+   *      sent as mhrId (that column FKs to mhr_records). Without this fallback,
+   *      picking a benchmark machine would silently store machine_name = null —
+   *      the record would look "not linked to a machine" even though a specific,
+   *      real (benchmark) machine was chosen.
+   *
+   * Neither given → both null (a genuine flat manual-rate entry, not an error).
+   */
+  private async deriveMachineFields(
+    mhrId: string | null | undefined,
+    benchmarkMhrId: string | number | null | undefined,
+    accessToken: string,
+  ): Promise<{ machine_name: string | null; machine_class: string | null }> {
+    if (mhrId) {
+      const { data, error } = await this.supabaseService
+        .getClient(accessToken)
+        .from('mhr_records')
+        .select('machine_name, machine_class')
+        .eq('id', mhrId)
+        .maybeSingle();
+
+      if (error || !data) {
+        if (error) {
+          this.logger.error(
+            `Error resolving MHR ${mhrId} for machine_name/machine_class derivation: ${error.message}`,
+            'ProcessCostService',
+          );
+        }
+        throw new BadRequestException('The specified MHR record does not exist or is not accessible.');
+      }
+
+      return {
+        machine_name: data.machine_name ?? null,
+        machine_class: data.machine_class ?? null,
+      };
+    }
+
+    if (benchmarkMhrId) {
+      // mhr.service.ts#getBenchmarkRates() (the endpoint that populates the
+      // dialog's dropdown) prefixes every benchmark row's raw bigint id with
+      // 'bm-mhr-' before it ever reaches the frontend, so a selected benchmark
+      // machine's id always looks like 'bm-mhr-42', never the bare '42' that
+      // mhr_benchmark_rates.id (BIGSERIAL) actually stores. Strip the prefix
+      // before querying — matching against the raw string would never find a
+      // row, for any id, regardless of RLS or anything else.
+      const rawId = String(benchmarkMhrId).replace(/^bm-mhr-/, '');
+
+      // This table is explicitly documented as global/shared with no user_id
+      // column (see migration 345) — getBenchmarkRates() itself reads it via
+      // the admin client for that reason. Use the same client here so a
+      // benchmark lookup can't fail due to RLS having no policy for a table
+      // that was never meant to be user-scoped in the first place.
+      const { data, error } = await this.supabaseService
+        .getAdminClient()
+        .from('mhr_benchmark_rates')
+        .select('machine_name, machine_class')
+        .eq('id', rawId)
+        .maybeSingle();
+
+      if (error || !data) {
+        if (error) {
+          this.logger.error(
+            `Error resolving benchmark MHR ${benchmarkMhrId} (raw id ${rawId}) for machine_name/machine_class derivation: ${error.message}`,
+            'ProcessCostService',
+          );
+        }
+        throw new BadRequestException('The specified benchmark machine rate does not exist or is not accessible.');
+      }
+
+      return {
+        machine_name: data.machine_name ?? null,
+        machine_class: data.machine_class ?? null,
+      };
+    }
+
+    return { machine_name: null, machine_class: null };
+  }
+
+  /**
+   * Resolve labor_type for a process cost record — the labour-side counterpart
+   * of deriveMachineFields(), same reasoning: single source of truth, derived
+   * server-side from whichever labour record was actually selected, never
+   * trusted from the client and never left to silently stay null.
+   *
+   * Two valid sources, checked in order:
+   *   1. lhrId → a real lhr_records row.
+   *   2. benchmarkLhrId → a lhr_benchmark_rates row (★ in the dialog, shown when
+   *      the user has no custom LHR data for a process group). Its id is a
+   *      bigint prefixed 'bm-lhr-' by lhr.service.ts#getBenchmarkRates() before
+   *      it reaches the frontend — strip the prefix before querying, same as
+   *      the MHR benchmark case.
+   *
+   * Neither given → null (a genuine flat manual-rate entry, not an error).
+   */
+  private async deriveLaborFields(
+    lhrId: string | null | undefined,
+    benchmarkLhrId: string | number | null | undefined,
+    accessToken: string,
+  ): Promise<{ labor_type: string | null }> {
+    if (lhrId) {
+      const { data, error } = await this.supabaseService
+        .getClient(accessToken)
+        .from('lhr_records')
+        .select('labour_type')
+        .eq('id', lhrId)
+        .maybeSingle();
+
+      if (error || !data) {
+        if (error) {
+          this.logger.error(
+            `Error resolving LHR ${lhrId} for labor_type derivation: ${error.message}`,
+            'ProcessCostService',
+          );
+        }
+        throw new BadRequestException('The specified LHR record does not exist or is not accessible.');
+      }
+
+      return { labor_type: data.labour_type ?? null };
+    }
+
+    if (benchmarkLhrId) {
+      const rawId = String(benchmarkLhrId).replace(/^bm-lhr-/, '');
+
+      // lhr_benchmark_rates is global/shared with no user_id column (migration
+      // 361) — getBenchmarkRates() reads it via the admin client for that
+      // reason; do the same here so this lookup can't fail due to RLS having
+      // no policy for a table that was never meant to be user-scoped.
+      const { data, error } = await this.supabaseService
+        .getAdminClient()
+        .from('lhr_benchmark_rates')
+        .select('labour_type')
+        .eq('id', rawId)
+        .maybeSingle();
+
+      if (error || !data) {
+        if (error) {
+          this.logger.error(
+            `Error resolving benchmark LHR ${benchmarkLhrId} (raw id ${rawId}) for labor_type derivation: ${error.message}`,
+            'ProcessCostService',
+          );
+        }
+        throw new BadRequestException('The specified benchmark LHR rate does not exist or is not accessible.');
+      }
+
+      return { labor_type: data.labour_type ?? null };
+    }
+
+    return { labor_type: null };
+  }
+
+  /**
    * Create a new process cost record with calculation
    */
   async create(
@@ -225,6 +385,9 @@ export class ProcessCostService {
       throw new BadRequestException(err.message || 'Invalid process cost input');
     }
 
+    const machineFields = await this.deriveMachineFields(createDto.mhrId, createDto.benchmarkMhrId, accessToken);
+    const laborFields = await this.deriveLaborFields(createDto.lhrId, createDto.benchmarkLhrId, accessToken);
+
     // Prepare database record
     const recordData = {
       // Input parameters
@@ -233,7 +396,12 @@ export class ProcessCostService {
       process_route: createDto.processRoute,
       operation: createDto.operation,
       mhr_id: createDto.mhrId,
+      benchmark_mhr_id: createDto.benchmarkMhrId ?? null,
+      machine_name: machineFields.machine_name,
+      machine_class: machineFields.machine_class,
       lhr_id: createDto.lhrId,
+      benchmark_lhr_id: createDto.benchmarkLhrId ?? null,
+      labor_type: laborFields.labor_type,
       facility_category_id: createDto.facilityCategoryId,
       facility_type_id: createDto.facilityTypeId,
       supplier_id: createDto.supplierId,
@@ -373,6 +541,23 @@ export class ProcessCostService {
       throw new NotFoundException(`Process cost record with ID ${id} was not found or you do not have access to it.`);
     }
 
+    // Only re-derive machine_name/machine_class when mhrId or benchmarkMhrId is
+    // actually part of this update payload (new id, same id re-sent, or explicit
+    // null to clear it). If the caller didn't touch either at all, leave the
+    // existing denormalized values alone — no extra DB round trip for edits that
+    // don't involve the machine link.
+    let machineFields: { machine_name: string | null; machine_class: string | null } | undefined;
+    if (updateDto.mhrId !== undefined || updateDto.benchmarkMhrId !== undefined) {
+      machineFields = await this.deriveMachineFields(updateDto.mhrId, updateDto.benchmarkMhrId, accessToken);
+    }
+
+    // Same gating for labor_type — only re-derive when lhrId/benchmarkLhrId is
+    // actually part of this update payload.
+    let laborFields: { labor_type: string | null } | undefined;
+    if (updateDto.lhrId !== undefined || updateDto.benchmarkLhrId !== undefined) {
+      laborFields = await this.deriveLaborFields(updateDto.lhrId, updateDto.benchmarkLhrId, accessToken);
+    }
+
     // Merge with update values
     const merged = {
       opNbr: updateDto.opNbr ?? existing.op_nbr,
@@ -407,7 +592,16 @@ export class ProcessCostService {
     if (updateDto.processRoute !== undefined) updateData.process_route = updateDto.processRoute;
     if (updateDto.operation !== undefined) updateData.operation = updateDto.operation;
     if (updateDto.mhrId !== undefined) updateData.mhr_id = updateDto.mhrId;
+    if (updateDto.benchmarkMhrId !== undefined) updateData.benchmark_mhr_id = updateDto.benchmarkMhrId;
+    if (machineFields) {
+      updateData.machine_name = machineFields.machine_name;
+      updateData.machine_class = machineFields.machine_class;
+    }
     if (updateDto.lhrId !== undefined) updateData.lhr_id = updateDto.lhrId;
+    if (updateDto.benchmarkLhrId !== undefined) updateData.benchmark_lhr_id = updateDto.benchmarkLhrId;
+    if (laborFields) {
+      updateData.labor_type = laborFields.labor_type;
+    }
     if (updateDto.facilityCategoryId !== undefined) updateData.facility_category_id = updateDto.facilityCategoryId;
     if (updateDto.facilityTypeId !== undefined) updateData.facility_type_id = updateDto.facilityTypeId;
     if (updateDto.supplierId !== undefined) updateData.supplier_id = updateDto.supplierId;

@@ -13,6 +13,7 @@ import {
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 // ============================================================================
 // ENUMS
@@ -388,13 +389,11 @@ export class QueryCalculatorDto {
   calculatorType?: CalculatorType;
 
   @ApiPropertyOptional()
-  @IsBoolean()
-  @IsOptional()
+  @IsOptionalBoolean()
   isTemplate?: boolean;
 
   @ApiPropertyOptional()
-  @IsBoolean()
-  @IsOptional()
+  @IsOptionalBoolean()
   isPublic?: boolean;
 
   @ApiPropertyOptional()

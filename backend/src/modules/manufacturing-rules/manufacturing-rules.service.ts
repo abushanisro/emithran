@@ -127,15 +127,15 @@ export class ManufacturingRulesService {
       operation,
       timingSource: "default",
       isoGroup,
-      totalCycleTimeSec: 60,
-      perFeatureCycleTimeSec: 60,
-      featureCount: 1,
+      totalCycleTimeSec: 0,
+      perFeatureCycleTimeSec: 0,
+      featureCount: 0,
       steps: [],
       parameterSource: params.parameterSource,
       machineRequirements: {
-        minPowerKw: 7.5,
-        minRpm: 1000,
-        machineCategoryHint: "vmc_3ax",
+        minPowerKw: 0,
+        minRpm: 0,
+        machineCategoryHint: "",
       },
       toolRequirements: {
         toolType: "unresolved",
@@ -144,8 +144,8 @@ export class ManufacturingRulesService {
       },
       validation: {
         valid: false,
-        errors: [`No calculator registered for operation "${operation}"`],
-        warnings: [],
+        errors: [`No calculator registered for operation "${operation}" — cycle time is 0 and this operation is NOT costed; register a calculator or add a manual cycle time`],
+        warnings: [`Operation "${operation}" has no calculator — excluded from cost calculation`],
       },
     };
   }

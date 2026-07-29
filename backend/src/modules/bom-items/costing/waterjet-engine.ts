@@ -1,10 +1,8 @@
 import {
-  WATERJET_MHR_INR,
   WATERJET_SETUP_MIN,
   WATERJET_PIERCE_SEC,
   WATERJET_SPEED_MM_PER_MIN,
   WATERJET_ABRASIVE_KG_PER_MIN,
-  WATERJET_ABRASIVE_INR_PER_KG,
 } from "./default-rates";
 import type { MHRRateInput } from "./cost-engine";
 import type { ProcessLineCost } from "../dto/cost-breakdown.dto";
@@ -15,10 +13,15 @@ export interface WaterjetInput {
   pierceCount: number;  // contour starts; 5 sec each (waterjet pierces in motion)
   batchSize: number;
   waterjetRate?: MHRRateInput;
-  // Garnet price in the SAME currency as waterjetRate.rate (from
-  // LOCATION_ABRASIVE_PRICE_PER_KG). Falls back to the India INR rate — only
-  // valid when the machine rate is also INR.
+  // Garnet price in the SAME currency as waterjetRate.rate.
+  // Resolved from consumable_prices DB table (migration 362) by the service.
+  // When null/absent, abrasive cost is 0 — user must add data to consumable_prices.
   abrasivePricePerKg?: number;
+  // Real process_calculator_mappings identity for the resolved machine class,
+  // resolved by the caller (BomItemsService.resolveProcessIdentities()) — never
+  // hardcoded here. Absent means the caller couldn't resolve one; consumers must
+  // not fabricate processGroup/processRoute/operation in that case.
+  processIdentity?: { processGroup: string; processRoute: string; operation: string };
 }
 
 export interface WaterjetResult {
@@ -33,7 +36,7 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
   const thk = input.sheetThicknessMm > 0 ? input.sheetThicknessMm : 2.0;
   if (input.sheetThicknessMm === 0) warnings.push("Waterjet: thickness 0 — defaulting to 2.0 mm");
 
-  const rate = input.waterjetRate ?? { rate: WATERJET_MHR_INR, source: "default_rate" as const, machineClass: "waterjet", machineName: null, commodityCode: null };
+  const rate = input.waterjetRate ?? { rate: 0, source: "no_db_rate" as const, machineClass: "waterjet", machineName: null, commodityCode: null };
 
   const speedMmMin = nearestVal(thk, WATERJET_SPEED_MM_PER_MIN);
   const cuttingSec = input.cutLengthMm > 0 ? (input.cutLengthMm / speedMmMin) * 60 : 0;
@@ -42,7 +45,7 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
   const cuttingMin = totalSec / 60;
 
   // Abrasive charged only for active cutting time, not piercing
-  const abrasivePricePerKg = input.abrasivePricePerKg ?? WATERJET_ABRASIVE_INR_PER_KG;
+  const abrasivePricePerKg = input.abrasivePricePerKg ?? 0;
   const abrasiveCost = r2(
     (cuttingSec / 60) * WATERJET_ABRASIVE_KG_PER_MIN * abrasivePricePerKg,
   );
@@ -54,6 +57,11 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
     processLines: [
       {
         process: "Waterjet Cutting",
+        ...(input.processIdentity ? {
+          processGroup: input.processIdentity.processGroup,
+          processRoute: input.processIdentity.processRoute,
+          operation: input.processIdentity.operation,
+        } : {}),
         setupCost,
         runCost,
         totalCost: r2(setupCost + runCost),

@@ -15,6 +15,7 @@ import type {
   MachineSelectionResult,
 } from '@/lib/api/hooks/useBOMItems';
 import { useMHRRecords } from '@/lib/api/hooks/useMHR';
+import { resolveMhrUsdRate } from '@/lib/api/mhr';
 
 export function confidenceColor(confidence: number): string {
   if (confidence >= 80) return 'text-emerald-500';
@@ -47,16 +48,33 @@ export function MachineSelector({
   selection,
   currencySymbol,
   location,
+  onApply,
+  applyPending,
+  applyError,
+  currentMhrId,
 }: {
   itemId: string;
   processKey: string;
   selection: MachineSelectionResult;
   currencySymbol: string;
   location: string;
+  // When provided, a pick persists via this callback instead of the
+  // location+processKey-scoped /machine-override endpoint — used when this
+  // selector is rendering for one specific SAVED process_cost_records row
+  // (its own mhrId/machineRate columns) rather than the live route-comparison
+  // preference for this machine class as a whole.
+  onApply?: (candidate: MachineCandidate | null) => void;
+  applyPending?: boolean;
+  applyError?: boolean;
+  // The saved row's actual current machine id, when it may differ from the
+  // engine's live recommendation (e.g. the row was saved before this part's
+  // geometry/MHR data changed) — used only to highlight the right list entry.
+  currentMhrId?: string | null;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
-  // Location-scoped: the override is stored for THIS Digital Factory location only
+  // Location-scoped: the override is stored for THIS Digital Factory location only.
+  // Unused (but still called — hooks can't be conditional) when onApply is provided.
   const override = useMachineOverride(itemId, location);
 
   // Full-list picker loads lazily — only when the user opens "Change machine"
@@ -67,6 +85,7 @@ export function MachineSelector({
 
   const active = selection.balanced;
   const recommended = active.candidate;
+  const highlightId = currentMhrId !== undefined ? currentMhrId : recommended.machineId;
   const fmtRate = (rate: number) => `${currencySymbol}${rate.toLocaleString(undefined, { maximumFractionDigits: 0 })}/hr`;
 
   const alternativeTag = (c: MachineCandidate): string | null => {
@@ -87,9 +106,16 @@ export function MachineSelector({
     ).slice(0, 50);
   }, [mhrList, search]);
 
-  const applyOverride = (mhrRecordId: string | null) => {
+  const isPending = onApply ? !!applyPending : override.isPending;
+  const isError = onApply ? !!applyError : override.isError;
+
+  const applyOverride = (mhrRecordId: string | null, candidate?: MachineCandidate) => {
     setPickerOpen(false);
-    override.mutate({ processKey, mhrRecordId });
+    if (onApply) {
+      onApply(candidate ?? null);
+    } else {
+      override.mutate({ processKey, mhrRecordId });
+    }
   };
 
   return (
@@ -119,8 +145,8 @@ export function MachineSelector({
           <button
             key={c.machineId ?? c.machineName ?? 'default'}
             type="button"
-            disabled={override.isPending || !c.machineId}
-            onClick={() => c.machineId && applyOverride(c.machineId)}
+            disabled={isPending || !c.machineId}
+            onClick={() => c.machineId && applyOverride(c.machineId, c)}
             className="w-full flex items-baseline justify-between gap-2 text-left hover:bg-muted/20 rounded px-1 -mx-1 transition-colors disabled:opacity-60"
           >
             <span className="text-xs text-muted-foreground min-w-0">
@@ -147,18 +173,18 @@ export function MachineSelector({
         >
           Change machine {pickerOpen ? '▴' : '▾'}
         </button>
-        {selection.overridden && (
+        {!onApply && selection.overridden && (
           <button
             type="button"
-            disabled={override.isPending}
+            disabled={isPending}
             onClick={() => applyOverride(null)}
             className="text-[10px] text-amber-500 hover:text-amber-400 underline underline-offset-2 transition-colors disabled:opacity-60"
           >
             Reset to recommended
           </button>
         )}
-        {override.isPending && <span className="text-[10px] text-muted-foreground">Saving…</span>}
-        {override.isError && <span className="text-[10px] text-red-500">Failed to save — retry</span>}
+        {isPending && <span className="text-[10px] text-muted-foreground">Saving…</span>}
+        {isError && <span className="text-[10px] text-red-500">Failed to save — retry</span>}
       </div>
 
       {/* Full-list picker — no capability filter; the cost engineer's judgment wins */}
@@ -178,16 +204,32 @@ export function MachineSelector({
               </p>
             )}
             {filteredMachines.map((r) => {
-              const rate = r.fullyBurdenedLocalPerHr ?? r.calculations?.totalMachineHourRate ?? r.manualMHRValue ?? 0;
+              const rate = resolveMhrUsdRate(r);
+              const candidate: MachineCandidate = {
+                machineId: r.id,
+                machineName: r.machineName,
+                commodityCode: r.commodityCode ?? null,
+                machineClass: (r.machineClass ?? recommended.machineClass) as MachineCandidate['machineClass'],
+                hourlyRate: rate,
+                utilizationPct: 75,
+                scheduledLoadPct: null,
+                availabilityStatus: 'available',
+                nextAvailableAt: null,
+                maintenanceWindowStart: null,
+                maintenanceWindowEnd: null,
+                capability: recommended.capability,
+                capabilitySource: 'imported',
+                capabilityVersion: null,
+              };
               return (
                 <button
                   key={r.id}
                   type="button"
-                  disabled={override.isPending}
-                  onClick={() => applyOverride(r.id)}
+                  disabled={isPending}
+                  onClick={() => applyOverride(r.id, candidate)}
                   className={cn(
                     'w-full flex items-baseline justify-between gap-2 text-left px-1 py-0.5 rounded hover:bg-muted/30 transition-colors disabled:opacity-60',
-                    r.id === recommended.machineId && 'bg-muted/20',
+                    r.id === highlightId && 'bg-muted/20',
                   )}
                 >
                   <span className="text-xs text-foreground min-w-0 truncate">

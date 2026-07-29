@@ -43,11 +43,12 @@ export const config = {
 
     // Endpoint-specific timeout overrides (in milliseconds)
     endpointTimeouts: {
-      '/calculators/bom-cost': 45000, // Complex calculations need more time
+      '/calculators/bom-cost': 45000,
       '/calculators/process-cost': 45000,
-      '/reports': 60000, // Report generation
-      '/export': 60000, // File exports
-      '/upload': 120000, // File uploads (2 minutes)
+      '/reports': 60000,
+      '/export': 60000,
+      '/upload': 120000,
+      '/bom-items/analyze-for-autofill': 120000, // CAD OCCT geometry analysis takes 30–60s
     } as Record<string, number>,
 
     // Retry Configuration

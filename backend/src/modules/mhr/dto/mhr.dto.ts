@@ -364,6 +364,11 @@ export class QueryMHRDto {
   @IsOptional()
   processGroup?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by machine class (e.g. fiber_laser, press_brake)' })
+  @IsString()
+  @IsOptional()
+  machineClass?: string;
+
   @ApiPropertyOptional({ description: 'Filter by wage grade' })
   @IsString()
   @IsOptional()

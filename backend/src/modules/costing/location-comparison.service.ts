@@ -2,8 +2,6 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import {
   LOCATION_INFO,
-  LOCATION_MHR_DEFAULTS,
-  defaultLHRRate,
 } from '../bom-items/costing/default-rates';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -39,11 +37,11 @@ export interface LocationCostEntry {
 
 export interface LocationComparisonDto {
   bomItemId: string;
-  currentLocation: string;
   processLinesCount: number;
   locations: LocationCostEntry[];
   cheapestLocation: string;
   mostExpensiveLocation: string;
+  warnings: string[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -52,21 +50,6 @@ const ALL_LOCATIONS = [
   'India', 'USA', 'China', 'Germany', 'France',
   'W. Europe', 'E. Europe', 'UK', 'Vietnam', 'Mexico',
 ] as const;
-
-// USD base: 1 INR = (1/83.5) USD. LOCATION_INFO.defaultInrRate = N INR per 1 local unit.
-// USD = local_amount × defaultInrRate / 83.5
-const INR_PER_USD = 83.5;
-
-// Representative MachineClass per process_group — used as fallback key into LOCATION_MHR_DEFAULTS
-const PROCESS_GROUP_TO_CLASS: Record<string, string> = {
-  'Sheet Metal':   'fiber_laser',
-  'Plastics':      'injection_molding',
-  'CNC Machining': 'cnc_3ax_vmc',
-  'Quality':       'cmm',
-};
-
-const SGA_PCT    = 0.125;
-const PROFIT_PCT = 0.08;
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
@@ -80,6 +63,53 @@ export class LocationComparisonService {
   ): Promise<LocationComparisonDto> {
     const db      = this.supabaseService.getClient(token);
     const adminDb = this.supabaseService.getAdminClient();
+    const serviceWarnings: string[] = [];
+
+    // 0. Load exchange rates and costing settings from DB (no hardcoded values)
+    const [fxResult, settingsResult] = await Promise.all([
+      adminDb
+        .from('exchange_rates')
+        .select('from_currency, rate')
+        .eq('to_currency', 'INR')
+        .eq('is_active', true),
+      adminDb
+        .from('costing_settings')
+        .select('key, value'),
+    ]);
+
+    // Build currency → INR rate map from DB
+    const fxMap = new Map<string, number>([['INR', 1]]);
+    for (const r of fxResult.data ?? []) {
+      if (r.from_currency && Number(r.rate) > 0) {
+        fxMap.set((r.from_currency as string).toUpperCase(), Number(r.rate));
+      }
+    }
+    if (fxMap.size <= 1) {
+      serviceWarnings.push(
+        'No active exchange rates found in DB — using LOCATION_INFO fallback rates for currency conversion; update the exchange_rates table for accurate location comparison',
+      );
+    }
+
+    // USD is the pivot anchor (everything converts to USD for comparison)
+    const inrPerUsd = fxMap.get('USD') ?? LOCATION_INFO['USA']!.defaultInrRate;
+
+    // Load SGA and profit from costing_settings table
+    const settingsMap = new Map<string, number>();
+    for (const s of settingsResult.data ?? []) settingsMap.set(s.key as string, Number(s.value));
+
+    const sgaPct = settingsMap.has('sga_pct') ? settingsMap.get('sga_pct')! : null;
+    const profitPct = settingsMap.has('profit_pct') ? settingsMap.get('profit_pct')! : null;
+
+    if (sgaPct == null) {
+      serviceWarnings.push(
+        'sga_pct not found in costing_settings — SG&A excluded from selling price; deploy migration 364 and set the row',
+      );
+    }
+    if (profitPct == null) {
+      serviceWarnings.push(
+        'profit_pct not found in costing_settings — profit margin excluded from selling price; deploy migration 364 and set the row',
+      );
+    }
 
     // 1. Fetch active process cost records for this BOM item
     const { data: processRows, error: pcErr } = await db
@@ -110,23 +140,33 @@ export class LocationComparisonService {
       processRows.map(r => r.process_group as string | null).filter((g): g is string => !!g),
     )];
 
+    if (!processGroups.length) {
+      serviceWarnings.push(
+        'No process_group set on any route operation — MHR/LHR rates cannot be matched; set process_group on each operation row',
+      );
+    }
+
     // 3. Batch-fetch MHR rates for all locations from mhr_records (admin bypasses per-user RLS)
-    // Grab the lowest viable rate per (location, process_group) — min picks the standard machine
-    const { data: mhrRows } = await adminDb
+    const mhrQuery = adminDb
       .from('mhr_records')
       .select('location, process_group, fully_burdened_local_per_hr, total_machine_hour_rate, manual_mhr_value')
-      .in('location', [...ALL_LOCATIONS])
-      .in('process_group', processGroups.length ? processGroups : ['Sheet Metal']);
+      .in('location', [...ALL_LOCATIONS]);
 
-    // 4. Fetch LHR benchmark rates (public SELECT — no admin needed)
-    const { data: LhrRows } = await db
+    if (processGroups.length) mhrQuery.in('process_group', processGroups);
+
+    const { data: mhrRows } = await mhrQuery;
+
+    // 4. Fetch LHR benchmark rates
+    const lhrQuery = db
       .from('lhr_benchmark_rates')
       .select('location, process_group, lhr, lhr_usd_effective, currency')
-      .in('location', [...ALL_LOCATIONS])
-      .in('process_group', processGroups.length ? processGroups : ['Sheet Metal']);
+      .in('location', [...ALL_LOCATIONS]);
+
+    if (processGroups.length) lhrQuery.in('process_group', processGroups);
+
+    const { data: LhrRows } = await lhrQuery;
 
     // 5. Build rate maps
-    // mhrRateMap[location][processGroup] = { usd, source }
     const mhrRateMap = new Map<string, Map<string, { usd: number; source: 'db' | 'default' }>>();
     const lhrRateMap = new Map<string, Map<string, { usd: number; source: 'db' | 'default' }>>();
 
@@ -135,7 +175,7 @@ export class LocationComparisonService {
       lhrRateMap.set(loc, new Map());
     }
 
-    // Aggregate MHR from DB: sum and count per (location, process_group) then average
+    // Aggregate MHR from DB: average per (location, process_group)
     const mhrAccum = new Map<string, { sumLocal: number; count: number }>();
     for (const row of mhrRows ?? []) {
       if (!row.location || !row.process_group) continue;
@@ -154,23 +194,20 @@ export class LocationComparisonService {
 
     for (const [key, acc] of mhrAccum) {
       const [loc, pg] = key.split('||');
-      const avgLocal = acc.sumLocal / acc.count;
-      const inrRate  = LOCATION_INFO[loc]?.defaultInrRate ?? INR_PER_USD;
-      const usd      = avgLocal * inrRate / INR_PER_USD;
-      mhrRateMap.get(loc)!.set(pg, { usd, source: 'db' });
+      const avgLocal  = acc.sumLocal / acc.count;
+      const currCode  = LOCATION_INFO[loc]?.code;
+      // Use DB exchange rate if available; fall back to LOCATION_INFO hardcoded rate with warning
+      const locInrRate = currCode ? (fxMap.get(currCode.toUpperCase()) ?? LOCATION_INFO[loc]?.defaultInrRate ?? inrPerUsd) : inrPerUsd;
+      const usd = avgLocal * locInrRate / inrPerUsd;
+      mhrRateMap.get(loc)?.set(pg, { usd, source: 'db' });
     }
 
-    // Fill gaps with static fallback
+    // Fill MHR gaps — zero surfaces in comparison table rather than a wrong static rate
     for (const loc of ALL_LOCATIONS) {
-      const locInfo = LOCATION_INFO[loc];
-      if (!locInfo) continue;
+      if (!LOCATION_INFO[loc]) continue;
       for (const pg of processGroups) {
         if (!mhrRateMap.get(loc)!.has(pg)) {
-          const cls    = PROCESS_GROUP_TO_CLASS[pg] ?? 'cnc_3ax_vmc';
-          const locDef = (LOCATION_MHR_DEFAULTS as Record<string, Record<string, number>>)[loc];
-          const local  = locDef?.[cls] ?? 85;
-          const usd    = local * locInfo.defaultInrRate / INR_PER_USD;
-          mhrRateMap.get(loc)!.set(pg, { usd, source: 'default' });
+          mhrRateMap.get(loc)!.set(pg, { usd: 0, source: 'default' });
         }
       }
     }
@@ -184,15 +221,12 @@ export class LocationComparisonService {
       }
     }
 
-    // Fill LHR gaps with static fallback (LOCATION_LHR_DEFAULTS already in USD for most locations)
+    // Fill LHR gaps
     for (const loc of ALL_LOCATIONS) {
-      const locInfo = LOCATION_INFO[loc];
-      if (!locInfo) continue;
+      if (!LOCATION_INFO[loc]) continue;
       for (const pg of processGroups) {
         if (!lhrRateMap.get(loc)!.has(pg)) {
-          const localLhr = defaultLHRRate(loc, pg);
-          const usd      = localLhr * locInfo.defaultInrRate / INR_PER_USD;
-          lhrRateMap.get(loc)!.set(pg, { usd, source: 'default' });
+          lhrRateMap.get(loc)!.set(pg, { usd: 0, source: 'default' });
         }
       }
     }
@@ -201,9 +235,11 @@ export class LocationComparisonService {
     const locationEntries: LocationCostEntry[] = [];
 
     for (const loc of ALL_LOCATIONS) {
-      const locInfo = LOCATION_INFO[loc] ?? LOCATION_INFO['USA']!;
-      const mhrMap  = mhrRateMap.get(loc)!;
-      const lhrMap  = lhrRateMap.get(loc)!;
+      const locInfo = LOCATION_INFO[loc];
+      if (!locInfo) continue;
+
+      const mhrMap = mhrRateMap.get(loc)!;
+      const lhrMap = lhrRateMap.get(loc)!;
 
       let totalMachineUsd = 0;
       let totalLabourUsd  = 0;
@@ -212,25 +248,24 @@ export class LocationComparisonService {
       const lines: LocationProcessLine[] = [];
 
       for (const row of processRows) {
-        const pg          = (row.process_group as string | null) ?? 'Sheet Metal';
-        const mhrEntry    = mhrMap.get(pg) ?? { usd: 0, source: 'default' as const };
-        const LHREntry    = lhrMap.get(pg) ?? { usd: 0, source: 'default' as const };
-        const mhrUsd      = mhrEntry.usd;
-        const lhrUsd      = LHREntry.usd;
+        const pg       = (row.process_group as string | null) ?? '';
+        const mhrEntry = mhrMap.get(pg) ?? { usd: 0, source: 'default' as const };
+        const lhrEntry = lhrMap.get(pg) ?? { usd: 0, source: 'default' as const };
+        const mhrUsd   = mhrEntry.usd;
+        const lhrUsd   = lhrEntry.usd;
 
         const setupManning = parseFloat(row.setup_manning) || 0;
         const setupTimeMin = parseFloat(row.setup_time)    || 0;
-        const batchSize    = Math.max(parseFloat(row.batch_size)    || 1, 1);
-        const heads        = parseFloat(row.heads)          || 0;
-        const cycleTimeSec = parseFloat(row.cycle_time)     || 0;
+        const batchSize    = Math.max(parseFloat(row.batch_size) || 1, 1);
+        const heads        = parseFloat(row.heads)         || 0;
+        const cycleTimeSec = parseFloat(row.cycle_time)    || 0;
         const ppc          = Math.max(parseFloat(row.parts_per_cycle) || 1, 1);
-        const scrap        = parseFloat(row.scrap)          || 0;
+        const scrap        = parseFloat(row.scrap)         || 0;
 
-        const setupCostUsd  = (setupTimeMin / 60) * (mhrUsd + lhrUsd * setupManning) / batchSize;
-        const cycleCostUsd  = (cycleTimeSec / 3600) * (mhrUsd + lhrUsd * heads) / ppc;
-        const totalCostUsd  = (setupCostUsd + cycleCostUsd) * (1 + scrap / 100);
+        const setupCostUsd = (setupTimeMin / 60) * (mhrUsd + lhrUsd * setupManning) / batchSize;
+        const cycleCostUsd = (cycleTimeSec / 3600) * (mhrUsd + lhrUsd * heads) / ppc;
+        const totalCostUsd = (setupCostUsd + cycleCostUsd) * (1 + scrap / 100);
 
-        // Machine vs labour split
         const setupMachine = (setupTimeMin / 60) * mhrUsd / batchSize;
         const cycleMachine = (cycleTimeSec / 3600) * mhrUsd / ppc;
         const setupLabour  = (setupTimeMin / 60) * lhrUsd * setupManning / batchSize;
@@ -238,7 +273,7 @@ export class LocationComparisonService {
         totalMachineUsd += (setupMachine + cycleMachine) * (1 + scrap / 100);
         totalLabourUsd  += (setupLabour  + cycleLabour)  * (1 + scrap / 100);
 
-        if (mhrEntry.source === 'db' || LHREntry.source === 'db') dbCount++;
+        if (mhrEntry.source === 'db' || lhrEntry.source === 'db') dbCount++;
         else defaultCount++;
 
         lines.push({
@@ -252,13 +287,15 @@ export class LocationComparisonService {
         });
       }
 
-      const processCostUsd   = lines.reduce((s, l) => s + l.totalCostUsd, 0);
-      const totalMfgCostUsd  = rawMaterialCostUsd + processCostUsd;
-      const sgaCostUsd       = totalMfgCostUsd * SGA_PCT;
-      const sellingPriceUsd  = totalMfgCostUsd * (1 + SGA_PCT + PROFIT_PCT);
+      const processCostUsd  = lines.reduce((s, l) => s + l.totalCostUsd, 0);
+      const totalMfgCostUsd = rawMaterialCostUsd + processCostUsd;
+      const sgaCostUsd      = sgaPct != null ? totalMfgCostUsd * sgaPct : 0;
+      const sellingPriceUsd = totalMfgCostUsd * (1 + (sgaPct ?? 0) + (profitPct ?? 0));
 
-      // Local-currency process cost (informational only)
-      const processCostLocal = processCostUsd / (locInfo.defaultInrRate / INR_PER_USD);
+      // Local-currency process cost — use DB FX rate if available
+      const currCode = locInfo.code;
+      const locInrRate = fxMap.get(currCode.toUpperCase()) ?? locInfo.defaultInrRate;
+      const processCostLocal = processCostUsd * inrPerUsd / locInrRate;
 
       const avgMhrUsd = lines.length ? lines.reduce((s, l) => s + l.mhrUsd, 0) / lines.length : 0;
       const avgLhrUsd = lines.length ? lines.reduce((s, l) => s + l.lhrUsd, 0) / lines.length : 0;
@@ -287,24 +324,20 @@ export class LocationComparisonService {
       });
     }
 
-    // 7. Sort cheapest → most expensive
+    // 7. Sort cheapest → most expensive and compute relative percentages
     locationEntries.sort((a, b) => a.totalMfgCostUsd - b.totalMfgCostUsd);
-
-    // Use the cheapest location as the anchor for vsCurrentPct comparisons
     const baseUsd = locationEntries[0]?.totalMfgCostUsd ?? 1;
     for (const entry of locationEntries) {
-      entry.vsCurrentPct = baseUsd > 0
-        ? ((entry.totalMfgCostUsd - baseUsd) / baseUsd) * 100
-        : 0;
+      entry.vsCurrentPct = baseUsd > 0 ? ((entry.totalMfgCostUsd - baseUsd) / baseUsd) * 100 : 0;
     }
 
     return {
       bomItemId,
-      currentLocation: 'USA',  // The UI location selector drives context; cheapest is the anchor
       processLinesCount: processRows.length,
       locations: locationEntries,
-      cheapestLocation: locationEntries[0]?.location ?? '',
+      cheapestLocation:     locationEntries[0]?.location ?? '',
       mostExpensiveLocation: locationEntries[locationEntries.length - 1]?.location ?? '',
+      warnings: serviceWarnings,
     };
   }
 }

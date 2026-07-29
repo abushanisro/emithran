@@ -660,6 +660,35 @@ export class CADAnalysisService {
   }
 
   /**
+   * Fire-and-forget: send the STEP buffer to /analyze/geometry so the GCD-adj
+   * result lands in the CAD engine disk cache BEFORE the user clicks "Analyze".
+   * Called immediately after file upload — no await, never throws to the caller.
+   */
+  prewarmCache(buffer: Buffer, originalFilename: string): void {
+    const FormData = require('form-data');
+    const ext = originalFilename.split('.').pop()?.toLowerCase() ?? 'stp';
+    const form = new FormData();
+    form.append('file', buffer, {
+      filename: `model.${ext}`,
+      contentType: 'application/step',
+    });
+    form.append('strategy', 'balanced');
+    form.append('bypass_format_check', 'true');
+
+    axios
+      .post(`${this.cadEngineUrl}/analyze/geometry`, form, {
+        headers: {
+          ...form.getHeaders(),
+          ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
+        },
+        timeout: 180_000,
+        maxContentLength: 150 * 1024 * 1024,
+      })
+      .then(() => this.logger.log(`[prewarm] geometry cache warmed for ${originalFilename}`))
+      .catch((e: Error) => this.logger.warn(`[prewarm] background analysis failed for ${originalFilename}: ${e.message}`));
+  }
+
+  /**
    * Fetch the user's manufacturing processes from the database.
    * Returns a lightweight array used to enrich the AI DFM prompt.
    */

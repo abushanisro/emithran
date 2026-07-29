@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsString, IsOptional, IsBoolean, IsNumber, IsUUID, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 // ============================================================================
 // PROCESS CALCULATOR MAPPING DTOs
@@ -65,8 +66,7 @@ export class QueryProcessCalculatorMappingsDto {
   calculatorId?: string;
 
   @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalBoolean()
   isActive?: boolean;
 
   @ApiPropertyOptional({ example: 'injection' })
@@ -103,6 +103,9 @@ export class ProcessCalculatorMappingResponseDto {
   operation: string;
 
   @ApiPropertyOptional()
+  machineClass?: string;
+
+  @ApiPropertyOptional()
   calculatorId?: string;
 
   @ApiPropertyOptional()
@@ -126,6 +129,7 @@ export class ProcessCalculatorMappingResponseDto {
       processGroup: row.process_group,
       processRoute: row.process_route,
       operation: row.operation,
+      machineClass: row.machine_class ?? undefined,
       calculatorId: row.calculator_id,
       calculatorName: row.calculator_name,
       isActive: row.is_active,

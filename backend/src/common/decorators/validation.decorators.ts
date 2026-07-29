@@ -24,6 +24,7 @@ import {
   Matches,
 } from 'class-validator';
 import { applyDecorators } from '@nestjs/common';
+import { Transform } from 'class-transformer';
 
 /**
  * Enhanced validation decorators with user-friendly error messages
@@ -237,6 +238,16 @@ export function IsUserFriendlyBoolean(message?: string, options?: ValidationOpti
 export function IsOptionalBoolean(message?: string, options?: ValidationOptions) {
   return applyDecorators(
     IsOptional(),
+    // HTTP query parameters always arrive as strings ("true"/"false"), never real
+    // booleans — @IsBoolean() alone rejects them with a 400, and @Type(() =>
+    // Boolean) coerces via JS's Boolean(), which incorrectly turns the string
+    // "false" into `true`. Coerce explicitly before validating.
+    Transform(({ value }) => {
+      if (typeof value !== 'string') return value;
+      if (value.toLowerCase() === 'true') return true;
+      if (value.toLowerCase() === 'false') return false;
+      return value;
+    }),
     IsBoolean({ message: message || 'This field must be true or false' })
   );
 }

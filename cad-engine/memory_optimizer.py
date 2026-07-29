@@ -227,7 +227,20 @@ class AdvancedCADMemoryOptimizer:
                     self._performance_stats['cache_hits'] += 1
                     logger.info(f"Using cached optimization result for hash: {geometry_hash[:12]}...")  # type: ignore
                     return cached_result
-            
+
+            # Check disk cache (survives Uvicorn restarts — warm path, no OCC recompute)
+            if not force_reanalysis:
+                disk_result = self._load_from_disk(geometry_hash)
+                if disk_result is not None:
+                    with self._lock:
+                        if len(self.optimization_cache) >= 100:
+                            oldest = min(self.optimization_cache, key=lambda k: self.optimization_cache[k].timestamp)
+                            self.optimization_cache.pop(oldest, None)
+                        self.optimization_cache[geometry_hash] = disk_result
+                    self._performance_stats['cache_hits'] += 1
+                    logger.info(f"[mem-disk-cache] hit for {geometry_hash[:12]}")
+                    return disk_result
+
             self._performance_stats['cache_misses'] += 1
             logger.info(f"Starting comprehensive analysis for geometry: {geometry_hash[:12]}...")  # type: ignore
             
@@ -1347,16 +1360,45 @@ class AdvancedCADMemoryOptimizer:
             gc.collect()
             self.current_memory_usage = 0  # Reset estimation
 
+    def _disk_cache_path(self, geometry_hash: str) -> Path:
+        # CACHE_VERSION is embedded in the filename so any logic bump auto-invalidates
+        return self.cache_dir / f"{geometry_hash}_{self.CACHE_VERSION}.pkl"
+
+    def _save_to_disk(self, geometry_hash: str, result: OptimizationResult) -> None:
+        try:
+            self._disk_cache_path(geometry_hash).write_bytes(pickle.dumps(result, protocol=4))
+        except Exception as exc:
+            logger.warning(f"[mem-disk-cache] write failed for {geometry_hash[:12]}: {exc}")
+
+    def _load_from_disk(self, geometry_hash: str) -> Optional['OptimizationResult']:
+        p = self._disk_cache_path(geometry_hash)
+        if not p.exists():
+            return None
+        try:
+            result: OptimizationResult = pickle.loads(p.read_bytes())
+            if not self._is_cache_valid(result.timestamp):
+                p.unlink(missing_ok=True)
+                return None
+            return result
+        except Exception as exc:
+            logger.warning(f"[mem-disk-cache] load failed for {geometry_hash[:12]}: {exc}")
+            try:
+                p.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return None
+
     def _cache_optimization_result(self, geometry_hash: str, result: OptimizationResult):
-        """Cache optimization result with size limits"""
+        """Cache optimization result in memory and persist to disk for restart survival."""
         with self._lock:
             # Remove old entries if cache is too large
             if len(self.optimization_cache) > 100:
-                oldest_hash = min(self.optimization_cache.keys(), 
+                oldest_hash = min(self.optimization_cache.keys(),
                                 key=lambda k: self.optimization_cache[k].timestamp)
                 self.optimization_cache.pop(oldest_hash, None)
-            
             self.optimization_cache[geometry_hash] = result
+        # Write outside the lock — disk I/O can be slow, don't block concurrent readers
+        self._save_to_disk(geometry_hash, result)
 
     def _is_cache_valid(self, timestamp: datetime) -> bool:
         """Check if cached result is still valid"""
@@ -1385,27 +1427,46 @@ class AdvancedCADMemoryOptimizer:
         )
 
     def _start_cache_cleanup(self):
-        """Start background task for cache cleanup"""
+        """Start background task for cache cleanup (memory + disk)."""
         def cleanup_task():
+            import time
             while True:
                 try:
-                    import time
                     time.sleep(3600)  # Run every hour
-                    
+
                     with self._lock:
-                        expired_keys = []
-                        for key, result in self.optimization_cache.items():
-                            if not self._is_cache_valid(result.timestamp):
-                                expired_keys.append(key)
-                        
+                        expired_keys = [
+                            key for key, result in self.optimization_cache.items()
+                            if not self._is_cache_valid(result.timestamp)
+                        ]
                         for key in expired_keys:
                             self.optimization_cache.pop(key, None)
-                        
-                        if expired_keys:
-                            logger.info(f"Cleaned up {len(expired_keys)} expired cache entries")
-                            
-                except Exception as e:
-                    logger.error(f"Cache cleanup error: {str(e)}")
-        
+
+                    if expired_keys:
+                        logger.info(f"[mem-cache] cleaned {len(expired_keys)} expired in-memory entries")
+
+                    # Evict expired AND old-version disk files
+                    removed = 0
+                    suffix = f"_{self.CACHE_VERSION}.pkl"
+                    for p in self.cache_dir.glob("*.pkl"):
+                        try:
+                            if not p.name.endswith(suffix):
+                                p.unlink()
+                                removed += 1
+                            else:
+                                result = pickle.loads(p.read_bytes())
+                                if not self._is_cache_valid(result.timestamp):
+                                    p.unlink()
+                                    removed += 1
+                        except Exception:
+                            try: p.unlink()
+                            except Exception: pass
+                            removed += 1
+                    if removed:
+                        logger.info(f"[mem-disk-cache] evicted {removed} stale/old-version files")
+
+                except Exception as exc:
+                    logger.error(f"Cache cleanup error: {exc}")
+
         cleanup_thread = threading.Thread(target=cleanup_task, daemon=True)
         cleanup_thread.start()

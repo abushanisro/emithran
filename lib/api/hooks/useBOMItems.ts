@@ -359,12 +359,26 @@ export interface AutoFillResponse {
 
 // ── Auto-fill standalone function ─────────────────────────────────────────────
 
+// In-flight deduplication: same filename+size reuses the pending promise
+const _analyzeInFlight = new Map<string, Promise<AutoFillResponse>>();
+
 export async function analyzeForAutoFill(file: File): Promise<AutoFillResponse> {
+  const key = `${file.name}:${file.size}`;
+  const existing = _analyzeInFlight.get(key);
+  if (existing) return existing;
+
   const form = new FormData();
   form.append('file', file);
-  const data = await apiClient.uploadFiles<AutoFillResponse>('/bom-items/analyze-for-autofill', form);
-  if (!data) throw new Error('No response from auto-fill analysis');
-  return data;
+  const promise = apiClient
+    .uploadFiles<AutoFillResponse>('/bom-items/analyze-for-autofill', form)
+    .then(data => {
+      if (!data) throw new Error('No response from auto-fill analysis');
+      return data;
+    })
+    .finally(() => _analyzeInFlight.delete(key));
+
+  _analyzeInFlight.set(key, promise);
+  return promise;
 }
 
 export function useAnalyzeForAutoFill() {
@@ -463,6 +477,13 @@ export interface FeatureOp {
 
 export interface ProcessLineCost {
   process: string;
+  /** Real process_calculator_mappings identity for this line, resolved server-side
+   *  from the DB (never hardcoded) — absent on paths not yet wired to resolve it,
+   *  in which case callers must derive a process group from machineClass rather
+   *  than reusing `process` as both processRoute and operation. */
+  processGroup?: string;
+  processRoute?: string;
+  operation?: string;
   setupCost: number;
   runCost: number;
   totalCost: number;

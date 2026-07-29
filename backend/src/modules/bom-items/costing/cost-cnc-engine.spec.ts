@@ -3,7 +3,6 @@ import {
   computeCNCTurnedCostSummary,
   computeInspectionMin,
   computeSurfaceTreatmentLine,
-  localizeFixtureCost,
   requiredMilledMachineClass,
   meetsRequiredMilledClass,
   pickRecommendedRoute,
@@ -15,7 +14,6 @@ import {
   classifySurfaceTreatment,
   CMM_SETUP_MIN,
   CNC_STOCK_ALLOWANCE_PER_SIDE_MM,
-  LOCATION_MHR_DEFAULTS,
 } from './default-rates';
 import type { MHRRateInput } from './cost-engine';
 import {
@@ -66,25 +64,6 @@ function milledInput(overrides: Partial<CNCCostInput> = {}): CNCCostInput {
     ...overrides,
   };
 }
-
-describe('localizeFixtureCost', () => {
-  it('is the INR benchmark in India (identity)', () => {
-    expect(localizeFixtureCost('cnc_3ax_vmc', 'India')).toBe(500);
-    expect(localizeFixtureCost('cnc_5ax_mc', 'India')).toBe(2000);
-  });
-
-  it('scales by the location machine-rate ratio, not raw FX-less reuse', () => {
-    // USA 3ax benchmark $85 vs India ₹900 → 500 × 85/900 ≈ $47.2
-    const usa = localizeFixtureCost('cnc_3ax_vmc', 'USA');
-    expect(usa).toBeCloseTo(500 * (85 / 900), 5);
-    // The defect this replaces: fixture showing the SAME digit in every currency
-    expect(usa).not.toBe(500);
-  });
-
-  it('falls back to the India benchmark for unknown locations', () => {
-    expect(localizeFixtureCost('cnc_3ax_vmc', 'Atlantis')).toBe(500);
-  });
-});
 
 describe('computeCNCMilledCostSummary — billet and chip loss', () => {
   it('adds stock allowance per side to the billet', () => {
@@ -362,60 +341,23 @@ describe('pickRecommendedRoute', () => {
 describe('benchmarkRateWarning', () => {
   it('flags an implausibly low DB rate (the ¥160 Makino case)', () => {
     // China 5-axis benchmark ¥580 — an imported ¥160 must be visible
-    const warning = benchmarkRateWarning('cnc_5ax_mc', 'China', 160, 'Makino D300');
+    const warning = benchmarkRateWarning('cnc_5ax_mc', 'China', 160, 'Makino D300', 580);
     expect(warning).toContain('Makino D300');
     expect(warning).toContain('below');
   });
 
   it('flags an implausibly high rate', () => {
-    const warning = benchmarkRateWarning('cnc_3ax_vmc', 'USA', 900, 'Mystery VMC');
+    const warning = benchmarkRateWarning('cnc_3ax_vmc', 'USA', 900, 'Mystery VMC', 85);
     expect(warning).toContain('over');
   });
 
-  it('stays silent inside the plausible band and for unknown locations/classes', () => {
-    expect(benchmarkRateWarning('cnc_3ax_vmc', 'USA', 85, 'Haas VF-2')).toBeNull();
-    expect(benchmarkRateWarning('cnc_3ax_vmc', 'Atlantis', 85, 'Haas VF-2')).toBeNull();
-    expect(benchmarkRateWarning('unknown_class', 'USA', 85, 'Haas VF-2')).toBeNull();
-  });
-});
-
-describe('LOCATION_MHR_DEFAULTS coherence', () => {
-  const classes = Object.keys(LOCATION_MHR_DEFAULTS['India']) as Array<
-    keyof (typeof LOCATION_MHR_DEFAULTS)['India']
-  >;
-
-  it('keeps Germany above France with W. Europe between them (EUR locations)', () => {
-    for (const cls of classes) {
-      const de = LOCATION_MHR_DEFAULTS['Germany'][cls];
-      const fr = LOCATION_MHR_DEFAULTS['France'][cls];
-      const we = LOCATION_MHR_DEFAULTS['W. Europe'][cls];
-      expect(de).toBeGreaterThan(fr);
-      expect(we).toBeGreaterThanOrEqual(fr);
-      expect(we).toBeLessThanOrEqual(de);
-    }
+  it('stays silent inside the plausible band', () => {
+    expect(benchmarkRateWarning('cnc_3ax_vmc', 'USA', 85, 'Haas VF-2', 85)).toBeNull();
   });
 
-  it('keeps E. Europe below W. Europe but out of the pre-2015 absurd range', () => {
-    for (const cls of classes) {
-      expect(LOCATION_MHR_DEFAULTS['E. Europe'][cls]).toBeLessThan(
-        LOCATION_MHR_DEFAULTS['W. Europe'][cls],
-      );
-    }
-    // The old seed had 3ax VMC at €20/hr — below any EU electricity+labour floor
-    expect(LOCATION_MHR_DEFAULTS['E. Europe'].cnc_3ax_vmc).toBeGreaterThanOrEqual(35);
-  });
-
-  it('keeps USA VMC rates inside the 2026 market band', () => {
-    expect(LOCATION_MHR_DEFAULTS['USA'].cnc_3ax_vmc).toBeGreaterThanOrEqual(65);
-    expect(LOCATION_MHR_DEFAULTS['USA'].cnc_3ax_vmc).toBeLessThanOrEqual(100);
-    expect(LOCATION_MHR_DEFAULTS['USA'].cnc_5ax_mc).toBeGreaterThanOrEqual(120);
-    expect(LOCATION_MHR_DEFAULTS['USA'].cnc_5ax_mc).toBeLessThanOrEqual(180);
-  });
-
-  it('keeps China VMC rates above the $22/hr impossibility line', () => {
-    // ¥300 ≈ $41, ¥580 ≈ $80 at ~7.25 CNY/USD — inside the $35-60 / $60-120 bands
-    expect(LOCATION_MHR_DEFAULTS['China'].cnc_3ax_vmc / 7.25).toBeGreaterThanOrEqual(35);
-    expect(LOCATION_MHR_DEFAULTS['China'].cnc_5ax_mc / 7.25).toBeGreaterThanOrEqual(60);
+  it('stays silent when no benchmark is provided (DB had no row)', () => {
+    expect(benchmarkRateWarning('cnc_3ax_vmc', 'Atlantis', 85, 'Haas VF-2', undefined)).toBeNull();
+    expect(benchmarkRateWarning('unknown_class', 'USA', 85, 'Haas VF-2', undefined)).toBeNull();
   });
 });
 

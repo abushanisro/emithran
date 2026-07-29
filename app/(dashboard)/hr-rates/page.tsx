@@ -185,6 +185,23 @@ export default function HRRatesPage() {
     exportMHRToPDF({ records: mhrData.records, companyName: 'Your Company Name', companyAddress: 'Your Company Address' });
   };
 
+  const handleMhrDownloadJson = () => {
+    if (!mhrData?.records?.length) return;
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      totalRecords: mhrData.total,
+      exportedCount: mhrData.records.length,
+      records: mhrData.records,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hr-rates-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // ─── Excel import (MHR only) ──────────────────────────────────────────────
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -314,6 +331,9 @@ export default function HRRatesPage() {
             </Button>
             <Button size="sm" variant="outline" onClick={handleMhrExportPdf} disabled={!mhrData?.records?.length}>
               <FileText className="h-3.5 w-3.5 mr-1.5" />PDF
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleMhrDownloadJson} disabled={!mhrData?.records?.length} title="Download all HR rate records as JSON">
+              <FileDown className="h-3.5 w-3.5 mr-1.5" />JSON
             </Button>
             <Button
               size="sm"

@@ -15,11 +15,11 @@ import {
   IsOptional,
   IsUUID,
   IsEnum,
-  IsBoolean,
   Min,
   Max,
   IsInt,
 } from 'class-validator';
+import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 /**
  * Evaluation status enum
@@ -303,8 +303,7 @@ export class QuerySupplierEvaluationDto {
   recommendationStatus?: RecommendationStatus;
 
   @ApiPropertyOptional({ description: 'Filter frozen evaluations only', example: true })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalBoolean()
   isFrozen?: boolean;
 
   @ApiPropertyOptional({ description: 'Evaluation round number' })

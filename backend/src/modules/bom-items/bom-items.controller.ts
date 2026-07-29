@@ -32,7 +32,7 @@ import { AutoFillResponseDto } from './dto/auto-fill.dto';
 import { MachineOverrideDto } from './dto/machine-selection.dto';
 import { CostOverrideDto } from './dto/cost-override.dto';
 import { ApplyRouteDto, type ApplyRouteResult } from './dto/apply-route.dto';
-import { DEFAULT_COSTING_LOCATION, defaultLHRRate, LOCATION_INFO } from './costing/default-rates';
+import { LOCATION_INFO } from './costing/default-rates';
 import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -52,6 +52,26 @@ interface User {
   email?: string;
   [key: string]: any;
 }
+
+// machine_class → process_group, mirroring the fuller vocabulary already used
+// for display in manufacturing-intelligence/page.tsx's
+// deriveProcessGroupFromMachineClass, and the process_group set
+// lhr_benchmark_rates actually has coverage for (migrations 369/371/375:
+// Sheet Metal, Machining, Assembly, Post Processing, Plastic & Rubber,
+// Quality). Built once at module load — a single Map.get() per line instead
+// of scanning several arrays with .includes() on every call.
+const MACHINE_CLASS_TO_PROCESS_GROUP: ReadonlyMap<string, string> = new Map([
+  ...['cmm', 'inspection'].map((c) => [c, 'Quality'] as const),
+  ...['fiber_laser', 'co2_laser', 'plasma', 'waterjet', 'press_brake', 'turret_punch', 'roll_forming', 'deep_draw', 'band_saw']
+    .map((c) => [c, 'Sheet Metal'] as const),
+  ...['cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn', 'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'grinding', 'drill_press', 'tapping', 'edm']
+    .map((c) => [c, 'Machining'] as const),
+  ...['welding', 'manual_assembly', 'adhesive_bonding', 'electrical_assembly'].map((c) => [c, 'Assembly'] as const),
+  ...['ndt_test', 'heat_treat_furnace', 'anodize', 'powder_coat', 'plating', 'chem_treatment', 'laser_marking', 'deburring']
+    .map((c) => [c, 'Post Processing'] as const),
+  ...['injection_molding', 'thermoforming', 'blow_molding', 'extrusion', 'rotational_molding', 'rubber_molding', 'compression_molding']
+    .map((c) => [c, 'Plastic & Rubber'] as const),
+]);
 
 @ApiTags('BOM Items')
 @ApiBearerAuth()
@@ -493,6 +513,11 @@ export class BOMItemsController {
           // STL for browser viewing; preserve original STEP for reanalysis
           updateData.file3dPath = stlUploadResult.storagePath;
           updateData.fileStepPath = uploadResult.storagePath;
+
+          // Pre-warm the CAD engine geometry cache now while the user fills in BOM
+          // details. Fire-and-forget — the result lands in the disk cache so the
+          // subsequent analyze-for-autofill call returns in < 1 s instead of 30–70 s.
+          this.cadAnalysisService.prewarmCache(file3d.buffer, file3d.originalname);
         } catch (error) {
           // Conversion failed — keep original STEP as the viewable file; it's also the analysis source
           this.logger.warn(`Auto-conversion failed for ${file3d.originalname}, keeping original file`);
@@ -1042,8 +1067,8 @@ export class BOMItemsController {
         },
         '3d',
         user.id,
-        assemblyItem.id,
         projectId,
+        assemblyItem.id,
       );
 
       await this.bomItemsService.update(
@@ -1109,12 +1134,13 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
+    if (!location) throw new BadRequestException('location query param is required — send the digital factory location with each costing request');
     return this.bomItemsService.getCostSummary(
       id,
       user.id,
       token,
       batchSize ? parseInt(batchSize, 10) : 1,
-      location || DEFAULT_COSTING_LOCATION,
+      location,
     );
   }
 
@@ -1130,12 +1156,13 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
+    if (!location) throw new BadRequestException('location query param is required — send the digital factory location with each costing request');
     return this.bomItemsService.getRouteComparison(
       id,
       user.id,
       token,
       batchSize ? parseInt(batchSize, 10) : 1,
-      location || DEFAULT_COSTING_LOCATION,
+      location,
     );
   }
 
@@ -1151,12 +1178,13 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
+    if (!location) throw new BadRequestException('location query param is required — send the digital factory location with each costing request');
     return this.bomItemsService.getCandidateRoutes(
       id,
       user.id,
       token,
       batchSize ? parseInt(batchSize, 10) : 1,
-      location || DEFAULT_COSTING_LOCATION,
+      location,
     );
   }
 
@@ -1181,13 +1209,14 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
+    if (!dto.location) throw new BadRequestException('location is required in the request body — send the digital factory location');
     return this.bomItemsService.setMachineOverride(
       id,
       user.id,
       token,
       dto.processKey,
       dto.mhrRecordId ?? null,
-      dto.location || DEFAULT_COSTING_LOCATION,
+      dto.location,
     );
   }
 
@@ -1202,13 +1231,14 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
+    if (!dto.location) throw new BadRequestException('location is required in the request body — send the digital factory location');
     return this.bomItemsService.setCostOverride(
       id,
       user.id,
       token,
       dto.fieldKey,
       dto.value ?? null,
-      dto.location || DEFAULT_COSTING_LOCATION,
+      dto.location,
     );
   }
 
@@ -1241,14 +1271,14 @@ export class BOMItemsController {
       const pierces = (item.pierceCount ?? 0) + (item.holeCount ?? 0) + 1;
       ops.push({ operation: 'laser_cutting', processGroup: 'Sheet Metal', geometry: { thicknessMm: t, cutLengthMm: cutLen, pierceCount: pierces } });
       if ((item.bendCount ?? 0) > 0) {
-        ops.push({ operation: 'press_brake', processGroup: 'Sheet Metal', geometry: { bendCount: item.bendCount, materialThicknessMm: t, bendLengthMm: 300, tensileStrengthMpa: 400 } });
+        ops.push({ operation: 'press_brake', processGroup: 'Sheet Metal', geometry: { bendCount: item.bendCount, materialThicknessMm: t, bendLengthMm: item.maxLength ?? 300, tensileStrengthMpa: 400 } });
       }
       if ((item.holeCount ?? 0) > 0) {
         ops.push({ operation: 'drilling', processGroup: 'Sheet Metal', geometry: { diameterMm: 6, depthMm: t, holeCount: item.holeCount } });
       }
     } else if (isPlastic) {
       const vol = item.volume ?? 10000;
-      ops.push({ operation: 'injection_molding', processGroup: 'Plastics', geometry: { polymerId: materialGrade, wallThicknessMm: 2.5, projectedAreaMm2: item.flatPatternAreaMm2 ?? Math.pow(vol / 50, 0.67) * 100, shotVolumeCm3: (vol / 1000) * 1.2 } });
+      ops.push({ operation: 'injection_molding', processGroup: 'Plastic & Rubber', geometry: { polymerId: materialGrade, wallThicknessMm: 2.5, projectedAreaMm2: item.flatPatternAreaMm2 ?? Math.pow(vol / 50, 0.67) * 100, shotVolumeCm3: (vol / 1000) * 1.2 } });
     } else {
       const vol = item.volume ?? 100000;
       const sizeMm = Math.cbrt(vol);
@@ -1410,7 +1440,7 @@ export class BOMItemsController {
       .order('lhr', { ascending: true });
 
     // Build group-keyed lookup: processGroup → benchmark LHR for that group.
-    // Falls back to defaultLHRRate() (static table in default-rates.ts) if the DB table is empty.
+    // When DB has no row for a group, LHR defaults to 0 — visible as a gap, not a silently wrong rate.
     const lhrByGroup = new Map<string, number>();
     for (const row of benchmarkRows ?? []) {
       const group = row.process_group as string;
@@ -1423,7 +1453,7 @@ export class BOMItemsController {
       }
     }
     const pickLHR = (group: string): { id: null; lhr: number } =>
-      ({ id: null, lhr: lhrByGroup.get(group) ?? defaultLHRRate(location, group) });
+      ({ id: null, lhr: lhrByGroup.get(group) ?? 0 });
 
     for (const line of route.processLines) {
       const operation    = line.process.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
@@ -1442,6 +1472,13 @@ export class BOMItemsController {
         operation,
         process_group:  processGroup,
         machine_name:   line.machineName ?? null,
+        // The route engine already selected a real machine per line (see
+        // attachMachineSelections() in bom-items.service.ts) — persist its
+        // mhr_records id so the ProcessCostDialog's MHR dropdown can find and
+        // pre-select it on the next load. Without this, only machine_name (a
+        // display string) was stored and the dropdown always showed "no
+        // machine selected" for a route-applied line.
+        mhr_id:         line.machineSelection?.balanced?.candidate?.machineId ?? null,
         machine_rate:   machineRate,
         labor_rate:     lhr.lhr,
         lhr_id:         null,
@@ -1489,10 +1526,14 @@ export class BOMItemsController {
     return map[machineCategoryHint] ?? machineCategoryHint.split('_')[0];
   }
 
+  // The old version only recognised 4 machine classes and silently
+  // miscategorized everything else — including 'deburring' — as the
+  // 'CNC Machining' catch-all, pulling the wrong (real-CNC-machinist) labour
+  // rate onto e.g. a Hand Deburring line instead of the correct Post
+  // Processing rate. im_* is kept as a prefix check since MACHINE_CLASS_TO_
+  // PROCESS_GROUP only has exact-match entries.
   private deriveProcessGroupFromMachineClass(machineClass: string): string {
-    if (['fiber_laser', 'turret_punch', 'waterjet', 'press_brake'].includes(machineClass)) return 'Sheet Metal';
-    if (machineClass.startsWith('im_') || machineClass === 'injection_molding') return 'Plastics';
-    if (['cmm', 'inspection'].includes(machineClass)) return 'Quality';
-    return 'CNC Machining';
+    if (machineClass.startsWith('im_')) return 'Plastic & Rubber';
+    return MACHINE_CLASS_TO_PROCESS_GROUP.get(machineClass) ?? 'CNC Machining';
   }
 }

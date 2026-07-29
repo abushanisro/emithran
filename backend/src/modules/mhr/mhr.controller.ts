@@ -67,8 +67,9 @@ export class MHRController {
   async getBenchmarkRates(
     @Query('location') location?: string,
     @Query('processGroup') processGroup?: string,
+    @Query('machineClass') machineClass?: string,
   ) {
-    return this.mhrService.getBenchmarkRates(location, processGroup);
+    return this.mhrService.getBenchmarkRates(location, processGroup, machineClass);
   }
 
   @Get(':id')

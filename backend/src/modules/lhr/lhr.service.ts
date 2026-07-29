@@ -109,7 +109,7 @@ export class LHRService {
     let query = this.supabaseService
       .getAdminClient()
       .from('lhr_benchmark_rates')
-      .select('id, location, process_group, lhr, currency, lhr_usd_effective')
+      .select('id, labour_code, labour_type, description, location, process_group, lhr, currency, lhr_usd_effective')
       .order('location', { ascending: true })
       .order('process_group', { ascending: true });
 
@@ -125,10 +125,21 @@ export class LHRService {
     }
 
     return (data ?? []).map(row => ({
-      id: `benchmark-${row.location}-${row.process_group}`,
-      labourCode: `BM-${row.location.toUpperCase().replace(/[\s.]/g, '')}-${row.process_group.toUpperCase().replace(/[\s-]/g, '')}`,
-      labourType: `${row.process_group}`,
-      description: `Benchmark LHR for ${row.location} — ${row.process_group}`,
+      // 'bm-lhr-<id>' — same reversible prefix scheme as mhr.service.ts's
+      // getBenchmarkRates() ('bm-mhr-<id>'). The previous id here was a
+      // descriptive string built from location+process_group with no real row
+      // id embedded in it at all, so a selected benchmark labour rate could
+      // never be looked back up by id — the save path had nothing valid to
+      // resolve labor_type from, for any benchmark selection, ever.
+      id: `bm-lhr-${row.id}`,
+      // labour_code/labour_type are real, seeded columns (migration 361) — use
+      // them directly instead of re-deriving a coarser substitute from
+      // location+process_group (that discarded the actual skill-level
+      // information, e.g. "CNC Machinist", collapsing it down to just the
+      // process group name, e.g. "CNC Machining").
+      labourCode: row.labour_code,
+      labourType: row.labour_type,
+      description: row.description ?? `Benchmark LHR for ${row.location} — ${row.process_group}`,
       lhr: parseFloat(row.lhr_usd_effective) || 0,
       location: row.location,
       processGroup: row.process_group,

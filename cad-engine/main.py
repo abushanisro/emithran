@@ -9,11 +9,16 @@ Standards: ISO 10303 (STEP), STL Binary Format
 """
 
 import os
+import asyncio
+import json
 import logging
 import tempfile
 import hashlib
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -78,12 +83,33 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     """Application lifespan manager - handles startup and shutdown"""
     
+    global _CF_DISK_CACHE_DIR
+
     # Startup
     logger.info("Initializing CAD Engine services...")
-    
+
     # Create temp directory if it doesn't exist
     os.makedirs(config.temp_dir, exist_ok=True)
     logger.info(f"Temp directory: {config.temp_dir}")
+
+    # Initialise GCD-adj disk cache and warm in-memory cache from persisted entries.
+    _CF_DISK_CACHE_DIR = Path(config.temp_dir) / "cf_disk_cache"
+    _CF_DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    _warm_count = 0
+    for _p in _CF_DISK_CACHE_DIR.glob("*.json"):
+        try:
+            _data = json.loads(_p.read_text(encoding="utf-8"))
+            if time.time() - _data.get("ts", 0) <= _CF_DISK_CACHE_TTL_SEC:
+                _gh = _p.stem
+                with _cf_cache_lock:
+                    if len(_cf_cache) < 50:
+                        _cf_cache[_gh] = _data["cf"]
+                _warm_count += 1
+            else:
+                _p.unlink(missing_ok=True)
+        except Exception:
+            pass
+    logger.info(f"[cf-disk-cache] warmed {_warm_count} GCD-adj entries from disk at {_CF_DISK_CACHE_DIR}")
     
     # Initialize services with dependency injection
     step_reader = StepReader()
@@ -135,6 +161,48 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
+
+# Process-lifetime cache for GCD adjacency (35–70s computation per unique STEP file).
+# Keyed by geometry_hash from memory_optimizer; evicted LRU-style at 50 entries.
+_cf_cache: Dict[str, Any] = {}
+_cf_cache_lock = threading.Lock()
+
+# Disk cache for GCD-adj results — survives Uvicorn restarts.
+# Stored as {geometry_hash}.json under CF_DISK_CACHE_DIR.
+_CF_DISK_CACHE_TTL_SEC = 7 * 24 * 3600  # 7 days
+_CF_DISK_CACHE_DIR: Path = Path("/tmp/cad_engine/cf_disk_cache")  # overridden in lifespan
+
+# Single-threaded executor keeps GCD-adj off the async event loop without
+# saturating CPU with parallel O(n²) walks.
+_cf_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="gcd-adj")
+
+
+def _cf_disk_path(gh: str) -> Path:
+    return _CF_DISK_CACHE_DIR / f"{gh}.json"
+
+
+def _load_cf_from_disk(gh: str) -> Optional[Dict[str, Any]]:
+    """Return cached component_features dict or None if absent / expired / corrupt."""
+    p = _cf_disk_path(gh)
+    if not p.exists():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        if time.time() - data.get("ts", 0) > _CF_DISK_CACHE_TTL_SEC:
+            p.unlink(missing_ok=True)
+            return None
+        return data["cf"]
+    except Exception:
+        return None
+
+
+def _save_cf_to_disk(gh: str, cf: Dict[str, Any]) -> None:
+    """Persist component_features dict to disk. Non-fatal on any error."""
+    try:
+        p = _cf_disk_path(gh)
+        p.write_text(json.dumps({"ts": time.time(), "cf": cf}), encoding="utf-8")
+    except Exception as exc:
+        logger.warning(f"[cf-disk-cache] write failed for {gh[:12]}: {exc}")
 
 # Add rate limiter to app state
 app.state.limiter = limiter
@@ -626,20 +694,53 @@ async def analyze_geometry_advanced(
             if cnc_features_result is not None:
                 response["cnc_features"] = cnc_features_result
 
-            # Component feature analysis (aPriori-style decomposition) —
-            # runs for all families; results stored inside manufacturing_features
-            # so they flow through the existing backend JSONB storage path.
+            # Component feature analysis (aPriori-style decomposition).
+            # GCD adjacency walk is the bottleneck (30–70 s for complex sheet metal).
+            # Three-layer cache: in-memory → disk → fresh computation in thread pool.
+            # The thread pool keeps the async event loop responsive so concurrent
+            # requests (e.g. route-comparison, cost-summary) are not blocked.
             try:
                 from feature_extractors import ComponentFeatureAnalyzer  # type: ignore
-                _mfg = optimization_result.geometry_features.manufacturing_features
-                _bbox = optimization_result.geometry_features.bounding_box
-                _cf = ComponentFeatureAnalyzer().analyze(shape, _mfg, _bbox)
+                _gh = optimization_result.geometry_hash
+
+                # Layer 1: in-memory (hot path — same process, any previous call)
+                with _cf_cache_lock:
+                    _cf = _cf_cache.get(_gh)
+
+                # Layer 2: disk (warm path — survives Uvicorn restarts)
+                if _cf is None and not force_reanalysis:
+                    _cf = _load_cf_from_disk(_gh)
+                    if _cf is not None:
+                        with _cf_cache_lock:
+                            if len(_cf_cache) >= 50:
+                                _cf_cache.pop(next(iter(_cf_cache)))
+                            _cf_cache[_gh] = _cf
+                        logger.info(f"[component_features] disk-cache hit {_gh[:12]}")
+
+                if _cf is not None:
+                    logger.info(f"[component_features] cache hit {_gh[:12]}")
+                else:
+                    # Layer 3: fresh computation — run in thread pool so the event loop
+                    # stays responsive for other concurrent requests during the 30–70 s walk.
+                    _mfg = optimization_result.geometry_features.manufacturing_features
+                    _bbox = optimization_result.geometry_features.bounding_box
+                    _loop = asyncio.get_event_loop()
+                    _cf = await _loop.run_in_executor(
+                        _cf_executor,
+                        lambda: ComponentFeatureAnalyzer().analyze(shape, _mfg, _bbox),
+                    )
+                    # Populate both cache layers so the next request is instant
+                    with _cf_cache_lock:
+                        if len(_cf_cache) >= 50:
+                            _cf_cache.pop(next(iter(_cf_cache)))
+                        _cf_cache[_gh] = _cf
+                    _save_cf_to_disk(_gh, _cf)
+                    logger.info(
+                        f"[component_features] computed blank={_cf['blank']['face_id']} "
+                        f"setup_axes={len(_cf['setup_axes_candidates'])} "
+                        f"gcd_relations={len(_cf['gcd_relations'])}"
+                    )
                 response["geometry_features"]["manufacturing_features"]["component_features"] = _cf
-                logger.info(
-                    f"[component_features] blank={_cf['blank']['face_id']} "
-                    f"setup_axes={len(_cf['setup_axes_candidates'])} "
-                    f"gcd_relations={len(_cf['gcd_relations'])}"
-                )
             except Exception as _cf_exc:
                 logger.warning(f"[component_features] extraction failed: {_cf_exc}")
 

@@ -19,6 +19,7 @@ import {
   IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 /**
  * DTO for creating a new tooling cost record
@@ -199,9 +200,7 @@ export class QueryToolingCostsDto {
   toolingType?: string;
 
   @ApiPropertyOptional({ description: 'Filter by active status', example: true })
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
+  @IsOptionalBoolean()
   isActive?: boolean;
 
   @ApiPropertyOptional({ description: 'Search in description or supplier' })
@@ -215,9 +214,7 @@ export class QueryToolingCostsDto {
   bomItemId?: string;
 
   @ApiPropertyOptional({ description: 'Filter by custom tooling', example: false })
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
+  @IsOptionalBoolean()
   isCustom?: boolean;
 }
 
