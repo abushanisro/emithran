@@ -1,9 +1,5 @@
 import {
-  LASER_MHR_INR, PRESS_BRAKE_MHR_INR, DEBURRING_MHR_INR, TAPPING_MHR_INR,
-  LASER_SETUP_MIN, PRESS_BRAKE_SETUP_MIN, TAPPING_SETUP_MIN,
-  MATERIAL_OVERHEAD_PCT,
-  LASER_SPEED_MM_PER_MIN, LASER_PIERCE_SEC, laserSpeedFactor,
-  PRESS_BRAKE_SEC_PER_BEND,
+  TAPPING_SETUP_MIN, MATERIAL_OVERHEAD_PCT,
   TAP_CYCLE_SEC,
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
   RATES_SOURCE_LABEL,
@@ -13,23 +9,24 @@ import {
   MATERIAL_CO2_KG_PER_KG, MATERIAL_RECYCLABILITY_PCT,
   SUSTAINABILITY_FACTORS_LABEL,
 } from './sustainability-factors';
+import type { LaserCutParams } from './sheet-metal-lookup.service';
+import type { NestingResult } from './sheet-metal-nesting.engine';
 import type { CostSummaryDto, ProcessLineCost, ProcessCO2, SustainabilitySummaryDto } from '../dto/cost-breakdown.dto';
+import { computeSurfaceTreatmentLine } from './cost-surface-treatment';
+import type { SurfaceTreatmentDbRate } from './default-rates';
 
 export interface MHRRateInput {
   rate: number;
-  source: 'mhr_database' | 'default_rate' | 'tier_synthetic' | 'benchmark_override';
+  source: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override';
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;
-  // Full physics-based selection result; present when the capability selector ran
   selection?: import('../dto/machine-selection.dto').MachineSelectionResult;
-  // Labour Hour Rate from lhr_benchmark_rates for the resolved location + process group.
-  // Already factored into `rate` (fully burdened) — shown separately for transparency.
   labourRate?: number | null;
 }
 
 export interface CostEngineInput {
-  // Geometry — from FeatureGraphSummary or promoted BOM item columns
+  // ── Geometry ─────────────────────────────────────────────────────────────
   sheetThicknessMm: number;
   cutLengthMm: number;
   pierceCount: number;
@@ -37,43 +34,87 @@ export interface CostEngineInput {
   flatPatternAreaMm2: number;
   holeCount: number;
 
-  // Material — resolved by caller before invoking engine
+  // ── Flat-pattern dimensions (for nesting) ─────────────────────────────────
+  flatPatternLengthMm?: number;
+  flatPatternWidthMm?: number;
+
+  // ── Bend geometry ─────────────────────────────────────────────────────────
+  bendLengthMm?: number;          // total bending line length (default: bendCount × 200)
+  shoulderWidthMm?: number;       // V-die opening (default: 8 × thickness)
+
+  // ── Part complexity ────────────────────────────────────────────────────────
+  partComplexity?: 'simple' | 'medium' | 'complex';
+
+  // ── Material ───────────────────────────────────────────────────────────────
   materialGrade: string | null;
   materialCostPerKg: number;
   materialDensityKgM3: number;
   materialSource: 'db' | 'default';
+  utsMpa?: number;                // from raw_materials (for tonnage calc)
+  shearStrengthMpa?: number;      // from raw_materials (for part allowance)
+  scrapPricePerKg?: number;       // from raw_materials
 
-  // Drawing-extracted threads (from drawing_intelligence.threads)
+  // ── Labor rates ────────────────────────────────────────────────────────────
+  directLaborRatePerHr?: number;  // DLR — from lhr_records
+  qaInspectorRatePerHr?: number;  // QAIR — from lhr_records
+
+  // ── Yield ─────────────────────────────────────────────────────────────────
+  yieldPct?: number;              // default 0.98
+
+  // ── Machine attributes ─────────────────────────────────────────────────────
+  laserPowerW?: number;           // from mhr_records specs
+  machineOperators?: number;      // nDL from mhr_records (default 1)
+
+  // ── Pre-resolved DB lookups ────────────────────────────────────────────────
+  laserParams?: LaserCutParams;
+  handlingTimeMin?: number;       // Table 2 for sheet weight
+  toolSetupPressMin?: number;     // Table 3A for press tonnage
+  toolSetupBrakeMin?: number;     // Table 3B for brake tool length
+  manualStrokeTimeSec?: number;   // Table 4 per stroke (already scaled × bendCount by caller)
+  samplingRate?: number;          // Table 6 fraction
+  inspectionTimeMin?: number;     // per-piece (default 0.5)
+
+  // ── Nesting result (pre-resolved) ─────────────────────────────────────────
+  nestingResult?: NestingResult;
+
+  // ── Threads & scenario ────────────────────────────────────────────────────
   threads: Array<{ size: string; count: number }>;
-
-  // Scenario
   batchSize: number;
   family: string;
 
-  // Optional: live MHR rates from mhr_records; fallback to default-rates when absent
+  // ── MHR rates ─────────────────────────────────────────────────────────────
   mhrRates?: {
     laser: MHRRateInput;
     pressBrake: MHRRateInput;
     deburring: MHRRateInput;
     tapping: MHRRateInput;
   };
+
+  // ── Costing location (for location-aware LHR fallback) ────────────────────
+  location?: string;
+
+  // ── Surface treatment (anodize / powder coat / plating) ──────────────────
+  surfaceAreaMm2?: number;            // from bom_items.surface_area (OCC 3D surface area)
+  surfaceTreatment?: string | null;   // callout from drawing / bom_items.coating
+  surfaceTreatmentDbRate?: SurfaceTreatmentDbRate | null;
+
+  // ── Process identity, resolved by the caller from process_calculator_mappings
+  // (never hardcoded here) — keyed by machine_class so each process line can state
+  // its real (processGroup, processRoute, operation) instead of leaving consumers
+  // to reuse the cosmetic `process` display label as a fake operation. Caller
+  // queries `SELECT process_group, process_route, operation FROM
+  // process_calculator_mappings WHERE machine_class = $1 AND is_active` and picks
+  // one representative row per class (e.g. lowest display_order) — see
+  // BomItemsService.resolveProcessIdentities().
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>;
 }
 
-// ── Find the nearest matching key in a numeric lookup table ──────────────────
-
-function nearest(mm: number, table: Record<number, number>): number {
-  const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
-  let best = keys[0];
-  for (const k of keys) {
-    if (Math.abs(k - mm) < Math.abs(best - mm)) best = k;
-  }
-  return best;
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function r2(n: number): number { return Math.round(n * 100) / 100; }
 function r3(n: number): number { return Math.round(n * 1000) / 1000; }
 
-// ── Sustainability calculation ─────────────────────────────────────────────────
+// ── Sustainability (unchanged logic) ──────────────────────────────────────────
 
 export function computeSustainability(
   materialGrade: string | null,
@@ -107,7 +148,6 @@ export function computeSustainability(
   const co2PerKgPart = r3(netWeightKg > 0 ? totalCo2Kg / netWeightKg : 0);
   const recyclabilityPct = MATERIAL_RECYCLABILITY_PCT[grade] ?? MATERIAL_RECYCLABILITY_PCT['__default__']!;
 
-  // Contributor ranking — dominant driver immediately visible
   const allContributors = [
     { label: 'Material Production', co2Kg: materialCo2Kg },
     ...processCo2Breakdown.map((p) => ({ label: p.process, co2Kg: p.co2Kg })),
@@ -120,7 +160,6 @@ export function computeSustainability(
       pct: r2(totalCo2Kg > 0 ? (c.co2Kg / totalCo2Kg) * 100 : 0),
     }));
 
-  // Score (0–100): material efficiency 30 + CO₂ intensity 30 + recyclability 20 + process energy 20
   const matScore    = (materialUtilizationPct / 100) * 30;
   const co2Score    = Math.max(0, 30 - co2PerKgPart * 3);
   const recyclScore = (recyclabilityPct / 100) * 20;
@@ -172,6 +211,44 @@ export function computeSustainability(
   };
 }
 
+// ── 5-term aPriori cost formula ────────────────────────────────────────────────
+// Returns { machineCost, setupCost, laborCost, inspCost, yieldCost, total }
+// All rates are per-hour in local currency; times are in minutes.
+function aprioriTerms(args: {
+  mhrPerHr: number;
+  dlrPerHr: number;
+  qairPerHr: number;
+  nDL: number;
+  cycleTimeMin: number;
+  setupTimeMin: number;
+  inspTimeMin: number;
+  samplingRate: number;
+  yieldPct: number;
+  netMatCost: number;
+  netWeightKg: number;
+  scrapPricePerKg: number;
+}): { machineCost: number; setupCost: number; laborCost: number; inspCost: number; yieldCost: number; total: number } {
+  const { mhrPerHr, dlrPerHr, qairPerHr, nDL, cycleTimeMin, setupTimeMin,
+          inspTimeMin, samplingRate, yieldPct, netMatCost, netWeightKg, scrapPricePerKg } = args;
+
+  const mhrMin = mhrPerHr / 60;
+  const dlrMin = dlrPerHr / 60;
+  const qairMin = qairPerHr / 60;
+
+  const machineCost = mhrMin * cycleTimeMin;
+  // Setup: machine idle time + DL idle time (no SL in this deployment)
+  const setupCost = (mhrMin + dlrMin * nDL) * setupTimeMin;
+  const laborCost = dlrMin * nDL * cycleTimeMin;
+  const inspCost = qairMin * inspTimeMin * samplingRate;
+
+  const scrapValue = netWeightKg * scrapPricePerKg;
+  const yieldBase = Math.max(0, netMatCost - scrapValue + machineCost + setupCost + laborCost + inspCost);
+  const yieldCost = (1 - yieldPct) * yieldBase;
+
+  const total = machineCost + setupCost + laborCost + inspCost + yieldCost;
+  return { machineCost, setupCost, laborCost, inspCost, yieldCost, total };
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
@@ -179,48 +256,132 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     sheetThicknessMm, cutLengthMm, pierceCount, bendCount,
     flatPatternAreaMm2, materialGrade, materialCostPerKg,
     materialDensityKgM3, materialSource, threads, batchSize, family,
+    nestingResult,
+    laserParams,
+    handlingTimeMin = 0.25,
+    toolSetupBrakeMin = 10,
+    manualStrokeTimeSec,
+    samplingRate = 0.08,
+    inspectionTimeMin = 0.5,
+    directLaborRatePerHr,
+    qaInspectorRatePerHr,
+    yieldPct = 0.98,
+    machineOperators = 1,
+    scrapPricePerKg = 0,
   } = input;
 
   const warnings: string[] = [];
   const processLines: ProcessLineCost[] = [];
 
-  const laserRate   = input.mhrRates?.laser      ?? { rate: LASER_MHR_INR,       source: 'default_rate' as const, machineClass: 'fiber_laser',  machineName: null, commodityCode: null };
-  const pbRate      = input.mhrRates?.pressBrake ?? { rate: PRESS_BRAKE_MHR_INR, source: 'default_rate' as const, machineClass: 'press_brake',  machineName: null, commodityCode: null };
-  const deburrRate  = input.mhrRates?.deburring  ?? { rate: DEBURRING_MHR_INR,   source: 'default_rate' as const, machineClass: 'deburring',    machineName: null, commodityCode: null };
-  const tappingRate = input.mhrRates?.tapping    ?? { rate: TAPPING_MHR_INR,     source: 'default_rate' as const, machineClass: 'tapping',      machineName: null, commodityCode: null };
+  const location = input.location;
+  if (!location) {
+    warnings.push('No factory location set — rates cannot be location-adjusted; configure your digital factory location in Settings');
+  }
+
+  const dlrPerHr  = directLaborRatePerHr  ?? 0;
+  const qairPerHr = qaInspectorRatePerHr  ?? 0;
+
+  if (directLaborRatePerHr == null) {
+    warnings.push(`No direct labor rate in DB for ${location ?? 'this location'} (Sheet Metal) — labor cost excluded from quote; add rows to lhr_records`);
+  }
+  if (qaInspectorRatePerHr == null) {
+    warnings.push(`No QA inspector rate in DB for ${location ?? 'this location'} — inspection labor excluded from quote; add rows to lhr_records`);
+  }
+
+  // MHR: when no DB machine exists, rate is 0 and source is 'no_db_rate'.
+  // Warnings are emitted at each usage point (only when that operation is actually present).
+  const laserRate   = input.mhrRates?.laser      ?? { rate: 0, source: 'no_db_rate' as const, machineClass: 'fiber_laser',  machineName: null, commodityCode: null };
+  const pbRate      = input.mhrRates?.pressBrake ?? { rate: 0, source: 'no_db_rate' as const, machineClass: 'press_brake',  machineName: null, commodityCode: null };
+  const deburrRate  = input.mhrRates?.deburring  ?? { rate: 0, source: 'no_db_rate' as const, machineClass: 'deburring',    machineName: null, commodityCode: null };
+  const tappingRate = input.mhrRates?.tapping    ?? { rate: 0, source: 'no_db_rate' as const, machineClass: 'tapping',      machineName: null, commodityCode: null };
 
   if (!materialGrade) warnings.push('Material grade not set — default mild steel rates applied');
   if (flatPatternAreaMm2 === 0) warnings.push('Flat pattern area is 0 — material cost may be inaccurate');
-  if (sheetThicknessMm === 0) warnings.push('Sheet thickness is 0 — cutting speed lookup may be inaccurate');
+  if (sheetThicknessMm === 0) warnings.push('Sheet thickness is 0 — cycle time lookups may be inaccurate');
 
   // ── Material cost ─────────────────────────────────────────────────────────
   const volumeMm3 = flatPatternAreaMm2 * sheetThicknessMm;
   const netWeightKg = (volumeMm3 / 1e9) * materialDensityKgM3;
-  const grossWeightKg = netWeightKg * (1 + MATERIAL_OVERHEAD_PCT / 100);
-  const materialCost = grossWeightKg * materialCostPerKg;
+
+  let materialCost: number;
+  let grossWeightKg: number;
+
+  if (nestingResult) {
+    // aPriori nesting path — use nesting-derived gross weight
+    materialCost = nestingResult.netMaterialCost;
+    grossWeightKg = nestingResult.grossWeightPerPartKg;
+    if (nestingResult.utilisationPct < 75) {
+      warnings.push(
+        `Material utilisation ${nestingResult.utilisationPct}% is low — ` +
+        `consider panel nesting optimisation (${nestingResult.partsPerSheet} parts/sheet on ` +
+        `${nestingResult.sheetWidthMm}×${nestingResult.sheetLengthMm}mm)`,
+      );
+    }
+  } else {
+    // Fallback: volume-based gross weight
+    grossWeightKg = netWeightKg * (1 + MATERIAL_OVERHEAD_PCT / 100);
+    materialCost = grossWeightKg * materialCostPerKg;
+  }
+
+  // netMaterialCost for yield formula: what we paid for material for this part
+  const netMatCost = materialCost;
 
   // ── Laser cutting ─────────────────────────────────────────────────────────
   let laserMin = 0;
   if (cutLengthMm > 0 || pierceCount > 0) {
-    const thk = sheetThicknessMm > 0 ? sheetThicknessMm : 2.0;
-    const speedKey = nearest(thk, LASER_SPEED_MM_PER_MIN);
-    const pierceKey = nearest(thk, LASER_PIERCE_SEC);
-    // Speed table is mild-steel baseline — derate for stainless (N₂) / aluminium
-    const speedMmPerMin = (LASER_SPEED_MM_PER_MIN[speedKey] ?? 3000) * laserSpeedFactor(materialGrade);
-    const pierceSec = LASER_PIERCE_SEC[pierceKey] ?? 1.5;
+    let speedMPerMin: number;
+    let pierceTimeMin: number;
 
-    const cuttingSec = cutLengthMm > 0 ? (cutLengthMm / speedMmPerMin) * 60 : 0;
-    const piercingTotalSec = pierceCount * pierceSec;
-    const totalLaserSec = cuttingSec + piercingTotalSec;
-    laserMin = totalLaserSec / 60;
+    if (laserParams) {
+      speedMPerMin = laserParams.cuttingSpeedMPerMin;
+      pierceTimeMin = laserParams.pierceTimeMin;
+      if (!laserParams.dataFound) {
+        warnings.push('Laser cut speed from fallback table — seed sm_lookup_laser_cut for accurate cycle times');
+      }
+    } else {
+      // Absolute last resort — 3 m/min baseline
+      speedMPerMin = 3;
+      pierceTimeMin = 0.025;
+      warnings.push('No laser params available — using conservative fallback speed');
+    }
 
-    const setupCost = (LASER_SETUP_MIN / 60) * laserRate.rate / Math.max(batchSize, 1);
-    const runCost = (totalLaserSec / 3600) * laserRate.rate;
+    const cutTimeMin = cutLengthMm > 0 && speedMPerMin > 0
+      ? (cutLengthMm / (speedMPerMin * 1000))
+      : 0;
+    const pierceMin = pierceCount * pierceTimeMin;
+    laserMin = cutTimeMin + pierceMin;
+
+    // Setup: program recall time + sheet handling per lot
+    // partsPerSheet from nesting; default 4 if nesting not run
+    const partsPerSheet = nestingResult?.partsPerSheet ?? 4;
+    const sheetsPerLot = Math.ceil(batchSize / partsPerSheet);
+    const setupTimeMin = (handlingTimeMin * sheetsPerLot) / Math.max(batchSize, 1);
+
+    const t = aprioriTerms({
+      mhrPerHr: laserRate.rate,
+      dlrPerHr,
+      qairPerHr,
+      nDL: machineOperators,
+      cycleTimeMin: laserMin,
+      setupTimeMin,
+      inspTimeMin: inspectionTimeMin,
+      samplingRate,
+      yieldPct,
+      netMatCost,
+      netWeightKg,
+      scrapPricePerKg,
+    });
+
+    if (laserRate.source === 'no_db_rate') {
+      warnings.push(`No fiber laser MHR rate in DB for ${location ?? 'this location'} — laser process cost is $0; add a row to mhr_records`);
+    }
+    const laserIdentity = input.processIdentityByMachineClass?.[laserRate.machineClass];
     processLines.push({
       process: 'Laser Cutting',
-      setupCost,
-      runCost,
-      totalCost: setupCost + runCost,
+      ...(laserIdentity ? { processGroup: laserIdentity.processGroup, processRoute: laserIdentity.processRoute, operation: laserIdentity.operation } : {}),
+      setupCost: t.setupCost,
+      runCost: t.machineCost + t.laborCost,
+      totalCost: t.total,
       cycleTimeMin: r2(laserMin),
       hourlyRate: laserRate.rate,
       rateSource: laserRate.source,
@@ -234,18 +395,46 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
   // ── Press brake ───────────────────────────────────────────────────────────
   let pressBrakeMin = 0;
   if (bendCount > 0) {
-    const thk = sheetThicknessMm > 0 ? sheetThicknessMm : 2.0;
-    const secPerBend = PRESS_BRAKE_SEC_PER_BEND[nearest(thk, PRESS_BRAKE_SEC_PER_BEND)] ?? 15;
-    const totalPBSec = bendCount * secPerBend;
-    pressBrakeMin = totalPBSec / 60;
+    let cycleTimeSec: number;
 
-    const setupCost = (PRESS_BRAKE_SETUP_MIN / 60) * pbRate.rate / Math.max(batchSize, 1);
-    const runCost = (totalPBSec / 3600) * pbRate.rate;
+    if (manualStrokeTimeSec != null) {
+      // manualStrokeTimeSec from service is already per-bend; multiply by bendCount
+      cycleTimeSec = manualStrokeTimeSec + handlingTimeMin * 60;
+    } else {
+      // Fallback: 15 sec/bend (old hardcoded baseline)
+      cycleTimeSec = bendCount * 15 + handlingTimeMin * 60;
+      warnings.push('Press brake stroke time from fallback — seed sm_lookup_manual_stroke for accurate cycle times');
+    }
+    pressBrakeMin = cycleTimeSec / 60;
+
+    // Setup: tool loading / lot size
+    const setupTimeMin = toolSetupBrakeMin / Math.max(batchSize, 1);
+
+    const t = aprioriTerms({
+      mhrPerHr: pbRate.rate,
+      dlrPerHr,
+      qairPerHr,
+      nDL: machineOperators,
+      cycleTimeMin: pressBrakeMin,
+      setupTimeMin,
+      inspTimeMin: inspectionTimeMin,
+      samplingRate,
+      yieldPct,
+      netMatCost,
+      netWeightKg,
+      scrapPricePerKg,
+    });
+
+    if (pbRate.source === 'no_db_rate') {
+      warnings.push(`No press brake MHR rate in DB for ${location ?? 'this location'} — bending process cost is $0; add a row to mhr_records`);
+    }
+    const pbIdentity = input.processIdentityByMachineClass?.[pbRate.machineClass];
     processLines.push({
       process: 'Press Brake',
-      setupCost,
-      runCost,
-      totalCost: setupCost + runCost,
+      ...(pbIdentity ? { processGroup: pbIdentity.processGroup, processRoute: pbIdentity.processRoute, operation: pbIdentity.operation } : {}),
+      setupCost: t.setupCost,
+      runCost: t.machineCost + t.laborCost,
+      totalCost: t.total,
       cycleTimeMin: r2(pressBrakeMin),
       hourlyRate: pbRate.rate,
       rateSource: pbRate.source,
@@ -261,12 +450,32 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
   if (cutLengthMm > 0) {
     const deburrSec = (cutLengthMm / 1000) * DEBURR_SEC_PER_METRE + pierceCount * DEBURR_SEC_PER_PIERCE;
     deburrMin = deburrSec / 60;
-    const runCost = (deburrSec / 3600) * deburrRate.rate;
+
+    const t = aprioriTerms({
+      mhrPerHr: deburrRate.rate,
+      dlrPerHr,
+      qairPerHr,
+      nDL: machineOperators,
+      cycleTimeMin: deburrMin,
+      setupTimeMin: 0,
+      inspTimeMin: inspectionTimeMin,
+      samplingRate,
+      yieldPct,
+      netMatCost,
+      netWeightKg,
+      scrapPricePerKg,
+    });
+
+    if (deburrRate.source === 'no_db_rate') {
+      warnings.push(`No deburring MHR rate in DB for ${location ?? 'this location'} — deburring process cost is $0; add a row to mhr_records`);
+    }
+    const deburrIdentity = input.processIdentityByMachineClass?.[deburrRate.machineClass];
     processLines.push({
       process: 'Deburring',
+      ...(deburrIdentity ? { processGroup: deburrIdentity.processGroup, processRoute: deburrIdentity.processRoute, operation: deburrIdentity.operation } : {}),
       setupCost: 0,
-      runCost,
-      totalCost: runCost,
+      runCost: t.machineCost + t.laborCost,
+      totalCost: t.total,
       cycleTimeMin: r2(deburrMin),
       hourlyRate: deburrRate.rate,
       rateSource: deburrRate.source,
@@ -282,13 +491,33 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
   if (threads.length > 0) {
     const totalSec = threads.reduce((sum, t) => sum + t.count * (TAP_CYCLE_SEC[t.size] ?? 10), 0);
     tappingMin = totalSec / 60;
-    const setupCost = (TAPPING_SETUP_MIN / 60) * tappingRate.rate / Math.max(batchSize, 1);
-    const runCost = (totalSec / 3600) * tappingRate.rate;
+    const setupTimeMin = TAPPING_SETUP_MIN / Math.max(batchSize, 1);
+
+    const t = aprioriTerms({
+      mhrPerHr: tappingRate.rate,
+      dlrPerHr,
+      qairPerHr,
+      nDL: 1, // single operator for tapping
+      cycleTimeMin: tappingMin,
+      setupTimeMin,
+      inspTimeMin: inspectionTimeMin,
+      samplingRate,
+      yieldPct,
+      netMatCost,
+      netWeightKg,
+      scrapPricePerKg,
+    });
+
+    if (tappingRate.source === 'no_db_rate') {
+      warnings.push(`No tapping MHR rate in DB for ${location ?? 'this location'} — tapping process cost is $0; add a row to mhr_records`);
+    }
+    const tappingIdentity = input.processIdentityByMachineClass?.[tappingRate.machineClass];
     processLines.push({
       process: 'Tapping',
-      setupCost,
-      runCost,
-      totalCost: setupCost + runCost,
+      ...(tappingIdentity ? { processGroup: tappingIdentity.processGroup, processRoute: tappingIdentity.processRoute, operation: tappingIdentity.operation } : {}),
+      setupCost: t.setupCost,
+      runCost: t.machineCost + t.laborCost,
+      totalCost: t.total,
       cycleTimeMin: r2(tappingMin),
       hourlyRate: tappingRate.rate,
       rateSource: tappingRate.source,
@@ -298,6 +527,17 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       labourRate: tappingRate.labourRate ?? null,
     });
   }
+
+  // ── Surface treatment ─────────────────────────────────────────────────────
+  const stLine = computeSurfaceTreatmentLine(
+    input.surfaceTreatment ?? null,
+    input.surfaceAreaMm2 ?? 0,
+    batchSize,
+    location ?? '__default__',
+    warnings,
+    input.surfaceTreatmentDbRate,
+  );
+  if (stLine) processLines.push(stLine);
 
   const totalProcessCost = processLines.reduce((s, l) => s + l.totalCost, 0);
   const totalCost = materialCost + totalProcessCost;

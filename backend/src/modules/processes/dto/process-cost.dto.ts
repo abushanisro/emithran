@@ -25,6 +25,7 @@ import {
   Validate,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 @ValidatorConstraint({ name: 'IsUUIDOrArrayOfUUIDs', async: false })
 export class IsUUIDOrArrayOfUUIDs implements ValidatorConstraintInterface {
@@ -85,11 +86,25 @@ export class CreateProcessCostDto {
   @IsUUID()
   mhrId?: string;
 
+  @ApiPropertyOptional({
+    description: 'mhr_benchmark_rates row id, when the selected machine is a benchmark (★) rate rather than a real mhr_records row (benchmark ids are bigint, never a UUID, so they cannot be sent as mhrId)',
+    example: '42',
+  })
+  @IsOptional()
+  benchmarkMhrId?: string | number;
+
   @ApiPropertyOptional({ description: 'Labour Standard Record ID', example: 'uuid' })
   @IsOptional()
   @ValidateIf(o => o.lhrId != null && o.lhrId !== '')
   @IsUUID()
   lhrId?: string;
+
+  @ApiPropertyOptional({
+    description: 'lhr_benchmark_rates row id, when the selected labour rate is a benchmark (★) rate rather than a real lhr_records row (benchmark ids are bigint, never a UUID, so they cannot be sent as lhrId)',
+    example: '17',
+  })
+  @IsOptional()
+  benchmarkLhrId?: string | number;
 
   // Facility Information
   @ApiPropertyOptional({ description: 'Facility category ID', example: '844' })
@@ -288,11 +303,25 @@ export class UpdateProcessCostDto {
   @IsUUID()
   mhrId?: string;
 
+  @ApiPropertyOptional({
+    description: 'mhr_benchmark_rates row id, when the selected machine is a benchmark (★) rate rather than a real mhr_records row (benchmark ids are bigint, never a UUID, so they cannot be sent as mhrId)',
+    example: '42',
+  })
+  @IsOptional()
+  benchmarkMhrId?: string | number;
+
   @ApiPropertyOptional({ description: 'Labour Standard Record ID', example: 'uuid' })
   @IsOptional()
   @ValidateIf(o => o.lhrId != null && o.lhrId !== '')
   @IsUUID()
   lhrId?: string;
+
+  @ApiPropertyOptional({
+    description: 'lhr_benchmark_rates row id, when the selected labour rate is a benchmark (★) rate rather than a real lhr_records row (benchmark ids are bigint, never a UUID, so they cannot be sent as lhrId)',
+    example: '17',
+  })
+  @IsOptional()
+  benchmarkLhrId?: string | number;
 
   // Facility Information
   @ApiPropertyOptional({ description: 'Facility category ID' })
@@ -501,9 +530,7 @@ export class QueryProcessCostsDto {
   supplier?: string;
 
   @ApiPropertyOptional({ description: 'Filter by active status', example: true })
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
+  @IsOptionalBoolean()
   isActive?: boolean;
 
   @ApiPropertyOptional({ description: 'Search in description', example: 'Assembly' })
@@ -554,8 +581,14 @@ export class ProcessCostResponseDto {
   @ApiPropertyOptional({ description: 'Machine Hour Record ID' })
   mhrId?: string;
 
+  @ApiPropertyOptional({ description: 'Benchmark MHR id (bm-mhr-<id>) when a benchmark machine rate was selected instead of a real mhr_records row' })
+  benchmarkMhrId?: string | number;
+
   @ApiPropertyOptional({ description: 'Labour Standard Record ID' })
   lhrId?: string;
+
+  @ApiPropertyOptional({ description: 'Benchmark LHR id (bm-lhr-<id>) when a benchmark labour rate was selected instead of a real lhr_records row' })
+  benchmarkLhrId?: string | number;
 
   @ApiProperty({ description: 'Currency code', example: 'INR' })
   currency: string;
@@ -657,6 +690,9 @@ export class ProcessCostResponseDto {
   @ApiPropertyOptional({ description: 'Machine name (from MHR record)', example: 'Fiber Laser 2kW' })
   machineName?: string | null;
 
+  @ApiPropertyOptional({ description: 'Machine class key (from MHR record, e.g. fiber_laser)', example: 'fiber_laser' })
+  machineClass?: string | null;
+
   @ApiPropertyOptional({ description: 'Labour type (from LHR record)', example: 'Sheet Metal Operator' })
   laborType?: string | null;
 
@@ -687,7 +723,9 @@ export class ProcessCostResponseDto {
       processRoute: row.process_route || '',
       operation: row.operation || '',
       mhrId: row.mhr_id,
+      benchmarkMhrId: row.benchmark_mhr_id ?? undefined,
       lhrId: row.lhr_id,
+      benchmarkLhrId: row.benchmark_lhr_id ?? undefined,
       currency: row.currency || 'USD',
       directRate: parseFloat(row.direct_rate) || 0,
       indirectRate: parseFloat(row.indirect_rate) || 0,
@@ -719,6 +757,7 @@ export class ProcessCostResponseDto {
       isOverride:   row.is_override  === true,
       timingSource: row.timing_source ?? null,
       machineName:  row.machine_name ?? null,
+      machineClass: row.machine_class ?? null,
       laborType:    row.labor_type   ?? null,
       isActive: row.is_active !== false,
       notes: row.notes,

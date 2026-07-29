@@ -13,6 +13,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsNumber, IsOptional, IsBoolean, IsUUID, IsEnum, Min, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 // ============================================================================
 // ENUMS
@@ -188,9 +189,7 @@ export class QueryPackagingLogisticsCostsDto {
   search?: string;
 
   @ApiPropertyOptional({ description: 'Filter by active status', default: true })
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
+  @IsOptionalBoolean()
   isActive?: boolean;
 
   @ApiPropertyOptional({ description: 'Page number', minimum: 1, default: 1 })

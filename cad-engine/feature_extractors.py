@@ -3110,15 +3110,6 @@ class ComponentFeatureAnalyzer:
 
         blank_face_id: Optional[int] = blank.get("face_id")
 
-        # Diagnostic log — remove once adjacent relations are confirmed working
-        all_face_ids_in_instances = [fid for inst in instances for fid in inst["face_ids"]]
-        logger.info(
-            f"[GCD-adj] blank_face_id={blank_face_id} "
-            f"instances={len(instances)} "
-            f"face_to_feature keys={sorted(face_to_feature.keys())[:20]} "
-            f"all_face_ids={sorted(set(all_face_ids_in_instances))[:30]}"
-        )
-
         # ── OCC face adjacency ─────────────────────────────────────────────
         # Global edge-midpoint matching across ALL faces.
         # Two faces sharing a geometrically coincident edge midpoint (within

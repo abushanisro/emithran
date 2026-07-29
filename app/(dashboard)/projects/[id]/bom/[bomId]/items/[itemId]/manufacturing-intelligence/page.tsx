@@ -35,6 +35,7 @@ import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient } from '@/lib/api/client';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
 import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
+import { StoredMachinePicker } from '@/components/features/manufacturing-intelligence/StoredMachinePicker';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { VendorNetworkPanel } from '@/components/features/manufacturing-intelligence/VendorNetworkPanel';
 import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
@@ -593,6 +594,50 @@ function fmtInt(n: number | undefined | null): string {
   if (n == null || isNaN(n)) return '—';
   return n.toLocaleString('en-IN');
 }
+// Never substitute the process route/group for a missing machine name — that
+// silently displays the process as if it were the machine (e.g. "Laser Cutting"
+// shown where a real machine like "Trumpf 3030" belongs). Say what's actually true.
+function machineDisplayLabel(proc: { machineName?: string | null; mhrId?: string | null }): string {
+  if (proc.machineName) return proc.machineName;
+  if (proc.mhrId) return 'Machine name unavailable';
+  return 'Manual rate — not linked to a machine';
+}
+// machineClass (e.g. 'fiber_laser') is a machine-table key, not a process_group —
+// never store it directly as processGroup (that produced the "Group: fiber_laser"
+// bug). Mirrors backend's deriveProcessGroupFromMachineClass in
+// bom-items.controller.ts, expanded to the fuller machine_class vocabulary
+// introduced by migrations 369/371.
+function deriveProcessGroupFromMachineClass(machineClass: string | null | undefined): string {
+  if (!machineClass) return '';
+  const sheetMetal = ['fiber_laser', 'co2_laser', 'plasma', 'waterjet', 'press_brake', 'turret_punch', 'roll_forming', 'deep_draw', 'band_saw'];
+  const machining = ['cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn', 'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'grinding', 'drill_press', 'tapping', 'edm'];
+  const assembly = ['welding', 'manual_assembly', 'adhesive_bonding', 'electrical_assembly'];
+  const postProcessing = ['cmm', 'ndt_test', 'heat_treat_furnace', 'anodize', 'powder_coat', 'plating', 'chem_treatment', 'laser_marking', 'deburring'];
+  const plastics = ['injection_molding', 'thermoforming', 'blow_molding', 'extrusion', 'rotational_molding', 'rubber_molding', 'compression_molding'];
+  if (sheetMetal.includes(machineClass)) return 'Sheet Metal';
+  if (machining.includes(machineClass)) return 'Machining';
+  if (assembly.includes(machineClass)) return 'Assembly';
+  if (postProcessing.includes(machineClass)) return 'Post Processing';
+  if (plastics.includes(machineClass)) return 'Plastic & Rubber';
+  return '';
+}
+// aPriori-style per-feature sub-operation list (cut path, pierces, bends...) —
+// shared by both the live-engine row and the saved-process-record row, since
+// it's driven by the same geometry regardless of which is currently showing.
+function FeatureBreakdown({ items }: { items: Array<{ name: string; timeSec: number; featureType: string; count: number }> | undefined }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="space-y-0.5">
+      <div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">Feature breakdown</div>
+      {items.map((op, oi) => (
+        <div key={oi} className="flex items-center justify-between py-0.5 pl-3 border-l-2 border-violet-500/20">
+          <span className="text-[11px] text-muted-foreground/80 font-mono">{op.name}</span>
+          <span className="text-[11px] text-muted-foreground/60 tabular-nums">{(op.timeSec / 60).toFixed(1)} min</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 function familyLabel(f: string): string {
   const m: Record<string, string> = {
     sheet_metal: 'Sheet Metal', cnc_milled: 'CNC Milled', cnc_turned: 'CNC Turned',
@@ -662,11 +707,63 @@ function findNode(node: ProcessTreeNode, id: string): ProcessTreeNode | null {
   return null;
 }
 
+// ── Real cycle-time lookups for the Properties tree ────────────────────────────
+// The backend already computes per-feature cycle time for Laser Cutting/Press
+// Brake lines (featureBreakdown on ProcessLineCost, from bom-items.service.ts's
+// buildLaserFeatureBreakdown/buildPressBrakeFeatureBreakdown — same lookup tables
+// cost-engine.ts uses for real costing). These read that real data instead of the
+// flat 2.5 sec/pierce, 42 sec/bend, /4000mm/min constants the tree used to guess.
+
+function realPierceCycleTimeSec(count: number, cost: CostSummaryDto | null | undefined): number | null {
+  const pierceEntry = cost?.processLines
+    ?.find((l) => l.process === 'Laser Cutting')
+    ?.featureBreakdown?.find((f) => f.featureType === 'pierce');
+  if (!pierceEntry || !pierceEntry.count) return null;
+  // Real aggregate isn't split per hole-diameter group — allocate this group's
+  // share by count. Labelled "≈" at the call site since it's a real-data-derived
+  // allocation, not an independently measured per-group figure.
+  return (count / pierceEntry.count) * pierceEntry.timeSec;
+}
+
+function realBendCycleTimeSec(count: number, radiusMm: number | null, cost: CostSummaryDto | null | undefined): number | null {
+  const breakdown = cost?.processLines
+    ?.find((l) => l.process === 'Press Brake')
+    ?.featureBreakdown?.filter((f) => f.featureType === 'bend') ?? [];
+  if (!breakdown.length) return null;
+  if (radiusMm != null) {
+    // Backend buckets radii identically (Math.round(r*2)/2) before naming each
+    // group "Bend R{bucket}mm ×{count}" — match that exact group, no allocation needed.
+    const bucket = Math.round(radiusMm * 2) / 2;
+    const exact = breakdown.find((f) => f.name.includes(`R${bucket}mm`));
+    if (exact) return exact.timeSec;
+  }
+  const totalCount = breakdown.reduce((s, f) => s + f.count, 0);
+  const totalSec = breakdown.reduce((s, f) => s + f.timeSec, 0);
+  if (!totalCount) return null;
+  return (count / totalCount) * totalSec;
+}
+
+function realLaserCutTimeSec(cost: CostSummaryDto | null | undefined): number | null {
+  const laserLine = cost?.processLines?.find((l) => l.process === 'Laser Cutting');
+  const cutEntry = laserLine?.featureBreakdown?.find((f) => f.featureType === 'laser_cut');
+  if (cutEntry) return cutEntry.timeSec;
+  if (typeof cost?.cycleTimes?.laserMin === 'number' && cost.cycleTimes.laserMin > 0) {
+    return cost.cycleTimes.laserMin * 60;
+  }
+  return null;
+}
+
+function formatEstCycleTime(sec: number | null, allocated = false): string {
+  if (sec == null || !Number.isFinite(sec)) return 'unavailable';
+  return allocated ? `≈${sec.toFixed(0)} sec` : `${sec.toFixed(0)} sec`;
+}
+
 // ── featureToTreeNode ──────────────────────────────────────────────────────────
 
-function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: string): ProcessTreeNode {
+function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: string, cost?: CostSummaryDto | null): ProcessTreeNode {
   if (f.type === 'flat_pattern') {
     const r = f.recognition;
+    const realCutSec = realLaserCutTimeSec(cost);
     return {
       id: f.id, kind: 'feature', label: 'Flat Pattern', factory, machine,
       attrs: [
@@ -674,25 +771,27 @@ function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: st
         ...(r.cut_length_mm > 0 ? [{ name: 'Cut Length', value: `${fmt(r.cut_length_mm, 0)} mm` }] : []),
         ...(r.pierce_count > 0 ? [{ name: 'Pierce Count', value: String(r.pierce_count) }] : []),
         { name: 'Sheet Thickness', value: `${fmt(r.sheet_thickness_mm, 1)} mm` },
-        ...(r.est_laser_time_sec > 0 ? [{ name: 'Est. Laser Time', value: `${r.est_laser_time_sec} sec` }] : []),
+        { name: 'Est. Laser Time', value: formatEstCycleTime(realCutSec) },
       ],
     };
   }
   if (f.type === 'hole') {
     const r = f.recognition;
     const dLabel = r.diameter_mm != null ? `Ø${r.diameter_mm.toFixed(1)}` : 'Ø?';
+    const realSec = realPierceCycleTimeSec(r.count, cost);
     return {
       id: f.id, kind: 'feature', label: `${dLabel} × ${r.count}`, factory, machine,
       attrs: [
         { name: 'Diameter', value: r.diameter_mm != null ? `${r.diameter_mm.toFixed(1)} mm` : '—' },
         { name: 'Count', value: String(r.count) },
         { name: 'Process', value: 'Laser Pierce' },
-        { name: 'Est. Cycle Time', value: `${(r.count * 2.5).toFixed(0)} sec` },
+        { name: 'Est. Cycle Time', value: formatEstCycleTime(realSec, true) },
       ],
     };
   }
   if (f.type === 'bend') {
     const r = f.recognition;
+    const realSec = realBendCycleTimeSec(r.count, r.radius_mm ?? null, cost);
     return {
       id: f.id, kind: 'feature',
       label: r.radius_mm != null ? `R${r.radius_mm.toFixed(1)} × ${r.count}` : `Bends × ${r.count}`,
@@ -701,7 +800,7 @@ function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: st
         ...(r.radius_mm != null ? [{ name: 'Radius', value: `${r.radius_mm.toFixed(1)} mm` }] : []),
         { name: 'Count', value: String(r.count) },
         { name: 'PB Hits', value: String(r.count) },
-        { name: 'Est. Cycle Time', value: `${r.count * 42} sec` },
+        { name: 'Est. Cycle Time', value: formatEstCycleTime(realSec, r.radius_mm == null) },
       ],
     };
   }
@@ -852,6 +951,7 @@ function buildProcessTree(
   summary: FeatureGraphSummary,
   factory: string,
   overrideProcesses?: string[],
+  cost?: CostSummaryDto | null,
 ): ProcessTreeNode {
   const family = resolveDisplayFamily(item, fg);
   const groupLabel = FAMILY_GROUP[family] ?? 'Manufacturing';
@@ -908,18 +1008,16 @@ function buildProcessTree(
       const holeFeats = (fg?.features ?? []).filter((f) => f.type === 'hole');
 
       if (flatFeat) {
-        featureNodes.push(featureToTreeNode(flatFeat, factory, machine));
+        featureNodes.push(featureToTreeNode(flatFeat, factory, machine, cost));
       } else if (summary.flatPatternAreaMm2 > 0) {
-        const cutTimeSec = summary.cutLengthMm > 0
-          ? Math.round((summary.cutLengthMm / 4000) * 60 + (summary.pierceCount ?? 0) * 2.0)
-          : null;
+        const cutTimeSec = realLaserCutTimeSec(cost);
         featureNodes.push({
           id: 'feat_flat', kind: 'feature', label: 'Flat Pattern', factory, machine,
           attrs: [
             { name: 'Area', value: `${fmtInt(summary.flatPatternAreaMm2)} mm²` },
             ...(summary.cutLengthMm > 0 ? [{ name: 'Cut Length', value: `${fmt(summary.cutLengthMm, 0)} mm` }] : []),
             ...(summary.pierceCount > 0 ? [{ name: 'Pierce Count', value: String(summary.pierceCount) }] : []),
-            ...(cutTimeSec != null ? [{ name: 'Est. Laser Time', value: `${cutTimeSec} sec` }] : []),
+            { name: 'Est. Laser Time', value: formatEstCycleTime(cutTimeSec) },
           ],
         });
       }
@@ -936,13 +1034,13 @@ function buildProcessTree(
               { name: 'Diameter',        value: `${g.diameter_mm.toFixed(1)} mm` },
               { name: 'Count',           value: String(g.count) },
               { name: 'Process',         value: 'Laser Pierce' },
-              { name: 'Est. Cycle Time', value: `${(g.count * 2.5).toFixed(0)} sec` },
+              { name: 'Est. Cycle Time', value: formatEstCycleTime(realPierceCycleTimeSec(g.count, cost), true) },
             ],
           });
         });
       } else if (holeFeats.length > 0) {
         // SECONDARY: stored HoleFeature objects (may have null diameter on old DB entries)
-        holeFeats.forEach((f) => featureNodes.push(featureToTreeNode(f, factory, machine)));
+        holeFeats.forEach((f) => featureNodes.push(featureToTreeNode(f, factory, machine, cost)));
       } else {
         // TERTIARY: flat diameter list → group on the fly
         const diameters = summary.holeDiameters ?? [];
@@ -956,7 +1054,7 @@ function buildProcessTree(
                 { name: 'Diameter',        value: `${d} mm` },
                 { name: 'Count',           value: String(count) },
                 { name: 'Process',         value: 'Laser Pierce' },
-                { name: 'Est. Cycle Time', value: `${(count * 2.5).toFixed(0)} sec` },
+                { name: 'Est. Cycle Time', value: formatEstCycleTime(realPierceCycleTimeSec(count, cost), true) },
               ],
             });
           });
@@ -971,7 +1069,7 @@ function buildProcessTree(
     } else if (isSheetMetal && isBending && summary.bendCount > 0) {
       const bendFeats = (fg?.features ?? []).filter((f) => f.type === 'bend');
       if (bendFeats.length > 0) {
-        bendFeats.forEach((f) => featureNodes.push(featureToTreeNode(f, factory, machine)));
+        bendFeats.forEach((f) => featureNodes.push(featureToTreeNode(f, factory, machine, cost)));
       } else {
         const radii = summary.bendRadii ?? [];
         if (radii.length > 0) {
@@ -984,7 +1082,7 @@ function buildProcessTree(
                 { name: 'Radius', value: `${r} mm` },
                 { name: 'Count', value: String(count) },
                 { name: 'PB Hits', value: String(count) },
-                { name: 'Est. Cycle Time', value: `${count * 42} sec` },
+                { name: 'Est. Cycle Time', value: formatEstCycleTime(realBendCycleTimeSec(count, parseFloat(r), cost)) },
               ],
             });
           });
@@ -994,7 +1092,7 @@ function buildProcessTree(
             attrs: [
               { name: 'Count', value: String(summary.bendCount) },
               { name: 'PB Hits', value: String(summary.bendCount) },
-              { name: 'Est. Cycle Time', value: `${summary.bendCount * 42} sec` },
+              { name: 'Est. Cycle Time', value: formatEstCycleTime(realBendCycleTimeSec(summary.bendCount, null, cost), true) },
             ],
           });
         }
@@ -1636,13 +1734,17 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
   // ── Process dialog (Edit / Add Process) ──────────────────────────────────
   const [procDialogOpen, setProcDialogOpen] = useState(false);
   const [procDialogPrefill, setProcDialogPrefill] = useState<any>(null);
+  // True only when the dialog was opened via the Cycle Time calculator icon
+  // specifically — makes it land straight on the computed-cycle-time view
+  // instead of the plain edit form.
+  const [procDialogAutoOpenCalculator, setProcDialogAutoOpenCalculator] = useState(false);
   const createProcCost = useCreateProcessCost();
   const updateProcCost = useUpdateProcessCost();
   const deleteProcCost = useDeleteProcessCost();
-  const { data: existingProcRecords } = useProcessCosts({ bomItemId: item.id, isActive: true, enabled: !!item.id });
+  const { data: existingProcRecords, isLoading: isLoadingProcRecords } = useProcessCosts({ bomItemId: item.id, isActive: true, enabled: !!item.id });
   const sortedStoredProcs = [...(existingProcRecords?.records ?? [])].sort((a: any, b: any) => (a.opNbr || 0) - (b.opNbr || 0));
 
-  const handleOpenEditProc = (line: { process: string; machineClass: string; rate: number; cycleMin: number; setupCost: number; hourlyRate: number; labourRate?: number | null }, index: number) => {
+  const handleOpenEditProc = (line: { process: string; machineClass: string; rate: number; cycleMin: number; setupCost: number; hourlyRate: number; labourRate?: number | null; processGroup?: string; processRoute?: string; operation?: string }, index: number, openCalculator = false) => {
     const batchSz = cost?.batchSize ?? 1;
     const setupTimeMins = line.hourlyRate > 0
       ? parseFloat(((line.setupCost * batchSz * 60) / line.hourlyRate).toFixed(1))
@@ -1653,9 +1755,9 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
     );
     setProcDialogPrefill(existingRecord ?? {
       opNbr: (index + 1) * 10,
-      operation: line.process,
-      processGroup: line.machineClass || line.process,
-      processRoute: line.process,
+      operation: line.operation || line.process,
+      processGroup: line.processGroup || deriveProcessGroupFromMachineClass(line.machineClass),
+      processRoute: line.processRoute || line.process,
       location: factory,
       machineRate: line.rate,
       laborRate: line.labourRate ?? 0,
@@ -1668,6 +1770,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
       scrap: 0,
       shiftPatternHoursPerDay: 8,
     });
+    setProcDialogAutoOpenCalculator(openCalculator);
     setProcDialogOpen(true);
   };
 
@@ -1685,7 +1788,9 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
             processRoute: data.processRoute,
             operation: data.operation,
             mhrId: data.mhrId || undefined,
+            benchmarkMhrId: data.benchmarkMhrId || undefined,
             lhrId: data.lhrId || undefined,
+            benchmarkLhrId: data.benchmarkLhrId || undefined,
             directRate: data.directRate || data.laborRate || 0,
             indirectRate: data.indirectRate || 0,
             fringeRate: data.fringeRate || 0,
@@ -1710,7 +1815,9 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
           processRoute: data.processRoute,
           operation: data.operation,
           mhrId: data.mhrId || undefined,
+          benchmarkMhrId: data.benchmarkMhrId || undefined,
           lhrId: data.lhrId || undefined,
+          benchmarkLhrId: data.benchmarkLhrId || undefined,
           directRate: data.directRate || data.laborRate || 0,
           indirectRate: data.indirectRate || 0,
           fringeRate: data.fringeRate || 0,
@@ -1973,7 +2080,13 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
         </>
       )}
 
-      {sortedStoredProcs.length === 0 && hasStoredMat && eff?.lines?.map((line, lineIdx) => {
+      {/* Gate on !isLoadingProcRecords too — otherwise this live-estimate preview
+          briefly renders (and a moment later gets replaced by the saved rows
+          below) every time the stored-records query hasn't resolved yet on
+          first paint, which reads as "it worked, then reverted to the old
+          data" even though the saved rows were the correct/authoritative view
+          the whole time. */}
+      {!isLoadingProcRecords && sortedStoredProcs.length === 0 && hasStoredMat && eff?.lines?.map((line, lineIdx) => {
         const procOv = procOverrides[line.process] ?? {};
         const ms = line.machineSelection;
         const rec = ms?.balanced?.candidate;
@@ -2024,20 +2137,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
             {isExpanded && (
               <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
                 {/* aPriori-style feature-level sub-operations */}
-                {(line as any).featureBreakdown?.length > 0 && (
-                  <div className="space-y-0.5">
-                    <div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">Feature breakdown</div>
-                    {((line as any).featureBreakdown as Array<{ name: string; timeSec: number; featureType: string; count: number }>).map((op, oi) => {
-                      const opMins = (op.timeSec / 60).toFixed(1);
-                      return (
-                        <div key={oi} className="flex items-center justify-between py-0.5 pl-3 border-l-2 border-violet-500/20">
-                          <span className="text-[11px] text-muted-foreground/80 font-mono">{op.name}</span>
-                          <span className="text-[11px] text-muted-foreground/60 tabular-nums">{opMins} min</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <FeatureBreakdown items={(line as any).featureBreakdown} />
                 {/* Machine selection */}
                 {ms && (
                   <MachineSelector
@@ -2068,7 +2168,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                       <span className="text-xs text-muted-foreground">Cycle Time</span>
                       <button
                         type="button"
-                        onClick={() => handleOpenEditProc(line, lineIdx)}
+                        onClick={() => handleOpenEditProc(line, lineIdx, true)}
                         className="text-muted-foreground/40 hover:text-violet-500 transition-colors"
                         title="Open cycle time in process calculator"
                       >
@@ -2109,6 +2209,16 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
         const procCost     = (setupPerPart + cyclePerPart) * (1 + scrap / 100) * fromUsd;
         const cycleMin     = cycleSec ? (cycleSec / 60).toFixed(1) : null;
         const isExpanded   = expandedProcs.has(`stored:${proc.id}`);
+        // Live engine data for this row's machine class — feature breakdown
+        // (cut path, pierces, bends...) and the ⭐/alternatives/"Why" picker are
+        // computed from current geometry + MHR data regardless of whether this
+        // operation has a saved row, so a saved row can show the exact same
+        // rich view as a not-yet-saved one, just persisting picks to ITS OWN
+        // record instead of the class-wide machine-override preference.
+        const matchedEngineLine = (eff?.lines ?? []).find(
+          (l) => l.machineClass && proc.machineClass && l.machineClass === proc.machineClass,
+        );
+        const ms = matchedEngineLine?.machineSelection;
         return (
           <div key={proc.id} className="group/storedrow">
             {/* Row header — click to expand */}
@@ -2126,7 +2236,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap pl-[26px]">
-                    <span className="truncate">{proc.machineName || proc.processRoute || proc.processGroup || '—'}</span>
+                    <span className="truncate">{machineDisplayLabel(proc)}</span>
                     {cycleMin && <span>· {cycleMin} min</span>}
                   </div>
                 </div>
@@ -2139,7 +2249,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
               <div className="shrink-0 flex items-center gap-0.5 pr-1">
                 <button
                   type="button"
-                  onClick={() => { setProcDialogPrefill(proc); setProcDialogOpen(true); }}
+                  onClick={() => { setProcDialogPrefill(proc); setProcDialogAutoOpenCalculator(false); setProcDialogOpen(true); }}
                   className="px-1.5 flex items-center text-muted-foreground/60 hover:text-foreground opacity-0 group-hover/storedrow:opacity-100 transition-opacity"
                   title="Edit"
                 >
@@ -2158,33 +2268,48 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
 
             {/* Expanded calculation breakdown */}
             {isExpanded && (
-              <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-1.5">
-                {/* Machine name chip — click to open calculator */}
-                {(proc.machineName || proc.processRoute) && (
-                  <button
-                    type="button"
-                    onClick={() => { setProcDialogPrefill(proc); setProcDialogOpen(true); }}
-                    className="w-full text-left flex items-center justify-between group/machline"
-                  >
-                    <span className="text-xs text-muted-foreground">Machine</span>
-                    <span className="text-xs tabular-nums text-foreground group-hover/machline:text-violet-400 transition-colors flex items-center gap-1">
-                      {proc.machineName || proc.processRoute}
-                      <Edit className="h-2.5 w-2.5 opacity-0 group-hover/machline:opacity-60" />
-                    </span>
-                  </button>
+              <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
+                {/* aPriori-style feature-level sub-operations — same as the live engine rows */}
+                <FeatureBreakdown items={matchedEngineLine?.featureBreakdown} />
+                {/* Machine — the same ⭐ recommended/alternatives/"Why" picker as the live
+                    engine rows, but persisting picks to THIS saved row (via onApply)
+                    instead of the class-wide machine-override preference. Falls back to
+                    the simpler picker when this operation has no live engine counterpart
+                    (e.g. Hand Deburring — genuinely manual, no machine class to match). */}
+                {ms ? (
+                  <MachineSelector
+                    itemId={item.id}
+                    processKey={proc.machineClass ?? ''}
+                    selection={ms}
+                    currencySymbol={sym}
+                    location={factory}
+                    currentMhrId={proc.mhrId ?? null}
+                    applyPending={updateProcCost.isPending}
+                    applyError={updateProcCost.isError}
+                    onApply={(candidate) => {
+                      updateProcCost.mutate({
+                        id: proc.id,
+                        data: {
+                          mhrId: candidate?.machineId ?? null,
+                          benchmarkMhrId: null,
+                          machineRate: candidate?.hourlyRate ?? 0,
+                        } as any,
+                      });
+                    }}
+                  />
+                ) : (
+                  <StoredMachinePicker
+                    procId={proc.id}
+                    machineClass={proc.machineClass}
+                    machineName={proc.machineName}
+                    machineRateUsd={machineRate}
+                    mhrId={proc.mhrId}
+                    benchmarkMhrId={proc.benchmarkMhrId}
+                    currencySymbol={sym}
+                    fromUsd={fromUsd}
+                    location={factory}
+                  />
                 )}
-                {/* Machine Rate — click to open calculator */}
-                <button
-                  type="button"
-                  onClick={() => { setProcDialogPrefill(proc); setProcDialogOpen(true); }}
-                  className="w-full text-left flex items-baseline justify-between group/rateline"
-                >
-                  <span className="text-xs text-muted-foreground">Machine Rate</span>
-                  <span className="text-xs tabular-nums text-foreground group-hover/rateline:text-violet-400 transition-colors flex items-center gap-1">
-                    {sym}{(machineRate * fromUsd).toFixed(0)}/hr
-                    <Edit className="h-2.5 w-2.5 opacity-0 group-hover/rateline:opacity-60" />
-                  </span>
-                </button>
                 {laborRate > 0 && (
                   <div className="flex items-baseline justify-between">
                     <span className="text-xs text-muted-foreground">Labour Rate</span>
@@ -2197,7 +2322,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                     <span className="text-xs text-muted-foreground">Cycle Time</span>
                     <button
                       type="button"
-                      onClick={() => { setProcDialogPrefill(proc); setProcDialogOpen(true); }}
+                      onClick={() => { setProcDialogPrefill(proc); setProcDialogAutoOpenCalculator(true); setProcDialogOpen(true); }}
                       className="text-muted-foreground/40 hover:text-violet-500 transition-colors"
                       title="Open in process calculator"
                     >
@@ -2241,6 +2366,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
               ? (sortedStoredProcs[sortedStoredProcs.length - 1]?.opNbr || 0)
               : 0;
             setProcDialogPrefill({ opNbr: lastOpNbr + 10 });
+            setProcDialogAutoOpenCalculator(false);
             setProcDialogOpen(true);
           }}
           className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
@@ -2261,6 +2387,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
         existingProcesses={existingProcRecords?.records ?? []}
         defaultLocation={factory}
         currencySymbol={sym}
+        autoOpenCalculator={procDialogAutoOpenCalculator}
       />
 
       {/* ── PACKAGING & LOGISTICS ── */}
@@ -3949,7 +4076,6 @@ function CostGuidePanel({
 
   // ── Auto-add process costs + logistics when material grade is applied ──────
   const createProcessCost = useCreateProcessCost();
-  const { data: existingProcessCosts } = useProcessCosts({ bomItemId: item.id, isActive: true, enabled: !!item.id });
   const createLogisticsCost = useCreatePackagingLogisticsCost();
   // React Query deduplicates by key — resolves from cache when CostSummaryTab already called it
   const { data: cgpCostSummary } = useCostSummary(item.id, batchSize, factory);
@@ -3960,10 +4086,23 @@ function CostGuidePanel({
 
   const autoAddProcessCosts = async () => {
     if (autoAddLock.current.has('process')) return;
-    if ((existingProcessCosts?.records?.length ?? 0) > 0) return;
     autoAddLock.current.add('process');
     try {
-      const lines = cgpCostSummary?.processLines ?? [];
+      // Fresh server check so stale React Query cache doesn't block re-creation
+      // after a material-grade change (when the Apply button has already deactivated old records).
+      try {
+        const freshProcs = await apiClient.get<{ records: any[] }>('/process-costs', {
+          params: { bomItemId: item.id, isActive: true, page: 1, limit: 5 },
+        });
+        if ((freshProcs?.records?.length ?? 0) > 0) return;
+      } catch { /* pre-check failure — fall through */ }
+
+      // Always read from the live query cache — the closure-captured cgpCostSummary
+      // was fetched before material grade was set and has empty processLines.
+      const liveSummary = queryClient.getQueryData<typeof cgpCostSummary>(
+        ['bom-items', item.id, 'cost-summary', batchSize, factory],
+      );
+      const lines = (liveSummary ?? cgpCostSummary)?.processLines ?? [];
       if (!lines.length) return;
       for (const [i, line] of lines.entries()) {
         const cycleTimeSec = Math.round(line.cycleTimeMin * 60);
@@ -3976,9 +4115,9 @@ function CostGuidePanel({
           await createProcessCost.mutateAsync({
             bomItemId: item.id,
             opNbr: (i + 1) * 10,
-            operation: line.process,
-            processGroup: line.machineClass || line.process,
-            processRoute: line.process,
+            operation: line.operation || line.process,
+            processGroup: line.processGroup || deriveProcessGroupFromMachineClass(line.machineClass),
+            processRoute: line.processRoute || line.process,
             machineRate: line.hourlyRate,
             laborRate: line.labourRate ?? 0,
             directRate: line.hourlyRate,
@@ -4043,14 +4182,17 @@ function CostGuidePanel({
         const fresh = await apiClient.get<{ records: any[] }>('/raw-material-costs', {
           params: { bomItemId: item.id, isActive: true, page: 1, limit: 10 },
         });
-        const hasValidRecord = (fresh?.records ?? []).some((r: any) => (r.totalCost ?? 0) > 0);
-        if (hasValidRecord) return;
-        // If there are only zero-cost records, mark them inactive so we can replace them
-        const zeroIds = (fresh?.records ?? [])
-          .filter((r: any) => (r.totalCost ?? 0) === 0)
-          .map((r: any) => r.id as string)
-          .filter(Boolean);
-        for (const id of zeroIds) {
+        const records = fresh?.records ?? [];
+        // Only skip if there is already a valid (totalCost > 0) record for THIS EXACT grade.
+        // A valid record for a DIFFERENT grade means material changed — we must replace it.
+        const hasValidRecordForThisGrade = records.some(
+          (r: any) => (r.totalCost ?? 0) > 0 && r.materialName === grade,
+        );
+        if (hasValidRecordForThisGrade) return;
+        // Mark ALL active records inactive — the grade changed (or they had $0 cost).
+        // This replaces stale material records cleanly without leaving ghost entries.
+        const staleIds = records.map((r: any) => r.id as string).filter(Boolean);
+        for (const id of staleIds) {
           try { await apiClient.put(`/raw-material-costs/${id}`, { isActive: false }); } catch { /* best-effort */ }
         }
       } catch { /* pre-check network failure — fall through and let server enforce uniqueness */ }
@@ -4106,7 +4248,14 @@ function CostGuidePanel({
       // 3. engineGrossKg — engine's grossWeightKg from cost summary (always available in UI)
       // For cases 1 & 2, item.weight / volume×density is the NET weight; gross = net / (1 - scrap%)
       // For case 3, grossWeightKg IS already the gross; net = gross × (1 - scrap%)
-      const engineGrossKg = (cgpCostSummary?.grossWeightKg ?? 0) > 0 ? cgpCostSummary!.grossWeightKg : null;
+      // Read from live query cache — closure-captured cgpCostSummary is stale (ran before
+      // material grade was set), so grossWeightKg there is 0. After Apply triggers a refetch,
+      // the cache holds the correct value even though the closure variable hasn't updated.
+      const liveSummary = queryClient.getQueryData<typeof cgpCostSummary>(
+        ['bom-items', item.id, 'cost-summary', batchSize, factory],
+      );
+      const freshSummary = liveSummary ?? cgpCostSummary;
+      const engineGrossKg = (freshSummary?.grossWeightKg ?? 0) > 0 ? freshSummary!.grossWeightKg : null;
       const cadWeight = typeof item.weight === 'number' && item.weight > 0 ? item.weight : null;
       let netUsage: number;
       let grossUsage: number;
@@ -4146,8 +4295,8 @@ function CostGuidePanel({
 
       // Fallback: DB has no pricing — use the engine's materialCostPerKg (factory currency → USD)
       if (!unitCost) {
-        const toUsd = cgpCostSummary?.toUsdRate ?? (1 / 83.5);
-        unitCost = (cgpCostSummary?.materialCostPerKg ?? 0) * toUsd;
+        const toUsd = freshSummary?.toUsdRate ?? (1 / 83.5);
+        unitCost = (freshSummary?.materialCostPerKg ?? 0) * toUsd;
       }
 
       await createRawMatCost.mutateAsync({
@@ -4528,9 +4677,56 @@ function CostGuidePanel({
       {/* Action buttons */}
       <div className="border-t px-3 py-2 flex gap-1.5 shrink-0">
         <button
-          onClick={() => {
-            queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'cost-summary'] });
-            queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'route-comparison'] });
+          onClick={async () => {
+            try {
+              // Step 1: Persist any unsaved material grade typed into the input.
+              // If the user typed without pressing Enter, the grade was never saved to
+              // the server — the cost-summary Scenario gate would return scenarioReady:false.
+              const pendingGrade = matInputValue.trim();
+              if (pendingGrade && pendingGrade !== item.materialGrade) {
+                try {
+                  await updateBOMItem.mutateAsync({ id: item.id, data: { materialGrade: pendingGrade } });
+                } catch { /* non-fatal — proceed with whatever is on the server */ }
+              }
+
+              // Step 2: Force-refetch cost summary so the engine runs with the now-correct
+              // material grade. This populates grossWeightKg and processLines in the cache
+              // BEFORE autoAddMaterialCost / autoAddProcessCosts read from it.
+              await queryClient.refetchQueries({
+                queryKey: ['bom-items', item.id, 'cost-summary'],
+                exact: false,
+              });
+
+              const currentGrade = pendingGrade || item.materialGrade;
+              if (currentGrade) {
+                // Step 3a: Deactivate existing process cost records so autoAddProcessCosts
+                // creates fresh ones reflecting the new material grade. Without this,
+                // autoAddProcessCosts sees stale records and returns early.
+                try {
+                  const freshProcs = await apiClient.get<{ records: any[] }>('/process-costs', {
+                    params: { bomItemId: item.id, isActive: true, page: 1, limit: 50 },
+                  });
+                  for (const r of (freshProcs?.records ?? [])) {
+                    if (r?.id) {
+                      try { await apiClient.put(`/process-costs/${r.id}`, { isActive: false }); } catch { /* best-effort */ }
+                    }
+                  }
+                  // Bust the stale cache so autoAddProcessCosts guard sees 0 records
+                  queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });
+                } catch { /* non-fatal */ }
+
+                // Step 3b: Create stored records from fresh engine data.
+                // autoAddMaterialCost replaces the old material record if grade changed.
+                // autoAddProcessCosts now sees 0 active records and creates fresh lines.
+                await autoAddMaterialCost(currentGrade);
+                await autoAddProcessCosts();
+                await autoAddLogistics();
+              }
+
+              // Step 4: Invalidate so the UI picks up newly created stored records.
+              queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'cost-summary'] });
+              queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'route-comparison'] });
+            } catch { /* outer safety net — never block the toast */ }
             toast.success('Scenario applied — recalculating…');
           }}
           className="flex-1 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded px-2 py-1 font-medium transition-colors">Apply</button>
@@ -7368,9 +7564,14 @@ export default function ManufacturingIntelligencePage() {
     return undefined;
   }, [processRouting, selectedManualRoute, selectedAutoRouteId, fg, item]);
 
+  // Real, backend-computed process lines (with per-feature cycle-time breakdown)
+  // — reused by the Properties tree below instead of hardcoded per-feature rates.
+  // React Query deduplicates this: free if the Cost tab has already loaded it.
+  const { data: costForHeatmap } = useCostSummary(item?.id ?? '', batchSize);
+
   const tree = useMemo(
-    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, activeOverrideProcesses) : null,
-    [item, fg, summary, factory, activeOverrideProcesses],
+    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, activeOverrideProcesses, costForHeatmap) : null,
+    [item, fg, summary, factory, activeOverrideProcesses, costForHeatmap],
   );
 
   const treeProcessNames = useMemo(() => {
@@ -7451,8 +7652,8 @@ export default function ManufacturingIntelligencePage() {
   const selectedFeatureScores = dfmScores?.features.find((f) => f.featureId === selectedV2Feature?.id)?.occurrences;
 
   // Heatmap weights — all derived from backend-computed values, no frontend cost constants.
-  // useCostSummary is React Query deduplicated: free if Cost tab already loaded.
-  const { data: costForHeatmap } = useCostSummary(item?.id ?? '', batchSize);
+  // costForHeatmap is declared above (reused by the Properties tree too; useCostSummary
+  // is React Query deduplicated, so this is free once either place has loaded it).
   const pierceCount = Math.max(item?.pierceCount ?? fg?.summary?.pierceCount ?? 1, 1);
   const bendCount   = Math.max(item?.bendCount   ?? fg?.summary?.bendCount   ?? 1, 1);
 

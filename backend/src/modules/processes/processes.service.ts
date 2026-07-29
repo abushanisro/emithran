@@ -660,7 +660,7 @@ export class ProcessesService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('process_calculator_mappings')
-      .select('process_group, process_route, operation')
+      .select('process_group, process_route, operation, machine_class')
       .eq('is_active', true);
 
     if (error) {

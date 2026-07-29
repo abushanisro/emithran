@@ -43,7 +43,17 @@ export interface CreateProcessCostDto extends ProcessCostInput {
   supplierId?: string;
   supplierLocationId?: string;
   mhrId?: string;
+  /** id of the mhr_benchmark_rates row selected, when the picked machine is a
+   *  benchmark (★) rate rather than a real mhr_records row — lets the backend
+   *  still resolve a real machine_name/machine_class instead of the record
+   *  ending up with no machine identity at all. */
+  benchmarkMhrId?: string | number;
   lhrId?: string;
+  /** id of the lhr_benchmark_rates row selected, when the picked labour rate is
+   *  a benchmark (★) rate rather than a real lhr_records row — lets the
+   *  backend still resolve a real labor_type instead of the record ending up
+   *  with no labour identity at all. */
+  benchmarkLhrId?: string | number;
   isActive?: boolean;
   notes?: string;
 }
@@ -59,6 +69,8 @@ export interface ProcessCostRecord {
   lhrId?: string;
   /** Machine name resolved from the linked MHR record */
   machineName?: string;
+  /** Machine class key resolved from the linked MHR record (e.g. 'fiber_laser') */
+  machineClass?: string;
   /** Labour type resolved from the linked LHR record */
   laborType?: string;
   /** Factory location recorded at time of route application */

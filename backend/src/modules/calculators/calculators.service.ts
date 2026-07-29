@@ -582,6 +582,13 @@ export class CalculatorsServiceV2 {
         this.logger.error(`✗ Error calculating field "${field.field_name}": ${e.message}`, 'CalculatorsServiceV2');
         this.logger.error(`   Formula was: "${field.default_value}"`, 'CalculatorsServiceV2');
         results[field.id] = { error: e.message, value: null };
+        // Also key by field_name (not just id) — the frontend reads results by
+        // fieldName exclusively, so without this an errored field is
+        // indistinguishable from one that was never evaluated at all: it just
+        // renders as undefined/"N/A" with no way to see what actually failed.
+        if (field.field_name) {
+          results[field.field_name] = { error: e.message, value: null };
+        }
       }
     }
 
@@ -614,6 +621,10 @@ export class CalculatorsServiceV2 {
       } catch (e) {
         this.logger.error(`Error calculating formula ${formula.formula_name || 'unknown'}: ${e.message}`, 'CalculatorsServiceV2');
         results[formula.id] = { error: e.message, value: null };
+        // Same fix as the calculated-fields loop above — key by name too, not just id.
+        if (formula.formula_name) {
+          results[formula.formula_name] = { error: e.message, value: null };
+        }
       }
     }
 

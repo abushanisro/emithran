@@ -7,6 +7,7 @@ export interface ProcessCalculatorMapping {
   processGroup: string;
   processRoute: string;
   operation: string;
+  machineClass?: string;
   calculatorId?: string;
   calculatorName?: string;
   isActive: boolean;

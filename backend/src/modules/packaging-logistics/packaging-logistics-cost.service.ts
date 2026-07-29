@@ -48,7 +48,7 @@ let queryBuilder = this.supabaseService
         .getClient(accessToken)
         .from('packaging_logistics_cost_records')
         .select('*', { count: 'exact' })
-        .eq('user_id', userId === 'temp-user' ? '00000000-0000-0000-0000-000000000000' : userId)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .range(from, to);
 

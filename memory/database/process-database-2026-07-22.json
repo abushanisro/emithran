@@ -1,0 +1,4413 @@
+{
+  "exportedAt": "2026-07-22T13:21:25.628Z",
+  "totalMappings": 253,
+  "mappings": [
+    {
+      "id": "80e45f5f-8ecc-4c5f-b4c4-9aa45d354c93",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Compression Molding",
+      "operation": "Compression Molding",
+      "calculatorId": null,
+      "calculatorName": "Compression Calculator",
+      "isActive": true,
+      "displayOrder": 1,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "b7ade4a9-8b03-449f-8478-f1d2c78926dc",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Injection Molding",
+      "operation": "Injection Molding",
+      "calculatorId": null,
+      "calculatorName": "Injection Molding Calculator",
+      "isActive": true,
+      "displayOrder": 2,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "8dfa091d-4973-4d4b-878c-287ec1f173f4",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Injection Molding",
+      "operation": "Injection Molding-Hot Runner",
+      "calculatorId": null,
+      "calculatorName": "Injection Molding Calculator",
+      "isActive": true,
+      "displayOrder": 3,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "286af254-f979-4828-80c6-015e7cef9f7c",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Injection Molding",
+      "operation": "Injection Molding-Cold Runner",
+      "calculatorId": null,
+      "calculatorName": "Injection Molding Calculator",
+      "isActive": true,
+      "displayOrder": 4,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "5d3bcc1e-92c1-49c0-aed0-f986f145bb30",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Injection Molding",
+      "operation": "Insert Molding",
+      "calculatorId": null,
+      "calculatorName": "Insert Molding Calculator",
+      "isActive": true,
+      "displayOrder": 5,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "e2e430bc-7c13-4930-a833-d76d34c09c2f",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Structural foam molding",
+      "operation": "Structural foam molding",
+      "calculatorId": null,
+      "calculatorName": "Structural Foam Calculator",
+      "isActive": true,
+      "displayOrder": 6,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "33366be1-6dca-47c0-8d24-8972dcaf310c",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Injection Molding",
+      "operation": "Overmolding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 6,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "e1ac054b-61b0-46d6-8d74-76c9c082316f",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Injection Molding",
+      "operation": "Gas-Assist Injection Molding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 7,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "e0f5a406-ad05-48ff-9f70-74e58eb6ceb2",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Reaction Foam Molding",
+      "operation": "Reaction Foam Molding",
+      "calculatorId": null,
+      "calculatorName": "Reaction Foam Calculator",
+      "isActive": true,
+      "displayOrder": 7,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "bef1848a-6548-4a72-811f-c28c543e3205",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Thermoforming",
+      "operation": "3 Station Rotary Thermoforming",
+      "calculatorId": null,
+      "calculatorName": "Thermoforming Calculator",
+      "isActive": true,
+      "displayOrder": 8,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "0f6ee4a5-8329-4aa5-8553-3ca677a4ab0b",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Thermoforming",
+      "operation": "4 Station Rotary Thermoforming",
+      "calculatorId": null,
+      "calculatorName": "Thermoforming Calculator",
+      "isActive": true,
+      "displayOrder": 9,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "a4377465-aa8a-41be-936a-d272c6a82487",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Thermoforming",
+      "operation": "Shuttle Station Thermoforming",
+      "calculatorId": null,
+      "calculatorName": "Thermoforming Calculator",
+      "isActive": true,
+      "displayOrder": 10,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "54b02720-b7cd-486e-8bd3-b12573d1c9a3",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Thermoforming",
+      "operation": "Single Station Thermoforming",
+      "calculatorId": null,
+      "calculatorName": "Thermoforming Calculator",
+      "isActive": true,
+      "displayOrder": 11,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "7343db13-6863-4c72-8d61-1e4c5b13e174",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Trimming / Degating",
+      "operation": "Manual",
+      "calculatorId": null,
+      "calculatorName": "Manual Time Calculator",
+      "isActive": true,
+      "displayOrder": 12,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "cbe982b0-5145-4173-9ae0-c4ed544272d7",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Trimming / Degating",
+      "operation": "Semi Automated",
+      "calculatorId": null,
+      "calculatorName": "Semi-Auto Time Calculator",
+      "isActive": true,
+      "displayOrder": 13,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "062129c7-fe56-4a02-b431-4044e2301610",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Raw Material",
+      "operation": "Granules / Pellets",
+      "calculatorId": null,
+      "calculatorName": "Material Weight Calculator",
+      "isActive": true,
+      "displayOrder": 14,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "21b96d86-e4c9-4fff-ae11-87695f842404",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Blow Molding",
+      "operation": "Extrusion Blow Molding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 14,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "4df289be-cef6-4c71-902b-ee3972d61175",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Blow Molding",
+      "operation": "Injection Blow Molding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 15,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "e25ac520-b3dd-4bb0-9dbf-e719437b7a44",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Blow Molding",
+      "operation": "Stretch Blow Molding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 16,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "4ba8c9ae-60d9-46cd-8c01-a6e6a732d688",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Extrusion",
+      "operation": "Profile Extrusion",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 17,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "625693e0-2f55-4e67-a046-e4efd1d52430",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Extrusion",
+      "operation": "Sheet Extrusion",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 18,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "e4ed34b6-0729-4432-9b70-b98ac5974876",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Extrusion",
+      "operation": "Pipe / Tube Extrusion",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 19,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "cb42d1ce-2822-4953-a078-895a4a106520",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Rotational Molding",
+      "operation": "Rotational Molding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 20,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "ac546896-2fdc-44d4-bee9-9bbd93ee785b",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Rubber Molding",
+      "operation": "Rubber Compression Molding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 21,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "ece23fa2-1838-4104-9598-6129f9d64dad",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Rubber Molding",
+      "operation": "Rubber Injection Molding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 22,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "7ea5f391-f6d9-490e-81b5-4de7ce9b847c",
+      "processGroup": "Plastic & Rubber",
+      "processRoute": "Rubber Molding",
+      "operation": "Rubber Transfer Molding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 23,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "72bff9c5-629a-44b0-a3ac-05b0fbd5e6ec",
+      "processGroup": "Machining",
+      "processRoute": "Cutting",
+      "operation": "Band Saw Cutting",
+      "calculatorId": null,
+      "calculatorName": "Band Saw Calculator",
+      "isActive": true,
+      "displayOrder": 100,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "8d6d2a31-e91e-419d-b18b-8786eaf5ad91",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Saw Cut / Stock Cut",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 100,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "17397590-4abc-4259-a0b1-dd201321e4e8",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Facing",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 101,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "2f159a8f-f697-4f8b-a0fc-21346d35dbc2",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "OD Rough Turning",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 102,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "b43b0778-3952-4dd7-8d7b-a3b937121641",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Turning",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 102,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "3fd5e1b7-7fd1-4338-bf1d-5a88159f3a54",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "OD Finish Turning",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 103,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "2ea6699b-27dc-4b5a-8182-ccacf93e0c97",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Drilling",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 103,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "1c553638-14cd-4b6c-bb58-3d4a83624342",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Threading",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 104,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "4f4081e5-6641-4568-9fc3-a0dbe544df70",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Shoulder Turning",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 105,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "55de175f-735d-426f-a912-f1d5e93361f2",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Chambering",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 105,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "b61af015-3b66-4d2c-816e-1cf75557803c",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Taper Turning",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 106,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "f064577c-dd33-44b0-89fc-203b54e8b3d6",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Flange Turning",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 106,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "d20788be-e4a5-4e62-826a-34f01c11ee5d",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Step turning",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 107,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "e8d8878c-686d-4515-867e-33e3fa6c5878",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Contour turning",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 108,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "faedee2c-e31b-46e0-a78b-1692008b4681",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Grooving",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 109,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "24084dad-ff8a-4ae4-9d4e-da9e09084a22",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Parting /Cut-off",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 110,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "b718a2a0-0aa8-4025-ab0e-774b5e0ae4b1",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Knurling",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 111,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "07fa209a-8690-402c-aa8b-ea59cd929584",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Eccentric / Off-Center Turning",
+      "calculatorId": null,
+      "calculatorName": "Turning Center Calculator",
+      "isActive": true,
+      "displayOrder": 112,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "6c3d6871-3448-40a3-aece-4b01329bdca8",
+      "processGroup": "Machining",
+      "processRoute": "Milling  Center",
+      "operation": "Face milling",
+      "calculatorId": null,
+      "calculatorName": "Milling Center Calculator",
+      "isActive": true,
+      "displayOrder": 113,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "37989828-ba60-4fee-91a1-0d5fc6f6dc22",
+      "processGroup": "Machining",
+      "processRoute": "Milling  Center",
+      "operation": "Peripheral (Slab) Milling",
+      "calculatorId": null,
+      "calculatorName": "Milling Center Calculator",
+      "isActive": true,
+      "displayOrder": 114,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "a94bda9e-6a2a-4cd9-90d4-1f64dda26ad2",
+      "processGroup": "Machining",
+      "processRoute": "Milling  Center",
+      "operation": "Thread Milling",
+      "calculatorId": null,
+      "calculatorName": "Milling Center Calculator",
+      "isActive": true,
+      "displayOrder": 115,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "b27ba399-55a9-43cb-a9b6-c784cabae214",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Boring",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 116,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "5f408878-b54a-4613-837d-d8057fbf49df",
+      "processGroup": "Machining",
+      "processRoute": "Milling  Center",
+      "operation": "Pocket Milling",
+      "calculatorId": null,
+      "calculatorName": "Milling Center Calculator",
+      "isActive": true,
+      "displayOrder": 116,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "edf08f84-f654-4c48-b039-1ea1dc5eb34a",
+      "processGroup": "Machining",
+      "processRoute": "Milling  Center",
+      "operation": "Slot Milling",
+      "calculatorId": null,
+      "calculatorName": "Milling Center Calculator",
+      "isActive": true,
+      "displayOrder": 117,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "dd903e17-fc04-4153-a733-549852110dbb",
+      "processGroup": "Machining",
+      "processRoute": "Milling  Center",
+      "operation": "Contour / Profile Milling",
+      "calculatorId": null,
+      "calculatorName": "Milling Center Calculator",
+      "isActive": true,
+      "displayOrder": 118,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "ed8a6fe7-90f4-42c9-844d-84264e3f2bcd",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Counterboring",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 118,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "5ab3dbc6-ca7b-451a-b087-c7cc356ba0ec",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Countersinking",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 119,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "cbaf976f-ca01-4c14-9a28-ba4289b2b98b",
+      "processGroup": "Machining",
+      "processRoute": "Milling  Center",
+      "operation": "Circular / Helical Milling",
+      "calculatorId": null,
+      "calculatorName": "Milling Center Calculator",
+      "isActive": true,
+      "displayOrder": 119,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "fd209ed8-1b8d-4932-a167-669e49cbc272",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Tapping",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 120,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "10fd8f83-c059-4258-9f2d-7e5450995ef2",
+      "processGroup": "Machining",
+      "processRoute": "Milling  Center",
+      "operation": "Chamfering",
+      "calculatorId": null,
+      "calculatorName": "Milling Center Calculator",
+      "isActive": true,
+      "displayOrder": 120,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "9c474f79-0746-4308-a0ea-41b0116dfcf0",
+      "processGroup": "Machining",
+      "processRoute": "Turning Center",
+      "operation": "Reaming",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 121,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "938b75b4-00d0-46fd-89c9-62bdf46dd92a",
+      "processGroup": "Machining",
+      "processRoute": "Gear Cutting",
+      "operation": "Gear Hobbing",
+      "calculatorId": null,
+      "calculatorName": "Gear Cutting Calculator",
+      "isActive": true,
+      "displayOrder": 121,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "229b819c-8b95-482e-891a-943060377e92",
+      "processGroup": "Machining",
+      "processRoute": "Gear Cutting",
+      "operation": "Gear Shaping",
+      "calculatorId": null,
+      "calculatorName": "Gear Cutting Calculator",
+      "isActive": true,
+      "displayOrder": 122,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "0eebfcae-e7ac-4b26-9526-1756bf98ebb0",
+      "processGroup": "Machining",
+      "processRoute": "Gear Cutting",
+      "operation": "Gear Milling",
+      "calculatorId": null,
+      "calculatorName": "Gear Cutting Calculator",
+      "isActive": true,
+      "displayOrder": 123,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "04914a64-309e-42fa-abc5-96f7b448f55f",
+      "processGroup": "Machining",
+      "processRoute": "Gear Cutting",
+      "operation": "Gear Honing",
+      "calculatorId": null,
+      "calculatorName": "Gear Cutting Calculator",
+      "isActive": true,
+      "displayOrder": 124,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "47da1c05-e26d-4c1a-8591-71b336f0e254",
+      "processGroup": "Machining",
+      "processRoute": "Gear Cutting",
+      "operation": "Gear Lapping",
+      "calculatorId": null,
+      "calculatorName": "Gear Cutting Calculator",
+      "isActive": true,
+      "displayOrder": 125,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "6ffa769f-1b93-466f-bc57-e50e0c2a83a0",
+      "processGroup": "Machining",
+      "processRoute": "Broach",
+      "operation": "Broaching",
+      "calculatorId": null,
+      "calculatorName": "Broaching Calculator",
+      "isActive": true,
+      "displayOrder": 126,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "78992da3-9835-4afe-a533-11e07b35862a",
+      "processGroup": "Machining",
+      "processRoute": "Broach",
+      "operation": "Gear Broaching",
+      "calculatorId": null,
+      "calculatorName": "Broaching Calculator",
+      "isActive": true,
+      "displayOrder": 127,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "a136b433-31a9-48e2-b145-83ecbec2ad19",
+      "processGroup": "Machining",
+      "processRoute": "Grinding",
+      "operation": "Cyclinderical Grinding",
+      "calculatorId": null,
+      "calculatorName": "Grinding Calculator",
+      "isActive": true,
+      "displayOrder": 128,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "1616d067-f5c6-48f1-b16c-835c0e17be6e",
+      "processGroup": "Machining",
+      "processRoute": "Grinding",
+      "operation": "Centerless Grinding",
+      "calculatorId": null,
+      "calculatorName": "Grinding Calculator",
+      "isActive": true,
+      "displayOrder": 129,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "e79bf7cc-5ad5-46c2-adfa-0090edf6140a",
+      "processGroup": "Machining",
+      "processRoute": "Grinding",
+      "operation": "Surface grinding",
+      "calculatorId": null,
+      "calculatorName": "Grinding Calculator",
+      "isActive": true,
+      "displayOrder": 130,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "681b8eb5-7cd7-4cfc-b036-83150a52f462",
+      "processGroup": "Machining",
+      "processRoute": "Grinding",
+      "operation": "Gear Grinding",
+      "calculatorId": null,
+      "calculatorName": "Grinding Calculator",
+      "isActive": true,
+      "displayOrder": 131,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "f9dbbd04-5e8d-47de-93b8-88a82263ac96",
+      "processGroup": "Machining",
+      "processRoute": "Drilling",
+      "operation": "Drilling",
+      "calculatorId": null,
+      "calculatorName": "Drilling Calculator",
+      "isActive": true,
+      "displayOrder": 132,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "94ea7dd7-95af-4152-9c08-fc4b3e10bb6c",
+      "processGroup": "Machining",
+      "processRoute": "Drilling",
+      "operation": "Tapping",
+      "calculatorId": null,
+      "calculatorName": "Drilling Calculator",
+      "isActive": true,
+      "displayOrder": 133,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "bc1c98c9-e6cf-445e-a37e-8fbd2861fb7c",
+      "processGroup": "Machining",
+      "processRoute": "Drilling",
+      "operation": "Gun Drilling",
+      "calculatorId": null,
+      "calculatorName": "Drilling Calculator",
+      "isActive": true,
+      "displayOrder": 134,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "b2e0959c-90fa-4c9f-b3ae-2789c9592ac9",
+      "processGroup": "Machining",
+      "processRoute": "Drilling",
+      "operation": "Boring",
+      "calculatorId": null,
+      "calculatorName": "Drilling Calculator",
+      "isActive": true,
+      "displayOrder": 135,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "2ef2e168-c898-4b9d-9dbd-dcf4edb122d5",
+      "processGroup": "Machining",
+      "processRoute": "Drilling",
+      "operation": "Reaming",
+      "calculatorId": null,
+      "calculatorName": "Drilling Calculator",
+      "isActive": true,
+      "displayOrder": 136,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "ecd362bd-c4de-4b5e-8e89-50eebceec323",
+      "processGroup": "Machining",
+      "processRoute": "EDM",
+      "operation": "Wire EDM",
+      "calculatorId": null,
+      "calculatorName": "EDM Calculator",
+      "isActive": true,
+      "displayOrder": 137,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "a9050942-4c7e-48fc-90f1-0bb3ca75f72f",
+      "processGroup": "Machining",
+      "processRoute": "EDM",
+      "operation": "Spark EDM",
+      "calculatorId": null,
+      "calculatorName": "EDM Calculator",
+      "isActive": true,
+      "displayOrder": 138,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "bb2e72cb-a3de-4928-917a-6b473092ef14",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Round Bar",
+      "calculatorId": null,
+      "calculatorName": "Bar Stock Calculator",
+      "isActive": true,
+      "displayOrder": 139,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "43926cde-00aa-44bd-bc9e-c42a7058913e",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Rectangular Bar",
+      "calculatorId": null,
+      "calculatorName": "Bar Stock Calculator",
+      "isActive": true,
+      "displayOrder": 140,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "a74235aa-2497-4267-941e-bcf13788b0d6",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Face Milling",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 140,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "13d4c2c8-cfee-4d91-aaf3-02b205382a70",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Peripheral Milling",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 141,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "c0c531fa-5270-4f75-8b32-4620c64c9e64",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Square Bar",
+      "calculatorId": null,
+      "calculatorName": "Bar Stock Calculator",
+      "isActive": true,
+      "displayOrder": 141,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "64facebf-2046-4f81-b92f-c14144ef3b33",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Pocket Milling",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 142,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "9da6cff7-bf58-4fd3-b5f8-8459bca48bfb",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Hexagonal Bar",
+      "calculatorId": null,
+      "calculatorName": "Bar Stock Calculator",
+      "isActive": true,
+      "displayOrder": 142,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "4d908e45-fdc5-4106-8683-026c6eceb8fe",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Contour / Profile Milling",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 143,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "42a5dec9-429a-4bd7-a8ed-ec2649690078",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Tube",
+      "calculatorId": null,
+      "calculatorName": "Tube Stock Calculator",
+      "isActive": true,
+      "displayOrder": 143,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "98ad9be2-edd6-40f5-99ed-b5ba540dbd6c",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Rectangular Tube",
+      "calculatorId": null,
+      "calculatorName": "Tube Stock Calculator",
+      "isActive": true,
+      "displayOrder": 144,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "c60980f1-491d-45f6-bdeb-08430a7b66f6",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Slot Milling",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 144,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "73ec506e-5d9b-4b0b-825e-dc1cffd26302",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Thread Milling",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 145,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "70118182-57bb-4517-b914-17d560f5f5ea",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Square Tube",
+      "calculatorId": null,
+      "calculatorName": "Tube Stock Calculator",
+      "isActive": true,
+      "displayOrder": 145,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "5af9bc76-be6a-415d-a2f1-25cb0cf68f65",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Ingot",
+      "calculatorId": null,
+      "calculatorName": "Material Entry",
+      "isActive": true,
+      "displayOrder": 146,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "c3dfc0bf-9c00-4e5e-b7b2-c724f7bc82c4",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Circular / Helical Milling",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 146,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "220f9b3c-5767-42d9-81cd-817555f695f1",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Casted RM",
+      "calculatorId": null,
+      "calculatorName": "Material Entry",
+      "isActive": true,
+      "displayOrder": 147,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "0e2641d8-63d0-4dbf-b356-623804b3cc84",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Chamfering",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 147,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "3934dec3-bace-4234-a2f6-31fb6d78935b",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Billet",
+      "calculatorId": null,
+      "calculatorName": "Material Entry",
+      "isActive": true,
+      "displayOrder": 148,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "ca50cdf4-6ae4-4820-b114-e5dbf5ee933d",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Drilling",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 148,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "bc7669a4-cda4-4baf-a88f-8b887c618d37",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Wire Rod",
+      "calculatorId": null,
+      "calculatorName": "Wire Stock Calculator",
+      "isActive": true,
+      "displayOrder": 149,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "6488a187-2a07-4c5f-a15f-2022861a7b90",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Counterboring",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 149,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "1137cd8f-c359-404e-8236-21352486244c",
+      "processGroup": "Machining",
+      "processRoute": "Raw Material",
+      "operation": "Forged RM",
+      "calculatorId": null,
+      "calculatorName": "Material Entry",
+      "isActive": true,
+      "displayOrder": 150,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "a5bfc31b-9a20-428c-8cdd-afc13eef5597",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Countersinking",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 150,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "4c766e05-9325-47f9-9d8c-48de001b93c0",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Tapping",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 151,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "3b865e0f-182b-431f-a79a-c69373c7c5a2",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Reaming",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 152,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "da18d7ca-375a-44f9-9200-d2d99bd268d9",
+      "processGroup": "Machining",
+      "processRoute": "VMC",
+      "operation": "Boring",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 153,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "94957574-b4bc-4664-a458-e982513a6b3f",
+      "processGroup": "Machining",
+      "processRoute": "Sawing",
+      "operation": "Band Saw Cut",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 170,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "8d7e9f5b-3f98-492c-aabf-1fc8fe1a573a",
+      "processGroup": "Machining",
+      "processRoute": "Sawing",
+      "operation": "Cold Saw Cut",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 171,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "6ef45b1b-100b-4a50-a173-111a9e8e61b0",
+      "processGroup": "Machining",
+      "processRoute": "Sawing",
+      "operation": "Stock Cut",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 172,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "271734ab-9324-4159-81e1-8f1b6ae3253b",
+      "processGroup": "Machining",
+      "processRoute": "Drilling",
+      "operation": "Counterboring",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 185,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "25228c66-8dab-451d-9c0d-bada3d25cf3f",
+      "processGroup": "Machining",
+      "processRoute": "Grinding",
+      "operation": "Cylindrical Grinding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 190,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "f3a99050-7ed5-4e04-9f86-c57a2bfcf69b",
+      "processGroup": "Machining",
+      "processRoute": "Grinding",
+      "operation": "Centreless Grinding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 193,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "6859416c-e711-4171-aca3-89cf6b4a5c6e",
+      "processGroup": "Machining",
+      "processRoute": "Grinding",
+      "operation": "ID Grinding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 195,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "9a4a7e1b-bec8-48fc-84b5-6b74457e9a4a",
+      "processGroup": "Machining",
+      "processRoute": "Grinding",
+      "operation": "Honing",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 197,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "39d81fa4-3abb-43bd-9e94-2157c2c80192",
+      "processGroup": "Machining",
+      "processRoute": "Grinding",
+      "operation": "Lapping",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 198,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "45d060be-2d75-43e4-b734-35095246543b",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Laser Cutting",
+      "operation": "Laser Cut",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 200,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "86c71e3c-5e18-4d28-90a6-4ea2af62222c",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Shearning",
+      "calculatorId": null,
+      "calculatorName": "Shearing Calculator",
+      "isActive": true,
+      "displayOrder": 200,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "7ee1fb69-ae38-4296-a28d-1a008cc1005c",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Fiber laser Cutting",
+      "calculatorId": null,
+      "calculatorName": "Laser Cutting Calculator",
+      "isActive": true,
+      "displayOrder": 201,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "37426bf0-73a4-4521-a04a-52f3fb02b8f0",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Laser Cutting",
+      "operation": "Fiber Laser Cut",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 201,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "36c8f524-10d8-4863-88c5-8c87121fee55",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Co2 Laser Cutting",
+      "calculatorId": null,
+      "calculatorName": "Laser Cutting Calculator",
+      "isActive": true,
+      "displayOrder": 202,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "7c2baa13-2197-458f-a327-d4658d9872fe",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Plasma Cutting",
+      "calculatorId": null,
+      "calculatorName": "Plasma Cutting Calculator",
+      "isActive": true,
+      "displayOrder": 203,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "95075deb-59b8-4b79-88a3-e74defd7708f",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Water jet Cutting",
+      "calculatorId": null,
+      "calculatorName": "Water Jet Calculator",
+      "isActive": true,
+      "displayOrder": 204,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "a24e8785-24ac-44ff-ac80-9b204693a584",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Blanking",
+      "calculatorId": null,
+      "calculatorName": "Blanking Press Calculator",
+      "isActive": true,
+      "displayOrder": 205,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "263c2236-d28f-4276-81b8-94a827c76100",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "3D Laser Cut",
+      "calculatorId": null,
+      "calculatorName": "Laser Cutting Calculator",
+      "isActive": true,
+      "displayOrder": 206,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "35bb5065-1baf-4857-83f0-338207412f61",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Turret Press",
+      "calculatorId": null,
+      "calculatorName": "Turret Press Calculator",
+      "isActive": true,
+      "displayOrder": 207,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "c43a6579-ad84-4d83-890e-74ef17d99428",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Bend Brake",
+      "calculatorId": null,
+      "calculatorName": "Press Brake Calculator",
+      "isActive": true,
+      "displayOrder": 208,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "f60c43dd-3229-4bfd-98cc-e9521c0b4afa",
+      "processGroup": "Machining",
+      "processRoute": "Waterjet",
+      "operation": "Waterjet Cutting",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 209,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "0cf620ae-7ce7-4744-a8d4-3e4ce0f4bd08",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Stage Tool Bending",
+      "calculatorId": null,
+      "calculatorName": "Bending Calculator",
+      "isActive": true,
+      "displayOrder": 209,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "af53350c-6003-499a-a729-e9f09779004a",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Press Brake",
+      "operation": "Bend",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 210,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "ab74154b-1c43-4703-8a7a-bff9a6b3c4ca",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Stage Tool Forming",
+      "calculatorId": null,
+      "calculatorName": "Forming Calculator",
+      "isActive": true,
+      "displayOrder": 210,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "645af938-49c3-4a32-b0e2-33daf09a8d26",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Roll Forming",
+      "calculatorId": null,
+      "calculatorName": "Roll Forming Calculator",
+      "isActive": true,
+      "displayOrder": 211,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "bce6c6d8-1da2-41b8-b10c-44ea049780d5",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Press Brake",
+      "operation": "Form",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 211,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "d69b7b4b-a516-4b92-9f1d-a4880105478e",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Deep Draw",
+      "calculatorId": null,
+      "calculatorName": "Deep Draw Calculator",
+      "isActive": true,
+      "displayOrder": 212,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "406136c2-3c9e-4921-bab2-fa38d7ef9de2",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Press Brake",
+      "operation": "Press Brake Bend",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 212,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "fb775ffb-4d0c-4ead-9855-18150a8dc311",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Laser Puch",
+      "calculatorId": null,
+      "calculatorName": "Punch Calculator",
+      "isActive": true,
+      "displayOrder": 213,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "4c212773-b941-4978-a311-9bc71666f70b",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Turret Press",
+      "calculatorId": null,
+      "calculatorName": "Turret Press Calculator",
+      "isActive": true,
+      "displayOrder": 214,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "250ad96b-d84d-4520-a7bc-d09fe5d7d10c",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Progressive die",
+      "calculatorId": null,
+      "calculatorName": "Progressive Die Calculator",
+      "isActive": true,
+      "displayOrder": 215,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "6bd22a1c-c036-4d93-85c7-a288f22466e2",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Offline Blank",
+      "calculatorId": null,
+      "calculatorName": "Blanking Calculator",
+      "isActive": true,
+      "displayOrder": 216,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "b9e69332-61e2-484d-8f53-7fb7c80386ee",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Stretch forming",
+      "calculatorId": null,
+      "calculatorName": "Stretch Forming Calculator",
+      "isActive": true,
+      "displayOrder": 217,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "eab66f55-9c80-45d1-a30e-a439b09d570f",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Raw Material",
+      "operation": "Sheet",
+      "calculatorId": null,
+      "calculatorName": "Sheet Stock Calculator",
+      "isActive": true,
+      "displayOrder": 218,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "6a42ad5c-c7f0-4a61-b2f0-49418c043cb5",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Raw Material",
+      "operation": "Flat",
+      "calculatorId": null,
+      "calculatorName": "Flat Stock Calculator",
+      "isActive": true,
+      "displayOrder": 219,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "1da9caf0-44be-400b-b4e5-a2e96903e285",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Finishing",
+      "operation": "Deburr",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 220,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "9e603b19-79ad-4ef0-9aa4-54c0e9d82c35",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Raw Material",
+      "operation": "Coil",
+      "calculatorId": null,
+      "calculatorName": "Coil Stock Calculator",
+      "isActive": true,
+      "displayOrder": 220,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "655c53ff-c3c6-4286-9438-a04f164ca2b4",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Finishing",
+      "operation": "Edge Finish",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 221,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "673bf1f5-ca42-41a7-960a-7330c13f37c4",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Raw Material",
+      "operation": "I-Beam",
+      "calculatorId": null,
+      "calculatorName": "Beam Stock Calculator",
+      "isActive": true,
+      "displayOrder": 221,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "07080605-391d-45c0-9e47-02cb62397015",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Raw Material",
+      "operation": "H-Beam",
+      "calculatorId": null,
+      "calculatorName": "Beam Stock Calculator",
+      "isActive": true,
+      "displayOrder": 222,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "2105e58d-492f-4af0-8bfc-56cd23ff9738",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Raw Material",
+      "operation": "Angle (L-shape)",
+      "calculatorId": null,
+      "calculatorName": "Angle Stock Calculator",
+      "isActive": true,
+      "displayOrder": 223,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "f931751c-c8e6-46af-ac73-c049f9e510a4",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Raw Material",
+      "operation": "Channel (C-shape / U-shape)",
+      "calculatorId": null,
+      "calculatorName": "Channel Stock Calculator",
+      "isActive": true,
+      "displayOrder": 224,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "3fa7a7d5-6731-44da-a3ba-8687f76a026a",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Raw Material",
+      "operation": "T-Sections",
+      "calculatorId": null,
+      "calculatorName": "Section Stock Calculator",
+      "isActive": true,
+      "displayOrder": 225,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "a39452c2-4d0a-43bc-8cf8-3a48aa1d244a",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Raw Material",
+      "operation": "Z-Sections",
+      "calculatorId": null,
+      "calculatorName": "Section Stock Calculator",
+      "isActive": true,
+      "displayOrder": 226,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "1b1e9fd8-368d-4984-9a94-5d04a9a886b2",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Inspection",
+      "operation": "Inspect",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 230,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "00543920-5eaf-4a40-b839-02b1731e6a71",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Inspection",
+      "operation": "Dimensional Inspect",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 231,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "b114ea90-6604-470f-b244-75361461364b",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Surface Treatment",
+      "operation": "Powder Coat",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 240,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "3705c5fe-f526-4b52-aa5b-97925299693e",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Surface Treatment",
+      "operation": "Paint",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 241,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "1bfaf18d-8e1c-4b54-b51f-763c1f79d1c3",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Surface Treatment",
+      "operation": "Anodize",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 242,
+      "createdAt": "2026-06-16T15:53:33.855235+00:00",
+      "updatedAt": "2026-06-16T15:53:33.855235+00:00"
+    },
+    {
+      "id": "1ab6dcb7-86be-480e-bbce-66e42008b403",
+      "processGroup": "Assembly",
+      "processRoute": "Pick & Place",
+      "operation": "Manual Pick and Place",
+      "calculatorId": null,
+      "calculatorName": "Manual Assembly Time Calculator",
+      "isActive": true,
+      "displayOrder": 300,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "8f187847-21ff-4ade-b759-cfae28f63d65",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Shearing",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 301,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "8d746fa8-4548-4b45-9c4a-310c0dcd7309",
+      "processGroup": "Assembly",
+      "processRoute": "Pick & Place",
+      "operation": "Semi automated",
+      "calculatorId": null,
+      "calculatorName": "Semi-Auto Assembly Calculator",
+      "isActive": true,
+      "displayOrder": 301,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "664cea23-a854-45f0-9af4-dd245435a7d6",
+      "processGroup": "Assembly",
+      "processRoute": "Welding",
+      "operation": "Mig Welding",
+      "calculatorId": null,
+      "calculatorName": "MIG Welding Calculator",
+      "isActive": true,
+      "displayOrder": 302,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "ffbea0be-228a-46f6-9400-a8cd7442c7e9",
+      "processGroup": "Assembly",
+      "processRoute": "Welding",
+      "operation": "Tig Welding",
+      "calculatorId": null,
+      "calculatorName": "TIG Welding Calculator",
+      "isActive": true,
+      "displayOrder": 303,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "fd1250ff-1024-49bd-ba66-f682f6e49e3b",
+      "processGroup": "Assembly",
+      "processRoute": "Welding",
+      "operation": "Spot Weld",
+      "calculatorId": null,
+      "calculatorName": "Spot Welding Calculator",
+      "isActive": true,
+      "displayOrder": 304,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "eccb2039-7f28-4baf-8f81-a3517eb7e0ad",
+      "processGroup": "Assembly",
+      "processRoute": "Welding",
+      "operation": "Seam Weld",
+      "calculatorId": null,
+      "calculatorName": "Seam Welding Calculator",
+      "isActive": true,
+      "displayOrder": 305,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "8d676928-0bca-427b-b98e-0e5801cce7af",
+      "processGroup": "Assembly",
+      "processRoute": "Welding",
+      "operation": "Laser Weld",
+      "calculatorId": null,
+      "calculatorName": "Laser Welding Calculator",
+      "isActive": true,
+      "displayOrder": 306,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "d2b6ac62-c10e-4584-b55a-6e633cb47dd0",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Waterjet Cutting",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 306,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "d38f93d9-b6e9-4fa7-82e2-0b94c24c8943",
+      "processGroup": "Assembly",
+      "processRoute": "Screwing",
+      "operation": "Manal",
+      "calculatorId": null,
+      "calculatorName": "Manual Fastening Calculator",
+      "isActive": true,
+      "displayOrder": 307,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "785e3e99-1f61-45a5-a762-c859f66b2dd2",
+      "processGroup": "Assembly",
+      "processRoute": "Screwing",
+      "operation": "Power gun",
+      "calculatorId": null,
+      "calculatorName": "Power Tool Calculator",
+      "isActive": true,
+      "displayOrder": 308,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "1ecaf398-f273-4184-96ac-8406e719ca5c",
+      "processGroup": "Assembly",
+      "processRoute": "Bolt Nut Assy",
+      "operation": "Power gun",
+      "calculatorId": null,
+      "calculatorName": "Power Tool Calculator",
+      "isActive": true,
+      "displayOrder": 309,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "dfbb14b0-fa2d-4267-a646-91dc384d9d4d",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Sheet Cutting",
+      "operation": "Nibbling",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 310,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "f266a6b4-23cc-4b35-af12-c623e2a5a028",
+      "processGroup": "Assembly",
+      "processRoute": "Bolt Nut Assy",
+      "operation": "Manal",
+      "calculatorId": null,
+      "calculatorName": "Manual Fastening Calculator",
+      "isActive": true,
+      "displayOrder": 310,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "0d6ad425-aa57-40e1-8b3e-184cda7b5930",
+      "processGroup": "Assembly",
+      "processRoute": "Electrical Connection",
+      "operation": "Wire Harness",
+      "calculatorId": null,
+      "calculatorName": "Harness Assembly Calculator",
+      "isActive": true,
+      "displayOrder": 311,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "30e4b55b-9a29-4f0b-bd43-f6e5e88bd90d",
+      "processGroup": "Assembly",
+      "processRoute": "Debur",
+      "operation": "Manual Debur",
+      "calculatorId": null,
+      "calculatorName": "Deburring Time Calculator",
+      "isActive": true,
+      "displayOrder": 312,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "68a4fd01-0d19-4dee-9217-d90257efbe59",
+      "processGroup": "Assembly",
+      "processRoute": "Weld Cleaning",
+      "operation": "Manual",
+      "calculatorId": null,
+      "calculatorName": "Manual Cleaning Calculator",
+      "isActive": true,
+      "displayOrder": 313,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "e60ca60a-ca37-4c37-9f56-9094cb4336c7",
+      "processGroup": "Assembly",
+      "processRoute": "Weld Cleaning",
+      "operation": "Semi automated-Sanding",
+      "calculatorId": null,
+      "calculatorName": "Sanding Calculator",
+      "isActive": true,
+      "displayOrder": 314,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "4a68e835-5e5d-4299-bdc6-011ab900bbb4",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Hemming",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 330,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "b0f9945f-4532-4882-b546-2e5d6f2b9576",
+      "processGroup": "Sheet Metal",
+      "processRoute": "Bending/Floating /Forming",
+      "operation": "Flanging",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 331,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "f35bad24-6930-45a2-9778-57102ba75a36",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Degrease",
+      "calculatorId": null,
+      "calculatorName": "Degreasing Calculator",
+      "isActive": true,
+      "displayOrder": 400,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "4f2da193-bab7-4d1b-95aa-3ac42aafd531",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Phosphating",
+      "calculatorId": null,
+      "calculatorName": "Phosphating Calculator",
+      "isActive": true,
+      "displayOrder": 401,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "d138f113-6870-4996-b5ad-5b3e08b776be",
+      "processGroup": "Assembly",
+      "processRoute": "Pick & Place",
+      "operation": "Fully Automated",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 402,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "9bebb1a6-7bd9-4e9a-a69e-1517b3037a2a",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Blackning",
+      "calculatorId": null,
+      "calculatorName": "Blackening Calculator",
+      "isActive": true,
+      "displayOrder": 402,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "e758cd45-966b-4a27-a02a-b4804ae011fe",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Plating",
+      "calculatorId": null,
+      "calculatorName": "Plating Calculator",
+      "isActive": true,
+      "displayOrder": 403,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "3184bfc1-c8b2-45ad-be6f-0ad92aa859ba",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Zinc Nickel plating",
+      "calculatorId": null,
+      "calculatorName": "Plating Calculator",
+      "isActive": true,
+      "displayOrder": 404,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "60cade71-4b73-4f4b-b4e6-7f7fd815c668",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Nickel Chrome Plating",
+      "calculatorId": null,
+      "calculatorName": "Plating Calculator",
+      "isActive": true,
+      "displayOrder": 405,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "0588cd62-39f3-4b8f-85b3-a817a24e6d30",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Hard Chrome plating",
+      "calculatorId": null,
+      "calculatorName": "Plating Calculator",
+      "isActive": true,
+      "displayOrder": 406,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "95078864-90fd-4f66-94be-441a6357ba9f",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Passivation",
+      "calculatorId": null,
+      "calculatorName": "Passivation Calculator",
+      "isActive": true,
+      "displayOrder": 407,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "fc30bfac-dcdb-4ebe-9ae8-27b5995fc071",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Anodizing Type I",
+      "calculatorId": null,
+      "calculatorName": "Anodizing Calculator",
+      "isActive": true,
+      "displayOrder": 408,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "9175f2b0-95cd-4c55-b429-525d0546aef7",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Anodizing Type II",
+      "calculatorId": null,
+      "calculatorName": "Anodizing Calculator",
+      "isActive": true,
+      "displayOrder": 409,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "0fb9dac6-9f07-42be-89f3-3799c631995b",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Anodizing Type III",
+      "calculatorId": null,
+      "calculatorName": "Anodizing Calculator",
+      "isActive": true,
+      "displayOrder": 410,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "f413ed96-adb9-4d4e-a07c-bd8d9605e091",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Manual Paint primer",
+      "calculatorId": null,
+      "calculatorName": "Painting Calculator",
+      "isActive": true,
+      "displayOrder": 411,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "de2cb4a5-5e57-4557-9213-ad2372564941",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Manual Paint finish Coat",
+      "calculatorId": null,
+      "calculatorName": "Painting Calculator",
+      "isActive": true,
+      "displayOrder": 412,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "2a022642-1310-4584-905c-f61b20dc53b0",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Manual Paint hand Cleaning",
+      "calculatorId": null,
+      "calculatorName": "Paint Prep Calculator",
+      "isActive": true,
+      "displayOrder": 413,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "bae63ba8-2682-42ff-ba78-8fdf1ab44e65",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Manual Paint hand Sanding",
+      "calculatorId": null,
+      "calculatorName": "Paint Prep Calculator",
+      "isActive": true,
+      "displayOrder": 414,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "ba84fbdc-172a-46f7-8e09-5919cae177b6",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Masking",
+      "calculatorId": null,
+      "calculatorName": "Masking Calculator",
+      "isActive": true,
+      "displayOrder": 415,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "ab275d86-5c69-428c-ba23-99879c708b3b",
+      "processGroup": "Assembly",
+      "processRoute": "Welding",
+      "operation": "Plasma Weld",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 415,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "ff655f74-b408-4805-b130-7fa9f4914f8c",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Powder Coating",
+      "calculatorId": null,
+      "calculatorName": "Powder Coating Calculator",
+      "isActive": true,
+      "displayOrder": 416,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "5e326494-5519-4b8e-85a3-76b4d4e05650",
+      "processGroup": "Assembly",
+      "processRoute": "Welding",
+      "operation": "Electron Beam Weld",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 416,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "7a40d824-cc53-41d1-9e05-08a193d1d679",
+      "processGroup": "Assembly",
+      "processRoute": "Welding",
+      "operation": "Friction Stir Weld",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 417,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "36732a1a-1481-45a4-9c6c-d21a1b380a04",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "ED Coating",
+      "calculatorId": null,
+      "calculatorName": "ED Coating Calculator",
+      "isActive": true,
+      "displayOrder": 417,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "330b177e-dd2b-4e62-80bc-274a98b9982c",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Surface Harden",
+      "calculatorId": null,
+      "calculatorName": "Heat Treatment Calculator",
+      "isActive": true,
+      "displayOrder": 418,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "63d54ee6-1bba-429c-9923-beb3212f0ce7",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Through Harden",
+      "calculatorId": null,
+      "calculatorName": "Heat Treatment Calculator",
+      "isActive": true,
+      "displayOrder": 419,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "27541be0-40ba-4bc3-a338-1fcc6f4d4e20",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Anneal",
+      "calculatorId": null,
+      "calculatorName": "Heat Treatment Calculator",
+      "isActive": true,
+      "displayOrder": 420,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "cbf4fdd6-0577-437b-aefe-85b1286513a7",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Temper",
+      "calculatorId": null,
+      "calculatorName": "Heat Treatment Calculator",
+      "isActive": true,
+      "displayOrder": 421,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "516cdfc3-4265-4e37-b7be-bbe89fb7ee44",
+      "processGroup": "Post Processing",
+      "processRoute": "Inspection",
+      "operation": "CMM Inspection",
+      "calculatorId": null,
+      "calculatorName": "CMM Inspection Calculator",
+      "isActive": true,
+      "displayOrder": 422,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "65390e80-0612-4446-8a78-77fc562fec0c",
+      "processGroup": "Post Processing",
+      "processRoute": "Inspection",
+      "operation": "Manual Inspection",
+      "calculatorId": null,
+      "calculatorName": "Manual Inspection Calculator",
+      "isActive": true,
+      "displayOrder": 423,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "0b1bfe83-2538-4ce5-b1b1-7be2c8669a37",
+      "processGroup": "Post Processing",
+      "processRoute": "Testing",
+      "operation": "Leak test",
+      "calculatorId": null,
+      "calculatorName": "Leak Test Calculator",
+      "isActive": true,
+      "displayOrder": 424,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "2be7dcb6-93ae-4d64-a12d-cc071161cb78",
+      "processGroup": "Post Processing",
+      "processRoute": "Testing",
+      "operation": "Ultrasonic Test",
+      "calculatorId": null,
+      "calculatorName": "UT Calculator",
+      "isActive": true,
+      "displayOrder": 425,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "bc0b6761-ec75-4f79-ab7e-4adbddee1a60",
+      "processGroup": "Assembly",
+      "processRoute": "Electrical Connection",
+      "operation": "Connector Crimping",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 425,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "0ac88fb3-8229-4b63-b379-5810a1dd9caa",
+      "processGroup": "Assembly",
+      "processRoute": "Electrical Connection",
+      "operation": "PCB Assembly",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 426,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "f4d6a30e-68c1-49d1-9a24-95912688b350",
+      "processGroup": "Post Processing",
+      "processRoute": "Testing",
+      "operation": "MPT",
+      "calculatorId": null,
+      "calculatorName": "MPT Calculator",
+      "isActive": true,
+      "displayOrder": 426,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "369a3100-8a93-4f4a-beda-5df399fb880e",
+      "processGroup": "Assembly",
+      "processRoute": "Adhesive Bonding",
+      "operation": "Manual Bonding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 430,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "2b97b28e-1226-4cb9-b398-de351d76c871",
+      "processGroup": "Assembly",
+      "processRoute": "Adhesive Bonding",
+      "operation": "Dispensing Robot",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 431,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "5b971ee5-b779-4ba6-bcef-4b24ddad0139",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Packing",
+      "operation": "Wooden Box Packing",
+      "calculatorId": null,
+      "calculatorName": "Packing Calculator",
+      "isActive": true,
+      "displayOrder": 500,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "51b06be1-b098-4057-8f24-8a96fbe73a25",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Packing",
+      "operation": "Corrugated box packing",
+      "calculatorId": null,
+      "calculatorName": "Packing Calculator",
+      "isActive": true,
+      "displayOrder": 501,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "ac69e876-816f-4392-83d9-ab689a075992",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Packing",
+      "operation": "Pallet",
+      "calculatorId": null,
+      "calculatorName": "Pallet Calculator",
+      "isActive": true,
+      "displayOrder": 502,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "813e0d60-7e20-4a5c-9068-7eafb84c2fa9",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Black Oxide",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 503,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "3ad23073-4f9a-4dd3-9756-0a6968c2e7bb",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Delivery",
+      "operation": "Ex",
+      "calculatorId": null,
+      "calculatorName": "Delivery Cost Calculator",
+      "isActive": true,
+      "displayOrder": 503,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "47893131-01c1-4a7c-bcaf-4b59d5c9ca32",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Delivery",
+      "operation": "FCA",
+      "calculatorId": null,
+      "calculatorName": "Delivery Cost Calculator",
+      "isActive": true,
+      "displayOrder": 504,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "6879f895-eef4-4362-86f8-edf88335651a",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Zinc Plating",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 505,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "e8ef8a2f-cf92-4fb3-8f3b-b24c13a03747",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Delivery",
+      "operation": "DDP",
+      "calculatorId": null,
+      "calculatorName": "Delivery Cost Calculator",
+      "isActive": true,
+      "displayOrder": 505,
+      "createdAt": "2026-06-13T16:14:59.391547+00:00",
+      "updatedAt": "2026-06-13T16:14:59.391547+00:00"
+    },
+    {
+      "id": "f97c37ea-18a4-486c-9582-f389e4a9edc4",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Nickel Plating",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 507,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "ff8cd8ed-a23a-4ea6-b982-d6a44e272b4e",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Chrome Plating",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 510,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "f4929e9e-d4ef-48ba-8da9-e210c9f76ba3",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Electroless Nickel",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 511,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "71d2e796-daa6-4107-b3cc-2e7e1b6b3d49",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Anodising",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 516,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "ce6eac19-37f1-47b6-b9b1-abac46cef128",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Hard Anodising",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 517,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "76dd5ea5-6ab2-470f-b29a-35314b4e4040",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Type III Hardcoat",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 518,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "f1214b7d-5de2-4972-8cb0-0627806a535f",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "PVD Coating",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 526,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "cfe77d3a-0013-4024-9ab3-bbc7a0ca106e",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "CVD Coating",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 527,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "b0b36049-9e60-4bcc-abdc-6bdbccd45e2b",
+      "processGroup": "Post Processing",
+      "processRoute": "Surface Protection",
+      "operation": "Tin Plating",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 528,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "51a01c22-1fa3-4318-b79f-a17108b32caf",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Annealing",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 543,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "f07b6d6b-a2a9-4a9d-8b68-c6015d1eca5a",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Normalising",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 545,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "695125c9-c1b2-4c41-855c-d84da634a7a3",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Hardening & Tempering",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 546,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "3060e60d-1d94-439e-9d75-736a25e0ea7f",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Carburising",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 547,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "a6badc17-ded6-4d05-b2d7-88bfede1589b",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Carburizing",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 548,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "68a41167-fb0d-4e2b-868c-9c4b543fc208",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Nitriding",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 549,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "d28d94c1-e97b-4d1a-ab3a-e5e16d40e3a0",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Stress Relieving",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 550,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "b9cd2175-b7c1-404f-8035-2a9f74633aec",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Age Hardening",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 551,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "c5e2257d-5863-4606-bc64-cec510242812",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Solution Annealing",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 552,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "2111ae5c-f712-467f-977b-b687dbe4fa93",
+      "processGroup": "Post Processing",
+      "processRoute": "Heat Treatment",
+      "operation": "Induction Hardening",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 553,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "76dd030b-6d1b-417f-90b7-2f22e623ebf6",
+      "processGroup": "Post Processing",
+      "processRoute": "Deburring",
+      "operation": "Hand Deburring",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 560,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "3c0fad8f-38ac-42c1-b0db-fc49245e97b0",
+      "processGroup": "Post Processing",
+      "processRoute": "Deburring",
+      "operation": "Tumble Deburring",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 561,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "d2233071-eeae-4799-a33d-679eb27160ee",
+      "processGroup": "Post Processing",
+      "processRoute": "Deburring",
+      "operation": "Vibratory Deburring",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 562,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "c626b64b-960f-4056-995a-94e8353230b4",
+      "processGroup": "Post Processing",
+      "processRoute": "Deburring",
+      "operation": "Robotic Deburring",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 563,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "8fcd1352-84c0-4c6a-810c-4713057db0b5",
+      "processGroup": "Post Processing",
+      "processRoute": "Deburring",
+      "operation": "Cleaning",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 564,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "a8292fdd-0cbd-471a-8977-70715073ee29",
+      "processGroup": "Post Processing",
+      "processRoute": "Deburring",
+      "operation": "Marking",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 565,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "625a9bc8-00a2-40c0-adf2-f763fe5a3bb1",
+      "processGroup": "Post Processing",
+      "processRoute": "Inspection",
+      "operation": "Final Inspection",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 572,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "16530910-8f31-40f4-b070-e62f692c4000",
+      "processGroup": "Post Processing",
+      "processRoute": "Inspection",
+      "operation": "Dimensional Inspection",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 573,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "7b714b54-a9b5-414a-8c56-f2ba4ffe1695",
+      "processGroup": "Post Processing",
+      "processRoute": "Inspection",
+      "operation": "Visual Inspection",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 574,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "760a8379-4141-461f-b417-66359245124b",
+      "processGroup": "Post Processing",
+      "processRoute": "Inspection",
+      "operation": "First Article Inspection",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 575,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "7ad4a8d7-594f-4b05-ad29-27b8c3594e53",
+      "processGroup": "Post Processing",
+      "processRoute": "Inspection",
+      "operation": "In-Process Inspection",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 576,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "63300d2e-d79c-4efe-8b0d-039f6960ff10",
+      "processGroup": "Post Processing",
+      "processRoute": "Inspection",
+      "operation": "Go / No-Go Gauging",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 577,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "0d2528b5-a241-407f-b728-376e887dc548",
+      "processGroup": "Post Processing",
+      "processRoute": "Testing",
+      "operation": "Dye Penetrant",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 583,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "e4f8f625-311c-4b11-9fc3-4efed8b1f75f",
+      "processGroup": "Post Processing",
+      "processRoute": "Testing",
+      "operation": "X-Ray",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 584,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "53a812a1-6d55-4325-af75-d9bc3f4186a0",
+      "processGroup": "Post Processing",
+      "processRoute": "Testing",
+      "operation": "Hardness Test",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 585,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "7dc3dade-3710-4339-b499-8c5c0572b6a7",
+      "processGroup": "Post Processing",
+      "processRoute": "Testing",
+      "operation": "Tensile Test",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 586,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "7c314dc1-87b0-4023-9c8d-962f11dec471",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Packing",
+      "operation": "Blister / Tray Packing",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 603,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "2b7a011c-77a9-455b-9d5b-8522224e9c7f",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Packing",
+      "operation": "Bubble Wrap",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 604,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "beaea97a-95c1-4c97-87b6-90108269ea38",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Packing",
+      "operation": "VCI Packaging",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 605,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "0a049e45-dedc-419a-a605-9a9b27b6b977",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Delivery",
+      "operation": "FOB",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 613,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    },
+    {
+      "id": "8e590e06-38b6-4974-b234-d79a0d021474",
+      "processGroup": "Packing & Delivery",
+      "processRoute": "Delivery",
+      "operation": "CIF",
+      "calculatorId": null,
+      "calculatorName": null,
+      "isActive": true,
+      "displayOrder": 614,
+      "createdAt": "2026-06-15T11:26:38.675654+00:00",
+      "updatedAt": "2026-06-15T11:26:38.675654+00:00"
+    }
+  ],
+  "hierarchy": {
+    "Plastic & Rubber": {
+      "Compression Molding": [
+        {
+          "id": "80e45f5f-8ecc-4c5f-b4c4-9aa45d354c93",
+          "operation": "Compression Molding",
+          "calculatorName": "Compression Calculator"
+        }
+      ],
+      "Injection Molding": [
+        {
+          "id": "b7ade4a9-8b03-449f-8478-f1d2c78926dc",
+          "operation": "Injection Molding",
+          "calculatorName": "Injection Molding Calculator"
+        },
+        {
+          "id": "8dfa091d-4973-4d4b-878c-287ec1f173f4",
+          "operation": "Injection Molding-Hot Runner",
+          "calculatorName": "Injection Molding Calculator"
+        },
+        {
+          "id": "286af254-f979-4828-80c6-015e7cef9f7c",
+          "operation": "Injection Molding-Cold Runner",
+          "calculatorName": "Injection Molding Calculator"
+        },
+        {
+          "id": "5d3bcc1e-92c1-49c0-aed0-f986f145bb30",
+          "operation": "Insert Molding",
+          "calculatorName": "Insert Molding Calculator"
+        },
+        {
+          "id": "33366be1-6dca-47c0-8d24-8972dcaf310c",
+          "operation": "Overmolding",
+          "calculatorName": ""
+        },
+        {
+          "id": "e1ac054b-61b0-46d6-8d74-76c9c082316f",
+          "operation": "Gas-Assist Injection Molding",
+          "calculatorName": ""
+        }
+      ],
+      "Structural foam molding": [
+        {
+          "id": "e2e430bc-7c13-4930-a833-d76d34c09c2f",
+          "operation": "Structural foam molding",
+          "calculatorName": "Structural Foam Calculator"
+        }
+      ],
+      "Reaction Foam Molding": [
+        {
+          "id": "e0f5a406-ad05-48ff-9f70-74e58eb6ceb2",
+          "operation": "Reaction Foam Molding",
+          "calculatorName": "Reaction Foam Calculator"
+        }
+      ],
+      "Thermoforming": [
+        {
+          "id": "bef1848a-6548-4a72-811f-c28c543e3205",
+          "operation": "3 Station Rotary Thermoforming",
+          "calculatorName": "Thermoforming Calculator"
+        },
+        {
+          "id": "0f6ee4a5-8329-4aa5-8553-3ca677a4ab0b",
+          "operation": "4 Station Rotary Thermoforming",
+          "calculatorName": "Thermoforming Calculator"
+        },
+        {
+          "id": "a4377465-aa8a-41be-936a-d272c6a82487",
+          "operation": "Shuttle Station Thermoforming",
+          "calculatorName": "Thermoforming Calculator"
+        },
+        {
+          "id": "54b02720-b7cd-486e-8bd3-b12573d1c9a3",
+          "operation": "Single Station Thermoforming",
+          "calculatorName": "Thermoforming Calculator"
+        }
+      ],
+      "Trimming / Degating": [
+        {
+          "id": "7343db13-6863-4c72-8d61-1e4c5b13e174",
+          "operation": "Manual",
+          "calculatorName": "Manual Time Calculator"
+        },
+        {
+          "id": "cbe982b0-5145-4173-9ae0-c4ed544272d7",
+          "operation": "Semi Automated",
+          "calculatorName": "Semi-Auto Time Calculator"
+        }
+      ],
+      "Raw Material": [
+        {
+          "id": "062129c7-fe56-4a02-b431-4044e2301610",
+          "operation": "Granules / Pellets",
+          "calculatorName": "Material Weight Calculator"
+        }
+      ],
+      "Blow Molding": [
+        {
+          "id": "21b96d86-e4c9-4fff-ae11-87695f842404",
+          "operation": "Extrusion Blow Molding",
+          "calculatorName": ""
+        },
+        {
+          "id": "4df289be-cef6-4c71-902b-ee3972d61175",
+          "operation": "Injection Blow Molding",
+          "calculatorName": ""
+        },
+        {
+          "id": "e25ac520-b3dd-4bb0-9dbf-e719437b7a44",
+          "operation": "Stretch Blow Molding",
+          "calculatorName": ""
+        }
+      ],
+      "Extrusion": [
+        {
+          "id": "4ba8c9ae-60d9-46cd-8c01-a6e6a732d688",
+          "operation": "Profile Extrusion",
+          "calculatorName": ""
+        },
+        {
+          "id": "625693e0-2f55-4e67-a046-e4efd1d52430",
+          "operation": "Sheet Extrusion",
+          "calculatorName": ""
+        },
+        {
+          "id": "e4ed34b6-0729-4432-9b70-b98ac5974876",
+          "operation": "Pipe / Tube Extrusion",
+          "calculatorName": ""
+        }
+      ],
+      "Rotational Molding": [
+        {
+          "id": "cb42d1ce-2822-4953-a078-895a4a106520",
+          "operation": "Rotational Molding",
+          "calculatorName": ""
+        }
+      ],
+      "Rubber Molding": [
+        {
+          "id": "ac546896-2fdc-44d4-bee9-9bbd93ee785b",
+          "operation": "Rubber Compression Molding",
+          "calculatorName": ""
+        },
+        {
+          "id": "ece23fa2-1838-4104-9598-6129f9d64dad",
+          "operation": "Rubber Injection Molding",
+          "calculatorName": ""
+        },
+        {
+          "id": "7ea5f391-f6d9-490e-81b5-4de7ce9b847c",
+          "operation": "Rubber Transfer Molding",
+          "calculatorName": ""
+        }
+      ]
+    },
+    "Machining": {
+      "Cutting": [
+        {
+          "id": "72bff9c5-629a-44b0-a3ac-05b0fbd5e6ec",
+          "operation": "Band Saw Cutting",
+          "calculatorName": "Band Saw Calculator"
+        }
+      ],
+      "Turning Center": [
+        {
+          "id": "8d6d2a31-e91e-419d-b18b-8786eaf5ad91",
+          "operation": "Saw Cut / Stock Cut",
+          "calculatorName": ""
+        },
+        {
+          "id": "17397590-4abc-4259-a0b1-dd201321e4e8",
+          "operation": "Facing",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "2f159a8f-f697-4f8b-a0fc-21346d35dbc2",
+          "operation": "OD Rough Turning",
+          "calculatorName": ""
+        },
+        {
+          "id": "b43b0778-3952-4dd7-8d7b-a3b937121641",
+          "operation": "Turning",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "3fd5e1b7-7fd1-4338-bf1d-5a88159f3a54",
+          "operation": "OD Finish Turning",
+          "calculatorName": ""
+        },
+        {
+          "id": "2ea6699b-27dc-4b5a-8182-ccacf93e0c97",
+          "operation": "Drilling",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "1c553638-14cd-4b6c-bb58-3d4a83624342",
+          "operation": "Threading",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "4f4081e5-6641-4568-9fc3-a0dbe544df70",
+          "operation": "Shoulder Turning",
+          "calculatorName": ""
+        },
+        {
+          "id": "55de175f-735d-426f-a912-f1d5e93361f2",
+          "operation": "Chambering",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "b61af015-3b66-4d2c-816e-1cf75557803c",
+          "operation": "Taper Turning",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "f064577c-dd33-44b0-89fc-203b54e8b3d6",
+          "operation": "Flange Turning",
+          "calculatorName": ""
+        },
+        {
+          "id": "d20788be-e4a5-4e62-826a-34f01c11ee5d",
+          "operation": "Step turning",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "e8d8878c-686d-4515-867e-33e3fa6c5878",
+          "operation": "Contour turning",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "faedee2c-e31b-46e0-a78b-1692008b4681",
+          "operation": "Grooving",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "24084dad-ff8a-4ae4-9d4e-da9e09084a22",
+          "operation": "Parting /Cut-off",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "b718a2a0-0aa8-4025-ab0e-774b5e0ae4b1",
+          "operation": "Knurling",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "07fa209a-8690-402c-aa8b-ea59cd929584",
+          "operation": "Eccentric / Off-Center Turning",
+          "calculatorName": "Turning Center Calculator"
+        },
+        {
+          "id": "b27ba399-55a9-43cb-a9b6-c784cabae214",
+          "operation": "Boring",
+          "calculatorName": ""
+        },
+        {
+          "id": "ed8a6fe7-90f4-42c9-844d-84264e3f2bcd",
+          "operation": "Counterboring",
+          "calculatorName": ""
+        },
+        {
+          "id": "5ab3dbc6-ca7b-451a-b087-c7cc356ba0ec",
+          "operation": "Countersinking",
+          "calculatorName": ""
+        },
+        {
+          "id": "fd209ed8-1b8d-4932-a167-669e49cbc272",
+          "operation": "Tapping",
+          "calculatorName": ""
+        },
+        {
+          "id": "9c474f79-0746-4308-a0ea-41b0116dfcf0",
+          "operation": "Reaming",
+          "calculatorName": ""
+        }
+      ],
+      "Milling  Center": [
+        {
+          "id": "6c3d6871-3448-40a3-aece-4b01329bdca8",
+          "operation": "Face milling",
+          "calculatorName": "Milling Center Calculator"
+        },
+        {
+          "id": "37989828-ba60-4fee-91a1-0d5fc6f6dc22",
+          "operation": "Peripheral (Slab) Milling",
+          "calculatorName": "Milling Center Calculator"
+        },
+        {
+          "id": "a94bda9e-6a2a-4cd9-90d4-1f64dda26ad2",
+          "operation": "Thread Milling",
+          "calculatorName": "Milling Center Calculator"
+        },
+        {
+          "id": "5f408878-b54a-4613-837d-d8057fbf49df",
+          "operation": "Pocket Milling",
+          "calculatorName": "Milling Center Calculator"
+        },
+        {
+          "id": "edf08f84-f654-4c48-b039-1ea1dc5eb34a",
+          "operation": "Slot Milling",
+          "calculatorName": "Milling Center Calculator"
+        },
+        {
+          "id": "dd903e17-fc04-4153-a733-549852110dbb",
+          "operation": "Contour / Profile Milling",
+          "calculatorName": "Milling Center Calculator"
+        },
+        {
+          "id": "cbaf976f-ca01-4c14-9a28-ba4289b2b98b",
+          "operation": "Circular / Helical Milling",
+          "calculatorName": "Milling Center Calculator"
+        },
+        {
+          "id": "10fd8f83-c059-4258-9f2d-7e5450995ef2",
+          "operation": "Chamfering",
+          "calculatorName": "Milling Center Calculator"
+        }
+      ],
+      "Gear Cutting": [
+        {
+          "id": "938b75b4-00d0-46fd-89c9-62bdf46dd92a",
+          "operation": "Gear Hobbing",
+          "calculatorName": "Gear Cutting Calculator"
+        },
+        {
+          "id": "229b819c-8b95-482e-891a-943060377e92",
+          "operation": "Gear Shaping",
+          "calculatorName": "Gear Cutting Calculator"
+        },
+        {
+          "id": "0eebfcae-e7ac-4b26-9526-1756bf98ebb0",
+          "operation": "Gear Milling",
+          "calculatorName": "Gear Cutting Calculator"
+        },
+        {
+          "id": "04914a64-309e-42fa-abc5-96f7b448f55f",
+          "operation": "Gear Honing",
+          "calculatorName": "Gear Cutting Calculator"
+        },
+        {
+          "id": "47da1c05-e26d-4c1a-8591-71b336f0e254",
+          "operation": "Gear Lapping",
+          "calculatorName": "Gear Cutting Calculator"
+        }
+      ],
+      "Broach": [
+        {
+          "id": "6ffa769f-1b93-466f-bc57-e50e0c2a83a0",
+          "operation": "Broaching",
+          "calculatorName": "Broaching Calculator"
+        },
+        {
+          "id": "78992da3-9835-4afe-a533-11e07b35862a",
+          "operation": "Gear Broaching",
+          "calculatorName": "Broaching Calculator"
+        }
+      ],
+      "Grinding": [
+        {
+          "id": "a136b433-31a9-48e2-b145-83ecbec2ad19",
+          "operation": "Cyclinderical Grinding",
+          "calculatorName": "Grinding Calculator"
+        },
+        {
+          "id": "1616d067-f5c6-48f1-b16c-835c0e17be6e",
+          "operation": "Centerless Grinding",
+          "calculatorName": "Grinding Calculator"
+        },
+        {
+          "id": "e79bf7cc-5ad5-46c2-adfa-0090edf6140a",
+          "operation": "Surface grinding",
+          "calculatorName": "Grinding Calculator"
+        },
+        {
+          "id": "681b8eb5-7cd7-4cfc-b036-83150a52f462",
+          "operation": "Gear Grinding",
+          "calculatorName": "Grinding Calculator"
+        },
+        {
+          "id": "25228c66-8dab-451d-9c0d-bada3d25cf3f",
+          "operation": "Cylindrical Grinding",
+          "calculatorName": ""
+        },
+        {
+          "id": "f3a99050-7ed5-4e04-9f86-c57a2bfcf69b",
+          "operation": "Centreless Grinding",
+          "calculatorName": ""
+        },
+        {
+          "id": "6859416c-e711-4171-aca3-89cf6b4a5c6e",
+          "operation": "ID Grinding",
+          "calculatorName": ""
+        },
+        {
+          "id": "9a4a7e1b-bec8-48fc-84b5-6b74457e9a4a",
+          "operation": "Honing",
+          "calculatorName": ""
+        },
+        {
+          "id": "39d81fa4-3abb-43bd-9e94-2157c2c80192",
+          "operation": "Lapping",
+          "calculatorName": ""
+        }
+      ],
+      "Drilling": [
+        {
+          "id": "f9dbbd04-5e8d-47de-93b8-88a82263ac96",
+          "operation": "Drilling",
+          "calculatorName": "Drilling Calculator"
+        },
+        {
+          "id": "94ea7dd7-95af-4152-9c08-fc4b3e10bb6c",
+          "operation": "Tapping",
+          "calculatorName": "Drilling Calculator"
+        },
+        {
+          "id": "bc1c98c9-e6cf-445e-a37e-8fbd2861fb7c",
+          "operation": "Gun Drilling",
+          "calculatorName": "Drilling Calculator"
+        },
+        {
+          "id": "b2e0959c-90fa-4c9f-b3ae-2789c9592ac9",
+          "operation": "Boring",
+          "calculatorName": "Drilling Calculator"
+        },
+        {
+          "id": "2ef2e168-c898-4b9d-9dbd-dcf4edb122d5",
+          "operation": "Reaming",
+          "calculatorName": "Drilling Calculator"
+        },
+        {
+          "id": "271734ab-9324-4159-81e1-8f1b6ae3253b",
+          "operation": "Counterboring",
+          "calculatorName": ""
+        }
+      ],
+      "EDM": [
+        {
+          "id": "ecd362bd-c4de-4b5e-8e89-50eebceec323",
+          "operation": "Wire EDM",
+          "calculatorName": "EDM Calculator"
+        },
+        {
+          "id": "a9050942-4c7e-48fc-90f1-0bb3ca75f72f",
+          "operation": "Spark EDM",
+          "calculatorName": "EDM Calculator"
+        }
+      ],
+      "Raw Material": [
+        {
+          "id": "bb2e72cb-a3de-4928-917a-6b473092ef14",
+          "operation": "Round Bar",
+          "calculatorName": "Bar Stock Calculator"
+        },
+        {
+          "id": "43926cde-00aa-44bd-bc9e-c42a7058913e",
+          "operation": "Rectangular Bar",
+          "calculatorName": "Bar Stock Calculator"
+        },
+        {
+          "id": "c0c531fa-5270-4f75-8b32-4620c64c9e64",
+          "operation": "Square Bar",
+          "calculatorName": "Bar Stock Calculator"
+        },
+        {
+          "id": "9da6cff7-bf58-4fd3-b5f8-8459bca48bfb",
+          "operation": "Hexagonal Bar",
+          "calculatorName": "Bar Stock Calculator"
+        },
+        {
+          "id": "42a5dec9-429a-4bd7-a8ed-ec2649690078",
+          "operation": "Tube",
+          "calculatorName": "Tube Stock Calculator"
+        },
+        {
+          "id": "98ad9be2-edd6-40f5-99ed-b5ba540dbd6c",
+          "operation": "Rectangular Tube",
+          "calculatorName": "Tube Stock Calculator"
+        },
+        {
+          "id": "70118182-57bb-4517-b914-17d560f5f5ea",
+          "operation": "Square Tube",
+          "calculatorName": "Tube Stock Calculator"
+        },
+        {
+          "id": "5af9bc76-be6a-415d-a2f1-25cb0cf68f65",
+          "operation": "Ingot",
+          "calculatorName": "Material Entry"
+        },
+        {
+          "id": "220f9b3c-5767-42d9-81cd-817555f695f1",
+          "operation": "Casted RM",
+          "calculatorName": "Material Entry"
+        },
+        {
+          "id": "3934dec3-bace-4234-a2f6-31fb6d78935b",
+          "operation": "Billet",
+          "calculatorName": "Material Entry"
+        },
+        {
+          "id": "bc7669a4-cda4-4baf-a88f-8b887c618d37",
+          "operation": "Wire Rod",
+          "calculatorName": "Wire Stock Calculator"
+        },
+        {
+          "id": "1137cd8f-c359-404e-8236-21352486244c",
+          "operation": "Forged RM",
+          "calculatorName": "Material Entry"
+        }
+      ],
+      "VMC": [
+        {
+          "id": "a74235aa-2497-4267-941e-bcf13788b0d6",
+          "operation": "Face Milling",
+          "calculatorName": ""
+        },
+        {
+          "id": "13d4c2c8-cfee-4d91-aaf3-02b205382a70",
+          "operation": "Peripheral Milling",
+          "calculatorName": ""
+        },
+        {
+          "id": "64facebf-2046-4f81-b92f-c14144ef3b33",
+          "operation": "Pocket Milling",
+          "calculatorName": ""
+        },
+        {
+          "id": "4d908e45-fdc5-4106-8683-026c6eceb8fe",
+          "operation": "Contour / Profile Milling",
+          "calculatorName": ""
+        },
+        {
+          "id": "c60980f1-491d-45f6-bdeb-08430a7b66f6",
+          "operation": "Slot Milling",
+          "calculatorName": ""
+        },
+        {
+          "id": "73ec506e-5d9b-4b0b-825e-dc1cffd26302",
+          "operation": "Thread Milling",
+          "calculatorName": ""
+        },
+        {
+          "id": "c3dfc0bf-9c00-4e5e-b7b2-c724f7bc82c4",
+          "operation": "Circular / Helical Milling",
+          "calculatorName": ""
+        },
+        {
+          "id": "0e2641d8-63d0-4dbf-b356-623804b3cc84",
+          "operation": "Chamfering",
+          "calculatorName": ""
+        },
+        {
+          "id": "ca50cdf4-6ae4-4820-b114-e5dbf5ee933d",
+          "operation": "Drilling",
+          "calculatorName": ""
+        },
+        {
+          "id": "6488a187-2a07-4c5f-a15f-2022861a7b90",
+          "operation": "Counterboring",
+          "calculatorName": ""
+        },
+        {
+          "id": "a5bfc31b-9a20-428c-8cdd-afc13eef5597",
+          "operation": "Countersinking",
+          "calculatorName": ""
+        },
+        {
+          "id": "4c766e05-9325-47f9-9d8c-48de001b93c0",
+          "operation": "Tapping",
+          "calculatorName": ""
+        },
+        {
+          "id": "3b865e0f-182b-431f-a79a-c69373c7c5a2",
+          "operation": "Reaming",
+          "calculatorName": ""
+        },
+        {
+          "id": "da18d7ca-375a-44f9-9200-d2d99bd268d9",
+          "operation": "Boring",
+          "calculatorName": ""
+        }
+      ],
+      "Sawing": [
+        {
+          "id": "94957574-b4bc-4664-a458-e982513a6b3f",
+          "operation": "Band Saw Cut",
+          "calculatorName": ""
+        },
+        {
+          "id": "8d7e9f5b-3f98-492c-aabf-1fc8fe1a573a",
+          "operation": "Cold Saw Cut",
+          "calculatorName": ""
+        },
+        {
+          "id": "6ef45b1b-100b-4a50-a173-111a9e8e61b0",
+          "operation": "Stock Cut",
+          "calculatorName": ""
+        }
+      ],
+      "Waterjet": [
+        {
+          "id": "f60c43dd-3229-4bfd-98cc-e9521c0b4afa",
+          "operation": "Waterjet Cutting",
+          "calculatorName": ""
+        }
+      ]
+    },
+    "Sheet Metal": {
+      "Laser Cutting": [
+        {
+          "id": "45d060be-2d75-43e4-b734-35095246543b",
+          "operation": "Laser Cut",
+          "calculatorName": ""
+        },
+        {
+          "id": "37426bf0-73a4-4521-a04a-52f3fb02b8f0",
+          "operation": "Fiber Laser Cut",
+          "calculatorName": ""
+        }
+      ],
+      "Sheet Cutting": [
+        {
+          "id": "86c71e3c-5e18-4d28-90a6-4ea2af62222c",
+          "operation": "Shearning",
+          "calculatorName": "Shearing Calculator"
+        },
+        {
+          "id": "7ee1fb69-ae38-4296-a28d-1a008cc1005c",
+          "operation": "Fiber laser Cutting",
+          "calculatorName": "Laser Cutting Calculator"
+        },
+        {
+          "id": "36c8f524-10d8-4863-88c5-8c87121fee55",
+          "operation": "Co2 Laser Cutting",
+          "calculatorName": "Laser Cutting Calculator"
+        },
+        {
+          "id": "7c2baa13-2197-458f-a327-d4658d9872fe",
+          "operation": "Plasma Cutting",
+          "calculatorName": "Plasma Cutting Calculator"
+        },
+        {
+          "id": "95075deb-59b8-4b79-88a3-e74defd7708f",
+          "operation": "Water jet Cutting",
+          "calculatorName": "Water Jet Calculator"
+        },
+        {
+          "id": "a24e8785-24ac-44ff-ac80-9b204693a584",
+          "operation": "Blanking",
+          "calculatorName": "Blanking Press Calculator"
+        },
+        {
+          "id": "263c2236-d28f-4276-81b8-94a827c76100",
+          "operation": "3D Laser Cut",
+          "calculatorName": "Laser Cutting Calculator"
+        },
+        {
+          "id": "35bb5065-1baf-4857-83f0-338207412f61",
+          "operation": "Turret Press",
+          "calculatorName": "Turret Press Calculator"
+        },
+        {
+          "id": "8f187847-21ff-4ade-b759-cfae28f63d65",
+          "operation": "Shearing",
+          "calculatorName": ""
+        },
+        {
+          "id": "d2b6ac62-c10e-4584-b55a-6e633cb47dd0",
+          "operation": "Waterjet Cutting",
+          "calculatorName": ""
+        },
+        {
+          "id": "dfbb14b0-fa2d-4267-a646-91dc384d9d4d",
+          "operation": "Nibbling",
+          "calculatorName": ""
+        }
+      ],
+      "Bending/Floating /Forming": [
+        {
+          "id": "c43a6579-ad84-4d83-890e-74ef17d99428",
+          "operation": "Bend Brake",
+          "calculatorName": "Press Brake Calculator"
+        },
+        {
+          "id": "0cf620ae-7ce7-4744-a8d4-3e4ce0f4bd08",
+          "operation": "Stage Tool Bending",
+          "calculatorName": "Bending Calculator"
+        },
+        {
+          "id": "ab74154b-1c43-4703-8a7a-bff9a6b3c4ca",
+          "operation": "Stage Tool Forming",
+          "calculatorName": "Forming Calculator"
+        },
+        {
+          "id": "645af938-49c3-4a32-b0e2-33daf09a8d26",
+          "operation": "Roll Forming",
+          "calculatorName": "Roll Forming Calculator"
+        },
+        {
+          "id": "d69b7b4b-a516-4b92-9f1d-a4880105478e",
+          "operation": "Deep Draw",
+          "calculatorName": "Deep Draw Calculator"
+        },
+        {
+          "id": "fb775ffb-4d0c-4ead-9855-18150a8dc311",
+          "operation": "Laser Puch",
+          "calculatorName": "Punch Calculator"
+        },
+        {
+          "id": "4c212773-b941-4978-a311-9bc71666f70b",
+          "operation": "Turret Press",
+          "calculatorName": "Turret Press Calculator"
+        },
+        {
+          "id": "250ad96b-d84d-4520-a7bc-d09fe5d7d10c",
+          "operation": "Progressive die",
+          "calculatorName": "Progressive Die Calculator"
+        },
+        {
+          "id": "6bd22a1c-c036-4d93-85c7-a288f22466e2",
+          "operation": "Offline Blank",
+          "calculatorName": "Blanking Calculator"
+        },
+        {
+          "id": "b9e69332-61e2-484d-8f53-7fb7c80386ee",
+          "operation": "Stretch forming",
+          "calculatorName": "Stretch Forming Calculator"
+        },
+        {
+          "id": "4a68e835-5e5d-4299-bdc6-011ab900bbb4",
+          "operation": "Hemming",
+          "calculatorName": ""
+        },
+        {
+          "id": "b0f9945f-4532-4882-b546-2e5d6f2b9576",
+          "operation": "Flanging",
+          "calculatorName": ""
+        }
+      ],
+      "Press Brake": [
+        {
+          "id": "af53350c-6003-499a-a729-e9f09779004a",
+          "operation": "Bend",
+          "calculatorName": ""
+        },
+        {
+          "id": "bce6c6d8-1da2-41b8-b10c-44ea049780d5",
+          "operation": "Form",
+          "calculatorName": ""
+        },
+        {
+          "id": "406136c2-3c9e-4921-bab2-fa38d7ef9de2",
+          "operation": "Press Brake Bend",
+          "calculatorName": ""
+        }
+      ],
+      "Raw Material": [
+        {
+          "id": "eab66f55-9c80-45d1-a30e-a439b09d570f",
+          "operation": "Sheet",
+          "calculatorName": "Sheet Stock Calculator"
+        },
+        {
+          "id": "6a42ad5c-c7f0-4a61-b2f0-49418c043cb5",
+          "operation": "Flat",
+          "calculatorName": "Flat Stock Calculator"
+        },
+        {
+          "id": "9e603b19-79ad-4ef0-9aa4-54c0e9d82c35",
+          "operation": "Coil",
+          "calculatorName": "Coil Stock Calculator"
+        },
+        {
+          "id": "673bf1f5-ca42-41a7-960a-7330c13f37c4",
+          "operation": "I-Beam",
+          "calculatorName": "Beam Stock Calculator"
+        },
+        {
+          "id": "07080605-391d-45c0-9e47-02cb62397015",
+          "operation": "H-Beam",
+          "calculatorName": "Beam Stock Calculator"
+        },
+        {
+          "id": "2105e58d-492f-4af0-8bfc-56cd23ff9738",
+          "operation": "Angle (L-shape)",
+          "calculatorName": "Angle Stock Calculator"
+        },
+        {
+          "id": "f931751c-c8e6-46af-ac73-c049f9e510a4",
+          "operation": "Channel (C-shape / U-shape)",
+          "calculatorName": "Channel Stock Calculator"
+        },
+        {
+          "id": "3fa7a7d5-6731-44da-a3ba-8687f76a026a",
+          "operation": "T-Sections",
+          "calculatorName": "Section Stock Calculator"
+        },
+        {
+          "id": "a39452c2-4d0a-43bc-8cf8-3a48aa1d244a",
+          "operation": "Z-Sections",
+          "calculatorName": "Section Stock Calculator"
+        }
+      ],
+      "Finishing": [
+        {
+          "id": "1da9caf0-44be-400b-b4e5-a2e96903e285",
+          "operation": "Deburr",
+          "calculatorName": ""
+        },
+        {
+          "id": "655c53ff-c3c6-4286-9438-a04f164ca2b4",
+          "operation": "Edge Finish",
+          "calculatorName": ""
+        }
+      ],
+      "Inspection": [
+        {
+          "id": "1b1e9fd8-368d-4984-9a94-5d04a9a886b2",
+          "operation": "Inspect",
+          "calculatorName": ""
+        },
+        {
+          "id": "00543920-5eaf-4a40-b839-02b1731e6a71",
+          "operation": "Dimensional Inspect",
+          "calculatorName": ""
+        }
+      ],
+      "Surface Treatment": [
+        {
+          "id": "b114ea90-6604-470f-b244-75361461364b",
+          "operation": "Powder Coat",
+          "calculatorName": ""
+        },
+        {
+          "id": "3705c5fe-f526-4b52-aa5b-97925299693e",
+          "operation": "Paint",
+          "calculatorName": ""
+        },
+        {
+          "id": "1bfaf18d-8e1c-4b54-b51f-763c1f79d1c3",
+          "operation": "Anodize",
+          "calculatorName": ""
+        }
+      ]
+    },
+    "Assembly": {
+      "Pick & Place": [
+        {
+          "id": "1ab6dcb7-86be-480e-bbce-66e42008b403",
+          "operation": "Manual Pick and Place",
+          "calculatorName": "Manual Assembly Time Calculator"
+        },
+        {
+          "id": "8d746fa8-4548-4b45-9c4a-310c0dcd7309",
+          "operation": "Semi automated",
+          "calculatorName": "Semi-Auto Assembly Calculator"
+        },
+        {
+          "id": "d138f113-6870-4996-b5ad-5b3e08b776be",
+          "operation": "Fully Automated",
+          "calculatorName": ""
+        }
+      ],
+      "Welding": [
+        {
+          "id": "664cea23-a854-45f0-9af4-dd245435a7d6",
+          "operation": "Mig Welding",
+          "calculatorName": "MIG Welding Calculator"
+        },
+        {
+          "id": "ffbea0be-228a-46f6-9400-a8cd7442c7e9",
+          "operation": "Tig Welding",
+          "calculatorName": "TIG Welding Calculator"
+        },
+        {
+          "id": "fd1250ff-1024-49bd-ba66-f682f6e49e3b",
+          "operation": "Spot Weld",
+          "calculatorName": "Spot Welding Calculator"
+        },
+        {
+          "id": "eccb2039-7f28-4baf-8f81-a3517eb7e0ad",
+          "operation": "Seam Weld",
+          "calculatorName": "Seam Welding Calculator"
+        },
+        {
+          "id": "8d676928-0bca-427b-b98e-0e5801cce7af",
+          "operation": "Laser Weld",
+          "calculatorName": "Laser Welding Calculator"
+        },
+        {
+          "id": "ab275d86-5c69-428c-ba23-99879c708b3b",
+          "operation": "Plasma Weld",
+          "calculatorName": ""
+        },
+        {
+          "id": "5e326494-5519-4b8e-85a3-76b4d4e05650",
+          "operation": "Electron Beam Weld",
+          "calculatorName": ""
+        },
+        {
+          "id": "7a40d824-cc53-41d1-9e05-08a193d1d679",
+          "operation": "Friction Stir Weld",
+          "calculatorName": ""
+        }
+      ],
+      "Screwing": [
+        {
+          "id": "d38f93d9-b6e9-4fa7-82e2-0b94c24c8943",
+          "operation": "Manal",
+          "calculatorName": "Manual Fastening Calculator"
+        },
+        {
+          "id": "785e3e99-1f61-45a5-a762-c859f66b2dd2",
+          "operation": "Power gun",
+          "calculatorName": "Power Tool Calculator"
+        }
+      ],
+      "Bolt Nut Assy": [
+        {
+          "id": "1ecaf398-f273-4184-96ac-8406e719ca5c",
+          "operation": "Power gun",
+          "calculatorName": "Power Tool Calculator"
+        },
+        {
+          "id": "f266a6b4-23cc-4b35-af12-c623e2a5a028",
+          "operation": "Manal",
+          "calculatorName": "Manual Fastening Calculator"
+        }
+      ],
+      "Electrical Connection": [
+        {
+          "id": "0d6ad425-aa57-40e1-8b3e-184cda7b5930",
+          "operation": "Wire Harness",
+          "calculatorName": "Harness Assembly Calculator"
+        },
+        {
+          "id": "bc0b6761-ec75-4f79-ab7e-4adbddee1a60",
+          "operation": "Connector Crimping",
+          "calculatorName": ""
+        },
+        {
+          "id": "0ac88fb3-8229-4b63-b379-5810a1dd9caa",
+          "operation": "PCB Assembly",
+          "calculatorName": ""
+        }
+      ],
+      "Debur": [
+        {
+          "id": "30e4b55b-9a29-4f0b-bd43-f6e5e88bd90d",
+          "operation": "Manual Debur",
+          "calculatorName": "Deburring Time Calculator"
+        }
+      ],
+      "Weld Cleaning": [
+        {
+          "id": "68a4fd01-0d19-4dee-9217-d90257efbe59",
+          "operation": "Manual",
+          "calculatorName": "Manual Cleaning Calculator"
+        },
+        {
+          "id": "e60ca60a-ca37-4c37-9f56-9094cb4336c7",
+          "operation": "Semi automated-Sanding",
+          "calculatorName": "Sanding Calculator"
+        }
+      ],
+      "Adhesive Bonding": [
+        {
+          "id": "369a3100-8a93-4f4a-beda-5df399fb880e",
+          "operation": "Manual Bonding",
+          "calculatorName": ""
+        },
+        {
+          "id": "2b97b28e-1226-4cb9-b398-de351d76c871",
+          "operation": "Dispensing Robot",
+          "calculatorName": ""
+        }
+      ]
+    },
+    "Post Processing": {
+      "Surface Protection": [
+        {
+          "id": "f35bad24-6930-45a2-9778-57102ba75a36",
+          "operation": "Degrease",
+          "calculatorName": "Degreasing Calculator"
+        },
+        {
+          "id": "4f2da193-bab7-4d1b-95aa-3ac42aafd531",
+          "operation": "Phosphating",
+          "calculatorName": "Phosphating Calculator"
+        },
+        {
+          "id": "9bebb1a6-7bd9-4e9a-a69e-1517b3037a2a",
+          "operation": "Blackning",
+          "calculatorName": "Blackening Calculator"
+        },
+        {
+          "id": "e758cd45-966b-4a27-a02a-b4804ae011fe",
+          "operation": "Plating",
+          "calculatorName": "Plating Calculator"
+        },
+        {
+          "id": "3184bfc1-c8b2-45ad-be6f-0ad92aa859ba",
+          "operation": "Zinc Nickel plating",
+          "calculatorName": "Plating Calculator"
+        },
+        {
+          "id": "60cade71-4b73-4f4b-b4e6-7f7fd815c668",
+          "operation": "Nickel Chrome Plating",
+          "calculatorName": "Plating Calculator"
+        },
+        {
+          "id": "0588cd62-39f3-4b8f-85b3-a817a24e6d30",
+          "operation": "Hard Chrome plating",
+          "calculatorName": "Plating Calculator"
+        },
+        {
+          "id": "95078864-90fd-4f66-94be-441a6357ba9f",
+          "operation": "Passivation",
+          "calculatorName": "Passivation Calculator"
+        },
+        {
+          "id": "fc30bfac-dcdb-4ebe-9ae8-27b5995fc071",
+          "operation": "Anodizing Type I",
+          "calculatorName": "Anodizing Calculator"
+        },
+        {
+          "id": "9175f2b0-95cd-4c55-b429-525d0546aef7",
+          "operation": "Anodizing Type II",
+          "calculatorName": "Anodizing Calculator"
+        },
+        {
+          "id": "0fb9dac6-9f07-42be-89f3-3799c631995b",
+          "operation": "Anodizing Type III",
+          "calculatorName": "Anodizing Calculator"
+        },
+        {
+          "id": "f413ed96-adb9-4d4e-a07c-bd8d9605e091",
+          "operation": "Manual Paint primer",
+          "calculatorName": "Painting Calculator"
+        },
+        {
+          "id": "de2cb4a5-5e57-4557-9213-ad2372564941",
+          "operation": "Manual Paint finish Coat",
+          "calculatorName": "Painting Calculator"
+        },
+        {
+          "id": "2a022642-1310-4584-905c-f61b20dc53b0",
+          "operation": "Manual Paint hand Cleaning",
+          "calculatorName": "Paint Prep Calculator"
+        },
+        {
+          "id": "bae63ba8-2682-42ff-ba78-8fdf1ab44e65",
+          "operation": "Manual Paint hand Sanding",
+          "calculatorName": "Paint Prep Calculator"
+        },
+        {
+          "id": "ba84fbdc-172a-46f7-8e09-5919cae177b6",
+          "operation": "Masking",
+          "calculatorName": "Masking Calculator"
+        },
+        {
+          "id": "ff655f74-b408-4805-b130-7fa9f4914f8c",
+          "operation": "Powder Coating",
+          "calculatorName": "Powder Coating Calculator"
+        },
+        {
+          "id": "36732a1a-1481-45a4-9c6c-d21a1b380a04",
+          "operation": "ED Coating",
+          "calculatorName": "ED Coating Calculator"
+        },
+        {
+          "id": "813e0d60-7e20-4a5c-9068-7eafb84c2fa9",
+          "operation": "Black Oxide",
+          "calculatorName": ""
+        },
+        {
+          "id": "6879f895-eef4-4362-86f8-edf88335651a",
+          "operation": "Zinc Plating",
+          "calculatorName": ""
+        },
+        {
+          "id": "f97c37ea-18a4-486c-9582-f389e4a9edc4",
+          "operation": "Nickel Plating",
+          "calculatorName": ""
+        },
+        {
+          "id": "ff8cd8ed-a23a-4ea6-b982-d6a44e272b4e",
+          "operation": "Chrome Plating",
+          "calculatorName": ""
+        },
+        {
+          "id": "f4929e9e-d4ef-48ba-8da9-e210c9f76ba3",
+          "operation": "Electroless Nickel",
+          "calculatorName": ""
+        },
+        {
+          "id": "71d2e796-daa6-4107-b3cc-2e7e1b6b3d49",
+          "operation": "Anodising",
+          "calculatorName": ""
+        },
+        {
+          "id": "ce6eac19-37f1-47b6-b9b1-abac46cef128",
+          "operation": "Hard Anodising",
+          "calculatorName": ""
+        },
+        {
+          "id": "76dd5ea5-6ab2-470f-b29a-35314b4e4040",
+          "operation": "Type III Hardcoat",
+          "calculatorName": ""
+        },
+        {
+          "id": "f1214b7d-5de2-4972-8cb0-0627806a535f",
+          "operation": "PVD Coating",
+          "calculatorName": ""
+        },
+        {
+          "id": "cfe77d3a-0013-4024-9ab3-bbc7a0ca106e",
+          "operation": "CVD Coating",
+          "calculatorName": ""
+        },
+        {
+          "id": "b0b36049-9e60-4bcc-abdc-6bdbccd45e2b",
+          "operation": "Tin Plating",
+          "calculatorName": ""
+        }
+      ],
+      "Heat Treatment": [
+        {
+          "id": "330b177e-dd2b-4e62-80bc-274a98b9982c",
+          "operation": "Surface Harden",
+          "calculatorName": "Heat Treatment Calculator"
+        },
+        {
+          "id": "63d54ee6-1bba-429c-9923-beb3212f0ce7",
+          "operation": "Through Harden",
+          "calculatorName": "Heat Treatment Calculator"
+        },
+        {
+          "id": "27541be0-40ba-4bc3-a338-1fcc6f4d4e20",
+          "operation": "Anneal",
+          "calculatorName": "Heat Treatment Calculator"
+        },
+        {
+          "id": "cbf4fdd6-0577-437b-aefe-85b1286513a7",
+          "operation": "Temper",
+          "calculatorName": "Heat Treatment Calculator"
+        },
+        {
+          "id": "51a01c22-1fa3-4318-b79f-a17108b32caf",
+          "operation": "Annealing",
+          "calculatorName": ""
+        },
+        {
+          "id": "f07b6d6b-a2a9-4a9d-8b68-c6015d1eca5a",
+          "operation": "Normalising",
+          "calculatorName": ""
+        },
+        {
+          "id": "695125c9-c1b2-4c41-855c-d84da634a7a3",
+          "operation": "Hardening & Tempering",
+          "calculatorName": ""
+        },
+        {
+          "id": "3060e60d-1d94-439e-9d75-736a25e0ea7f",
+          "operation": "Carburising",
+          "calculatorName": ""
+        },
+        {
+          "id": "a6badc17-ded6-4d05-b2d7-88bfede1589b",
+          "operation": "Carburizing",
+          "calculatorName": ""
+        },
+        {
+          "id": "68a41167-fb0d-4e2b-868c-9c4b543fc208",
+          "operation": "Nitriding",
+          "calculatorName": ""
+        },
+        {
+          "id": "d28d94c1-e97b-4d1a-ab3a-e5e16d40e3a0",
+          "operation": "Stress Relieving",
+          "calculatorName": ""
+        },
+        {
+          "id": "b9cd2175-b7c1-404f-8035-2a9f74633aec",
+          "operation": "Age Hardening",
+          "calculatorName": ""
+        },
+        {
+          "id": "c5e2257d-5863-4606-bc64-cec510242812",
+          "operation": "Solution Annealing",
+          "calculatorName": ""
+        },
+        {
+          "id": "2111ae5c-f712-467f-977b-b687dbe4fa93",
+          "operation": "Induction Hardening",
+          "calculatorName": ""
+        }
+      ],
+      "Inspection": [
+        {
+          "id": "516cdfc3-4265-4e37-b7be-bbe89fb7ee44",
+          "operation": "CMM Inspection",
+          "calculatorName": "CMM Inspection Calculator"
+        },
+        {
+          "id": "65390e80-0612-4446-8a78-77fc562fec0c",
+          "operation": "Manual Inspection",
+          "calculatorName": "Manual Inspection Calculator"
+        },
+        {
+          "id": "625a9bc8-00a2-40c0-adf2-f763fe5a3bb1",
+          "operation": "Final Inspection",
+          "calculatorName": ""
+        },
+        {
+          "id": "16530910-8f31-40f4-b070-e62f692c4000",
+          "operation": "Dimensional Inspection",
+          "calculatorName": ""
+        },
+        {
+          "id": "7b714b54-a9b5-414a-8c56-f2ba4ffe1695",
+          "operation": "Visual Inspection",
+          "calculatorName": ""
+        },
+        {
+          "id": "760a8379-4141-461f-b417-66359245124b",
+          "operation": "First Article Inspection",
+          "calculatorName": ""
+        },
+        {
+          "id": "7ad4a8d7-594f-4b05-ad29-27b8c3594e53",
+          "operation": "In-Process Inspection",
+          "calculatorName": ""
+        },
+        {
+          "id": "63300d2e-d79c-4efe-8b0d-039f6960ff10",
+          "operation": "Go / No-Go Gauging",
+          "calculatorName": ""
+        }
+      ],
+      "Testing": [
+        {
+          "id": "0b1bfe83-2538-4ce5-b1b1-7be2c8669a37",
+          "operation": "Leak test",
+          "calculatorName": "Leak Test Calculator"
+        },
+        {
+          "id": "2be7dcb6-93ae-4d64-a12d-cc071161cb78",
+          "operation": "Ultrasonic Test",
+          "calculatorName": "UT Calculator"
+        },
+        {
+          "id": "f4d6a30e-68c1-49d1-9a24-95912688b350",
+          "operation": "MPT",
+          "calculatorName": "MPT Calculator"
+        },
+        {
+          "id": "0d2528b5-a241-407f-b728-376e887dc548",
+          "operation": "Dye Penetrant",
+          "calculatorName": ""
+        },
+        {
+          "id": "e4f8f625-311c-4b11-9fc3-4efed8b1f75f",
+          "operation": "X-Ray",
+          "calculatorName": ""
+        },
+        {
+          "id": "53a812a1-6d55-4325-af75-d9bc3f4186a0",
+          "operation": "Hardness Test",
+          "calculatorName": ""
+        },
+        {
+          "id": "7dc3dade-3710-4339-b499-8c5c0572b6a7",
+          "operation": "Tensile Test",
+          "calculatorName": ""
+        }
+      ],
+      "Deburring": [
+        {
+          "id": "76dd030b-6d1b-417f-90b7-2f22e623ebf6",
+          "operation": "Hand Deburring",
+          "calculatorName": ""
+        },
+        {
+          "id": "3c0fad8f-38ac-42c1-b0db-fc49245e97b0",
+          "operation": "Tumble Deburring",
+          "calculatorName": ""
+        },
+        {
+          "id": "d2233071-eeae-4799-a33d-679eb27160ee",
+          "operation": "Vibratory Deburring",
+          "calculatorName": ""
+        },
+        {
+          "id": "c626b64b-960f-4056-995a-94e8353230b4",
+          "operation": "Robotic Deburring",
+          "calculatorName": ""
+        },
+        {
+          "id": "8fcd1352-84c0-4c6a-810c-4713057db0b5",
+          "operation": "Cleaning",
+          "calculatorName": ""
+        },
+        {
+          "id": "a8292fdd-0cbd-471a-8977-70715073ee29",
+          "operation": "Marking",
+          "calculatorName": ""
+        }
+      ]
+    },
+    "Packing & Delivery": {
+      "Packing": [
+        {
+          "id": "5b971ee5-b779-4ba6-bcef-4b24ddad0139",
+          "operation": "Wooden Box Packing",
+          "calculatorName": "Packing Calculator"
+        },
+        {
+          "id": "51b06be1-b098-4057-8f24-8a96fbe73a25",
+          "operation": "Corrugated box packing",
+          "calculatorName": "Packing Calculator"
+        },
+        {
+          "id": "ac69e876-816f-4392-83d9-ab689a075992",
+          "operation": "Pallet",
+          "calculatorName": "Pallet Calculator"
+        },
+        {
+          "id": "7c314dc1-87b0-4023-9c8d-962f11dec471",
+          "operation": "Blister / Tray Packing",
+          "calculatorName": ""
+        },
+        {
+          "id": "2b7a011c-77a9-455b-9d5b-8522224e9c7f",
+          "operation": "Bubble Wrap",
+          "calculatorName": ""
+        },
+        {
+          "id": "beaea97a-95c1-4c97-87b6-90108269ea38",
+          "operation": "VCI Packaging",
+          "calculatorName": ""
+        }
+      ],
+      "Delivery": [
+        {
+          "id": "3ad23073-4f9a-4dd3-9756-0a6968c2e7bb",
+          "operation": "Ex",
+          "calculatorName": "Delivery Cost Calculator"
+        },
+        {
+          "id": "47893131-01c1-4a7c-bcaf-4b59d5c9ca32",
+          "operation": "FCA",
+          "calculatorName": "Delivery Cost Calculator"
+        },
+        {
+          "id": "e8ef8a2f-cf92-4fb3-8f3b-b24c13a03747",
+          "operation": "DDP",
+          "calculatorName": "Delivery Cost Calculator"
+        },
+        {
+          "id": "0a049e45-dedc-419a-a605-9a9b27b6b977",
+          "operation": "FOB",
+          "calculatorName": ""
+        },
+        {
+          "id": "8e590e06-38b6-4974-b234-d79a0d021474",
+          "operation": "CIF",
+          "calculatorName": ""
+        }
+      ]
+    }
+  }
+}

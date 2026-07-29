@@ -1,15 +1,11 @@
 import {
   TAP_CYCLE_SEC,
-  TAPPING_MHR_INR,
-  DEBURRING_MHR_INR,
   RATES_SOURCE_LABEL,
   CNC_STOCK_ALLOWANCE_PER_SIDE_MM,
-  DEFAULT_COSTING_LOCATION,
-  LOCATION_MHR_DEFAULTS,
   CMM_SETUP_MIN,
   INSPECTION_SAMPLING_DEFAULT,
-  SURFACE_TREATMENT_RATES,
   classifySurfaceTreatment,
+  type SurfaceTreatmentDbRate,
   type InspectionStagePolicy,
   type MachineClass,
 } from './default-rates';
@@ -80,6 +76,16 @@ export interface CNCCostInput {
   // Feature volumes from feature_graph_v2 — enables per-feature cycle time instead
   // of (billetVol − partVol) / MRR. When absent, falls back to the bbox formula.
   featureOps?: Array<{ name: string; timeSec: number; source: string }>;
+  // Surface treatment rate resolved from surface_treatment_rates DB table (migration 362).
+  // If null/absent, surface treatment cost is 0 with a warning.
+  surfaceTreatmentDbRate?: SurfaceTreatmentDbRate | null;
+  // Per-piece fixture cost in local currency (from DB or 0 when not configured).
+  fixtureUnitCostLocal?: number;
+  // Real process_calculator_mappings identity per machine class, resolved by the
+  // caller (BomItemsService.resolveProcessIdentities()) — never hardcoded here.
+  // Looked up per-line by that line's own rate.machineClass; a class missing from
+  // this map is simply omitted from the line, not fabricated.
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>;
 }
 
 export interface CNCCapabilityResult {
@@ -140,33 +146,8 @@ function drillDiamClass(diam: number): 'small' | 'medium' | 'large' | 'xlarge' {
 }
 
 // ── Per-machine constants ─────────────────────────────────────────────────────
-
-// India-benchmark fixture cost (soft jaws / plate fixture / chuck jaws) per class.
-// NOT a universal number — fixtures are toolroom work priced in local labour.
-// localizeFixtureCost() scales it to the costing location before use.
-const FIXTURE_COST_INR: Record<CNCMachineClass, number> = {
-  cnc_3ax_vmc:     500,
-  cnc_4ax_vmc:   1_000,
-  cnc_5ax_mc:    2_000,
-  cnc_lathe:       300,
-  cnc_lathe_live:  500,
-  cnc_mill_turn:   800,
-};
-
-// Fixture cost in the location's local currency. The India table above is
-// expressed as "machine-hour equivalents" of toolroom work: dividing by India's
-// class benchmark rate and multiplying by the location's converts both currency
-// AND local toolroom labour cost in one step (a US-built fixture is not an
-// India-built fixture at spot FX). Same digit in every currency — the bug this
-// replaces — understated fixtures ~10× outside India.
-export function localizeFixtureCost(machineClass: CNCMachineClass, location: string): number {
-  const inrCost = FIXTURE_COST_INR[machineClass];
-  const defaults = LOCATION_MHR_DEFAULTS as Record<string, Partial<Record<MachineClass, number>>>;
-  const indiaRate = defaults[DEFAULT_COSTING_LOCATION]?.[machineClass];
-  const localRate = defaults[location]?.[machineClass];
-  if (!indiaRate || !localRate) return inrCost; // unknown location → India benchmark unchanged
-  return (inrCost / indiaRate) * localRate;
-}
+// Fixture costs are 0 until the cnc_fixture_rates table is seeded in a future
+// migration. The service will pass fixtureUnitCostLocal via CNCCostInput.
 
 const SETUP_COUNT: Record<CNCMachineClass, number> = {
   cnc_3ax_vmc: 3, cnc_4ax_vmc: 2, cnc_5ax_mc: 1,
@@ -200,9 +181,12 @@ function makeLine(
   runCost: number,
   cycleTimeMin: number,
   rate: MHRRateInput,
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
 ): ProcessLineCost {
+  const identity = processIdentityByMachineClass?.[rate.machineClass];
   return {
     process,
+    ...(identity ? { processGroup: identity.processGroup, processRoute: identity.processRoute, operation: identity.operation } : {}),
     setupCost: r2(setupCost),
     runCost: r2(runCost),
     totalCost: r2(setupCost + runCost),
@@ -260,6 +244,7 @@ function computeInspectionLine(
   batchSize: number,
   samplingPerN: number | undefined,
   samplingPolicy: InspectionStagePolicy | undefined,
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
 ): ProcessLineCost {
   const policy = samplingPolicy ?? INSPECTION_SAMPLING_DEFAULT;
   const batch = Math.max(batchSize, 1);
@@ -275,58 +260,12 @@ function computeInspectionLine(
   const runCost = r2((measuredMin / 60) * inspectionRate.rate / batch);
   // Amortized per-part time keeps totalMin per-part-honest
   const cycleMin = r2(measuredMin / batch);
-  return makeLine('Inspection', setupCost, runCost, cycleMin, inspectionRate);
+  return makeLine('Inspection', setupCost, runCost, cycleMin, inspectionRate, processIdentityByMachineClass);
 }
 
-// ── Surface treatment line (anodize / plating / coating) ─────────────────────
-// perPart = max(area × rate/m², min-lot charge / batch). Localized via the
-// deburring-rate ratio (same reasoning as localizeFixtureCost: treatment is
-// local labour + chemistry, not a spot-FX conversion).
-export function computeSurfaceTreatmentLine(
-  surfaceTreatment: string | null,
-  surfaceAreaMm2: number,
-  batchSize: number,
-  location: string,
-  warnings: string[],
-): ProcessLineCost | null {
-  const trimmed = surfaceTreatment?.trim() ?? '';
-  const key = classifySurfaceTreatment(surfaceTreatment);
-  if (!key) {
-    if (trimmed && !/^(none|n\/a|na|nil|no|-|as.?required)$/i.test(trimmed)) {
-      warnings.push(
-        `Surface treatment callout "${trimmed}" not recognized — treatment cost NOT included; verify before quoting.`,
-      );
-    }
-    return null;
-  }
-  if (surfaceAreaMm2 <= 0) {
-    warnings.push(
-      `Drawing calls out surface treatment "${trimmed}" but part surface area is unknown — treatment cost NOT included; re-run CAD analysis.`,
-    );
-    return null;
-  }
-  const rates = SURFACE_TREATMENT_RATES[key];
-  const defaults = LOCATION_MHR_DEFAULTS as Record<string, Partial<Record<MachineClass, number>>>;
-  const indiaDeburr = defaults[DEFAULT_COSTING_LOCATION]?.deburring;
-  const localDeburr = defaults[location]?.deburring;
-  const localRatio = indiaDeburr && localDeburr ? localDeburr / indiaDeburr : 1;
-
-  const areaCost = (surfaceAreaMm2 / 1e6) * rates.ratePerM2Inr * localRatio;
-  const minLotPerPart = (rates.minLotChargeInr * localRatio) / Math.max(batchSize, 1);
-  const perPart = r2(Math.max(areaCost, minLotPerPart));
-  return {
-    process: `Surface Treatment (${rates.label})`,
-    setupCost: 0,
-    runCost: perPart,
-    totalCost: perPart,
-    cycleTimeMin: 0, // outside-process lead time, not machine cycle
-    hourlyRate: 0,
-    rateSource: 'default_rate',
-    machineClass: 'surface_treatment',
-    machineName: null,
-    commodityCode: null,
-  };
-}
+// Surface treatment is now in its own module to avoid circular dep with cost-engine.ts.
+import { computeSurfaceTreatmentLine } from './cost-surface-treatment';
+export { computeSurfaceTreatmentLine };
 
 // ── Route complexity score (0–100) ───────────────────────────────────────────
 // Inputs: raw feature counts + setup count per machine class.
@@ -390,7 +329,7 @@ export function computeCNCMilledCostSummary(
   const warnings: string[] = [];
   const processLines: ProcessLineCost[] = [];
   const matClass = detectMaterialClass(materialGrade);
-  const location = input.location ?? DEFAULT_COSTING_LOCATION;
+  const location = input.location ?? '__default__';
 
   // ── Billet ────────────────────────────────────────────────────────────────
   // Prefer blank optimizer result (round bar / rectangular bar selected from stock
@@ -419,7 +358,7 @@ export function computeCNCMilledCostSummary(
   // phantom process — fixture hardware is a one-time setup charge, not a machine step.
   const setupCount = SETUP_COUNT[machineClass];
   const setupMin = (setupCount * BASE_SETUP_MIN[machineClass]) / Math.max(batchSize, 1);
-  const fixtureCost = r2(localizeFixtureCost(machineClass, location) / Math.max(batchSize, 1));
+  const fixtureCost = r2((input.fixtureUnitCostLocal ?? 0) / Math.max(batchSize, 1));
   const setupCostVal = r2((setupMin / 60) * mhrRate.rate) + fixtureCost;
   processLines.push(makeLine('Setup', setupCostVal, 0, setupMin, mhrRate));
 
@@ -458,7 +397,7 @@ export function computeCNCMilledCostSummary(
     cncMillingMin = roughingMin + drillingMin;
   }
   if (cncMillingMin > 0) {
-    processLines.push(makeLine('CNC Milling', 0, r2((cncMillingMin / 60) * mhrRate.rate), cncMillingMin, mhrRate));
+    processLines.push(makeLine('CNC Milling', 0, r2((cncMillingMin / 60) * mhrRate.rate), cncMillingMin, mhrRate, input.processIdentityByMachineClass));
   } else {
     warnings.push('Volume data unavailable — CNC milling time estimated at 0');
   }
@@ -469,17 +408,17 @@ export function computeCNCMilledCostSummary(
   if (tappingMin > 0) {
     const tapSetup = r2((10 / 60) * tappingRate.rate / Math.max(batchSize, 1));
     const tapRun = r2((tappingMin / 60) * tappingRate.rate);
-    processLines.push(makeLine('Tapping', tapSetup, tapRun, tappingMin, tappingRate));
+    processLines.push(makeLine('Tapping', tapSetup, tapRun, tappingMin, tappingRate, input.processIdentityByMachineClass));
   }
 
   // ── Deburring ────────────────────────────────────────────────────────────
   const deburrMin = surfaceArea > 0 ? (surfaceArea / 10_000) * 0.5 : 0;
   if (deburrMin > 0) {
-    processLines.push(makeLine('Deburring', 0, r2((deburrMin / 60) * deburrRate.rate), deburrMin, deburrRate));
+    processLines.push(makeLine('Deburring', 0, r2((deburrMin / 60) * deburrRate.rate), deburrMin, deburrRate, input.processIdentityByMachineClass));
   }
 
   // ── Surface Treatment (anodize / plating — drawing callout) ──────────────
-  const surfaceLine = computeSurfaceTreatmentLine(surfaceTreatment, surfaceArea, batchSize, location, warnings);
+  const surfaceLine = computeSurfaceTreatmentLine(surfaceTreatment, surfaceArea, batchSize, location, warnings, input.surfaceTreatmentDbRate);
   if (surfaceLine) processLines.push(surfaceLine);
 
   // ── Inspection (batch-sampled; CMM amortization rides on the MHR rate) ───
@@ -487,7 +426,7 @@ export function computeCNCMilledCostSummary(
     holeCount, threadCount, tightestToleranceMm, gdtFeatureCount, input.gdtFeatures,
   );
   processLines.push(
-    computeInspectionLine(inspectionMin, inspectionRate, batchSize, input.samplingPerN, input.samplingPolicy),
+    computeInspectionLine(inspectionMin, inspectionRate, batchSize, input.samplingPerN, input.samplingPolicy, input.processIdentityByMachineClass),
   );
 
   const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
@@ -576,7 +515,7 @@ export function computeCNCTurnedCostSummary(
     );
   }
 
-  const location = input.location ?? DEFAULT_COSTING_LOCATION;
+  const location = input.location ?? '__default__';
 
   // ── Bar stock ────────────────────────────────────────────────────────────
   // Prefer blank optimizer result when available (Fix 2). For turned parts the
@@ -600,7 +539,7 @@ export function computeCNCTurnedCostSummary(
   // Fixture cost folded into Setup — same rationale as the milling path.
   const setupCount = SETUP_COUNT[machineClass];
   const setupMin = (setupCount * BASE_SETUP_MIN[machineClass]) / Math.max(batchSize, 1);
-  const fixtureCost = r2(localizeFixtureCost(machineClass, location) / Math.max(batchSize, 1));
+  const fixtureCost = r2((input.fixtureUnitCostLocal ?? 0) / Math.max(batchSize, 1));
   const setupCostVal = r2((setupMin / 60) * mhrRate.rate) + fixtureCost;
   processLines.push(makeLine('Setup', setupCostVal, 0, setupMin, mhrRate));
 
@@ -611,7 +550,7 @@ export function computeCNCTurnedCostSummary(
   const materialRemovalMm3 = Math.max(0, barVolMm3 - volume);
   const turningMin = materialRemovalMm3 > 0 ? (materialRemovalMm3 / effectiveTurningMrr) * 1.2 : 0;
   if (turningMin > 0) {
-    processLines.push(makeLine('OD Turning', 0, r2((turningMin / 60) * mhrRate.rate), turningMin, mhrRate));
+    processLines.push(makeLine('OD Turning', 0, r2((turningMin / 60) * mhrRate.rate), turningMin, mhrRate, input.processIdentityByMachineClass));
   }
 
   // ── Boring / Drilling ─────────────────────────────────────────────────────
@@ -621,7 +560,7 @@ export function computeCNCTurnedCostSummary(
     ? holeGroups.reduce((total, g) => total + (g.count * DRILL_CYCLE_SEC[drillDiamClass(g.diameter_mm)]) / 60, 0)
     : drilledHoleCount > 0 ? (drilledHoleCount * 14) / 60 : 0;  // 14 sec/hole fallback (medium)
   if (boringMin > 0) {
-    processLines.push(makeLine('Boring/Drilling', 0, r2((boringMin / 60) * mhrRate.rate), boringMin, mhrRate));
+    processLines.push(makeLine('Boring/Drilling', 0, r2((boringMin / 60) * mhrRate.rate), boringMin, mhrRate, input.processIdentityByMachineClass));
   }
 
   // ── Tapping ───────────────────────────────────────────────────────────────
@@ -630,7 +569,7 @@ export function computeCNCTurnedCostSummary(
   if (tappingMin > 0) {
     const tapSetup = r2((10 / 60) * tappingRate.rate / Math.max(batchSize, 1));
     const tapRun = r2((tappingMin / 60) * tappingRate.rate);
-    processLines.push(makeLine('Tapping', tapSetup, tapRun, tappingMin, tappingRate));
+    processLines.push(makeLine('Tapping', tapSetup, tapRun, tappingMin, tappingRate, input.processIdentityByMachineClass));
   }
 
   // ── Secondary setup / rechucking (2-axis lathe only) ─────────────────────
@@ -645,11 +584,11 @@ export function computeCNCTurnedCostSummary(
 
   // ── Facing + Parting (constant 2 min) ────────────────────────────────────
   const facingMin = 2;
-  processLines.push(makeLine('Facing + Parting', 0, r2((facingMin / 60) * mhrRate.rate), facingMin, mhrRate));
+  processLines.push(makeLine('Facing + Parting', 0, r2((facingMin / 60) * mhrRate.rate), facingMin, mhrRate, input.processIdentityByMachineClass));
 
   // ── Surface Treatment (anodize / plating — drawing callout) ──────────────
   const surfaceLine = computeSurfaceTreatmentLine(
-    surfaceTreatment, input.surfaceArea, batchSize, location, warnings,
+    surfaceTreatment, input.surfaceArea, batchSize, location, warnings, input.surfaceTreatmentDbRate,
   );
   if (surfaceLine) processLines.push(surfaceLine);
 
@@ -660,7 +599,7 @@ export function computeCNCTurnedCostSummary(
     drilledHoleCount, threadCount, tightestToleranceMm, gdtFeatureCount, input.gdtFeatures,
   );
   processLines.push(
-    computeInspectionLine(inspectionMin, inspectionRate, batchSize, input.samplingPerN, input.samplingPolicy),
+    computeInspectionLine(inspectionMin, inspectionRate, batchSize, input.samplingPerN, input.samplingPolicy, input.processIdentityByMachineClass),
   );
 
   const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));

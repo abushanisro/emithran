@@ -21,6 +21,7 @@ import {
   IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 /**
  * Make/Buy enum for child parts
@@ -234,9 +235,7 @@ export class QueryChildPartCostsDto {
   search?: string;
 
   @ApiPropertyOptional({ description: 'Filter by active status' })
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
+  @IsOptionalBoolean()
   isActive?: boolean;
 
   @ApiPropertyOptional({ description: 'Page number', default: 1, minimum: 1 })

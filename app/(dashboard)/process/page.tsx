@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload, Download } from 'lucide-react';
 import {
   useProcesses,
   useReferenceTables,
@@ -504,6 +504,31 @@ export default function ProcessPage() {
     }
   };
 
+  const handleDownloadJson = () => {
+    const allMappings = calculatorMappings?.mappings ?? [];
+    // Build grouped hierarchy for readability
+    const grouped: Record<string, Record<string, { id: string; operation: string; calculatorName: string }[]>> = {};
+    for (const m of allMappings) {
+      if (!grouped[m.processGroup]) grouped[m.processGroup] = {};
+      const groupEntry = grouped[m.processGroup]!;
+      if (!groupEntry[m.processRoute]) groupEntry[m.processRoute] = [];
+      groupEntry[m.processRoute]!.push({ id: m.id, operation: m.operation, calculatorName: m.calculatorName ?? '' });
+    }
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      totalMappings: allMappings.length,
+      mappings: allMappings,
+      hierarchy: grouped,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `process-database-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleClearAll = async () => {
     try {
       const result = await clearMappingMutation.mutateAsync();
@@ -578,6 +603,16 @@ export default function ProcessPage() {
                     ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     : <Upload className="h-4 w-4 mr-2" />}
                   Import Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadJson}
+                  disabled={!calculatorMappings || calculatorMappings.mappings.length === 0}
+                  title="Download all process mappings as JSON"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download JSON
                 </Button>
                 <Button
                   variant="outline"

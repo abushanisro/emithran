@@ -1,5 +1,4 @@
 import {
-  TURRET_MHR_INR,
   TURRET_SETUP_MIN,
   TURRET_TOOL_CHANGE_SEC,
   TURRET_HITS_PER_MIN,
@@ -15,6 +14,11 @@ export interface TurretPunchInput {
   cutLengthMm: number;   // contour length to nibble
   batchSize: number;
   turretRate?: MHRRateInput;
+  // Real process_calculator_mappings identity for the resolved machine class,
+  // resolved by the caller (BomItemsService.resolveProcessIdentities()) — never
+  // hardcoded here. Absent means the caller couldn't resolve one; consumers must
+  // not fabricate processGroup/processRoute/operation in that case.
+  processIdentity?: { processGroup: string; processRoute: string; operation: string };
 }
 
 export interface TurretPunchResult {
@@ -29,7 +33,7 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
   if (input.sheetThicknessMm === 0) warnings.push("Turret: thickness 0 — defaulting to 2.0 mm");
   if (thk > 6) warnings.push(`Turret: ${thk}mm exceeds typical turret punch range (≤6 mm)`);
 
-  const rate = input.turretRate ?? { rate: TURRET_MHR_INR, source: "default_rate" as const, machineClass: "turret_punch", machineName: null, commodityCode: null };
+  const rate = input.turretRate ?? { rate: 0, source: "no_db_rate" as const, machineClass: "turret_punch", machineName: null, commodityCode: null };
 
   // Punching hits
   const hitsPerMin = nearestVal(thk, TURRET_HITS_PER_MIN);
@@ -54,6 +58,11 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
     processLines: [
       {
         process: "Turret Punching",
+        ...(input.processIdentity ? {
+          processGroup: input.processIdentity.processGroup,
+          processRoute: input.processIdentity.processRoute,
+          operation: input.processIdentity.operation,
+        } : {}),
         setupCost,
         runCost,
         totalCost: r2(setupCost + runCost),

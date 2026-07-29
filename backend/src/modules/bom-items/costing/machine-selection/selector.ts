@@ -12,7 +12,6 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  LOCATION_MHR_DEFAULTS,
   MACHINE_REGISTRY,
   type MachineClass,
 } from '../default-rates';
@@ -120,7 +119,40 @@ function pickRate(row: RawMachineRow): number {
   return fb > 0 ? fb : mhr > 0 ? mhr : man;
 }
 
+const ALL_CLASSES_SET = new Set<string>(ALL_CLASSES);
+
+// Plain substring matching lets a short/generic keyword match INSIDE an
+// unrelated word — e.g. press_brake's keyword 'Press' matches inside
+// "compression_molding" (com-PRESS-ion), so a rubber compression press was
+// getting classified (and then recommended, as the cheapest "capable" match)
+// as a press brake for sheet-metal bending. Requiring a boundary before the
+// keyword fixes that (no boundary between 'm' and 'p' in "co[m][p]ression")
+// while still allowing an intentional prefix match like '3AX' inside
+// "3axis" (boundary before '3', keyword doesn't need to end the word) — only
+// anchoring the END too would break that case, so this checks the start only.
+function hasKeyword(haystack: string, keyword: string): boolean {
+  const escaped = keyword.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\b${escaped}`, 'i').test(haystack);
+}
+
 export function classifyMachineRecord(row: RawMachineRow): MachineClass | null {
+  // Tier 0 — machine_class already holds a canonical value (migrations 369/371
+  // normalized this column to the exact MachineClass vocabulary) — trust it
+  // directly instead of re-deriving classification via fuzzy keyword matching
+  // against machine_name. Without this, a correctly-tagged real machine whose
+  // human-readable name doesn't happen to contain a marketing keyword (e.g.
+  // "Salvagnini L3-40 3KW Fiber" has machine_class='fiber_laser' but its name
+  // contains no word "Laser") was silently invisible to the pool — it never
+  // matched Tier 2 (machine_class keyword search expects e.g. "Fiber Laser"
+  // with a space, not the DB's underscored 'fiber_laser') or Tier 3 (needs the
+  // NAME to also contain a keyword) — so every process line for that class
+  // fell back to the generic class-default/benchmark rate instead of the
+  // real machine actually on file.
+  const rawClass = (row.machine_class ?? '').trim().toLowerCase();
+  if (rawClass && ALL_CLASSES_SET.has(rawClass)) {
+    return rawClass as MachineClass;
+  }
+
   // Tier 1 — exact commodity code
   if (row.commodity_code && COMMODITY_TO_CLASS.has(row.commodity_code)) {
     return COMMODITY_TO_CLASS.get(row.commodity_code)!;
@@ -145,7 +177,7 @@ export function classifyMachineRecord(row: RawMachineRow): MachineClass | null {
     const isVMCClass = cls === 'cnc_3ax_vmc' || cls === 'cnc_4ax_vmc' || cls === 'cnc_5ax_mc';
     if (isVMCClass && isLatheRecord) continue;
     if (isMachiningClass && isRouterRecord) continue;
-    if (MACHINE_REGISTRY[cls].machineClassKeywords.some((kw) => mcLower.includes(kw.toLowerCase()))) {
+    if (MACHINE_REGISTRY[cls].machineClassKeywords.some((kw) => hasKeyword(mcLower, kw))) {
       return cls;
     }
   }
@@ -158,8 +190,8 @@ export function classifyMachineRecord(row: RawMachineRow): MachineClass | null {
     if (isVMCClass && isLatheRecord) continue;
     if (isMachiningClass && isRouterRecord) continue;
     const entry = MACHINE_REGISTRY[cls];
-    const pgMatch = entry.processGroupKeywords.some((kw) => pgLower.includes(kw.toLowerCase()));
-    const nameMatch = entry.machineClassKeywords.some((kw) => mnLower.includes(kw.toLowerCase()));
+    const pgMatch = entry.processGroupKeywords.some((kw) => hasKeyword(pgLower, kw));
+    const nameMatch = entry.machineClassKeywords.some((kw) => hasKeyword(mnLower, kw));
     if (pgMatch && nameMatch) return cls;
   }
 
@@ -202,10 +234,38 @@ function hydrateCapability(row: RawMachineRow, cls: MachineClass): {
   const seed = lookupSeedCapability(row.machine_name);
   if (seed) return { capability: { ...EMPTY_CAPABILITY, ...seed }, source: 'seed' };
 
+  // Tonnage-class machines (press brake, turret punch) commonly have their real
+  // capacity stated plainly in the name itself (e.g. "Bend Brake-1500kN",
+  // "Press 50T") — the seed registry above only recognises specific named
+  // models plus one generic "press brake|bending" pattern, which a common
+  // synonym like "Bend Brake" never matches. Without this, such a machine
+  // silently inherits the flat MACHINE_CLASS_DEFAULTS tonnage (60t) even when
+  // its own name says 1500kN (~153t) or 2500kN (~255t), making a genuinely
+  // capable real machine look incapable of jobs well within its real range.
+  if (cls === 'press_brake' || cls === 'turret_punch') {
+    const tonnage = parseTonnageFromName(row.machine_name);
+    if (tonnage != null) {
+      return {
+        capability: { ...EMPTY_CAPABILITY, ...MACHINE_CLASS_DEFAULTS[cls], maxTonnage: tonnage },
+        source: 'seed',
+      };
+    }
+  }
+
   return {
     capability: { ...EMPTY_CAPABILITY, ...MACHINE_CLASS_DEFAULTS[cls] },
     source: 'default_class',
   };
+}
+
+// 1 kN ≈ 0.10197 tonnes-force (divide by standard gravity 9.80665 m/s²).
+function parseTonnageFromName(name: string | null | undefined): number | null {
+  if (!name) return null;
+  const kn = name.match(/(\d+(?:\.\d+)?)\s*k\s*n\b/i);
+  if (kn?.[1]) return Math.round((parseFloat(kn[1]) / 9.80665) * 10) / 10;
+  const tons = name.match(/(\d+(?:\.\d+)?)\s*(?:tonnes?|tons?|t)\b/i);
+  if (tons?.[1]) return parseFloat(tons[1]);
+  return null;
 }
 
 // ── Pool fetch ────────────────────────────────────────────────────────────────
@@ -492,14 +552,13 @@ const PROFILES: Record<'balanced' | 'cheapest' | 'fastest', ProfileWeights> = {
   fastest:  { fit: 0.2, util: 0.5, cost: 0.2, avail: 0.1 },
 };
 
-function makeDefaultCandidate(location: string, cls: MachineClass): MachineCandidate {
-  const locationMHR = (LOCATION_MHR_DEFAULTS as Record<string, Partial<Record<MachineClass, number>>>)[location];
+function makeDefaultCandidate(_location: string, cls: MachineClass): MachineCandidate {
   return {
     machineId: null,
     machineName: null,
     commodityCode: null,
     machineClass: cls,
-    hourlyRate: locationMHR?.[cls] ?? MACHINE_REGISTRY[cls].defaultRate,
+    hourlyRate: 0, // no hardcoded fallback — rate: 0 triggers 'no_db_rate' in cost engine
     utilizationPct: 75,
     scheduledLoadPct: null,
     availabilityStatus: 'available',

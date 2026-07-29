@@ -19,6 +19,7 @@ import {
   IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 /**
  * DTO for creating a new raw material cost record
@@ -330,9 +331,7 @@ export class QueryRawMaterialCostsDto {
   materialType?: string;
 
   @ApiPropertyOptional({ description: 'Filter by active status', example: true })
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
+  @IsOptionalBoolean()
   isActive?: boolean;
 
   @ApiPropertyOptional({ description: 'Search in material name or cost name' })

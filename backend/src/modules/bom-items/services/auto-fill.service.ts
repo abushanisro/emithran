@@ -891,7 +891,7 @@ export class AutoFillService {
           ...form.getHeaders(),
           ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
         },
-        timeout: 120_000,
+        timeout: 180_000,
         maxContentLength: 150 * 1024 * 1024,
       },
     );

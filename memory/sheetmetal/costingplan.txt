@@ -1,0 +1,36 @@
+
+First process. First process, the raw material you have to select. For selecting the raw material, you have to select which size of sheet you have to consider.
+
+So, for that you have your part. So, you will do a flat pattern. Flat pattern is nothing like if your particle is bended, you have to open and show it out.
+
+
+
+
+
+
+So, which direction you have to assign, you have to assemble and you have to find out what is the maximum number of parts you can produce in this part, each sheet. Then you can select finally, okay, for example, one first sheet coming, 99 part. Second part coming, 102 part.
+
+Third part sheet coming, 105 part. Then 105 part is the maximum like better for us. So, in that case we will consider 105 part.
+
+Then we will produce, based on that we will calculate the weight of the part and then we will calculate what is the finished, I mean the raw input weight. Then you, from that input weight you know like how much number of parts you can produce. Then for one in one part how much input weight you can calculate.
+
+Then you calculate the total cost for the, material cost for that. Then you can calculate the scrap minus the scrap and all that you will give the cost for that. Then the next thing comes around.
+
+So, you have like multiple process like fibre, labour, bending operations, it will go, ok. How would you select? So, this is manually we are selecting at the moment. Like how, what? So, for example, if you now like if you go here, what these guys will do is like it will calculate like, this is like how they calculate cycle time for the bending.
+
+So, here what they will do is, they will calculate like number of piercing, number of laser power, ok. So, then cutting speed, position time. So, they have one like chart.
+
+So, for example, this is the different size of material, for different materials, this is the speed I can use for different watt of these machines, ok. So, like based on that they will select the, what is the cycle time for that, ok. So, then it will calculate number of position, cutting time calculation, some calculations are there, handling time.
+
+So, all things, it will give approximate cost for you. This is all like manually calculating, ok. So, then once you come down, you have calculated based on the tonnage.
+
+Tonnage you have to calculate, ok. So, for that you have like what is your material factor, then sheet thickness, then die, like how much, then it will give you what is the tonnage to manufacture this, ok. So, based on that, you have to select the next machine which is available in the market.
+
+For example, the tonnage is coming. Which will be coming from the database of our MHR, LHR. Then based on that, it will calculate what is the cycle time for that.
+
+For example, how it is calculating cycle time is, for each simple part or medium part, they have some logic, ok. What is the logic? So, what is the overall cut length divided by feed rate? So, that is the logic, ok. So, based on that, it will calculate the cycle time.
+
+Same L by F and N formula, ok. Then based on that, it will give the cycle time for the eg deburr operation. So, that is why they put out like each operation wise, they will calculate and then it will give the solution.
+
+Got it, right? like that for sheet metal part we have to do
+

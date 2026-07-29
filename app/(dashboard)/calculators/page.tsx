@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Search, Trash2, Edit2, X, Check, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, X, Check, ArrowLeft, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -48,8 +48,8 @@ export default function CalculatorsPage() {
   }, [searchParams]);
 
   const { data, isLoading } = useCalculators({
-    search: searchQuery || undefined,
-    calcCategory: activeCategory || undefined,
+    ...(searchQuery ? { search: searchQuery } : {}),
+    ...(activeCategory ? { calcCategory: activeCategory } : {}),
     limit: 100,
   });
 
@@ -108,7 +108,7 @@ export default function CalculatorsPage() {
         id,
         data: {
           ...editForm,
-          calcCategory: editForm.calcCategory || undefined,
+          ...(editForm.calcCategory ? { calcCategory: editForm.calcCategory } : {}),
         },
       });
       setEditingId(null);
@@ -118,6 +118,21 @@ export default function CalculatorsPage() {
   };
 
   const allCalculators = data?.calculators || [];
+
+  const handleDownloadJson = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      totalCalculators: allCalculators.length,
+      calculators: allCalculators,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `calculators-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const filteredCalculators = allCalculators.filter((calc) => {
     if (!processFilters.processGroup && !processFilters.processRoute && !processFilters.operation) {
@@ -222,15 +237,27 @@ export default function CalculatorsPage() {
             )}
           </div>
         </div>
-        <Button
-          onClick={handleCreateCalculator}
-          disabled={createCalculatorMutation.isPending}
-          variant="default"
-          size="sm"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {processFilters.operation ? `New ${processFilters.operation} Calculator` : 'New'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadJson}
+            disabled={allCalculators.length === 0}
+            title="Download all calculators as JSON"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download JSON
+          </Button>
+          <Button
+            onClick={handleCreateCalculator}
+            disabled={createCalculatorMutation.isPending}
+            variant="default"
+            size="sm"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {processFilters.operation ? `New ${processFilters.operation} Calculator` : 'New'}
+          </Button>
+        </div>
       </div>
 
       {/* Category Tabs */}

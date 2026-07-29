@@ -59,13 +59,22 @@ export interface FeatureOp {
 }
 
 export interface ProcessLineCost {
-  process: string;       // "Laser Cutting", "Press Brake", "Tapping", "Deburring"
+  process: string;       // "Laser Cutting", "Press Brake", "Tapping", "Deburring" — cosmetic display label only
+  // Real process_calculator_mappings identity for this line, when the engine can state it
+  // unambiguously (e.g. the laser line always means fiber/CO2 laser cutting specifically).
+  // Absent on engines not yet updated to populate it — consumers must fall back to deriving
+  // group/route from machineClass rather than reusing `process` as both route and operation
+  // (that produced a real bug: process_cost_records saved with processRoute === operation ===
+  // the bare display label, which never matches a real mapping row).
+  processGroup?: string;
+  processRoute?: string;
+  operation?: string;
   setupCost: number;     // INR — amortised over batchSize
   runCost: number;       // INR — pure cycle cost per piece
   totalCost: number;     // setupCost + runCost
   cycleTimeMin: number;  // machine cycle time in minutes (setup excluded)
   hourlyRate: number;    // local currency/hr — fully burdened MHR (machine + labour)
-  rateSource: 'mhr_database' | 'default_rate' | 'tier_synthetic' | 'benchmark_override';
+  rateSource: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override';
   machineClass: string;        // e.g. 'fiber_laser' — maps to MACHINE_REGISTRY key
   machineName: string | null;  // DB machine_name; null when source is 'default_rate'
   commodityCode: string | null; // DB commodity_code; null when source is 'default_rate'

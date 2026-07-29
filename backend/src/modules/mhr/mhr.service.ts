@@ -48,11 +48,12 @@ export class MHRService {
     manualMHRValue: number,
     row?: any,
   ): MHRCalculationResult {
-    const workingDays  = parseFloat(row?.working_days_per_year ?? 0) || 250;
-    const shiftsPerDay = parseFloat(row?.shifts_per_day ?? 0) || 2;
-    const hoursPerShift = parseFloat(row?.hours_per_shift ?? 0) || 8;
-    const maintHrs  = parseFloat(row?.planned_maintenance_hours_per_year ?? 0) || 0;
-    const utilPct   = parseFloat(row?.capacity_utilization_rate ?? 0) || 85;
+    const { DEFAULTS } = MHR_CALCULATION_CONSTANTS;
+    const workingDays   = parseFloat(row?.working_days_per_year ?? 0)            || DEFAULTS.WORKING_DAYS_PER_YEAR;
+    const shiftsPerDay  = parseFloat(row?.shifts_per_day ?? 0)                   || DEFAULTS.SHIFTS_PER_DAY;
+    const hoursPerShift = parseFloat(row?.hours_per_shift ?? 0)                  || DEFAULTS.HOURS_PER_SHIFT;
+    const maintHrs      = parseFloat(row?.planned_maintenance_hours_per_year ?? 0) || 0;
+    const utilPct       = parseFloat(row?.capacity_utilization_rate ?? 0)        || DEFAULTS.CAPACITY_UTILIZATION_RATE;
 
     const workingHrs   = workingDays * shiftsPerDay * hoursPerShift;
     const availableHrs = Math.max(0, workingHrs - maintHrs);
@@ -158,17 +159,18 @@ export class MHRService {
    * Used as a fallback when the user has no custom MHR records for the selected location.
    * Response shape mirrors the subset of MHRRecord that the Process Cost dialog needs.
    */
-  async getBenchmarkRates(location?: string, processGroup?: string) {
+  async getBenchmarkRates(location?: string, processGroup?: string, machineClass?: string) {
     let query = this.supabaseService
       .getAdminClient()
       .from('mhr_benchmark_rates')
-      .select('id, machine_name, process_group, location, mhr_usd, machine_ref')
+      .select('id, machine_name, process_group, machine_class, location, mhr_usd, machine_ref')
       .order('location', { ascending: true })
-      .order('process_group', { ascending: true })
+      .order('machine_class', { ascending: true })
       .order('machine_name', { ascending: true });
 
     if (location) query = query.ilike('location', location);
-    if (processGroup) query = query.eq('process_group', processGroup);
+    if (machineClass) query = query.eq('machine_class', machineClass);
+    else if (processGroup) query = query.eq('process_group', processGroup);
 
     const { data, error } = await query;
 
@@ -181,6 +183,7 @@ export class MHRService {
       id: `bm-mhr-${row.id}`,
       machineName:   row.machine_name,
       processGroup:  row.process_group,
+      machineClass:  row.machine_class,
       location:      row.location,
       machineRef:    row.machine_ref,
       isBenchmark:   true,
@@ -202,7 +205,7 @@ export class MHRService {
       // Delegate calculation to the specialized engine
       const result = this.calculationEngine.calculate(dto);
 
-      this.logger.log('MHR calculation completed successfully', 'MHRService');
+      this.logger.debug('MHR calculation completed', 'MHRService');
 
       return result;
     } catch (error) {
@@ -242,6 +245,14 @@ export class MHRService {
       queryBuilder = queryBuilder.eq('commodity_code', query.commodityCode);
     }
 
+    if (query.processGroup) {
+      queryBuilder = queryBuilder.eq('process_group', query.processGroup);
+    }
+
+    if (query.machineClass) {
+      queryBuilder = queryBuilder.eq('machine_class', query.machineClass);
+    }
+
     const { data, error, count } = await queryBuilder;
 
     if (error) {
@@ -261,13 +272,20 @@ export class MHRService {
     }
 
     const records = (data || []).map(row => {
-      // For manual entries, use stored values; for others, recalculate to ensure accuracy
+      // Prefer stored computed values on reads — the engine ran at write time (create/update/import)
+      // and wrote total_machine_hour_rate / total_fixed_cost_per_hour / total_variable_cost_per_hour.
+      // Re-running the engine per-row on every GET is redundant and O(N) CPU for list pages.
+      // Only fall back to full engine for legacy rows that somehow have no stored total.
       let calculations: MHRCalculationResult;
 
       if (row.is_manual_entry && row.manual_mhr_value) {
         calculations = this.createManualEntryCalculation(parseFloat(row.manual_mhr_value), row);
+      } else if (Number(row.total_machine_hour_rate ?? 0) > 0) {
+        // Use stored total (covers both import/aPriori records and full-capex records).
+        // createManualEntryCalculation picks up stored fixed/variable/annual from the row object.
+        calculations = this.createManualEntryCalculation(Number(row.total_machine_hour_rate), row);
       } else {
-        // Recalculate for automatic entries (skip validation for DB data)
+        // Fallback: legacy record with no stored total — run engine once to populate it.
         calculations = this.calculateMHR(this.mapRowToDto(row), true);
       }
 
@@ -316,6 +334,12 @@ export class MHRService {
 
     if (data.is_manual_entry && data.manual_mhr_value) {
       calculations = this.createManualEntryCalculation(parseFloat(data.manual_mhr_value), data);
+    } else if (
+      (data.landed_machine_cost == null || Number(data.landed_machine_cost) === 0) &&
+      Number(data.total_machine_hour_rate ?? 0) > 0
+    ) {
+      // Import/aPriori record: use stored total directly (same logic as findAll).
+      calculations = this.createManualEntryCalculation(Number(data.total_machine_hour_rate), data);
     } else {
       calculations = this.calculateMHR(this.mapRowToDto(data), true);
     }

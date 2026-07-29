@@ -12,6 +12,7 @@ import {
   IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 export enum WorkflowState {
   DRAFT = 'draft',
@@ -113,8 +114,7 @@ export class QueryProcessRoutesDto {
   processCategory?: string;
 
   @ApiPropertyOptional({ example: false })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalBoolean()
   isTemplate?: boolean;
 
   @ApiPropertyOptional({ example: 'process_planner', enum: UserRole })
