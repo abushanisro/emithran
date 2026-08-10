@@ -18,7 +18,7 @@ import { rankTooling } from '../ranking/tooling-ranker';
 
 import { ScopeClassifierService } from './scope-classifier.service';
 import { DrawingExtractorService } from './drawing-extractor.service';
-import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { FeatureGraphService } from './feature-graph.service';
 import { RuleEngineService } from './rule-engine.service';
 import { ManufacturingKnowledgeService } from '../../../modules/manufacturing-knowledge/manufacturing-knowledge.service';
@@ -66,7 +66,9 @@ export class RetrievalService {
     accessToken: string | null,
   ): Promise<{ brief: EngineeringBrief; candidates: CandidateSet }> {
     // ── Load budget exchange rates (must happen before candidate queries) ───
-    await this.fx.loadRates(accessToken);
+    // One snapshot for the whole assemble() call — every row converted below
+    // uses the exact same rates, even if the shared cache reloads meanwhile.
+    const rates = await this.fx.getSnapshot(accessToken);
 
     const client = this.supabaseService.getClient(accessToken ?? undefined);
 
@@ -351,9 +353,9 @@ export class RetrievalService {
 
     // ── Query masters in parallel ──────────────────────────────────────────
     const [materialsRaw, mhrRaw, lhrRaw, processesRaw, calculatorsRaw, toolingRaw] = await Promise.all([
-      this.queryRawMaterials(client, userId, family),
-      this.queryMhr(client, userId, orgLocation),
-      this.queryLhr(client, userId, orgLocation),
+      this.queryRawMaterials(client, userId, family, rates),
+      this.queryMhr(client, userId, orgLocation, rates),
+      this.queryLhr(client, userId, orgLocation, rates),
       this.queryProcesses(client, userId, family),
       this.queryCalculators(client, userId),
       this.queryTooling(client, userId),
@@ -396,7 +398,7 @@ export class RetrievalService {
 
   // ── Per-kind queries ──────────────────────────────────────────────────────
 
-  private async queryRawMaterials(client: any, userId: string, family: string) {
+  private async queryRawMaterials(client: any, userId: string, family: string, rates: RateSnapshot) {
     const { data, error } = await client
       .from('raw_materials')
       .select('id, material_group, material, material_grade, density_kg_m3, cost, currency, location, user_id, material_form, material_family')
@@ -411,15 +413,21 @@ export class RetrievalService {
     // Convert each row's cost to INR using the budget rate for its declared currency.
     // The ranker reads `cost` and maps it to `unitCostInrPerKg` — so we overwrite
     // `cost` with the INR-converted value here, keeping the original in `cost_original`.
-    return (data ?? []).map((row: any) => ({
-      ...row,
-      cost_original: row.cost,
-      cost_original_currency: row.currency ?? 'INR',
-      cost: this.fx.convertToInr(Number(row.cost ?? 0), row.currency ?? 'INR'),
-    }));
+    // A row whose currency has no rate on file is honestly left with `cost: null`
+    // (never silently treated as INR) — the ranker/caller decides how to handle a gap.
+    return (data ?? []).map((row: any) => {
+      const currency = row.currency ?? 'INR';
+      const localPerInr = rates.convertOptional(currency, 'INR');
+      return {
+        ...row,
+        cost_original: row.cost,
+        cost_original_currency: currency,
+        cost: localPerInr != null ? Number(row.cost ?? 0) * localPerInr : null,
+      };
+    });
   }
 
-  private async queryMhr(client: any, userId: string, orgLocation: string) {
+  private async queryMhr(client: any, userId: string, orgLocation: string, rates: RateSnapshot) {
     // All BENCHMARK rows across all locations — the machine-ranker's locationFitScore
     // scores them: same location = 1.0, off-location = 0.4. This ensures:
     // (a) India gets routes even before India BENCHMARK rows are seeded (fallback to off-location).
@@ -445,13 +453,14 @@ export class RetrievalService {
 
     const merged = [...(benchmark ?? []), ...(userRows ?? [])];
     this.logger.log(`[queryMhr] ${benchmark?.length ?? 0} BENCHMARK + ${userRows?.length ?? 0} user rows for orgLocation="${orgLocation}"`);
-    return merged.map((row: any) => ({
-      ...row,
-      rate_inr: this.fx.convertToInr(Number(row.total_machine_hour_rate ?? 0), row.currency_code ?? 'INR'),
-    }));
+    return merged.map((row: any) => {
+      const currency = row.currency_code ?? 'INR';
+      const localPerInr = rates.convertOptional(currency, 'INR');
+      return { ...row, rate_inr: localPerInr != null ? Number(row.total_machine_hour_rate ?? 0) * localPerInr : null };
+    });
   }
 
-  private async queryLhr(client: any, userId: string, orgLocation: string) {
+  private async queryLhr(client: any, userId: string, orgLocation: string, rates: RateSnapshot) {
     // All BENCHMARK LHR rows — ranker sorts by location fit.
     const { data: benchmark, error: benchErr } = await client
       .from('lhr_records')
@@ -473,10 +482,11 @@ export class RetrievalService {
       .limit(20);
 
     const merged = [...(benchmark ?? []), ...(userRows ?? [])];
-    return merged.map((row: any) => ({
-      ...row,
-      lhr_inr: this.fx.convertToInr(Number(row.lhr ?? 0), row.currency_code ?? 'INR'),
-    }));
+    return merged.map((row: any) => {
+      const currency = row.currency_code ?? 'INR';
+      const localPerInr = rates.convertOptional(currency, 'INR');
+      return { ...row, lhr_inr: localPerInr != null ? Number(row.lhr ?? 0) * localPerInr : null };
+    });
   }
 
   private async queryProcesses(client: any, userId: string, family: string) {

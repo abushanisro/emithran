@@ -213,6 +213,17 @@ html.compact {
     @apply border-border;
   }
 
+  html,
+  body {
+    /* Hard containment boundary: no single misbehaving descendant (an
+       untruncated long string, a fixed-width table, a stray min-content
+       flex item) should ever be able to widen the whole page and shift it
+       sideways. Panels/dialogs that need their own horizontal scroll keep
+       it via their own overflow-x-auto -- this only stops it from
+       escaping to the document level. */
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }

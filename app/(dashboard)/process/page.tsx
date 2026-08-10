@@ -19,6 +19,8 @@ import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Datab
 import {
   useProcesses,
   useReferenceTables,
+  useSmLookupTables,
+  useUpdateSmLookupRow,
   useBulkUpdateTableRows,
   useCreateProcess,
   type ReferenceTable,
@@ -95,10 +97,19 @@ export default function ProcessPage() {
   const [filterProcessGroup, setFilterProcessGroup] = useState<string>('');
   const [filterProcessRoute, setFilterProcessRoute] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  // Deactivated mappings (is_active=false — retired duplicates/phantom
+  // calculator refs, e.g. migration 418's Sheet Metal cleanup) are hidden by
+  // default; this list previously showed every row regardless of is_active,
+  // so deactivating a mapping never visibly cleaned anything up here.
+  const [showInactive, setShowInactive] = useState(false);
 
   // State for per-route inline lookup tables
   const [modalProcessId, setModalProcessId] = useState<string | null>(null);
   const [modalProcessName, setModalProcessName] = useState<string>('');
+  // Process group of the currently-open Lookup Tables dialog — needed only to
+  // scope the live sm_lookup_* bridge (route names like "Inspection" repeat
+  // across unrelated groups; group+route together identify the real tables).
+  const [modalProcessGroup, setModalProcessGroup] = useState<string>('');
 
   const [inlineEditorTables, setInlineEditorTables] = useState<any[]>([]);
   const [isLookupDialogOpen, setIsLookupDialogOpen] = useState(false);
@@ -127,12 +138,19 @@ export default function ProcessPage() {
   const { data: modalReferenceTables, isLoading: loadingModalTables, refetch: refetchModalTables } = useReferenceTables(
     modalProcessId && modalProcessId !== 'test' ? modalProcessId : undefined
   );
+  // Live sm_lookup_* cost-engine tables for this route — separate source,
+  // merged with modalReferenceTables below for display only.
+  const { data: modalSmLookupTables, isLoading: loadingSmLookupTables } = useSmLookupTables(
+    modalProcessGroup || undefined, modalProcessName || undefined,
+  );
+  const modalAllTables = [...(modalSmLookupTables ?? []), ...(modalReferenceTables ?? [])];
 
   // Fetch calculator mappings with filters
   const { data: calculatorMappings, isLoading: loadingMappings } = useProcessCalculatorMappings({
     processGroup: filterProcessGroup && filterProcessGroup !== 'all' ? filterProcessGroup : undefined,
     processRoute: filterProcessRoute && filterProcessRoute !== 'all' ? filterProcessRoute : undefined,
     search: searchQuery || undefined,
+    ...(showInactive ? {} : { isActive: true as const }),
     limit: 1000,
   });
   useProcessHierarchy();
@@ -141,6 +159,7 @@ export default function ProcessPage() {
 
   // Bulk update mutation
   const bulkUpdateMutation = useBulkUpdateTableRows();
+  const updateSmLookupRowMutation = useUpdateSmLookupRow();
 
   // Process create mutation (for auto-creating process records when clicking route buttons)
   const createProcessMutation = useCreateProcess();
@@ -155,8 +174,10 @@ export default function ProcessPage() {
 
   const handleEditTable = (tableId: string) => {
     setEditingTableId(tableId);
-    // Initialize edited data with current table rows - try both sources
-    const table = modalReferenceTables?.find(t => t.id === tableId) || referenceTables?.find(t => t.id === tableId);
+    // Initialize edited data with current table rows - try all sources
+    const table = modalReferenceTables?.find(t => t.id === tableId)
+      || referenceTables?.find(t => t.id === tableId)
+      || modalSmLookupTables?.find(t => t.id === tableId);
     if (table?.rows) {
       setEditedTableData({
         ...editedTableData,
@@ -197,6 +218,35 @@ export default function ProcessPage() {
   const handleSaveTable = async (tableId: string) => {
     const tableData = editedTableData[tableId];
     if (!tableData) {
+      return;
+    }
+
+    // Live sm_lookup_* tables: per-row UPDATE against the real cost-engine
+    // table (never a bulk delete-and-reinsert — see useUpdateSmLookupRow).
+    // Only real column names (from columnDefinitions) are sent, since edited
+    // rows also carry a duplicate camelCase copy of each field for display
+    // that the backend would reject as an unknown column.
+    if (tableId.startsWith('live:')) {
+      const sourceTable = tableId.slice('live:'.length);
+      const originalTable = modalSmLookupTables?.find(t => t.id === tableId);
+      const originalRows = originalTable?.rows ?? [];
+      const columnNames = originalTable?.columnDefinitions.map(c => c.name) ?? [];
+      try {
+        await Promise.all(
+          tableData.map((row, idx) => {
+            const rowId = originalRows[idx]?.id;
+            if (!rowId) return Promise.resolve(null);
+            const updates: Record<string, any> = {};
+            for (const name of columnNames) if (name in row) updates[name] = row[name];
+            return updateSmLookupRowMutation.mutateAsync({ table: sourceTable, rowId, updates });
+          })
+        );
+        setEditingTableId(null);
+        setEditedTableData({});
+        toast.success('Lookup table updated — takes effect on the next cost calculation');
+      } catch (error) {
+        toast.error('Failed to update lookup table. Please try again.');
+      }
       return;
     }
 
@@ -268,6 +318,10 @@ export default function ProcessPage() {
 
   const renderEditableTable = (table: ReferenceTable) => {
     const isEditing = editingTableId === table.id;
+    // Live sm_lookup_* tables support editing existing values only — no
+    // add/delete row here, since that's a structural change to the real
+    // cost-engine table's row set, not a value correction.
+    const isLive = table.id.startsWith('live:');
 
     // Enhanced data mapping - handle both snake_case and camelCase
     const mapRowData = (row: any) => {
@@ -345,13 +399,13 @@ export default function ProcessPage() {
                       {col.label}
                     </TableHead>
                   ))}
-                  {isEditing && <TableHead className="text-right">Actions</TableHead>}
+                  {isEditing && !isLive && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {displayData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={table.columnDefinitions.length + (isEditing ? 1 : 0)} className="text-center text-muted-foreground">
+                    <TableCell colSpan={table.columnDefinitions.length + (isEditing && !isLive ? 1 : 0)} className="text-center text-muted-foreground">
                       No data available
                     </TableCell>
                   </TableRow>
@@ -377,7 +431,7 @@ export default function ProcessPage() {
                           </TableCell>
                         );
                       })}
-                      {isEditing && (
+                      {isEditing && !isLive && (
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
@@ -395,7 +449,7 @@ export default function ProcessPage() {
               </TableBody>
             </Table>
           </div>
-          {isEditing && (
+          {isEditing && !isLive && (
             <div className="mt-4">
               <Button
                 variant="outline"
@@ -651,6 +705,15 @@ export default function ProcessPage() {
                   <X className="h-4 w-4 mr-1" /> Clear
                 </Button>
               )}
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  className="h-3.5 w-3.5"
+                />
+                Show inactive
+              </label>
               {calculatorMappings && (
                 <span className="text-xs text-muted-foreground ml-auto">
                   {calculatorMappings.mappings.length} operations ·{' '}
@@ -732,9 +795,17 @@ export default function ProcessPage() {
                                 {ops.map((op) => (
                                   <div
                                     key={op.id}
-                                    className="flex items-center gap-1 bg-secondary/40 border border-border rounded-full px-2.5 py-0.5 group"
+                                    className={`flex items-center gap-1 border rounded-full px-2.5 py-0.5 group ${
+                                      op.isActive === false
+                                        ? 'bg-muted/30 border-dashed border-border/60 opacity-60'
+                                        : 'bg-secondary/40 border-border'
+                                    }`}
+                                    title={op.isActive === false ? 'Inactive — not offered for costing' : undefined}
                                   >
                                     <span className="text-xs text-foreground">{op.operation}</span>
+                                    {op.isActive === false && (
+                                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">inactive</span>
+                                    )}
                                     <button
                                       className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary flex items-center justify-center"
                                       onClick={() => {
@@ -786,6 +857,7 @@ export default function ProcessPage() {
                                   }
                                   setModalProcessId(processId);
                                   setModalProcessName(route);
+                                  setModalProcessGroup(group);
                                   setExpandedTableId(null);
                                   setShowAddTableEditor(false);
                                   setInlineEditorTables([]);
@@ -1018,22 +1090,32 @@ export default function ProcessPage() {
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-3 py-2 pr-1">
-            {loadingModalTables ? (
+            {(loadingModalTables || loadingSmLookupTables) ? (
               <div className="flex items-center justify-center py-10">
                 <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
                 <span className="text-sm text-muted-foreground">Loading tables...</span>
               </div>
             ) : (
               <>
-                {modalReferenceTables && modalReferenceTables.length > 0 ? (
-                  modalReferenceTables.map((table) => (
+                {modalAllTables.length > 0 ? (
+                  modalAllTables.map((table) => (
                     <div key={table.id} className="border border-border rounded-lg bg-card overflow-hidden">
                       <div
                         className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-secondary/30 transition-colors"
                         onClick={() => setExpandedTableId(expandedTableId === table.id ? null : table.id)}
                       >
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-semibold">{table.tableName}</h3>
+                          <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                            {table.tableName}
+                            {table.id.startsWith('live:') && (
+                              <span
+                                className="text-[10px] uppercase tracking-wide text-primary/70 border border-primary/30 rounded px-1"
+                                title="Live cost-engine data — edits apply directly to the table the cost engine reads"
+                              >
+                                live
+                              </span>
+                            )}
+                          </h3>
                           {table.tableDescription && (
                             <p className="text-xs text-muted-foreground mt-0.5 truncate">{table.tableDescription}</p>
                           )}
@@ -1048,24 +1130,26 @@ export default function ProcessPage() {
                           >
                             {expandedTableId === table.id ? 'Collapse' : 'Edit'}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              if (!confirm(`Delete "${table.tableName}"?`)) return;
-                              try {
-                                const { apiClient } = await import('@/lib/api/client');
-                                await apiClient.delete(`/processes/reference-tables/${table.id}`);
-                                toast.success(`"${table.tableName}" deleted`);
-                                if (expandedTableId === table.id) setExpandedTableId(null);
-                                refetchModalTables();
-                              } catch { toast.error('Failed to delete table'); }
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {!table.id.startsWith('live:') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!confirm(`Delete "${table.tableName}"?`)) return;
+                                try {
+                                  const { apiClient } = await import('@/lib/api/client');
+                                  await apiClient.delete(`/processes/reference-tables/${table.id}`);
+                                  toast.success(`"${table.tableName}" deleted`);
+                                  if (expandedTableId === table.id) setExpandedTableId(null);
+                                  refetchModalTables();
+                                } catch { toast.error('Failed to delete table'); }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                       {expandedTableId === table.id && (

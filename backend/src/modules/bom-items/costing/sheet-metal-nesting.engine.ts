@@ -43,6 +43,44 @@ export interface NestingResult {
   partAllowanceMm: number;
 }
 
+export interface NestingDimensionResolution {
+  lengthMm: number;
+  widthMm: number;
+  source: 'cad_flat_pattern_bounding_rect' | 'folded_3d_bounding_box';
+  confidence: 'verified' | 'fallback';
+}
+
+// Which rectangle nesting should actually pack against. Prefers the
+// cad-engine's true unfolded flat-pattern bounding rectangle (from its 2D
+// unfold solver) over the folded 3D part's own bounding box -- for any bent
+// part these are two genuinely different rectangles (unfolding adds
+// developed length at each bend), so packing against the folded envelope
+// overcounts real nesting capacity. Falls back to the folded box only when
+// the true flat-pattern rectangle wasn't resolvable for this part (e.g.
+// non-manifold topology the unfold solver couldn't walk) -- never silently;
+// source/confidence disclose exactly which rectangle was used.
+export function resolveNestingDimensions(
+  trueFlatLengthMm: number,
+  trueFlatWidthMm: number,
+  foldedLengthMm: number,
+  foldedWidthMm: number,
+): NestingDimensionResolution {
+  if (trueFlatLengthMm > 0 && trueFlatWidthMm > 0) {
+    return {
+      lengthMm: Math.max(trueFlatLengthMm, trueFlatWidthMm),
+      widthMm: Math.min(trueFlatLengthMm, trueFlatWidthMm),
+      source: 'cad_flat_pattern_bounding_rect',
+      confidence: 'verified',
+    };
+  }
+  return {
+    lengthMm: foldedLengthMm,
+    widthMm: foldedWidthMm,
+    source: 'folded_3d_bounding_box',
+    confidence: 'fallback',
+  };
+}
+
 export function computeNesting(input: NestingInput): NestingResult {
   const {
     flatPatternLengthMm,

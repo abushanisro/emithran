@@ -31,8 +31,10 @@ import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-respo
 import { AutoFillResponseDto } from './dto/auto-fill.dto';
 import { MachineOverrideDto } from './dto/machine-selection.dto';
 import { CostOverrideDto } from './dto/cost-override.dto';
-import { ApplyRouteDto, type ApplyRouteResult } from './dto/apply-route.dto';
+import { ApplyRouteDto, type ApplyRouteResult, ApplyCustomRouteDto, type ApplyCustomRouteResult } from './dto/apply-route.dto';
+import type { PhysicsGap } from './dto/cost-breakdown.dto';
 import { LOCATION_INFO } from './costing/default-rates';
+import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -67,7 +69,7 @@ const MACHINE_CLASS_TO_PROCESS_GROUP: ReadonlyMap<string, string> = new Map([
   ...['cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn', 'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'grinding', 'drill_press', 'tapping', 'edm']
     .map((c) => [c, 'Machining'] as const),
   ...['welding', 'manual_assembly', 'adhesive_bonding', 'electrical_assembly'].map((c) => [c, 'Assembly'] as const),
-  ...['ndt_test', 'heat_treat_furnace', 'anodize', 'powder_coat', 'plating', 'chem_treatment', 'laser_marking', 'deburring']
+  ...['ndt_test', 'heat_treat_furnace', 'anodize', 'powder_coat', 'plating', 'chem_treatment', 'laser_marking', 'deburring', 'cleaning']
     .map((c) => [c, 'Post Processing'] as const),
   ...['injection_molding', 'thermoforming', 'blow_molding', 'extrusion', 'rotational_molding', 'rubber_molding', 'compression_molding']
     .map((c) => [c, 'Plastic & Rubber'] as const),
@@ -89,6 +91,7 @@ export class BOMItemsController {
     private readonly materialIntelligenceService: MaterialIntelligenceService,
     @Optional() private readonly manufacturingRules: ManufacturingRulesService | undefined,
     private readonly supabaseService: SupabaseService,
+    private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -120,6 +123,48 @@ export class BOMItemsController {
       throw new BadRequestException('User authentication required');
     }
     return this.autoFillService.analyzeAndSuggest(file.buffer, file.originalname, user.id, token, location);
+  }
+
+  // ── Background variant: for large/complex files where CAD analysis can take
+  // minutes (mostly OCC's own STEP transfer). Returns a jobId immediately;
+  // poll GET analyze-for-autofill/:jobId for the result. ──────────────────────
+  @Post('analyze-for-autofill/start')
+  @ApiOperation({ summary: 'Start a background 3D file analysis; returns a jobId to poll' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 100 * 1024 * 1024 },
+    }),
+  )
+  async startAnalyzeForAutoFill(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @Query('location') location?: string,
+  ): Promise<{ jobId: string }> {
+    if (!file) {
+      throw new BadRequestException('file is required');
+    }
+    const allowedExts = ['.step', '.stp', '.stl', '.iges', '.igs', '.obj', '.sldprt'];
+    const ext = path.extname(file.originalname ?? '').toLowerCase();
+    if (!allowedExts.includes(ext)) {
+      throw new BadRequestException(`Unsupported file type: ${ext}`);
+    }
+    const jobId = this.autoFillService.startAnalysis(file.buffer, file.originalname, user.id, token, location);
+    return { jobId };
+  }
+
+  @Get('analyze-for-autofill/:jobId')
+  @ApiOperation({ summary: 'Poll the status/result of a background analysis job' })
+  async getAnalyzeForAutoFillStatus(
+    @Param('jobId') jobId: string,
+  ): Promise<{ status: 'processing' | 'ready' | 'error'; result?: AutoFillResponseDto; error?: string }> {
+    const job = this.autoFillService.getJobStatus(jobId);
+    if (!job) {
+      throw new NotFoundException('Analysis job not found or expired');
+    }
+    return { status: job.status, result: job.result, error: job.error };
   }
 
   @Get()
@@ -341,6 +386,53 @@ export class BOMItemsController {
     return this.bomItemsService.update(id, updateData, user.id, token);
   }
 
+  // Manual re-trigger, mirroring /reanalyze's pattern for the 3D file — for
+  // items whose 2D drawing was already uploaded before drawing-intelligence
+  // extraction existed (upload-files only calls this automatically for NEW
+  // uploads going forward), or to re-run after the parser itself improves.
+  @Post(':id/analyze-drawing')
+  @ApiOperation({ summary: 'Re-run drawing intelligence extraction on the stored 2D file and update drawing_intelligence in DB' })
+  @ApiResponse({ status: 200, description: 'Drawing analysis complete', type: BOMItemResponseDto })
+  @ApiResponse({ status: 400, description: 'No 2D file found for this item, or it is not a PDF' })
+  async analyzeDrawing(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<BOMItemResponseDto> {
+    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
+
+    if (!bomItem.file2dPath) {
+      throw new BadRequestException('No 2D drawing found for this item — upload a PDF drawing first');
+    }
+    if (!bomItem.file2dPath.toLowerCase().endsWith('.pdf')) {
+      throw new BadRequestException('Drawing intelligence extraction requires a vector PDF (text extraction, not OCR) — this file is not a PDF');
+    }
+
+    const signedUrl = await this.fileStorageService.getSignedUrl(bomItem.file2dPath, 3600);
+
+    let fileBuffer: Buffer;
+    try {
+      const response = await axios.get(signedUrl, {
+        responseType: 'arraybuffer',
+        timeout: 60000,
+        maxContentLength: 100 * 1024 * 1024,
+      });
+      fileBuffer = Buffer.from(response.data);
+    } catch (err: any) {
+      this.logger.error(`[analyze-drawing] Failed to download file: ${err.message}`);
+      throw new BadRequestException('Failed to download 2D file from storage');
+    }
+
+    const drawingResult = await this.autoFillService.analyzeDrawing(fileBuffer, bomItem.partNumber);
+
+    return this.bomItemsService.update(
+      id,
+      { drawingIntelligence: drawingResult as unknown as Record<string, any> },
+      user.id,
+      token,
+    );
+  }
+
   @Get(':id/dependencies')
   @ApiOperation({ summary: 'Check BOM item delete dependencies' })
   @ApiResponse({ status: 200, description: 'Dependencies checked successfully' })
@@ -373,6 +465,17 @@ export class BOMItemsController {
     @AccessToken() token: string,
   ): Promise<{ ok: boolean }> {
     return this.bomItemsService.updateThumbnailUrl(id, body.thumbnailUrl, token);
+  }
+
+  @Patch(':id/scenario-overrides')
+  @ApiOperation({ summary: 'Merge Cost Guide manual overrides (e.g. sheetThicknessMm) — a null value clears that key, reverting to the CAD/auto-detected value' })
+  @ApiResponse({ status: 200, description: 'Scenario overrides updated successfully', type: BOMItemResponseDto })
+  async patchScenarioOverrides(
+    @Param('id') id: string,
+    @Body() patch: Record<string, unknown>,
+    @AccessToken() token: string,
+  ): Promise<BOMItemResponseDto> {
+    return this.bomItemsService.patchScenarioOverrides(id, patch, token);
   }
 
   @Patch('reorder')
@@ -462,6 +565,24 @@ export class BOMItemsController {
         id,
       );
       updateData.file2dPath = uploadResult.storagePath;
+
+      // Drawing intelligence extraction (cad-engine/drawing_analyzer.py) —
+      // vector-PDF text extraction only; the parser itself returns an honest
+      // "requires OCR" fallback for image/scanned drawings rather than an
+      // error, so it's still safe to call for any file2d mimetype. Non-fatal:
+      // a failed/unavailable drawing parse must never block the file upload
+      // itself — same convention as reanalyze's 3D CAD engine call.
+      if (file2d.mimetype === 'application/pdf') {
+        try {
+          const drawingResult = await this.autoFillService.analyzeDrawing(
+            file2d.buffer,
+            bomItem.partNumber,
+          );
+          updateData.drawingIntelligence = drawingResult as unknown as Record<string, any>;
+        } catch (err: any) {
+          this.logger.warn(`[upload-files] drawing analysis failed (non-fatal): ${err?.message}`);
+        }
+      }
     }
 
     // Upload 3D file if provided
@@ -1414,18 +1535,236 @@ export class BOMItemsController {
       );
     }
 
+    const insertedOps = await this.writeProcessLinesAsRecords(
+      id, route.processLines, batchSize, location, user, token, `auto_fill_from_route:${dto.routeId}`,
+    );
+
+    this.logger.log(`[apply-route] partId=${id} route=${dto.routeId} wrote ${insertedOps.length} ops`);
+
+    return {
+      created:    insertedOps.length,
+      operations: insertedOps,
+      routeLabel: route.routeLabel,
+      routeId:    dto.routeId,
+    };
+  }
+
+  // ── Apply a dynamically-assembled Workflow Builder route → write real process_cost_records ─
+  // Deliberately NOT a free-form cost-line author: baseCuttingRouteId still picks one of the
+  // 3 real engine-computed routes (its cutting line + its full processLines set — every other
+  // real operation is identical across all 3, since they're gated purely by this part's real
+  // geometry, not by cutting method — see getRouteComparison's "shared process lines" comment).
+  // includedProcesses is a subset + custom order of THAT real, already-computed set — filtering
+  // and reordering, never inventing a cost line the engine didn't already derive from real
+  // geometry. Reuses the exact same insert logic as applyRoute (writeProcessLinesAsRecords) —
+  // no new cost formulas anywhere in this endpoint.
+  @Post(':id/apply-custom-route')
+  @ApiOperation({
+    summary: 'Write process cost records from a dynamically-assembled Workflow Builder route',
+    description:
+      'Takes a real, already-engine-computed route (by cutting method) and writes only the ' +
+      'processLines the user selected, in their chosen order. Rejects any requested process ' +
+      'not present in the real computed set — never fabricates a cost line.',
+  })
+  @ApiResponse({ status: 201, description: 'Process cost records written for the custom route' })
+  async applyCustomRoute(
+    @Param('id') id: string,
+    @Body() dto: ApplyCustomRouteDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<ApplyCustomRouteResult> {
+    const batchSize = dto.batchSize ?? 1;
+    const location  = dto.location  ?? 'USA';
+
+    const comparison = await this.bomItemsService.getRouteComparison(
+      id, user.id, token, batchSize, location,
+    );
+    // Own snapshot for resolveRealMachineRate below — getRouteComparison already
+    // took its own internally; both read the same short-TTL cache in practice.
+    const rates = await this.exchangeRateService.getSnapshot(token);
+    const baseRoute = comparison.routes.find((r) => r.routeId === dto.baseCuttingRouteId);
+    if (!baseRoute) {
+      throw new NotFoundException(
+        `Base cutting route '${dto.baseCuttingRouteId}' not available for this part. ` +
+        `Available: ${comparison.routes.map((r) => r.routeId).join(', ')}`,
+      );
+    }
+    if (!baseRoute.processLines?.length) {
+      throw new BadRequestException(
+        `Base cutting route '${dto.baseCuttingRouteId}' returned no process lines — cannot build a custom route from it`,
+      );
+    }
+
+    // Two kinds of step, resolved in order:
+    //   1. A real, already-engine-computed operation for this part — reuse its
+    //      real cycleTimeMin/hourlyRate verbatim, exactly as before.
+    //   2. A real catalog operation with no geometric trigger on this part yet
+    //      — validated against process_calculator_mappings (never an arbitrary
+    //      string), a REAL machine rate resolved for its machineClass, but
+    //      cycleTimeMin honestly 0 — no real geometry to derive it from, and
+    //      this endpoint never fabricates one.
+    const availableByName = new Map(baseRoute.processLines.map((l) => [l.process, l]));
+    const db = this.supabaseService.getClient(token);
+    const orderedLines: Array<{
+      process: string; machineClass: string; machineName: string | null; hourlyRate: number;
+      cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } };
+    }> = [];
+    const needsManualCycleTime: string[] = [];
+
+    for (const step of dto.steps) {
+      const real = availableByName.get(step.process);
+      if (real) {
+        orderedLines.push(real);
+        continue;
+      }
+      if (!step.processGroup || !step.processRoute || !step.machineClass) {
+        throw new BadRequestException(
+          `'${step.process}' is not a real, geometry-computed operation for this part, and no real ` +
+          `process identity (processGroup/processRoute/machineClass) was supplied to resolve it from the catalog. ` +
+          `Geometry-computed operations available: ${[...availableByName.keys()].join(', ')}`,
+        );
+      }
+      // Validate it's a REAL, active row in the catalog — not an arbitrary string.
+      const { data: mappingRows } = await db
+        .from('process_calculator_mappings')
+        .select('id')
+        .eq('process_group', step.processGroup)
+        .eq('process_route', step.processRoute)
+        .eq('operation', step.process)
+        .eq('machine_class', step.machineClass)
+        .eq('is_active', true)
+        .limit(1);
+      if (!mappingRows?.length) {
+        throw new BadRequestException(
+          `'${step.process}' (${step.processGroup} / ${step.processRoute} / ${step.machineClass}) is not a ` +
+          `real, active operation in process_calculator_mappings.`,
+        );
+      }
+      const rate = await this.resolveRealMachineRate(step.machineClass, location, token, rates);
+      orderedLines.push({
+        process: step.process,
+        machineClass: step.machineClass,
+        machineName: rate?.machineName ?? null,
+        hourlyRate: rate?.rate ?? 0,
+        cycleTimeMin: 0,
+      });
+      needsManualCycleTime.push(step.process);
+    }
+
+    const routeLabel = `Custom: ${dto.steps.map((s) => s.process).join(' + ')}`;
+    const insertedOps = await this.writeProcessLinesAsRecords(
+      id, orderedLines, batchSize, location, user, token, `auto_fill_from_custom_route:${id}`,
+    );
+
+    this.logger.log(`[apply-custom-route] partId=${id} wrote ${insertedOps.length} ops: ${insertedOps.join(', ')}` +
+      (needsManualCycleTime.length ? ` (needs manual cycle time: ${needsManualCycleTime.join(', ')})` : ''));
+
+    return {
+      created:    insertedOps.length,
+      operations: insertedOps,
+      routeLabel,
+      needsManualCycleTime,
+    };
+  }
+
+  // Real machine rate for a machine class with no geometric trigger on this
+  // part yet — used only by applyCustomRoute's catalog-operation path. Same
+  // fallback order as everywhere else in this codebase: cheapest real
+  // mhr_records row for this location > cheapest mhr_benchmark_rates row
+  // (converted from its USD storage convention to local currency) > null
+  // (honest no-rate-on-file, never a fabricated number).
+  // Returns rate in USD — matches getRouteComparison's processLines (also USD,
+  // see BOMItemsService.normalizeRouteComparisonToUsd), since this is merged
+  // with those lines before writeProcessLinesAsRecords inserts them together.
+  private async resolveRealMachineRate(
+    machineClass: string,
+    location: string,
+    token: string,
+    rates: RateSnapshot,
+  ): Promise<{ machineName: string | null; rate: number } | null> {
+    const db = this.supabaseService.getClient(token);
+    const { data: ownRows } = await db
+      .from('mhr_records')
+      .select('machine_name, total_machine_hour_rate')
+      .eq('machine_class', machineClass)
+      .eq('location', location)
+      .order('total_machine_hour_rate', { ascending: true })
+      .limit(1);
+    if (ownRows?.length) {
+      const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['USA']!;
+      return {
+        machineName: ownRows[0].machine_name ?? null,
+        rate: rates.toUsd(Number(ownRows[0].total_machine_hour_rate ?? 0), locInfo.code),
+      };
+    }
+
+    const { data: benchRows } = await db
+      .from('mhr_benchmark_rates')
+      .select('machine_name, mhr_usd')
+      .eq('machine_class', machineClass)
+      .eq('location', location)
+      .order('mhr_usd', { ascending: true })
+      .limit(1);
+    if (benchRows?.length) {
+      // mhr_benchmark_rates.mhr_usd is already USD-native — no conversion needed.
+      return { machineName: benchRows[0].machine_name ?? null, rate: Number(benchRows[0].mhr_usd ?? 0) };
+    }
+
+    return null;
+  }
+
+  // Shared by applyRoute and applyCustomRoute — writes one process_cost_records row per
+  // process line, in array order (op_nbr 10, 20, 30...). Idempotent: replaces the part's
+  // ENTIRE active process routing, not just previously-auto-filled rows (re-applying a
+  // route must not duplicate op_nbr 10/20/30/40 rows alongside the old ones).
+  private async writeProcessLinesAsRecords(
+    id: string,
+    lines: Array<{
+      process: string; machineClass: string; machineName?: string | null; hourlyRate: number;
+      cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } };
+      physicsGap?: PhysicsGap | null;
+    }>,
+    batchSize: number,
+    location: string,
+    user: User,
+    token: string,
+    notesTag: string,
+  ): Promise<string[]> {
+    // Manufacturing Physics Calculator architecture: process_cost_records.cycle_time
+    // is NUMERIC(12,2) NOT NULL CHECK (cycle_time >= 1) (migration 034) — a line
+    // whose cycle time couldn't be resolved (physicsGap set, or cycleTimeMin <=~0
+    // for a process that was still included in the route) is schema-impossible to
+    // persist. Reject the WHOLE apply-route request before touching any existing
+    // data — previously an insert failure here was only logged and the loop moved
+    // on, which (after the delete below already ran) silently dropped that one
+    // process line from the part's active routing with no error surfaced to the
+    // user and no way to recover the deleted prior rows.
+    for (const line of lines) {
+      const cycleTimeSecRounded = Math.round(line.cycleTimeMin * 60 * 100) / 100;
+      if (line.physicsGap || cycleTimeSecRounded < 1) {
+        const gap = line.physicsGap;
+        const reason = gap
+          ? (gap.gapType === 'missing_lookup'
+              ? gap.requiredAction
+              : gap.reason)
+          : 'cycle time resolved to less than 1 second, which this system cannot persist as a real machine cycle';
+        throw new BadRequestException(
+          `Cannot apply this route — '${line.process}' cycle time is unavailable: ${reason}. ` +
+          `No records were written.`,
+        );
+      }
+    }
+
     const db = this.supabaseService.getClient(token);
 
-    // 4. Idempotent: remove ALL previous auto-fill records so re-applying is safe
-    await db.from('process_cost_records').delete().eq('bom_item_id', id).eq('notes', 'auto_fill_from_cad');
-    await db.from('process_cost_records').delete().eq('bom_item_id', id).ilike('notes', 'auto_fill_from_route:%');
+    await db.from('process_cost_records').delete().eq('bom_item_id', id).eq('is_active', true);
 
-    // 5. Insert one record per process line from the selected route
-    // process_cost_records.machine_rate is always stored in USD — convert from local currency here.
-    // LHR (lhr_usd_effective) is already in USD from lhr_benchmark_rates; machine rate is not.
-    const locInfo     = LOCATION_INFO[location] ?? LOCATION_INFO['USA']!;
-    const INR_PER_USD = 83.5;
-    const toUsd = (localRate: number) => localRate * locInfo.defaultInrRate / INR_PER_USD;
+    // process_cost_records.machine_rate is always stored in USD. Every `lines`
+    // entry is already USD by the time it reaches here — real geometry-computed
+    // lines come from getRouteComparison (normalizeRouteComparisonToUsd), catalog-
+    // only lines come from resolveRealMachineRate (also returns USD) — so no
+    // conversion happens in this function anymore (a local-currency static pivot
+    // used to run here, double-converting once both sources became USD-native).
 
     const insertedOps: string[] = [];
     let opNbr = 10;
@@ -1455,15 +1794,54 @@ export class BOMItemsController {
     const pickLHR = (group: string): { id: null; lhr: number } =>
       ({ id: null, lhr: lhrByGroup.get(group) ?? 0 });
 
-    for (const line of route.processLines) {
-      const operation    = line.process.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-      const processGroup = this.deriveProcessGroupFromMachineClass(line.machineClass);
-      // Store machine_rate in USD always. line.hourlyRate is in the selected location's local
-      // currency (INR for India, USD for USA, EUR for Germany, etc.).
-      // toUsd() normalises via the INR pivot: localRate × defaultInrRate / 83.5
-      const machineRate  = toUsd(line.hourlyRate);
-      const cycleTimeSec = Math.round(line.cycleTimeMin * 60);
-      const lhr = pickLHR(processGroup);
+    for (const line of lines) {
+      // The real process hierarchy (Group/Route/Operation) that the manual
+      // "Edit Process Cost" dialog's picker matches against lives in
+      // process_calculator_mappings, keyed by machine_class (migrations
+      // 368/369). This used to just slugify line.process ("Waterjet Cutting"
+      // -> "waterjet_cutting") into `operation` and never set `process_route`
+      // at all -- a real, indexed column (migration 041) that stayed NULL for
+      // every route-applied line. The dialog's "Saved process" panel only
+      // renders a Route line when one is set, so every applied-route process
+      // showed an incomplete hierarchy (Group + Operation, no Route) and could
+      // never be correctly re-matched against the picker's own Group -> Route
+      // -> Operation cascade. Resolve the real triple from the same table the
+      // picker itself reads, picking the lowest display_order row for this
+      // machine_class (mirrors the frontend's own defaultCalculatorForOperation
+      // "sort by displayOrder, take first" convention) -- falling back to the
+      // slug only when a machine class genuinely has no mapping row at all.
+      const { data: hierarchyRows } = await db
+        .from('process_calculator_mappings')
+        .select('process_group, process_route, operation, lhr_process_group, display_order')
+        .eq('machine_class', line.machineClass)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .limit(1);
+      const hierarchyRow = hierarchyRows?.[0] as
+        | { process_group: string; process_route: string; operation: string; lhr_process_group: string | null }
+        | undefined;
+      const operation    = hierarchyRow?.operation
+        ?? line.process.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      const processGroup = hierarchyRow?.process_group
+        ?? this.deriveProcessGroupFromMachineClass(line.machineClass);
+      const processRoute = hierarchyRow?.process_route ?? null;
+      // Store machine_rate in USD always — line.hourlyRate already is (see comment above).
+      const machineRate  = line.hourlyRate;
+      // process_cost_records.cycle_time is NUMERIC(12,2) — round to 2dp, not
+      // to a whole integer. Rounding to an integer here silently threw away
+      // real precision the schema already supports on every applied route —
+      // confirmed live: a genuine 19.2s Inspection line saved as 19s, then
+      // visibly disagreed with its own calculator's exact recomputation.
+      const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
+      // Labour-wage tier vs. routing category are different things that happen
+      // to share the same process_calculator_mappings.process_group column for
+      // most machine classes — but several classes (cmm, deburring,
+      // turret_punch, the CNC classes, injection_molding) bill a genuinely
+      // different, more specific labour tier than their ROUTING group.
+      // lhr_process_group (migration 424) is the single DB-driven source for
+      // this, shared with BOMItemsService.resolveLHRRates — same row already
+      // fetched above, no second query.
+      const lhr = pickLHR(hierarchyRow?.lhr_process_group ?? processGroup);
 
       const { error } = await db.from('process_cost_records').insert({
         bom_item_id:    id,
@@ -1471,6 +1849,25 @@ export class BOMItemsController {
         op_nbr:         opNbr,
         operation,
         process_group:  processGroup,
+        process_route:  processRoute,
+        // Added by migration 343 specifically so the Edit Process Cost dialog
+        // knows which Digital Factory location to filter its MHR/LHR dropdowns
+        // by on reopen -- never wired up here despite `location` already being
+        // computed above. Left NULL, every route-applied row's dialog defaulted
+        // to "All locations" (no filter), which is why the Machine/Labour
+        // dropdowns showed every country's rows mixed together (raw local-
+        // currency figures under one flat "$" label, e.g. Vietnam's
+        // 471560 VND showing as "$471560.00/hr") instead of just the applied
+        // location's real rate.
+        location,
+        // machine_class was never persisted here despite line.machineClass
+        // being available (already used above for deriveProcessGroupFromMachineClass) —
+        // every route-applied row's machine_class came back NULL, so the frontend's
+        // matchedEngineLine lookup (which requires proc.machineClass === l.machineClass)
+        // always failed and every applied row silently lost the live MachineSelector
+        // (alternatives, "Why" reasoning, capability checks), falling back to a
+        // read-only display of whatever machine_name happened to be stored.
+        machine_class:  line.machineClass ?? null,
         machine_name:   line.machineName ?? null,
         // The route engine already selected a real machine per line (see
         // attachMachineSelections() in bom-items.service.ts) — persist its
@@ -1492,25 +1889,31 @@ export class BOMItemsController {
         scrap:          0,
         currency:       'USD',
         is_active:      true,
-        notes:          `auto_fill_from_route:${dto.routeId}`,
+        notes:          notesTag,
       });
 
       if (error) {
         this.logger.error(`[apply-route] insert failed op=${operation}: ${error.message}`);
-      } else {
-        insertedOps.push(line.process);
-        opNbr += 10;
+        // Previously this only logged and moved on, leaving the loop to report
+        // overall success (201, full insertedOps-based toast) while this one
+        // operation was silently absent from the applied route with no trace
+        // for the user — confirmed live: Press Brake and Hole Extrusion
+        // (Burring) both vanished from an "applied successfully" custom route
+        // with no error shown, because their inserts individually failed here
+        // and nothing downstream ever saw that. Row deletion above has already
+        // committed, so surfacing this loudly (instead of pretending the whole
+        // route applied) is the only way the user finds out re-applying is
+        // needed rather than trusting an incomplete, wrongly-"successful" route.
+        throw new InternalServerErrorException(
+          `Failed to write process cost record for '${operation}': ${error.message}. ` +
+          `${insertedOps.length} operation(s) were written before this failure — re-apply the route to retry.`,
+        );
       }
+      insertedOps.push(line.process);
+      opNbr += 10;
     }
 
-    this.logger.log(`[apply-route] partId=${id} route=${dto.routeId} wrote ${insertedOps.length} ops`);
-
-    return {
-      created:    insertedOps.length,
-      operations: insertedOps,
-      routeLabel: route.routeLabel,
-      routeId:    dto.routeId,
-    };
+    return insertedOps;
   }
 
   private getMhrSearchTerm(machineCategoryHint: string): string {

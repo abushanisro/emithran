@@ -14,6 +14,8 @@ export interface ProcessCostInput {
   processGroup?: string;
   processRoute?: string;
   operation?: string;
+  /** Digital Factory location this process was configured for (India, USA, China, ...) */
+  location?: string;
   directRate: number;
   indirectRate?: number;
   fringeRate?: number;
@@ -21,7 +23,7 @@ export interface ProcessCostInput {
   machineValue?: number;
   laborRate?: number;
   currency?: string;
-  shiftPatternHoursPerDay: number;
+  shiftPatternHoursPerDay?: number;
   setupManning: number;
   setupTime: number;
   batchSize: number;

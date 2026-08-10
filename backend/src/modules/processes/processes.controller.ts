@@ -143,6 +143,42 @@ export class ProcessesController {
     return this.processesService.findAll(query, user.id, token);
   }
 
+  @Get('sm-lookup-tables')
+  @ApiOperation({ summary: 'Get live sm_lookup_* cost-engine tables for a process route, shaped as reference tables' })
+  @ApiResponse({ status: 200, description: 'Live lookup tables retrieved successfully' })
+  async getSmLookupTables(
+    @Query('group') group: string,
+    @Query('route') route: string,
+    @AccessToken() token: string,
+  ) {
+    return this.processesService.getSmLookupTables(group, route, token);
+  }
+
+  @Get('sm-lookup-tables/by-name/:table')
+  @ApiOperation({ summary: 'Get one real sm_lookup_* cost-engine table by name (allowlisted tables only) — used by calculator popups\' "view lookup table" button' })
+  @ApiResponse({ status: 200, description: 'Live lookup table retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Unrecognized table' })
+  async getSmLookupTableByName(
+    @Param('table') table: string,
+    @AccessToken() token: string,
+  ) {
+    return this.processesService.getSmLookupTableByName(table, token);
+  }
+
+  @Put('sm-lookup-tables/rows/:table/:id')
+  @ApiOperation({ summary: 'Update one row of a real sm_lookup_* cost-engine table (allowlisted tables/columns only)' })
+  @ApiResponse({ status: 200, description: 'Row updated successfully' })
+  @ApiResponse({ status: 400, description: 'Unrecognized table or column' })
+  @ApiResponse({ status: 404, description: 'Row not found' })
+  async updateSmLookupRow(
+    @Param('table') table: string,
+    @Param('id') id: string,
+    @Body() updates: Record<string, unknown>,
+    @AccessToken() token: string,
+  ) {
+    return this.processesService.updateSmLookupRow(table, id, updates, token);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get process by ID' })
   @ApiResponse({ status: 200, description: 'Process retrieved successfully', type: ProcessResponseDto })

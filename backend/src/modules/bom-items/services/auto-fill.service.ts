@@ -5,6 +5,8 @@ import { SheetMetalFeatureExtractorService } from './sheet-metal-feature-extract
 import { evaluate } from 'mathjs';
 import axios from 'axios';
 import * as path from 'path';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import {
   AutoFillResponseDto,
   AutoFillGeometryDto,
@@ -12,6 +14,12 @@ import {
   AutoFillCostsDto,
   AutoFillConfidenceDto,
 } from '../dto/auto-fill.dto';
+import { DrawingIntelligenceDto } from '../dto/drawing-intelligence.dto';
+
+// Bumped whenever drawing-intelligence.dto.ts's expected shape changes, so a
+// stored drawing_intelligence row can be told apart from one written under a
+// future, differently-shaped parser response.
+const DRAWING_PARSER_VERSION = 'v1';
 import {
   LASER_SPEED_MM_PER_MIN,
   LASER_PIERCE_SEC,
@@ -29,12 +37,79 @@ export interface RawGeometry {
   thinWallCount: number;
   bendCount: number;
   cutLengthMm: number;
+  // Breakdown of cutLengthMm by category — lets the UI show a checkable
+  // total instead of one opaque number. Undefined for CNC/mesh-inference
+  // parts (no panel-wire-walk data available there); the frontend falls
+  // back to showing only the combined total when absent.
+  cutLengthBreakdown?: { outerProfileMm: number; circularHolesMm: number; internalProfilesMm: number };
+  // Length of the single longest unbroken laser path (whole-part outer
+  // profile treated as ONE continuous loop, vs. each individual hole rim /
+  // internal cutout wire on its own) — laser machines slow down on long
+  // contours, so this is the DFM-relevant number, not the summed total.
+  // Undefined for CNC/mesh-inference parts, same as cutLengthBreakdown.
+  longestContinuousCutMm?: number;
+  // Corner turn-angle counts — how many discrete corners on the cut path
+  // need the laser/punch head to decelerate. sharpCornerCount: turn angle
+  // > 60deg (ordinary right-angle-ish corners). acuteCornerCount: turn
+  // angle > 150deg / interior angle < 30deg (near-reversal spike/notch
+  // tips) — always a SUBSET of sharpCornerCount, not a separate bucket.
+  // Undefined for CNC/mesh-inference parts, same as cutLengthBreakdown.
+  sharpCornerCount?: number;
+  acuteCornerCount?: number;
+  // Count of holes under 2x sheet thickness in diameter — a laser/punch
+  // must run a reduced feed rate piercing these (heat buildup relative to
+  // hole size and taper/dross risk both increase below ~2x thickness).
+  // Undefined for CNC/mesh-inference parts, same as cutLengthBreakdown.
+  smallHoleCount?: number;
+  // New in cad-engine geo_v38. extrudedFlangeCount: real, pierced/extruded
+  // hole flanges (a raised collar formed around a hole on thin sheet to
+  // gain thread-engagement depth before tapping) — a heuristic over coaxial
+  // stepped-hole clustering, coarsely corrected for counterbore/countersink
+  // overlap; see memory_optimizer.py's CACHE_VERSION changelog for the full
+  // disclosed limitation. thinWebCount: holes whose true edge-to-edge gap
+  // to a neighbouring hole is below 1.5x sheet thickness (excludes holes
+  // already counted in smallHoleCount, so no double-count). internalProfileCount:
+  // discrete count of internal cutout wires (slots/scalloped profiles/
+  // keyholes — anything that isn't the outer boundary or a plain round
+  // hole), alongside the existing cutLengthBreakdown.internalProfilesMm length.
+  extrudedFlangeCount?: number;
+  thinWebCount?: number;
+  internalProfileCount?: number;
+  // Nesting/material-utilization metrics (bounding rectangle of the TRUE
+  // unfolded flat pattern, via the cad-engine's 2D unfold solver — NOT the
+  // 3D part's bbox, a completely different number for a bent part).
+  // Undefined when the solver couldn't confidently walk this part's
+  // panel/bend graph (e.g. non-manifold topology) — never guessed.
+  boundingRectMm2?: number;
+  // The two dimensions the cad-engine's unfold solver actually resolves
+  // (boundingRectMm2 is just their product) -- the real unfolded flat
+  // pattern's own length/width, as opposed to the folded 3D part's
+  // maxLength/maxWidth (a different rectangle for any bent part). Same
+  // undefined-when-unresolved rule as boundingRectMm2 above.
+  flatPatternBoundingLengthMm?: number;
+  flatPatternBoundingWidthMm?: number;
+  materialUtilizationPct?: number;
+  scrapAreaMm2?: number;
   sheetThicknessMm: number;
   pierceCount: number;
+  // Non-cutting head-repositioning ("rapid traverse") time between real
+  // pierce locations (nearest-neighbour tour over hole/slot centroids) —
+  // additive on top of cutting+piercing time. Undefined when the cad
+  // engine had no dominant-face reference point to anchor the tour on.
+  rapidTraverseSec?: number;
   flatPatternAreaMm2: number;
   holeDiameters: number[];
   holeGroups: Array<{ diameter_mm: number; count: number }>;
+  counterboreGroups: Array<{ diameter_mm: number; count: number }>;
+  countersinkGroups: Array<{ diameter_mm: number; count: number }>;
   bendRadii: number[];
+  // Real per-bend length/angle, aligned index-for-index with bendRadii (all
+  // three come from the SAME cad-engine clustering pass — see
+  // _collect_dedup_bends). Empty when that pass wasn't usable (mesh-
+  // inference-only parts, or a sharp-fold/no-bend-radius part) — never
+  // guessed or backfilled from a flat-pattern-dimension proxy.
+  bendLengths: number[];
+  bendAngles: number[];
   featureSource: 'step_topology' | 'mesh_inference';
 }
 
@@ -59,6 +134,47 @@ export class AutoFillService {
   ) {
     this.cadEngineUrl = process.env.CAD_ENGINE_URL || 'http://localhost:5000';
     this.cadEngineApiKey = process.env.CAD_ENGINE_API_KEY || '';
+  }
+
+  // ── Background analysis jobs ─────────────────────────────────────────────────
+  // Large/complex STEP files can spend several minutes in the CAD engine
+  // (mostly OCC's own STEP transfer, unrelated to app code). Rather than hold
+  // one HTTP request open that long, the controller starts a job here and
+  // returns immediately; the frontend polls getJobStatus() for the result.
+  // In-memory is sufficient — single dev instance, no queue infra needed.
+  private readonly jobs = new Map<string, {
+    status: 'processing' | 'ready' | 'error';
+    result?: AutoFillResponseDto;
+    error?: string;
+    createdAt: number;
+  }>();
+  private static readonly JOB_TTL_MS = 30 * 60 * 1000; // 30 min
+
+  startAnalysis(
+    fileBuffer: Buffer,
+    fileName: string,
+    userId: string,
+    accessToken: string,
+    location?: string,
+  ): string {
+    // Sweep stale jobs on each new start — bounds Map growth without a background timer.
+    const now = Date.now();
+    for (const [id, job] of this.jobs) {
+      if (now - job.createdAt > AutoFillService.JOB_TTL_MS) this.jobs.delete(id);
+    }
+
+    const jobId = crypto.randomUUID();
+    this.jobs.set(jobId, { status: 'processing', createdAt: now });
+
+    this.analyzeAndSuggest(fileBuffer, fileName, userId, accessToken, location)
+      .then((result) => this.jobs.set(jobId, { status: 'ready', result, createdAt: now }))
+      .catch((e: any) => this.jobs.set(jobId, { status: 'error', error: e?.message ?? 'Analysis failed', createdAt: now }));
+
+    return jobId;
+  }
+
+  getJobStatus(jobId: string) {
+    return this.jobs.get(jobId);
   }
 
   async analyzeAndSuggest(
@@ -159,9 +275,17 @@ export class AutoFillService {
       processSuggestion.estimatedCycleTimeMin,
     );
     processSuggestion.estimatedCycleTimeMin = physicsResult.cycleTimeMin;
+    // NOTE: this is a whole-process (cut+pierce+bend+deburr combined), pre-
+    // material-resolution rough estimate used only for process/route
+    // classification and the should_cost_predictions audit log — it is NOT
+    // the same figure as, and will not match, the per-operation cycle times
+    // shown in Direct Process Costs (those come from cost-engine.ts, after
+    // material + machine are resolved). Logged as "(whole process, rough)"
+    // specifically so this isn't mistaken for a stale/duplicate of the final
+    // per-operation costed cycle time during QA.
     this.logger.log(
       `[cycle-time] ${processSuggestion.processType} → ` +
-      `${physicsResult.cycleTimeMin.toFixed(2)} min (${physicsResult.source})`,
+      `${physicsResult.cycleTimeMin.toFixed(2)} min (${physicsResult.source}, whole process incl. cut+pierce+deburr — not the final per-operation cycle time)`,
     );
 
     // 3. Lookup material
@@ -397,6 +521,8 @@ export class AutoFillService {
           ?? 0,
         pierceCount:        geo.pierceCount,
         flatPatternAreaMm2: geo.flatPatternAreaMm2,
+        flatPatternBoundingLengthMm: geo.flatPatternBoundingLengthMm,
+        flatPatternBoundingWidthMm: geo.flatPatternBoundingWidthMm,
         costDrivers,
         holeDiameters:      geo.holeDiameters ?? [],
         holeGroups:         (geo.holeGroups ?? []).map((g) => ({
@@ -404,7 +530,21 @@ export class AutoFillService {
           id: `hole_d${g.diameter_mm.toFixed(1)}_c${g.count}`,
           geometry_refs: { faces: [], edges: [] },
         })),
+        counterboreGroups: geo.counterboreGroups ?? [],
+        countersinkGroups: geo.countersinkGroups ?? [],
         bendRadii:          geo.bendRadii ?? [],
+        bendLengths:        geo.bendLengths ?? [],
+        bendAngles:         geo.bendAngles ?? [],
+        // Already computed on RawGeometry (see extractGeometryFromCADResult)
+        // but never copied into summary before now — the "Detected" feature-
+        // checklist panel (manufacturing-intelligence/page.tsx) needs these
+        // at this top level, not nested under a feature's own recognition object.
+        sharpCornerCount:     geo.sharpCornerCount,
+        acuteCornerCount:     geo.acuteCornerCount,
+        smallHoleCount:       geo.smallHoleCount,
+        extrudedFlangeCount:  geo.extrudedFlangeCount,
+        thinWebCount:         geo.thinWebCount,
+        internalProfileCount: geo.internalProfileCount,
         // Injection-molded features — promoted from InjectionMoldedFeatureExtractor
         // output (cadMI.features). Phase 1 fields are always present; Phase 2 fields
         // are present when extraction_version >= im_v2_phase2 and fall back to safe
@@ -891,7 +1031,12 @@ export class AutoFillService {
           ...form.getHeaders(),
           ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
         },
-        timeout: 180_000,
+        // Large/complex STEP files can spend several minutes inside OCC's
+        // STEPControl_Reader.TransferRoots() alone (a raw OCC call, not
+        // anything in this codebase) — 180s was too tight for real production
+        // parts (e.g. a 48MB single-part STEP timed out here with TransferRoots
+        // still running). 10 min gives large files a real chance to finish.
+        timeout: 600_000,
         maxContentLength: 150 * 1024 * 1024,
       },
     );
@@ -942,8 +1087,26 @@ export class AutoFillService {
       thinWallCount: (mf?.thin_walls ?? 0) > 0 || gf?.feature_detection?.thin_walls ? 1 : 0,
       bendCount: safe(smf?.bend_count, 0),
       cutLengthMm: safe(smf?.cut_length_mm, 0),
+      cutLengthBreakdown: smf?.cut_length_breakdown ? {
+        outerProfileMm: safe(smf.cut_length_breakdown.outer_profile_mm, 0),
+        circularHolesMm: safe(smf.cut_length_breakdown.circular_holes_mm, 0),
+        internalProfilesMm: safe(smf.cut_length_breakdown.internal_profiles_mm, 0),
+      } : undefined,
+      longestContinuousCutMm: smf?.longest_continuous_cut_mm != null ? safe(smf.longest_continuous_cut_mm, 0) : undefined,
+      sharpCornerCount: smf?.sharp_corner_count != null ? safe(smf.sharp_corner_count, 0) : undefined,
+      acuteCornerCount: smf?.acute_corner_count != null ? safe(smf.acute_corner_count, 0) : undefined,
+      smallHoleCount: smf?.small_hole_count != null ? safe(smf.small_hole_count, 0) : undefined,
+      extrudedFlangeCount: smf?.extruded_flange_count != null ? safe(smf.extruded_flange_count, 0) : undefined,
+      thinWebCount: smf?.thin_web_count != null ? safe(smf.thin_web_count, 0) : undefined,
+      internalProfileCount: smf?.internal_profile_count != null ? safe(smf.internal_profile_count, 0) : undefined,
+      boundingRectMm2: smf?.flat_pattern_bounding_rect_mm2 ? safe(smf.flat_pattern_bounding_rect_mm2, 0) : undefined,
+      flatPatternBoundingLengthMm: smf?.flat_pattern_bounding_length_mm != null ? safe(smf.flat_pattern_bounding_length_mm, 0) : undefined,
+      flatPatternBoundingWidthMm: smf?.flat_pattern_bounding_width_mm != null ? safe(smf.flat_pattern_bounding_width_mm, 0) : undefined,
+      materialUtilizationPct: smf?.material_utilization_pct != null ? safe(smf.material_utilization_pct, 0) : undefined,
+      scrapAreaMm2: smf?.scrap_area_mm2 != null ? safe(smf.scrap_area_mm2, 0) : undefined,
       sheetThicknessMm: safe(smf?.sheet_thickness_mm, 0),
       pierceCount: safe(smf?.pierce_count, 0),
+      rapidTraverseSec: smf?.rapid_traverse_sec != null ? safe(smf.rapid_traverse_sec, 0) : undefined,
       flatPatternAreaMm2: safe(smf?.flat_pattern_area_mm2, 0),
       // Prefer SheetMetalExtractor full-per-hole list → OCC _detect_holes_real all_diameters → unique fallback
       holeDiameters: Array.isArray(smf?.hole_diameters_mm) && smf.hole_diameters_mm.length > 0
@@ -976,7 +1139,19 @@ export class AutoFillService {
         }
         return [];
       })(),
+      // Counterbore/countersink: sheet-metal-only signal (see feature_extractors.py
+      // SheetMetalFeatureExtractor._detect_counterbore_countersink) — always empty
+      // for CNC/other families, and empty on the STL mesh-inference fallback since
+      // coaxial face pairs require real STEP topology.
+      counterboreGroups: Array.isArray(smf?.counterbore_groups)
+        ? smf.counterbore_groups.filter((g: any) => typeof g.diameter_mm === 'number' && g.diameter_mm > 0 && g.count > 0)
+        : [],
+      countersinkGroups: Array.isArray(smf?.countersink_groups)
+        ? smf.countersink_groups.filter((g: any) => typeof g.diameter_mm === 'number' && g.diameter_mm > 0 && g.count > 0)
+        : [],
       bendRadii: Array.isArray(smf?.bend_radii_mm) ? smf.bend_radii_mm : [],
+      bendLengths: Array.isArray(smf?.bend_lengths_mm) ? smf.bend_lengths_mm : [],
+      bendAngles: Array.isArray(smf?.bend_angles_deg) ? smf.bend_angles_deg : [],
       featureSource: (cncSummary != null || smf?.hole_count != null) ? 'step_topology' : 'mesh_inference',
     };
   }
@@ -1070,7 +1245,11 @@ export class AutoFillService {
       flatPatternAreaMm2: 0,
       holeDiameters: [],
       holeGroups: [],
+      counterboreGroups: [],
+      countersinkGroups: [],
       bendRadii: [],
+      bendLengths: [],
+      bendAngles: [],
       featureSource: 'mesh_inference',
     };
   }
@@ -1542,7 +1721,8 @@ export class AutoFillService {
       holeCount: 0, pocketCount: 0, thinWallCount: 0,
       bendCount: 0, cutLengthMm: 0,
       sheetThicknessMm: 0, pierceCount: 0, flatPatternAreaMm2: 0,
-      holeDiameters: [], holeGroups: [], bendRadii: [],
+      holeDiameters: [], holeGroups: [], counterboreGroups: [], countersinkGroups: [], bendRadii: [],
+      bendLengths: [], bendAngles: [],
       featureSource: 'mesh_inference',
     };
   }
@@ -1563,12 +1743,30 @@ export class AutoFillService {
       thinWallCount:    Math.min(Math.max(0, geo.thinWallCount    ?? 0), 100),
       bendCount:        Math.min(Math.max(0, geo.bendCount        ?? 0), 100),
       cutLengthMm:      clamp(geo.cutLengthMm, 100_000),
+      cutLengthBreakdown: geo.cutLengthBreakdown,
+      longestContinuousCutMm: geo.longestContinuousCutMm,
+      sharpCornerCount: geo.sharpCornerCount,
+      acuteCornerCount: geo.acuteCornerCount,
+      smallHoleCount: geo.smallHoleCount,
+      extrudedFlangeCount: geo.extrudedFlangeCount,
+      thinWebCount: geo.thinWebCount,
+      internalProfileCount: geo.internalProfileCount,
+      rapidTraverseSec: geo.rapidTraverseSec,
+      boundingRectMm2: geo.boundingRectMm2,
+      flatPatternBoundingLengthMm: geo.flatPatternBoundingLengthMm,
+      flatPatternBoundingWidthMm: geo.flatPatternBoundingWidthMm,
+      materialUtilizationPct: geo.materialUtilizationPct,
+      scrapAreaMm2: geo.scrapAreaMm2,
       sheetThicknessMm: clamp(geo.sheetThicknessMm, 50),
       pierceCount:      Math.min(Math.max(0, geo.pierceCount      ?? 0), 500),
       flatPatternAreaMm2: clamp(geo.flatPatternAreaMm2, 1e7),
       holeDiameters: Array.isArray(geo.holeDiameters) ? geo.holeDiameters : [],
       holeGroups:    Array.isArray(geo.holeGroups)    ? geo.holeGroups    : [],
+      counterboreGroups: Array.isArray(geo.counterboreGroups) ? geo.counterboreGroups : [],
+      countersinkGroups: Array.isArray(geo.countersinkGroups) ? geo.countersinkGroups : [],
       bendRadii:     Array.isArray(geo.bendRadii)     ? geo.bendRadii     : [],
+      bendLengths:   Array.isArray(geo.bendLengths)   ? geo.bendLengths   : [],
+      bendAngles:    Array.isArray(geo.bendAngles)    ? geo.bendAngles    : [],
       featureSource: geo.featureSource ?? 'mesh_inference',
     };
   }
@@ -1604,6 +1802,42 @@ export class AutoFillService {
     const cost = costCalculated ? 0.75 : 0.2;
     const overall = parseFloat(((geometry + material + proc + cost) / 4).toFixed(2));
     return { overall, geometry, material, process: proc, cost };
+  }
+
+  // Calls cad-engine/drawing_analyzer.py's real POST /drawing/analyze —
+  // PyMuPDF text-block extraction of the 2D drawing's title block, thread
+  // callouts, dimensions, etc. (see drawing-intelligence.dto.ts for the exact
+  // shape this validates against). Vector PDFs only — the parser itself
+  // returns a real, disclosed fallback (not an error) for image/scanned
+  // drawings, since it does text extraction, not OCR.
+  //
+  // The parser is treated as authoritative: this method validates its
+  // response shape (never persist something malformed) but does not
+  // reinterpret or reshape its field values.
+  async analyzeDrawing(pdfBuffer: Buffer, partNumber?: string): Promise<DrawingIntelligenceDto> {
+    const imageBase64 = pdfBuffer.toString('base64');
+    const response = await axios.post(
+      `${this.cadEngineUrl}/drawing/analyze`,
+      { imageBase64, mediaType: 'application/pdf', ...(partNumber ? { partNumber } : {}) },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
+        },
+        timeout: 60_000,
+        maxContentLength: 150 * 1024 * 1024,
+      },
+    );
+
+    const withVersion = { ...response.data, parserVersion: DRAWING_PARSER_VERSION };
+    const instance = plainToInstance(DrawingIntelligenceDto, withVersion);
+    const errors = await validate(instance, { whitelist: true, forbidNonWhitelisted: false });
+    if (errors.length > 0) {
+      throw new Error(
+        `/drawing/analyze returned a response that doesn't match the expected shape: ${errors.map((e) => e.toString()).join('; ')}`,
+      );
+    }
+    return instance;
   }
 }
 

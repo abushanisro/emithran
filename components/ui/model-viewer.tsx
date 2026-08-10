@@ -1,13 +1,14 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Suspense, useState, Component } from 'react';
+import { Suspense, useState, useEffect, Component } from 'react';
 import type { ReactNode } from 'react';
-import { Loader2, Download, RotateCcw, RefreshCw } from 'lucide-react';
+import { Loader2, Download, RotateCcw, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
 import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
+import { isWebGLAvailable } from '@/lib/utils/webgl';
 
 export type { HeatmapSource, HeatmapNormalization, HeatmapLayerType } from '@/lib/heatmap/types';
 
@@ -173,6 +174,11 @@ export function ModelViewer({
   const [error, setError] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [viewerKey, setViewerKey] = useState(0);
+  const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setWebglSupported(isWebGLAvailable());
+  }, []);
 
   const fileExt = fileType.toLowerCase().replace(/^\.+/, '');
 
@@ -235,8 +241,33 @@ export function ModelViewer({
     setViewerKey(prev => prev + 1);
   };
 
+  const renderWebGLUnavailable = () => (
+    <div className="relative h-full min-h-[400px] border rounded-lg overflow-hidden bg-muted/20 flex items-center justify-center p-8">
+      <div className="text-center max-w-md">
+        <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
+          <AlertTriangle className="h-8 w-8 text-destructive" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2">3D preview unavailable</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          This browser or environment can&apos;t create a WebGL context (hardware
+          acceleration may be disabled, or you&apos;re on a sandboxed/remote
+          session). Download the file to view it in CAD software instead.
+        </p>
+        <Button asChild>
+          <a href={fileUrl} download>
+            <Download className="h-4 w-4 mr-2" />
+            Download {fileExt.toUpperCase()}
+          </a>
+        </Button>
+      </div>
+    </div>
+  );
+
   // Priority check: Always show 3D viewer for STL/OBJ files regardless of other conditions
   if (shouldShow3DViewer) {
+    if (webglSupported === false) {
+      return renderWebGLUnavailable();
+    }
     return (
       <div className="h-full relative overflow-hidden">
         <Suspense fallback={
@@ -372,6 +403,9 @@ export function ModelViewer({
 
   // Interactive 3D Viewer (STL/OBJ)
   if (isInteractiveSupported) {
+    if (webglSupported === false) {
+      return renderWebGLUnavailable();
+    }
     return (
       <div className="h-full relative overflow-hidden">
         <Suspense fallback={

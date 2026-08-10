@@ -11,8 +11,11 @@ import { useLocationComparison, type LocationCostEntry } from '@/lib/api/hooks/u
 const fmtUsd = (v: number) =>
   `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// .toFixed(2), matching fmtUsd above and every other real rate display in
+// this codebase — .toFixed(0) rounds any rate under $1/hr to "$0/hr",
+// indistinguishable from a genuine no-rate-on-file zero.
 const fmtRate = (v: number) =>
-  `$${v.toFixed(0)}/hr`;
+  `$${v.toFixed(2)}/hr`;
 
 const LOCATION_FLAGS: Record<string, string> = {
   'India':     '🇮🇳',

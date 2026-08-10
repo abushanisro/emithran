@@ -85,7 +85,7 @@ export default function RawMaterialsPage() {
     properties: true,
     standards: true,
   });
-  const [costRegion, setCostRegion] = useState<'india' | 'usa' | 'china' | 'france' | 'germany' | 'w_europe' | 'e_europe'>('india');
+  const [costRegion, setCostRegion] = useState<'india' | 'usa' | 'china' | 'france' | 'germany' | 'w_europe' | 'e_europe'>('usa');
   const [subTypeFilter, setSubTypeFilter] = useState('');
   const [newMaterial, setNewMaterial] = useState({
     materialGroup: '',
@@ -96,7 +96,7 @@ export default function RawMaterialsPage() {
     densityKgM3: '',
     unitCost: '',
     country: '',
-    currency: 'INR' as Currency,
+    currency: 'USD' as Currency,
     shape: '' as MaterialShape | '',
     
     // Material properties
@@ -278,8 +278,8 @@ export default function RawMaterialsPage() {
         'Thermoplastic',
         'High-impact ABS plastic for automotive applications',
         'GRANULES',
-        'INDIA',
-        'INR',
+        'USA',
+        'USD',
         'Yes',
         '10',
         '49.4',
@@ -319,8 +319,8 @@ export default function RawMaterialsPage() {
         'Carbon Steel',
         'Low carbon steel for structural applications',
         'BARS',
-        'INDIA',
-        'INR',
+        'USA',
+        'USD',
         '7.85',
         '520',
         '350',
@@ -352,8 +352,8 @@ export default function RawMaterialsPage() {
         'Thermoplastic',
         'General purpose ABS plastic',
         'GRANULES',
-        'INDIA',
-        'INR',
+        'USA',
+        'USD',
         '135.50',
         '2024',
       ];
@@ -401,7 +401,7 @@ export default function RawMaterialsPage() {
       specificHeatMelt: newMaterial.specificHeatMelt ? parseFloat(newMaterial.specificHeatMelt) : undefined,
       thermalConductivityMelt: newMaterial.thermalConductivityMelt ? parseFloat(newMaterial.thermalConductivityMelt) : undefined,
       country: newMaterial.country || undefined,
-      currency: newMaterial.currency || 'INR',
+      currency: newMaterial.currency || 'USD',
       unitCost: newMaterial.unitCost ? parseFloat(newMaterial.unitCost) : undefined,
       year: newMaterial.year ? parseInt(newMaterial.year) : undefined,
       q1Cost: newMaterial.q1Cost ? parseFloat(newMaterial.q1Cost) : undefined,
@@ -441,7 +441,7 @@ export default function RawMaterialsPage() {
       densityKgM3: '',
       unitCost: '',
       country: '',
-      currency: 'INR' as Currency,
+      currency: 'USD' as Currency,
       shape: '' as MaterialShape | '',
       
       // Material properties
@@ -521,7 +521,7 @@ export default function RawMaterialsPage() {
       jisStandard: material.jisStandard || '',
       country: material.country,
       shape: material.shape,
-      currency: material.currency || 'INR',
+      currency: material.currency || 'USD',
       unitCost: material.unitCost,
     };
     

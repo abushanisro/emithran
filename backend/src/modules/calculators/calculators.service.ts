@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
-import { evaluate } from 'mathjs';
+import { evaluateCalculatorFormulas } from './calculator-formula-evaluator';
+import { PHYSICS_REGISTRY } from './physics-registry';
+import { SheetMetalLookupService, normaliseLaserMaterial } from '../bom-items/costing/sheet-metal-lookup.service';
 import {
   CreateCalculatorDto,
   UpdateCalculatorDto,
@@ -28,6 +30,7 @@ export class CalculatorsServiceV2 {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
+    private readonly sheetMetalLookup: SheetMetalLookupService,
   ) { }
 
   /**
@@ -431,208 +434,34 @@ export class CalculatorsServiceV2 {
     const calculator = await this.findOne(id, userId, accessToken);
     const { formulas = [], fields = [] } = calculator;
 
-    // Helper function to normalize field names for mathjs (replace all non-alphanumeric chars with underscores)
-    const normalizeFieldName = (name: string): string => {
-      return name
-        .trim()
-        .replace(/[^a-zA-Z0-9]+/g, '_') // Replace all non-alphanumeric sequences with single underscore
-        .replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
-    };
-
-    // Create scope with input values
-    const scope: Record<string, any> = { ...dto.inputValues };
-
-    // Normalize field values into scope (non-calculated fields only)
-    fields.forEach((field: any) => {
-      if (field.field_type === 'calculated') return; // Skip calculated fields
-
-      const val = dto.inputValues[field.id] !== undefined ? dto.inputValues[field.id] : dto.inputValues[field.field_name];
-
-      if (val !== undefined && field.field_name) {
-        const numericValue = field.field_type === 'number' || !isNaN(Number(val)) ? Number(val) : val;
-
-        // Store with normalized field name (spaces -> underscores) for mathjs compatibility
-        const normalizedName = normalizeFieldName(field.field_name);
-        scope[normalizedName] = numericValue;
-
-        this.logger.log(`Loaded field: "${field.field_name}" as "${normalizedName}" = ${numericValue}`, 'CalculatorsServiceV2');
-      } else if (field.default_value !== undefined && field.default_value !== null) {
-        // Use default value if no input provided
-        const defaultValue = field.field_type === 'number' || !isNaN(Number(field.default_value))
-          ? Number(field.default_value)
-          : field.default_value;
-
-        const normalizedName = normalizeFieldName(field.field_name);
-        scope[normalizedName] = defaultValue;
-
-        this.logger.log(`Loaded field (default): "${field.field_name}" as "${normalizedName}" = ${defaultValue}`, 'CalculatorsServiceV2');
-      }
-    });
-
-    const results: Record<string, any> = {};
     const startTime = Date.now();
-
-    // Add custom math functions (Excel-compatible)
-    const customFunctions = {
-      IF: (condition: boolean, trueValue: any, falseValue: any) => {
-        return condition ? trueValue : falseValue;
-      },
-      LN: (value: number) => {
-        if (value <= 0) {
-          throw new Error('LN function requires a positive value');
-        }
-        return Math.log(value); // Natural logarithm (base e)
-      },
-      LOG: (value: number) => {
-        if (value <= 0) {
-          throw new Error('LOG function requires a positive value');
-        }
-        return Math.log10(value); // Logarithm base 10
-      },
-    };
-
-    // Create extended scope with custom functions
-    Object.assign(scope, customFunctions);
-
-    // Process calculated fields (sorted by display_order to respect dependencies)
-    const calculatedFields = fields
-      .filter((field: any) => field.field_type === 'calculated')
-      .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
-
-    for (const field of calculatedFields) {
-      try {
-        if (!field.default_value) continue; // Skip if no formula
-
-        let expression = field.default_value;
-
-        // STEP 0: Remove Excel-style = prefix if present
-        if (expression.trim().startsWith('=')) {
-          expression = expression.trim().substring(1).trim();
-        }
-
-        // STEP 1: Replace {fieldName} with normalized field names
-        const bracedFieldPattern = /\{([^}]+)\}/g;
-        expression = expression.replace(bracedFieldPattern, (match: string, fieldName: string) => {
-          const trimmedName = fieldName.trim();
-          const normalizedName = normalizeFieldName(trimmedName);
-          this.logger.log(`Replacing "{${trimmedName}}" with "${normalizedName}"`, 'CalculatorsServiceV2');
-          return normalizedName;
-        });
-
-        // STEP 2: Build a map of all field names (original -> normalized) for bare name replacement
-        const fieldNameMap = new Map<string, string>();
-        fields.forEach((f: any) => {
-          if (f.field_name) {
-            fieldNameMap.set(f.field_name, normalizeFieldName(f.field_name));
-          }
-        });
-
-        // STEP 3: Replace bare field names (not in braces) with normalized versions
-        // Sort by length (longest first) to avoid partial replacements
-        const sortedFieldNames = Array.from(fieldNameMap.keys()).sort((a, b) => b.length - a.length);
-
-        for (const originalName of sortedFieldNames) {
-          const normalizedName = fieldNameMap.get(originalName)!;
-          // Use word boundaries to ensure we only replace complete field names
-          // Match field names that are not already normalized (contain spaces or special chars)
-          if (originalName !== normalizedName) {
-            const regex = new RegExp(`\\b${originalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
-            const beforeReplace = expression;
-            expression = expression.replace(regex, normalizedName);
-            if (beforeReplace !== expression) {
-              this.logger.log(`Replacing bare "${originalName}" with "${normalizedName}"`, 'CalculatorsServiceV2');
-            }
-          }
-        }
-
-        this.logger.log(`Original formula: "${field.default_value}"`, 'CalculatorsServiceV2');
-        this.logger.log(`Normalized formula: "${expression}"`, 'CalculatorsServiceV2');
-        this.logger.log(`Available variables: ${Object.keys(scope).join(', ')}`, 'CalculatorsServiceV2');
-
-        // Log all scope values for debugging
-        const scopeValues = Object.entries(scope).map(([key, val]) => `${key}=${val}`).join(', ');
-        this.logger.log(`Scope values: ${scopeValues}`, 'CalculatorsServiceV2');
-
-        // Evaluate formula
-        const result = evaluate(expression, scope);
-
-        this.logger.log(`Raw calculation result: ${result}`, 'CalculatorsServiceV2');
-
-        // Handle special validation cases
-        if (field.field_name === 'No. of passes' && result < 0) {
-          this.logger.warn(`Negative passes detected: ${result}. This may indicate incorrect input values (final diameter > initial diameter).`, 'CalculatorsServiceV2');
-        }
-
-        // Store result in scope for subsequent calculations (normalized name)
-        if (field.field_name) {
-          const normalizedName = normalizeFieldName(field.field_name);
-          scope[normalizedName] = result;
-
-          this.logger.log(`Stored result in scope as: "${normalizedName}" = ${result}`, 'CalculatorsServiceV2');
-        }
-
-        // Store result for response
-        results[field.id] = result;
-        if (field.field_name) {
-          results[field.field_name] = result;
-        }
-
-        this.logger.log(`✓ Calculated "${field.field_name}" = ${result}`, 'CalculatorsServiceV2');
-      } catch (e) {
-        this.logger.error(`✗ Error calculating field "${field.field_name}": ${e.message}`, 'CalculatorsServiceV2');
-        this.logger.error(`   Formula was: "${field.default_value}"`, 'CalculatorsServiceV2');
-        results[field.id] = { error: e.message, value: null };
-        // Also key by field_name (not just id) — the frontend reads results by
-        // fieldName exclusively, so without this an errored field is
-        // indistinguishable from one that was never evaluated at all: it just
-        // renders as undefined/"N/A" with no way to see what actually failed.
-        if (field.field_name) {
-          results[field.field_name] = { error: e.message, value: null };
-        }
-      }
+    // physics_key set -> a real TypeScript function (physics-registry.ts)
+    // already used by cost-engine.ts computes the results directly, instead
+    // of evaluating this calculator's own calculator_fields formula strings.
+    // Eliminates the possibility of this calculator's numbers drifting from
+    // the live cost engine's numbers for these processes — see migration 056.
+    const physicsFn = (calculator as any).physics_key ? PHYSICS_REGISTRY[(calculator as any).physics_key] : undefined;
+    const rawResults = physicsFn
+      ? physicsFn(dto.inputValues)
+      : evaluateCalculatorFormulas(fields, formulas, dto.inputValues, {
+          log: (m) => this.logger.log(m, 'CalculatorsServiceV2'),
+          error: (m) => this.logger.error(m, 'CalculatorsServiceV2'),
+          warn: (m) => this.logger.warn(m, 'CalculatorsServiceV2'),
+        }).results;
+    // Disclosed, not silent: a physics function's `_warnings` (e.g. "no MHR
+    // rate provided — Machine Cost computed as $0") is metadata, not a
+    // calculator field — lifted out of `results` into its own response key
+    // so it doesn't pollute the displayed field list, but isn't dropped either.
+    const { _warnings, ...results } = rawResults as Record<string, any>;
+    if (_warnings?.length > 0) {
+      for (const w of _warnings) this.logger.warn(`Calculator ${id}: ${w}`, 'CalculatorsServiceV2');
     }
-
-    // Process regular formulas (sorted by execution order)
-    const sortedFormulas = [...formulas].sort((a: any, b: any) => (a.execution_order || 0) - (b.execution_order || 0));
-
-    for (const formula of sortedFormulas) {
-      try {
-        if (!formula.formula_expression) continue;
-
-        // Clean formula expression (remove Excel-style = prefix)
-        let expression = formula.formula_expression.trim();
-        if (expression.startsWith('=')) {
-          expression = expression.substring(1).trim();
-        }
-
-        // Evaluate formula
-        const result = evaluate(expression, scope);
-
-        // Store result in scope for subsequent formulas
-        if (formula.formula_name) {
-          scope[formula.formula_name] = result;
-        }
-
-        // Store result for response
-        results[formula.id] = result;
-        if (formula.formula_name) {
-          results[formula.formula_name] = result;
-        }
-      } catch (e) {
-        this.logger.error(`Error calculating formula ${formula.formula_name || 'unknown'}: ${e.message}`, 'CalculatorsServiceV2');
-        results[formula.id] = { error: e.message, value: null };
-        // Same fix as the calculated-fields loop above — key by name too, not just id.
-        if (formula.formula_name) {
-          results[formula.formula_name] = { error: e.message, value: null };
-        }
-      }
-    }
-
     const duration = Date.now() - startTime;
 
     return {
       success: true,
       results,
+      ...(_warnings?.length > 0 ? { warnings: _warnings } : {}),
       durationMs: duration,
     };
   }
@@ -651,6 +480,7 @@ export class CalculatorsServiceV2 {
    *   tool_setup     → params: { setup_type, key_value }
    *   manual_stroke  → params: { thickness_mm, tonnage, complexity }
    *   laser_cut      → params: { material, thickness_mm, laser_power_w }
+   *   waterjet_cut   → params: { material, thickness_mm }
    *   sampling_plan  → params: { batch_size, complexity_level (1|2|3) }
    */
   async resolveSheetMetalLookup(tableName: string, params: Record<string, any>) {
@@ -663,15 +493,20 @@ export class CalculatorsServiceV2 {
         const col = complexity === 'complex' ? 'eff_complex'
                   : complexity === 'inter' ? 'eff_inter'
                   : 'eff_simple';
+        // Same underflow risk as 'manual_stroke'/'tool_setup' above:
+        // sm_lookup_stroke_rate's lowest seeded tonnage is 10 -- a strict
+        // .lte() match returns nothing for any required tonnage below that.
         const { data, error } = await client
           .from('sm_lookup_stroke_rate')
           .select(`tonnage, ${col}`)
-          .lte('tonnage', tonnage)
-          .order('tonnage', { ascending: false })
-          .limit(1)
-          .single();
-        if (error || !data) return { value: null };
-        return { value: (data as any)[col], row: data };
+          .order('tonnage', { ascending: true });
+        if (error || !data?.length) return { value: null };
+
+        const atOrBelow = data.filter((r) => Number(r.tonnage) <= tonnage);
+        const row = atOrBelow.length
+          ? atOrBelow.reduce((best, r) => (Number(r.tonnage) > Number(best.tonnage) ? r : best))
+          : data[0]; // clamp to the smallest seeded tonnage when below every column
+        return { value: (row as any)[col], row };
       }
 
       case 'handling_time': {
@@ -690,54 +525,122 @@ export class CalculatorsServiceV2 {
       case 'tool_setup': {
         const setupType = String(params.setup_type || 'press');
         const keyValue = Number(params.key_value);
+        // Same underflow risk as 'manual_stroke' above: sm_lookup_tool_setup's
+        // 'brake' rows only start at key_value=100 (mm of tool/bend length) —
+        // a strict .lte() match returns nothing for a small part whose bend
+        // line is shorter than that (this session's real test part: 70.3mm).
         const { data, error } = await client
           .from('sm_lookup_tool_setup')
           .select('key_value, loading_time_min')
           .eq('setup_type', setupType)
-          .lte('key_value', keyValue)
-          .order('key_value', { ascending: false })
-          .limit(1)
-          .single();
-        if (error || !data) return { value: null };
-        return { value: (data as any).loading_time_min, row: data };
+          .order('key_value', { ascending: true });
+        if (error || !data?.length) return { value: null };
+
+        const atOrBelow = data.filter((r) => Number(r.key_value) <= keyValue);
+        const row = atOrBelow.length
+          ? atOrBelow.reduce((best, r) => (Number(r.key_value) > Number(best.key_value) ? r : best))
+          : data[0]; // clamp to the smallest seeded key_value when below every column
+        return { value: (row as any).loading_time_min, row };
       }
 
       case 'manual_stroke': {
+        // Delegates entirely to SheetMetalLookupService.getManualStrokeTime —
+        // the one registered resolver for this table (bom-items.service.ts's
+        // cost engine and route comparison already call it directly). This
+        // used to be a second, independent implementation here: a bare
+        // EXACT_MATCH query with none of that resolver's real-world
+        // tolerances (thickness INTERPOLATE between real bracketing rows,
+        // and rounding a precise kN-derived tonnage like 81.6T to the
+        // nearest standard press-brake class like 80T when within 10%).
+        // Confirmed live: the standalone interactive Calculator dialog kept
+        // gapping on exactly the cases the cost engine had already learned
+        // to resolve, because this duplicate never got the same fixes.
         const thickness = Number(params.thickness_mm);
         const tonnage = Number(params.tonnage);
-        const complexity = String(params.complexity || 'simple').toLowerCase();
-        // Find closest thickness and tonnage ≤ requested values
-        const { data, error } = await client
-          .from('sm_lookup_manual_stroke')
-          .select('thickness_mm, tonnage, complexity, stroke_time_sec')
-          .eq('complexity', complexity)
-          .lte('thickness_mm', thickness)
-          .lte('tonnage', tonnage)
-          .order('thickness_mm', { ascending: false })
-          .order('tonnage', { ascending: false })
-          .limit(1)
-          .single();
-        if (error || !data) return { value: null };
-        return { value: (data as any).stroke_time_sec, row: data };
+        const complexity = String(params.complexity || 'simple').toLowerCase() === 'complex' ? 'complex' : 'simple';
+        const result = await this.sheetMetalLookup.getManualStrokeTime(thickness, tonnage, complexity);
+        if (!result.dataFound) return { value: null, resolution: result.resolution };
+        return { value: result.secondsPerBend, row: result.resolution.matchedRow, resolution: result.resolution };
       }
 
       case 'laser_cut': {
-        const material = String(params.material || '');
+        // Nearest-thickness/nearest-power match, same as sheet-metal-lookup.service.ts's
+        // getLaserParams — an exact .eq().eq() match (the old behaviour here) returns
+        // nothing for any thickness/power combination not stored verbatim, which is most
+        // of them (this table is seeded at fixed steps: 500W, 1000W, ... 15000W and whole-
+        // mm thicknesses). Confirmed live: a real 2000W machine at 4mm silently returned
+        // null here while the correct row (1.56 m/min) existed one power-step away.
+        //
+        // Normalises material via the SAME shared function getLaserParams uses — this
+        // case used to `ilike` the raw grade string directly (e.g. "SECC"), which never
+        // matches the table's 4 seeded material buckets (Carbon Steel/Stainless Steel/
+        // Aluminium/Brass) unless the caller happened to pre-normalise it itself. Also
+        // filters by laser_technology (migration 457) from the caller's machine_class —
+        // this dialog's real machine could be a co2_laser (e.g. AMADA Quattro), and
+        // without this filter its nearest-power match would silently return FIBER
+        // cutting speed/pierce time, exactly the cross-technology substitution the
+        // interactive costing path was already fixed to prevent.
+        const material = normaliseLaserMaterial(String(params.material || ''));
         const thickness = Number(params.thickness_mm);
         const laserPower = Number(params.laser_power_w);
+        const technology: 'fiber' | 'co2' = params.machine_class === 'co2_laser' ? 'co2' : 'fiber';
         const { data, error } = await client
           .from('sm_lookup_laser_cut')
-          .select('material, thickness_mm, kerf_mm, laser_power_w, cutting_speed_m_per_min')
-          .ilike('material', `%${material}%`)
-          .eq('thickness_mm', thickness)
-          .eq('laser_power_w', laserPower)
-          .limit(1)
-          .single();
-        if (error || !data) return { value: null };
+          .select('material, thickness_mm, kerf_mm, laser_power_w, cutting_speed_m_per_min, pierce_time_min')
+          .eq('material', material)
+          .eq('laser_technology', technology)
+          .not('cutting_speed_m_per_min', 'is', null);
+        if (error || !data?.length) return { value: null };
+
+        const nearest = <T,>(target: number, items: T[], key: (x: T) => number): T =>
+          items.reduce((best, x) => Math.abs(key(x) - target) < Math.abs(key(best) - target) ? x : best, items[0]);
+
+        const thicknesses = [...new Set(data.map((r) => Number(r.thickness_mm)))];
+        const nearestThickness = nearest(thickness, thicknesses, (t) => t);
+        const rowsAtThickness = data.filter((r) => Number(r.thickness_mm) === nearestThickness);
+        if (!rowsAtThickness.length) return { value: null };
+
+        const powers = rowsAtThickness.map((r) => Number(r.laser_power_w));
+        const nearestPower = nearest(laserPower, powers, (p) => p);
+        const row = rowsAtThickness.find((r) => Number(r.laser_power_w) === nearestPower);
+        if (!row) return { value: null };
+
         return {
-          value: (data as any).cutting_speed_m_per_min,
-          kerf: (data as any).kerf_mm,
-          row: data,
+          value: (row as any).cutting_speed_m_per_min,
+          kerf: (row as any).kerf_mm,
+          row,
+        };
+      }
+
+      case 'waterjet_cut': {
+        // Nearest-thickness match only — no power axis (see migration 398 for
+        // why: this app's real waterjet machine names don't carry a
+        // consistently parseable pump rating, unlike laser's kW-in-name
+        // convention). Normalises material via the same shared function as
+        // laser_cut above — same 4 seeded buckets (Carbon Steel/Stainless
+        // Steel/Aluminium/Brass), same "raw grade string never matches"
+        // failure mode this fixes for laser_cut.
+        const material = normaliseLaserMaterial(String(params.material || ''));
+        const thickness = Number(params.thickness_mm);
+        const { data, error } = await client
+          .from('sm_lookup_waterjet_cut')
+          .select('material, thickness_mm, kerf_mm, cutting_speed_mm_per_min, pierce_time_sec')
+          .eq('material', material)
+          .not('cutting_speed_mm_per_min', 'is', null);
+        if (error || !data?.length) return { value: null };
+
+        const nearest = <T,>(target: number, items: T[], key: (x: T) => number): T =>
+          items.reduce((best, x) => Math.abs(key(x) - target) < Math.abs(key(best) - target) ? x : best, items[0]);
+
+        const thicknesses = [...new Set(data.map((r) => Number(r.thickness_mm)))];
+        const nearestThickness = nearest(thickness, thicknesses, (t) => t);
+        const row = data.find((r) => Number(r.thickness_mm) === nearestThickness);
+        if (!row) return { value: null };
+
+        return {
+          value: (row as any).cutting_speed_mm_per_min,
+          kerf: (row as any).kerf_mm,
+          row,
         };
       }
 
@@ -750,18 +653,25 @@ export class CalculatorsServiceV2 {
         const qtyCol = level === 3 ? 'sample_qty_l3'
                      : level === 2 ? 'sample_qty_l2'
                      : 'sample_qty_l1';
+        // Same class of range issue as the other lookups above: the table's
+        // brackets only span 2-1,000,000 (batch_size_from starts at 2) — a
+        // strict range match returns nothing for a batch size of 1. Clamp to
+        // the lowest/highest bracket rather than failing outright.
         const { data, error } = await client
           .from('sm_lookup_sampling_plan')
           .select(`batch_size_from, batch_size_to, ${pctCol}, ${qtyCol}`)
-          .lte('batch_size_from', batchSize)
-          .gte('batch_size_to', batchSize)
-          .limit(1)
-          .single();
-        if (error || !data) return { value: null };
+          .order('batch_size_from', { ascending: true });
+        if (error || !data?.length) return { value: null };
+
+        const inRange = data.find(
+          (r) => Number(r.batch_size_from) <= batchSize && batchSize <= Number(r.batch_size_to),
+        );
+        const row = inRange
+          ?? (batchSize < Number(data[0].batch_size_from) ? data[0] : data[data.length - 1]);
         return {
-          value: (data as any)[pctCol],
-          sampleQty: (data as any)[qtyCol],
-          row: data,
+          value: (row as any)[pctCol],
+          sampleQty: (row as any)[qtyCol],
+          row,
         };
       }
 

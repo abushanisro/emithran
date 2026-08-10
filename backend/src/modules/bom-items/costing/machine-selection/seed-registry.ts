@@ -204,12 +204,29 @@ export function lookupSeedCapability(machineName: string | null): Partial<Machin
 // so unknown machines never silently win jobs they may not handle.
 export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapability>> = {
   fiber_laser:    { maxXMm: 2500, maxYMm: 1250, maxThicknessMsMm: 12, maxThicknessSsMm: 8, maxThicknessAlMm: 6, maxThicknessCuMm: 3 },
+  // No conservative envelope default here on purpose (unlike fiber_laser
+  // above) — CO2 laser machines vary far more widely in real bed size/power
+  // than this app has seen enough real examples of yet (only "Quattro" on
+  // file so far), so a generic floor would be a guess with no real machines
+  // behind it. An unclassified/unverified CO2 laser gets EMPTY_CAPABILITY
+  // only — a real, honest "no capability on file" state, not a number.
+  co2_laser:      {},
   press_brake:    { maxTonnage: 60, maxLengthMm: 2000, maxThicknessMm: 5 },
   turret_punch:   { maxXMm: 2000, maxYMm: 1000, maxThicknessMm: 4, maxTonnage: 20 },
   waterjet:       { maxXMm: 2000, maxYMm: 1000, maxThicknessMm: 80 },
   tapping:        {},
   deburring:      {},
+  cleaning:       {},
   cmm:            {},
+  drill_press:    {},
+  pem_press:      {},
+  // Conservative floor for an unknown hole_forming machine with no capability
+  // on file — real researched units (Whitney Jensen/FTC105-10T/Fresan FP10P,
+  // migration 409) are all 10-ton presses; 5t is a deliberately lower, safe
+  // default so an unverified machine doesn't silently claim it's as capable
+  // as the real ones (same "conservative floor, not the real number" pattern
+  // as press_brake/turret_punch above).
+  hole_forming:   { maxTonnage: 5 },
   cnc_3ax_vmc:    { maxXMm: 600, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 500 },
   cnc_4ax_vmc:    { maxXMm: 500, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 400 },
   cnc_5ax_mc:     { maxXMm: 400, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 300 },

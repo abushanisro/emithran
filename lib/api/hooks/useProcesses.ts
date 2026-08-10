@@ -222,6 +222,49 @@ export function useReferenceTables(processId: string | undefined) {
   });
 }
 
+// Live bridge to the real sm_lookup_* cost-engine tables for a process route
+// (see backend's sm-lookup-bridge.config.ts) — a SEPARATE data source from
+// process_reference_tables, merged into the same dialog on the frontend so
+// admins see and can correct the tables the cost engine actually uses, not
+// just user-managed custom ones. Editable per-row (see
+// useUpdateSmLookupRow) — adding/deleting rows or whole tables is
+// intentionally not exposed here.
+export function useSmLookupTables(group: string | undefined, route: string | undefined) {
+  const { user, loading: authLoading } = useAuth();
+
+  return useQuery({
+    queryKey: ['processes', 'sm-lookup-tables', group, route],
+    queryFn: async () => {
+      if (!group || !route) return [];
+      const response = await apiClient.get<ReferenceTable[]>(
+        `/processes/sm-lookup-tables?group=${encodeURIComponent(group)}&route=${encodeURIComponent(route)}`,
+      );
+      return response;
+    },
+    enabled: !authLoading && !!user && !!group && !!route,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+// Updates one row of a real sm_lookup_* table by its real DB id. `table` is
+// the real table name (e.g. "sm_lookup_waterjet_cut"), parsed from the live
+// entry's synthetic table id (`live:<tableName>`) — see handleSaveTable in
+// process/page.tsx. The backend re-validates `table` against the same
+// allowlist regardless of what the client sends.
+export function useUpdateSmLookupRow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ table, rowId, updates }: { table: string; rowId: string; updates: Record<string, unknown> }) => {
+      const response = await apiClient.put<TableRow>(`/processes/sm-lookup-tables/rows/${table}/${rowId}`, updates);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['processes', 'sm-lookup-tables'] });
+    },
+  });
+}
+
 export function useReferenceTable(tableId: string | undefined) {
   const { user, loading: authLoading } = useAuth();
 

@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useRawMaterials, useRawMaterialFilterOptions, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
+import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useExchangeRates } from '@/lib/api/hooks/useExchangeRates';
 import { Loader2, Calculator as CalculatorIcon, Play, Eye, Box, FileText } from 'lucide-react';
@@ -71,6 +72,45 @@ const CALCULATOR_PROPERTY_MAPPINGS: Record<string, string> = {
   enStandard: 'enStandard',
   jisStandard: 'jisStandard',
 };
+
+// Resolves a material's price for the given pricing location to USD, mirroring
+// getRegionalRate's own per-country column selection (India->costIndia,
+// USA->costUsa, ...) then pivoting through INR to USD via live exchange
+// rates. This used to be copy-pasted separately into the live preview memo
+// and the "new material" submit handler -- and was MISSING entirely from the
+// "edit material" submit handler, which instead checked selectedMaterial?.
+// unitCost / ?.cost (neither of which exists for a material priced only via
+// a regional column, e.g. AL6101's cost_usa/cost_india/cost_china with no
+// generic cost/unitCost column) and silently fell back to 0. Confirmed live:
+// editing an already-saved AL6101 line kept re-persisting $0 forever even
+// though the dialog's own preview showed a real nonzero cost. One shared
+// resolver now backs the preview AND both submit paths, so this can't
+// silently drift out of sync a second time.
+function resolveRegionalUnitCostUsd(
+  material: RawMaterial | null | undefined,
+  countryStr: string,
+  rates: Record<string, number>,
+): number {
+  if (!material) return 0;
+  const cl = (countryStr || '').toLowerCase();
+  let localAmount = 0;
+  let localCurrency = 'USD';
+
+  if (cl.includes('india')) { localAmount = material.costIndia ?? 0; localCurrency = 'INR'; }
+  else if (cl.includes('usa') || cl.includes('united states')) { localAmount = material.costUsa ?? 0; localCurrency = 'USD'; }
+  else if (cl.includes('germany')) { localAmount = material.costGermany ?? 0; localCurrency = 'EUR'; }
+  else if (cl.includes('france')) { localAmount = material.costFrance ?? 0; localCurrency = 'EUR'; }
+  else if (cl.includes('w. europe') || cl.includes('western europe')) { localAmount = material.costWEurope ?? 0; localCurrency = 'EUR'; }
+  else if (cl.includes('e. europe') || cl.includes('eastern europe')) { localAmount = material.costEEurope ?? 0; localCurrency = 'EUR'; }
+  else if (cl.includes('china')) { localAmount = material.costChina ?? 0; localCurrency = 'CNY'; }
+  else { localAmount = (material as any).unitCost || (material as any).cost || (material as any).costPerUnit || (material as any).price || 0; localCurrency = (material as any).currency || 'USD'; }
+
+  if (!localAmount) {
+    if (material.costIndia) { localAmount = material.costIndia; localCurrency = 'INR'; }
+    else { localAmount = (material as any).unitCost || (material as any).cost || 0; localCurrency = (material as any).currency || 'USD'; }
+  }
+  return (localAmount * (rates[localCurrency] ?? 1)) / (rates['USD'] ?? 83.5);
+}
 
 interface RawMaterialDialogProps {
   open: boolean;
@@ -461,6 +501,27 @@ export function RawMaterialDialog({
   // Fetch raw materials from API
   const { data: rawMaterialsData, isLoading } = useRawMaterials();
   const { data: filterOptions, isLoading: isLoadingOptions } = useRawMaterialFilterOptions();
+  // Regional/shorthand designations (e.g. "AL6101" for "Generic Aluminum, ANSI
+  // 6101") that don't appear in a material's own name -- without these, typing
+  // the CAD-detected grade into the material search can't find its own row.
+  const { data: materialAliases } = useMaterialAliases();
+  const aliasesByMaterialId = useMemo(() => {
+    const map = new Map<string, string[]>();
+    (materialAliases ?? []).forEach((a) => {
+      const list = map.get(a.rawMaterialId) ?? [];
+      list.push(a.aliasNormalized);
+      map.set(a.rawMaterialId, list);
+    });
+    return map;
+  }, [materialAliases]);
+  // Reverse of the above: alias -> the one real row it resolves to. Used to
+  // re-find a saved line's material when it was stored under a shorthand
+  // grade (e.g. "AL6101") that has no direct field match on its own row.
+  const materialIdByAliasNormalized = useMemo(() => {
+    const map = new Map<string, string>();
+    (materialAliases ?? []).forEach((a) => map.set(a.aliasNormalized, a.rawMaterialId));
+    return map;
+  }, [materialAliases]);
 
   // Debug logging
 
@@ -486,6 +547,19 @@ export function RawMaterialDialog({
     if (!selectedMaterialId || !materials.length) return null;
     return materials.find(m => m.id === selectedMaterialId);
   }, [selectedMaterialId, materials]);
+
+  // Combobox options -- alias keywords let a search for "AL6101" (or any other
+  // regional/shorthand designation from material_aliases) find its real row
+  // even though that text never appears in the row's own displayed label.
+  const materialOptions: ComboboxOption[] = useMemo(() => materials.map((material) => ({
+    value: material.id,
+    label: `${material.material}${material.materialType ? ` (${material.materialType})` : ''}${material.country ? ` - ${material.country}` : ''}`,
+    keywords: [
+      material.material,
+      material.materialGrade ?? '',
+      ...(aliasesByMaterialId.get(material.id) ?? []),
+    ].filter(Boolean),
+  })), [materials, aliasesByMaterialId]);
 
   // ── Smart Fill ──────────────────────────────────────────────────────────────
   // Derives net usage directly from CAD volume × material density without going
@@ -516,12 +590,21 @@ export function RawMaterialDialog({
   // materialName = "IS2062 E250 CRCA" but DB has material.material = "CRCA Steel").
   const findMaterialByEditData = (pool: RawMaterial[] | null | undefined, ed: any) => {
     if (!pool || !ed) return undefined;
-    return pool.find(m =>
+    const direct = pool.find(m =>
       m.material === ed.materialName ||
       (m as any).materialName === ed.materialName ||
       m.materialGrade === ed.materialName ||
       m.id === ed.materialId,
     );
+    if (direct) return direct;
+    // Alias fallback: a saved line's materialName can be a shorthand/regional
+    // grade (e.g. "AL6101") that has no substring/field match anywhere on its
+    // real row ("Generic Aluminum, ANSI 6101") -- same root cause as the
+    // backend costing resolver's alias gap (bom-items.service.ts), just for
+    // this dialog's own re-lookup when reopening a saved line.
+    const normalized = String(ed.materialName ?? '').toUpperCase().replace(/[\s-]/g, '');
+    const aliasedId = normalized ? materialIdByAliasNormalized.get(normalized) : undefined;
+    return aliasedId ? pool.find(m => m.id === aliasedId) : undefined;
   };
 
   // Load edit data first (wait for data to be loaded AND options to be available)
@@ -596,28 +679,7 @@ export function RawMaterialDialog({
     const zero = { previewCost: 0, previewBreakdown: null as null | Record<string, number> };
     if (!((selectedMaterial || editData) && (grossUsage > 0 || (netUsage as number) > 0))) return zero;
     const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
-    let unitCostUsd = 0;
-
-    if (selectedMaterial) {
-      const cl = (country || '').toLowerCase();
-      let localAmount = 0;
-      let localCurrency = 'USD';
-
-      if (cl.includes('india'))                                            { localAmount = selectedMaterial.costIndia   ?? 0; localCurrency = 'INR'; }
-      else if (cl.includes('usa') || cl.includes('united states'))        { localAmount = selectedMaterial.costUsa     ?? 0; localCurrency = 'USD'; }
-      else if (cl.includes('germany'))                                    { localAmount = selectedMaterial.costGermany ?? 0; localCurrency = 'EUR'; }
-      else if (cl.includes('france'))                                     { localAmount = selectedMaterial.costFrance  ?? 0; localCurrency = 'EUR'; }
-      else if (cl.includes('w. europe') || cl.includes('western europe')) { localAmount = selectedMaterial.costWEurope ?? 0; localCurrency = 'EUR'; }
-      else if (cl.includes('e. europe') || cl.includes('eastern europe')) { localAmount = selectedMaterial.costEEurope ?? 0; localCurrency = 'EUR'; }
-      else if (cl.includes('china'))                                      { localAmount = selectedMaterial.costChina   ?? 0; localCurrency = 'CNY'; }
-      else { localAmount = selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0; localCurrency = selectedMaterial.currency || 'USD'; }
-
-      if (!localAmount) {
-        if (selectedMaterial.costIndia) { localAmount = selectedMaterial.costIndia; localCurrency = 'INR'; }
-        else { localAmount = selectedMaterial.unitCost || selectedMaterial.cost || 0; localCurrency = selectedMaterial.currency || 'USD'; }
-      }
-      unitCostUsd = (localAmount * (rates[localCurrency] ?? 1)) / (rates['USD'] ?? 83.5);
-    }
+    const unitCostUsd = resolveRegionalUnitCostUsd(selectedMaterial, country, rates);
 
     const finalUnitCost = unitCostUsd || manualUnitCost || 0;
     if (!finalUnitCost) return zero;
@@ -714,7 +776,15 @@ export function RawMaterialDialog({
         materialDescription: materialInfo.materialDescription || '',
         country: materialInfo.country || '',
         quarter: selectedQuarter,
-        unitCost: editData.unitCost || manualUnitCost || (selectedMaterial?.unitCost || selectedMaterial?.cost || 0),
+        // Freshly-resolved live price first -- editData.unitCost is whatever
+        // was last SAVED, often stale $0 from before this material's regional
+        // cost column existed. Preferring it here (as this used to) meant
+        // every edit just re-persisted the old $0 forever, even once the
+        // live preview above was already showing the real resolved cost.
+        unitCost: resolveRegionalUnitCostUsd(selectedMaterial, materialInfo.country || country, exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 })
+          || manualUnitCost
+          || editData.unitCost
+          || 0,
         grossUsage,
         netUsage,
         scrap,
@@ -736,35 +806,8 @@ export function RawMaterialDialog({
       
       // Get unit cost in USD for the selected country (mirrors getRegionalRate + INR pivot)
       const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
-      const countryLowerSubmit = (country || '').toLowerCase();
-      let submitLocalAmount = 0;
-      let submitLocalCurrency = 'USD';
+      const materialUnitCost = resolveRegionalUnitCostUsd(selectedMaterial, country, rates);
 
-      if (countryLowerSubmit.includes('india')) {
-        submitLocalAmount = selectedMaterial.costIndia ?? 0; submitLocalCurrency = 'INR';
-      } else if (countryLowerSubmit.includes('usa') || countryLowerSubmit.includes('united states')) {
-        submitLocalAmount = selectedMaterial.costUsa ?? 0; submitLocalCurrency = 'USD';
-      } else if (countryLowerSubmit.includes('germany')) {
-        submitLocalAmount = selectedMaterial.costGermany ?? 0; submitLocalCurrency = 'EUR';
-      } else if (countryLowerSubmit.includes('france')) {
-        submitLocalAmount = selectedMaterial.costFrance ?? 0; submitLocalCurrency = 'EUR';
-      } else if (countryLowerSubmit.includes('w. europe') || countryLowerSubmit.includes('western europe')) {
-        submitLocalAmount = selectedMaterial.costWEurope ?? 0; submitLocalCurrency = 'EUR';
-      } else if (countryLowerSubmit.includes('e. europe') || countryLowerSubmit.includes('eastern europe')) {
-        submitLocalAmount = selectedMaterial.costEEurope ?? 0; submitLocalCurrency = 'EUR';
-      } else if (countryLowerSubmit.includes('china')) {
-        submitLocalAmount = selectedMaterial.costChina ?? 0; submitLocalCurrency = 'CNY';
-      } else {
-        submitLocalAmount = selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0;
-        submitLocalCurrency = selectedMaterial.currency || 'USD';
-      }
-      if (!submitLocalAmount) {
-        if (selectedMaterial.costIndia) { submitLocalAmount = selectedMaterial.costIndia; submitLocalCurrency = 'INR'; }
-        else { submitLocalAmount = selectedMaterial.unitCost || selectedMaterial.cost || 0; submitLocalCurrency = selectedMaterial.currency || 'USD'; }
-      }
-      // Convert to USD via INR pivot
-      const materialUnitCost = (submitLocalAmount * (rates[submitLocalCurrency] ?? 1)) / (rates['USD'] ?? 83.5);
-      
       if (!materialUnitCost && !manualUnitCost) {
         alert('Please enter a unit cost. The selected material has no cost data available.');
         return;
@@ -875,66 +918,31 @@ export function RawMaterialDialog({
                 )}
 
                 {/* Filters Row */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   {/* Material Group */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Material Group</label>
-                    <Select value={materialGroup} onValueChange={setMaterialGroup}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select material group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {materialGroups.length > 0 ? (
-                          materialGroups.map((group) => (
-                            <SelectItem key={group} value={group}>
-                              {group}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem key="no-groups" value="none" disabled>
-                            No material groups available
+                  <label className="text-sm font-semibold">Material Group</label>
+                  <Select value={materialGroup} onValueChange={setMaterialGroup}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select material group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {materialGroups.length > 0 ? (
+                        materialGroups.map((group) => (
+                          <SelectItem key={group} value={group}>
+                            {group}
                           </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Pricing Location */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">
-                      Pricing Location <span className="text-muted-foreground text-xs">(Optional)</span>
-                    </label>
-                    <div className="flex gap-2">
-                      <Select value={country} onValueChange={setCountry}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Global (base price)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="India">🇮🇳 India</SelectItem>
-                          <SelectItem value="USA">🇺🇸 USA</SelectItem>
-                          <SelectItem value="China">🇨🇳 China</SelectItem>
-                          <SelectItem value="Germany">🇩🇪 Germany</SelectItem>
-                          <SelectItem value="France">🇫🇷 France</SelectItem>
-                          <SelectItem value="W. Europe">🇪🇺 W. Europe</SelectItem>
-                          <SelectItem value="E. Europe">🇪🇺 E. Europe</SelectItem>
-                          <SelectItem value="UK">🇬🇧 UK</SelectItem>
-                          <SelectItem value="Vietnam">🇻🇳 Vietnam</SelectItem>
-                          <SelectItem value="Mexico">🇲🇽 Mexico</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {country && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCountry('')}
-                          className="px-3"
-                        >
-                          Clear
-                        </Button>
+                        ))
+                      ) : (
+                        <SelectItem key="no-groups" value="none" disabled>
+                          No material groups available
+                        </SelectItem>
                       )}
-                    </div>
-                  </div>
+                    </SelectContent>
+                  </Select>
+                  {/* Pricing location is now chosen from the "Price data available
+                      for this material" matrix below (click a location to use its
+                      price) once a material is selected -- this standalone dropdown
+                      duplicated that and could disagree with it, so it's removed. */}
                 </div>
 
                 {/* Material Selection */}
@@ -947,29 +955,15 @@ export function RawMaterialDialog({
                       </span>
                     )}
                   </label>
-                  <Select
+                  <Combobox
+                    options={materialOptions}
                     value={selectedMaterialId}
                     onValueChange={setSelectedMaterialId}
                     disabled={!materialGroup}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={materialGroup ? "Select material" : "Select material group first"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {materials.length > 0 ? (
-                        materials.map((material) => (
-                          <SelectItem key={material.id} value={material.id}>
-                            {material.material} {material.materialType ? `(${material.materialType})` : ''}
-                            {material.country ? ` - ${material.country}` : ''}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem key="no-materials" value="none" disabled>
-                          {materialGroup ? 'No materials available' : 'Select material group first'}
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                    placeholder={materialGroup ? "Select material" : "Select material group first"}
+                    searchPlaceholder="Search by name or grade (e.g. AL6101)..."
+                    emptyText={materialGroup ? 'No materials found' : 'Select material group first'}
+                  />
                 </div>
               </>
             )}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,14 +20,18 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useMHRRecords, useMHRRecord, useMHRBenchmark } from '@/lib/api/hooks/useMHR';
+import { resolveMhrUsdRate } from '@/lib/api/mhr';
 import { useLHR, useLHRById, useLHRBenchmark } from '@/lib/api/hooks/useLHR';
 import { useProcessHierarchy, useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
+import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { calculatorsApi } from '@/lib/api/calculators';
+import { apiClient } from '@/lib/api/client';
 
 // Known options for calculator fields whose fieldType is 'select' — the
 // calculator engine has no generic options-storage column yet, so this is a
@@ -59,13 +63,110 @@ function normaliseLaserMaterial(grade: string): string {
   return 'Carbon Steel';
 }
 
-// mhr_records has no numeric laser-power column (only powerKwhPerHour, an
-// energy-consumption figure, not a beam power rating) — the only place the
-// real rating exists today is the selected machine's own name, e.g. "Fiber
-// Laser 10kW". Parse it rather than guessing a default.
-function parseLaserPowerW(machineName: string | undefined): number | null {
-  const m = machineName?.match(/(\d+(?:\.\d+)?)\s*k\s*w/i);
-  return m?.[1] ? parseFloat(m[1]) * 1000 : null;
+// Inspection's per-feature cycle-time fields carry no data_source/sourceField
+// either (they're seeded straight from inspection_operation_defaults inside
+// inspection-engine.ts's planInspection(), never DB-tagged at the calculator-
+// field level) — maps each visible field to the real `feature` column value
+// that identifies its row in that table (method is an escalated, derived
+// value — visual/caliper/height_gauge/cmm — not something typed into a
+// field, so handleViewLookupTable matches by the field's OWN current value
+// instead of trying to know which method was used).
+const INSPECTION_FEATURE_BY_FIELD: Record<string, string> = {
+  'Visual Pass Base': 'visual_base',
+  'Hole Check Time': 'hole',
+  'Bend Check Time': 'bend',
+  'Thread Gauge Time': 'thread',
+  'Thickness Check Time': 'thickness',
+  'Dimension Check Time': 'dimension',
+};
+
+// Same idea as FIELD_NAME_EXTRA_DEPS (relevantFieldNames, above) but for the
+// "eye" viewer button: several real lookup-fed fields carry no data_source/
+// sourceField at the DB level (migration 378's own comment on Cutting Speed/
+// Piercing Time Per Start applies equally here — their lookup is resolved
+// entirely in application code, not marked sheet_metal_lookup at the field-
+// definition level), so the generic dataSource-driven eye-button check can
+// never see them on its own. Returns the REAL, FULL table name directly
+// (not a sm_lookup_-suffix — inspection_operation_defaults and
+// surface_treatment_rates don't follow that naming convention at all).
+function resolveAdHocLookupTableKey(fieldName: string, machineClass: string | undefined): string | null {
+  if (fieldName === 'Cutting Speed' || fieldName === 'Piercing Time Per Start') {
+    return machineClass === 'waterjet' ? 'sm_lookup_waterjet_cut' : 'sm_lookup_laser_cut';
+  }
+  if (fieldName === 'Sec Per Metre' || fieldName === 'Sec Per Pierce') {
+    return 'sm_lookup_deburr_rate';
+  }
+  if (fieldName in INSPECTION_FEATURE_BY_FIELD) {
+    return 'inspection_operation_defaults';
+  }
+  if (fieldName === 'Rate Per M2' || fieldName === 'Min Lot Charge') {
+    return 'surface_treatment_rates';
+  }
+  return null;
+}
+
+// Computes which real row a newly-covered ad-hoc field's CURRENT value came
+// from, for highlighting — client-side, from the already-fetched table, no
+// extra API call. Unlike Cutting Speed/Piercing Time Per Start (highlighted
+// via a live re-resolution during auto-fill, calculatorMatchedRowKeys),
+// these fields' real source (an escalated inspection method, a treatment
+// type keyed on free-text callout matching) isn't reproducible client-side
+// — but the row that produced the CURRENT numeric value is still real and
+// findable: match on the static, always-known column (feature/location)
+// plus the field's own value against the table's value column. Returns null
+// (no highlight, table still shown) when nothing matches — never a guessed
+// highlight.
+function computeAdHocMatchedRow(
+  tableName: string,
+  fieldName: string,
+  rows: any[],
+  currentValue: unknown,
+  location: string,
+): Record<string, any> | null {
+  const num = Number(currentValue);
+  if (tableName === 'inspection_operation_defaults') {
+    const feature = INSPECTION_FEATURE_BY_FIELD[fieldName];
+    if (!feature || !Number.isFinite(num)) return null;
+    return rows.find((r) => r.feature === feature && Math.abs(Number(r.cycleTimeSec) - num) < 1e-6) ?? null;
+  }
+  if (tableName === 'sm_lookup_deburr_rate') {
+    // Only one real row exists today (material_family='__default__') — see
+    // this session's own audit of this table.
+    return rows.find((r) => r.materialFamily === '__default__') ?? rows[0] ?? null;
+  }
+  if (tableName === 'surface_treatment_rates') {
+    if (!Number.isFinite(num)) return rows.find((r) => r.location === location) ?? null;
+    return rows.find((r) => r.location === location &&
+      (Math.abs(Number(r.ratePerM2Usd) - num) < 1e-6 || Math.abs(Number(r.minLotChargeUsd) - num) < 1e-6)) ?? null;
+  }
+  return null;
+}
+
+// Normalises the row a sheet_metal_lookup call resolved to, for
+// calculatorMatchedRowKeys (below). Two different shapes exist across the
+// sm_lookup_* resolvers: getManualStrokeTime's LookupResolution wraps the
+// real row as { columns: {...} }, while resolveSheetMetalLookup's other
+// cases (laser_cut, waterjet_cut, tool_setup) return the flat row directly.
+function extractRowColumns(row: any): Record<string, any> | null {
+  if (!row) return null;
+  if (row.columns && typeof row.columns === 'object') return row.columns;
+  return typeof row === 'object' ? row : null;
+}
+
+// Press-brake/turret-punch capacity stated plainly in the machine name (e.g.
+// "Bend Brake-2500kN") — mhr_records.max_tonnage is null for most seeded
+// press brakes, but machine-selection/selector.ts's own parseTonnageFromName
+// already falls back to parsing the name for exactly this reason. Mirrors
+// that same regex/conversion so this dialog's auto-fill agrees with the
+// capacity figure machine selection already displays ("≤ 254.9 t machine
+// capacity") instead of duplicating a different approximation.
+function parseTonnageFromMachineName(machineName: string | undefined): number | null {
+  if (!machineName) return null;
+  const kn = machineName.match(/(\d+(?:\.\d+)?)\s*k\s*n\b/i);
+  if (kn?.[1]) return Math.round((parseFloat(kn[1]) / 9.80665) * 10) / 10;
+  const tons = machineName.match(/(\d+(?:\.\d+)?)\s*(?:tonnes?|tons?|t)\b/i);
+  if (tons?.[1]) return parseFloat(tons[1]);
+  return null;
 }
 
 interface ProcessCostDialogProps {
@@ -136,6 +237,38 @@ export function ProcessCostDialog({
   const [calculatorTarget, setCalculatorTarget] = useState<string | null>(null);
   const [selectedCalculatorId, setSelectedCalculatorId] = useState<string>('');
   const [calculatorInputs, setCalculatorInputs] = useState<Record<string, any>>({});
+  // autoPopulateFromBOM runs from two separate effects (immediate + a 100ms
+  // delayed retry) and does async lookups in between — a closure over the
+  // `calculatorInputs` state variable goes stale mid-flight, so a later plain
+  // setCalculatorInputs(newInputs) call can clobber an earlier async lookup's
+  // result (e.g. Cutting Speed lands but Piercing Time Per Start's write gets
+  // overwritten back to blank). This ref always holds the true latest value.
+  const calculatorInputsRef = useRef(calculatorInputs);
+  useEffect(() => {
+    calculatorInputsRef.current = calculatorInputs;
+  }, [calculatorInputs]);
+  // One-line provenance per auto-filled input field (which DB row / BOM
+  // feature it came from) — rendered as a "Why:" caption under the field so
+  // the engineer can see it's a real lookup/CAD value, not a guess, and can
+  // check it against the machine plate the same way the machine-recommendation
+  // panel's own "Why:" line works.
+  const [calculatorInputProvenance, setCalculatorInputProvenance] = useState<Record<string, string>>({});
+  const calculatorInputProvenanceRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    calculatorInputProvenanceRef.current = calculatorInputProvenance;
+  }, [calculatorInputProvenance]);
+  // Snapshot of the EXACT sm_lookup_* row each lookup-populated field
+  // resolved to (its non-output key columns, e.g. { thicknessMm: 1,
+  // laserPowerW: 6000, material: 'Carbon Steel' }) — the "Why:" text already
+  // discloses this in prose, but with a stepped table seeding dozens of
+  // thickness×power combos per material, finding the ONE matching row by
+  // eye in the "eye" button's full table view was the actual ask here.
+  // Lets the viewer highlight/scroll to it instead of the engineer having
+  // to re-derive the match themselves.
+  const [calculatorMatchedRowKeys, setCalculatorMatchedRowKeys] = useState<Record<string, Record<string, any>>>({});
+  // Scrolls the "eye" viewer straight to the highlighted (currently-used)
+  // row when it opens — see the matchedCurrentRowRef assignment below.
+  const matchedCurrentRowRef = useRef<HTMLTableRowElement | null>(null);
   // True once the engineer explicitly picks a calculator — prevents auto-select
   // from overwriting a manual choice.
   const [userOverrodeCalculator, setUserOverrodeCalculator] = useState(false);
@@ -165,20 +298,46 @@ export function ProcessCostDialog({
   // selectedGroup is the domain name ('Sheet Metal'); selectedMachineClass is the MHR table key
   // ('fiber_laser'). They are separate concepts — migration 368 added machine_class to the
   // process_calculator_mappings table so we no longer need heuristics to link them.
-  const selectedMachineClass = useMemo(() => {
-    if (!selectedGroup || !selectedRoute || !selectedOperation || !allMappingsData?.mappings) return '';
-    const match = allMappingsData.mappings.find((m: any) =>
+  const selectedMapping = useMemo(() => {
+    if (!selectedGroup || !selectedRoute || !selectedOperation || !allMappingsData?.mappings) return undefined;
+    return allMappingsData.mappings.find((m: any) =>
       m.processGroup === selectedGroup &&
       m.processRoute === selectedRoute &&
       m.operation === selectedOperation
     );
-    return (match as any)?.machineClass || '';
   }, [allMappingsData, selectedGroup, selectedRoute, selectedOperation]);
+
+  const selectedMachineClass = useMemo(() => (selectedMapping as any)?.machineClass || '', [selectedMapping]);
+
+  // Real lhr_records/lhr_benchmark_rates process_group this operation's
+  // machine class is billed against (migration 424's lhr_process_group
+  // column) — falls back to selectedGroup when the mapping row has none set,
+  // which is correct for classes whose hierarchy domain already IS their
+  // real labour tier. Several classes bill a genuinely different, more
+  // specific skill tier (cmm → 'Quality', deburring → 'Deburr', etc.) — see
+  // bom-items.service.ts::resolveLHRRates for the backend half of this same
+  // DB-driven resolution.
+  const selectedLhrGroup = useMemo(
+    () => (selectedMapping as any)?.lhrProcessGroup || selectedGroup,
+    [selectedMapping, selectedGroup],
+  );
+
+  // Mirrors the exact exclusion rule in backend migration 369's chk_machine_class_required
+  // CHECK constraint: Raw Material intake, Packing & Delivery logistics, and the
+  // General/General placeholder route are legitimately non-machine steps — machine_class
+  // is NULL for them by design, not a data gap. Without this, the dialog told users to
+  // "contact an admin to fix the process mapping" for operations that were never supposed
+  // to have a machine in the first place.
+  const isNonMachineOperation = !!(
+    selectedRoute === 'Raw Material' ||
+    selectedGroup === 'Packing & Delivery' ||
+    (selectedRoute === 'General' && selectedOperation === 'General')
+  );
 
   const { data: mhrData, isLoading: isLoadingMHR, error: mhrError } = useMHRRecords({
     limit: 100,
     ...(selectedMachineClass ? { machineClass: selectedMachineClass } : {}),
-  });
+  }, { enabled: open });
   // Benchmark MHR from DB — filtered by machine class (migration 367 added machine_class column)
   const { data: benchmarkMHR } = useMHRBenchmark(undefined, selectedMachineClass || undefined, { enabled: open });
   // When editing, fetch the specific saved MHR/LHR so they always appear in their lists
@@ -223,6 +382,117 @@ export function ProcessCostDialog({
   const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators({ limit: 100 });
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
   const executeCalculator = useExecuteCalculator();
+
+  // The calculated field holding the effective cycle time is NOT named the
+  // same across every manufacturing calculator: laser cutting and every
+  // machining op (facing, turning, drilling, milling, tapping, ...) name it
+  // 'Total Time', but the sheet-metal PROCESS calculators (Bending, TPP,
+  // Stamping, Drawing/Forming — backend/migrations/calculators/009/008/010/012)
+  // name it 'Cycle Time' instead — confirmed directly from those migrations'
+  // own field_name inserts, not assumed. Checking only 'Total Time' silently
+  // produced an empty Results panel and no "Computed Cycle Time"/"Use as
+  // Cycle Time" section for all four of those, even though their formulas
+  // evaluated fine server-side. Everything else on a calculator (Setup Time,
+  // per-sub-step times like Cutting/Piercing Time) feeds INTO whichever of
+  // these two fields exists, but isn't itself the cycle time. Deriving
+  // "Computed Cycle Time" from that one field (rather than re-deriving it
+  // here) means this summary can never drift from whatever formula the
+  // calculator actually used.
+  const CYCLE_TIME_FIELD_NAMES = ['Total Time', 'Cycle Time'];
+  const computedCycleTime = useMemo(() => {
+    if (!calculatorResults || !selectedCalculator?.fields) return null;
+    const totalTimeField = selectedCalculator.fields.find((f: any) => CYCLE_TIME_FIELD_NAMES.includes(f.fieldName));
+    if (!totalTimeField) return null;
+    const raw = calculatorResults[totalTimeField.fieldName];
+    const hasError = raw && typeof raw === 'object' && 'error' in raw;
+    if (hasError) return null;
+    const value = raw?.value !== undefined ? raw.value : raw;
+    if (typeof value !== 'number' || !isFinite(value)) return null;
+
+    // Unit is always seconds for this field ('sec' or 's' across every
+    // calculator that defines it) — normalise to both sec and min.
+    const totalTimeSec = value;
+    const totalTimeMin = totalTimeSec / 60;
+    const currentCycleTimeSec = parseFloat(cycleTime as string) || 0;
+    const matchesCurrent = currentCycleTimeSec > 0 && Math.abs(totalTimeSec - currentCycleTimeSec) < 0.05;
+
+    return {
+      totalTimeSec,
+      totalTimeMin,
+      formula: totalTimeField.defaultValue || null,
+      matchesCurrent,
+      currentCycleTimeSec,
+    };
+  }, [calculatorResults, selectedCalculator?.fields, cycleTime]);
+
+  // sourceField -> the extra fields the two-pass sm_lookup mechanism ABOVE
+  // (see the lookupField/toolSetupField block) reads directly in JS to build
+  // its lookup params — real dependencies of a lookup-populated field
+  // (Time Per Stroke, Tool Loading Time) that formula-token parsing alone
+  // can never see, since these fields carry no {…} formula themselves.
+  // 'Selected Tonnage' is listed alongside 'Total Tonnage' because
+  // handleExecuteCalculator's tonnage lookup now prefers it (the real
+  // selected machine's rated capacity) over 'Total Tonnage' (this bend's own
+  // theoretical minimum required force) — see that function's own doc
+  // comment. Omitting it here was the reason 'Selected Tonnage' never
+  // rendered in this popup at all: relevantFieldNames only shows a field
+  // once something resolves it as a real dependency, so with no way to see
+  // or fill it in, the tonnage lookup was always forced onto the (usually
+  // sub-10T, never-matches-a-real-machine) theoretical estimate.
+  const SM_LOOKUP_PARAM_DEPS: Record<string, string[]> = {
+    manual_stroke: ['Thickness', 'Total Tonnage', 'Selected Tonnage', 'Complexity'],
+    tool_setup: ['Total Tonnage', 'Selected Tonnage'],
+  };
+
+  // Same idea as SM_LOOKUP_PARAM_DEPS above, but keyed by fieldName instead
+  // of sourceField — for auto-fill logic that reads sm_lookup_laser_cut/
+  // sm_lookup_waterjet_cut directly in JS (below, ~line 1189) without the
+  // field ever being marked dataSource='sheet_metal_lookup' in the DB (see
+  // migration 378's own comment: Cutting Speed/Piercing Time Per Start are
+  // plain 'number' fields — "the one remaining gap... is resolved entirely
+  // on the frontend"). Without this, 'Laser Machine Power' — the ONLY
+  // field the Cutting Speed/Piercing Time lookup reads to build its query —
+  // was never a resolve()-visited dependency, so relevantFieldNames hid it
+  // from this popup exactly like 'Selected Tonnage' was hidden before: no
+  // way to see or fill it in, so with no verified machine capability
+  // the lookup could never run and Cutting Speed/Piercing Time Per Start
+  // stayed permanently blank.
+  const FIELD_NAME_EXTRA_DEPS: Record<string, string[]> = {
+    'Cutting Speed': ['Laser Machine Power'],
+    'Piercing Time Per Start': ['Laser Machine Power'],
+  };
+
+  // When this popup was opened for a specific result (currently only Cycle
+  // Time), show only the input fields that actually feed it — not every
+  // field this same calculator also carries for tonnage/setup/labour math
+  // unrelated to the requested value. Resolved by walking {Field Name}
+  // formula references back from CYCLE_TIME_FIELD_NAMES' own field, plus the
+  // sm_lookup param dependencies above for lookup-populated fields — never a
+  // hardcoded per-calculator field list, so it degrades to "show everything"
+  // for any calculator/target this can't confidently resolve.
+  const relevantFieldNames = useMemo(() => {
+    if (!selectedCalculator?.fields || calculatorTarget !== 'cycleTime') return null;
+    const fields = selectedCalculator.fields as any[];
+    const byName = new Map(fields.map((f) => [f.fieldName, f]));
+    const targetField = fields.find((f) => CYCLE_TIME_FIELD_NAMES.includes(f.fieldName));
+    if (!targetField) return null;
+
+    const visited = new Set<string>();
+    const resolve = (fieldName: string) => {
+      if (visited.has(fieldName)) return;
+      visited.add(fieldName);
+      const f = byName.get(fieldName);
+      if (!f) return;
+      const formula = typeof f.defaultValue === 'string' ? f.defaultValue : '';
+      for (const ref of formula.match(/\{([^}]+)\}/g) ?? []) resolve(ref.slice(1, -1));
+      if (f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField) {
+        for (const dep of SM_LOOKUP_PARAM_DEPS[f.sourceField] ?? []) resolve(dep);
+      }
+      for (const dep of FIELD_NAME_EXTRA_DEPS[fieldName] ?? []) resolve(dep);
+    };
+    resolve(targetField.fieldName);
+    return visited;
+  }, [selectedCalculator, calculatorTarget]);
 
   // Check for errors
   const hasErrors = mhrError || lhrError || hierarchyError || calculatorsError;
@@ -271,6 +541,33 @@ export function ProcessCostDialog({
     return processCalculatorMappings.mappings;
   }, [processCalculatorMappings]);
 
+  // Every calculator ID used ANYWHERE within the current process group (e.g.
+  // every "Sheet Metal" mapping row, not just the ones for this exact
+  // operation) — scopes the "Select Calculator" dropdown to the current
+  // process the same way MHR/LHR are already scoped by machine class/process
+  // group, instead of listing all ~45 calculators across every process
+  // (Machining, Injection Molding, Sheet Metal...) mixed together.
+  const calculatorIdsForGroup = useMemo(() => {
+    if (!selectedGroup || !allMappingsData?.mappings || !calculatorsData?.calculators) return null;
+    const ids = new Set<string>();
+    for (const mapping of allMappingsData.mappings) {
+      if (mapping.processGroup !== selectedGroup) continue;
+      if (mapping.calculatorId) {
+        ids.add(mapping.calculatorId);
+      } else if (mapping.calculatorName) {
+        const match = calculatorsData.calculators.find((c: any) => c.name === mapping.calculatorName);
+        if (match) ids.add(match.id);
+      }
+    }
+    return ids;
+  }, [selectedGroup, allMappingsData, calculatorsData]);
+
+  const calculatorsForDropdown = useMemo(() => {
+    const all = calculatorsData?.calculators ?? [];
+    if (!calculatorIdsForGroup || calculatorIdsForGroup.size === 0) return all;
+    return all.filter((c: any) => calculatorIdsForGroup.has(c.id));
+  }, [calculatorsData, calculatorIdsForGroup]);
+
   // The calculator mapped to the currently selected operation, resolved to a real
   // calculator id so it can be auto-selected instead of requiring a manual pick
   // from the full unfiltered list.
@@ -302,6 +599,10 @@ export function ProcessCostDialog({
   const operationFullySelected = !!(selectedGroup && selectedRoute && selectedOperation);
 
   const filteredMHR = useMemo(() => {
+    // No machine ever applies to a Raw Material / Packing & Delivery / General-General
+    // operation — return no machines at all, including any previously-saved one, rather
+    // than let it leak through via the "no class to validate against" branch below.
+    if (isNonMachineOperation) return [];
     const base = mhrData?.records ?? [];
     const bm   = benchmarkMHR ?? [];
     const locLower = location.toLowerCase();
@@ -350,7 +651,12 @@ export function ProcessCostDialog({
     // 3 & 4 — DB benchmark table (mhr_benchmark_rates)
     const bmLoc   = byLoc(bm);
     const bmMatch = byBmGroup(bmLoc);
-    const bmResult = bmMatch.length > 0 ? bmMatch : (bmLoc.length > 0 && !operationFullySelected ? bmLoc : (!operationFullySelected ? bm : []));
+    // Widen across machine class (bmLoc, pre-operation-selection) is fine, but
+    // never widen across LOCATION — falling back to the raw, every-country
+    // `bm` here (as this used to) is the same "all country" leak fixed in
+    // filteredLHR above: an applied/selected location must always be
+    // respected, even before the Group/Route/Operation triple is chosen.
+    const bmResult = bmMatch.length > 0 ? bmMatch : (bmLoc.length > 0 && !operationFullySelected ? bmLoc : []);
     if (bmResult.length > 0) return withSaved(bmResult);
 
     // 5 — Cross-location fallback: all user records regardless of factory location.
@@ -362,7 +668,7 @@ export function ProcessCostDialog({
     if (!operationFullySelected && base.length > 0) return withSaved(base);
 
     return withSaved([]);
-  }, [mhrData, benchmarkMHR, location, selectedMachineClass, savedMHRRecord, savedBenchmarkMHRRecord, operationFullySelected]);
+  }, [mhrData, benchmarkMHR, location, selectedMachineClass, savedMHRRecord, savedBenchmarkMHRRecord, operationFullySelected, isNonMachineOperation]);
 
   // Each lhr_records/lhr_benchmark_rates row carries a `description` field seeded
   // from the labour database's operation-keyword text (e.g. the "Skilled" band's
@@ -425,12 +731,20 @@ export function ProcessCostDialog({
 
     const byLoc = (arr: any[]) =>
       !location ? arr : arr.filter((r: any) => (r.location ?? '').toLowerCase() === locLower);
-    // LHR records may store processGroup as the domain name ('Sheet Metal') in newer records,
-    // or as the machine class key ('fiber_laser') in legacy records. Accept both.
+    // Match against the machine class's REAL billing skill-group
+    // (selectedLhrGroup — migration 424's lhr_process_group, e.g. 'Quality'
+    // for cmm/Inspection), not the coarse hierarchy domain name. They
+    // coincide for most classes (selectedLhrGroup already falls back to
+    // selectedGroup when no override is set), but genuinely differ for
+    // cmm/deburring/turret_punch/the CNC classes/injection_molding — without
+    // this, the dropdown silently defaulted to (and let an engineer
+    // "confirm") the wrong labour type/rate for those classes. LHR records
+    // may also store processGroup as the raw machine class key
+    // ('fiber_laser') in legacy records — accept that too.
     const byGroup = (arr: any[]) => {
       if (!selectedGroup) return arr;
       return arr.filter((r: any) =>
-        r.processGroup === selectedGroup ||
+        r.processGroup === selectedLhrGroup ||
         (selectedMachineClass && r.processGroup === selectedMachineClass)
       );
     };
@@ -448,7 +762,7 @@ export function ProcessCostDialog({
       if (savedLHRRecord && !result.some((r: any) => String(r.id) === String((savedLHRRecord as any).id))) {
         const savedPg = (savedLHRRecord as any).processGroup;
         const groupMatch = !savedPg || !selectedGroup ||
-          savedPg === selectedGroup ||
+          savedPg === selectedLhrGroup ||
           (selectedMachineClass && savedPg === selectedMachineClass);
         if (groupMatch) result = [savedLHRRecord, ...result];
       }
@@ -471,7 +785,12 @@ export function ProcessCostDialog({
     // 3 & 4 — DB benchmark table (lhr_benchmark_rates)
     const bmLoc   = byLoc(bm);
     const bmMatch = byGroup(bmLoc);
-    const bmResult = bmMatch.length > 0 ? bmMatch : (bmLoc.length > 0 && !operationFullySelected ? bmLoc : (!operationFullySelected ? bm : []));
+    // Widen across GROUP (bmLoc, pre-operation-selection) is fine, but never
+    // widen across LOCATION — falling back to the raw, every-country `bm`
+    // here (as this used to) is exactly the "all country LHR" leak: an
+    // applied/selected location must always be respected, even before the
+    // Group/Route/Operation triple is fully chosen.
+    const bmResult = bmMatch.length > 0 ? bmMatch : (bmLoc.length > 0 && !operationFullySelected ? bmLoc : []);
     if ((bmResult as any[]).length > 0) return withSaved(bmResult as any[]);
 
     // 5 — Cross-location fallback: all user LHR records regardless of factory
@@ -482,7 +801,7 @@ export function ProcessCostDialog({
     if (!operationFullySelected && records.length > 0) return withSaved(records);
 
     return withSaved([]);
-  }, [lhrData, benchmarkLHR, location, selectedGroup, selectedMachineClass, savedLHRRecord, savedBenchmarkLHRRecord, operationFullySelected]);
+  }, [lhrData, benchmarkLHR, location, selectedGroup, selectedLhrGroup, selectedMachineClass, savedLHRRecord, savedBenchmarkLHRRecord, operationFullySelected]);
 
   // Get selected MHR and LHR — both use String() to avoid number/string type mismatch
   const selectedMHR = useMemo(() => {
@@ -502,7 +821,20 @@ export function ProcessCostDialog({
   // so the machine always matches the operation, not just the broader group.
   // Clears a stale selection if it's no longer in the filtered list.
   useEffect(() => {
-    if (!selectedGroup || userOverrodeMHR) return;
+    // selectedMachineClass resolves asynchronously (allMappingsData fetch +
+    // group/route/operation) -- filteredMHR is filtered BY it, so right after
+    // editData restores a real saved mhrId, there's a render or two where
+    // selectedMachineClass is still '' and filteredMHR reflects the wrong
+    // (unresolved) class. This effect's own "is the current selection valid
+    // against filteredMHR" check can't tell that apart from a genuinely stale
+    // id, and permanently overwrites the correct saved machine with
+    // filteredMHR[0] before the real class-filtered list ever loads.
+    // Confirmed live: editing a saved Laser Cutting row kept "Salvagnini
+    // L3-30 Fiber" in the Applied Rates display (that falls back to
+    // editData.machineName, unaffected) while selectedMHR itself resolved to
+    // nothing, so the calculator's Machine Capability read "no machine
+    // selected" and its Cutting Speed/Laser Power inputs never auto-filled.
+    if (!selectedGroup || !selectedMachineClass || userOverrodeMHR) return;
     const currentValid = selectedMHRId && filteredMHR.some(r => String(r.id) === String(selectedMHRId));
     if (!currentValid && filteredMHR.length > 0) {
       setSelectedMHRId(String(filteredMHR[0].id));
@@ -517,18 +849,28 @@ export function ProcessCostDialog({
   // the list) was never replaced — the Select kept a value matching no
   // rendered option, which renders blank, and no new default ever got picked.
   useEffect(() => {
-    if (!selectedGroup || userOverrodeLHR) return;
+    // Same race as the MHR auto-correct effect above -- filteredLHR is also
+    // filtered by selectedMachineClass, which resolves a render or two after
+    // editData restores the real saved lhrId.
+    if (!selectedGroup || !selectedMachineClass || userOverrodeLHR) return;
     const currentValid = selectedLHRId && filteredLHR.some((r: any) => String(r.id) === String(selectedLHRId));
     if (!currentValid && filteredLHR.length > 0) {
       setSelectedLHRId(String((filteredLHR[0] as any).id));
     }
-  }, [selectedGroup, filteredLHR, userOverrodeLHR, selectedLHRId]);
+  }, [selectedGroup, selectedMachineClass, filteredLHR, userOverrodeLHR, selectedLHRId]);
 
-  // Reset the calculator override whenever the process identity changes — a
-  // manual pick made for one operation shouldn't silently stick for another.
+  // Reset the calculator override whenever the process identity changes, OR
+  // whenever a different field's calculator is opened — userOverrodeCalculator
+  // is one shared flag across every calculator popup in this dialog (Cycle
+  // Time, Machine Value, ...), so without resetting on calculatorTarget too, a
+  // manual pick (or even just re-picking the same value) made in ANY OTHER
+  // field's calculator permanently blocks the Cycle Time popup's auto-select
+  // for the rest of the editing session — it shows a blank "Choose a
+  // calculator" forever even though the operation has a real mapped default,
+  // since selectedCalculatorId itself was already cleared to '' on close.
   useEffect(() => {
     setUserOverrodeCalculator(false);
-  }, [selectedGroup, selectedRoute, selectedOperation]);
+  }, [selectedGroup, selectedRoute, selectedOperation, calculatorTarget]);
 
   // Auto-select the calculator mapped to this operation when opening the Cycle
   // Time calculator — skip only if the engineer explicitly picked a different one.
@@ -551,15 +893,21 @@ export function ProcessCostDialog({
   }, [savedMHRRecord, selectedMachineClass, userOverrodeMHR]);
 
   // Calculator handlers
+  // Values coming from a calculator's own "Use" button are raw formula results
+  // (e.g. a division like Cutting Length / Cutting Speed) — full floating-point
+  // precision (1.3796428571428572), not something meant for a form field. Round
+  // to 2dp here, at the one place every "Use"/"Use as Cycle Time" click funnels
+  // through, rather than relying on each input's own display formatting to hide it.
+  const round2 = (n: number) => Math.round(n * 100) / 100;
   const handleCalculatorValue = (value: number | string) => {
-    if (calculatorTarget === 'setupManning') setSetupManning(Number(value));
-    else if (calculatorTarget === 'setupTime') setSetupTime(Number(value));
-    else if (calculatorTarget === 'batchSize') setBatchSize(Number(value));
-    else if (calculatorTarget === 'cycleTime') setCycleTime(Number(value));
-    else if (calculatorTarget === 'partsPerCycle') setPartsPerCycle(Number(value));
-    else if (calculatorTarget === 'heads') setHeads(Number(value));
-    else if (calculatorTarget === 'scrap') setScrap(Number(value));
-    else if (calculatorTarget === 'machineValue') setMachineValue(Number(value));
+    if (calculatorTarget === 'setupManning') setSetupManning(round2(Number(value)));
+    else if (calculatorTarget === 'setupTime') setSetupTime(round2(Number(value)));
+    else if (calculatorTarget === 'batchSize') setBatchSize(round2(Number(value)));
+    else if (calculatorTarget === 'cycleTime') setCycleTime(round2(Number(value)));
+    else if (calculatorTarget === 'partsPerCycle') setPartsPerCycle(round2(Number(value)));
+    else if (calculatorTarget === 'heads') setHeads(round2(Number(value)));
+    else if (calculatorTarget === 'scrap') setScrap(round2(Number(value)));
+    else if (calculatorTarget === 'machineValue') setMachineValue(round2(Number(value)));
     else if (calculatorTarget === 'operation') {
       // For operation, we might get an operation name
       if (typeof value === 'string') {
@@ -576,6 +924,7 @@ export function ProcessCostDialog({
     setCalculatorResults(null);
     setCalculatorError(null);
     setCalculatorInputs({});
+    setCalculatorInputProvenance({});
     // Don't reset selectedCalculatorId for processCalculator as we want to keep it selected
     if (calculatorTarget !== 'processCalculator') {
       setSelectedCalculatorId('');
@@ -609,26 +958,83 @@ export function ProcessCostDialog({
         (f: any) => f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField === 'manual_stroke' && !calculatorInputs[f.fieldName]
       );
 
-      if (lookupField) {
-        const thickness = parseFloat(calculatorInputs['Thickness']);
-        const tonnage = Number(result.results?.['Total Tonnage']);
-        const complexity = String(calculatorInputs['Complexity'] || 'Simple').toLowerCase();
+      // Same reasoning, for Stamping/Drawing-Forming's "Tool Loading Time":
+      // Lookup Table 3A (press) is keyed by required tonnage, not known until
+      // this same first execute() pass computes Total Tonnage. Bending's own
+      // "Tool Loading Time" (Table 3B, keyed by tool/bend length) already
+      // resolves upfront in autoPopulateFromBOM, so by the time this runs its
+      // input is already filled and this correctly finds nothing to do there.
+      const toolSetupField = selectedCalculator?.fields?.find(
+        (f: any) => f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField === 'tool_setup' && !calculatorInputs[f.fieldName]
+      );
 
-        if (thickness > 0 && tonnage > 0) {
+      if (lookupField || toolSetupField) {
+        const thickness = parseFloat(calculatorInputs['Thickness']);
+        // sm_lookup_manual_stroke/tool_setup are keyed by a real MACHINE's
+        // tonnage class, not by this bend's own theoretical minimum required
+        // force ('Total Tonnage' — often well under 10T, which no real
+        // commercial press brake is even rated for). Prefer 'Selected
+        // Tonnage' (the currently selected machine's real rated capacity,
+        // populated in autoPopulateFromBOM below) the same way
+        // bom-items.service.ts's resolveStrokeLookupTonnage already does
+        // server-side; fall back to the theoretical requirement only when no
+        // machine is selected.
+        const selectedTonnage = Number(calculatorInputs['Selected Tonnage']);
+        const requiredTonnage = Number(result.results?.['Total Tonnage']);
+        const tonnage = selectedTonnage > 0 ? selectedTonnage : requiredTonnage;
+        const complexity = String(calculatorInputs['Complexity'] || 'Simple').toLowerCase();
+        let updatedInputs = { ...calculatorInputs };
+        let changed = false;
+
+        if (lookupField && thickness > 0 && tonnage > 0) {
+          const lookupTable = `sm_lookup_${lookupField.sourceField || 'manual_stroke'}`;
           const lookup = await calculatorsApi.sheetMetalLookup(
             lookupField.sourceField || 'manual_stroke',
             { thickness_mm: thickness, tonnage, complexity },
           );
           if (typeof lookup?.value === 'number') {
-            const updatedInputs = { ...calculatorInputs, [lookupField.fieldName]: lookup.value };
-            setCalculatorInputs(updatedInputs);
-            const finalResult = await executeCalculator.mutateAsync({
-              calculatorId: selectedCalculatorId,
-              inputValues: updatedInputs,
-            });
-            if (finalResult.success) setCalculatorResults(finalResult.results);
+            updatedInputs[lookupField.fieldName] = lookup.value;
+            changed = true;
+            const rowCols = extractRowColumns((lookup as any).row);
+            if (rowCols) setCalculatorMatchedRowKeys((prev) => ({ ...prev, [lookupField.fieldName]: rowCols }));
+          } else {
+            // Manufacturing Physics Calculator architecture: no seeded row for
+            // these real inputs — report the gap plainly (table + the exact
+            // inputs that missed + required action) instead of substituting a
+            // guessed per-thickness constant or letting the formula fail with
+            // an opaque "undefined symbol" error.
+            setCalculatorError(
+              `Cycle time unavailable — no seeded row in ${lookupTable} for thickness ${thickness}mm, ` +
+              `tonnage ${tonnage}T, ${complexity} complexity. Add real data to this table to resolve.`,
+            );
             return;
           }
+        }
+
+        if (toolSetupField && tonnage > 0) {
+          const lookup = await calculatorsApi.sheetMetalLookup('tool_setup', { setup_type: 'press', key_value: tonnage });
+          if (typeof lookup?.value === 'number') {
+            updatedInputs[toolSetupField.fieldName] = lookup.value;
+            changed = true;
+            const rowCols = extractRowColumns((lookup as any).row);
+            if (rowCols) setCalculatorMatchedRowKeys((prev) => ({ ...prev, [toolSetupField.fieldName]: rowCols }));
+          } else {
+            setCalculatorError(
+              `Setup time unavailable — no seeded row in sm_lookup_tool_setup for tonnage ${tonnage}T. ` +
+              `Add real data to this table to resolve.`,
+            );
+            return;
+          }
+        }
+
+        if (changed) {
+          setCalculatorInputs(updatedInputs);
+          const finalResult = await executeCalculator.mutateAsync({
+            calculatorId: selectedCalculatorId,
+            inputValues: updatedInputs,
+          });
+          if (finalResult.success) setCalculatorResults(finalResult.results);
+          return;
         }
       }
 
@@ -655,7 +1061,14 @@ export function ProcessCostDialog({
       // Dimension mappings
       'length': bomItemData.length || bomItemData.maxLength,
       'maxLength': bomItemData.maxLength || bomItemData.length,
-      'Length': bomItemData.length || bomItemData.maxLength,
+      // "Length" collides across calculators: on most it means the part's
+      // overall length, but on Machining - Tapping it means the tap's
+      // engagement depth (its own formula: Machining Time = f(Length + 4mm
+      // lead-in)) -- excluded here and set correctly (to sheet thickness)
+      // in the Tapping-specific block below instead.
+      ...(selectedCalculatorId !== 'fe42139c-5675-4a82-94d5-7f2d440ae9bf'
+        ? { 'Length': bomItemData.length || bomItemData.maxLength }
+        : {}),
       'Max Length': bomItemData.maxLength || bomItemData.length,
       'Max Length(mm)': bomItemData.maxLength || bomItemData.length,
       
@@ -678,8 +1091,8 @@ export function ProcessCostDialog({
 
       // Sheet-metal CAD geometry mappings (real, per-part values — only mapped
       // where a corresponding calculator field exists and the concept is
-      // unambiguous; flatPatternAreaMm2/holeCount and bend-length fields are
-      // deliberately NOT mapped here, see ProcessCostDialog plan notes).
+      // unambiguous; flatPatternAreaMm2/holeCount are deliberately NOT mapped
+      // here, see ProcessCostDialog plan notes).
       'Cutting Length': bomItemData.cutLengthMm,
       'Length Of Cut (mm)': bomItemData.cutLengthMm,
       'Length Of Cut': bomItemData.cutLengthMm,
@@ -687,9 +1100,135 @@ export function ProcessCostDialog({
       'No Of Bends': bomItemData.bendCount,
       'Thickness': bomItemData.sheetThicknessMm,
       'Thickness (mm)': bomItemData.sheetThicknessMm,
+      // Longest flat-pattern edge as a bend-line proxy — the SAME conservative
+      // approximation (real per-bend lengths aren't tracked in the feature
+      // graph yet) already used server-side for press-brake tonnage/capability
+      // checks (bom-items.service.ts's capabilityGeometry.bendLengthMm and its
+      // machine-selection requirement), not a new/independent guess.
+      ...(bomItemData.bendCount > 0 && (bomItemData.maxLength || bomItemData.maxWidth)
+        ? {
+            'Bending Line Length': Math.max(bomItemData.maxLength || 0, bomItemData.maxWidth || 0),
+            'Bending Line Length (mm)': Math.max(bomItemData.maxLength || 0, bomItemData.maxWidth || 0),
+          }
+        : {}),
+      // V-die shoulder/opening width = 8 × sheet thickness — the same industry
+      // rule of thumb already used server-side for press-brake tonnage
+      // estimation (default-rates.ts's estimateBendTonnage: "V-die opening V
+      // = 8 × t"), not a new/independent guess.
+      ...(bomItemData.sheetThicknessMm > 0
+        ? {
+            'Shoulder Width': 8 * bomItemData.sheetThicknessMm,
+            'Shoulder Width (mm)': 8 * bomItemData.sheetThicknessMm,
+          }
+        : {}),
+      // Real batch size already entered in this same dialog's main form — not a
+      // second, independently-guessed lot size for the calculator.
+      'Lot Size': batchSize,
+
+      // MHR/LHR per Hour: the real Applied Rates already shown above in this
+      // same dialog ($40.00/hr, $46.67/hr etc.) — not each calculator's own
+      // generic seeded default (was a flat 91.6/96.14, silently wrong for
+      // every currency/machine/labour combination that isn't whatever the
+      // calculator was originally authored against).
+      ...(effectiveMachineRate > 0 ? { 'MHR per Hour': effectiveMachineRate } : {}),
+      ...(effectiveLaborRate > 0 ? { 'LHR per Hour': effectiveLaborRate } : {}),
+
+      // "Sheet Metal - Inspection" calculator fields — sourced from the SAME
+      // real, already-sampled feature counts and method-resolved per-feature
+      // times shown in the Feature breakdown panel (threaded in via
+      // editData.featureBreakdown by page.tsx's Calculator-button handler),
+      // not re-derived or re-guessed here. Absent entirely for any other
+      // process type, so this is a no-op everywhere else.
+      ...(Array.isArray(editData?.featureBreakdown) ? (() => {
+        const fb = editData.featureBreakdown as Array<{ name: string; timeSec: number; featureType: string; count: number }>;
+        const byType = (t: string) => fb.find((f) => f.featureType === t);
+        const methodEntry = fb.find((f) => f.featureType === 'inspection_method');
+        const hole = byType('hole');
+        const bend = byType('bend');
+        const thread = byType('thread');
+        const thickness = byType('thickness');
+        const dimension = byType('dimension');
+        const visualBase = byType('visual_base');
+        return {
+          'Method': methodEntry ? methodEntry.name.replace(/^Method:\s*/, '') : undefined,
+          'Visual Pass Base': visualBase?.timeSec,
+          'Holes to Inspect': hole?.count ?? 0,
+          'Hole Check Time': hole?.timeSec ?? 0,
+          'Bends to Inspect': bend?.count ?? 0,
+          'Bend Check Time': bend?.timeSec ?? 0,
+          'Threads to Inspect': thread?.count ?? 0,
+          'Thread Gauge Time': thread?.timeSec ?? 0,
+          'Has Thickness Check': thickness ? 1 : 0,
+          'Thickness Check Time': thickness?.timeSec ?? 0,
+          'Has Dimension Check': dimension ? 1 : 0,
+          'Dimension Check Time': dimension?.timeSec ?? 0,
+        };
+      })() : {}),
     };
 
-    const newInputs: Record<string, any> = { ...calculatorInputs };
+    // Parallel human-readable source for each bomFieldMapping key above — shown
+    // as a "Why:" caption under the field, same idea as the machine-recommendation
+    // panel's own "Why: ..." reasoning line, so every auto-filled number is
+    // traceable back to the part's CAD geometry instead of looking like a guess.
+    const bomFieldProvenance: Record<string, string> = {
+      'weight': 'CAD/BOM part weight', 'unitWeight': 'CAD/BOM part weight', 'Weight': 'CAD/BOM part weight', 'Weight(kg)': 'CAD/BOM part weight',
+      'length': 'CAD/BOM part geometry — length', 'maxLength': 'CAD/BOM part geometry — max length', 'Length': 'CAD/BOM part geometry — length', 'Max Length': 'CAD/BOM part geometry — max length', 'Max Length(mm)': 'CAD/BOM part geometry — max length',
+      'width': 'CAD/BOM part geometry — width', 'maxWidth': 'CAD/BOM part geometry — max width', 'Width': 'CAD/BOM part geometry — width', 'Max Width': 'CAD/BOM part geometry — max width', 'Max Width(mm)': 'CAD/BOM part geometry — max width',
+      'height': 'CAD/BOM part geometry — height', 'maxHeight': 'CAD/BOM part geometry — max height', 'Height': 'CAD/BOM part geometry — height', 'Max Height': 'CAD/BOM part geometry — max height', 'Max Height(mm)': 'CAD/BOM part geometry — max height',
+      'surfaceArea': 'CAD feature extraction — surface area', 'Surface Area': 'CAD feature extraction — surface area', 'Surface Area(mm²)': 'CAD feature extraction — surface area',
+      'Cutting Length': 'CAD feature extraction — total cut path length', 'Length Of Cut (mm)': 'CAD feature extraction — total cut path length', 'Length Of Cut': 'CAD feature extraction — total cut path length',
+      'No Of Starts': 'CAD feature extraction — pierce/start count', 'No Of Bends': 'CAD feature extraction — bend count',
+      'Thickness': 'BOM sheet thickness', 'Thickness (mm)': 'BOM sheet thickness',
+      'Bending Line Length': 'CAD/BOM part geometry — longest flat-pattern edge (bend-line proxy, same value machine selection already uses)',
+      'Bending Line Length (mm)': 'CAD/BOM part geometry — longest flat-pattern edge (bend-line proxy, same value machine selection already uses)',
+      'Shoulder Width': 'V-die opening = 8 × sheet thickness (same rule of thumb machine selection already uses)',
+      'Shoulder Width (mm)': 'V-die opening = 8 × sheet thickness (same rule of thumb machine selection already uses)',
+      'Lot Size': 'Batch Size entered above in this process cost form',
+      // Mirrors the EXACT same fallback chain the "Applied Rates" card below
+      // uses (selectedMHR -> editData.machineName -> manual entry -> unlinked)
+      // -- effectiveMachineRate/effectiveLaborRate already fall back the same
+      // way, so when nothing is actively selected in the Machine/Labour Type
+      // dropdowns (e.g. the saved machine isn't in the current filtered list),
+      // this note must name the SAME machine "Applied Rates" is showing, not
+      // a vague "selected machine" that doesn't match what's actually applied.
+      'MHR per Hour': `Applied machine rate — ${
+        selectedMHR ? selectedMHR.machineName
+        : editData?.machineName ? editData.machineName
+        : manualMhrRate ? 'Manual entry'
+        : describeUnlinkedRateProvenance()
+      }${
+        selectedMHR?.location ? ` · ${selectedMHR.location}`
+        : editData?.location ? ` · ${editData.location}`
+        : location ? ` · ${location}`
+        : ''
+      } (Resources & Location above)`,
+      'LHR per Hour': `Applied labour rate — ${
+        selectedLHR ? (selectedLHR as any).labourType
+        : editData?.laborType ? editData.laborType
+        : manualLhrRate ? 'Manual entry'
+        : describeUnlinkedRateProvenance()
+      }${
+        (selectedLHR as any)?.location ? ` · ${(selectedLHR as any).location}`
+        : editData?.location ? ` · ${editData.location}`
+        : location ? ` · ${location}`
+        : ''
+      } (Resources & Location above)`,
+      'Method': 'Inspection Engine — method escalated from tolerance/GD&T (Feature breakdown panel)',
+      'Visual Pass Base': 'Inspection Engine — Feature breakdown panel',
+      'Holes to Inspect': 'Inspection Engine — sampled hole count (Feature breakdown panel)',
+      'Hole Check Time': 'Inspection Engine — Feature breakdown panel',
+      'Bends to Inspect': 'Inspection Engine — sampled bend count (Feature breakdown panel)',
+      'Bend Check Time': 'Inspection Engine — Feature breakdown panel',
+      'Threads to Inspect': 'Inspection Engine — sampled thread count (Feature breakdown panel)',
+      'Thread Gauge Time': 'Inspection Engine — Feature breakdown panel',
+      'Has Thickness Check': 'Inspection Engine — Feature breakdown panel',
+      'Thickness Check Time': 'Inspection Engine — Feature breakdown panel',
+      'Has Dimension Check': 'Inspection Engine — Feature breakdown panel',
+      'Dimension Check Time': 'Inspection Engine — Feature breakdown panel',
+    };
+
+    const newInputs: Record<string, any> = { ...calculatorInputsRef.current };
+    const newProvenance: Record<string, string> = { ...calculatorInputProvenanceRef.current };
 
     selectedCalculator.fields
       ?.filter((field: any) => field.fieldType !== 'calculated')
@@ -701,7 +1240,10 @@ export function ProcessCostDialog({
         const bomValue = bomFieldMapping[fieldName] || bomFieldMapping[displayName];
 
         if (bomValue !== undefined && bomValue !== null && bomValue !== '') {
-          newInputs[fieldName] = typeof bomValue === 'number' ? bomValue : parseFloat(bomValue) || 0;
+          newInputs[fieldName] = (field.fieldType === 'select' || field.fieldType === 'text')
+            ? String(bomValue)
+            : (typeof bomValue === 'number' ? bomValue : parseFloat(bomValue) || 0);
+          newProvenance[fieldName] = bomFieldProvenance[fieldName] || bomFieldProvenance[displayName] || 'CAD/BOM part data';
         } else if (newInputs[fieldName] === undefined && field.defaultValue !== undefined && field.defaultValue !== null && field.defaultValue !== '') {
           // Surface the calculator's own real default (e.g. Complexity: "Simple",
           // Bending Coefficient: "1.33") in the UI instead of only applying it
@@ -709,36 +1251,456 @@ export function ProcessCostDialog({
           newInputs[fieldName] = (field.fieldType === 'select' || field.fieldType === 'text')
             ? field.defaultValue
             : (parseFloat(field.defaultValue) || 0);
+          newProvenance[fieldName] = `Calculator's own default value`;
         }
       });
 
     setCalculatorInputs(newInputs);
+    setCalculatorInputProvenance(newProvenance);
 
     // Cutting Speed (Laser Cutting Manufacturing): a real value from the
     // sm_lookup_laser_cut table (material x thickness x laser power), never a
     // manual guess. Unlike Bend's Stroke Time Per Bend, this has no dependency
     // on any calculated field, so it resolves in this single pass — no need
     // for a second execute() call.
+    // calculatorInputs persists across calls (newInputs starts as a copy of it), so a
+    // field left as '' from an earlier interaction — not undefined, but visually just
+    // as blank — must count as "still needs a value" here, or it silently never gets
+    // auto-filled even after a real lookup value becomes available.
+    const isBlank = (v: any) => v === undefined || v === null || v === '';
     const cuttingSpeedField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Cutting Speed');
-    if (cuttingSpeedField && newInputs['Cutting Speed'] === undefined) {
+    const pierceTimeField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Piercing Time Per Start');
+    const needsCuttingSpeed = cuttingSpeedField && isBlank(newInputs['Cutting Speed']);
+    const needsPierceTime = pierceTimeField && isBlank(newInputs['Piercing Time Per Start']);
+    if (needsCuttingSpeed || needsPierceTime) {
       const grade = bomItemData.materialGrade || bomItemData.material;
       const thickness = bomItemData.sheetThicknessMm;
-      const laserPowerW = parseLaserPowerW(selectedMHR?.machineName);
+
+      // 'Cutting Speed'/'Piercing Time Per Start' are shared field names
+      // across BOTH the Laser Cutting and Waterjet Cutting Manufacturing
+      // calculators — selectedMachineClass (already resolved from
+      // process_calculator_mappings for the current operation, not a string
+      // guess on the calculator's name) says which real lookup table this
+      // operation's numbers actually come from.
+      if (selectedMachineClass === 'waterjet') {
+        if (grade && thickness > 0) {
+          try {
+            const lookup = await calculatorsApi.sheetMetalLookup('waterjet_cut', {
+              material: normaliseLaserMaterial(grade),
+              thickness_mm: thickness,
+            });
+            const pierceTimeSec = (lookup as any)?.row?.pierceTimeSec;
+            const pierceTimeMin = typeof pierceTimeSec === 'number' ? pierceTimeSec / 60 : null;
+            const matchedThickness = (lookup as any)?.row?.thicknessMm;
+            const nearestNote = matchedThickness != null && Number(matchedThickness) !== thickness
+              ? ` (nearest seeded row: ${matchedThickness}mm — table is stepped, not every thickness is seeded verbatim)`
+              : '';
+            const rowSourceNote = `sm_lookup_waterjet_cut — ${normaliseLaserMaterial(grade)}, ${thickness}mm sheet${nearestNote}`;
+            setCalculatorInputs((prev) => ({
+              ...prev,
+              ...(needsCuttingSpeed && isBlank(prev['Cutting Speed']) && typeof lookup?.value === 'number' ? { 'Cutting Speed': lookup.value } : {}),
+              ...(needsPierceTime && isBlank(prev['Piercing Time Per Start']) && typeof pierceTimeMin === 'number' ? { 'Piercing Time Per Start': pierceTimeMin } : {}),
+            }));
+            setCalculatorInputProvenance((prev) => ({
+              ...prev,
+              ...(needsCuttingSpeed && typeof lookup?.value === 'number' ? { 'Cutting Speed': rowSourceNote } : {}),
+              ...(needsPierceTime && typeof pierceTimeMin === 'number' ? { 'Piercing Time Per Start': rowSourceNote } : {}),
+            }));
+            const rowCols = extractRowColumns((lookup as any)?.row);
+            if (rowCols) {
+              setCalculatorMatchedRowKeys((prev) => ({
+                ...prev,
+                ...(needsCuttingSpeed && typeof lookup?.value === 'number' ? { 'Cutting Speed': rowCols } : {}),
+                ...(needsPierceTime && typeof pierceTimeMin === 'number' ? { 'Piercing Time Per Start': rowCols } : {}),
+              }));
+            }
+          } catch {
+            // No match / lookup failed — leave these fields blank for the
+            // engineer to fill in manually rather than guessing a number.
+          }
+        }
+      } else {
+      // Read the real, verified capability (selectedMHR.powerKw) DIRECTLY —
+      // never the calculator's own 'Laser Machine Power' *field* value.
+      // This whole block and the field's own auto-fill (which sets
+      // 'Laser Machine Power' from this exact same selectedMHR.powerKw) live
+      // in the SAME single-pass autoPopulateFromBOM() function, and the
+      // field's auto-fill runs LATER in that pass — reading the field here
+      // would always see it still blank, on every run, forever (this
+      // function's own useEffect only re-fires on
+      // [selectedCalculator?.id, bomItemData?.id, calculatorTarget], never on
+      // calculatorInputs changing, so there is no "next pass" to catch up).
+      // Falls back to parsing the field's raw text only for the manual-entry
+      // case (no selectedMHR at all — an engineer typed a wattage directly).
+      const parseWattageField = (raw: unknown): number | null => {
+        if (typeof raw === 'number' && raw > 0) return raw;
+        if (typeof raw !== 'string') return null;
+        const kw = raw.match(/(\d+(?:\.\d+)?)\s*k\s*w/i);
+        if (kw?.[1]) return parseFloat(kw[1]) * 1000;
+        const w = raw.match(/(\d+(?:\.\d+)?)/);
+        return w?.[1] ? parseFloat(w[1]) : null;
+      };
+      const laserPowerW = (typeof (selectedMHR as any)?.powerKw === 'number' && (selectedMHR as any).powerKw > 0)
+        ? (selectedMHR as any).powerKw * 1000
+        : parseWattageField(newInputs['Laser Machine Power']);
 
       if (grade && thickness > 0 && laserPowerW) {
         try {
+          // Same lookup call/row covers both fields — sm_lookup_laser_cut carries
+          // cutting speed and pierce time together per material×thickness×power.
           const lookup = await calculatorsApi.sheetMetalLookup('laser_cut', {
             material: normaliseLaserMaterial(grade),
             thickness_mm: thickness,
             laser_power_w: laserPowerW,
+            // Backend gates cutting speed/pierce time by technology
+            // (migration 457) — a co2_laser machine (e.g. AMADA Quattro)
+            // must never silently match fiber-sourced data at the nearest
+            // power. selectedMachineClass is already tracked for the eye-
+            // icon's own resolveAdHocLookupTableKey lookup above.
+            machine_class: selectedMachineClass,
           });
-          if (typeof lookup?.value === 'number') {
-            setCalculatorInputs((prev) => ({ ...prev, 'Cutting Speed': lookup.value }));
+          // Backend responses go through a global camelCase transform
+          // interceptor — the DB column is pierce_time_min, but the row
+          // this endpoint returns arrives as pierceTimeMin. Reading the
+          // snake_case name here silently returned undefined forever,
+          // which is why Cutting Speed (a top-level, single-word 'value'
+          // key — unaffected by the casing transform) always populated
+          // while this field never did.
+          const pierceTimeMin = (lookup as any)?.row?.pierceTimeMin;
+          const matchedThickness = (lookup as any)?.row?.thicknessMm;
+          const matchedPowerW = (lookup as any)?.row?.laserPowerW;
+          const nearestNote = (matchedThickness != null && Number(matchedThickness) !== thickness) || (matchedPowerW != null && Number(matchedPowerW) !== laserPowerW)
+            ? ` (nearest seeded row: ${matchedThickness}mm @ ${matchedPowerW}W — table is stepped, not every thickness/power combo is seeded verbatim)`
+            : '';
+          const rowSourceNote = `sm_lookup_laser_cut — ${normaliseLaserMaterial(grade)}, ${thickness}mm sheet, ${selectedMHR?.machineName || 'selected machine'} (${laserPowerW}W)${nearestNote}`;
+          // Re-check blankness against `prev` (not the pre-await snapshot) —
+          // a concurrent invocation or a manual edit during this await could
+          // have already filled the field; never stomp that.
+          setCalculatorInputs((prev) => ({
+            ...prev,
+            ...(needsCuttingSpeed && isBlank(prev['Cutting Speed']) && typeof lookup?.value === 'number' ? { 'Cutting Speed': lookup.value } : {}),
+            ...(needsPierceTime && isBlank(prev['Piercing Time Per Start']) && typeof pierceTimeMin === 'number' ? { 'Piercing Time Per Start': pierceTimeMin } : {}),
+          }));
+          setCalculatorInputProvenance((prev) => ({
+            ...prev,
+            ...(needsCuttingSpeed && typeof lookup?.value === 'number' ? { 'Cutting Speed': rowSourceNote } : {}),
+            ...(needsPierceTime && typeof pierceTimeMin === 'number' ? { 'Piercing Time Per Start': rowSourceNote } : {}),
+          }));
+          const rowCols = extractRowColumns((lookup as any)?.row);
+          if (rowCols) {
+            setCalculatorMatchedRowKeys((prev) => ({
+              ...prev,
+              ...(needsCuttingSpeed && typeof lookup?.value === 'number' ? { 'Cutting Speed': rowCols } : {}),
+              ...(needsPierceTime && typeof pierceTimeMin === 'number' ? { 'Piercing Time Per Start': rowCols } : {}),
+            }));
           }
         } catch {
-          // No match / lookup failed — leave Cutting Speed blank for the
+          // No match / lookup failed — leave these fields blank for the
           // engineer to fill in manually rather than guessing a number.
         }
+      }
+      }
+    }
+
+    // UTS (database_lookup, data_source: raw_materials) — this field type had
+    // no resolution mechanism anywhere (frontend or backend): unlike Direct/
+    // Skilled Labors' data_source='lhr' fields, which just fall back to their
+    // configured default_value, UTS has default_value=NULL, so it silently
+    // stayed blank forever. Look up the part's actual material by grade —
+    // same /raw-materials search endpoint the Cost Guide panel already uses —
+    // and read its real ultimate_tensile_strength (backfilled Aug 2026 into
+    // uts_mpa too; both columns now agree wherever populated).
+    const utsField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'UTS');
+    if (utsField && isBlank(newInputs['UTS'])) {
+      const grade = bomItemData.materialGrade || bomItemData.material;
+      if (grade) {
+        try {
+          const res = await apiClient.get<{ items: any[] }>('/raw-materials', {
+            params: { search: grade, limit: 5 },
+          });
+          const match = res?.items?.[0];
+          const uts = match?.utsMpa ?? match?.ultimateTensileStrength;
+          if (typeof uts === 'number' && uts > 0) {
+            setCalculatorInputs((prev) => (isBlank(prev['UTS']) ? { ...prev, UTS: uts } : prev));
+            setCalculatorInputProvenance((prev) => ({
+              ...prev,
+              UTS: `raw_materials — "${match.material}" ultimate tensile strength`,
+            }));
+          }
+        } catch {
+          // No match / lookup failed — leave blank for manual entry.
+        }
+      }
+    }
+
+    // Shear Strength (Stamping/TPP) and Yield Strength (Drawing/Forming) —
+    // same class of gap as UTS above: both are database_lookup/raw_materials
+    // fields with no resolution mechanism anywhere. Field name varies by
+    // calculator ("Shear Strength" on Stamping, "Shear Strength (Mpa)" on TPP).
+    const shearField = selectedCalculator.fields?.find(
+      (f: any) => f.fieldName === 'Shear Strength' || f.fieldName === 'Shear Strength (Mpa)'
+    );
+    if (shearField && isBlank(newInputs[shearField.fieldName])) {
+      const grade = bomItemData.materialGrade || bomItemData.material;
+      if (grade) {
+        try {
+          const res = await apiClient.get<{ items: any[] }>('/raw-materials', { params: { search: grade, limit: 5 } });
+          const match = res?.items?.[0];
+          const shear = match?.shearStrengthMpa ?? match?.shearingStrength;
+          if (typeof shear === 'number' && shear > 0) {
+            setCalculatorInputs((prev) => (isBlank(prev[shearField.fieldName]) ? { ...prev, [shearField.fieldName]: shear } : prev));
+            setCalculatorInputProvenance((prev) => ({
+              ...prev,
+              [shearField.fieldName]: `raw_materials — "${match.material}" shear strength`,
+            }));
+          }
+        } catch {
+          // No match / lookup failed — leave blank for manual entry.
+        }
+      }
+    }
+
+    const yieldField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Yield Strength');
+    if (yieldField && isBlank(newInputs['Yield Strength'])) {
+      const grade = bomItemData.materialGrade || bomItemData.material;
+      if (grade) {
+        try {
+          const res = await apiClient.get<{ items: any[] }>('/raw-materials', { params: { search: grade, limit: 5 } });
+          const match = res?.items?.[0];
+          const yieldStrength = match?.yieldStrengthMpa ?? match?.yieldTensileStrength;
+          if (typeof yieldStrength === 'number' && yieldStrength > 0) {
+            setCalculatorInputs((prev) => (isBlank(prev['Yield Strength']) ? { ...prev, 'Yield Strength': yieldStrength } : prev));
+            setCalculatorInputProvenance((prev) => ({
+              ...prev,
+              'Yield Strength': `raw_materials — "${match.material}" yield strength`,
+            }));
+          }
+        } catch {
+          // No match / lookup failed — leave blank for manual entry.
+        }
+      }
+    }
+
+    // Sheet/Coil Loading/Unloading Time (Table 2, sm_lookup_handling_time) —
+    // real weight-based handling time, same table cost-engine.ts already uses
+    // for the automated cost estimate. Never a manual guess when the part's
+    // weight is known. Field name varies by calculator (Bending/Laser
+    // Cutting/Drawing-Forming: "Sheet Loading Time"; Stamping: "Total Coil
+    // Loading Time"; TPP: "Total Sheet Loading Unloading (min)").
+    const sheetLoadingField = selectedCalculator.fields?.find(
+      (f: any) => f.fieldName === 'Sheet Loading Time'
+        || f.fieldName === 'Total Coil Loading Time'
+        || f.fieldName === 'Total Sheet Loading Unloading (min)'
+    );
+    if (sheetLoadingField && isBlank(newInputs[sheetLoadingField.fieldName])) {
+      const weightKg = Number(bomItemData.weight || 0);
+      if (weightKg > 0) {
+        try {
+          const lookup = await calculatorsApi.sheetMetalLookup('handling_time', { weight_kg: weightKg });
+          if (typeof lookup?.value === 'number') {
+            setCalculatorInputs((prev) => isBlank(prev[sheetLoadingField.fieldName]) ? ({ ...prev, [sheetLoadingField.fieldName]: lookup.value }) : prev);
+            setCalculatorInputProvenance((prev) => ({ ...prev, [sheetLoadingField.fieldName]: `sm_lookup_handling_time — part weight ${weightKg}kg` }));
+          }
+        } catch {
+          // No match / lookup failed — leave blank for manual entry.
+        }
+      }
+    }
+
+    // Sampling Rate (Lookup Table 6, sm_lookup_sampling_plan) — real batch-size
+    // -based inspection sampling percentage, on every Cost Drivers calculator.
+    // No part-complexity concept is exposed on these calculators to pick a
+    // level, so this defaults to Level I (lowest/simplest) — the safe,
+    // documented default rather than guessing Medium/High, same reasoning as
+    // "Simple" for Time Per Stroke's complexity default above.
+    const samplingField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Sampling Rate');
+    if (samplingField && isBlank(newInputs['Sampling Rate'])) {
+      const lotSize = Number(newInputs['Lot Size'] || batchSize || 0);
+      if (lotSize > 0) {
+        try {
+          const lookup = await calculatorsApi.sheetMetalLookup('sampling_plan', { batch_size: lotSize, complexity_level: 1 });
+          if (typeof lookup?.value === 'number') {
+            setCalculatorInputs((prev) => (isBlank(prev['Sampling Rate']) ? { ...prev, 'Sampling Rate': lookup.value } : prev));
+            setCalculatorInputProvenance((prev) => ({
+              ...prev,
+              'Sampling Rate': `sm_lookup_sampling_plan — lot size ${lotSize}, Level I (default, no complexity field on this calculator)`,
+            }));
+          }
+        } catch {
+          // No match / lookup failed — leave blank for manual entry.
+        }
+      }
+    }
+
+    // Machining - Tapping specific fields — all three derivable from the same
+    // real thread spec (drawingIntelligence.threads, real 2D-drawing-text
+    // extraction) already used for "Potential tapping features" elsewhere on
+    // this page, not a new/independent guess:
+    //   Length (tap engagement depth) — sheet thickness, matching the
+    //     feature breakdown's own "depth Xmm assumed" note, NOT the part's
+    //     overall length (excluded from the generic mapping above).
+    //   Tap Diameter — the thread's nominal major diameter (M3 -> 3mm).
+    //   Feed per Rev — for rigid tapping, feed/rev IS the thread pitch by
+    //     definition (0.5mm for M3x0.5).
+    if (selectedCalculatorId === 'fe42139c-5675-4a82-94d5-7f2d440ae9bf') {
+      const thread = ((bomItemData.drawingIntelligence as any)?.threads as Array<{ size: string; pitch: number; count?: number }> | undefined)?.[0];
+      const nominalDia = thread?.size ? parseFloat(thread.size.replace(/[^0-9.]/g, '')) : null;
+
+      const tapLengthField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Length');
+      if (tapLengthField && isBlank(newInputs['Length']) && bomItemData.sheetThicknessMm > 0) {
+        setCalculatorInputs((prev) => (isBlank(prev['Length']) ? { ...prev, Length: bomItemData.sheetThicknessMm } : prev));
+        setCalculatorInputProvenance((prev) => ({ ...prev, Length: 'BOM sheet thickness (tap engagement depth)' }));
+      }
+
+      const tapDiaField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Tap Diameter');
+      if (tapDiaField && isBlank(newInputs['Tap Diameter']) && nominalDia) {
+        setCalculatorInputs((prev) => (isBlank(prev['Tap Diameter']) ? { ...prev, 'Tap Diameter': nominalDia } : prev));
+        setCalculatorInputProvenance((prev) => ({ ...prev, 'Tap Diameter': `Nominal major diameter of "${thread!.size}" thread (drawing callout)` }));
+      }
+
+      const feedField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Feed per Rev');
+      if (feedField && isBlank(newInputs['Feed per Rev']) && thread?.pitch) {
+        setCalculatorInputs((prev) => (isBlank(prev['Feed per Rev']) ? { ...prev, 'Feed per Rev': thread.pitch } : prev));
+        setCalculatorInputProvenance((prev) => ({
+          ...prev,
+          'Feed per Rev': `Thread pitch (drawing callout) — feed/rev = pitch for rigid tapping`,
+        }));
+      }
+
+      // Cutting Speed — real HSS (M2) tapping surface speed by material family,
+      // same TAP_SURFACE_SPEED_M_MIN_BY_MATERIAL table default-rates.ts's
+      // computeTapCycleSec() now uses, cross-verified from two independent
+      // published tap-vendor references (Viking/Norseman Drill & Tool SFM
+      // tables + Slugger Tools m/min chart, converted/averaged where they
+      // overlap): mild/carbon steel ~10, stainless (300-series) ~4.5,
+      // aluminum (wrought) ~25 m/min. Family classification mirrors this
+      // file's own classifySubstrate-equivalent keyword taxonomy (see
+      // page.tsx's classifySubstrate / backend's classifyMaterialFamily) —
+      // keep the keyword lists in sync across all three.
+      const cuttingSpeedField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Cutting Speed');
+      if (cuttingSpeedField && isBlank(newInputs['Cutting Speed'])) {
+        const gradeText = (bomItemData.materialGrade || bomItemData.material || '').toString().toUpperCase();
+        let materialFamily: 'aluminum' | 'stainless' | 'carbon_steel' | 'unknown' = 'unknown';
+        // T6 (ANSI H35.1 temper) is aluminum-exclusive; SECC/SPCC/SGCC/SPHC/SPCE
+        // are JIS cold-rolled/galvanized mild-steel sheet codes — same families
+        // page.tsx's classifySubstrate / backend's classifyMaterialFamily use.
+        if (/ALUMIN|(^|[^A-Z0-9])(AA\s?\d{4}|AL)([^A-Z]|$)|6061|6063|5052|5754|7075|2024|\bT6\b/.test(gradeText)) {
+          materialFamily = 'aluminum';
+        } else if (/STAINLESS|(^|[^A-Z])SS([^A-Z]|$)|304|316|430|17-4/.test(gradeText)) {
+          materialFamily = 'stainless';
+        } else if (/MILD|EN\s?8|S235|S355|HR\b|CR[1-5]\b|CRCA|IS\s?2062|DC01|E250|E350|\bMS\b|SECC|SPCC|SGCC|SPHC|SPCE/.test(gradeText)) {
+          materialFamily = 'carbon_steel';
+        }
+        const tapSpeedByFamily: Record<string, number> = { carbon_steel: 10, stainless: 4.5, aluminum: 25, unknown: 10 };
+        const tapSpeedSourceByFamily: Record<string, string> = {
+          carbon_steel: 'Mild/carbon steel HSS tapping reference (~10 m/min) — Viking/Norseman Drill & Tool + Slugger Tools tap-speed charts',
+          stainless: 'Stainless (300-series) HSS tapping reference (~4.5 m/min) — Viking/Norseman Drill & Tool + Slugger Tools tap-speed charts',
+          aluminum: 'Aluminum (wrought) HSS tapping reference (~25 m/min) — Viking/Norseman Drill & Tool + Slugger Tools tap-speed charts',
+          unknown: 'Material not identified — defaulting to mild-steel HSS tapping reference (~10 m/min); same fallback the cost engine uses',
+        };
+        const speed = tapSpeedByFamily[materialFamily] ?? tapSpeedByFamily.unknown!;
+        const speedSource = tapSpeedSourceByFamily[materialFamily] ?? tapSpeedSourceByFamily.unknown!;
+        setCalculatorInputs((prev) => (isBlank(prev['Cutting Speed']) ? { ...prev, 'Cutting Speed': speed } : prev));
+        setCalculatorInputProvenance((prev) => ({
+          ...prev,
+          'Cutting Speed': speedSource,
+        }));
+      }
+
+      // No of Uses defaults to 1 (one tap) — override with the drawing's
+      // actual tapped-hole count so Total Time reflects every hole, not just one.
+      const noOfUsesField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'No of Uses');
+      if (noOfUsesField && thread?.count && Number(newInputs['No of Uses']) === 1) {
+        setCalculatorInputs((prev) => (Number(prev['No of Uses']) === 1 ? { ...prev, 'No of Uses': thread.count } : prev));
+        setCalculatorInputProvenance((prev) => ({
+          ...prev,
+          'No of Uses': `Thread callout count (${thread!.count} × "${thread!.size}" holes on drawing)`,
+        }));
+      }
+    }
+
+    // Tool Loading Time (Lookup Table 3B, sm_lookup_tool_setup, setup_type='brake')
+    // — keyed by tool/bend length, the same concept as this calculator's own
+    // "Bending Line Length" field. Real table, real resolver case
+    // (calculators.service.ts's 'tool_setup'); this field just never called it.
+    // Scoped to the Bending calculator specifically: Table 3B ("brake") is
+    // keyed by tool/bend length, known upfront. Stamping/Drawing-Forming use
+    // Table 3A ("press", keyed by required tonnage) instead — tonnage is a
+    // CALCULATED result, not known until after execute() runs once, so that
+    // variant is resolved in handleExecuteCalculator's post-execute chain
+    // (alongside Time Per Stroke) instead of here.
+    const toolLoadingField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Tool Loading Time');
+    if (
+      toolLoadingField && isBlank(newInputs['Tool Loading Time']) && bomItemData.bendCount > 0 &&
+      selectedCalculatorId === '102772ff-5422-45c1-b391-6d2d4a96ab1b'
+    ) {
+      const bendLengthMm = Math.max(bomItemData.maxLength || 0, bomItemData.maxWidth || 0);
+      if (bendLengthMm > 0) {
+        try {
+          const lookup = await calculatorsApi.sheetMetalLookup('tool_setup', { setup_type: 'brake', key_value: bendLengthMm });
+          if (typeof lookup?.value === 'number') {
+            setCalculatorInputs((prev) => (isBlank(prev['Tool Loading Time']) ? { ...prev, 'Tool Loading Time': lookup.value } : prev));
+            setCalculatorInputProvenance((prev) => ({
+              ...prev,
+              'Tool Loading Time': `sm_lookup_tool_setup (press brake) — tool/bend length ${bendLengthMm}mm`,
+            }));
+          }
+        } catch {
+          // No match / lookup failed — leave blank for manual entry.
+        }
+      }
+    }
+
+    // Machine name/power display fields — these carried literal hardcoded seed
+    // values ("Trulaser", "6000 W") that never matched the actually selected
+    // machine and don't feed any formula (purely informational). Show the real
+    // selected machine instead of a generic placeholder.
+    const machineNameField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Machine Name');
+    if (machineNameField && isBlank(newInputs['Machine Name']) && selectedMHR?.machineName) {
+      setCalculatorInputs((prev) => ({ ...prev, 'Machine Name': selectedMHR.machineName }));
+      setCalculatorInputProvenance((prev) => ({ ...prev, 'Machine Name': 'Currently selected machine for this process (Resources & Location above)' }));
+    }
+    // Selected Tonnage — the currently selected press brake's own rated
+    // capacity, the same figure machine-selection's capability check already
+    // uses ("Bend X t ≤ Y t machine capacity"). Prefers the DB-recorded
+    // mhr_records.max_tonnage when a machine has it; most seeded press
+    // brakes don't (confirmed: only 10/48), so falls back to parsing the
+    // capacity stated plainly in the machine's own name — the same fallback
+    // machine-selection/selector.ts's own parseTonnageFromName already uses
+    // server-side for this exact reason.
+    const selectedTonnageField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Selected Tonnage');
+    if (selectedTonnageField && isBlank(newInputs['Selected Tonnage'])) {
+      const tonnage = selectedMHR?.maxTonnage ?? parseTonnageFromMachineName(selectedMHR?.machineName);
+      if (tonnage) {
+        setCalculatorInputs((prev) => ({ ...prev, 'Selected Tonnage': tonnage }));
+        setCalculatorInputProvenance((prev) => ({
+          ...prev,
+          'Selected Tonnage': selectedMHR?.maxTonnage
+            ? `Rated capacity of "${selectedMHR.machineName ?? 'selected machine'}" (Resources & Location above)`
+            : `Parsed from selected machine name "${selectedMHR?.machineName}"`,
+        }));
+      }
+    }
+
+    // 'Laser Machine Power' — a real machine CAPABILITY (mhr_records.power_kw,
+    // migration 324, verified OEM data only — migration 450's backfill), never
+    // inferred from the machine's name string at calculation time. That regex
+    // fallback (this field used to show a hardcoded '6000 W' placeholder, then
+    // a name-parsed guess) is exactly the class of mock/inferred value this
+    // architecture exists to remove — see bom-items.service.ts's identical
+    // fix for the real cost engine's own laser-power resolution. A blank
+    // field now correctly means "no verified capability on file — enter the
+    // real value," never a guess dressed up as resolved data.
+    const laserMachinePowerField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Laser Machine Power');
+    if (laserMachinePowerField && isBlank(newInputs['Laser Machine Power'])) {
+      const powerKw = (selectedMHR as any)?.powerKw;
+      if (typeof powerKw === 'number' && powerKw > 0) {
+        const powerW = powerKw * 1000;
+        setCalculatorInputs((prev) => (isBlank(prev['Laser Machine Power']) ? { ...prev, 'Laser Machine Power': `${powerW} W` } : prev));
+        setCalculatorInputProvenance((prev) => ({
+          ...prev,
+          'Laser Machine Power': `Verified machine capability: "${selectedMHR?.machineName ?? 'selected machine'}" (Resources & Location above)`,
+        }));
       }
     }
   };
@@ -758,12 +1720,63 @@ export function ProcessCostDialog({
     }
   }, [open, selectedCalculatorId, bomItemData?.id]);
 
+  // Scroll to the highlighted "currently used" row as soon as the eye
+  // viewer's table renders — with a stepped lookup table seeding dozens of
+  // rows per material, the matching row is otherwise easy to lose among the
+  // rest (the actual ask behind this whole feature).
+  useEffect(() => {
+    if (showLookupTable && matchedCurrentRowRef.current) {
+      matchedCurrentRowRef.current.scrollIntoView({ block: 'center' });
+    }
+  }, [showLookupTable, lookupTableData]);
+
   // Handle viewing lookup table
   const handleViewLookupTable = async (field: any) => {
     setSelectedLookupField(field);
 
     try {
       const { processesApi } = await import('@/lib/api/processes');
+
+      // Case 0: a real sm_lookup_* cost-engine table — the same live data
+      // SheetMetalLookupService queries for this exact field's value (Time
+      // Per Stroke, Stroke Time, Tool Loading Time, Cutting Speed, Piercing
+      // Time Per Start, ...), not the separate process_reference_tables
+      // system Cases 1/2 below read from.
+      // DB-tagged fields (sourceField) store a bare suffix ('manual_stroke',
+      // 'tool_setup') — the ad-hoc resolver above returns the real, FULL
+      // table name directly instead (needed for inspection_operation_defaults/
+      // surface_treatment_rates, which don't follow the sm_lookup_ convention).
+      const isAdHoc = !(field.dataSource === SM_LOOKUP_DATA_SOURCE && field.sourceField);
+      const smLookupTableName = isAdHoc
+        ? resolveAdHocLookupTableKey(field.fieldName, selectedMachineClass)
+        : `sm_lookup_${field.sourceField}`;
+      if (smLookupTableName) {
+        const table = await processesApi.getSmLookupTableByName(smLookupTableName);
+        if (table) {
+          const processedRows = table.rows?.map((row: any) =>
+            row.rowData ? row.rowData : row
+          ) || [];
+          // Ad-hoc fields compute their own highlight client-side from the
+          // field's current value (see computeAdHocMatchedRow's own doc
+          // comment) — the pre-computed calculatorMatchedRowKeys snapshot
+          // only exists for the original auto-fill-wired fields (Cutting
+          // Speed, Piercing Time Per Start, Time Per Stroke, ...).
+          const adHocMatch = isAdHoc
+            ? computeAdHocMatchedRow(smLookupTableName, field.fieldName, processedRows, calculatorInputs[field.fieldName], location)
+            : null;
+          setLookupTableData({
+            fieldName: field.fieldName,
+            fieldLabel: field.displayLabel || field.fieldName,
+            tableName: table.tableName,
+            tableId: table.id,
+            column_definitions: table.columnDefinitions || [],
+            rows: processedRows,
+            matchedRowKeys: adHocMatch ?? calculatorMatchedRowKeys[field.fieldName] ?? null,
+          });
+          setShowLookupTable(true);
+          return;
+        }
+      }
 
       // Case 1: sourceField is set — fetch by table ID directly
       if (field.sourceField) {
@@ -851,6 +1864,7 @@ export function ProcessCostDialog({
     if (!calculatorOpen) {
       setSelectedCalculatorId('');
       setCalculatorInputs({});
+      setCalculatorInputProvenance({});
       setCalculatorResults(null);
       setCalculatorError(null);
       setCalculatorTarget(null);
@@ -955,18 +1969,34 @@ export function ProcessCostDialog({
     }
   }, [editData, open, isLoadingHierarchy, isLoadingMHR, isLoadingLHR, mhrData, lhrData, existingProcesses, autoOpenCalculator]);
 
-  // Effective rates: dropdown selection → manual input → editData stored fallback
-  const effectiveMachineRate = selectedMHR
-    ? selectedMHR.calculations.totalMachineHourRate
-    : (typeof manualMhrRate === 'number' && manualMhrRate > 0 ? manualMhrRate : (Number(editData?.machineRate) || 0));
+  // Effective rates: dropdown selection → manual input → editData stored fallback.
+  // Non-machine operations (Raw Material / Packing & Delivery / General-General) never
+  // have a real machine cost, so no stale saved/manual value is allowed to surface here.
+  const effectiveMachineRate = isNonMachineOperation
+    ? 0
+    : selectedMHR
+      // calculations.totalMachineHourRate is the rate AS STORED, in whatever
+      // currency that machine's location uses (e.g. raw INR for an India
+      // record) — resolveMhrUsdRate prefers the real USD-normalised field so
+      // a non-USA machine's local-currency number is never fed into this
+      // USD-denominated cost preview/save as if it already were dollars.
+      ? resolveMhrUsdRate(selectedMHR)
+      : (typeof manualMhrRate === 'number' && manualMhrRate > 0 ? manualMhrRate : (Number(editData?.machineRate) || 0));
   // For benchmark records lhr is already in USD (= lhrUsdEffective). For user records
   // lhrUsdEffective is the correct USD value; fall back to lhr when it is missing.
   const effectiveLaborRate = selectedLHR
     ? (Number((selectedLHR as any).lhrUsdEffective) || Number((selectedLHR as any).lhr) || 0)
     : (typeof manualLhrRate === 'number' && manualLhrRate > 0 ? manualLhrRate : (Number(editData?.laborRate) || 0));
 
-  // Derived — no extra re-render per keystroke
-  const totalCost = useMemo(() => {
+  // Cost preview: calls the exact same aprioriTerms()-based engine that computes the
+  // saved record server-side (POST /process-costs/calculate → ProcessCostCalculationEngine),
+  // instead of a second, independently-maintained formula here — the preview can never
+  // show a number that diverges from what actually gets charged on save. Debounced so
+  // live typing doesn't fire a request per keystroke.
+  const calculateProcessCost = useCalculateProcessCost();
+  const [totalCost, setTotalCost] = useState(0);
+
+  const costPreviewInput = useMemo(() => {
     const cycleTimeNum     = parseFloat(cycleTime     as string) || 0;
     const batchSizeNum     = parseFloat(batchSize     as string) || 0;
     const partsPerCycleNum = parseFloat(partsPerCycle as string) || 0;
@@ -975,14 +2005,38 @@ export function ProcessCostDialog({
     const headsNum         = parseFloat(heads         as string) || 0;
     const scrapNum         = parseFloat(scrap         as string) || 0;
 
-    if (cycleTimeNum <= 0 || batchSizeNum <= 0 || partsPerCycleNum <= 0) return 0;
+    if (cycleTimeNum <= 0 || batchSizeNum <= 0 || partsPerCycleNum <= 0) return null;
 
-    const setupCostPerPart = ((setupTimeNum / 60) * (effectiveMachineRate + effectiveLaborRate * setupManningNum)) / Math.max(batchSizeNum, 1);
-    const cycleTimeHours   = cycleTimeNum / 3600;
-    const cycleCostPerPart = (cycleTimeHours * (effectiveMachineRate + effectiveLaborRate * headsNum)) / partsPerCycleNum;
-    const baseCost         = setupCostPerPart + cycleCostPerPart;
-    return Math.max(0, baseCost * (1 + scrapNum / 100));
+    return {
+      directRate: effectiveLaborRate,
+      machineRate: effectiveMachineRate,
+      setupManning: setupManningNum,
+      setupTime: setupTimeNum,
+      batchSize: batchSizeNum,
+      heads: headsNum,
+      cycleTime: cycleTimeNum,
+      partsPerCycle: partsPerCycleNum,
+      scrap: scrapNum,
+    };
   }, [effectiveMachineRate, effectiveLaborRate, setupManning, setupTime, batchSize, heads, cycleTime, partsPerCycle, scrap]);
+
+  const { debouncedValue: debouncedCostPreviewInput } = useDebounce(costPreviewInput, 300);
+
+  useEffect(() => {
+    if (!debouncedCostPreviewInput) {
+      setTotalCost(0);
+      return;
+    }
+    let cancelled = false;
+    calculateProcessCost.mutateAsync(debouncedCostPreviewInput).then((result) => {
+      if (!cancelled) setTotalCost(result?.totalCostPerPart ?? 0);
+    }).catch(() => {
+      // Leave the last known-good total displayed rather than silently zeroing it
+      // out on a transient network error.
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedCostPreviewInput]);
 
   // Benchmark LHR/MHR records use synthetic IDs (e.g. "bm-USA-Sheet Metal") that are not
   // UUIDs. The backend DTO validates @IsUUID() when the field is non-empty, so we must strip
@@ -1387,7 +2441,7 @@ export function ProcessCostDialog({
                             <SelectContent>
                               {filteredMHR.map((mhr: any) => (
                                 <SelectItem key={mhr.id} value={String(mhr.id)}>
-                                  {mhr.machineName} - ${mhr.calculations.totalMachineHourRate.toFixed(2)}/hr
+                                  {mhr.machineName} - ${resolveMhrUsdRate(mhr).toFixed(2)}/hr
                                   {mhr.location ? ` (${mhr.location})` : ''}
                                   {mhr.isBenchmark ? ' ★' : ''}
                                 </SelectItem>
@@ -1400,6 +2454,11 @@ export function ProcessCostDialog({
                             </p>
                           )}
                           </>
+                        ) : isNonMachineOperation ? (
+                          <p className="text-xs text-muted-foreground">
+                            No machine hour rate applies — this is a raw-material / logistics step, not a
+                            machine operation.
+                          </p>
                         ) : (
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -1688,12 +2747,20 @@ export function ProcessCostDialog({
                     />
                   </div>
 
-              {/* Total Cost Display */}
+              {/* Total Cost Display — 2dp rounds a genuinely real, non-zero
+                  cost to "$0.00" for very cheap machine+labour combinations
+                  at a large batch size (confirmed live: Hole Extrusion
+                  (Burring) at $0.28/hr machine + $1.73/hr labour, 2.1s cycle,
+                  batch 250 — a real ~$0.0019/part, not a calculation bug).
+                  Show more precision instead of hiding it whenever 2dp would
+                  misrepresent a real cost as exactly zero. */}
               <Card className="bg-primary/10 border border-primary/20">
                 <CardContent className="pt-6">
                   <Label className="block mb-2">Total Cost</Label>
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold text-primary">{currencySymbol}{totalCost.toFixed(2)}</span>
+                    <span className="text-2xl font-bold text-primary">
+                      {currencySymbol}{totalCost > 0 && totalCost < 0.01 ? totalCost.toFixed(4) : totalCost.toFixed(2)}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -1759,8 +2826,8 @@ export function ProcessCostDialog({
                     <SelectItem key="error" value="__error__" disabled>
                       Error loading calculators
                     </SelectItem>
-                  ) : calculatorsData?.calculators && calculatorsData.calculators.length > 0 ? (
-                    calculatorsData.calculators.map((calc: any) => (
+                  ) : calculatorsForDropdown.length > 0 ? (
+                    calculatorsForDropdown.map((calc: any) => (
                       <SelectItem key={calc.id} value={calc.id}>
                         {calc.name}
                       </SelectItem>
@@ -1786,6 +2853,7 @@ export function ProcessCostDialog({
                     setCalculatorResults(null);
                     setCalculatorError(null);
                     setCalculatorInputs({});
+                    setCalculatorInputProvenance({});
                     setCalculatorTarget(null);
                   }}
                   className="w-full"
@@ -1805,13 +2873,36 @@ export function ProcessCostDialog({
                   <CardContent className="space-y-4">
                     {selectedCalculator.fields
                       ?.filter((field: any) => field.fieldType !== 'calculated')
+                      // MHR per Hour / LHR per Hour are already set above in this
+                      // same dialog's Resources & Location section (Applied Rates:
+                      // machine + labour type + location) — showing them again here
+                      // as a second editable box duplicates that, and risks the two
+                      // silently drifting apart. Still auto-populated into
+                      // calculatorInputs from the same Applied Rates (see
+                      // autoPopulateFromBOM's bomFieldMapping) so formulas that
+                      // reference {MHR per Hour}/{LHR per Hour} keep working —
+                      // just not rendered as a separate input here.
+                      .filter((field: any) => field.fieldName !== 'MHR per Hour' && field.fieldName !== 'LHR per Hour')
+                      // Opened specifically for Cycle Time: hide inputs that don't
+                      // feed it (Machine Name, Lot Size, labour counts, ...) — see
+                      // relevantFieldNames' own comment. No-ops (shows everything)
+                      // when that couldn't be confidently resolved.
+                      .filter((field: any) => !relevantFieldNames || relevantFieldNames.has(field.fieldName))
                       .map((field: any) => {
                         // Only show eye button for fields that have actual lookup tables configured
-                        const isLookupTableField = 
+                        const isLookupTableField =
                           // Only show for explicitly configured database lookup fields
                           (field.fieldType === 'database_lookup' && field.dataSource === 'processes') ||
                           // Only show for fields with sourceField starting with 'from_' (linked to reference tables)
-                          (field.sourceField && field.sourceField.startsWith('from_'));
+                          (field.sourceField && field.sourceField.startsWith('from_')) ||
+                          // Real sm_lookup_* cost-engine tables — every field this session's
+                          // whole Manufacturing Physics Calculator work has been wiring up
+                          // (Time Per Stroke, Stroke Time, Tool Loading Time, Cutting Speed,
+                          // Piercing Time Per Start, ...). Covers both DB-marked lookup
+                          // fields (dataSource='sheet_metal_lookup') and the handful resolved
+                          // via ad-hoc frontend JS instead (resolveAdHocLookupTableKey).
+                          (field.dataSource === SM_LOOKUP_DATA_SOURCE && !!field.sourceField) ||
+                          !!resolveAdHocLookupTableKey(field.fieldName, selectedMachineClass);
 
 
 
@@ -1828,7 +2919,7 @@ export function ProcessCostDialog({
 
                             {field.fieldType === 'select' && selectOptions ? (
                               <Select
-                                value={calculatorInputs[field.fieldName] || ''}
+                                value={calculatorInputs[field.fieldName] ?? ''}
                                 onValueChange={(v) => setCalculatorInputs({ ...calculatorInputs, [field.fieldName]: v })}
                               >
                                 <SelectTrigger>
@@ -1844,7 +2935,7 @@ export function ProcessCostDialog({
                               <Input
                                 id={field.fieldName}
                                 type="text"
-                                value={calculatorInputs[field.fieldName] || ''}
+                                value={calculatorInputs[field.fieldName] ?? ''}
                                 onChange={(e) =>
                                   setCalculatorInputs({ ...calculatorInputs, [field.fieldName]: e.target.value })
                                 }
@@ -1857,7 +2948,7 @@ export function ProcessCostDialog({
                                   id={field.fieldName}
                                   type="number"
                                   step="0.01"
-                                  value={calculatorInputs[field.fieldName] || ''}
+                                  value={calculatorInputs[field.fieldName] ?? ''}
                                   onChange={(e) =>
                                     setCalculatorInputs({
                                       ...calculatorInputs,
@@ -1884,7 +2975,7 @@ export function ProcessCostDialog({
                                 id={field.fieldName}
                                 type="number"
                                 step="0.01"
-                                value={calculatorInputs[field.fieldName] || ''}
+                                value={calculatorInputs[field.fieldName] ?? ''}
                                 onChange={(e) =>
                                   setCalculatorInputs({
                                     ...calculatorInputs,
@@ -1894,9 +2985,61 @@ export function ProcessCostDialog({
                                 placeholder={`Enter ${field.displayLabel || field.fieldName}`}
                               />
                             )}
+
+                            {calculatorInputProvenance[field.fieldName] && (
+                              <div className="text-xs text-muted-foreground">
+                                Why: {calculatorInputProvenance[field.fieldName]}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
+
+                    {/* Machine Capability — only for calculators that price
+                        laser power (Laser Cutting today). Shows the REAL,
+                        verified mhr_records.power_kw this calculation used,
+                        or plainly discloses why none is available, instead
+                        of leaving that fact implicit in a "Why:" line. */}
+                    {selectedCalculator.fields?.some((f: any) => f.fieldName === 'Laser Machine Power') && (() => {
+                      const capabilityPowerKw = (selectedMHR as any)?.powerKw;
+                      const hasPower = typeof capabilityPowerKw === 'number' && capabilityPowerKw > 0;
+                      // 'seed' = real, sourced, but NOT this unit's own verified
+                      // nameplate reading (e.g. Salvagnini L3-30, migration 459's
+                      // disclosed estimate from documented model specs) — must
+                      // never render as "Verified" just because a number exists.
+                      // Same distinction machine-selection/selector.ts already
+                      // renders server-side ("Capability from model seed data —
+                      // verify against machine plate").
+                      const isEstimated = (selectedMHR as any)?.capabilitySource === 'seed';
+                      return (
+                        <div className="rounded-md border border-border p-3 space-y-1 text-xs">
+                          <div className="font-semibold text-sm mb-1">Machine Capability</div>
+                          {hasPower ? (
+                            <>
+                              <div>Machine: {selectedMHR?.machineName ?? 'Unknown'}</div>
+                              <div>Laser Power: {(capabilityPowerKw * 1000).toLocaleString()} W</div>
+                              <div>Source: {isEstimated ? 'disclosed estimate from documented model specs' : 'machine capability record'}</div>
+                              {isEstimated ? (
+                                <>
+                                  <div className="text-amber-600 dark:text-amber-400 font-medium">Status: Estimated (not verified)</div>
+                                  <div>Action: verify against this unit's nameplate/PO before finalizing</div>
+                                </>
+                              ) : (
+                                <div className="text-primary font-medium">Status: Verified</div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-destructive font-medium">Laser Power: Unavailable</div>
+                              <div>Reason: {selectedMHR
+                                ? `power_kw not defined for "${selectedMHR.machineName}"`
+                                : 'no machine selected'}</div>
+                              <div>Action: Add verified machine capability</div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     <Button
                       onClick={handleExecuteCalculator}
@@ -1921,6 +3064,18 @@ export function ProcessCostDialog({
                     <CardContent className="space-y-3">
                       {selectedCalculator.fields
                         ?.filter((field: any) => field.fieldType === 'calculated')
+                        // This calculator is being used only to derive a Cycle
+                        // Time value for the main form (calculatorTarget ===
+                        // 'cycleTime') — the cost breakdown (Machine/Labour/
+                        // Process/Setup/Total Process Cost) duplicates what the
+                        // main Edit Process Cost form already computes itself
+                        // from its own MHR/LHR/Cycle Time inputs, so show only
+                        // the one result that matters here: whichever of
+                        // 'Total Time'/'Cycle Time' this calculator actually
+                        // defines (see CYCLE_TIME_FIELD_NAMES above) — the
+                        // same field computedCycleTime/"Use as Cycle Time"
+                        // below already keys off.
+                        .filter((field: any) => calculatorTarget !== 'cycleTime' || CYCLE_TIME_FIELD_NAMES.includes(field.fieldName))
                         .map((field: any) => {
                           const result = calculatorResults[field.fieldName];
                           const hasError = result && typeof result === 'object' && 'error' in result;
@@ -1936,6 +3091,11 @@ export function ProcessCostDialog({
                                 {field.unit && !hasError && (
                                   <div className="text-xs text-muted-foreground">{field.unit}</div>
                                 )}
+                                {field.defaultValue && (
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    Why: {field.displayLabel || field.fieldName} = {field.defaultValue}
+                                  </div>
+                                )}
                                 {hasError && (
                                   <div className="text-xs text-destructive" title={result.error}>
                                     {result.error}
@@ -1945,7 +3105,7 @@ export function ProcessCostDialog({
                               <div className="flex items-center gap-2">
                                 {!hasError && (
                                   <div className="text-lg font-bold text-primary">
-                                    {typeof value === 'number' ? value.toFixed(4) : value || 'N/A'}
+                                    {typeof value === 'number' ? value.toFixed(2) : value || 'N/A'}
                                   </div>
                                 )}
                                 <Button
@@ -1960,6 +3120,54 @@ export function ProcessCostDialog({
                             </div>
                           );
                         })}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Computed Cycle Time — derived from the calculator's own
+                    'Total Time'/'Cycle Time' field (see CYCLE_TIME_FIELD_NAMES),
+                    not re-derived here, so it can't disagree with the
+                    Results above or the calculator's formula definition. */}
+                {computedCycleTime && (
+                  <Card className="border-primary bg-primary/5">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Computed Cycle Time</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-2xl font-bold text-primary">
+                            {computedCycleTime.totalTimeMin.toFixed(2)} min
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {computedCycleTime.totalTimeSec.toFixed(1)} sec — from this calculator's "Total Time" result
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleCalculatorValue(computedCycleTime.totalTimeSec)}
+                        >
+                          Use as Cycle Time
+                        </Button>
+                      </div>
+
+                      {computedCycleTime.formula && (
+                        <div className="text-xs text-muted-foreground bg-secondary/50 rounded p-2 font-mono">
+                          Total Time (sec) = {computedCycleTime.formula}
+                        </div>
+                      )}
+
+                      <div className="text-xs">
+                        {computedCycleTime.matchesCurrent ? (
+                          <span className="text-green-600 dark:text-green-500 font-medium">
+                            ✓ Matches the Cycle Time currently set on this process ({computedCycleTime.currentCycleTimeSec.toFixed(1)} sec) — this is the value Direct Process Costs will use.
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-500 font-medium">
+                            This process's saved Cycle Time is currently {computedCycleTime.currentCycleTimeSec.toFixed(1)} sec — click "Use as Cycle Time" so Direct Process Costs matches this calculator.
+                          </span>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 )}
@@ -2023,6 +3231,9 @@ export function ProcessCostDialog({
           <div className="px-3 py-1.5 bg-primary/5 border-b border-border text-xs text-muted-foreground flex items-center gap-1.5">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
             Click any row to use that value for <strong className="text-foreground mx-0.5">{lookupTableData.fieldLabel}</strong>. Highlighted column = selected value.
+            {lookupTableData.matchedRowKeys && (
+              <span className="text-primary font-medium ml-1">The row outlined below is the one currently in use.</span>
+            )}
           </div>
 
           <div
@@ -2068,10 +3279,27 @@ export function ProcessCostDialog({
                       return row[col.name] !== undefined ? row[col.name] : row[camel];
                     };
                     const outputValue = outputCol ? getVal(outputCol) : undefined;
+                    // This row IS the exact one the lookup already resolved
+                    // for the field the "eye" button was clicked on — every
+                    // key in matchedRowKeys (the snapshot taken at
+                    // resolution time) must match this row's own value.
+                    // Numeric comparison tolerates string-vs-number typing
+                    // differences between the two API responses; real
+                    // lookup values never differ by a meaningful amount.
+                    const matchedRowKeys = lookupTableData.matchedRowKeys;
+                    const isCurrentMatch = !!matchedRowKeys && Object.entries(matchedRowKeys).every(([key, expected]) => {
+                      const actual = row[key];
+                      if (actual === undefined) return true; // column not present on this row shape — don't fail the match over it
+                      if (typeof expected === 'number' || typeof actual === 'number') {
+                        return Math.abs(Number(actual) - Number(expected)) < 1e-6;
+                      }
+                      return String(actual) === String(expected);
+                    });
                     return (
                       <tr
                         key={rowIndex}
-                        className="hover:bg-primary/10 cursor-pointer transition-colors"
+                        ref={isCurrentMatch ? matchedCurrentRowRef : undefined}
+                        className={`hover:bg-primary/10 cursor-pointer transition-colors${isCurrentMatch ? ' ring-2 ring-inset ring-primary bg-primary/10' : ''}`}
                         onMouseDown={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
@@ -2100,10 +3328,12 @@ export function ProcessCostDialog({
                           
                           return false;
                         }}
-                        title={outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`}
+                        title={isCurrentMatch
+                          ? `Currently used for ${lookupTableData.fieldLabel}`
+                          : (outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`)}
                       >
-                        <td className="border border-border text-center text-xs py-1 px-1 text-muted-foreground font-mono bg-muted/20">
-                          {rowIndex + 1}
+                        <td className={`border border-border text-center text-xs py-1 px-1 font-mono ${isCurrentMatch ? 'text-primary bg-primary/20' : 'text-muted-foreground bg-muted/20'}`}>
+                          {isCurrentMatch ? '★' : rowIndex + 1}
                         </td>
                         {lookupTableData.column_definitions.map((col: any) => {
                           const value = getVal(col);

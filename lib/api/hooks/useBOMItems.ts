@@ -54,6 +54,11 @@ export interface BOMItem {
   // Denormalised from featureGraph.classification for display + filtering
   familyClassification?: string;
   familyConfidence?: number;
+  // Generic Cost Guide manual-override bag, keyed by scenario input name
+  // (e.g. "sheetThicknessMm") — see backend's costing/scenario-overrides.ts.
+  // A present key wins over the CAD-extracted value for that input in every
+  // costing calculation; absent/cleared falls through to the real CAD value.
+  scenarioOverrides?: Record<string, unknown>;
   // Phase 1 sheet metal extracted fields
   sheetThicknessMm?: number;
   cutLengthMm?: number;
@@ -277,6 +282,31 @@ export function useUpdateBOMItem() {
 }
 
 /**
+ * Merges a partial patch into a BOM item's Cost Guide manual-override bag
+ * (bom_items.scenario_overrides). Pass `null` for a key to clear that
+ * override and revert to the real CAD-extracted/auto-detected value.
+ */
+export function usePatchScenarioOverrides() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
+      return apiClient.patch<BOMItem>(`/bom-items/${id}/scenario-overrides`, patch);
+    },
+    onSuccess: (data) => {
+      if (data) {
+        queryClient.invalidateQueries({ queryKey: bomItemKeys.detail(data.id) });
+        queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'cost-summary'] });
+        queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'route-comparison'] });
+      }
+    },
+    onError: () => {
+      toast.error('Failed to save override. Please try again.');
+    },
+  });
+}
+
+/**
  * Delete a BOM item
  */
 export function useDeleteBOMItem() {
@@ -362,6 +392,18 @@ export interface AutoFillResponse {
 // In-flight deduplication: same filename+size reuses the pending promise
 const _analyzeInFlight = new Map<string, Promise<AutoFillResponse>>();
 
+const ANALYZE_POLL_INTERVAL_MS = 3000;
+const ANALYZE_MAX_WAIT_MS = 10 * 60 * 1000; // 10 min — matches the CAD engine's own timeout budget
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Starts a background analysis job and polls until it's ready. Large/complex
+// STEP files can take minutes in the CAD engine — this avoids holding one long
+// HTTP request open (fragile across proxies/timeouts) by returning the same
+// Promise<AutoFillResponse> shape callers already expect, with polling hidden
+// inside.
 export async function analyzeForAutoFill(file: File): Promise<AutoFillResponse> {
   const key = `${file.name}:${file.size}`;
   const existing = _analyzeInFlight.get(key);
@@ -369,13 +411,27 @@ export async function analyzeForAutoFill(file: File): Promise<AutoFillResponse> 
 
   const form = new FormData();
   form.append('file', file);
-  const promise = apiClient
-    .uploadFiles<AutoFillResponse>('/bom-items/analyze-for-autofill', form)
-    .then(data => {
-      if (!data) throw new Error('No response from auto-fill analysis');
-      return data;
-    })
-    .finally(() => _analyzeInFlight.delete(key));
+  const promise = (async () => {
+    const { jobId } = await apiClient.uploadFiles<{ jobId: string }>('/bom-items/analyze-for-autofill/start', form);
+    if (!jobId) throw new Error('No job started for auto-fill analysis');
+
+    const deadline = Date.now() + ANALYZE_MAX_WAIT_MS;
+    while (Date.now() < deadline) {
+      const status = await apiClient.get<{ status: 'processing' | 'ready' | 'error'; result?: AutoFillResponse; error?: string }>(
+        `/bom-items/analyze-for-autofill/${jobId}`,
+      );
+      if (!status) throw new Error('No response from auto-fill analysis');
+      if (status.status === 'ready') {
+        if (!status.result) throw new Error('No response from auto-fill analysis');
+        return status.result;
+      }
+      if (status.status === 'error') {
+        throw new Error(status.error ?? 'Analysis failed');
+      }
+      await sleep(ANALYZE_POLL_INTERVAL_MS);
+    }
+    throw new Error('Analysis timed out');
+  })().finally(() => _analyzeInFlight.delete(key));
 
   _analyzeInFlight.set(key, promise);
   return promise;
@@ -450,10 +506,20 @@ export interface MachineCandidate {
   capabilityVersion: number | null;
 }
 
+export interface CapabilityCheck {
+  parameter: string;
+  materialGrade: string | null;
+  value: number;
+  limit: number | null;
+  unit: string;
+  supported: boolean;
+}
+
 export interface MachineRecommendation {
   candidate: MachineCandidate;
   score: number;
   reasons: string[];
+  capabilityCheck?: CapabilityCheck | null;
 }
 
 export interface MachineSelectionResult {
@@ -475,6 +541,72 @@ export interface FeatureOp {
   count: number;
 }
 
+export interface CalculationTraceStep {
+  fieldName: string;
+  displayLabel: string;
+  kind: 'input' | 'calculated';
+  value: number | string | null;
+  unit?: string | null;
+  source?: string;
+  formula?: string;
+  /** 'lookup' when this step's value came from a real sm_lookup_* DB row;
+   *  'physics' when it's a deterministic formula over already-known values. */
+  stepType?: 'physics' | 'lookup';
+}
+
+export type LookupPolicyType = 'EXACT_MATCH' | 'INTERPOLATE' | 'RANGE' | 'FORMULA';
+
+export interface LookupQueryParam {
+  column: string;
+  value: string | number;
+  unit?: string;
+}
+
+export interface LookupTableRow {
+  columns: Record<string, string | number>;
+  matchedDimensions?: number;
+  totalDimensions?: number;
+}
+
+export interface LookupResolution {
+  table: string;
+  policy: LookupPolicyType;
+  queryParams: LookupQueryParam[];
+  matchedRow: LookupTableRow | null;
+  nearestRows: LookupTableRow[];
+}
+
+export interface ValidatedInput {
+  fieldName: string;
+  value: string | number;
+  source: string;
+}
+
+/** Two distinct gap types, with different owners/triage. */
+export interface LookupGap {
+  gapType: 'missing_lookup';
+  process: string;
+  machineClass: string;
+  inputValidation: ValidatedInput[];
+  lookupResolution: LookupResolution;
+  requiredAction: string;
+  suggestedSources?: string[];
+  priority: 'low' | 'medium' | 'high';
+}
+export interface UnsupportedOperationGap {
+  gapType: 'unsupported_operation';
+  process: string;
+  machineClass: string;
+  reason: string;
+  requiredCapability?: string;
+}
+export type PhysicsGap = LookupGap | UnsupportedOperationGap;
+
+/** How much a calculator-resolved result should be trusted — see backend
+ *  ConfidenceLevel's own doc comment (cost-breakdown.dto.ts) for the full
+ *  definition of each tier. */
+export type ConfidenceLevel = 'verified' | 'derived' | 'unsupported';
+
 export interface ProcessLineCost {
   process: string;
   /** Real process_calculator_mappings identity for this line, resolved server-side
@@ -489,7 +621,7 @@ export interface ProcessLineCost {
   totalCost: number;
   cycleTimeMin: number;
   hourlyRate: number;
-  rateSource: 'mhr_database' | 'default_rate' | 'tier_synthetic' | 'benchmark_override';
+  rateSource: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override';
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;
@@ -497,6 +629,34 @@ export interface ProcessLineCost {
   labourRate?: number | null;
   machineSelection?: MachineSelectionResult;
   featureBreakdown?: FeatureOp[];
+  /** Full end-to-end audit trail (real inputs + provenance, then calculated
+   *  fields + real DB formula string, in evaluation order) — present only for
+   *  processes wired to a real DB calculator (Laser Cutting, Press Brake).
+   *  Powers the "Download calculation" export. */
+  calculationTrace?: CalculationTraceStep[];
+  /** Which real, registry-resolved calculator (and version) computed this
+   *  line's cycle time, when resolved via the Manufacturing Physics
+   *  Calculator pipeline. Absent for processes not yet migrated onto it. */
+  calculatorId?: string;
+  calculatorVersion?: number;
+  /** Present instead of a fabricated fallback number when the calculator
+   *  couldn't resolve this line's cycle time — the line still appears (never
+   *  silently omitted), but cycleTimeMin/totalCost reflect the gap (0/null). */
+  physicsGap?: PhysicsGap;
+  /** See ConfidenceLevel's own doc comment. Absent for processes not yet
+   *  migrated onto the calculator pipeline. */
+  confidence?: ConfidenceLevel;
+  /** Separate axis from `confidence` — grades the SELECTED MACHINE's own
+   *  capability data (real import vs seed/benchmark pattern-match vs generic
+   *  MACHINE_CLASS_DEFAULTS floor), not the process parameters. A line can
+   *  be `confidence: 'verified'` (real lookup row) while
+   *  `capabilityConfidence: 'unsupported'` (the machine's own tonnage/power
+   *  is a generic class default, not this machine's real rating). */
+  capabilityConfidence?: ConfidenceLevel;
+  /** Explanation for a saved process row's own machine, keyed by mhrId, for
+   *  when that machine differs from the live balanced/cheapest/fastest picks
+   *  in machineSelection above. */
+  savedMachineExplanations?: Record<string, { reasons: string[]; capabilityCheck: CapabilityCheck | null }>;
 }
 
 export interface ProcessCO2 {
@@ -547,10 +707,20 @@ export interface RouteResultSustainability {
   sustainabilityScore: number;
 }
 
+/** 'incomplete' whenever any processLines entry carries a physicsGap — see
+ *  backend CostStatus's own doc comment (cost-breakdown.dto.ts). totalCost
+ *  still sums whatever resolved, for engineering inspection, but is a
+ *  partial figure, not a real quote, when this is 'incomplete'. */
+export type CostStatus = 'complete' | 'incomplete';
+
 export interface CostSummaryDto {
   // Scenario readiness — false when no material is applied; frontend blocks cost display
   scenarioReady?: boolean;
   missingInputs?: string[];
+  /** See CostStatus's own doc comment. Always present once scenarioReady. */
+  costStatus?: CostStatus;
+  /** Process names with an unresolved physicsGap, when costStatus is 'incomplete'. */
+  incompleteProcesses?: string[];
   materialCost: number;
   materialGrade: string;
   grossWeightKg: number;
@@ -602,20 +772,33 @@ export function useCostSummary(itemId: string | undefined, batchSize: number = 1
   return useQuery({
     queryKey: ['bom-items', itemId, 'cost-summary', batchSize, location],
     queryFn: () =>
+      // Observed taking 14-40s in practice (re-runs nesting/machine-selection),
+      // well past the 15s dev-mode default (lib/config.ts) — same fix as
+      // useApplyRoute's timeout override above.
       apiClient.get<CostSummaryDto>(
         `/bom-items/${itemId}/cost-summary?batchSize=${batchSize}&location=${encodeURIComponent(location)}`,
+        { timeout: 60000 },
       ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
+    // MHR/LHR rates and process-mapping data this summary depends on are edited
+    // out-of-band (HR Rates page, Calculators/Process admin, direct migrations)
+    // at any time, with no realtime push to an already-open tab. Once this exact
+    // (itemId, batchSize, location) key was ever fetched during the current page
+    // session, staleTime elapsing alone never re-fetches it without some trigger —
+    // and this manufacturing-intelligence page keeps its cost panel mounted for
+    // the whole session, so a rate fixed elsewhere can look permanently "still
+    // broken" here even though the server is already correct (same root cause as
+    // the identical fix on useMHRRecords in useMHR.ts). Force a fresh fetch on
+    // every mount instead so "Recalculate Cost" isn't the only way to see it.
+    refetchOnMount: 'always',
   });
 }
 
-export type RouteId =
-  | "sm-laser" | "sm-turret" | "sm-waterjet"
-  | "cnc-3ax" | "cnc-4ax" | "cnc-5ax"
-  | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn"
-  | "injection-molding"
-  | "im-small-50t" | "im-standard-200t" | "im-large-500t";
+// Mirrors backend route-comparison.dto.ts's RouteId — widened to `string` for
+// the same reason: a newly-registered backend cutting engine's route id is
+// valid here with no frontend edit needed. Real validation happens server-side.
+export type RouteId = string;
 
 export type CapabilityReasonCode =
   | "DIMENSIONS_UNAVAILABLE"
@@ -679,12 +862,18 @@ export function useRouteComparison(itemId: string | undefined, batchSize: number
   return useQuery({
     queryKey: ["bom-items", itemId, "route-comparison", batchSize, location],
     queryFn: () =>
+      // Observed taking 8-18s in practice — same timeout fix as useCostSummary above.
       apiClient.get<RouteComparisonDto>(
         `/bom-items/${itemId}/route-comparison?batchSize=${batchSize}&location=${encodeURIComponent(location)}`,
+        { timeout: 60000 },
       ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    // Same staleness class as useCostSummary above — force a fresh fetch every
+    // mount so an MHR/mapping change made out-of-band is never masked by a
+    // result cached from earlier in the same page session.
+    refetchOnMount: 'always',
   });
 }
 
@@ -741,13 +930,64 @@ export function useApplyRoute(bomItemId: string | undefined) {
       apiClient.post<{ created: number; operations: string[]; routeLabel: string; routeId: string }>(
         `/bom-items/${bomItemId}/apply-route`,
         payload,
+        // Re-runs the whole route-comparison engine before writing records —
+        // observed taking 12-42s in practice, well past the 15s dev-mode
+        // default (lib/config.ts) and this endpoint has no dynamic-ID-safe
+        // entry in endpointTimeouts (those are exact-string keys, which can't
+        // match a URL containing this item's UUID) — override per-call instead.
+        { timeout: 60000 },
       ),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });
+      // Without these, the Cost tab kept rendering its stale cached
+      // cost-summary/route-comparison after a successful apply — the new
+      // process_cost_records were real, but nothing told the UI to refetch.
+      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'cost-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'route-comparison'] });
       toast.success(`${data.created} operations filled from "${data.routeLabel}"`);
     },
     onError: (err: Error) => {
       toast.error(`Route apply failed: ${err.message}`);
+    },
+  });
+}
+
+// Dynamically-assembled Workflow Builder route (add/remove/reorder real,
+// already-engine-computed operations, OR a real catalog operation with no
+// geometric trigger on this part yet) — see bom-items.controller.ts's
+// applyCustomRoute. A step with only `process` set must match a real,
+// already-engine-computed line; a step with processGroup/processRoute/
+// machineClass also set is validated against process_calculator_mappings and
+// gets a real machine rate resolved from scratch, but an honest 0 cycle time
+// (never fabricated) — surfaced back via needsManualCycleTime.
+export interface ApplyCustomRouteStep {
+  process: string;
+  processGroup?: string;
+  processRoute?: string;
+  machineClass?: string;
+}
+export function useApplyCustomRoute(bomItemId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { baseCuttingRouteId: string; steps: ApplyCustomRouteStep[]; batchSize?: number; location?: string }) =>
+      apiClient.post<{ created: number; operations: string[]; routeLabel: string; needsManualCycleTime: string[] }>(
+        `/bom-items/${bomItemId}/apply-custom-route`,
+        payload,
+        { timeout: 60000 }, // same route-comparison re-run cost as apply-route
+      ),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });
+      // Same gap as useApplyRoute above — the Cost tab never refetched after
+      // a successful custom-route apply without these.
+      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'cost-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'route-comparison'] });
+      toast.success(`${data.created} operations filled from "${data.routeLabel}"`);
+      if (data.needsManualCycleTime.length) {
+        toast.warning(`Set cycle time via Edit Process Cost for: ${data.needsManualCycleTime.join(', ')} — no real geometric trigger found, so cost is $0 until then.`);
+      }
+    },
+    onError: (err: Error) => {
+      toast.error(`Custom route apply failed: ${err.message}`);
     },
   });
 }

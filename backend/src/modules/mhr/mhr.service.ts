@@ -8,7 +8,7 @@ import { MHRCalculationEngine } from './engines/mhr-calculation.engine';
 import { MHRInputValidator } from './validators/mhr-input.validator';
 import { getCurrencyForLocation, MHR_CALCULATION_CONSTANTS } from './constants/mhr-calculation.constants';
 import { invalidateMachinePools } from '../bom-items/costing/machine-selection/pool-cache';
-import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import * as ExcelJS from 'exceljs';
 
 /**
@@ -54,6 +54,21 @@ export class MHRService {
     const hoursPerShift = parseFloat(row?.hours_per_shift ?? 0)                  || DEFAULTS.HOURS_PER_SHIFT;
     const maintHrs      = parseFloat(row?.planned_maintenance_hours_per_year ?? 0) || 0;
     const utilPct       = parseFloat(row?.capacity_utilization_rate ?? 0)        || DEFAULTS.CAPACITY_UTILIZATION_RATE;
+    // Disclosed, not silent: effectiveHoursPerYear/totalAnnualCost below are
+    // DERIVED from these operational assumptions (the manually-entered rate
+    // itself is unaffected) — a caller that omits real shift/hours/utilization
+    // data gets a real warning in the logs, not a number that looks measured.
+    const usedDefaults: string[] = [];
+    if (!(parseFloat(row?.working_days_per_year ?? 0) > 0)) usedDefaults.push(`working days/yr=${DEFAULTS.WORKING_DAYS_PER_YEAR}`);
+    if (!(parseFloat(row?.shifts_per_day ?? 0) > 0)) usedDefaults.push(`shifts/day=${DEFAULTS.SHIFTS_PER_DAY}`);
+    if (!(parseFloat(row?.hours_per_shift ?? 0) > 0)) usedDefaults.push(`hours/shift=${DEFAULTS.HOURS_PER_SHIFT}`);
+    if (!(parseFloat(row?.capacity_utilization_rate ?? 0) > 0)) usedDefaults.push(`utilization=${DEFAULTS.CAPACITY_UTILIZATION_RATE}%`);
+    if (usedDefaults.length > 0) {
+      this.logger.warn(
+        `Manual MHR entry: no real operational data for ${usedDefaults.join(', ')} — effectiveHoursPerYear/totalAnnualCost use assumed defaults, not measured values.`,
+        'MHRService',
+      );
+    }
 
     const workingHrs   = workingDays * shiftsPerDay * hoursPerShift;
     const availableHrs = Math.max(0, workingHrs - maintHrs);
@@ -105,46 +120,35 @@ export class MHRService {
    * For India (INR): uses lhrInrPerHr for the labor component.
    * For all other locations: uses usdLhrTotal as the labor USD rate directly.
    *
-   * FX rate comes from the `exchange_rates` table (via ExchangeRateService), not a
-   * hardcoded constant — an admin maintains the rate; this method never invents one.
-   * If the DB has no rate for this currency, mhrUsdPerHour falls back to the raw
-   * local figure (visibly wrong in USD terms, but never silently mispriced) and a
-   * warning is logged instead of failing the create/update request outright.
+   * FX rate comes from the caller's RateSnapshot (one FX read per request —
+   * see ExchangeRateService.getSnapshot), not a hardcoded constant — an admin
+   * maintains the rate; this method never invents one, and never silently
+   * treats local currency as USD when a rate is missing (throws instead).
    */
-  private async computeUsdAndBurdenedRates(
+  private computeUsdAndBurdenedRates(
     totalMachineHourRate: number,
     location: string,
-    accessToken: string,
+    rates: RateSnapshot,
     lhrInrPerHr?: number | null,
     usdLhrTotal?: number | null,
-  ): Promise<{
+  ): {
     currency: string;
     currencySymbol: string;
     mhrUsdPerHour: number;
     fullyBurdenedLocalPerHr: number | null;
     fullyBurdenedUsdPerHr: number | null;
-  }> {
+  } {
     const { currency, symbol } = getCurrencyForLocation(location);
-    await this.exchangeRateService.loadRates(accessToken);
-    const usdPerLocal = this.exchangeRateService.convert(currency, 'USD');
-    if (usdPerLocal == null) {
-      this.logger.warn(
-        `No exchange rate on file for '${currency}' — add it to the exchange_rates table. ` +
-        `USD-equivalent fields will be left unconverted for this record.`,
-        'MHRService',
-      );
-    }
-    const mhrUsdPerHour = parseFloat((totalMachineHourRate * (usdPerLocal ?? 1)).toFixed(4));
+    const usdPerLocal = rates.convertStrict(currency, 'USD');
+    const mhrUsdPerHour = parseFloat((totalMachineHourRate * usdPerLocal).toFixed(4));
 
     let fullyBurdenedLocalPerHr: number | null = null;
     let fullyBurdenedUsdPerHr: number | null = null;
 
     if (currency === 'INR' && lhrInrPerHr && lhrInrPerHr > 0) {
       fullyBurdenedLocalPerHr = parseFloat((totalMachineHourRate + lhrInrPerHr).toFixed(2));
-      fullyBurdenedUsdPerHr = usdPerLocal != null
-        ? parseFloat((fullyBurdenedLocalPerHr * usdPerLocal).toFixed(4))
-        : null;
-    } else if (currency !== 'INR' && usdLhrTotal && usdLhrTotal > 0 && usdPerLocal != null) {
+      fullyBurdenedUsdPerHr = parseFloat((fullyBurdenedLocalPerHr * usdPerLocal).toFixed(4));
+    } else if (currency !== 'INR' && usdLhrTotal && usdLhrTotal > 0) {
       // Convert USD labor back to local for the local burdened rate
       const lhrInLocal = usdLhrTotal / usdPerLocal;
       fullyBurdenedLocalPerHr = parseFloat((totalMachineHourRate + lhrInLocal).toFixed(2));
@@ -218,7 +222,7 @@ export class MHRService {
     this.logger.log('Fetching all MHR records', 'MHRService');
 
     const page = query.page || 1;
-    const limit = Math.min(query.limit || 50, 1000);
+    const limit = Math.min(query.limit || 50, 10000);
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -354,15 +358,25 @@ export class MHRService {
     let calculations: MHRCalculationResult;
     if (createMHRDto.isManualEntry && createMHRDto.manualMHRValue) {
       this.logger.log(`Using manual MHR value: ${createMHRDto.manualMHRValue}`, 'MHRService');
-      calculations = this.createManualEntryCalculation(createMHRDto.manualMHRValue);
+      // Previously called with no row at all — any real shiftsPerDay/hoursPerShift/
+      // workingDaysPerYear/capacityUtilizationRate the caller submitted alongside
+      // the manual value was silently discarded in favor of DEFAULTS below.
+      calculations = this.createManualEntryCalculation(createMHRDto.manualMHRValue, {
+        working_days_per_year: createMHRDto.workingDaysPerYear,
+        shifts_per_day: createMHRDto.shiftsPerDay,
+        hours_per_shift: createMHRDto.hoursPerShift,
+        planned_maintenance_hours_per_year: createMHRDto.plannedMaintenanceHoursPerYear,
+        capacity_utilization_rate: createMHRDto.capacityUtilizationRate,
+      });
     } else {
       calculations = this.calculateMHR(createMHRDto);
     }
 
-    const usdRates = await this.computeUsdAndBurdenedRates(
+    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const usdRates = this.computeUsdAndBurdenedRates(
       calculations.totalMachineHourRate,
       createMHRDto.location,
-      accessToken,
+      rates,
       createMHRDto.lhrInrPerHr ?? null,
       createMHRDto.usdLhrTotal ?? null,
     );
@@ -487,8 +501,17 @@ export class MHRService {
     let calculations: MHRCalculationResult;
     if (updateMHRDto.isManualEntry && updateMHRDto.manualMHRValue) {
       this.logger.log(`Using manual MHR value for update: ${updateMHRDto.manualMHRValue}`, 'MHRService');
-      // Create complete calculation result for manual entry
-      calculations = this.createManualEntryCalculation(updateMHRDto.manualMHRValue);
+      // Previously called with no row at all — any real operational data already
+      // stored on the existing record (or newly submitted in this update) was
+      // silently discarded in favor of DEFAULTS. mergedData already combines
+      // existing + this update's changes (see its own construction above).
+      calculations = this.createManualEntryCalculation(updateMHRDto.manualMHRValue, {
+        working_days_per_year: mergedData.workingDaysPerYear,
+        shifts_per_day: mergedData.shiftsPerDay,
+        hours_per_shift: mergedData.hoursPerShift,
+        planned_maintenance_hours_per_year: mergedData.plannedMaintenanceHoursPerYear,
+        capacity_utilization_rate: mergedData.capacityUtilizationRate,
+      });
     } else {
       // Calculate all metrics using the engine
       calculations = this.calculateMHR(mergedData);
@@ -543,10 +566,11 @@ export class MHRService {
     const effectiveLocation = updateMHRDto.location ?? existing.location;
     const effectiveLhrInr   = updateMHRDto.lhrInrPerHr ?? (existing as any).lhrInrPerHr ?? null;
     const effectiveUsdLhr   = updateMHRDto.usdLhrTotal ?? (existing as any).usdLhrTotal ?? null;
-    const usdRates = await this.computeUsdAndBurdenedRates(
+    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const usdRates = this.computeUsdAndBurdenedRates(
       calculations.totalMachineHourRate,
       effectiveLocation,
-      accessToken,
+      rates,
       effectiveLhrInr,
       effectiveUsdLhr,
     );
@@ -646,8 +670,11 @@ export class MHRService {
 
     // Loaded once for the whole import — every row's USD→local conversion below
     // reads from this live DB-backed rate map, never a hardcoded FX table.
-    await this.exchangeRateService.loadRates(accessToken);
+    const importRates = await this.exchangeRateService.getSnapshot(accessToken);
     const missingRateCurrencies = new Set<string>();
+    // Populated per-sheet below (shiftsCol etc. are scoped inside the sheet
+    // loop) — aggregated here so one disclosure covers every sheet processed.
+    const missingOperationalColsSet = new Set<string>();
 
     const workbook = new ExcelJS.Workbook();
     const arrayBuffer = fileBuffer.buffer.slice(
@@ -739,6 +766,16 @@ export class MHRService {
       const footprintCol        = getCol('machine footprint m', 'machine footprint sqm', 'machine footprint', 'machine_footprint_m2');
       const rentCol             = getCol('rent per m per month local', 'rent sqm month', 'rent per sqm per month', 'rent_per_m2_per_month_inr');
       const maintenanceCol      = getCol('maintenance cost', 'maintenance_cost_pct');
+      // Disclosed, not silent — see missingOperationalColsSet's declaration above.
+      if (!shiftsCol) missingOperationalColsSet.add('shifts/day');
+      if (!hoursCol) missingOperationalColsSet.add('hours/shift');
+      if (!daysCol) missingOperationalColsSet.add('working days/yr');
+      if (!accessoriesCol) missingOperationalColsSet.add('accessories cost %');
+      if (!installationCol) missingOperationalColsSet.add('installation cost %');
+      if (!paybackCol) missingOperationalColsSet.add('payback period (yrs)');
+      if (!interestCol) missingOperationalColsSet.add('interest rate %');
+      if (!insuranceCol) missingOperationalColsSet.add('insurance rate %');
+      if (!maintenanceCol) missingOperationalColsSet.add('maintenance cost %');
       const powerCol            = getCol('power kwh per hour', 'power kwh hr', 'spindle power kw', 'powers', 'power_kwh_per_hour');
       const electricityCol      = getCol('electricity cost per kwh local', 'electricity cost kwh', 'electricity cost per kwh', 'electricity_cost_per_kwh_inr');
       const adminCol            = getCol('admin overhead', 'admin_overhead_pct');
@@ -925,7 +962,7 @@ export class MHRService {
         // If Excel has no local landed cost column, derive from USD machine price × location FX
         // rate — read live from exchange_rates (loaded once above), never a hardcoded table.
         const { currency: locCurrency, symbol: locSymbol } = getCurrencyForLocation(locationVal);
-        const localPerUsd = this.exchangeRateService.convert('USD', locCurrency);
+        const localPerUsd = importRates.convertOptional('USD', locCurrency);
         if (localPerUsd == null) missingRateCurrencies.add(locCurrency);
         const landedCost = rawLandedCost > 0
           ? rawLandedCost
@@ -1248,6 +1285,20 @@ export class MHRService {
       errors.push(
         `No exchange rate on file for: ${list}. Add these to the exchange_rates table, then re-import — ` +
         `affected rows were saved with unconverted USD figures and will under-price by the FX factor until fixed.`,
+      );
+    }
+
+    // Disclosed, not silent: columns entirely absent from the workbook (not
+    // just a blank cell in a present column) fall back to
+    // MHR_CALCULATION_CONSTANTS.DEFAULTS with no prior disclosure anywhere —
+    // every affected row's totalAnnualCost/depreciation/etc. is derived from
+    // an assumed operational parameter, not the shop's real one.
+    if (missingOperationalColsSet.size > 0) {
+      const list = [...missingOperationalColsSet].join(', ');
+      this.logger.warn(`MHR import: workbook has no column for ${list} — all rows used assumed defaults for these fields`, 'MHRService');
+      errors.push(
+        `Workbook has no column for: ${list}. All imported rows used assumed default values for these fields ` +
+        `(not the shop's real operational data) — add these columns and re-import for accurate rates.`,
       );
     }
 

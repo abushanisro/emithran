@@ -70,6 +70,13 @@ export class RawMaterialsController {
     return this.rawMaterialsService.getFilterOptions(user.id, token);
   }
 
+  // Must be declared before @Get(':id') so 'aliases' isn't swallowed as an :id param.
+  @Get('aliases')
+  @ApiOperation({ summary: 'Get all material aliases (alias_normalized -> raw_material_id), for client-side alias-aware search' })
+  async getAliases(@AccessToken() token: string) {
+    return this.rawMaterialsService.getAliases(token);
+  }
+
   @Get('categories')
   @ApiOperation({ summary: 'Get available material categories' })
   @ApiResponse({ status: 200, description: 'Material categories retrieved successfully' })

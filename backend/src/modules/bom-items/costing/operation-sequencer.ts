@@ -13,6 +13,49 @@
  * - TAP_CYCLE_SEC is imported from default-rates.ts.
  * - When feature_graph_v2 is absent or empty, the caller falls back to the old
  *   (billetVol − partVol) / MRR formula — no regression for legacy data.
+ *
+ * ── Sheet-metal feature-driven routing backlog (see migration 381) ─────────
+ * Sheet metal's Counterboring/Countersinking/PEM Insertion/Reaming/CMM Inspection/
+ * Hole Extrusion (Burring) are now feature-driven (cost-engine.ts::computeCostSummary,
+ * gated on SheetMetalFeatureExtractorService output). Hole extrusion (burled/
+ * extruded hole flanges, e.g. drawing callout "2X M3 BURLING BACK CONVEX") was
+ * added via a real coaxial-hole-cluster detector in feature_extractors.py
+ * (geo_v40+, extruded_flange_count) — previously listed below as undetectable
+ * via surface-deviation analysis; the coaxial-cluster approach found it instead.
+ * The following requested process types are still deliberately NOT implemented —
+ * as of 2026-07-30 the CAD engine (cad-engine/feature_extractors.py) has no
+ * detector for them, and inventing a flag that always reads "not present" would
+ * be indistinguishable from a real detector silently failing. Each needs real
+ * detection work before it can be routed honestly:
+ *
+ *   Weld seams / spot welds / MIG-TIG-Laser weld — needs a weld-symbol/seam
+ *     detector (drawing callout OCR extension to drawing_analyzer.py, or a
+ *     seam-geometry detector in feature_extractors.py for multi-body assemblies).
+ *   Rivets / clinch features — needs a fastener-pattern detector (hole diameter
+ *     + spacing pattern matching, similar approach to sm_lookup_pem_hardware).
+ *   Roll forming / hems / return flanges / jog bends — needs bend-topology
+ *     classifiers beyond the current radius/angle bend detector (BendFeature
+ *     in feature_extractors.py only reports count + radius today).
+ *   Louvers / embosses / dimples / beads / coining — needs non-planar
+ *     surface-deviation detectors on the dominant flat face (none of these
+ *     show up as simple cylindrical/planar/conical faces).
+ *   Tabs & slots as assembly features, GD&T-driven CMM beyond the tight-
+ *     tolerance case, assembly/packaging triggers — need multi-part assembly
+ *     context this per-part extractor doesn't have.
+ *
+ * Extension recipe for any of the above (same pattern used for counterbore/
+ * countersink/PEM):
+ *   1. Detect the feature in feature_extractors.py (or add an OCR extractor to
+ *      drawing_analyzer.py for callout-based features like welds/threads).
+ *   2. Emit it into manufacturing_intelligence.features (or drawing_intelligence).
+ *   3. Classify it in SheetMetalFeatureExtractorService / auto-fill.service.ts's
+ *      RawGeometry, following the counterboreGroups/countersinkGroups precedent.
+ *   4. Add a gated block in cost-engine.ts::computeCostSummary + a
+ *      process_calculator_mappings row (+ sm_lookup_* cycle-time table if the
+ *      op needs one) for the new operation.
+ *
+ * Packaging & Logistics already has its own manual/auto-on-material-set UI
+ * section (unrelated to this routing engine) — not part of this backlog.
  */
 
 import type { MaterialClass } from "./cost-cnc-engine";

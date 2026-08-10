@@ -681,7 +681,10 @@ export class CADAnalysisService {
           ...form.getHeaders(),
           ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
         },
-        timeout: 180_000,
+        // Kept in sync with auto-fill.service.ts's analyze/geometry timeout —
+        // large/complex STEP files can spend minutes in OCC's own STEP
+        // transfer step alone, independent of this codebase.
+        timeout: 600_000,
         maxContentLength: 150 * 1024 * 1024,
       })
       .then(() => this.logger.log(`[prewarm] geometry cache warmed for ${originalFilename}`))

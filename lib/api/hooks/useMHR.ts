@@ -29,6 +29,19 @@ export function useMHRRecords(query?: MHRQuery, options?: { enabled?: boolean })
     enabled: options?.enabled !== false,
     retry: false, // 2026 Best Practice: Fail fast for list queries
     refetchOnWindowFocus: false,
+    // This list is filtered by machineClass, which changes per operation the
+    // process-cost dialog is opened for (e.g. 'tapping', 'deburring',
+    // 'press_brake') — each distinct value is its own cache entry. Admins add/
+    // edit mhr_records out-of-band (HR Rates page, migrations) at any time, so
+    // whichever machine classes were queried BEFORE such a change permanently
+    // cache an empty/stale result for the rest of the browser tab's life —
+    // nothing else in this hook's config (staleTime elapsing alone, window
+    // refocus, dialog close/reopen without a real unmount) ever forces a
+    // re-fetch of an already-cached key. Force one fresh network fetch every
+    // time a component newly observes this query (e.g. every dialog open)
+    // instead, so a machine that was just added is never masked by a stale
+    // "no machines for this class" result from earlier in the session.
+    refetchOnMount: 'always',
     throwOnError: false, // Graceful error handling
   });
 }

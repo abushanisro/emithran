@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiClient } from '@/lib/api/client';
 import { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { isWebGLAvailable } from '@/lib/utils/webgl';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
@@ -213,7 +214,8 @@ export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
         resolvedCategory.current = actualCategory === 'unknown' ? fileCategory : actualCategory;
 
         setFileUrl(url);
-        if (is3d && (resolvedCategory.current === 'stl' || resolvedCategory.current === 'obj')) {
+        const canRenderStl = resolvedCategory.current === 'stl' || resolvedCategory.current === 'obj';
+        if (is3d && canRenderStl && isWebGLAvailable()) {
           setPhase('rendering');
         } else {
           setPhase('done');

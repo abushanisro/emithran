@@ -102,6 +102,21 @@ export class RawMaterialResponseDto {
   @ApiProperty({ required: false })
   cutCode?: number;
 
+  @ApiProperty({ required: false })
+  elasticModulusGpa?: number;
+
+  @ApiProperty({ required: false })
+  poissonRatio?: number;
+
+  @ApiProperty({ required: false })
+  elongationPct?: number;
+
+  @ApiProperty({ required: false })
+  electricalConductivityIacsPct?: number;
+
+  @ApiProperty({ required: false })
+  thermalConductivityWMk?: number;
+
   // Plastic-specific properties
 
   @ApiProperty({ required: false })
@@ -139,6 +154,15 @@ export class RawMaterialResponseDto {
 
   static fromDatabase(row: any): RawMaterialResponseDto {
     const costValue = row.cost_india ?? (row.cost ? parseFloat(row.cost) : undefined);
+    // `cost`/`cost_india` are always INR by column definition (migration 069:
+    // "Material cost per unit in INR") — row.currency is only reliable when a
+    // distinct currency was actually recorded for this row (e.g. an imported
+    // material priced in a listed non-INR currency). Defaulting to 'USD'
+    // whenever row.currency was null silently mislabeled INR-sourced values
+    // as USD — confirmed live: costValue backed by cost_india displayed as
+    // "$X USD" instead of "₹X". Leave undefined (not a guessed default) when
+    // there's no cost value to label at all.
+    const currency = row.currency || (costValue !== undefined ? 'INR' : undefined);
 
     return {
       id: row.id,
@@ -150,7 +174,7 @@ export class RawMaterialResponseDto {
       densityKgM3: row.density_kg_m3 ? parseFloat(row.density_kg_m3) : undefined,
       cost: costValue ? parseFloat(String(costValue)) : undefined,
       unitCost: costValue ? parseFloat(String(costValue)) : undefined,
-      currency: row.currency || 'USD',
+      currency,
       // Regional costs
       costFrance: row.cost_france ? parseFloat(row.cost_france) : undefined,
       costGermany: row.cost_germany ? parseFloat(row.cost_germany) : undefined,
@@ -176,6 +200,11 @@ export class RawMaterialResponseDto {
       hardness: row.hardness ? parseFloat(row.hardness) : undefined,
       hardnessSystem: row.hardness_system,
       cutCode: row.cut_code ? parseFloat(row.cut_code) : undefined,
+      elasticModulusGpa: row.elastic_modulus_gpa ? parseFloat(row.elastic_modulus_gpa) : undefined,
+      poissonRatio: row.poisson_ratio ? parseFloat(row.poisson_ratio) : undefined,
+      elongationPct: row.elongation_pct ? parseFloat(row.elongation_pct) : undefined,
+      electricalConductivityIacsPct: row.electrical_conductivity_iacs_pct ? parseFloat(row.electrical_conductivity_iacs_pct) : undefined,
+      thermalConductivityWMk: row.thermal_conductivity_w_mk ? parseFloat(row.thermal_conductivity_w_mk) : undefined,
       // Plastic-specific properties
       regrinding: row.regrinding,
       regrindingPercentage: row.regrinding_percentage ? parseFloat(row.regrinding_percentage) : undefined,

@@ -22,6 +22,6 @@ import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.mod
   imports: [SupabaseModule, LoggerModule, ConfigModule, ManufacturingKnowledgeModule, ManufacturingRulesModule, ExchangeRateModule],
   controllers: [BOMItemsController],
   providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalFeatureExtractorService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService],
-  exports: [BOMItemsService, BomItemCostService, CADAnalysisService, AutoFillService],
+  exports: [BOMItemsService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalLookupService],
 })
 export class BOMItemsModule {}

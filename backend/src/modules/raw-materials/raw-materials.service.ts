@@ -17,6 +17,38 @@ export class RawMaterialsService {
     private readonly ferrousContainer: FerrousContainerService,
   ) {}
 
+  // Full alias list for client-side alias-aware search (the material-picker
+  // dialog fetches all materials once and filters in the browser, rather than
+  // calling findAll()'s search= param -- so it needs the alias map directly).
+  async getAliases(accessToken?: string): Promise<Array<{ aliasNormalized: string; rawMaterialId: string }>> {
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('material_aliases')
+      .select('alias_normalized, raw_material_id');
+    if (error) {
+      this.logger.error(`Error fetching material aliases: ${error.message}`, 'RawMaterialsService');
+      throw new InternalServerErrorException(`Failed to fetch material aliases: ${error.message}`);
+    }
+    return (data || []).map((r) => ({ aliasNormalized: r.alias_normalized, rawMaterialId: r.raw_material_id }));
+  }
+
+  // Alias lookup: a drawing/search term like "AL6101" or "EN AW-6101" has no
+  // substring in common with the row it should match ("Generic Aluminum, ANSI
+  // 6101"), so ilike alone can never find it. Checked first, exact match only —
+  // no fuzzy/nearest-neighbour guessing (a wrong material silently substituted
+  // is worse than an honest "not found").
+  private async resolveAliasId(searchTerm: string, accessToken?: string): Promise<string | null> {
+    const normalized = searchTerm.toUpperCase().replace(/[\s-]/g, '');
+    if (!normalized) return null;
+    const { data } = await this.supabaseService
+      .getClient(accessToken)
+      .from('material_aliases')
+      .select('raw_material_id')
+      .eq('alias_normalized', normalized)
+      .maybeSingle();
+    return data?.raw_material_id ?? null;
+  }
+
   async findAll(query: QueryRawMaterialsDto, userId?: string, accessToken?: string): Promise<RawMaterialListResponseDto> {
     this.logger.log('Fetching all raw materials', 'RawMaterialsService');
 
@@ -42,10 +74,15 @@ export class RawMaterialsService {
     // e.g. "Generic Stainless Steel, Alloy (X10CrNi18-8) Wrought/AM" would
     // otherwise split on the comma and be misread as nested grouping.
     if (query.search) {
-      const safe = query.search.replace(/"/g, '\\"'); // escape any literal double quotes
-      queryBuilder = queryBuilder.or(
-        `material.ilike."%${safe}%",material_group.ilike."%${safe}%",material_grade.ilike."%${safe}%"`
-      );
+      const aliasId = await this.resolveAliasId(query.search, accessToken);
+      if (aliasId) {
+        queryBuilder = queryBuilder.eq('id', aliasId);
+      } else {
+        const safe = query.search.replace(/"/g, '\\"'); // escape any literal double quotes
+        queryBuilder = queryBuilder.or(
+          `material.ilike."%${safe}%",material_group.ilike."%${safe}%",material_grade.ilike."%${safe}%"`
+        );
+      }
     }
 
     // Apply sorting
@@ -555,9 +592,14 @@ export class RawMaterialsService {
     }
 
     if (query.search) {
-      queryBuilder = queryBuilder.or(
-        `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_grade.ilike.%${query.search}%`
-      );
+      const aliasId = await this.resolveAliasId(query.search, accessToken);
+      if (aliasId) {
+        queryBuilder = queryBuilder.eq('id', aliasId);
+      } else {
+        queryBuilder = queryBuilder.or(
+          `material.ilike.%${query.search}%,material_group.ilike.%${query.search}%,material_grade.ilike.%${query.search}%`
+        );
+      }
     }
 
     // Apply pagination

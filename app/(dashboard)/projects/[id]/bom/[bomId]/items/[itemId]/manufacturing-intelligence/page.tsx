@@ -7,9 +7,14 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import {
   ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight,
   AlertCircle, GripVertical, GripHorizontal, RefreshCw,
-  Calculator, ShieldCheck, Flame, Crosshair, Loader2, Edit, X,
+  Calculator, ShieldCheck, Flame, Crosshair, Loader2, Edit, X, Download,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/components/ui/model-viewer';
@@ -22,20 +27,24 @@ import {
 } from '@/lib/heatmap/sources';
 import type { IMHeatmapFeatures, IMHeatmapSignals } from '@/lib/heatmap/types';
 import { cn } from '@/lib/utils';
+import { generateCalculationReportPdf } from '@/lib/utils/calculation-report';
+import { CalculationTracePanel } from '@/components/features/process-planning/CalculationTracePanel';
 import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
-import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useUpdateBOMItem, useCostSummary, useRouteComparison, useGdtAnalysis, useCostOverride, useApplyRoute, useCandidateRoutes, type BlankSpecDto, type CandidateRouteComparisonDto, type CandidateRouteDto } from '@/lib/api/hooks/useBOMItems';
+import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useGdtAnalysis, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, type BlankSpecDto, type ProcessLineCost, type ApplyCustomRouteStep } from '@/lib/api/hooks/useBOMItems';
+import { useMHRRecords, useMHRBenchmark } from '@/lib/api/hooks/useMHR';
+import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
+import { resolveMhrUsdRate } from '@/lib/api/mhr';
 import type { MaterialCandidate, GdtSeverity, CostSummaryDto, RouteResultDto } from '@/lib/api/hooks/useBOMItems';
-import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
+import { useRawMaterials, useMaterialAliases } from '@/lib/api/hooks/useRawMaterials';
 import type { RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { useCreateRawMaterialCost, useRawMaterialCosts } from '@/lib/api/hooks/useRawMaterialCosts';
 import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import type { ClearanceHole } from '@/lib/api/vave';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
 import { PartDimensionViewer } from '@/components/ui/part-dimension-viewer';
 import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
-import { StoredMachinePicker } from '@/components/features/manufacturing-intelligence/StoredMachinePicker';
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
 import { VendorNetworkPanel } from '@/components/features/manufacturing-intelligence/VendorNetworkPanel';
 import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
@@ -43,18 +52,15 @@ import { ProcessCostDialog } from '@/components/features/process-planning/Proces
 import { PackagingLogisticsSection } from '@/components/features/process-planning/PackagingLogisticsSection';
 import { ProcuredPartsSection } from '@/components/features/process-planning/ProcuredPartsSection';
 import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
-import { useCreateProcessCost, useUpdateProcessCost, useDeleteProcessCost, useProcessCosts } from '@/lib/api/hooks/useProcessCosts';
-import { useCreatePackagingLogisticsCost, usePackagingLogisticsCosts, LogisticsType, CostBasis } from '@/lib/api/hooks/usePackagingLogisticsCosts';
+import { useCreateProcessCost, useUpdateProcessCost, useDeleteProcessCost, useProcessCosts, type CreateProcessCostDto } from '@/lib/api/hooks/useProcessCosts';
+import { usePackagingLogisticsCosts } from '@/lib/api/hooks/usePackagingLogisticsCosts';
 import { useProcuredPartsCosts } from '@/lib/api/hooks/useProcuredPartsCosts';
 import { useToolingCosts } from '@/lib/api/hooks/useToolingCosts';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import type { FeatureGraph, FeatureGraphSummary, DFMWarning, DFMSeverity, ValidationResult, ManufacturingFeature, HoleGroup, HoleGroupLocation, BendFeature, FeatureNodeV2, FaceMapEntry, FeatureCategory } from '@/lib/types/manufacturing';
-import { FeatureAnalysisPanel } from '@/components/features/manufacturing-intelligence/FeatureAnalysisPanel';
-import type { ComponentFeatureAnalysis } from '@/lib/types/component-features';
-
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type PanelId = 'left' | 'center' | 'right' | 'process' | 'drivers' | 'features';
+type PanelId = 'left' | 'center' | 'right' | 'process' | 'drivers';
 
 interface ManualRouteOption {
   id: string;
@@ -63,6 +69,27 @@ interface ManualRouteOption {
   isRecommended: boolean;
   processes: string[];
   rationale: string;
+  // Real machine picks made in the Workflow Builder (page.tsx's
+  // RouteSelectionDialog) — applied via useMachineOverride AFTER apply-route
+  // creates the process_cost_records rows, since machine-override updates an
+  // existing row rather than creating one.
+  machineOverrides?: { processKey: string; mhrRecordId: string }[];
+  // Exact identity of a dynamically-assembled (Workflow Builder) route, so
+  // reopening the dialog to EDIT this same route restores exactly what's
+  // applied instead of resetting to the CAD-optimal default. `processes`
+  // above is cosmetic-label-only and `id` is a synthetic `custom-<timestamp>`
+  // — neither can round-trip back to a real cuttingRouteId ('sm-laser' etc.)
+  // or the real additional-step identities, so this is tracked separately.
+  dynamicCuttingRouteId?: string;
+  dynamicSteps?: Array<{ process: string; machineClass: string; isReal: boolean; processGroup?: string; processRoute?: string }>;
+  // The cutting route's OWN process line (e.g. "Turret Punching") — tracked
+  // separately from dynamicSteps ("additional steps" only, deliberately, so
+  // the Workflow Builder's cutting-method selector and its additional-steps
+  // list don't show it twice). apply-custom-route writes ONLY what's in its
+  // `steps` payload — it does NOT implicitly add baseCuttingRouteId's own
+  // cutting line — so this must be prepended at the call site, or the
+  // cutting operation is silently missing from every applied route.
+  dynamicCuttingStep?: { process: string; machineClass: string };
 }
 
 interface RouteScoringContext {
@@ -92,6 +119,10 @@ interface ProcessTreeNode {
   children?: ProcessTreeNode[];
   attrs?: { name: string; value: string }[];
   source?: string;
+  // Set on hole-diameter-group feature nodes ("Ø1.6 × 24") so
+  // computeFeatureNodeVisual can match this row to its v2Features occurrences
+  // for highlighting — matching by diameter, not by parsing the display label.
+  holeDiameterMm?: number;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -194,7 +225,10 @@ const SURFACE_TREATMENT_KB: Record<string, KBFeature[]> = {
 const CARBON_STEEL_TREATMENT_KEY = 'Zinc + Powder Coat';
 
 // Carbon/mild steel grades that corrode bare and default to Zinc + Powder Coat
-const RUSTY_MATERIALS = ['CRCA', 'MS', 'IS2062', 'DC01'];
+// SECC/SPCC/SGCC/SPHC/SPCE: JIS G3141/G3302/G3313 cold-rolled and
+// galvanized/electrogalvanized mild-steel sheet codes — same substrate
+// family as CRCA/IS2062/DC01, just JIS-coded instead of IS/EN-coded.
+const RUSTY_MATERIALS = ['CRCA', 'MS', 'IS2062', 'DC01', 'SECC', 'SPCC', 'SGCC', 'SPHC', 'SPCE'];
 
 type SubstrateClass = 'aluminum' | 'stainless' | 'carbon_steel' | 'unknown';
 
@@ -203,7 +237,10 @@ type SubstrateClass = 'aluminum' | 'stainless' | 'carbon_steel' | 'unknown';
 function classifySubstrate(materialText: string): SubstrateClass {
   const m = materialText.toUpperCase();
   if (m.trim().length === 0) return 'unknown';
-  if (/ALUMIN|(^|[^A-Z0-9])(AA\s?\d{4}|AL)([^A-Z]|$)|6061|6063|5052|5754|7075|2024/.test(m)) {
+  // T6 (ANSI H35.1 temper designation) is exclusive to heat-treatable
+  // aluminum alloys — real parts here are stored as e.g. "T6 - Sheet" with
+  // no alloy number, so match the temper code itself.
+  if (/ALUMIN|(^|[^A-Z0-9])(AA\s?\d{4}|AL)([^A-Z]|$)|6061|6063|5052|5754|7075|2024|\bT6\b/.test(m)) {
     return 'aluminum';
   }
   if (/STAINLESS|(^|[^A-Z])SS([^A-Z]|$)|304|316|430|17-4/.test(m)) return 'stainless';
@@ -562,7 +599,6 @@ function computeRouteScore(routeId: string, ctx: RouteScoringContext): RouteScor
 const RIGHT_TABS = [
   { key: 'copilot',       label: '✦ Copilot'   },
   { key: 'cost',          label: 'Cost'         },
-  { key: 'candidates',    label: 'Candidates'   },
   { key: 'validation',    label: 'Validation'   },
   { key: 'part_summary',  label: 'Part Info'    },
   { key: 'sustainability', label: 'Sustain'     },
@@ -594,6 +630,14 @@ function fmtInt(n: number | undefined | null): string {
   if (n == null || isNaN(n)) return '—';
   return n.toLocaleString('en-IN');
 }
+// A real ~5s operation (e.g. a short cut path + a handful of pierces) rounds
+// to "0.0 min" at 1-decimal-place minutes, indistinguishable from unset/zero.
+// Show sub-minute durations in seconds instead.
+function formatCycleMin(min: number | null | undefined): string {
+  if (min == null || !Number.isFinite(min) || min <= 0) return '0.0 min';
+  if (min < 1) return `${(min * 60).toFixed(1)} s`;
+  return `${min.toFixed(1)} min`;
+}
 // Never substitute the process route/group for a missing machine name — that
 // silently displays the process as if it were the machine (e.g. "Laser Cutting"
 // shown where a real machine like "Trumpf 3030" belongs). Say what's actually true.
@@ -621,20 +665,75 @@ function deriveProcessGroupFromMachineClass(machineClass: string | null | undefi
   if (plastics.includes(machineClass)) return 'Plastic & Rubber';
   return '';
 }
+// Maps one FeatureBreakdown row to the 3D-viewer highlight it represents, so
+// clicking "Bend R1mm x2" shows exactly those 2 bends (not every bend in the
+// part), "Pierces x19"/pierce cleanup shows all pierced holes, and cut-path/
+// edge-length rows (no discrete feature — the cut path runs around the whole
+// part) show the full model outline via the face map. Returns null when there's
+// nothing to highlight (feature graph not loaded, or an unrecognized type),
+// which the caller uses to disable the row rather than showing a dead click.
+function resolveFeatureOpHighlight(
+  op: { name: string; featureType: string },
+  v2Features: FeatureNodeV2[],
+  faceMap: FaceMapEntry[],
+): FeatureNodeV2 | null {
+  if (op.featureType === 'bend') {
+    const bendFeatures = v2Features.filter((f) => f.feature_type === 'bend');
+    const m = op.name.match(/R([\d.]+)mm/);
+    if (m) {
+      const bucket = parseFloat(m[1]!);
+      const matched = bendFeatures.filter((f) => Math.round((f.radius_mm ?? 0) * 2) / 2 === bucket);
+      if (matched.length) return mergeFeaturesToHL(`fb_bend_r${bucket}`, matched);
+    }
+    return mergeFeaturesToHL('fb_bend_all', bendFeatures);
+  }
+  if (op.featureType === 'pierce' || op.featureType === 'deburr_pierce') {
+    return mergeFeaturesToHL('fb_holes', v2Features.filter((f) => f.feature_type === 'hole'));
+  }
+  if (op.featureType === 'laser_cut' || op.featureType === 'deburr_edge') {
+    return buildFullModelHL('fb_outline', faceMap);
+  }
+  return null;
+}
+
 // aPriori-style per-feature sub-operation list (cut path, pierces, bends...) —
 // shared by both the live-engine row and the saved-process-record row, since
 // it's driven by the same geometry regardless of which is currently showing.
-function FeatureBreakdown({ items }: { items: Array<{ name: string; timeSec: number; featureType: string; count: number }> | undefined }) {
+// Clickable when a matching 3D feature is resolvable (see resolveFeatureOpHighlight)
+// — clicking highlights that exact feature in the 3D viewer so the number can
+// be visually verified against the model, reusing the same highlight mechanism
+// the Properties tree already uses for holes/bends.
+function FeatureBreakdown({
+  items,
+  fg,
+  onSelectHighlight,
+}: {
+  items: Array<{ name: string; timeSec: number; featureType: string; count: number }> | undefined;
+  fg?: FeatureGraph | null | undefined;
+  onSelectHighlight?: ((node: FeatureNodeV2 | null) => void) | undefined;
+}) {
   if (!items || items.length === 0) return null;
+  const v2Features = fg?.feature_graph_v2?.features ?? [];
+  const faceMap = fg?.feature_graph_v2?.metadata?.face_map ?? [];
   return (
     <div className="space-y-0.5">
       <div className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">Feature breakdown</div>
-      {items.map((op, oi) => (
-        <div key={oi} className="flex items-center justify-between py-0.5 pl-3 border-l-2 border-violet-500/20">
-          <span className="text-[11px] text-muted-foreground/80 font-mono">{op.name}</span>
-          <span className="text-[11px] text-muted-foreground/60 tabular-nums">{(op.timeSec / 60).toFixed(1)} min</span>
-        </div>
-      ))}
+      {items.map((op, oi) => {
+        const highlight = onSelectHighlight ? resolveFeatureOpHighlight(op, v2Features, faceMap) : null;
+        return (
+          <button
+            key={oi}
+            type="button"
+            disabled={!highlight}
+            onClick={() => highlight && onSelectHighlight?.(highlight)}
+            title={highlight ? 'Click to highlight in the 3D view' : undefined}
+            className="w-full flex items-center justify-between py-0.5 pl-3 border-l-2 border-violet-500/20 text-left transition-colors disabled:cursor-default enabled:hover:border-violet-500/60 enabled:hover:bg-violet-500/5"
+          >
+            <span className="text-[11px] text-muted-foreground/80 font-mono">{op.name}</span>
+            <span className="text-[11px] text-muted-foreground/60 tabular-nums">{formatCycleMin(op.timeSec / 60)}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -743,14 +842,54 @@ function realBendCycleTimeSec(count: number, radiusMm: number | null, cost: Cost
   return (count / totalCount) * totalSec;
 }
 
-function realLaserCutTimeSec(cost: CostSummaryDto | null | undefined): number | null {
-  const laserLine = cost?.processLines?.find((l) => l.process === 'Laser Cutting');
-  const cutEntry = laserLine?.featureBreakdown?.find((f) => f.featureType === 'laser_cut');
+// Load/Unload is a real, but PART-level (not per-radius-group) handling time —
+// buildPressBrakeFeatureBreakdown emits it once per part, not once per bend
+// group. Surfaced on whichever bend node is selected for reference; not
+// summed across multiple bend nodes if a part has more than one radius group.
+function realBendHandlingSec(cost: CostSummaryDto | null | undefined): number | null {
+  const entry = cost?.processLines
+    ?.find((l) => l.process === 'Press Brake')
+    ?.featureBreakdown?.find((f) => f.featureType === 'handling');
+  return entry ? entry.timeSec : null;
+}
+
+// Real machine-selection result for Press Brake — same object the
+// MachineSelector component renders elsewhere; surfaced here too so the Bend
+// tree node can show "why this machine" (tonnage/bed-length reasons) and
+// required tonnage (from the SAME PressBrakeRequirement the selector used —
+// see physics.ts's pressBrakeRequirement) without recomputing anything.
+function realBendMachineSelection(cost: CostSummaryDto | null | undefined) {
+  return cost?.processLines?.find((l) => l.process === 'Press Brake')?.machineSelection ?? null;
+}
+
+// Matched by the real, applied process name — not a hardcoded 'Laser Cutting'
+// literal — so this resolves correctly for whichever cutting process (Laser,
+// Waterjet, Plasma...) is actually applied. cycleTimes.laserMin is a laser-
+// specific fallback field on CostSummaryDto with no equivalent for other
+// cutting processes yet, so it's only consulted when processName really is
+// 'Laser Cutting'; otherwise this honestly returns null rather than reusing
+// a laser-specific number for a different process.
+function realCutTimeSec(cost: CostSummaryDto | null | undefined, processName: string): number | null {
+  const line = cost?.processLines?.find((l) => l.process === processName);
+  const cutEntry = line?.featureBreakdown?.find((f) => f.featureType === 'laser_cut');
   if (cutEntry) return cutEntry.timeSec;
-  if (typeof cost?.cycleTimes?.laserMin === 'number' && cost.cycleTimes.laserMin > 0) {
+  if (processName === 'Laser Cutting' && typeof cost?.cycleTimes?.laserMin === 'number' && cost.cycleTimes.laserMin > 0) {
     return cost.cycleTimes.laserMin * 60;
   }
   return null;
+}
+
+// Real Cutting/Piercing split from the SAME featureBreakdown entries that
+// drive the actual $ cost (buildLaserFeatureBreakdown, backend) — not a
+// separate client-side re-estimate. Returns null (not a guess) unless BOTH
+// entries are present, e.g. cost summary hasn't loaded yet, or the applied
+// process's cost line doesn't have a per-feature breakdown at all.
+function realCutTimeSplit(cost: CostSummaryDto | null | undefined, processName: string): { cuttingSec: number; piercingSec: number } | null {
+  const line = cost?.processLines?.find((l) => l.process === processName);
+  const cutEntry = line?.featureBreakdown?.find((f) => f.featureType === 'laser_cut');
+  const pierceEntry = line?.featureBreakdown?.find((f) => f.featureType === 'pierce');
+  if (!cutEntry && !pierceEntry) return null;
+  return { cuttingSec: cutEntry?.timeSec ?? 0, piercingSec: pierceEntry?.timeSec ?? 0 };
 }
 
 function formatEstCycleTime(sec: number | null, allocated = false): string {
@@ -760,31 +899,102 @@ function formatEstCycleTime(sec: number | null, allocated = false): string {
 
 // ── featureToTreeNode ──────────────────────────────────────────────────────────
 
-function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: string, cost?: CostSummaryDto | null): ProcessTreeNode {
+function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: string, cost?: CostSummaryDto | null, processName?: string): ProcessTreeNode {
   if (f.type === 'flat_pattern') {
     const r = f.recognition;
-    const realCutSec = realLaserCutTimeSec(cost);
+    // processName is the real, applied cutting process name (e.g. 'Water Jet
+    // Cutting') — falls back to 'Laser Cutting' only when the caller has no
+    // process context at all, so existing non-cutting callers (bend/hole
+    // features, which never read realCutSec/timeSplit below) are unaffected.
+    const cuttingProcessName = processName ?? 'Laser Cutting';
+    const realCutSec = realCutTimeSec(cost, cuttingProcessName);
+    const timeSplit = realCutTimeSplit(cost, cuttingProcessName);
     return {
       id: f.id, kind: 'feature', label: 'Flat Pattern', factory, machine,
       attrs: [
-        { name: 'Area', value: `${fmtInt(r.area_mm2)} mm²` },
+        { name: 'Part Area', value: `${fmtInt(r.area_mm2)} mm²` },
+        // Nesting/material-utilization metrics — directly affects nesting
+        // cost, so surfaced alongside area rather than buried in a cost tab.
+        // Only present when the true 2D unfold solver could resolve this
+        // part's flat-pattern layout (fails gracefully otherwise, e.g. non-
+        // manifold topology — never a guessed number).
+        ...(r.bounding_rect_mm2 ? [
+          { name: 'Bounding Rectangle', value: `${fmtInt(r.bounding_rect_mm2)} mm²` },
+          { name: 'Material Utilization', value: `${fmt(r.material_utilization_pct ?? 0, 1)}%` },
+          { name: 'Scrap', value: `${fmtInt(r.scrap_area_mm2 ?? 0)} mm²` },
+        ] : []),
         ...(r.cut_length_mm > 0 ? [{ name: 'Cut Length', value: `${fmt(r.cut_length_mm, 0)} mm` }] : []),
-        ...(r.pierce_count > 0 ? [{ name: 'Pierce Count', value: String(r.pierce_count) }] : []),
+        // Breakdown by category — lets the number be checked instead of
+        // trusted as one opaque total. Only present when the CAD engine's
+        // panel-wire walk produced it (STEP topology path).
+        ...(r.cut_length_breakdown ? [
+          { name: '— Outer Profile', value: `${fmt(r.cut_length_breakdown.outer_profile_mm, 1)} mm` },
+          ...(r.cut_length_breakdown.circular_holes_mm > 0 ? [{ name: '— Circular Holes', value: `${fmt(r.cut_length_breakdown.circular_holes_mm, 1)} mm` }] : []),
+          ...(r.cut_length_breakdown.internal_profiles_mm > 0 ? [{ name: '— Internal Profiles', value: `${fmt(r.cut_length_breakdown.internal_profiles_mm, 1)} mm` }] : []),
+        ] : []),
+        // Laser machines slow down on long unbroken contours — this is the
+        // single longest cut path, not the summed total above, so it's
+        // surfaced as its own DFM-relevant row. Only present when the
+        // panel-wire walk produced it (same convention as the breakdown).
+        ...(r.longest_continuous_cut_mm != null ? [{ name: 'Longest Continuous Cut', value: `${fmt(r.longest_continuous_cut_mm, 1)} mm` }] : []),
+        // Corner count by turn angle — useful for estimating machine
+        // deceleration. Acute is always a SUBSET of sharp, not a separate
+        // total. Only present when the panel-wire walk produced it.
+        ...(r.sharp_corner_count != null ? [
+          { name: 'Sharp Corners (>60°)', value: String(r.sharp_corner_count) },
+          { name: 'Acute Corners (<30°)', value: String(r.acute_corner_count ?? 0) },
+        ] : []),
+        // Reported as Lead-ins/Lead-outs (matching commercial CAM software
+        // convention) rather than one "Pierce Count" — each pierce point is
+        // one closed-contour entry (lead-in) and one exit before the head
+        // lifts (lead-out). Same count as pierce_count under this system's
+        // current model (no chain-cutting between adjacent contours), so
+        // both rows share the one underlying number rather than being two
+        // independently-measured quantities.
+        ...(r.pierce_count > 0 ? [
+          { name: 'Lead-ins', value: String(r.pierce_count) },
+          { name: 'Lead-outs', value: String(r.pierce_count) },
+        ] : []),
+        // Holes under 2x sheet thickness need a reduced feed rate to pierce
+        // cleanly — useful for estimating cycle-time slowdown. Only present
+        // when the panel-wire walk produced it.
+        ...(r.small_hole_count != null ? [{ name: 'Small Holes (<2×Thickness)', value: String(r.small_hole_count) }] : []),
         { name: 'Sheet Thickness', value: `${fmt(r.sheet_thickness_mm, 1)} mm` },
-        { name: 'Est. Laser Time', value: formatEstCycleTime(realCutSec) },
+        // Breakdown instead of one opaque "Est. Laser Time" — matches how
+        // commercial CAM software explains a cycle-time estimate. Cutting/
+        // Piercing come from the SAME featureBreakdown entries that drive
+        // the actual $ cost (not a separate re-estimate); Rapid Traverse is
+        // a real addition on top (head repositioning between pierce points
+        // isn't in the cost engine's total at all currently). Falls back to
+        // the single old row when either piece of real data isn't loaded
+        // yet, rather than showing a partially-real, partially-guessed mix.
+        ...(timeSplit && r.rapid_traverse_sec != null ? [
+          { name: 'Rapid Traverse', value: `${fmt(r.rapid_traverse_sec, 1)} sec` },
+          { name: 'Piercing', value: `${fmt(timeSplit.piercingSec, 1)} sec` },
+          { name: cuttingProcessName, value: `${fmt(timeSplit.cuttingSec, 1)} sec` },
+          { name: 'Total', value: `${fmt(r.rapid_traverse_sec + timeSplit.piercingSec + timeSplit.cuttingSec, 1)} sec` },
+        ] : [
+          { name: `Est. ${cuttingProcessName} Time`, value: formatEstCycleTime(realCutSec) },
+        ]),
       ],
     };
   }
   if (f.type === 'hole') {
     const r = f.recognition;
+    const holeType = r.hole_type ?? 'through';
     const dLabel = r.diameter_mm != null ? `Ø${r.diameter_mm.toFixed(1)}` : 'Ø?';
+    const typeLabel = holeType === 'counterbore' ? 'Counterbore' : holeType === 'countersink' ? 'Countersink' : null;
     const realSec = realPierceCycleTimeSec(r.count, cost);
     return {
-      id: f.id, kind: 'feature', label: `${dLabel} × ${r.count}`, factory, machine,
+      id: f.id, kind: 'feature',
+      label: typeLabel ? `${typeLabel} ${dLabel} × ${r.count}` : `${dLabel} × ${r.count}`,
+      factory, machine,
+      ...(r.diameter_mm != null ? { holeDiameterMm: r.diameter_mm } : {}),
       attrs: [
         { name: 'Diameter', value: r.diameter_mm != null ? `${r.diameter_mm.toFixed(1)} mm` : '—' },
         { name: 'Count', value: String(r.count) },
-        { name: 'Process', value: 'Laser Pierce' },
+        { name: 'Hole Type', value: typeLabel ?? 'Through' },
+        { name: 'Process', value: typeLabel ?? 'Laser Pierce' },
         { name: 'Est. Cycle Time', value: formatEstCycleTime(realSec, true) },
       ],
     };
@@ -792,15 +1002,46 @@ function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: st
   if (f.type === 'bend') {
     const r = f.recognition;
     const realSec = realBendCycleTimeSec(r.count, r.radius_mm ?? null, cost);
+    const handlingSec = realBendHandlingSec(cost);
+    const totalSec = realSec != null || handlingSec != null ? (realSec ?? 0) + (handlingSec ?? 0) : null;
+    const ms = realBendMachineSelection(cost);
+    const req = ms?.requirement as ({ kind: string; tonnage?: number; bendLengthMm?: number } | undefined);
+    const requiredTonnage = req?.kind === 'press_brake' && typeof req.tonnage === 'number' ? req.tonnage : null;
+    const pickedMachine = ms?.balanced?.candidate ?? null;
+    const maxTonnage = pickedMachine?.capability?.maxTonnage ?? null;
+    const utilizationPct = requiredTonnage != null && maxTonnage != null && maxTonnage > 0
+      ? Math.round((requiredTonnage / maxTonnage) * 1000) / 10
+      : null;
     return {
       id: f.id, kind: 'feature',
       label: r.radius_mm != null ? `R${r.radius_mm.toFixed(1)} × ${r.count}` : `Bends × ${r.count}`,
       factory, machine,
       attrs: [
-        ...(r.radius_mm != null ? [{ name: 'Radius', value: `${r.radius_mm.toFixed(1)} mm` }] : []),
-        { name: 'Count', value: String(r.count) },
-        { name: 'PB Hits', value: String(r.count) },
-        { name: 'Est. Cycle Time', value: formatEstCycleTime(realSec, r.radius_mm == null) },
+        ...(r.radius_mm != null ? [{ name: 'Bend Radius', value: `${r.radius_mm.toFixed(1)} mm` }] : []),
+        { name: 'Bend Count', value: String(r.count) },
+        // Real per-bend angle/length from the cad-engine's bend clustering —
+        // null (omitted) rather than guessed when that pass wasn't usable
+        // (mesh-inference-only parts, or a sharp-fold part with no bend radius).
+        ...(r.angle_deg != null ? [{ name: 'Bend Angle', value: `${r.angle_deg.toFixed(0)}°` }] : []),
+        ...(r.bend_length_mm != null ? [{ name: 'Bend Length', value: `${r.bend_length_mm.toFixed(1)} mm` }] : []),
+        // Required tonnage/machine/utilization all come from the SAME
+        // PressBrakeRequirement + selectMachine result that actually picked
+        // the machine and drove the $ cost — not a separate re-estimate.
+        ...(requiredTonnage != null ? [{ name: 'Required Force', value: `${requiredTonnage.toFixed(2)} ton` }] : []),
+        ...(pickedMachine?.machineName ? [{ name: 'Recommended Machine', value: pickedMachine.machineName }] : []),
+        ...(utilizationPct != null ? [{ name: 'Capacity Utilization', value: `${utilizationPct.toFixed(1)}%` }] : []),
+        ...((ms?.balanced?.reasons ?? []).map((reason) => ({ name: '— Why', value: reason }))),
+        // Cycle time: Bending is this radius group's real stroke time; Load/
+        // Unload is a real but PART-level (not per-group) handling time — see
+        // realBendHandlingSec. Falls back to the old single estimate when
+        // the real breakdown isn't loaded yet.
+        ...(realSec != null || handlingSec != null ? [
+          { name: 'Bending', value: formatEstCycleTime(realSec) },
+          { name: 'Load / Unload', value: formatEstCycleTime(handlingSec) },
+          { name: 'Total', value: formatEstCycleTime(totalSec) },
+        ] : [
+          { name: 'Est. Cycle Time', value: formatEstCycleTime(realSec, r.radius_mm == null) },
+        ]),
       ],
     };
   }
@@ -834,6 +1075,20 @@ function isHygroscopicResin(grade: string | null | undefined): boolean {
   return false;
 }
 
+// ── Feature-driven gate helpers ─────────────────────────────────────────────────
+// Single source of truth for "does this part need X" — shared by autoCompleteRoute
+// (below) and RouteSelectionDialog's WORKFLOW_KB step visibility, so the Workflow
+// Builder's step list and the tree's auto-completion can never silently disagree
+// about which real, feature-driven operations apply to this part.
+
+// Tapping: pilot-hole diameter filter — Ø ≤ 6mm covers M2–M6 pilot sizes.
+function tappingCandidateCount(summary: FeatureGraphSummary): number {
+  if (!(summary.sheetThicknessMm > 0 && summary.sheetThicknessMm < 3)) return 0;
+  return (summary.holeGroups ?? [])
+    .filter((g) => g.diameter_mm <= 6.0)
+    .reduce((sum, g) => sum + g.count, 0);
+}
+
 // ── autoCompleteRoute ──────────────────────────────────────────────────────────
 
 function autoCompleteRoute(
@@ -851,28 +1106,51 @@ function autoCompleteRoute(
     );
     if (!hasCutting) completed.unshift({ process: 'Fiber Laser Cutting' });
 
+    // Hole Extrusion (Burring) + Tapping run right after cutting, BEFORE Press
+    // Brake + Deburring: the M3 thread sits in the extruded collar, so the
+    // collar must be formed and tapped while the part is still flat — tapping
+    // into an already-bent flange risks tool access/interference, and this
+    // also avoids handling an already-bent part through tapping. Same reorder
+    // as cost-engine.ts / bom-items.service.ts::getRouteComparison's allLines.
+    // `frontIdx` tracks the insertion point so each step lands right after the
+    // previous one, in this order, regardless of which are actually present.
+    const cutIdx = completed.findIndex((r) =>
+      r.process.includes('Laser') || r.process.includes('Punch') || r.process.includes('Waterjet'),
+    );
+    let frontIdx = cutIdx >= 0 ? cutIdx : -1;
+
+    if ((summary.extrudedFlangeCount ?? 0) > 0 && !completed.some((r) => r.process === 'Hole Extrusion (Burring)')) {
+      completed.splice(frontIdx + 1, 0, { process: 'Hole Extrusion (Burring)' });
+      frontIdx += 1;
+    } else {
+      const existingIdx = completed.findIndex((r) => r.process === 'Hole Extrusion (Burring)');
+      if (existingIdx >= 0) frontIdx = existingIdx;
+    }
+
+    if (tappingCandidateCount(summary) > 0 && !completed.some((r) => r.process === 'Tapping')) {
+      completed.splice(frontIdx + 1, 0, { process: 'Tapping' });
+      frontIdx += 1;
+    } else {
+      const existingIdx = completed.findIndex((r) => r.process === 'Tapping');
+      if (existingIdx >= 0) frontIdx = existingIdx;
+    }
+
     const hasBending = [...processes].some((p) => p.includes('Press Brake') || p.includes('Bending'));
     if (summary.bendCount > 0 && !hasBending) {
-      const cutIdx = completed.findIndex((r) =>
-        r.process.includes('Laser') || r.process.includes('Punch') || r.process.includes('Waterjet'),
-      );
-      completed.splice(cutIdx >= 0 ? cutIdx + 1 : completed.length, 0, { process: 'CNC Press Brake' });
+      completed.splice(frontIdx + 1, 0, { process: 'CNC Press Brake' });
     }
 
     if (!completed.some((r) => r.process === 'Deburring')) completed.push({ process: 'Deburring' });
 
-    // Tapping: pilot-hole diameter filter — Ø ≤ 6mm covers M2–M6 pilot sizes
-    const tappingCandidateCount = (summary.holeGroups ?? [])
-      .filter((g) => g.diameter_mm <= 6.0)
-      .reduce((sum, g) => sum + g.count, 0);
-    if (
-      tappingCandidateCount > 0 &&
-      summary.sheetThicknessMm > 0 &&
-      summary.sheetThicknessMm < 3 &&
-      !completed.some((r) => r.process === 'Tapping')
-    ) {
+    // Counterboring/Countersinking: feature-driven, mirrors cost-engine.ts's gating
+    // on summary.counterboreGroups/countersinkGroups (see migration 381).
+    if ((summary.counterboreGroups?.length ?? 0) > 0 && !completed.some((r) => r.process === 'Counterboring')) {
       const deburrIdx = completed.findIndex((r) => r.process === 'Deburring');
-      completed.splice(deburrIdx >= 0 ? deburrIdx : completed.length, 0, { process: 'Tapping' });
+      completed.splice(deburrIdx >= 0 ? deburrIdx : completed.length, 0, { process: 'Counterboring' });
+    }
+    if ((summary.countersinkGroups?.length ?? 0) > 0 && !completed.some((r) => r.process === 'Countersinking')) {
+      const deburrIdx = completed.findIndex((r) => r.process === 'Deburring');
+      completed.splice(deburrIdx >= 0 ? deburrIdx : completed.length, 0, { process: 'Countersinking' });
     }
 
     // Surface Treatment: only when the drawing calls out a coating, or the substrate
@@ -976,18 +1254,33 @@ function buildProcessTree(
     (item.tightestToleranceMm != null && item.tightestToleranceMm > 0 && item.tightestToleranceMm <= 0.10);
 
   const operations: ProcessTreeNode[] = recs.map((rec, opIdx) => {
-    const machine = rec.process === 'Inspection'
-      ? (needsCmm ? 'CMM' : 'Inspection Bench')
-      : MACHINE_FOR[rec.process] ?? '—';
-    const subLabel = SUB_OP[rec.process] ?? 'As Processed';
-    const featureNodes: ProcessTreeNode[] = [];
-
     const isSheetMetal = family === 'sheet_metal';
     const isCutting = rec.process.includes('Laser') || rec.process.includes('Cutting');
     const isBending = rec.process.includes('Press Brake') || rec.process.includes('Bending');
     const isTurning = rec.process.includes('Turning');
     const isMilling = !isTurning && (rec.process.includes('Milling') || rec.process.includes('Machining'));
     const isMolding = rec.process.includes('Moulding') || rec.process.includes('Molding');
+
+    // Prefer the real, DB-resolved machine from the live cost engine over the
+    // generic MACHINE_FOR placeholder table below — that table is a last-resort
+    // label for when no cost data exists yet at all (e.g. material grade not
+    // set), never a stand-in for an actual machine selection. Matched by EXACT
+    // process name against cost.processLines[].process (both machineName and
+    // machineClass are read straight off that same real, backend-resolved
+    // line — nothing here classifies or guesses a machine class from the
+    // process label). This used to hardcode a family lookup ('Cutting' ->
+    // always 'Laser Cutting') that silently pulled the laser's machine onto a
+    // Waterjet Cutting step; matching on the actual name this tree is already
+    // using (rec.process, itself now sourced from the applied route when one
+    // exists — see appliedRouteProcessNames at the buildProcessTree call site)
+    // removes the guesswork entirely instead of trading one guess for another.
+    const matchedCostLine = cost?.processLines?.find((l) => l.process === rec.process);
+    const realMachineName = matchedCostLine?.machineName ?? null;
+    const machine = rec.process === 'Inspection'
+      ? (needsCmm ? 'CMM' : 'Inspection Bench')
+      : realMachineName ?? MACHINE_FOR[rec.process] ?? '—';
+    const subLabel = SUB_OP[rec.process] ?? 'As Processed';
+    const featureNodes: ProcessTreeNode[] = [];
 
     // For CNC parts: which feature groups belong to this operation
     const OP_GROUPS: Record<string, string[]> = {
@@ -1007,29 +1300,51 @@ function buildProcessTree(
       const flatFeat = (fg?.features ?? []).find((f) => f.type === 'flat_pattern') ?? null;
       const holeFeats = (fg?.features ?? []).filter((f) => f.type === 'hole');
 
+      let flatNode: ProcessTreeNode | null = null;
       if (flatFeat) {
-        featureNodes.push(featureToTreeNode(flatFeat, factory, machine, cost));
+        flatNode = featureToTreeNode(flatFeat, factory, machine, cost, rec.process);
       } else if (summary.flatPatternAreaMm2 > 0) {
-        const cutTimeSec = realLaserCutTimeSec(cost);
-        featureNodes.push({
+        const cutTimeSec = realCutTimeSec(cost, rec.process);
+        flatNode = {
           id: 'feat_flat', kind: 'feature', label: 'Flat Pattern', factory, machine,
           attrs: [
             { name: 'Area', value: `${fmtInt(summary.flatPatternAreaMm2)} mm²` },
             ...(summary.cutLengthMm > 0 ? [{ name: 'Cut Length', value: `${fmt(summary.cutLengthMm, 0)} mm` }] : []),
-            ...(summary.pierceCount > 0 ? [{ name: 'Pierce Count', value: String(summary.pierceCount) }] : []),
-            { name: 'Est. Laser Time', value: formatEstCycleTime(cutTimeSec) },
+            ...(summary.pierceCount > 0 ? [
+              { name: 'Lead-ins', value: String(summary.pierceCount) },
+              { name: 'Lead-outs', value: String(summary.pierceCount) },
+            ] : []),
+            // realCutTimeSec only ever resolves a real number when the matched
+            // cost line has a per-feature breakdown — correctly returns null
+            // (never a fabricated guess) for a cutting process with no such
+            // breakdown yet. The label names whichever process actually
+            // matched the real cost line (falling back to rec.process, itself
+            // the real applied-route name, not a guess) instead of a
+            // hardcoded process-family list.
+            { name: `Est. ${matchedCostLine?.process ?? rec.process} Time`, value: formatEstCycleTime(cutTimeSec) },
           ],
-        });
+        };
       }
 
+      // Every hole feature — grouped-by-diameter ("symmetric" repeats) and any
+      // ungrouped/one-off ("asymmetric") hole below in the SECONDARY/TERTIARY
+      // fallbacks alike — nests under Flat Pattern instead of showing as its
+      // own top-level row: a dozen+ separate "Ø1.6 × 24" / "Ø2.5 × 10" / ...
+      // siblings cluttered the tree. Each is still individually selectable,
+      // just as a child. Flat Pattern's own Cut Length/Pierce Count attrs
+      // above already sum every real hole via the backend's
+      // _compute_cut_length, so this nesting only ever changes display, never
+      // the cost-accuracy number itself.
+      const holeNodes: ProcessTreeNode[] = [];
       const holeGroups = summary.holeGroups ?? [];
       if (holeGroups.length > 0) {
         // PRIMARY: pre-grouped from CAD engine — diameter guaranteed correct
         holeGroups.forEach((g) => {
-          featureNodes.push({
+          holeNodes.push({
             id: g.id ?? `hole_d${g.diameter_mm.toFixed(1)}_c${g.count}`, kind: 'feature',
             label: `Ø${g.diameter_mm.toFixed(1)} × ${g.count}`,
             factory, machine,
+            holeDiameterMm: g.diameter_mm,
             attrs: [
               { name: 'Diameter',        value: `${g.diameter_mm.toFixed(1)} mm` },
               { name: 'Count',           value: String(g.count) },
@@ -1040,7 +1355,7 @@ function buildProcessTree(
         });
       } else if (holeFeats.length > 0) {
         // SECONDARY: stored HoleFeature objects (may have null diameter on old DB entries)
-        holeFeats.forEach((f) => featureNodes.push(featureToTreeNode(f, factory, machine, cost)));
+        holeFeats.forEach((f) => holeNodes.push(featureToTreeNode(f, factory, machine, cost, rec.process)));
       } else {
         // TERTIARY: flat diameter list → group on the fly
         const diameters = summary.holeDiameters ?? [];
@@ -1048,8 +1363,9 @@ function buildProcessTree(
           const diaGroups: Record<string, number> = {};
           for (const d of diameters) { const k = d.toFixed(1); diaGroups[k] = (diaGroups[k] ?? 0) + 1; }
           Object.entries(diaGroups).forEach(([d, count], i) => {
-            featureNodes.push({
+            holeNodes.push({
               id: `feat_hole_d${i}`, kind: 'feature', label: `Ø${d} × ${count}`, factory, machine,
+              holeDiameterMm: parseFloat(d),
               attrs: [
                 { name: 'Diameter',        value: `${d} mm` },
                 { name: 'Count',           value: String(count) },
@@ -1059,17 +1375,26 @@ function buildProcessTree(
             });
           });
         } else if (summary.holeCount > 0) {
-          featureNodes.push({
+          holeNodes.push({
             id: 'feat_holes', kind: 'feature', label: `Holes (${summary.holeCount})`, factory, machine,
             attrs: [{ name: 'Count', value: String(summary.holeCount) }, { name: 'Process', value: 'Laser' }],
           });
         }
       }
 
+      if (flatNode) {
+        if (holeNodes.length > 0) flatNode.children = holeNodes;
+        featureNodes.push(flatNode);
+      } else {
+        // No flat-pattern data at all (rare) — still surface hole info rather
+        // than silently dropping it with no parent to nest under.
+        featureNodes.push(...holeNodes);
+      }
+
     } else if (isSheetMetal && isBending && summary.bendCount > 0) {
       const bendFeats = (fg?.features ?? []).filter((f) => f.type === 'bend');
       if (bendFeats.length > 0) {
-        bendFeats.forEach((f) => featureNodes.push(featureToTreeNode(f, factory, machine, cost)));
+        bendFeats.forEach((f) => featureNodes.push(featureToTreeNode(f, factory, machine, cost, rec.process)));
       } else {
         const radii = summary.bendRadii ?? [];
         if (radii.length > 0) {
@@ -1448,7 +1773,7 @@ function computeOperationVisual(
     return hl ? { highlight: hl, color } : null;
   };
   if (l.includes('laser') || l.includes('cutting') || l.includes('punch') || l.includes('waterjet'))
-    return merge('op-cutting', v2Features.filter((f) => f.feature_type === 'hole'), '#3b82f6');
+    return merge('op-cutting', v2Features.filter((f) => f.feature_type === 'hole' || f.feature_type === 'cut_profile'), '#3b82f6');
   if (l.includes('press brake') || l.includes('bending'))
     return merge('op-bending', v2Features.filter((f) => f.feature_type === 'bend'), '#eab308');
   if (l.includes('tapping'))
@@ -1522,6 +1847,44 @@ function computeFeatureNodeVisual(
     return hl ? { highlight: hl, color: '#e2e8f0' } : null; // light — quality overlay
   }
   if (node.id === 'feat_im_dry_resin') return null; // Pre-process — no geometry
+  // Individual hole-diameter-group rows ("Ø1.6 × 24") nested under Flat
+  // Pattern — previously fell through every branch above to `return null`,
+  // so clicking one never highlighted anything at all. Match by diameter
+  // (tagged on the node at build time) rather than parsing the label.
+  if (node.holeDiameterMm != null) {
+    // Round both sides to 1dp before comparing — summary.holeGroups and
+    // feature_graph_v2.features are computed by two separate backend calls
+    // that both round to 1dp with the same formula, but comparing raw floats
+    // risks a spurious mismatch from binary floating-point representation
+    // (e.g. 1.6 stored as 1.5999999999999999 on one side).
+    const targetD = Math.round(node.holeDiameterMm * 10) / 10;
+    const matches = v2Features.filter(
+      (f) => f.feature_type === 'hole' && f.diameter_mm != null && Math.round(f.diameter_mm * 10) / 10 === targetD,
+    );
+    const hl = mergeFeaturesToHL(`hl-hole-${targetD}`, matches);
+    if (hl) return { highlight: hl, color: '#3b82f6' };
+    // No v2 occurrence matched this diameter (e.g. stale/out-of-sync feature
+    // graph data) — fall back to the full-model tint rather than nothing,
+    // same convention Flat Pattern's own highlight below uses.
+    const full = buildFullModelHL(`hl-hole-${targetD}`, faceMap);
+    return full ? { highlight: full, color: '#3b82f6' } : null;
+  }
+  if (node.label === 'Flat Pattern') {
+    // The complete laser-cutting operation: every hole (every diameter group
+    // — "symmetric" repeats — and any one-off/ungrouped "asymmetric" hole
+    // alike) TOGETHER WITH every real cut boundary's side-wall faces
+    // ('cut_profile' — every panel's outer perimeter AND any cutout in it,
+    // whatever shape it is — what the laser actually cuts along, not the
+    // flat panel surface itself), merged into one highlight. Falls back to
+    // the full-model tint only when the part has neither (e.g.
+    // feature_graph_v2 not yet computed for this part), so clicking Flat
+    // Pattern always shows something.
+    const cutFeatures = v2Features.filter((f) => f.feature_type === 'hole' || f.feature_type === 'cut_profile');
+    const holeHl = mergeFeaturesToHL('hl-flat-pattern', cutFeatures);
+    if (holeHl) return { highlight: holeHl, color: '#38bdf8' }; // sky blue — unfolded blank
+    const hl = buildFullModelHL('hl-flat-pattern', faceMap);
+    return hl ? { highlight: hl, color: '#38bdf8' } : null;
+  }
   return null;
 }
 
@@ -1647,11 +2010,55 @@ function EditCell({
 
 // ── CostSummaryTab — aPriori-style with inline editing ─────────────────────
 
-function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { item: BOMItem; batchSize: number; appliedRouteId?: string | null; factory?: string }) {
+function CostSummaryTab({
+  item, batchSize, appliedRouteId, factory = 'USA', fg, onSelectHighlight,
+}: {
+  item: BOMItem; batchSize: number; appliedRouteId?: string | null; factory?: string;
+  fg?: FeatureGraph | null | undefined;
+  onSelectHighlight?: ((node: FeatureNodeV2 | null) => void) | undefined;
+}) {
   const { data: cost, isLoading } = useCostSummary(item.id, batchSize, factory);
   const { data: comparison } = useRouteComparison(item.id, batchSize, factory);
-  const appliedRoute: RouteResultDto | null = appliedRouteId
-    ? (comparison?.routes.find((r) => r.routeId === appliedRouteId) ?? null)
+  const { data: existingProcRecords, isLoading: isLoadingProcRecords } = useProcessCosts({ bomItemId: item.id, isActive: true, enabled: !!item.id });
+  // The caller never actually passes appliedRouteId (see <CostSummaryTab .../>
+  // call site) -- it's a leftover prop from when route selection lived only in
+  // RouteComparisonCard's own local useState, which resets to null on every
+  // reload/navigation and was never wired to this tab at all. That meant
+  // `eff.lines` below always fell back to cost.processLines (the cost engine's
+  // OWN default-recommended route), so any process class that only exists in
+  // a route the engineer manually applied (e.g. Waterjet Cutting, when the
+  // engine's own default pick is Laser Cutting) permanently lost the live
+  // MachineSelector "Why"/alternatives UI and showed the flat "$X/hr · Edit to
+  // change" fallback instead -- even though machine_class/location were both
+  // correctly persisted. Recover the REAL applied route from persisted data
+  // instead: applyRoute() stamps every inserted row's `notes` with
+  // `auto_fill_from_route:${routeId}` specifically for this purpose.
+  const persistedAppliedRouteId = useMemo(() => {
+    const records = existingProcRecords?.records ?? [];
+    for (const rec of records) {
+      const m = /^auto_fill_from_route:(.+)$/.exec((rec as any).notes ?? '');
+      if (m) return m[1];
+    }
+    // A Workflow Builder (dynamic/custom) apply stamps `auto_fill_from_
+    // custom_route:<itemId>` instead — it never embeds a real routeId the
+    // way the simple apply-route path does (see bom-items.controller.ts's
+    // applyCustomRoute), so the regex above always missed it and this fell
+    // through to `comparison.processLines`' own auto-recommended default
+    // (e.g. Laser Cut) — even when the real applied route was, say, Turret
+    // Punching. Derive the real routeId from the persisted rows' own
+    // machine_class instead, same lookup the restore-effect below uses.
+    const isCustomApply = records.some((r: any) => /^auto_fill_from_custom_route:/.test(r.notes ?? ''));
+    if (isCustomApply && comparison?.routes) {
+      const sorted = [...records].sort((a: any, b: any) => (a.opNbr || 0) - (b.opNbr || 0));
+      const classToRouteId = cuttingMachineClassToRouteId(comparison.routes);
+      const cuttingClass = sorted[0]?.machineClass as string | undefined;
+      if (cuttingClass && classToRouteId[cuttingClass]) return classToRouteId[cuttingClass];
+    }
+    return null;
+  }, [existingProcRecords, comparison]);
+  const effectiveAppliedRouteId = appliedRouteId ?? persistedAppliedRouteId;
+  const appliedRoute: RouteResultDto | null = effectiveAppliedRouteId
+    ? (comparison?.routes.find((r) => r.routeId === effectiveAppliedRouteId) ?? null)
     : null;
 
   // aPriori-style persistent overrides — sourced from the server response
@@ -1741,27 +2148,53 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
   const createProcCost = useCreateProcessCost();
   const updateProcCost = useUpdateProcessCost();
   const deleteProcCost = useDeleteProcessCost();
-  const { data: existingProcRecords, isLoading: isLoadingProcRecords } = useProcessCosts({ bomItemId: item.id, isActive: true, enabled: !!item.id });
   const sortedStoredProcs = [...(existingProcRecords?.records ?? [])].sort((a: any, b: any) => (a.opNbr || 0) - (b.opNbr || 0));
 
   const handleOpenEditProc = (line: { process: string; machineClass: string; rate: number; cycleMin: number; setupCost: number; hourlyRate: number; labourRate?: number | null; processGroup?: string; processRoute?: string; operation?: string }, index: number, openCalculator = false) => {
     const batchSz = cost?.batchSize ?? 1;
-    const setupTimeMins = line.hourlyRate > 0
-      ? parseFloat(((line.setupCost * batchSz * 60) / line.hourlyRate).toFixed(1))
+    // Reverse-compute setup time from amortized setupCost — must divide by the
+    // SAME combined machine+labor rate the backend used to produce setupCost
+    // (aprioriTerms: setupCost = (mhrMin + dlrMin*setupNDL) * setupTimeMin —
+    // cost-engine.ts:365), not machine rate alone. Dividing by hourlyRate only
+    // silently ignores the labor-rate term, wildly inflating the derived
+    // minutes whenever labor rate dwarfs machine rate — confirmed live: Hole
+    // Extrusion (Burring)'s machine rate is ~$0.28/hr (India) against a
+    // ~$47/hr labor rate, turning a real 5-minute seeded setup into a
+    // reverse-derived "1200 minutes" shown in the Edit Process Cost dialog.
+    const combinedRate = line.hourlyRate + (line.labourRate ?? 0);
+    const setupTimeMins = combinedRate > 0
+      ? parseFloat(((line.setupCost * batchSz * 60) / combinedRate).toFixed(1))
       : 0;
     // Look for an existing stored record for this process (match by operation name)
     const existingRecord = existingProcRecords?.records?.find(
       (r: any) => r.operation === line.process || r.processRoute === line.process,
     );
+    // No saved record for this line — fall back to the SAME live,
+    // machine-selection candidate this row already shows (ms.balanced,
+    // the ⭐ pick surfaced in eff.lines) rather than opening the calculator
+    // with no machine at all. Without this, a real recommended/manually-
+    // selected machine like "Salvagnini L3-30 2KW Fiber" — visibly shown on
+    // this exact row — never reaches the dialog, so Machine Capability
+    // shows "no machine selected" and power-dependent fields (Cutting
+    // Speed, Piercing Time Per Start) can never auto-fill, even though the
+    // row itself proves a real candidate is already known.
+    const liveCandidate = (line as any).machineSelection?.balanced?.candidate;
     setProcDialogPrefill(existingRecord ?? {
       opNbr: (index + 1) * 10,
       operation: line.operation || line.process,
       processGroup: line.processGroup || deriveProcessGroupFromMachineClass(line.machineClass),
       processRoute: line.processRoute || line.process,
       location: factory,
+      mhrId: liveCandidate?.machineId ?? null,
+      machineName: liveCandidate?.machineName ?? undefined,
       machineRate: line.rate,
       laborRate: line.labourRate ?? 0,
-      cycleTime: Math.round(line.cycleMin * 60),
+      // process_cost_records.cycle_time is NUMERIC(12,2) — rounding to a
+      // whole integer here silently threw away real precision the schema
+      // already supports (confirmed live: a genuine 19.2s line was saved as
+      // 19s, then visibly disagreed with the calculator's own exact 19.2s
+      // recomputation).
+      cycleTime: Math.round(line.cycleMin * 60 * 100) / 100,
       setupTime: setupTimeMins,
       batchSize: batchSz,
       heads: 1,
@@ -1787,6 +2220,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
             processGroup: data.group,
             processRoute: data.processRoute,
             operation: data.operation,
+            location: data.location || undefined,
             mhrId: data.mhrId || undefined,
             benchmarkMhrId: data.benchmarkMhrId || undefined,
             lhrId: data.lhrId || undefined,
@@ -1814,6 +2248,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
           processGroup: data.group,
           processRoute: data.processRoute,
           operation: data.operation,
+          location: data.location || undefined,
           mhrId: data.mhrId || undefined,
           benchmarkMhrId: data.benchmarkMhrId || undefined,
           lhrId: data.lhrId || undefined,
@@ -1863,8 +2298,16 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
   const toUsd = cost.toUsdRate ?? (1 / 83.5);
   // multiply stored USD values by this to convert to factory currency (e.g. 83.5 for India)
   const fromUsd = 1 / toUsd;
-  const fmtL = (v: number, d = 2) =>
-    `${sym}${v.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d })}`;
+  // A real, non-zero cost this small (e.g. Hole Extrusion (Burring) at
+  // $0.28/hr machine + $1.73/hr labour, 2.1s cycle, batch 250 — a genuine
+  // ~$0.0019/part) rounds to "$0.00" at the default 2dp, reading as broken/
+  // missing rather than a real, correctly-computed tiny figure. Bump
+  // precision automatically whenever 2dp would otherwise hide it — every
+  // caller across this page benefits without needing its own fix.
+  const fmtL = (v: number, d = 2) => {
+    const effectiveD = v > 0 && v < 0.01 && d <= 2 ? 4 : d;
+    return `${sym}${v.toLocaleString(undefined, { minimumFractionDigits: effectiveD, maximumFractionDigits: effectiveD })}`;
+  };
   const fmtUsd = (v: number) =>
     `$${(v * toUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -1877,14 +2320,29 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
     return s + base * (1 + Number(p.scrapPercentage ?? 0) / 100 + Number(p.overheadPercentage ?? 0) / 100);
   }, 0) * fromUsd;
   const toolingTotal = (storedTooling?.records ?? []).reduce((s, r: any) => s + (r.totalCost ?? 0), 0) * fromUsd;
-  // Stored process records — additive on top of engine estimate, converted from USD
+  // Stored process records — additive on top of engine estimate, converted from USD.
+  // Must use the exact same live-data preference as the per-row display below
+  // (matchedEngineLine / liveCycleSec / liveCandidate) — otherwise this grand total
+  // silently disagrees with what the individual rows show and their percentages
+  // stop summing to 100%.
   const storedProcessTotal = (existingProcRecords?.records ?? []).reduce((s: number, p: any) => {
-    const machineRate  = Number(p.machineRate  || 0);
+    const matchedLine = (eff?.lines ?? []).find(
+      (l) => l.machineClass && p.machineClass && l.machineClass === p.machineClass,
+    );
+    const liveCycleSec = matchedLine ? matchedLine.cycleTimeMin * 60 : null;
+    // Mirrors the per-row display's hasSavedMachine trust rule — a saved
+    // machine link is a deliberate pick, not stale data, so it wins unless the
+    // row was never given a machine at all.
+    const hasSavedMachine = !!(p.mhrId || p.machineName);
+    const liveCandidate = (!hasSavedMachine && !matchedLine?.machineSelection?.overridden)
+      ? matchedLine?.machineSelection?.balanced?.candidate
+      : null;
+    const machineRate  = hasSavedMachine ? Number(p.machineRate || 0) : (liveCandidate ? liveCandidate.hourlyRate : Number(p.machineRate || 0));
     const laborRate    = Number(p.laborRate    || 0);
     const setupMin     = Number(p.setupTime    || 0);
     const setupManning = Number(p.setupManning || 1);
     const batch        = Math.max(Number(p.batchSize     || 1), 1);
-    const cycleSec     = Number(p.cycleTime    || 0);
+    const cycleSec     = liveCycleSec != null ? liveCycleSec : Number(p.cycleTime || 0);
     const heads        = Math.max(Number(p.heads         || 1), 1);
     const ppc          = Math.max(Number(p.partsPerCycle || 1), 1);
     const scrap        = Number(p.scrap        || 0);
@@ -1946,16 +2404,40 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
         </div>
       )}
 
-      {/* ── Grand total header ── */}
+      {/* ── Grand total header ──
+          costStatus === 'incomplete' means at least one required process has
+          an unresolved physicsGap (see backend CostStatus's doc comment) —
+          grandTotal below still sums whatever DID resolve, for engineering
+          inspection, but it is a partial figure, not a real quote. Surfacing
+          this next to the number itself (not just as a warning further down)
+          so it can never be read as "the part costs $X" when it doesn't yet. */}
       <div className="flex items-start justify-between pt-3 pb-2 border-b-2 border-border">
         <div>
-          <p className="text-sm font-bold text-foreground">Total Manufacturing Cost</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-bold text-foreground">Total Manufacturing Cost</p>
+            {isScenarioReady && cost.costStatus === 'incomplete' && (
+              <span
+                className="text-[10px] font-semibold uppercase tracking-wide text-destructive border border-destructive/40 rounded px-1 py-0.5"
+                title={cost.incompleteProcesses?.length ? `Unresolved: ${cost.incompleteProcesses.join(', ')}` : undefined}
+              >
+                Incomplete
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">1 pc · batch {cost.batchSize}</p>
+          {isScenarioReady && cost.costStatus === 'incomplete' && !!cost.incompleteProcesses?.length && (
+            <p className="text-[10px] text-destructive mt-0.5 max-w-[220px]">
+              Partial total — {cost.incompleteProcesses.join(', ')} unresolved
+            </p>
+          )}
         </div>
         <div className="text-right shrink-0 ml-4">
           {isScenarioReady ? (
             <>
-              <p className={cn('text-2xl font-bold tabular-nums leading-tight', hasAnyOverride ? 'text-amber-500' : 'text-foreground')}>
+              <p className={cn(
+                'text-2xl font-bold tabular-nums leading-tight',
+                cost.costStatus === 'incomplete' ? 'text-destructive' : hasAnyOverride ? 'text-amber-500' : 'text-foreground',
+              )}>
                 {fmtL(grandTotal)}
               </p>
               {showUsd && <p className="text-sm text-muted-foreground tabular-nums mt-0.5">{fmtUsd(grandTotal)}</p>}
@@ -2020,8 +2502,12 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
       )}
 
       {/* No material grade yet — show route + cycle times from comparison engine,
-          hide cost columns. Engineers can still answer "3-axis or 5-axis?" etc. */}
-      {!isScenarioReady && previewRoute && previewRoute.processLines.length > 0 && (
+          hide cost columns. Engineers can still answer "3-axis or 5-axis?" etc.
+          Gated on !hasStoredProcs too: when stale stored records exist (see the
+          amber warning above), the "Stored process records" block below already
+          renders these same operations — showing this geometry preview as well
+          would duplicate every row under the same header. */}
+      {!isScenarioReady && !hasStoredProcs && previewRoute && previewRoute.processLines.length > 0 && (
         <>
           <p className="text-[10px] text-muted-foreground/50 pb-1.5">
             {previewRoute.routeLabel} · cycle times from geometry · apply material grade to see cost
@@ -2034,7 +2520,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                 </span>
                 <div>
                   <span className="text-sm text-foreground">{line.process}</span>
-                  <span className="text-xs text-muted-foreground ml-2">{line.cycleTimeMin.toFixed(1)} min</span>
+                  <span className="text-xs text-muted-foreground ml-2">{formatCycleMin(line.cycleTimeMin)}</span>
                 </div>
               </div>
               <span className="text-sm tabular-nums text-muted-foreground/30 shrink-0">—</span>
@@ -2043,7 +2529,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
           <div className="flex items-baseline justify-between py-2 border-t border-border mt-1">
             <span className="text-xs text-muted-foreground">Total Cycle Time (est.)</span>
             <span className="text-sm tabular-nums font-medium text-foreground">
-              {previewRoute.cycleTimes.totalMin.toFixed(1)} min
+              {formatCycleMin(previewRoute.cycleTimes.totalMin)}
             </span>
           </div>
         </>
@@ -2051,8 +2537,10 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
 
       {/* Material-grade set but no committed cost record — show cycle times only so
           the engineer can see the route without any dollar figures that would be
-          inaccurate (laser speed, press-brake tonnage, LHR all depend on material). */}
-      {isScenarioReady && !hasStoredMat && (eff?.lines ?? []).length > 0 && (
+          inaccurate (laser speed, press-brake tonnage, LHR all depend on material).
+          Gated on !hasStoredProcs for the same reason as the preview block above —
+          stale stored records already render these operations below. */}
+      {isScenarioReady && !hasStoredMat && !hasStoredProcs && (eff?.lines ?? []).length > 0 && (
         <>
           <p className="text-[10px] text-muted-foreground/50 pb-1.5">
             Cycle times from geometry · add material to see cost
@@ -2065,7 +2553,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                 </span>
                 <div>
                   <span className="text-sm text-foreground">{line.process}</span>
-                  <span className="text-xs text-muted-foreground ml-2">{(line.cycleMin ?? 0).toFixed(1)} min</span>
+                  <span className="text-xs text-muted-foreground ml-2">{formatCycleMin(line.cycleMin ?? 0)}</span>
                 </div>
               </div>
               <span className="text-sm tabular-nums text-muted-foreground/30 shrink-0">—</span>
@@ -2074,7 +2562,7 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
           <div className="flex items-baseline justify-between py-2 border-t border-border mt-1">
             <span className="text-xs text-muted-foreground">Total Cycle Time (est.)</span>
             <span className="text-sm tabular-nums font-medium text-foreground">
-              {(eff?.lines ?? []).reduce((s, l) => s + (l.cycleMin ?? 0), 0).toFixed(1)} min
+              {formatCycleMin((eff?.lines ?? []).reduce((s, l) => s + (l.cycleMin ?? 0), 0))}
             </span>
           </div>
         </>
@@ -2110,7 +2598,12 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap pl-[26px]">
                     <span className="truncate">
-                      {rec?.machineName ?? (line.rateSource === 'mhr_database' ? 'MHR DB' : line.rateSource === 'tier_synthetic' ? 'Benchmark' : 'est.')}
+                      {rec?.machineName ?? (
+                        line.rateSource === 'mhr_database' ? 'MHR DB'
+                        : line.rateSource === 'tier_synthetic' ? 'Benchmark'
+                        : line.rateSource === 'no_db_rate' ? 'no rate on file'
+                        : 'est.'
+                      )}
                     </span>
                     {peers.length > 0 && <span className="shrink-0">· same machine as {peers.join(', ')}</span>}
                     {ms?.overridden && <span className="text-amber-500 shrink-0">· overridden</span>}
@@ -2137,7 +2630,27 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
             {isExpanded && (
               <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
                 {/* aPriori-style feature-level sub-operations */}
-                <FeatureBreakdown items={(line as any).featureBreakdown} />
+                <FeatureBreakdown items={(line as any).featureBreakdown} fg={fg} onSelectHighlight={onSelectHighlight} />
+                <CalculationTracePanel line={line} />
+                {!!line.calculationTrace?.length && (
+                  <button
+                    type="button"
+                    onClick={() => generateCalculationReportPdf({
+                      partNumber: item.partNumber ?? item.id,
+                      location: factory,
+                      currencySymbol: sym,
+                      batchSize: cost.batchSize,
+                      line,
+                      cycleTimeSec: line.cycleTimeMin * 60,
+                      laborRate: line.labourRate ?? null,
+                    })}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border/40 rounded px-2 py-1 transition-colors"
+                    title="Download the full calculation (formulas + real values) as a PDF for engineering review"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download calculation (PDF)
+                  </button>
+                )}
                 {/* Machine selection */}
                 {ms && (
                   <MachineSelector
@@ -2149,34 +2662,39 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                   />
                 )}
                 {/* Cost overrides */}
-                <div className="space-y-1.5">
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">Machine Rate</span>
-                    <EditCell value={line.rate} prefix={sym} suffix="/hr" decimals={0}
-                      fieldKey={`${line.process}::rate`} isOverridden={!!procOv.rate} {...cellProps} />
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex items-baseline justify-between gap-2 min-w-0">
+                    <span className="text-xs text-muted-foreground truncate min-w-0">Machine Rate</span>
+                    <span className="shrink-0">
+                      <EditCell value={line.rate} prefix={sym} suffix="/hr" decimals={0}
+                        fieldKey={`${line.process}::rate`} isOverridden={!!procOv.rate} {...cellProps} />
+                    </span>
                   </div>
                   {(line.labourRate ?? 0) > 0 && (
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs text-muted-foreground">Labour Rate</span>
-                      <span className="text-xs tabular-nums text-muted-foreground">
+                    <div className="flex items-baseline justify-between gap-2 min-w-0">
+                      <span className="text-xs text-muted-foreground truncate min-w-0">Labour Rate</span>
+                      <span className="text-xs tabular-nums text-muted-foreground shrink-0">
                         {sym}{fmt(line.labourRate!, 0)}/hr
                       </span>
                     </div>
                   )}
-                  <div className="flex items-baseline justify-between">
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground">Cycle Time</span>
+                  <div className="flex items-baseline justify-between gap-2 min-w-0">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-xs text-muted-foreground truncate min-w-0">Cycle Time</span>
                       <button
                         type="button"
                         onClick={() => handleOpenEditProc(line, lineIdx, true)}
-                        className="text-muted-foreground/40 hover:text-violet-500 transition-colors"
+                        className="text-muted-foreground/40 hover:text-violet-500 transition-colors shrink-0"
                         title="Open cycle time in process calculator"
                       >
                         <Calculator className="h-3 w-3" />
                       </button>
                     </div>
-                    <EditCell value={line.cycleMin} suffix=" min" decimals={1}
-                      fieldKey={`${line.process}::cycleMin`} isOverridden={!!procOv.cycleMin} {...cellProps} />
+                    <span className="shrink-0">
+                      <EditCell value={line.cycleMin * 60} suffix=" s" decimals={2}
+                        fieldKey={`${line.process}::cycleMin`} isOverridden={!!procOv.cycleMin} {...cellProps}
+                        onCommit={(key, secs) => cellProps.onCommit(key, secs / 60)} />
+                    </span>
                   </div>
                   <div className="flex items-baseline justify-between border-t border-border/20 pt-1">
                     <span className="text-xs text-muted-foreground">Setup (÷{cost.batchSize})</span>
@@ -2193,22 +2711,197 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
         );
       })}
 
-      {/* ── Stored process records — expandable, same style as engine rows ── */}
-      {sortedStoredProcs.map((proc: any) => {
-        const machineRate  = Number(proc.machineRate  || 0);
-        const laborRate    = Number(proc.laborRate    || 0);
-        const setupMin     = Number(proc.setupTime    || 0);
-        const setupManning = Number(proc.setupManning || 1);
-        const batch        = Math.max(Number(proc.batchSize     || 1), 1);
-        const cycleSec     = Number(proc.cycleTime    || 0);
-        const heads        = Math.max(Number(proc.heads         || 1), 1);
-        const ppc          = Math.max(Number(proc.partsPerCycle || 1), 1);
-        const scrap        = Number(proc.scrap        || 0);
-        const setupPerPart = ((setupMin / 60) * (machineRate + laborRate * setupManning)) / batch;
-        const cyclePerPart = ((cycleSec / 3600) * (machineRate + laborRate * heads)) / ppc;
-        const procCost     = (setupPerPart + cyclePerPart) * (1 + scrap / 100) * fromUsd;
-        const cycleMin     = cycleSec ? (cycleSec / 60).toFixed(1) : null;
-        const isExpanded   = expandedProcs.has(`stored:${proc.id}`);
+      {/* ── All processes, merged and ordered by real manufacturing sequence —
+          NOT by save status. Saved rows (Deburr, Inspect, ...) and not-yet-
+          saved/gapped rows (Laser Cutting, Press Brake, ...) used to render as
+          two separate, sequential blocks — every saved row before every
+          unsaved one, regardless of which actually happens earlier in the
+          real process (cut → form → machine → finish → inspect). Confirmed
+          live: Deburr/Inspect (finishing/inspection — properly LAST) showed
+          at the top with low numbers just because they were saved, while
+          Laser Cutting/Press Brake (cutting/forming — properly FIRST) were
+          pushed to the bottom just because they weren't. Both row "kinds"
+          are merged into one array and sorted by PROCESS_ORDER_RANK before
+          rendering, so op numbers 10/20/30/... always reflect the real
+          sequence regardless of which lines happen to be saved. */}
+      {(() => {
+        const PROCESS_ORDER_RANK: Record<string, number> = {
+          fiber_laser: 1, co2_laser: 1, turret_punch: 1, waterjet: 1,
+          press_brake: 2, hole_forming: 2,
+          tapping: 3, drill_press: 3, pem_press: 3, cnc_3ax_vmc: 3, cnc_4ax_vmc: 3, cnc_5ax_mc: 3, cnc_lathe: 3, cnc_lathe_live: 3, cnc_mill_turn: 3,
+          deburring: 4, cleaning: 4,
+          surface_treatment: 5,
+          cmm: 6,
+        };
+        const rankOf = (machineClass: string | null | undefined) => PROCESS_ORDER_RANK[machineClass ?? ''] ?? 99;
+
+        const CANON_PROCESS_NAME: Record<string, string> = {
+          'laser cut': 'laser cutting',
+          'bend brake': 'press brake',
+          'deburr': 'deburring',
+          'inspect': 'inspection',
+        };
+        const canonName = (s: string) => CANON_PROCESS_NAME[s] ?? s;
+        const storedProcessNames = new Set(
+          sortedStoredProcs
+            .map((p: any) => canonName((p.operation || p.processRoute || '').toLowerCase()))
+            .filter(Boolean),
+        );
+        const storedMachineClasses = new Set(
+          sortedStoredProcs.map((p: any) => p.machineClass).filter(Boolean),
+        );
+        const missingLines = hasStoredMat ? (eff?.lines ?? []).filter(
+          (l) => !storedProcessNames.has(canonName(l.process.toLowerCase()))
+            && !(l.machineClass && storedMachineClasses.has(l.machineClass)),
+        ) : [];
+
+        type Row = { key: string; kind: 'stored'; proc: any } | { key: string; kind: 'missing'; line: any };
+        const rows: Row[] = [
+          ...sortedStoredProcs.map((proc: any): Row => ({ key: `stored:${proc.id}`, kind: 'stored', proc })),
+          ...missingLines.map((line: any): Row => ({ key: `missing:${line.process}`, kind: 'missing', line })),
+        ];
+        rows.sort((a, b) => rankOf(a.kind === 'stored' ? a.proc.machineClass : a.line.machineClass)
+          - rankOf(b.kind === 'stored' ? b.proc.machineClass : b.line.machineClass));
+
+        return rows.map((row, rowIdx) => {
+          const opNbr = (rowIdx + 1) * 10;
+
+          if (row.kind === 'missing') {
+            const line = row.line;
+            const gap = line.physicsGap;
+            const reason = gap ? (gap.gapType === 'missing_lookup' ? gap.requiredAction : gap.reason) : null;
+            // Same rich expandable panel as a saved/live engine row (feature
+            // breakdown, calculation trace, ⭐/alternatives machine picker) —
+            // a process being "not saved"/"Result Unavailable" is about its
+            // COST OUTPUT, not about whether it deserves the same real,
+            // sourced provenance and machine-selection detail every other
+            // process line already shows. `line` IS the live engine line
+            // itself here, so line.machineSelection is used directly.
+            const ms = line.machineSelection;
+            const procOv = procOverrides[line.process] ?? {};
+            const isExpanded = expandedProcs.has(`missing:${line.process}`);
+            return (
+              <div key={row.key} className="group/procrow">
+                <div className="flex items-stretch border-b border-border/20 hover:bg-muted/10 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => toggleProc(`missing:${line.process}`)}
+                    className="flex-1 flex items-baseline justify-between py-2 text-left pl-2 min-w-0"
+                  >
+                    <div className="flex-1 min-w-0 pr-2">
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-[10px] tabular-nums text-muted-foreground/50 font-mono w-5 shrink-0 text-right">
+                          {opNbr}
+                        </span>
+                        <span className="text-sm text-foreground">
+                          {isExpanded ? '▾' : '▸'} {line.process}
+                        </span>
+                        {reason ? (
+                          <span className="text-xs text-destructive font-medium">· Result Unavailable</span>
+                        ) : (
+                          <span className="text-xs text-amber-500">· not saved</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 pl-[26px]">
+                        {reason ?? 'Re-apply the route to save this process, or set it up manually.'}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right pr-2">
+                      <span className="text-sm tabular-nums text-foreground">{fmtL(line.totalCost)}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums ml-2">{eff.pct(line.totalCost).toFixed(1)}%</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditProc(line, rowIdx, true)}
+                    className="shrink-0 px-2.5 flex items-center text-muted-foreground/40 hover:text-foreground opacity-0 group-hover/procrow:opacity-100 transition-opacity"
+                    title="Open in process calculator"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                {isExpanded && (
+                  <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
+                    <FeatureBreakdown items={(line as any).featureBreakdown} fg={fg} onSelectHighlight={onSelectHighlight} />
+                    <CalculationTracePanel line={line} />
+                    {!!line.calculationTrace?.length && (
+                      <button
+                        type="button"
+                        onClick={() => generateCalculationReportPdf({
+                          partNumber: item.partNumber ?? item.id,
+                          location: factory,
+                          currencySymbol: sym,
+                          batchSize: cost.batchSize,
+                          line,
+                          cycleTimeSec: line.cycleTimeMin * 60,
+                          laborRate: line.labourRate ?? null,
+                        })}
+                        className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border/40 rounded px-2 py-1 transition-colors"
+                        title="Download the full calculation (formulas + real values) as a PDF for engineering review"
+                      >
+                        <Download className="h-3 w-3" />
+                        Download calculation (PDF)
+                      </button>
+                    )}
+                    {ms && (
+                      <MachineSelector
+                        itemId={item.id}
+                        processKey={line.machineClass}
+                        selection={ms}
+                        currencySymbol={sym}
+                        location={factory}
+                      />
+                    )}
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2 min-w-0">
+                        <span className="text-xs text-muted-foreground truncate min-w-0">Machine Rate</span>
+                        <span className="shrink-0">
+                          <EditCell value={line.rate ?? line.hourlyRate} prefix={sym} suffix="/hr" decimals={0}
+                            fieldKey={`${line.process}::rate`} isOverridden={!!procOv.rate} {...cellProps} />
+                        </span>
+                      </div>
+                      {(line.labourRate ?? 0) > 0 && (
+                        <div className="flex items-baseline justify-between gap-2 min-w-0">
+                          <span className="text-xs text-muted-foreground truncate min-w-0">Labour Rate</span>
+                          <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+                            {sym}{fmt(line.labourRate!, 0)}/hr
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-baseline justify-between gap-2 min-w-0">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className="text-xs text-muted-foreground truncate min-w-0">Cycle Time</span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditProc(line, rowIdx, true)}
+                            className="text-muted-foreground/40 hover:text-violet-500 transition-colors shrink-0"
+                            title="Open cycle time in process calculator"
+                          >
+                            <Calculator className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <span className="shrink-0">
+                          <EditCell value={(line.cycleMin ?? line.cycleTimeMin) * 60} suffix=" s" decimals={2}
+                            fieldKey={`${line.process}::cycleMin`} isOverridden={!!procOv.cycleMin} {...cellProps}
+                            onCommit={(key, secs) => cellProps.onCommit(key, secs / 60)} />
+                        </span>
+                      </div>
+                      <div className="flex items-baseline justify-between border-t border-border/20 pt-1">
+                        <span className="text-xs text-muted-foreground">Setup (÷{cost.batchSize})</span>
+                        <span className="text-xs tabular-nums text-foreground">{fmtL(line.setupCost)}</span>
+                      </div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-muted-foreground">Run</span>
+                        <span className="text-xs tabular-nums text-foreground">{fmtL(line.runCost)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+        const proc = row.proc;
         // Live engine data for this row's machine class — feature breakdown
         // (cut path, pierces, bends...) and the ⭐/alternatives/"Why" picker are
         // computed from current geometry + MHR data regardless of whether this
@@ -2219,6 +2912,58 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
           (l) => l.machineClass && proc.machineClass && l.machineClass === proc.machineClass,
         );
         const ms = matchedEngineLine?.machineSelection;
+
+        // cycleTime is an INPUT field, not something any cost formula derives — it's
+        // whatever was last saved on this row, and goes stale the moment the CAD
+        // geometry-driven cycle-time formula improves (as it did today), even though
+        // the "Feature breakdown" shown right below it is always freshly recomputed
+        // from current geometry. is_override is NOT a usable signal here — every
+        // record saved via ProcessCostDialog gets is_override=true unconditionally
+        // (confirmed directly against the DB), so gating on it made this a no-op for
+        // every manually-saved line, which is effectively all of them. Always prefer
+        // the live, geometry-derived cycle time when a matching engine line exists;
+        // fall back to the stored value only when this machine class has no live
+        // engine counterpart at all (e.g. Hand Deburring with no linked machine_class).
+        const liveCycleSec = matchedEngineLine ? matchedEngineLine.cycleTimeMin * 60 : null;
+        // The machine itself is different from cycle time: it's not a derived
+        // formula output, it's a deliberate pick the engineer made via Edit
+        // Process Cost / the machine picker below, and that flow now writes a
+        // real, current machine (the mhrApi.getAll() dropdown-defaulting bug
+        // that used to silently pick the wrong benchmark is fixed). So a saved
+        // machine link on this row IS trustworthy — prefer it, and fall back to
+        // the live ⭐ recommendation only when the row was never given a
+        // machine at all (e.g. an AI/geometry-generated line with NULL machine
+        // fields — the actual original bug this fallback exists for).
+        const hasSavedMachine = !!(proc.mhrId || proc.machineName);
+        const liveCandidate = (!hasSavedMachine && !ms?.overridden) ? ms?.balanced?.candidate : null;
+        const machineRate  = hasSavedMachine ? Number(proc.machineRate || 0) : (liveCandidate ? liveCandidate.hourlyRate : Number(proc.machineRate || 0));
+        const liveMachineName = hasSavedMachine ? null : (liveCandidate?.machineName ?? null);
+        const laborRate    = Number(proc.laborRate    || 0);
+        const setupMin     = Number(proc.setupTime    || 0);
+        const setupManning = Number(proc.setupManning || 1);
+        const batch        = Math.max(Number(proc.batchSize     || 1), 1);
+        const cycleSec     = liveCycleSec != null ? liveCycleSec : Number(proc.cycleTime || 0);
+        const heads        = Math.max(Number(proc.heads         || 1), 1);
+        const ppc          = Math.max(Number(proc.partsPerCycle || 1), 1);
+        const scrap        = Number(proc.scrap        || 0);
+        const setupPerPart = ((setupMin / 60) * (machineRate + laborRate * setupManning)) / batch;
+        const cyclePerPart = ((cycleSec / 3600) * (machineRate + laborRate * heads)) / ppc;
+        // Always derive from setupPerPart/cyclePerPart — the SAME values the
+        // Setup/Run rows below display — rather than ever substituting the
+        // stored proc.totalCostPerPart. That stored field previously won
+        // whenever neither cycle time nor machine rate had been live-
+        // substituted, on the theory that it was "the same number the shared
+        // ProcessCostCalculationEngine computed at save time" — but a row
+        // auto-created for a newly-applied route (confirmed: e.g. this
+        // part's waterjet_cutting/press_brake/deburring/tapping rows after
+        // switching routes) can have totalCostPerPart still 0/null despite
+        // real, non-zero setupPerPart+cyclePerPart — showing "$0.00 · 0.0%"
+        // in the header while Setup/Run just below it showed real numbers,
+        // an internally-inconsistent, obviously-wrong result. Recomputing
+        // unconditionally can only ever match what's already displayed.
+        const procCost     = (setupPerPart + cyclePerPart) * (1 + scrap / 100) * fromUsd;
+        const cycleMin     = cycleSec ? formatCycleMin(cycleSec / 60) : null;
+        const isExpanded   = expandedProcs.has(`stored:${proc.id}`);
         return (
           <div key={proc.id} className="group/storedrow">
             {/* Row header — click to expand */}
@@ -2230,14 +2975,14 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
               >
                 <div className="flex-1 min-w-0 pr-2">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-[10px] tabular-nums text-muted-foreground/50 font-mono w-5 shrink-0 text-right">{proc.opNbr ?? '—'}</span>
+                    <span className="text-[10px] tabular-nums text-muted-foreground/50 font-mono w-5 shrink-0 text-right">{opNbr}</span>
                     <span className="text-sm text-foreground">
                       {isExpanded ? '▾' : '▸'} {proc.operation || proc.processGroup || 'Process'}
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap pl-[26px]">
-                    <span className="truncate">{machineDisplayLabel(proc)}</span>
-                    {cycleMin && <span>· {cycleMin} min</span>}
+                    <span className="truncate">{liveMachineName ?? machineDisplayLabel(proc)}</span>
+                    {cycleMin && <span>· {cycleMin}</span>}
                   </div>
                 </div>
                 <div className="shrink-0 text-right pr-2">
@@ -2245,12 +2990,12 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                   <span className="text-xs text-muted-foreground tabular-nums ml-2">{grandTotal > 0 ? ((procCost / grandTotal) * 100).toFixed(1) : '0.0'}%</span>
                 </div>
               </button>
-              {/* Edit on hover + always-visible X delete */}
+              {/* Always-visible Edit + X delete */}
               <div className="shrink-0 flex items-center gap-0.5 pr-1">
                 <button
                   type="button"
                   onClick={() => { setProcDialogPrefill(proc); setProcDialogAutoOpenCalculator(false); setProcDialogOpen(true); }}
-                  className="px-1.5 flex items-center text-muted-foreground/60 hover:text-foreground opacity-0 group-hover/storedrow:opacity-100 transition-opacity"
+                  className="px-1.5 flex items-center text-muted-foreground/60 hover:text-foreground transition-colors"
                   title="Edit"
                 >
                   <Edit className="h-3.5 w-3.5" />
@@ -2270,12 +3015,38 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
             {isExpanded && (
               <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
                 {/* aPriori-style feature-level sub-operations — same as the live engine rows */}
-                <FeatureBreakdown items={matchedEngineLine?.featureBreakdown} />
+                <FeatureBreakdown items={matchedEngineLine?.featureBreakdown} fg={fg} onSelectHighlight={onSelectHighlight} />
+                {matchedEngineLine && <CalculationTracePanel line={matchedEngineLine} />}
+                {/* Full end-to-end calculation export — only offered when the live engine
+                    actually has a real DB-calculator audit trail for this process (Laser
+                    Cutting, Press Brake so far); no placeholder button for processes that
+                    don't have one yet. */}
+                {!!matchedEngineLine?.calculationTrace?.length && (
+                  <button
+                    type="button"
+                    onClick={() => generateCalculationReportPdf({
+                      partNumber: item.partNumber ?? item.id,
+                      location: factory,
+                      currencySymbol: sym,
+                      batchSize: batch,
+                      line: matchedEngineLine,
+                      cycleTimeSec: cycleSec,
+                      laborRate: laborRate || null,
+                    })}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border/40 rounded px-2 py-1 transition-colors"
+                    title="Download the full calculation (formulas + real values) as a PDF for engineering review"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download calculation (PDF)
+                  </button>
+                )}
                 {/* Machine — the same ⭐ recommended/alternatives/"Why" picker as the live
-                    engine rows, but persisting picks to THIS saved row (via onApply)
-                    instead of the class-wide machine-override preference. Falls back to
-                    the simpler picker when this operation has no live engine counterpart
-                    (e.g. Hand Deburring — genuinely manual, no machine class to match). */}
+                    engine rows, persisting picks to THIS saved row (via onApply) instead
+                    of the class-wide machine-override preference. When this operation has
+                    no live engine counterpart (e.g. Hand Deburring — genuinely manual, no
+                    machine class to match), there's no candidate list to offer inline —
+                    show the saved machine/rate read-only and point to Edit to change it,
+                    rather than an inline picker with no way to filter by the right class. */}
                 {ms ? (
                   <MachineSelector
                     itemId={item.id}
@@ -2283,7 +3054,8 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                     selection={ms}
                     currencySymbol={sym}
                     location={factory}
-                    currentMhrId={proc.mhrId ?? null}
+                    currentMachine={{ mhrId: proc.mhrId ?? null, machineName: proc.machineName ?? null, machineRate: proc.machineRate ?? null }}
+                    savedExplanation={proc.mhrId ? matchedEngineLine?.savedMachineExplanations?.[proc.mhrId] ?? null : null}
                     applyPending={updateProcCost.isPending}
                     applyError={updateProcCost.isError}
                     onApply={(candidate) => {
@@ -2298,64 +3070,82 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
                     }}
                   />
                 ) : (
-                  <StoredMachinePicker
-                    procId={proc.id}
-                    machineClass={proc.machineClass}
-                    machineName={proc.machineName}
-                    machineRateUsd={machineRate}
-                    mhrId={proc.mhrId}
-                    benchmarkMhrId={proc.benchmarkMhrId}
-                    currencySymbol={sym}
-                    fromUsd={fromUsd}
-                    location={factory}
-                  />
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xs text-foreground min-w-0 truncate">
+                      {proc.machineName ?? 'Manual rate — not linked to a machine'}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {sym}{(machineRate * fromUsd).toFixed(2)}/hr · Edit to change
+                    </span>
+                  </div>
                 )}
                 {laborRate > 0 && (
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">Labour Rate</span>
-                    <span className="text-xs tabular-nums text-foreground">{sym}{(laborRate * fromUsd).toFixed(0)}/hr</span>
+                  <div className="flex items-baseline justify-between gap-2 min-w-0">
+                    <span className="text-xs text-muted-foreground truncate min-w-0">Labour Rate</span>
+                    <span className="text-xs tabular-nums text-foreground shrink-0">{sym}{(laborRate * fromUsd).toFixed(0)}/hr</span>
                   </div>
                 )}
                 {/* Cycle Time — with calculator button */}
-                <div className="flex items-baseline justify-between">
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground">Cycle Time</span>
+                <div className="flex items-baseline justify-between gap-2 min-w-0">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="text-xs text-muted-foreground truncate min-w-0">Cycle Time</span>
                     <button
                       type="button"
-                      onClick={() => { setProcDialogPrefill(proc); setProcDialogAutoOpenCalculator(true); setProcDialogOpen(true); }}
-                      className="text-muted-foreground/40 hover:text-violet-500 transition-colors"
+                      onClick={() => {
+                        // proc.cycleTime is whatever was last saved — stale the
+                        // moment the geometry-driven engine's cycle-time formula
+                        // improves (see liveCycleSec's own comment above). The
+                        // read-only value just below already prefers
+                        // liveCycleSec; the calculator popup must open with the
+                        // SAME real, database-driven value, not the stale one.
+                        // featureBreakdown (when present, e.g. Inspection) feeds
+                        // the "Sheet Metal - Inspection" calculator's fields —
+                        // same real per-feature counts/times already shown in
+                        // the Feature breakdown panel, not re-derived here.
+                        setProcDialogPrefill({
+                          // process_cost_records.cycle_time is NUMERIC(12,2) —
+                          // round to 2dp, not to a whole integer (that silently
+                          // dropped real precision the schema already supports).
+                          ...(liveCycleSec != null ? { ...proc, cycleTime: Math.round(liveCycleSec * 100) / 100 } : proc),
+                          ...(matchedEngineLine?.featureBreakdown ? { featureBreakdown: matchedEngineLine.featureBreakdown } : {}),
+                        });
+                        setProcDialogAutoOpenCalculator(true);
+                        setProcDialogOpen(true);
+                      }}
+                      className="text-muted-foreground/40 hover:text-violet-500 transition-colors shrink-0"
                       title="Open in process calculator"
                     >
                       <Calculator className="h-3 w-3" />
                     </button>
                   </div>
-                  <span className="text-xs tabular-nums text-foreground">{cycleMin ?? '—'} min</span>
+                  <span className="text-xs tabular-nums text-foreground shrink-0">{cycleMin ?? '—'}</span>
                 </div>
                 {(heads > 1 || ppc > 1) && (
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">Heads × Parts/Cycle</span>
-                    <span className="text-xs tabular-nums text-foreground">{heads} × {ppc}</span>
+                  <div className="flex items-baseline justify-between gap-2 min-w-0">
+                    <span className="text-xs text-muted-foreground truncate min-w-0">Heads × Parts/Cycle</span>
+                    <span className="text-xs tabular-nums text-foreground shrink-0">{heads} × {ppc}</span>
                   </div>
                 )}
-                <div className="flex items-baseline justify-between border-t border-border/20 pt-1">
-                  <span className="text-xs text-muted-foreground">Setup ({setupMin.toFixed(1)} min ÷ {batch})</span>
-                  <span className="text-xs tabular-nums text-foreground">{fmtL(setupPerPart * fromUsd)}</span>
+                <div className="flex items-baseline justify-between gap-2 min-w-0 border-t border-border/20 pt-1">
+                  <span className="text-xs text-muted-foreground truncate min-w-0">Setup ({setupMin.toFixed(1)} min ÷ {batch})</span>
+                  <span className="text-xs tabular-nums text-foreground shrink-0">{fmtL(setupPerPart * fromUsd)}</span>
                 </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-muted-foreground">Run</span>
-                  <span className="text-xs tabular-nums text-foreground">{fmtL(cyclePerPart * fromUsd)}</span>
+                <div className="flex items-baseline justify-between gap-2 min-w-0">
+                  <span className="text-xs text-muted-foreground truncate min-w-0">Run</span>
+                  <span className="text-xs tabular-nums text-foreground shrink-0">{fmtL(cyclePerPart * fromUsd)}</span>
                 </div>
                 {scrap > 0 && (
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">Scrap ({scrap}%)</span>
-                    <span className="text-xs tabular-nums text-foreground">+{fmtL((setupPerPart + cyclePerPart) * (scrap / 100) * fromUsd)}</span>
+                  <div className="flex items-baseline justify-between gap-2 min-w-0">
+                    <span className="text-xs text-muted-foreground truncate min-w-0">Scrap ({scrap}%)</span>
+                    <span className="text-xs tabular-nums text-foreground shrink-0">+{fmtL((setupPerPart + cyclePerPart) * (scrap / 100) * fromUsd)}</span>
                   </div>
                 )}
               </div>
             )}
           </div>
         );
-      })}
+        });
+      })()}
 
       {/* Add Process button */}
       <div className="py-2 pl-2">
@@ -2443,16 +3233,21 @@ function CostSummaryTab({ item, batchSize, appliedRouteId, factory = 'USA' }: { 
 }
 
 function RouteComparisonCard({
-  item, batchSize, appliedRouteId, onAppliedRouteChange, factory = 'USA',
+  item, batchSize, appliedRouteId, onAppliedRouteChange, factory = 'USA', onSelectHighlight,
 }: {
   item: BOMItem; batchSize: number;
   appliedRouteId: string | null;
   onAppliedRouteChange: (id: string | null) => void;
   factory?: string;
+  onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
 }) {
   const { data: comparison, isLoading } = useRouteComparison(item.id, batchSize, factory);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const sym = comparison?.currencySymbol ?? '$';
+  // Persists the applied route to process_cost_records — same mutation the
+  // removed Candidate Routes panel used, so "Apply Route" here now actually
+  // commits the change server-side instead of only updating local UI state.
+  const applyRoute = useApplyRoute(item.id);
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
@@ -2469,7 +3264,140 @@ function RouteComparisonCard({
   const minCost = feasibleCosts.length > 0 ? Math.min(...feasibleCosts) : 0;
   const maxCost = feasibleCosts.length > 0 ? Math.max(...feasibleCosts) : 0;
 
+  // "Detected Geometry" + "Derived Manufacturing Operations" — real, CAD-
+  // derived counts shown directly (never aggregated into a fabricated
+  // combined metric — an earlier version summed sharp corners + small holes
+  // into a "burr regions" count that came out ~10x any real notion of
+  // distinct regions, since 15 raw sharp-corner flags on 2-3 physical zones
+  // of a part are not 15 "regions"), plus a second section explaining WHICH
+  // raw counts justify WHICH operation, so the reasoning is inspectable
+  // rather than opaque. Every number traces to real data: item.featureGraph.
+  // summary (cad-engine/feature_extractors.py) for bends/holes/corners/
+  // extrusions, item.drawingIntelligence for taps — never fabricated, and
+  // each row (and each section) only renders when its real count is > 0.
+  const fg = item.featureGraph;
+  const summary = fg?.summary;
+  const tapCount = item.drawingIntelligence?.threads?.reduce((s, t) => s + t.count, 0) ?? 0;
+  // Click-to-highlight for the "Detected Geometry" rows below — reuses the same
+  // FeatureNodeV2/mergeFeaturesToHL mechanism the Feature breakdown rows already
+  // use (see FeatureBreakdown/resolveFeatureOpHighlight above). Only feature
+  // types that carry real OCC face_ids in feature_graph_v2 are clickable: hole,
+  // bend, extruded_flange (geo_v40+). Internal profiles have no per-wire face_id
+  // plumbing yet (_face_breakdown only accumulates aggregate length/count, not
+  // per-wire face identity) — that row stays plain text until that OCC-side work
+  // is done, disclosed rather than silently faked.
+  const v2Features = fg?.feature_graph_v2?.features ?? [];
+  const highlightFor = (featureType: string): FeatureNodeV2 | null =>
+    onSelectHighlight ? mergeFeaturesToHL(`detected_${featureType}`, v2Features.filter((f) => f.feature_type === featureType)) : null;
+  const bendHL = highlightFor('bend');
+  const holeHL = highlightFor('hole');
+  const extrusionHL = highlightFor('extruded_flange');
+  const detectedRow = (label: string, highlight: FeatureNodeV2 | null) => (
+    <button
+      type="button"
+      disabled={!highlight}
+      onClick={() => highlight && onSelectHighlight?.(highlight)}
+      title={highlight ? 'Click to highlight in the 3D view' : undefined}
+      className={cn(
+        'w-full flex items-center justify-between py-0.5 pl-3 border-l-2 text-left transition-colors',
+        highlight
+          ? 'border-violet-500/20 hover:border-violet-500/60 hover:bg-violet-500/5 cursor-pointer'
+          : 'border-transparent cursor-default',
+      )}
+    >
+      <p className="text-[10px] text-muted-foreground">✓ {label}</p>
+      {highlight && <span className="text-[9px] text-violet-500/70 shrink-0">show in 3D</span>}
+    </button>
+  );
+  const hasDetected = !!summary && (
+    (summary.bendCount ?? 0) > 0 || tapCount > 0 || (summary.holeCount ?? 0) > 0 ||
+    (summary.internalProfileCount ?? 0) > 0 || (summary.sharpCornerCount ?? 0) > 0 ||
+    (summary.smallHoleCount ?? 0) > 0 || (summary.extrudedFlangeCount ?? 0) > 0
+  );
+  const opReasons: Array<{ op: string; reasons: string[] }> = summary ? [
+    ...((summary.bendCount ?? 0) > 0
+      ? [{ op: 'Press Brake', reasons: [`${summary.bendCount} bend line${summary.bendCount === 1 ? '' : 's'}`] }]
+      : []),
+    // Hole Extrusion (Burring) must physically happen before Tapping (the
+    // collar is formed, then threaded) — its own operation, not a footnote
+    // under Tapping, since it's now separately costed (see cost-engine.ts).
+    ...((summary.extrudedFlangeCount ?? 0) > 0
+      ? [{ op: 'Hole Extrusion (Burring)', reasons: [`${summary.extrudedFlangeCount} hole extrusion${summary.extrudedFlangeCount === 1 ? '' : 's'}`] }]
+      : []),
+    ...(tapCount > 0
+      ? [{ op: 'Tapping', reasons: [`${tapCount} tap${tapCount === 1 ? '' : 's'}`] }]
+      : []),
+    ...(((summary.sharpCornerCount ?? 0) > 0 || (summary.smallHoleCount ?? 0) > 0)
+      ? [{
+          op: 'Deburring',
+          reasons: [
+            ...((summary.sharpCornerCount ?? 0) > 0 ? [`${summary.sharpCornerCount} sharp corner${summary.sharpCornerCount === 1 ? '' : 's'}`] : []),
+            ...((summary.smallHoleCount ?? 0) > 0 ? [`${summary.smallHoleCount} small hole${summary.smallHoleCount === 1 ? '' : 's'}`] : []),
+          ],
+        }]
+      : []),
+  ] : [];
+  // Self-validating check: if the CAD engine detected hole extrusions but the
+  // currently-displayed route has no matching operation, surface it as a rule
+  // violation rather than silently under-costing (catches a stale pre-fix
+  // cache, a manually-edited route that dropped the line, etc.).
+  const burringExpected = (summary?.extrudedFlangeCount ?? 0) > 0;
+  const routeForViolationCheck = appliedRoute ?? comparison.routes[0] ?? null;
+  const burringPresent = (routeForViolationCheck?.processLines ?? []).some(
+    (l) => l.process === 'Hole Extrusion (Burring)',
+  );
+  const burringRuleViolation = burringExpected && !burringPresent;
+
   return (
+    <>
+      {hasDetected && summary && (
+        <Section title="Detected Geometry" defaultOpen>
+          <div className="space-y-0.5 pt-1">
+            {(summary.bendCount ?? 0) > 0 &&
+              detectedRow(`${summary.bendCount} bend line${summary.bendCount === 1 ? '' : 's'}`, bendHL)}
+            {tapCount > 0 && (
+              <p className="text-[10px] text-muted-foreground py-0.5">✓ {tapCount} tap{tapCount === 1 ? '' : 's'}</p>
+            )}
+            {(summary.holeCount ?? 0) > 0 &&
+              detectedRow(`${summary.holeCount} hole${summary.holeCount === 1 ? '' : 's'}`, holeHL)}
+            {(summary.internalProfileCount ?? 0) > 0 && (
+              <p className="text-[10px] text-muted-foreground py-0.5" title="Highlighting not yet available — needs per-wire face-id tracking not yet built in the CAD engine">
+                ✓ {summary.internalProfileCount} internal profile{summary.internalProfileCount === 1 ? '' : 's'}
+              </p>
+            )}
+            {(summary.sharpCornerCount ?? 0) > 0 && (
+              <p className="text-[10px] text-muted-foreground py-0.5">✓ {summary.sharpCornerCount} sharp internal corner{summary.sharpCornerCount === 1 ? '' : 's'}</p>
+            )}
+            {(summary.smallHoleCount ?? 0) > 0 && (
+              <p className="text-[10px] text-muted-foreground py-0.5">✓ {summary.smallHoleCount} small hole{summary.smallHoleCount === 1 ? '' : 's'}</p>
+            )}
+            {(summary.extrudedFlangeCount ?? 0) > 0 &&
+              detectedRow(`${summary.extrudedFlangeCount} hole extrusion${summary.extrudedFlangeCount === 1 ? '' : 's'}`, extrusionHL)}
+          </div>
+        </Section>
+      )}
+      {opReasons.length > 0 && (
+        <Section title="Derived Manufacturing Operations" defaultOpen>
+          <div className="space-y-2 pt-1">
+            {opReasons.map(({ op, reasons }) => (
+              <div key={op}>
+                <p className="text-[11px] font-semibold text-foreground">{op}</p>
+                {reasons.map((r) => (
+                  <p key={r} className="text-[10px] text-muted-foreground pl-2">• {r}</p>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+      {burringRuleViolation && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-0.5">
+          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">⚠ Manufacturing Rule Violation</p>
+          <p className="text-[10px] text-muted-foreground">Detected: {summary?.extrudedFlangeCount} hole extrusion{summary?.extrudedFlangeCount === 1 ? '' : 's'}</p>
+          <p className="text-[10px] text-muted-foreground">Expected operation: Hole Extrusion (Burring)</p>
+          <p className="text-[10px] text-muted-foreground">Current route: Missing</p>
+        </div>
+      )}
     <Section title="Route Comparison" defaultOpen>
       <div className="space-y-2.5 pt-1">
         {comparison.routes.filter((r) => r.capability?.overallCapable !== false).map((route) => {
@@ -2585,10 +3513,18 @@ function RouteComparisonCard({
               {isSelected && !isApplied && !incapable && (
                 <div className="px-3 py-2 border-t border-violet-500/20 bg-violet-500/5 flex justify-end">
                   <button
-                    onClick={(e) => { e.stopPropagation(); onAppliedRouteChange(route.routeId); setSelectedRouteId(null); }}
-                    className="text-xs px-3 py-1.5 rounded-md bg-violet-600 text-white hover:bg-violet-700 font-medium transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (route.routeId) {
+                        applyRoute.mutate({ routeId: route.routeId, batchSize, location: factory });
+                      }
+                      onAppliedRouteChange(route.routeId);
+                      setSelectedRouteId(null);
+                    }}
+                    disabled={applyRoute.isPending}
+                    className="text-xs px-3 py-1.5 rounded-md bg-violet-600 text-white hover:bg-violet-700 font-medium transition-colors disabled:opacity-50"
                   >
-                    Apply Route
+                    {applyRoute.isPending ? 'Applying…' : 'Apply Route'}
                   </button>
                 </div>
               )}
@@ -2645,8 +3581,11 @@ function RouteComparisonCard({
                     {line.machineName && <span>{line.machineName}</span>}
                     <span className="tabular-nums">{fmt(line.cycleTimeMin, 1)} min</span>
                     <span className="tabular-nums">{sym}{fmt(line.hourlyRate, 0)}/hr</span>
-                    <span className={line.rateSource === 'mhr_database' ? 'text-emerald-600' : line.rateSource === 'tier_synthetic' ? 'text-slate-400' : 'text-amber-600'}>
-                      {line.rateSource === 'mhr_database' ? 'MHR DB' : line.rateSource === 'tier_synthetic' ? 'Benchmark' : 'est.'}
+                    <span className={line.rateSource === 'mhr_database' ? 'text-emerald-600' : line.rateSource === 'tier_synthetic' ? 'text-slate-400' : line.rateSource === 'no_db_rate' ? 'text-red-600' : 'text-amber-600'}>
+                      {line.rateSource === 'mhr_database' ? 'MHR DB'
+                        : line.rateSource === 'tier_synthetic' ? 'Benchmark'
+                        : line.rateSource === 'no_db_rate' ? 'no rate on file'
+                        : 'est.'}
                     </span>
                   </div>
                 </div>
@@ -2671,6 +3610,7 @@ function RouteComparisonCard({
         )}
       </div>
     </Section>
+    </>
   );
 }
 
@@ -3259,16 +4199,38 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InputRow({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function InputRow({ label, value, onChange, onBlur }: { label: string; value: number; onChange: (v: number) => void; onBlur?: () => void }) {
+  // Click-to-edit, same pattern as the Cost Guide's Blank Thickness override:
+  // renders as static text by default, click (or the pencil) reveals the
+  // input. Escape restores whatever value was current when editing started.
+  const [isEditing, setIsEditing] = useState(false);
+  const [priorValue, setPriorValue] = useState(value);
   return (
     <div className="flex items-center gap-2 py-0.5">
       <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate">{label}</span>
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value) || 0)}
-        className="text-xs font-medium text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 tabular-nums"
-      />
+      {isEditing ? (
+        <input
+          autoFocus
+          type="number"
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value) || 0)}
+          onBlur={() => { onBlur?.(); setIsEditing(false); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            if (e.key === 'Escape') { onChange(priorValue); setIsEditing(false); }
+          }}
+          className="text-xs font-medium text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 tabular-nums"
+        />
+      ) : (
+        <button
+          onClick={() => { setPriorValue(value); setIsEditing(true); }}
+          title="Click to edit"
+          className="flex items-center gap-1 w-20 shrink-0 justify-end px-1.5 py-0.5 rounded border border-transparent hover:border-border group"
+        >
+          <Edit className="h-3 w-3 text-muted-foreground group-hover:text-foreground shrink-0" />
+          <span className="text-xs font-medium tabular-nums">{value.toLocaleString()}</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -3304,7 +4266,7 @@ function TreeRow({
   return (
     <>
       <tr
-        onClick={() => { if (hasChildren) onToggle(node.id); onSelect(node); }}
+        onClick={() => onSelect(node)}
         className={`border-b border-border/30 cursor-pointer transition-colors text-xs ${isSelected ? 'bg-primary/10' : 'hover:bg-primary/5'}`}
       >
         <td className="px-2 py-1 w-5 text-center shrink-0">
@@ -3313,7 +4275,16 @@ function TreeRow({
         <td className="py-1 pr-2 max-w-0">
           <div className="flex items-center gap-1" style={{ paddingLeft: `${depth * 14}px` }}>
             {hasChildren
-              ? <span className="shrink-0 text-muted-foreground">{isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}</span>
+              ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onToggle(node.id); }}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  title={isExpanded ? 'Collapse' : 'Expand'}
+                >
+                  {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                </button>
+              )
               : <span className="w-3 shrink-0" />}
             {node.kind === 'feature' && <span className="text-blue-400 text-[9px] shrink-0">▣</span>}
             <span className={`truncate ${
@@ -3345,6 +4316,10 @@ interface WorkflowStepOption {
   process: string;
   label: string;
   machine?: string;
+  // Real mhr_records machine_class key (default-rates.ts's machine registry) —
+  // when set, RouteSelectionDialog resolves the real machine name/rate for
+  // this class+location instead of showing the static `machine` placeholder.
+  machineClassKey?: string;
   isDefault: boolean;
   costNote?: string;
   constraintNote?: string;
@@ -3369,19 +4344,19 @@ const WORKFLOW_KB: Record<string, WorkflowStep[]> = {
         : '',
       options: [
         {
-          id: 'fiber-laser', process: 'Fiber Laser Cutting', label: 'Fiber Laser 6kW',
-          machine: 'Fiber Laser 6kW', isDefault: true,
+          id: 'fiber-laser', process: 'Fiber Laser Cutting', label: 'Fiber Laser',
+          machineClassKey: 'fiber_laser', isDefault: true,
           costNote: 'Best for complex profiles, diverse hole sizes, and batch < 50,000 pcs',
         },
         {
           id: 'turret-punch', process: 'Turret Punching', label: 'Turret Punch',
-          machine: 'CNC Turret Press', isDefault: false,
+          machineClassKey: 'turret_punch', isDefault: false,
           costNote: 'Lower unit cost at high volume with simple, repeating hole patterns',
           constraintNote: 'Requires dedicated punch-die per hole size — tooling lead time',
         },
         {
           id: 'waterjet', process: 'Waterjet Cutting', label: 'Waterjet',
-          machine: 'Waterjet Cutter', isDefault: false,
+          machineClassKey: 'waterjet', isDefault: false,
           costNote: 'No heat-affected zone — use for hardened or heat-sensitive alloys',
           constraintNote: 'Slow cycle — not economical above ~5,000 pcs/yr',
         },
@@ -3394,8 +4369,8 @@ const WORKFLOW_KB: Record<string, WorkflowStep[]> = {
       contextHint: (ctx) => ctx ? `${ctx.summary.bendCount ?? 0} bends detected` : '',
       options: [
         {
-          id: 'press-brake', process: 'CNC Press Brake', label: 'CNC Press Brake 100T',
-          machine: 'CNC Press Brake 100T', isDefault: true,
+          id: 'press-brake', process: 'CNC Press Brake', label: 'CNC Press Brake',
+          machineClassKey: 'press_brake', isDefault: true,
         },
         {
           id: 'folding', process: 'Sheet Metal Folding', label: 'Folding Machine',
@@ -3412,13 +4387,78 @@ const WORKFLOW_KB: Record<string, WorkflowStep[]> = {
       contextHint: () => 'Burr removal and edge cleanup',
       options: [
         {
-          id: 'deburring', process: 'Deburring', label: 'Deburring Station',
-          machine: 'Deburring Station', isDefault: true,
+          id: 'deburring', process: 'Deburring', label: 'Deburring',
+          machineClassKey: 'deburring', isDefault: true,
         },
         {
           id: 'skip-deburr', process: '', label: 'Skip',
           isDefault: false,
           constraintNote: 'Only for non-critical internal parts — sharp edges risk operator injury',
+        },
+      ],
+    },
+    // The four steps below are purely feature-driven — real gates shared with
+    // autoCompleteRoute (tappingCandidateCount, summary.extrudedFlangeCount/
+    // counterboreGroups/countersinkGroups), same real machineClassKey rate
+    // resolution as every step above. No alternative machine/approach exists
+    // for any of these in this system yet, so each has exactly one option
+    // (still database-driven — the RATE is real, only the CHOICE isn't
+    // meaningful) rather than a fabricated second "alternative" to fill the
+    // dropdown. Ordered to match cost-engine.ts's real processLines sequence:
+    // Deburring -> Hole Extrusion (Burring) -> Tapping -> Counterboring ->
+    // Countersinking -> Surface Treatment.
+    {
+      id: 'hole-forming',
+      category: 'Hole Extrusion (Burring)',
+      visible: (ctx) => (ctx?.summary.extrudedFlangeCount ?? 0) > 0,
+      contextHint: (ctx) => ctx
+        ? `${ctx.summary.extrudedFlangeCount ?? 0} hole extrusion${(ctx.summary.extrudedFlangeCount ?? 0) === 1 ? '' : 's'} detected`
+        : '',
+      options: [
+        {
+          id: 'hole-forming-press', process: 'Hole Extrusion (Burring)', label: 'Hole Flanging Press',
+          machineClassKey: 'hole_forming', isDefault: true,
+          costNote: 'Forms the extruded collar before tapping — required whenever the drawing calls out burling',
+        },
+      ],
+    },
+    {
+      id: 'tapping',
+      category: 'Tapping',
+      visible: (ctx) => tappingCandidateCount(ctx?.summary ?? ({} as FeatureGraphSummary)) > 0,
+      contextHint: (ctx) => ctx ? `${tappingCandidateCount(ctx.summary)} tap${tappingCandidateCount(ctx.summary) === 1 ? '' : 's'} detected` : '',
+      options: [
+        {
+          id: 'tapping-arm', process: 'Tapping', label: 'Tapping Arm',
+          machineClassKey: 'tapping', isDefault: true,
+        },
+      ],
+    },
+    {
+      id: 'counterboring',
+      category: 'Counterboring',
+      visible: (ctx) => (ctx?.summary.counterboreGroups?.length ?? 0) > 0,
+      contextHint: (ctx) => ctx
+        ? `${(ctx.summary.counterboreGroups ?? []).reduce((s, g) => s + g.count, 0)} counterbore(s) detected`
+        : '',
+      options: [
+        {
+          id: 'counterboring-drill', process: 'Counterboring', label: 'Drill Press',
+          machineClassKey: 'drill_press', isDefault: true,
+        },
+      ],
+    },
+    {
+      id: 'countersinking',
+      category: 'Countersinking',
+      visible: (ctx) => (ctx?.summary.countersinkGroups?.length ?? 0) > 0,
+      contextHint: (ctx) => ctx
+        ? `${(ctx.summary.countersinkGroups ?? []).reduce((s, g) => s + g.count, 0)} countersink(s) detected`
+        : '',
+      options: [
+        {
+          id: 'countersinking-drill', process: 'Countersinking', label: 'Drill Press',
+          machineClassKey: 'drill_press', isDefault: true,
         },
       ],
     },
@@ -3540,21 +4580,398 @@ const WORKFLOW_KB: Record<string, WorkflowStep[]> = {
   ],
 };
 
+// ── Dynamic route step model (sheet_metal only — real, DB-driven, no
+// hardcoded option lists) ────────────────────────────────────────────────────
+interface DynamicRouteStep {
+  key: string;
+  process: string;
+  machineClass: string;
+  hourlyRate: number; // real, local-currency — from the engine-computed line
+                       // when isReal, else a from-scratch real machine rate
+  cycleTimeMin: number; // real when isReal; 0/manual-entry-needed otherwise
+  // True when `process` matches a line the engine actually computed from this
+  // part's real geometry. False for a step picked from the full catalog with
+  // no geometric trigger here yet — processGroup/processRoute are required in
+  // that case so the backend can validate + resolve a real machine class from
+  // process_calculator_mappings (see applyCustomRoute).
+  isReal: boolean;
+  processGroup?: string;
+  processRoute?: string;
+}
+
+// Every route getRouteComparison returns shares identical non-cutting lines
+// (deburr/press-brake/tapping/burring — computed once, reused across all
+// routes; see that method's "Shared process lines" section) — only each
+// route's own cutting line differs. So "which machineClass is a cutting
+// machineClass" is derivable structurally from the live API response itself
+// (whatever machineClass ISN'T common to every route), never a hardcoded set
+// that silently goes stale the moment the backend's engine registry grows.
+function cuttingMachineClassesFromRoutes(routes: Pick<RouteResultDto, 'processLines'>[]): Set<string> {
+  if (routes.length === 0) return new Set();
+  const classSets = routes.map((r) => new Set(r.processLines.map((l) => l.machineClass)));
+  const shared = new Set([...classSets[0]!].filter((cls) => classSets.every((s) => s.has(cls))));
+  const cutting = new Set<string>();
+  for (const s of classSets) for (const cls of s) if (!shared.has(cls)) cutting.add(cls);
+  return cutting;
+}
+// Inverse of the above — used to recover which real cutting route a stored
+// process_cost_records row's machine_class corresponds to (see the routing-
+// restoration effect below), never a guessed/computed mapping.
+function cuttingMachineClassToRouteId(routes: Pick<RouteResultDto, 'routeId' | 'processLines'>[]): Record<string, string> {
+  const cuttingClasses = cuttingMachineClassesFromRoutes(routes);
+  const map: Record<string, string> = {};
+  for (const r of routes) {
+    const cuttingLine = r.processLines.find((l) => cuttingClasses.has(l.machineClass));
+    if (cuttingLine) map[cuttingLine.machineClass] = r.routeId;
+  }
+  return map;
+}
+// Tied to computeRouteScore's hand-authored engineering judgment below (real
+// tooling-amortization/HAZ/edge-quality tradeoffs specific to these 3 methods)
+// — NOT structural like the two functions above, so deliberately NOT derived
+// from the live route list: a future 4th registered engine needs its own real
+// scoring heuristic added to computeRouteScore (and a literal added here) before
+// it's meaningful to rank, same as it needs its own real cost formula on the
+// backend. Iterating whatever the API happens to return would silently score
+// an unresearched method using computeRouteScore's neutral 76/100 default,
+// which is exactly the "fabricated confidence" this whole registry redesign
+// was meant to prevent.
+const CUTTING_ROUTE_IDS = ['sm-laser', 'sm-turret', 'sm-waterjet'] as const;
+
+// Real physical ordering already encoded elsewhere in this codebase
+// (cost-engine.ts's real processLines sequence, autoCompleteRoute's insertion
+// points) — used only to softly WARN on an invalid custom reorder, never to
+// block it (a real shop may have a genuine reason to deviate).
+// Real process names as cost-engine.ts/turret-punch-engine.ts/waterjet-engine.ts
+// actually emit them (confirmed by grep — "Laser Cutting" and "Press Brake",
+// NOT the old WORKFLOW_KB display labels "Fiber Laser Cutting"/"CNC Press
+// Brake", which never matched and silently made every ordering check a no-op).
+// Hole Extrusion (Burring) + Tapping come BEFORE Press Brake + Deburring:
+// the thread sits in the extruded collar, so the collar must be formed and
+// tapped while the part is still flat (tapping an already-bent flange risks
+// tool access/interference, and this also avoids handling an already-bent
+// part through tapping) — see the matching reorder in cost-engine.ts /
+// bom-items.service.ts::getRouteComparison's allLines assembly.
+const REAL_PROCESS_ORDER = [
+  'Laser Cutting', 'Turret Punching', 'Waterjet Cutting',
+  'Hole Extrusion (Burring)', 'Tapping', 'Press Brake', 'Deburring',
+  'Counterboring', 'Countersinking', 'PEM Insertion', 'Reaming', 'CMM Inspection',
+  'Surface Treatment',
+];
+function orderingWarnings(orderedProcesses: string[]): Record<string, string> {
+  const warnings: Record<string, string> = {};
+  for (let i = 0; i < orderedProcesses.length; i++) {
+    const p = orderedProcesses[i]!;
+    const pIdx = REAL_PROCESS_ORDER.indexOf(p);
+    if (pIdx < 0) continue;
+    for (let j = 0; j < i; j++) {
+      const q = orderedProcesses[j]!;
+      const qIdx = REAL_PROCESS_ORDER.indexOf(q);
+      if (qIdx > pIdx) { warnings[p] = `Typically performed before ${q}`; break; }
+    }
+  }
+  return warnings;
+}
+
 // ── RouteSelectionDialog (Workflow Builder) ────────────────────────────────────
 
 function RouteSelectionDialog({
-  open, onClose, partFamily, onSelectRoute, scoringCtx,
+  open, onClose, onApplied, partFamily, currentRouteId, onSelectRoute, scoringCtx, factory = 'USA',
+  itemId, batchSize = 1, existingCuttingRouteId, existingSteps,
 }: {
   open: boolean;
+  // Cancel / backdrop-dismiss / Escape — genuinely closing without applying.
+  // Falls back to Auto routing if no manual route had ever been applied yet.
   onClose: () => void;
+  // A route was just successfully applied — just close, never fall back to
+  // Auto. Calling onClose() here instead used to race: onSelectRoute's
+  // setProcessRouting('manual')/setSelectedManualRoute(route) haven't
+  // re-rendered yet when onClose's own "if (!selectedManualRoute) revert to
+  // auto" check runs in the same tick, so it read the pre-update (null) value
+  // and clobbered 'manual' back to 'auto' immediately after every apply.
+  onApplied: () => void;
   partFamily: string | null;
   currentRouteId: string | null;
   onSelectRoute: (route: ManualRouteOption) => void;
   cost: CostSummaryDto | null;
   scoringCtx: RouteScoringContext | null;
+  factory?: string;
+  itemId?: string;
+  batchSize?: number;
+  // Exact identity of the currently-applied dynamic route (see
+  // ManualRouteOption.dynamicCuttingRouteId/dynamicSteps) — when present and
+  // still a valid real route, reopening this dialog to edit restores exactly
+  // what's applied instead of resetting to the CAD-optimal default (which is
+  // only right the FIRST time a part gets a manual route, not on every re-edit).
+  existingCuttingRouteId?: string | null;
+  existingSteps?: ManualRouteOption['dynamicSteps'];
 }) {
-  const allSteps: WorkflowStep[] = WORKFLOW_KB[partFamily ?? ''] ?? WORKFLOW_KB.sheet_metal ?? [];
+  const isSheetMetal = partFamily === 'sheet_metal';
+
+  // ── Universal real machine/rate resolution — ONE fetch each, no fixed
+  // per-class array. The old array existed because React hooks can't be
+  // called in a variable-length loop — but mhrApi.getAll/getBenchmarkRates
+  // both treat machineClass as optional (lib/api/mhr.ts), returning every
+  // class for the location when omitted. Filtering client-side per row
+  // removes that ceiling structurally, which is what actually made dynamic
+  // (any number of, any class) steps possible.
+  const allMhr = useMHRRecords({ location: factory, limit: 300 }, { enabled: open });
+  const allBenchmark = useMHRBenchmark(factory, undefined, { enabled: open });
+  const resolveForClass = (cls: string): { id: string; machineName: string; rate: number; isBenchmark: boolean } | null => {
+    const own = (allMhr.data?.records ?? []).filter((r) => r.machineClass === cls);
+    const bm = (allBenchmark.data ?? []).filter((r) => r.machineClass === cls);
+    if (own.length > 0) {
+      const cheapest = [...own].sort((a, b) => resolveMhrUsdRate(a) - resolveMhrUsdRate(b))[0]!;
+      return { id: cheapest.id, machineName: cheapest.machineName, rate: resolveMhrUsdRate(cheapest), isBenchmark: false };
+    }
+    if (bm.length > 0) {
+      const cheapest = [...bm].sort((a, b) => (a.calculations?.totalMachineHourRate ?? 0) - (b.calculations?.totalMachineHourRate ?? 0))[0]!;
+      return { id: cheapest.id, machineName: cheapest.machineName, rate: cheapest.calculations?.totalMachineHourRate ?? 0, isBenchmark: true };
+    }
+    return null;
+  };
+  // Old fixed-family path still keys into this by machineClassKey — kept
+  // working via resolveForClass instead of the retired per-class object.
+  const resolvedMachine: Record<string, { id: string; machineName: string; rate: number; isBenchmark: boolean } | null> = {};
+
+  // ═══ Dynamic path (sheet_metal): real, comparison-driven steps ═══════════
+  // "Add Step" can only ever offer operations from this real, already-
+  // engine-computed set — never an unconstrained browse of the whole DB
+  // catalog. Every route the engine returns shares identical non-cutting
+  // lines (see getRouteComparison's "shared process lines" — gated purely by
+  // this part's real geometry, not by cutting method), so any one route's
+  // full line set (minus its own cutting line) is the real universe of
+  // addable operations; cutting itself gets exactly 3 real alternatives.
+  const comparison = useRouteComparison(isSheetMetal ? itemId : undefined, batchSize, factory);
+  const realRoutes = comparison.data?.routes ?? [];
+  const cuttingMachineClasses = cuttingMachineClassesFromRoutes(realRoutes);
+  const sharedLines: ProcessLineCost[] = (realRoutes[0]?.processLines ?? []).filter(
+    (l) => !cuttingMachineClasses.has(l.machineClass),
+  );
+  const cuttingLineByRouteId = new Map<string, ProcessLineCost>();
+  for (const r of realRoutes) {
+    const cuttingLine = r.processLines.find((l) => cuttingMachineClasses.has(l.machineClass));
+    if (cuttingLine) cuttingLineByRouteId.set(r.routeId, cuttingLine);
+  }
+
+  const [cuttingRouteId, setCuttingRouteId] = useState<string | null>(null);
+  const [additionalSteps, setAdditionalSteps] = useState<DynamicRouteStep[] | null>(null);
+  const wasOpenRef = useRef(false);
+
+  // Real, CAD-derived best cutting route for THIS part's geometry (tonnage,
+  // thickness, hole count, etc. — see computeRouteScore) — recomputed from
+  // live scoringCtx, never cached from a prior selection, so it always
+  // reflects the part actually loaded in the dialog.
+  const cuttingRouteScores = scoringCtx
+    ? CUTTING_ROUTE_IDS.map((rid) => [rid, computeRouteScore(rid, scoringCtx).totalScore] as const)
+    : null;
+  const recommendedCuttingId = cuttingRouteScores
+    ? [...cuttingRouteScores].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+    : null;
+  const selectedCuttingRouteLabel = cuttingRouteId
+    ? realRoutes.find((r) => r.routeId === cuttingRouteId)?.routeLabel ?? null
+    : null;
+  // Surfaced only as an honest "previously applied X" note when it differs
+  // from the CAD-optimal pick above — the dialog's default no longer follows
+  // it (see the seeding effect below), but silently discarding it would hide
+  // a real change from the user.
+  const previouslyAppliedRouteLabel = (currentRouteId && currentRouteId !== recommendedCuttingId)
+    ? realRoutes.find((r) => r.routeId === currentRouteId)?.routeLabel ?? null
+    : null;
+
+  // ── "Add Step" — full real Group → Route → Operation cascade, same source
+  // (process_calculator_mappings) and derivation pattern as ProcessCostDialog's
+  // own hierarchical picker, so any real, active catalog operation can be
+  // added — not just ones this part's geometry already triggered. An
+  // operation added this way that ISN'T also a real engine-computed line for
+  // this part gets a real machine rate (resolveForClass) but an honest 0
+  // cycle time — see DynamicRouteStep.isReal.
+  const { data: allMappingsData } = useProcessCalculatorMappings({ limit: 1000 }, { enabled: open && isSheetMetal });
+  const [addGroup, setAddGroup] = useState('');
+  const [addRoute, setAddRoute] = useState('');
+  const [addOperation, setAddOperation] = useState('');
+  const addGroupOptions = Array.from(new Set((allMappingsData?.mappings ?? []).map((m) => m.processGroup))).sort();
+  const addRouteOptions = addGroup
+    ? Array.from(new Set((allMappingsData?.mappings ?? [])
+        .filter((m) => m.processGroup === addGroup).map((m) => m.processRoute))).sort()
+    : [];
+  const addOperationOptions = (addGroup && addRoute)
+    ? (allMappingsData?.mappings ?? [])
+        .filter((m) => m.processGroup === addGroup && m.processRoute === addRoute && m.isActive)
+        .filter((m) => !(additionalSteps ?? []).some((s) => s.process === m.operation || s.machineClass === m.machineClass))
+    : [];
+  useEffect(() => {
+    if (!isSheetMetal) return;
+    const justOpened = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
+    if (!justOpened || realRoutes.length === 0) return;
+
+    // Editing an already-applied dynamic route restores exactly what's
+    // applied — CAD-optimal is only the right default the FIRST time a part
+    // gets a manual route, not every time its existing custom route is
+    // reopened (that would silently discard the customization on every edit).
+    if (existingCuttingRouteId && cuttingLineByRouteId.has(existingCuttingRouteId)) {
+      setCuttingRouteId(existingCuttingRouteId);
+      setAdditionalSteps((existingSteps ?? []).map((s, i): DynamicRouteStep => {
+        // Match by machineClass, not process name — process_cost_records.operation
+        // is resolved from process_calculator_mappings' real catalog name (e.g.
+        // "Bend Brake", "Deburr") at apply time, which differs from the cost
+        // engine's own internal process label ("Press Brake", "Deburring") for
+        // the exact same machine class. machineClass is the stable identifier
+        // both sides agree on; process is only a cosmetic display string that
+        // differs between the two naming systems. Matching by process name here
+        // silently lost the real engine cycleTimeMin/hourlyRate on every restore
+        // for these two classes, falling back to isReal:false + cycleTimeMin:0.
+        const real = sharedLines.find((l) => l.machineClass === s.machineClass) ?? sharedLines.find((l) => l.process === s.process);
+        if (real) {
+          return {
+            key: `${s.process}-${i}`, process: real.process, machineClass: real.machineClass,
+            hourlyRate: real.hourlyRate, cycleTimeMin: real.cycleTimeMin, isReal: true,
+          };
+        }
+        const resolved = resolveForClass(s.machineClass);
+        return {
+          key: `${s.process}-${i}`, process: s.process, machineClass: s.machineClass,
+          hourlyRate: resolved?.rate ?? 0, cycleTimeMin: 0, isReal: false,
+          ...(s.processGroup !== undefined ? { processGroup: s.processGroup } : {}),
+          ...(s.processRoute !== undefined ? { processRoute: s.processRoute } : {}),
+        };
+      }));
+      return;
+    }
+
+    // No existing dynamic route to restore — default to the CAD-optimal
+    // cutting route for this part's real geometry (computeRouteScore).
+    setCuttingRouteId(recommendedCuttingId ?? realRoutes[0]!.routeId);
+    setAdditionalSteps(sharedLines.map((l, i) => ({
+      key: `${l.process}-${i}`, process: l.process, machineClass: l.machineClass,
+      hourlyRate: l.hourlyRate, cycleTimeMin: l.cycleTimeMin, isReal: true,
+    })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isSheetMetal, realRoutes.length]);
+
+  const orderedRealProcesses = [
+    cuttingRouteId ? cuttingLineByRouteId.get(cuttingRouteId)?.process : null,
+    ...(additionalSteps ?? []).map((s) => s.process),
+  ].filter((p): p is string => !!p);
+  const stepOrderWarnings = orderingWarnings(orderedRealProcesses);
+  // Real, geometry-triggered operations (sharedLines) this part actually
+  // needs but that aren't in the current step list — happens whenever an
+  // existing custom route is being re-edited (that path restores exactly
+  // what was applied before, deliberately not auto-adding new steps — see
+  // the seeding effect above) and the part's detected features have since
+  // gained a new real operation (e.g. threads detected → Tapping) that
+  // predates this particular saved route. Surfaced as an explicit prompt
+  // instead of silently omitted or silently force-added.
+  // Matched by machineClass, not process name — see the restore-effect
+  // comment above for why a name-only match spuriously flagged Press
+  // Brake/Deburring as "missing" (they were present, just stored under
+  // the catalog's own operation name, "Bend Brake"/"Deburr").
+  const missingRealSteps = sharedLines.filter(
+    (l) => !(additionalSteps ?? []).some((s) => s.machineClass === l.machineClass || s.process === l.process),
+  );
+  function addMissingStep(l: ProcessLineCost) {
+    setAdditionalSteps((prev) => [...(prev ?? []), {
+      key: `${l.process}-${Date.now()}`, process: l.process, machineClass: l.machineClass,
+      hourlyRate: l.hourlyRate, cycleTimeMin: l.cycleTimeMin, isReal: true,
+    }]);
+  }
+
+  function moveStep(index: number, dir: -1 | 1) {
+    setAdditionalSteps((prev) => {
+      if (!prev) return prev;
+      const next = [...prev];
+      const swapWith = index + dir;
+      if (swapWith < 0 || swapWith >= next.length) return prev;
+      [next[index], next[swapWith]] = [next[swapWith]!, next[index]!];
+      return next;
+    });
+  }
+  function removeStep(key: string) {
+    setAdditionalSteps((prev) => prev?.filter((s) => s.key !== key) ?? prev);
+  }
+  // Adds whatever operation is currently selected in the Group/Route/
+  // Operation cascade. If it matches a real, engine-computed line for this
+  // part (isReal: true), reuse its real cycleTimeMin/hourlyRate verbatim.
+  // Otherwise it's a real catalog operation with no geometric trigger here
+  // yet — real machine class + real machine rate (resolveForClass), but an
+  // honest 0 cycle time, never fabricated (see applyCustomRoute server-side).
+  function addStepFromCatalog() {
+    const mapping = addOperationOptions.find((m) => m.operation === addOperation);
+    if (!mapping) return;
+    // Match by machineClass, not operation name — see the identical comment on
+    // the restore-effect lookup above for why (catalog operation names like
+    // "Bend Brake"/"Deburr" differ from the engine's own process labels
+    // "Press Brake"/"Deburring" for the same machine class).
+    const real = mapping.machineClass
+      ? sharedLines.find((l) => l.machineClass === mapping.machineClass)
+      : sharedLines.find((l) => l.process === mapping.operation);
+    const key = `${mapping.operation}-${Date.now()}`;
+    if (real) {
+      setAdditionalSteps((prev) => [...(prev ?? []), {
+        key, process: real.process, machineClass: real.machineClass,
+        hourlyRate: real.hourlyRate, cycleTimeMin: real.cycleTimeMin, isReal: true,
+      }]);
+    } else if (mapping.machineClass) {
+      const resolved = resolveForClass(mapping.machineClass);
+      setAdditionalSteps((prev) => [...(prev ?? []), {
+        key, process: mapping.operation, machineClass: mapping.machineClass!,
+        hourlyRate: resolved?.rate ?? 0, cycleTimeMin: 0, isReal: false,
+        processGroup: mapping.processGroup, processRoute: mapping.processRoute,
+      }]);
+    }
+    setAddOperation('');
+  }
+
+  // Stages the dynamic (sheet-metal) route — builds the same ApplyCustomRouteStep
+  // shape apply-custom-route will eventually need, but does NOT call the API
+  // here. "Set Route" only sets processRouting='manual'/selectedManualRoute in
+  // the parent; the real apply-custom-route call happens later, inside Apply
+  // Scenario (see the parent's applyScenario), bundled with whatever Digital
+  // Factory/Batch Size is committed at that point.
+  function handleSetRouteDynamic() {
+    if (!cuttingRouteId || !additionalSteps) return;
+    const cuttingLine = cuttingLineByRouteId.get(cuttingRouteId);
+    if (!cuttingLine) return;
+    // Pin the exact real machine shown in this dialog for every step — the
+    // engine's own internal selection could otherwise independently pick a
+    // different real machine of the same class than what was displayed.
+    const allClasses = [cuttingLine.machineClass, ...additionalSteps.map((s) => s.machineClass)];
+    const machineOverrides: { processKey: string; mhrRecordId: string }[] = [];
+    for (const cls of allClasses) {
+      const resolved = resolveForClass(cls);
+      if (resolved) machineOverrides.push({ processKey: cls, mhrRecordId: resolved.id });
+    }
+    const route: ManualRouteOption = {
+      id: `custom-${Date.now()}`,
+      label: [cuttingLine.process, ...additionalSteps.map((s) => s.process)].filter(Boolean).join(' + ') || 'Custom Workflow',
+      complexityLevel: 'standard',
+      isRecommended: false,
+      processes: orderedRealProcesses,
+      rationale: 'Custom workflow — assembled step by step, staged for Apply Scenario',
+      machineOverrides,
+      dynamicCuttingRouteId: cuttingRouteId,
+      dynamicCuttingStep: { process: cuttingLine.process, machineClass: cuttingLine.machineClass },
+      dynamicSteps: additionalSteps.map((s) => ({
+        process: s.process, machineClass: s.machineClass, isReal: s.isReal,
+        ...(s.processGroup !== undefined ? { processGroup: s.processGroup } : {}),
+        ...(s.processRoute !== undefined ? { processRoute: s.processRoute } : {}),
+      })),
+    };
+    onSelectRoute(route);
+    onApplied();
+  }
+
+  // ═══ Fixed-family path (cnc_turned/cnc_milled/etc. — unchanged UX,
+  // WORKFLOW_KB-driven) — kept for families not yet migrated to the real
+  // comparison-driven model above. ═══════════════════════════════════════════
+  const allSteps: WorkflowStep[] = WORKFLOW_KB[partFamily ?? ''] ?? [];
   const visibleSteps = allSteps.filter((s) => s.visible(scoringCtx));
+  for (const step of visibleSteps) {
+    for (const opt of step.options) {
+      if (opt.machineClassKey) resolvedMachine[opt.machineClassKey] = resolveForClass(opt.machineClassKey);
+    }
+  }
 
   const [selectedPerStep, setSelectedPerStep] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
@@ -3583,9 +5000,33 @@ function RouteSelectionDialog({
     })
     .filter((p) => p.length > 0);
 
-  const flowNodes = ['Raw Blank', ...appliedProcesses, 'Finished Part'];
+  // Real machine name per applied process — for the compact flow diagram,
+  // which is keyed by process name rather than machineClassKey.
+  const fixedProcessToMachineName: Record<string, string> = {};
+  for (const step of visibleSteps) {
+    const selId = selectedPerStep[step.id] ?? step.options.find((o) => o.isDefault)?.id;
+    const opt = step.options.find((o) => o.id === selId);
+    if (!opt?.process) continue;
+    const real = opt.machineClassKey ? resolvedMachine[opt.machineClassKey] : null;
+    fixedProcessToMachineName[opt.process] = real?.machineName ?? opt.machine ?? '';
+  }
 
-  function handleApply() {
+  const fixedFlowNodes = ['Raw Blank', ...appliedProcesses, 'Finished Part'];
+
+  // ═══ Dynamic path's flow-diagram equivalents ═══════════════════════════════
+  const dynamicFlowNodes = ['Raw Blank', ...orderedRealProcesses, 'Finished Part'];
+  const dynamicProcessToMachineName: Record<string, string> = {};
+  if (cuttingRouteId) {
+    const cl = cuttingLineByRouteId.get(cuttingRouteId);
+    if (cl) dynamicProcessToMachineName[cl.process] = resolveForClass(cl.machineClass)?.machineName ?? cl.machineName ?? '';
+  }
+  for (const s of additionalSteps ?? []) {
+    dynamicProcessToMachineName[s.process] = resolveForClass(s.machineClass)?.machineName ?? '';
+  }
+  const flowNodes = isSheetMetal ? dynamicFlowNodes : fixedFlowNodes;
+  const processToMachineName = isSheetMetal ? dynamicProcessToMachineName : fixedProcessToMachineName;
+
+  function handleApplyFixed() {
     const label = visibleSteps
       .map((step) => {
         const selId = selectedPerStep[step.id] ?? step.options.find((o) => o.isDefault)?.id;
@@ -3594,6 +5035,19 @@ function RouteSelectionDialog({
       .filter(Boolean)
       .slice(0, 3)
       .join(' + ');
+    // Real machine picked per step where a real mhr_records/benchmark machine
+    // was resolved — carried on the route so the parent can apply it via
+    // useMachineOverride AFTER apply-route creates the process_cost_records
+    // rows (machine-override updates an existing row, so firing it here,
+    // before apply-route runs, would silently do nothing).
+    const machineOverrides: { processKey: string; mhrRecordId: string }[] = [];
+    for (const step of visibleSteps) {
+      const selId = selectedPerStep[step.id] ?? step.options.find((o) => o.isDefault)?.id;
+      const opt = step.options.find((o) => o.id === selId);
+      if (opt?.machineClassKey && resolvedMachine[opt.machineClassKey]) {
+        machineOverrides.push({ processKey: opt.machineClassKey, mhrRecordId: resolvedMachine[opt.machineClassKey]!.id });
+      }
+    }
     const route: ManualRouteOption = {
       id: `custom-${Date.now()}`,
       label: label || 'Custom Workflow',
@@ -3601,9 +5055,10 @@ function RouteSelectionDialog({
       isRecommended: false,
       processes: appliedProcesses,
       rationale: 'Custom workflow — assembled step by step',
+      machineOverrides,
     };
     onSelectRoute(route);
-    onClose();
+    onApplied();
   }
 
   return (
@@ -3632,8 +5087,8 @@ function RouteSelectionDialog({
                       : 'border-violet-500/50 bg-violet-950/40 text-slate-100 min-w-[72px]',
                   )}>
                     <div className="text-[10px] font-medium leading-tight">{proc}</div>
-                    {MACHINE_FOR[proc] && (
-                      <div className="text-[9px] text-muted-foreground mt-0.5 truncate">{MACHINE_FOR[proc]}</div>
+                    {(processToMachineName[proc] || MACHINE_FOR[proc]) && (
+                      <div className="text-[9px] text-muted-foreground mt-0.5 truncate">{processToMachineName[proc] || MACHINE_FOR[proc]}</div>
                     )}
                   </div>
                   {i < flowNodes.length - 1 && (
@@ -3644,7 +5099,200 @@ function RouteSelectionDialog({
             </div>
           </div>
 
+          {/* Automatic route indicator — always reflects the real cutting
+              line actually selected below, never a separate/stale label */}
+          {isSheetMetal && selectedCuttingRouteLabel && (
+            <div className="px-4 py-1.5 border-b bg-muted/20 flex items-center gap-1.5 text-[11px] shrink-0">
+              <span className="text-muted-foreground">Route:</span>
+              <span className="font-medium">{selectedCuttingRouteLabel}</span>
+              {cuttingRouteId === recommendedCuttingId ? (
+                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30">CAD-optimal</span>
+              ) : (
+                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium bg-violet-600/20 text-violet-400 border border-violet-500/30">Custom</span>
+              )}
+              {previouslyAppliedRouteLabel && (
+                <span className="text-muted-foreground/60 italic">
+                  (previously applied: {previouslyAppliedRouteLabel})
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Operations table — Apriori style */}
+          {isSheetMetal ? (
+            <>
+            {missingRealSteps.length > 0 && (
+              <div className="mb-2 px-3 py-2 rounded border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] space-y-1.5">
+                <div>⚠ This part's real geometry also triggers {missingRealSteps.length === 1 ? 'an operation' : 'operations'} not in this route:</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {missingRealSteps.map((l) => (
+                    <button
+                      key={l.process}
+                      type="button"
+                      onClick={() => addMissingStep(l)}
+                      className="text-[11px] font-medium bg-amber-500/20 border border-amber-500/40 rounded px-2 py-0.5 hover:bg-amber-500/30"
+                    >
+                      + Add {l.process}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left w-6">#</th>
+                  <th className="px-3 py-2 text-left w-16">Reorder</th>
+                  <th className="px-3 py-2 text-left">Operation</th>
+                  <th className="px-3 py-2 text-left w-36">Machine / Resource</th>
+                  <th className="px-3 py-2 text-left w-24"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Add Step — full real Group → Route → Operation catalog
+                    (process_calculator_mappings), cascading. Picks matching this
+                    part's real engine-computed lines reuse their real rate/cycle
+                    time; catalog-only picks resolve a real machine rate with an
+                    honest "needs manual cycle time" flag — see addStepFromCatalog.
+                    Kept at the top so it's visible without scrolling past the
+                    whole route. */}
+                <tr className="border-b bg-muted/10">
+                  <td className="px-3 py-2.5" colSpan={2}></td>
+                  <td className="px-3 py-2.5" colSpan={3}>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <select
+                        value={addGroup}
+                        onChange={(e) => { setAddGroup(e.target.value); setAddRoute(''); setAddOperation(''); }}
+                        className="text-xs bg-background border border-dashed border-border rounded px-2 py-1 focus:border-violet-500 focus:outline-none cursor-pointer"
+                      >
+                        <option value="">+ Group…</option>
+                        {addGroupOptions.map((g) => (
+                          <option key={g} value={g}>{g}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={addRoute}
+                        onChange={(e) => { setAddRoute(e.target.value); setAddOperation(''); }}
+                        disabled={!addGroup}
+                        className="text-xs bg-background border border-dashed border-border rounded px-2 py-1 focus:border-violet-500 focus:outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Route…</option>
+                        {addRouteOptions.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={addOperation}
+                        onChange={(e) => setAddOperation(e.target.value)}
+                        disabled={!addRoute}
+                        className="text-xs bg-background border border-dashed border-border rounded px-2 py-1 focus:border-violet-500 focus:outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Operation…</option>
+                        {addOperationOptions.map((m) => (
+                          <option key={m.operation} value={m.operation}>{m.operation}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={addStepFromCatalog}
+                        disabled={!addOperation}
+                        className="text-xs px-2 py-1 rounded bg-violet-600/20 text-violet-400 border border-violet-500/30 hover:bg-violet-600/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                    {addGroup && addRoute && addOperationOptions.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground/60 italic mt-1">
+                        Every active operation in this route is already included.
+                      </p>
+                    )}
+                  </td>
+                </tr>
+
+                {/* Cutting — always required, exactly 3 real alternatives (the
+                    only thing that genuinely varies between the engine's routes) */}
+                {(() => {
+                  const cl = cuttingRouteId ? cuttingLineByRouteId.get(cuttingRouteId) : null;
+                  const machine = cl ? resolveForClass(cl.machineClass) : null;
+                  return (
+                    <tr className="border-b hover:bg-muted/20 transition-colors align-top">
+                      <td className="px-3 py-2.5 text-[11px] text-muted-foreground/60">1</td>
+                      <td className="px-3 py-2.5 text-[10px] text-muted-foreground/40">fixed</td>
+                      <td className="px-3 py-2.5">
+                        <select
+                          value={cuttingRouteId ?? ''}
+                          onChange={(e) => setCuttingRouteId(e.target.value)}
+                          className="w-full text-xs bg-background border border-border rounded px-2 py-1 focus:border-violet-500 focus:outline-none cursor-pointer"
+                        >
+                          {realRoutes.map((r) => (
+                            <option key={r.routeId} value={r.routeId}>
+                              {cuttingLineByRouteId.get(r.routeId)?.process ?? r.routeLabel}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground leading-tight">
+                        {machine ? (
+                          <>
+                            <div>{machine.machineName}</div>
+                            <div className="text-[10px] tabular-nums">
+                              ${machine.rate.toFixed(2)}/hr{machine.isBenchmark ? ' ★' : ''}
+                            </div>
+                          </>
+                        ) : <span className="italic text-muted-foreground/60">No machine on file</span>}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {cuttingRouteId === recommendedCuttingId ? (
+                          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30">Recommended</span>
+                        ) : (
+                          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium bg-violet-600/20 text-violet-400 border border-violet-500/30">Custom</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })()}
+
+                {/* Every other real, geometry-driven operation — add/remove/reorder freely */}
+                {(additionalSteps ?? []).map((s, idx) => {
+                  const machine = resolveForClass(s.machineClass);
+                  const warning = stepOrderWarnings[s.process];
+                  return (
+                    <tr key={s.key} className="border-b hover:bg-muted/20 transition-colors align-top">
+                      <td className="px-3 py-2.5 text-[11px] text-muted-foreground/60">{idx + 2}</td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1">
+                          <button type="button" onClick={() => moveStep(idx, -1)} disabled={idx === 0}
+                            className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30 text-[10px] leading-none" title="Move up">▲</button>
+                          <button type="button" onClick={() => moveStep(idx, 1)} disabled={idx === (additionalSteps?.length ?? 0) - 1}
+                            className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30 text-[10px] leading-none" title="Move down">▼</button>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="text-xs font-medium leading-tight">{s.process}</div>
+                        {warning && <p className="text-[10px] text-orange-400/80 mt-1 leading-snug">⚠ {warning}</p>}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground leading-tight">
+                        {machine ? (
+                          <>
+                            <div>{machine.machineName}</div>
+                            <div className="text-[10px] tabular-nums">
+                              ${machine.rate.toFixed(2)}/hr{machine.isBenchmark ? ' ★' : ''}
+                            </div>
+                          </>
+                        ) : <span className="italic text-muted-foreground/60">No machine on file</span>}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <button type="button" onClick={() => removeStep(s.key)}
+                          className="text-muted-foreground/60 hover:text-red-400 text-xs" title="Remove step">✕ Remove</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+              </tbody>
+            </table>
+            </>
+          ) : (
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b bg-muted/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -3699,9 +5347,24 @@ function RouteSelectionDialog({
                       )}
                     </td>
 
-                    {/* Machine */}
+                    {/* Machine — real mhr_records/benchmark name+rate when this
+                        option has a machineClassKey; static text otherwise
+                        (e.g. Folding Machine, Surface Treatment — no clean
+                        single machine_class mapping exists for those yet) */}
                     <td className="px-3 py-2.5 text-xs text-muted-foreground leading-tight">
-                      {selectedOpt?.machine ?? '—'}
+                      {selectedOpt?.machineClassKey ? (
+                        resolvedMachine[selectedOpt.machineClassKey] ? (
+                          <>
+                            <div>{resolvedMachine[selectedOpt.machineClassKey]!.machineName}</div>
+                            <div className="text-[10px] tabular-nums">
+                              ${resolvedMachine[selectedOpt.machineClassKey]!.rate.toFixed(2)}/hr
+                              {resolvedMachine[selectedOpt.machineClassKey]!.isBenchmark ? ' ★' : ''}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="italic text-muted-foreground/60">No machine on file</span>
+                        )
+                      ) : (selectedOpt?.machine ?? '—')}
                     </td>
 
                     {/* Status badge */}
@@ -3725,13 +5388,24 @@ function RouteSelectionDialog({
               })}
             </tbody>
           </table>
+          )}
 
         </div>
 
         {/* Footer */}
-        <DialogFooter className="px-5 py-3 border-t shrink-0">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleApply}>Apply Workflow</Button>
+        <DialogFooter className="px-5 py-3 border-t shrink-0 flex-col items-stretch gap-2 sm:flex-col">
+          <p className="text-[11px] text-muted-foreground text-right">
+            Sets this as the manual route — nothing is written yet. Use the Cost Guide's Apply button to actually apply it, together with any Digital Factory/Batch Size change.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
+              onClick={() => { if (isSheetMetal) handleSetRouteDynamic(); else handleApplyFixed(); }}
+              disabled={isSheetMetal && (!cuttingRouteId || !additionalSteps)}
+            >
+              Set Route
+            </Button>
+          </div>
         </DialogFooter>
 
       </DialogContent>
@@ -3764,6 +5438,16 @@ function MaterialPickerDialog({
   const { data, isLoading } = useRawMaterials(open ? { limit: 1000 } : undefined);
   const materials: RawMaterial[] = data?.items ?? [];
 
+  // This dialog filters client-side (fetches all materials once above) rather
+  // than calling the backend's search= param, so alias-aware matching (e.g.
+  // "AL6101" -> Generic Aluminum, ANSI 6101) has to be checked here directly --
+  // same normalization as raw-materials.service.ts's resolveAliasId().
+  const { data: aliases } = useMaterialAliases();
+  const normalize = (s: string) => s.toUpperCase().replace(/[\s-]/g, '');
+  const aliasMatchId = search.trim()
+    ? aliases?.find((a) => a.aliasNormalized === normalize(search))?.rawMaterialId
+    : undefined;
+
   const groups = Array.from(new Set(materials.map((m) => m.materialGroup).filter(Boolean))).sort();
 
   const filtered = materials.filter((m) => {
@@ -3772,10 +5456,21 @@ function MaterialPickerDialog({
       m.material.toLowerCase().includes(q) ||
       (m.materialGrade ?? '').toLowerCase().includes(q) ||
       (m.materialGroup ?? '').toLowerCase().includes(q) ||
-      (m.materialDescription ?? '').toLowerCase().includes(q);
+      (m.materialDescription ?? '').toLowerCase().includes(q) ||
+      m.id === aliasMatchId;
     const matchGroup = !groupFilter || m.materialGroup === groupFilter;
     return matchSearch && matchGroup;
   });
+
+  // The detail panel must never show a material that isn't in the current
+  // filtered list -- without this, changing the search after already having
+  // selected a row leaves the OLD selection's details on screen, looking like
+  // it belongs to the new search results even though nothing there was clicked.
+  useEffect(() => {
+    if (selected && !filtered.some((m) => m.id === selected.id)) {
+      setSelected(null);
+    }
+  }, [search, groupFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function fmt(v: number | undefined | null, unit = '', dp = 0) {
     if (v == null) return null;
@@ -3792,10 +5487,10 @@ function MaterialPickerDialog({
     : null;
 
   const standards = [
-    sel?.astm_standard ? `ASTM: ${sel.astm_standard}` : null,
-    sel?.din_standard  ? `DIN: ${sel.din_standard}`   : null,
-    sel?.en_standard   ? `EN: ${sel.en_standard}`      : null,
-    sel?.jis_standard  ? `JIS: ${sel.jis_standard}`   : null,
+    sel?.astmStandard ? `ASTM: ${sel.astmStandard}` : null,
+    sel?.dinStandard  ? `DIN: ${sel.dinStandard}`   : null,
+    sel?.enStandard   ? `EN: ${sel.enStandard}`      : null,
+    sel?.jisStandard  ? `JIS: ${sel.jisStandard}`   : null,
   ].filter(Boolean).join(' · ') || null;
 
   const regionalCosts: { label: string; value: number | undefined }[] = [
@@ -3888,10 +5583,10 @@ function MaterialPickerDialog({
                           {dens ? `${dens.toFixed(0)}` : '—'}
                         </td>
                         <td className="px-2.5 py-1.5 text-right text-muted-foreground">
-                          {m.ultimate_tensile_strength != null ? m.ultimate_tensile_strength : '—'}
+                          {m.ultimateTensileStrength != null ? m.ultimateTensileStrength : '—'}
                         </td>
                         <td className="px-2.5 py-1.5 text-right text-muted-foreground">
-                          {m.yield_tensile_strength != null ? m.yield_tensile_strength : '—'}
+                          {m.yieldTensileStrength != null ? m.yieldTensileStrength : '—'}
                         </td>
                         <td className="px-2.5 py-1.5 text-right text-muted-foreground">
                           {m.costIndia != null ? `$${m.costIndia}` : '—'}
@@ -3954,9 +5649,14 @@ function MaterialPickerDialog({
                 <div className="border-t pt-3">
                   <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Physical Properties</p>
                   <MatPropRow label="Density" value={densityDisplay} />
-                  <MatPropRow label="UTS (MPa)" value={fmt(sel.ultimate_tensile_strength)} />
-                  <MatPropRow label="Yield Strength (MPa)" value={fmt(sel.yield_tensile_strength)} />
-                  <MatPropRow label="Shear Strength (MPa)" value={fmt(sel.shearing_strength)} />
+                  <MatPropRow label="UTS (MPa)" value={fmt(sel.ultimateTensileStrength)} />
+                  <MatPropRow label="Yield Strength (MPa)" value={fmt(sel.yieldTensileStrength)} />
+                  <MatPropRow label="Shear Strength (MPa)" value={fmt(sel.shearingStrength)} />
+                  <MatPropRow label="Elongation (%)" value={fmt(sel.elongationPct)} />
+                  <MatPropRow label="Elastic Modulus (GPa)" value={fmt(sel.elasticModulusGpa, '', 1)} />
+                  <MatPropRow label="Poisson's Ratio" value={fmt(sel.poissonRatio, '', 2)} />
+                  <MatPropRow label="Electrical Conductivity (%IACS)" value={fmt(sel.electricalConductivityIacsPct, '', 1)} />
+                  <MatPropRow label="Thermal Conductivity (W/m-K)" value={fmt(sel.thermalConductivityWMk)} />
                 </div>
 
                 {/* Plastic-specific */}
@@ -4030,27 +5730,99 @@ function MaterialPickerDialog({
 // ── CostGuidePanel (Left) ──────────────────────────────────────────────────────
 
 function CostGuidePanel({
-  item, fg, summary, batchSize, setBatchSize, productionLife, setProductionLife,
-  processRouting, setProcessRouting, factory, setFactory,
-  onManualClick, selectedManualRoute,
+  item, fg, summary, batchSize, productionLife, setProductionLife,
+  processRouting, setProcessRouting, factory,
+  factoryDraft, setFactoryDraft, batchSizeDraft, setBatchSizeDraft,
+  applyScenario,
+  onManualClick, selectedManualRoute, onSelectHighlight,
 }: {
   item: BOMItem; fg: FeatureGraph | null; summary: FeatureGraphSummary | null;
-  batchSize: number; setBatchSize: (v: number) => void;
+  batchSize: number;
   productionLife: number; setProductionLife: (v: number) => void;
   processRouting: 'auto' | 'manual'; setProcessRouting: (v: 'auto' | 'manual') => void;
-  factory: string; setFactory: (v: string) => void;
+  factory: string;
+  // Digital Factory + Batch Size drive live server recompute (useCostSummary/
+  // useRouteComparison/useCostOverride etc. all key off the committed factory/
+  // batchSize above) — staged as drafts (owned by the parent, not here, so the
+  // Workflow Builder can also see scenarioDirty) so picking a new factory or
+  // typing a new batch size doesn't refetch the whole scenario on every change.
+  // Only committing both together via "Apply Scenario" updates factory/batchSize.
+  factoryDraft: string; setFactoryDraft: (v: string) => void;
+  batchSizeDraft: number; setBatchSizeDraft: (v: number) => void;
+  applyScenario: () => Promise<void>;
   onManualClick: () => void;
   selectedManualRoute: ManualRouteOption | null;
+  onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
 }) {
   const queryClient = useQueryClient();
   type LeftTab = 'scenario' | 'geo' | 'gdt' | 'features' | 'machine';
   const [tab, setTab] = useState<LeftTab>('scenario');
   const [leftAppliedRouteId, setLeftAppliedRouteId] = useState<string | null>(null);
+  const applyRoute = useApplyRoute(item.id);
   const [productLine, setProductLine] = useState('');
   const [currency, setCurrency] = useState('USD');
   const [askPrice, setAskPrice] = useState('');
   const [matPickerOpen, setMatPickerOpen] = useState(false);
-  const [blankThickness, setBlankThickness] = useState(item.sheetThicknessMm != null ? String(item.sheetThicknessMm) : '');
+  // Apply Scenario confirmation + progress — the apply-route/apply-custom-route
+  // round trip re-runs the whole route-comparison engine server-side (observed
+  // 12-60s live) with several more sequential steps after it (material grade
+  // commit, cost-summary refetch, auto-add material/process, cache invalidation).
+  // Previously this all fired instantly on click with no confirmation and no
+  // feedback beyond a single toast at the very end, so a 30-60s wait looked
+  // identical to the button doing nothing.
+  const [confirmApplyOpen, setConfirmApplyOpen] = useState(false);
+  const [applyProgress, setApplyProgress] = useState<{ step: string; pct: number } | null>(null);
+  const isApplying = applyProgress != null;
+  // Draft for the Blank Thickness MANUAL OVERRIDE (bom_items.scenario_overrides.
+  // sheetThicknessMm) — deliberately NOT the same field as the real CAD-
+  // extracted thickness (item.featureGraph.summary.sheetThicknessMm) or the
+  // bom_items.sheet_thickness_mm fallback column. Saving into either of
+  // those would either be silently ignored by costing (CAD always wins over
+  // the fallback column) or destroy the real CAD reference value — see
+  // migration 420's own comment. Resynced whenever the item's saved
+  // override changes (e.g. after this mutation succeeds, or after Discard).
+  const [blankThickness, setBlankThickness] = useState(
+    item.scenarioOverrides?.sheetThicknessMm != null ? String(item.scenarioOverrides.sheetThicknessMm) : '',
+  );
+  useEffect(() => {
+    setBlankThickness(item.scenarioOverrides?.sheetThicknessMm != null ? String(item.scenarioOverrides.sheetThicknessMm) : '');
+  }, [item.scenarioOverrides?.sheetThicknessMm]);
+  // cadThicknessMm itself is declared further down (shared with the rest of
+  // this component, already computed from the same featureGraph.summary).
+  const effectiveThicknessMm =
+    (item.scenarioOverrides?.sheetThicknessMm as number | undefined)
+    ?? (item.featureGraph?.summary?.sheetThicknessMm || null)
+    ?? item.sheetThicknessMm ?? 0;
+  // Manual Override renders as static text by default — click it (or the
+  // pencil icon) to reveal the editable input, matching an inline-edit
+  // pattern instead of an always-open text box.
+  const [isEditingBlankThickness, setIsEditingBlankThickness] = useState(false);
+  const commitBlankThicknessOverride = () => {
+    const trimmed = blankThickness.trim();
+    if (trimmed === '') {
+      if (item.scenarioOverrides?.sheetThicknessMm != null) {
+        patchScenarioOverrides.mutate({ id: item.id, patch: { sheetThicknessMm: null } });
+      }
+      setIsEditingBlankThickness(false);
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    if (parsed !== item.scenarioOverrides?.sheetThicknessMm) {
+      patchScenarioOverrides.mutate({ id: item.id, patch: { sheetThicknessMm: parsed } });
+    }
+    setIsEditingBlankThickness(false);
+  };
+  const cancelBlankThicknessEdit = () => {
+    setBlankThickness(item.scenarioOverrides?.sheetThicknessMm != null ? String(item.scenarioOverrides.sheetThicknessMm) : '');
+    setIsEditingBlankThickness(false);
+  };
+  const [annualVolumeDraft, setAnnualVolumeDraft] = useState(item.annualVolume ?? 0);
+  const commitAnnualVolume = () => {
+    if (annualVolumeDraft !== (item.annualVolume ?? 0)) {
+      updateBOMItem.mutate({ id: item.id, data: { annualVolume: annualVolumeDraft } });
+    }
+  };
   const [matInputValue, setMatInputValue] = useState(item.materialGrade ?? '');
   const [matDropOpen, setMatDropOpen] = useState(false);
   useEffect(() => { setMatInputValue(item.materialGrade ?? ''); }, [item.materialGrade]);
@@ -4074,9 +5846,8 @@ function CostGuidePanel({
   // ── Auto-add raw material cost when material grade is applied ─────────────
   const createRawMatCost = useCreateRawMaterialCost();
 
-  // ── Auto-add process costs + logistics when material grade is applied ──────
+  // ── Auto-add process costs when material grade is applied ──────────────────
   const createProcessCost = useCreateProcessCost();
-  const createLogisticsCost = useCreatePackagingLogisticsCost();
   // React Query deduplicates by key — resolves from cache when CostSummaryTab already called it
   const { data: cgpCostSummary } = useCostSummary(item.id, batchSize, factory);
 
@@ -4105,66 +5876,56 @@ function CostGuidePanel({
       const lines = (liveSummary ?? cgpCostSummary)?.processLines ?? [];
       if (!lines.length) return;
       for (const [i, line] of lines.entries()) {
-        const cycleTimeSec = Math.round(line.cycleTimeMin * 60);
-        // Reverse-compute setup time from amortized setupCost:
-        // setupCost = (setupTime/60 * hourlyRate) / batchSize → setupTime = setupCost * batchSize * 60 / hourlyRate
-        const setupTimeMins = line.hourlyRate > 0
-          ? parseFloat(((line.setupCost * batchSize * 60) / line.hourlyRate).toFixed(1))
+        // process_cost_records.cycle_time is NUMERIC(12,2) — round to 2dp,
+        // not to a whole integer (see the matching fix on the Calculator
+        // button handlers above for why that silently loses real precision).
+        const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
+        // Reverse-compute setup time from amortized setupCost — must divide by
+        // the SAME combined machine+labor rate the backend used (aprioriTerms:
+        // setupCost = (mhrMin + dlrMin*setupNDL) * setupTimeMin —
+        // cost-engine.ts:365), not machine rate alone. See the identical fix
+        // and its confirmed-live example on handleOpenEditProc above — this
+        // path is worse: it PERSISTS the inflated minutes into a new
+        // process_cost_records row via CreateProcessCostDto below, not just
+        // displaying it.
+        const combinedRateForSetup = line.hourlyRate + (line.labourRate ?? 0);
+        const setupTimeMins = combinedRateForSetup > 0
+          ? parseFloat(((line.setupCost * batchSize * 60) / combinedRateForSetup).toFixed(1))
           : 0;
+        // Link the real recommended machine (same one the ⭐ picker already
+        // shows) instead of leaving mhrId unset — otherwise every
+        // auto-created row reads "Manual rate — not linked to a machine"
+        // even though a specific real machine was already identified for it.
+        const recommendedCandidate = line.machineSelection?.balanced?.candidate;
+        const payload: CreateProcessCostDto = {
+          bomItemId: item.id,
+          opNbr: (i + 1) * 10,
+          operation: line.operation || line.process,
+          processGroup: line.processGroup || deriveProcessGroupFromMachineClass(line.machineClass),
+          processRoute: line.processRoute || line.process,
+          machineRate: recommendedCandidate?.hourlyRate ?? line.hourlyRate,
+          laborRate: line.labourRate ?? 0,
+          directRate: recommendedCandidate?.hourlyRate ?? line.hourlyRate,
+          indirectRate: 0,
+          fringeRate: 0,
+          machineValue: 0,
+          cycleTime: cycleTimeSec,
+          setupTime: setupTimeMins,
+          setupManning: 1,
+          batchSize,
+          heads: 1,
+          partsPerCycle: 1,
+          scrap: 0,
+          shiftPatternHoursPerDay: 8,
+          isActive: true,
+        };
+        if (recommendedCandidate?.machineId) payload.mhrId = recommendedCandidate.machineId;
         try {
-          await createProcessCost.mutateAsync({
-            bomItemId: item.id,
-            opNbr: (i + 1) * 10,
-            operation: line.operation || line.process,
-            processGroup: line.processGroup || deriveProcessGroupFromMachineClass(line.machineClass),
-            processRoute: line.processRoute || line.process,
-            machineRate: line.hourlyRate,
-            laborRate: line.labourRate ?? 0,
-            directRate: line.hourlyRate,
-            indirectRate: 0,
-            fringeRate: 0,
-            machineValue: 0,
-            cycleTime: cycleTimeSec,
-            setupTime: setupTimeMins,
-            setupManning: 1,
-            batchSize,
-            heads: 1,
-            partsPerCycle: 1,
-            scrap: 0,
-            shiftPatternHoursPerDay: 8,
-            isActive: true,
-          });
+          await createProcessCost.mutateAsync(payload);
         } catch { /* individual line failure is non-fatal */ }
       }
     } finally {
       autoAddLock.current.delete('process');
-    }
-  };
-
-  const STANDARD_LOGISTICS_TEMPLATES = [
-    { costName: 'Inner Packaging', logisticsType: LogisticsType.PACKAGING, costBasis: CostBasis.PER_UNIT, unitCost: 0.5, quantity: 1 },
-    { costName: 'Export Carton',   logisticsType: LogisticsType.PACKAGING, costBasis: CostBasis.PER_UNIT, unitCost: 1.5, quantity: 1 },
-    { costName: 'Outbound Freight', logisticsType: LogisticsType.OUTBOUND,  costBasis: CostBasis.PER_KG,   unitCost: 3.0, quantity: 1 },
-  ];
-
-  const autoAddLogistics = async () => {
-    if (autoAddLock.current.has('logistics')) return;
-    autoAddLock.current.add('logistics');
-    try {
-      // Fresh server check — stale cache after deletion can block creation
-      try {
-        const fresh = await apiClient.get<{ items: any[] }>('/packaging-logistics-costs', {
-          params: { bomItemId: item.id, isActive: true, page: 1, limit: 10 },
-        });
-        if ((fresh?.items?.length ?? 0) > 0) return;
-      } catch { /* pre-check network failure — fall through */ }
-      for (const template of STANDARD_LOGISTICS_TEMPLATES) {
-        try {
-          await createLogisticsCost.mutateAsync({ bomItemId: item.id, ...template, isActive: true });
-        } catch { /* individual item failure is non-fatal */ }
-      }
-    } finally {
-      autoAddLock.current.delete('logistics');
     }
   };
 
@@ -4242,12 +6003,31 @@ function CostGuidePanel({
       const density = mat?.densityKgM3 ?? null;
       const scrap = 10;
 
-      // Weight chain (most reliable first):
-      // 1. volume × density — most accurate: volume from CAD + density from DB material
-      // 2. item.weight — CAD-extracted net weight stored on the BOM item entity
-      // 3. engineGrossKg — engine's grossWeightKg from cost summary (always available in UI)
-      // For cases 1 & 2, item.weight / volume×density is the NET weight; gross = net / (1 - scrap%)
-      // For case 3, grossWeightKg IS already the gross; net = gross × (1 - scrap%)
+      // Weight chain — order depends on part family:
+      //
+      // item.volume and item.weight are BOTH snapshots captured once at CAD
+      // upload time from the drawing's own detected thickness. Neither is
+      // recomputed when Blank Thickness's Manual Override changes — so for a
+      // sheet metal part with an active thickness override, both are stale
+      // by construction (e.g. baked in at CAD's 1.5mm while the effective/
+      // costed thickness is 2mm), regardless of whether the material's real
+      // density is known. Confirmed live: a 2mm SS304 part with a 3,245 mm²
+      // flat pattern (expected ~0.05-0.06 kg) came out as 0.0138 kg — right
+      // in line with item.weight's 1.5mm-CAD-thickness snapshot, not the 2mm
+      // override.
+      //
+      // The engine's own grossWeightKg is the only source that's always
+      // live-recomputed from flatPatternAreaMm2 × the EFFECTIVE (override-
+      // aware) thickness (see resolveEffectiveSheetThicknessMm in
+      // getCostSummary) — so for sheet metal it is the authoritative weight,
+      // even when the real material's density isn't in raw_materials yet
+      // (that gap only affects price/density, not geometry, and is already
+      // surfaced by its own warning banner).
+      //
+      // For non-sheet-metal (machined/solid) parts there's no flat-pattern
+      // concept or thickness override to go stale against, so item.volume ×
+      // a real DB density remains the most accurate source there.
+      //
       // Read from live query cache — closure-captured cgpCostSummary is stale (ran before
       // material grade was set), so grossWeightKg there is 0. After Apply triggers a refetch,
       // the cache holds the correct value even though the closure variable hasn't updated.
@@ -4257,9 +6037,13 @@ function CostGuidePanel({
       const freshSummary = liveSummary ?? cgpCostSummary;
       const engineGrossKg = (freshSummary?.grossWeightKg ?? 0) > 0 ? freshSummary!.grossWeightKg : null;
       const cadWeight = typeof item.weight === 'number' && item.weight > 0 ? item.weight : null;
+      const isSheetMetalPart = fg?.classification?.family === 'sheet_metal' || (summary?.sheetThicknessMm ?? 0) > 0;
       let netUsage: number;
       let grossUsage: number;
-      if (item.volume && density) {
+      if (isSheetMetalPart && engineGrossKg != null) {
+        grossUsage = parseFloat(engineGrossKg.toFixed(6));
+        netUsage   = parseFloat((grossUsage * (1 - scrap / 100)).toFixed(6));
+      } else if (item.volume && density) {
         netUsage  = parseFloat(((item.volume * density) / 1e9).toFixed(6));
         grossUsage = parseFloat((netUsage / (1 - scrap / 100)).toFixed(6));
       } else if (cadWeight != null) {
@@ -4322,6 +6106,61 @@ function CostGuidePanel({
     }
   };
 
+  // Re-applies whatever manufacturing route is currently in effect — a
+  // staged Workflow Builder pick, or an already-persisted route re-applied
+  // with fresh material/batch/location — instead of blindly recreating the
+  // engine's own default route. Every place that changes material grade
+  // (Enter, dropdown pick, the mini "Apply" badge, drawing-suggested
+  // "Apply") used to call autoAddProcessCosts() directly, which silently
+  // discarded an explicitly-chosen alternate route (e.g. Turret Punching)
+  // and replaced it with the engine default (Laser Cut + Bend Brake +
+  // Deburr) every single time — confirmed live via process_cost_records
+  // showing notes=null (never auto_fill_from_route/auto_fill_from_custom_
+  // route) across an entire test session despite a manual route being
+  // staged throughout.
+  // No manual route staged this session — re-apply whatever route is
+  // already persisted (so a material-grade-only change doesn't silently
+  // revert an earlier explicit pick), else fall back to the engine's own
+  // default route. Shared by reapplyEffectiveRoute below and the bottom
+  // "Apply" button's own material-grade branch (which has already called
+  // applyScenario() itself when a route WAS staged, so it skips this).
+  const reapplyExistingOrDefaultRoute = async () => {
+    let existingRouteId: string | null = null;
+    let freshProcs: { records: any[] } | undefined;
+    try {
+      freshProcs = await apiClient.get<{ records: any[] }>('/process-costs', {
+        params: { bomItemId: item.id, isActive: true, page: 1, limit: 50 },
+      });
+      for (const r of (freshProcs?.records ?? [])) {
+        const m = /^auto_fill_from_route:(.+)$/.exec(r?.notes ?? '');
+        if (m) { existingRouteId = m[1] ?? null; break; }
+      }
+    } catch { /* non-fatal — falls through to the default-route path below */ }
+
+    if (existingRouteId) {
+      try {
+        await applyRoute.mutateAsync({ routeId: existingRouteId, batchSize, location: factory });
+      } catch { /* errors surfaced by the mutation's own onError toast */ }
+    } else {
+      try {
+        for (const r of (freshProcs?.records ?? [])) {
+          if (r?.id) {
+            try { await apiClient.put(`/process-costs/${r.id}`, { isActive: false }); } catch { /* best-effort */ }
+          }
+        }
+        queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });
+      } catch { /* non-fatal */ }
+      await autoAddProcessCosts();
+    }
+  };
+  const reapplyEffectiveRoute = async () => {
+    if (processRouting === 'manual' && selectedManualRoute) {
+      await applyScenario();
+      return;
+    }
+    await reapplyExistingOrDefaultRoute();
+  };
+
   const [exchangeRateVersion, setExchangeRateVersion] = useState<'default' | 'budget' | 'custom'>('default');
   const [customExchangeRate, setCustomExchangeRate] = useState('');
   const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -4335,6 +6174,7 @@ function CostGuidePanel({
     : (DEFAULT_RATES[currency] ?? 1);
   const { data: materialCandidates, isLoading: matLoading } = useMaterialIntelligence(item.id);
   const updateBOMItem = useUpdateBOMItem();
+  const patchScenarioOverrides = usePatchScenarioOverrides();
 
   // Fetch a broad slice of DB materials to validate AI candidates against.
   // Candidates not present in the DB (e.g. ABS on a sheet-metal part) are hidden.
@@ -4360,6 +6200,60 @@ function CostGuidePanel({
   const isSheetMetalCAD =
     fg?.classification?.family === 'sheet_metal' || (summary?.sheetThicknessMm ?? 0) > 0;
   const cadThicknessMm = summary?.sheetThicknessMm ?? 0;
+
+  // The actual apply logic — previously ran straight from the button's onClick
+  // with no confirmation and no visible progress. Now triggered only after the
+  // user confirms via the AlertDialog below, with applyProgress driving a
+  // step-by-step indicator instead of a single silent 12-60s wait.
+  const runApplyScenario = async () => {
+    setApplyProgress({ step: 'Applying manufacturing route…', pct: 10 });
+    try {
+      try {
+        const routeStagedThisSession = processRouting === 'manual' && !!selectedManualRoute;
+        await applyScenario();
+        setApplyProgress({ step: 'Saving material grade…', pct: 40 });
+
+        const pendingGrade = matInputValue.trim();
+        if (pendingGrade && pendingGrade !== item.materialGrade) {
+          try {
+            await updateBOMItem.mutateAsync({ id: item.id, data: { materialGrade: pendingGrade } });
+          } catch { /* non-fatal — proceed with whatever is on the server */ }
+        }
+
+        setApplyProgress({ step: 'Recalculating cost summary…', pct: 60 });
+        await queryClient.refetchQueries({
+          queryKey: ['bom-items', item.id, 'cost-summary'],
+          exact: false,
+        });
+
+        const currentGrade = pendingGrade || item.materialGrade;
+        if (currentGrade) {
+          setApplyProgress({ step: 'Updating material cost…', pct: 80 });
+          await autoAddMaterialCost(currentGrade);
+
+          if (!routeStagedThisSession) {
+            setApplyProgress({ step: 'Re-applying process route…', pct: 90 });
+            await reapplyExistingOrDefaultRoute();
+          }
+        }
+
+        setApplyProgress({ step: 'Finishing up…', pct: 95 });
+        queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'cost-summary'] });
+        queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'route-comparison'] });
+      } catch { /* outer safety net — never block the toast */ }
+
+      const appliedParts: string[] = [
+        processRouting === 'manual' && selectedManualRoute ? selectedManualRoute.label : 'Auto-recommended route',
+      ];
+      const gradeForToast = matInputValue.trim() || item.materialGrade;
+      if (gradeForToast) appliedParts.push(`Material: ${gradeForToast}`);
+      appliedParts.push(`Batch: ${batchSizeDraft.toLocaleString()}`);
+      appliedParts.push(`Location: ${factoryDraft}`);
+      toast.success('Scenario applied', { description: appliedParts.join(' · ') });
+    } finally {
+      setApplyProgress(null);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -4450,8 +6344,8 @@ function CostGuidePanel({
 
             <Section title="Digital Factory">
               <select
-                value={factory}
-                onChange={(e) => setFactory(e.target.value)}
+                value={factoryDraft}
+                onChange={(e) => setFactoryDraft(e.target.value)}
                 className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
               >
                 <option value="India">India</option>
@@ -4516,8 +6410,7 @@ function CostGuidePanel({
                     if (e.key === 'Enter' && matInputValue.trim()) {
                       updateBOMItem.mutate({ id: item.id, data: { materialGrade: matInputValue.trim() } });
                       autoAddMaterialCost(matInputValue.trim());
-                      void autoAddProcessCosts();
-                      void autoAddLogistics();
+                      void reapplyEffectiveRoute();
                       setMatDropOpen(false);
                     }
                     if (e.key === 'Escape') setMatDropOpen(false);
@@ -4535,8 +6428,7 @@ function CostGuidePanel({
                         e.preventDefault();
                         updateBOMItem.mutate({ id: item.id, data: { materialGrade: matInputValue.trim() } });
                         autoAddMaterialCost(matInputValue.trim());
-                        void autoAddProcessCosts();
-                        void autoAddLogistics();
+                        void reapplyEffectiveRoute();
                         setMatDropOpen(false);
                       }}
                       className="text-[8px] font-semibold text-violet-400 border border-violet-500/40 rounded px-1 py-px leading-none hover:bg-violet-500/10"
@@ -4562,8 +6454,7 @@ function CostGuidePanel({
                             setMatInputValue(grade);
                             updateBOMItem.mutate({ id: item.id, data: { materialGrade: grade } });
                             autoAddMaterialCost(grade);
-                            void autoAddProcessCosts();
-                            void autoAddLogistics();
+                            void reapplyEffectiveRoute();
                             setMatDropOpen(false);
                           }}
                           className="w-full text-left px-2.5 py-1.5 hover:bg-muted/60 transition-colors border-b border-border/20 last:border-0"
@@ -4596,7 +6487,7 @@ function CostGuidePanel({
                   </div>
                   <span className="text-[9px] font-semibold text-blue-400 border border-blue-500/40 rounded px-1 py-px leading-none shrink-0">DRAWING</span>
                   <button
-                    onClick={() => { updateBOMItem.mutate({ id: item.id, data: { materialGrade: drawingMaterial! } }); autoAddMaterialCost(drawingMaterial!); void autoAddProcessCosts(); void autoAddLogistics(); }}
+                    onClick={() => { updateBOMItem.mutate({ id: item.id, data: { materialGrade: drawingMaterial! } }); autoAddMaterialCost(drawingMaterial!); void reapplyEffectiveRoute(); }}
                     className="text-[9px] font-medium text-violet-400 hover:text-violet-300 shrink-0"
                   >Apply</button>
                 </div>
@@ -4604,23 +6495,58 @@ function CostGuidePanel({
             </Section>
 
             <Section title="Blank Thickness">
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={blankThickness}
-                  onChange={(e) => setBlankThickness(e.target.value)}
-                  placeholder={item.sheetThicknessMm ? String(item.sheetThicknessMm) : '—'}
-                  className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
-                />
-                <span className="text-xs text-muted-foreground shrink-0">mm</span>
+              <div className="flex items-center justify-between text-[11px] py-1">
+                <span className="text-muted-foreground">CAD Thickness</span>
+                <span className="font-medium">{cadThicknessMm > 0 ? `${cadThicknessMm} mm` : '—'}</span>
               </div>
-              {item.sheetThicknessMm != null && blankThickness !== String(item.sheetThicknessMm) && blankThickness !== '' && (
-                <p className="text-[10px] text-muted-foreground/50 mt-1">
-                  CAD value: {item.sheetThicknessMm} mm
-                </p>
-              )}
+              <div className="flex items-center gap-2 py-1">
+                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Manual Override</span>
+                {isEditingBlankThickness ? (
+                  <>
+                    <input
+                      autoFocus
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={blankThickness}
+                      onChange={(e) => setBlankThickness(e.target.value)}
+                      onBlur={commitBlankThicknessOverride}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                        if (e.key === 'Escape') cancelBlankThicknessEdit();
+                      }}
+                      placeholder={cadThicknessMm > 0 ? String(cadThicknessMm) : '—'}
+                      className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                    <span className="text-xs text-muted-foreground shrink-0">mm</span>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setIsEditingBlankThickness(true)}
+                    className="flex-1 flex items-center justify-between text-xs border border-transparent hover:border-border rounded px-2.5 py-1.5 text-left group"
+                    title="Click to edit"
+                  >
+                    <span className={item.scenarioOverrides?.sheetThicknessMm != null ? 'font-medium' : 'text-muted-foreground'}>
+                      {item.scenarioOverrides?.sheetThicknessMm != null ? `${item.scenarioOverrides.sheetThicknessMm} mm` : 'Not set'}
+                    </span>
+                    <Edit className="h-3 w-3 text-muted-foreground group-hover:text-foreground shrink-0" />
+                  </button>
+                )}
+                {item.scenarioOverrides?.sheetThicknessMm != null && (
+                  <button
+                    onClick={() => { setBlankThickness(''); setIsEditingBlankThickness(false); patchScenarioOverrides.mutate({ id: item.id, patch: { sheetThicknessMm: null } }); }}
+                    title="Clear override — revert to CAD thickness"
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-[11px] py-1 border-t border-border/50 mt-1 pt-1.5">
+                <span className="text-foreground font-medium">Effective Thickness</span>
+                <span className="font-semibold text-violet-400">{effectiveThicknessMm} mm</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground/50 mt-0.5">Used for costing — override wins when set, else the real CAD value</p>
             </Section>
 
             {cgpCostSummary?.blankSpec && (
@@ -4633,8 +6559,8 @@ function CostGuidePanel({
             )}
 
             <Section title="Volume and Batch Size">
-              <Row label="Annual Volume" value={fmtInt(item.annualVolume ?? 0)} />
-              <InputRow label="Batch Size" value={batchSize} onChange={setBatchSize} />
+              <InputRow label="Annual Volume" value={annualVolumeDraft} onChange={setAnnualVolumeDraft} onBlur={commitAnnualVolume} />
+              <InputRow label="Batch Size" value={batchSizeDraft} onChange={setBatchSizeDraft} />
               <InputRow label="Production Life (yr)" value={productionLife} onChange={setProductionLife} />
             </Section>
 
@@ -4669,70 +6595,85 @@ function CostGuidePanel({
             appliedRouteId={leftAppliedRouteId}
             onAppliedRouteChange={setLeftAppliedRouteId}
             factory={factory}
+            {...(onSelectHighlight ? { onSelectHighlight } : {})}
           />
         )}
 
       </div>
 
       {/* Action buttons */}
-      <div className="border-t px-3 py-2 flex gap-1.5 shrink-0">
-        <button
-          onClick={async () => {
-            try {
-              // Step 1: Persist any unsaved material grade typed into the input.
-              // If the user typed without pressing Enter, the grade was never saved to
-              // the server — the cost-summary Scenario gate would return scenarioReady:false.
-              const pendingGrade = matInputValue.trim();
-              if (pendingGrade && pendingGrade !== item.materialGrade) {
-                try {
-                  await updateBOMItem.mutateAsync({ id: item.id, data: { materialGrade: pendingGrade } });
-                } catch { /* non-fatal — proceed with whatever is on the server */ }
-              }
-
-              // Step 2: Force-refetch cost summary so the engine runs with the now-correct
-              // material grade. This populates grossWeightKg and processLines in the cache
-              // BEFORE autoAddMaterialCost / autoAddProcessCosts read from it.
-              await queryClient.refetchQueries({
-                queryKey: ['bom-items', item.id, 'cost-summary'],
-                exact: false,
-              });
-
-              const currentGrade = pendingGrade || item.materialGrade;
-              if (currentGrade) {
-                // Step 3a: Deactivate existing process cost records so autoAddProcessCosts
-                // creates fresh ones reflecting the new material grade. Without this,
-                // autoAddProcessCosts sees stale records and returns early.
-                try {
-                  const freshProcs = await apiClient.get<{ records: any[] }>('/process-costs', {
-                    params: { bomItemId: item.id, isActive: true, page: 1, limit: 50 },
-                  });
-                  for (const r of (freshProcs?.records ?? [])) {
-                    if (r?.id) {
-                      try { await apiClient.put(`/process-costs/${r.id}`, { isActive: false }); } catch { /* best-effort */ }
-                    }
-                  }
-                  // Bust the stale cache so autoAddProcessCosts guard sees 0 records
-                  queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });
-                } catch { /* non-fatal */ }
-
-                // Step 3b: Create stored records from fresh engine data.
-                // autoAddMaterialCost replaces the old material record if grade changed.
-                // autoAddProcessCosts now sees 0 active records and creates fresh lines.
-                await autoAddMaterialCost(currentGrade);
-                await autoAddProcessCosts();
-                await autoAddLogistics();
-              }
-
-              // Step 4: Invalidate so the UI picks up newly created stored records.
-              queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'cost-summary'] });
-              queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'route-comparison'] });
-            } catch { /* outer safety net — never block the toast */ }
-            toast.success('Scenario applied — recalculating…');
-          }}
-          className="flex-1 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded px-2 py-1 font-medium transition-colors">Apply</button>
-        <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">Copy</button>
-        <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">New</button>
+      <div className="border-t px-3 py-2 shrink-0 space-y-1.5">
+        {applyProgress && (
+          <div className="space-y-1">
+            <Progress value={applyProgress.pct} className="h-1.5" />
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              {applyProgress.step}
+            </p>
+          </div>
+        )}
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setConfirmApplyOpen(true)}
+            disabled={isApplying}
+            className="flex-1 text-xs bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded px-2 py-1 font-medium transition-colors flex items-center justify-center gap-1.5"
+          >
+            {isApplying && <Loader2 className="h-3 w-3 animate-spin" />}
+            {isApplying ? 'Applying…' : 'Apply'}
+          </button>
+          <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">Copy</button>
+          <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">New</button>
+        </div>
       </div>
+
+      {/* Confirm before committing — apply-route/apply-custom-route re-runs the
+          whole route-comparison engine and replaces this part's ENTIRE active
+          process routing (writeProcessLinesAsRecords deletes+reinserts), so an
+          accidental click had real, hard-to-notice consequences with no way
+          back except re-applying again. */}
+      <AlertDialog open={confirmApplyOpen} onOpenChange={(open) => { if (!isApplying) setConfirmApplyOpen(open); }}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apply this scenario?</AlertDialogTitle>
+            {/* AlertDialogDescription renders a real <p> (Radix's Description
+                primitive) — it must only ever wrap plain inline text. The
+                <ul>/second <p> below are real HTML block content and were
+                nested INSIDE it, which is invalid (<p> can't contain <p> or
+                <ul>) and threw a hydration error. Moved them to a sibling
+                <div>, outside AlertDialogDescription, instead. */}
+            <AlertDialogDescription>This replaces the part's current process routing with:</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <ul className="text-xs space-y-1 pl-1">
+              <li>
+                Route:{' '}
+                <span className="text-foreground font-medium">
+                  {processRouting === 'manual' && selectedManualRoute ? selectedManualRoute.label : 'Auto-recommended'}
+                </span>
+              </li>
+              <li>Location: <span className="text-foreground font-medium">{factoryDraft}</span></li>
+              <li>Batch size: <span className="text-foreground font-medium">{batchSizeDraft.toLocaleString()}</span></li>
+              {matInputValue.trim() && (
+                <li>Material: <span className="text-foreground font-medium">{matInputValue.trim()}</span></li>
+              )}
+            </ul>
+            <p className="text-xs">Any process whose cycle time can't be resolved will be reported below rather than saved.</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                setConfirmApplyOpen(false);
+                void runApplyScenario();
+              }}
+            >
+              Apply
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <MaterialPickerDialog
         open={matPickerOpen}
         onClose={() => setMatPickerOpen(false)}
@@ -4786,7 +6727,7 @@ function SustainabilityTab({ item, batchSize }: { item: BOMItem; batchSize: numb
         <Row label="Part Weight"          value={`${s.netWeightKg} kg`} />
         <Row label="Scrap Generated"      value={`${s.scrapKg} kg`} />
         <Row label="Waste Cost"           value={`$${s.wasteCostInr.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} />
-        <Row label="Material Utilization" value={`${s.materialUtilizationPct.toFixed(1)}%`} />
+        <Row label="Material Yield (Weight)" value={`${s.materialUtilizationPct.toFixed(1)}%`} />
         <Row label="Total CO₂"            value={`${s.totalCo2Kg} kg CO₂e`} />
         <Row label="Manufacturing Energy" value={`${s.totalProcessEnergyKwh} kWh`} />
         <Row label="Recyclability"        value={`${s.recyclabilityPct}%`} />
@@ -5703,9 +7644,9 @@ function ValidationTab({ fg, item, modelScreenshot, file3dUrl }: { fg: FeatureGr
               {file3dUrl && item.file3dPath?.toLowerCase().endsWith('.stl') ? (
                 <PartDimensionViewer
                   fileUrl={file3dUrl}
-                  maxLength={item.maxLength}
-                  maxWidth={item.maxWidth}
-                  maxHeight={item.maxHeight}
+                  maxLength={item.maxLength ?? null}
+                  maxWidth={item.maxWidth ?? null}
+                  maxHeight={item.maxHeight ?? null}
                 />
               ) : (
                 /* Fallback: proportional bounding-box rectangle when no model loaded yet */
@@ -6288,8 +8229,8 @@ function InvestmentTab({
   const uniqueDrillDiams  = holeGroups.length || ((fg?.summary?.holeCount ?? 0) > 0 ? 3 : 0);
   const uniqueThreadSizes = new Set(threads.map((t) => t.size)).size;
 
-  const loc   = INV_LOC_RATE[factory] ?? INV_LOC_RATE['India'];
-  const fmtC  = (inr: number, dec = 0) =>
+  const loc = (INV_LOC_RATE[factory] ?? INV_LOC_RATE['India'])!;
+  const fmtC = (inr: number, dec = 0) =>
     `${loc.symbol}${(inr / loc.inrRate).toLocaleString(undefined, {
       minimumFractionDigits: dec, maximumFractionDigits: dec,
     })}`;
@@ -6309,10 +8250,10 @@ function InvestmentTab({
   const fixtureTotal  = fixtureBase * fixtureSetups * (isTightTol ? INV_TIGHT_TOL_PREMIUM : 1);
 
   // ── Programming ──
-  const progBase    = INV_PROG_BASE[difficulty] ?? INV_PROG_BASE['medium'];
+  const progBase = (INV_PROG_BASE[difficulty] ?? INV_PROG_BASE['medium'])!;
   const progPockets = pocketCount * INV_PROG_PER_POCKET;
-  const prog5ax     = machineClass === 'cnc_5ax_mc' ? INV_PROG_5AX_ADDER : 0;
-  const progTotal   = progBase + progPockets + prog5ax;
+  const prog5ax = machineClass === 'cnc_5ax_mc' ? INV_PROG_5AX_ADDER : 0;
+  const progTotal = progBase + progPockets + prog5ax;
   const progHours   = Math.round(progTotal / INV_PROG_HOURLY_RATE);
 
   // ── Tools ──
@@ -6619,121 +8560,13 @@ function BlankStockSection({ blank, currencySymbol }: { blank: BlankSpecDto; cur
   );
 }
 
-// ── CandidateRoutesPanel ──────────────────────────────────────────────────────
-
-function CandidateRoutesPanel({ item, batchSize, factory }: { item: BOMItem; batchSize: number; factory: string }) {
-  const { data, isLoading, error } = useCandidateRoutes(item.id, batchSize, factory);
-  const applyRoute = useApplyRoute(item.id);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-32 text-muted-foreground text-xs gap-2">
-        <div className="h-4 w-4 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
-        Computing candidates…
-      </div>
-    );
-  }
-  if (error || !data) {
-    return (
-      <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
-        <AlertCircle className="h-5 w-5 opacity-40" />
-        <p className="text-xs text-center">Could not load candidate routes.</p>
-      </div>
-    );
-  }
-
-  const sym = data.currencySymbol ?? '₹';
-  const primaryCost = data.candidates.find((c) => c.isPrimary)?.totalCost ?? 0;
-
-  return (
-    <div className="p-3 space-y-2.5">
-      <div className="flex items-center justify-between pb-1 border-b border-border">
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-          Candidate Routes
-        </span>
-        <span className="text-[10px] text-muted-foreground">batch {batchSize} · {data.location}</span>
-      </div>
-
-      {data.candidates.map((candidate) => {
-        const costDelta = primaryCost > 0 && !candidate.isPrimary
-          ? ((candidate.totalCost - primaryCost) / primaryCost) * 100
-          : null;
-        return (
-          <div
-            key={candidate.candidateId}
-            className={`rounded border p-2.5 space-y-1.5 ${
-              candidate.isPrimary
-                ? 'border-violet-500/40 bg-violet-500/5'
-                : !candidate.isFeasible
-                ? 'border-border bg-muted/20 opacity-60'
-                : 'border-border bg-background'
-            }`}
-          >
-            {/* Header row */}
-            <div className="flex items-start justify-between gap-1">
-              <div className="flex items-center gap-1.5 min-w-0">
-                {candidate.isPrimary && (
-                  <span className="text-[9px] px-1 py-0.5 rounded bg-violet-500 text-white font-semibold shrink-0">PRIMARY</span>
-                )}
-                <span className={`text-[11px] font-medium truncate ${!candidate.isFeasible ? 'line-through' : ''}`}>
-                  {candidate.routeLabel}
-                </span>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                {candidate.badges.lowestCost && <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">$</span>}
-                {candidate.badges.fastest && <span className="text-[9px] px-1 py-0.5 rounded bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30">⚡</span>}
-                {candidate.badges.lowestWaste && <span className="text-[9px] px-1 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">♻</span>}
-              </div>
-            </div>
-
-            {/* Blank row */}
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <span className="font-mono">{candidate.blankSpec.sizeLabel}</span>
-              <span>·</span>
-              <span>{candidate.blankSpec.utilizationPct.toFixed(0)}% util</span>
-            </div>
-
-            {/* Cost row */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs tabular-nums">
-                <span className="font-semibold">{sym}{candidate.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                {costDelta !== null && (
-                  <span className={`text-[10px] ${costDelta > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                    {costDelta > 0 ? '+' : ''}{costDelta.toFixed(0)}%
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] text-muted-foreground tabular-nums">{candidate.cycleTimes.totalMin.toFixed(0)} min</span>
-            </div>
-
-            {/* Apply button (feasible non-primary only, if routeId available) */}
-            {!candidate.isPrimary && candidate.isFeasible && candidate.routeId && (
-              <button
-                onClick={() => applyRoute.mutate({ routeId: candidate.routeId!, batchSize, location: factory })}
-                disabled={applyRoute.isPending}
-                className="w-full mt-1 text-[10px] py-1 rounded border border-violet-500/40 text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 transition-colors disabled:opacity-50"
-              >
-                Apply this route
-              </button>
-            )}
-
-            {/* Infeasibility note */}
-            {!candidate.isFeasible && candidate.feasibilityNotes[0] && (
-              <p className="text-[10px] text-muted-foreground/70 italic">{candidate.feasibilityNotes[0]}</p>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── AnalysisTabsPanel (Right) ──────────────────────────────────────────────────
 
 function AnalysisTabsPanel({
   projectId,
   item, fg, batchSize, productionLife, factory, selectedCNCFeatureKey, onCNCFeatureSelect,
   modelScreenshot, file3dUrl, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
+  onSelectHighlight,
 }: {
   projectId: string;
   item: BOMItem; fg: FeatureGraph | null;
@@ -6746,6 +8579,7 @@ function AnalysisTabsPanel({
   onTabChange: (tab: RightTabKey) => void;
   treeProcessNames: string[];
   vendorHotspotContext: { layer: HeatmapLayerType; riskLevel: string } | null;
+  onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
 }) {
   const tab = activeTab;
   const setTab = onTabChange;
@@ -6859,11 +8693,11 @@ function AnalysisTabsPanel({
         )}
 
         {tab === 'cost' && (
-          <CostSummaryTab item={item} batchSize={batchSize} factory={factory} />
+          <CostSummaryTab item={item} batchSize={batchSize} factory={factory} fg={fg} onSelectHighlight={onSelectHighlight} />
         )}
 
         {tab === 'validation' && item && (
-          <ValidationTab fg={fg} item={item} modelScreenshot={modelScreenshot} file3dUrl={file3dUrl} />
+          <ValidationTab fg={fg} item={item} modelScreenshot={modelScreenshot ?? null} file3dUrl={file3dUrl ?? null} />
         )}
 
 
@@ -6914,15 +8748,7 @@ function AnalysisTabsPanel({
           />
         )}
 
-        {tab === 'candidates' && (
-          <CandidateRoutesPanel
-            item={item}
-            batchSize={batchSize}
-            factory={factory}
-          />
-        )}
-
-        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'validation' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && tab !== 'copilot' && tab !== 'vendor_network' && tab !== 'candidates' && (
+        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'validation' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && tab !== 'copilot' && tab !== 'vendor_network' && (
           <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
             <AlertCircle className="h-6 w-6 opacity-30" />
             <p className="text-xs text-center">{RIGHT_TABS.find((t) => t.key === tab)?.label} coming in Phase 2.</p>
@@ -7414,7 +9240,7 @@ function GeometricCostDriversPanel({
                 </div>
                 {selected.attrs.map((attr, i) => (
                   <div key={i} className="flex items-baseline px-2 py-1.5 gap-2">
-                    <span className="text-[10px] text-muted-foreground w-20 shrink-0 truncate">{attr.name}</span>
+                    <span className="text-[10px] text-muted-foreground w-36 shrink-0 truncate">{attr.name}</span>
                     <span className="text-xs font-medium truncate tabular-nums">{attr.value}</span>
                   </div>
                 ))}
@@ -7435,6 +9261,16 @@ function GeometricCostDriversPanel({
             <ThreadFeatureInspectorPanel selectedId={selectedId} item={item} />
           ) : isCNCFeatureSelected && fg && selectedId ? (
             <CNCFeatureInspectorPanel selectedId={selectedId} fg={fg} />
+          ) : !featureMetadata && selected?.attrs?.length ? (
+            <div className="p-2 space-y-0.5">
+              <div className="px-2 py-1 text-xs font-medium text-foreground">{selected.label}</div>
+              {selected.attrs.map((attr, i) => (
+                <div key={i} className="flex items-baseline px-2 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground w-36 shrink-0 truncate">{attr.name}</span>
+                  <span className="text-xs font-medium truncate tabular-nums">{attr.value}</span>
+                </div>
+              ))}
+            </div>
           ) : (
             <FeatureDetailPanel metadata={featureMetadata} />
           )}
@@ -7470,6 +9306,8 @@ export default function ManufacturingIntelligencePage() {
   const { data: item, isLoading } = useBOMItem(itemId);
   const { data: analysisVersionData } = useAnalysisVersion();
   const [file3dUrl, setFile3dUrl] = useState<string | null>(null);
+  const [file3dUrlError, setFile3dUrlError] = useState<string | null>(null);
+  const [file3dUrlRetryToken, setFile3dUrlRetryToken] = useState(0);
   const [file2dUrl, setFile2dUrl] = useState<string | null>(null);
   const [viewerTab, setViewerTab] = useState<'3d' | '2d'>('3d');
   const [modelScreenshot, setModelScreenshot] = useState<string | null>(null);
@@ -7487,8 +9325,107 @@ export default function ManufacturingIntelligencePage() {
   const [selectedAutoRouteId, setSelectedAutoRouteId] = useState<string | null>(null);
   const [operationVisual, setOperationVisual] = useState<OperationVisual>(null);
   const [vizLabel, setVizLabel] = useState<string | null>(null);
+  // 'USA'/250 are only the pre-load defaults — resynced below from this
+  // item's own saved scenario_overrides once it loads, and persisted there
+  // on Apply, so a refresh no longer silently reverts Digital Factory/Batch
+  // Size back to USA/250 (same override bag as Blank Thickness — see
+  // migration 420 / costing/scenario-overrides.ts).
   const [factory, setFactory] = useState('USA');
+  // Digital Factory / Batch Size staged drafts — see CostGuidePanel's "Apply
+  // Scenario" banner. Lifted up here (not local to CostGuidePanel) so the
+  // Workflow Builder can also see scenarioDirty and refuse to apply a route
+  // against a scenario that isn't actually the one committed yet.
+  const [factoryDraft, setFactoryDraft] = useState(factory);
+  const [batchSizeDraft, setBatchSizeDraft] = useState(batchSize);
+  const patchScenarioOverrides = usePatchScenarioOverrides();
+  // Seed factory/batchSize (and their drafts) from the server's saved
+  // scenario_overrides — but ONLY ONCE per item load, via the ref guard
+  // below. Without the guard, this effect re-fires on EVERY refetch of
+  // `item` — including ones triggered by completely unrelated actions
+  // (material-grade save, blank-thickness override) — and each time it
+  // would blindly overwrite the in-progress draft with whatever the server
+  // still has from before this session's edits, silently discarding a
+  // Batch Size / Digital Factory change the user typed but hadn't clicked
+  // Apply on yet. Confirmed live: a batchSize=10000 draft was clobbered back
+  // to the server's stale batchSize=250 this way, purely from an unrelated
+  // material-grade "SET" refetching the item mid-session.
+  const scenarioSeededForItemRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!item?.id || scenarioSeededForItemRef.current === item.id) return;
+    scenarioSeededForItemRef.current = item.id;
+    const savedLocation = item.scenarioOverrides?.location;
+    if (typeof savedLocation === 'string' && savedLocation) {
+      setFactory(savedLocation);
+      setFactoryDraft(savedLocation);
+    }
+    const savedBatchSize = item.scenarioOverrides?.batchSize;
+    if (typeof savedBatchSize === 'number' && savedBatchSize > 0) {
+      setBatchSize(savedBatchSize);
+      setBatchSizeDraft(savedBatchSize);
+    }
+  }, [item]);
+  const scenarioDirty = factoryDraft !== factory || batchSizeDraft !== batchSize;
+  // Awaitable so the single bottom "Apply" button (CostGuidePanel) can commit
+  // Digital Factory/Batch Size + the staged Workflow Builder route together
+  // and only THEN run its own material-grade-driven logic — there is no
+  // longer a separate top "Apply Scenario" banner/button.
+  const applyScenario = async () => {
+    setFactory(factoryDraft);
+    setBatchSize(batchSizeDraft);
+    if (item?.id) {
+      patchScenarioOverrides.mutate({ id: item.id, patch: { location: factoryDraft, batchSize: batchSizeDraft } });
+    }
+    // Workflow Builder's "Set Route" only stages selectedManualRoute — the
+    // real apply-route/apply-custom-route call (creating process_cost_records)
+    // happens HERE, bundled with whatever Digital Factory/Batch Size was just
+    // committed above, using factoryDraft/batchSizeDraft directly rather than
+    // the (not-yet-updated) factory/batchSize state.
+    if (processRouting === 'manual' && selectedManualRoute && item?.id) {
+      const route = selectedManualRoute;
+      const applyMachineOverrides = () => {
+        for (const ov of route.machineOverrides ?? []) applyManualMachineOverride.mutate(ov);
+      };
+      if (route.dynamicCuttingRouteId) {
+        // apply-custom-route writes ONLY what's listed in `steps` — it never
+        // implicitly includes baseCuttingRouteId's own cutting line. Without
+        // this prepend, the cutting operation (e.g. Turret Punching) is
+        // silently absent from every applied custom route — confirmed live:
+        // the backend logged "wrote 3 ops: Press Brake, Deburring, Hole
+        // Extrusion (Burring)" with the cutting op missing entirely.
+        const steps: ApplyCustomRouteStep[] = [
+          ...(route.dynamicCuttingStep ? [{ process: route.dynamicCuttingStep.process }] : []),
+          ...(route.dynamicSteps ?? []).map((s): ApplyCustomRouteStep => s.isReal
+            ? { process: s.process }
+            : {
+                process: s.process,
+                machineClass: s.machineClass,
+                ...(s.processGroup !== undefined ? { processGroup: s.processGroup } : {}),
+                ...(s.processRoute !== undefined ? { processRoute: s.processRoute } : {}),
+              }),
+        ];
+        try {
+          await applyCustomRoute.mutateAsync({ baseCuttingRouteId: route.dynamicCuttingRouteId, steps, batchSize: batchSizeDraft, location: factoryDraft });
+          applyMachineOverrides();
+        } catch { /* errors surfaced by the mutation's own onError toast */ }
+      } else {
+        const applyId = KB_TO_APPLY_ROUTE[route.id];
+        if (applyId) {
+          try {
+            await applyRoute.mutateAsync({ routeId: applyId, batchSize: batchSizeDraft, location: factoryDraft });
+            applyMachineOverrides();
+          } catch { /* errors surfaced by the mutation's own onError toast */ }
+        }
+      }
+    }
+  };
   const [refreshing, setRefreshing] = useState(false);
+  // Applies the real machine picked per step in the Workflow Builder, after
+  // applyRoute/applyCustomRoute create the process_cost_records rows — see
+  // ManualRouteOption.machineOverrides / applyScenario above. Uses the DRAFT
+  // location while scenarioDirty so this mutation's closure can't fire with a
+  // stale committed location before setFactory's state update has propagated.
+  const applyManualMachineOverride = useMachineOverride(item?.id, scenarioDirty ? factoryDraft : factory);
+  const applyCustomRoute = useApplyCustomRoute(item?.id);
 
   // ── Right panel tab — lifted so the inspector bridge button can switch it ─────
   const [rightTab, setRightTab] = useState<RightTabKey>('copilot');
@@ -7568,10 +9505,142 @@ export default function ManufacturingIntelligencePage() {
   // — reused by the Properties tree below instead of hardcoded per-feature rates.
   // React Query deduplicates this: free if the Cost tab has already loaded it.
   const { data: costForHeatmap } = useCostSummary(item?.id ?? '', batchSize);
+  // costForHeatmap.processLines always reflects the cost engine's OWN default-
+  // recommended route (e.g. Fiber Laser Cutting), never whatever route the
+  // engineer actually applied (e.g. Waterjet Cutting) -- same root cause
+  // already fixed for Direct Process Costs in CostSummaryTab (see
+  // persistedAppliedRouteId there). This tree needs the identical substitution:
+  // recover the real applied route from the stored process records' `notes`
+  // field (applyRoute() stamps `auto_fill_from_route:${routeId}` on every row)
+  // and swap in ITS processLines, so the process step tree and its feature
+  // highlighting reflect what's actually applied, not the engine's unrelated
+  // default pick. React Query dedupes both fetches against the Cost tab's own.
+  const { data: comparisonForTree } = useRouteComparison(item?.id ?? '', batchSize, factory);
+  const { data: procRecordsForTree } = useProcessCosts({ bomItemId: item?.id ?? '', isActive: true, enabled: !!item?.id });
+  // processRouting/selectedManualRoute are pure client state — a page refresh
+  // wipes them back to the useState defaults ('auto', null) even though the
+  // real applied route is still sitting in process_cost_records, correctly
+  // persisted. Restore them ONCE per item load from the real stored records'
+  // `notes` tag (writeProcessLinesAsRecords stamps 'auto_fill_from_custom_
+  // route:<id>' for a Workflow Builder dynamic apply — unambiguous, unlike
+  // the plain 'auto_fill_from_route:<routeId>' tag also used by Auto mode's
+  // own recommended pick, which this deliberately does NOT try to disambiguate
+  // into Manual — guessing wrong there would misrepresent what the user chose).
+  const routingRestoredForItemRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!item?.id || !procRecordsForTree || !comparisonForTree) return;
+    if (routingRestoredForItemRef.current === item.id) return;
+    routingRestoredForItemRef.current = item.id;
+
+    const records = procRecordsForTree.records ?? [];
+    const isDynamic = records.some((r: any) => /^auto_fill_from_custom_route:/.test(r.notes ?? ''));
+    if (!isDynamic) return;
+
+    const sorted = [...records].sort((a: any, b: any) => (a.opNbr || 0) - (b.opNbr || 0));
+    const cuttingRow = sorted[0];
+    const classToRouteId = cuttingMachineClassToRouteId(comparisonForTree.routes ?? []);
+    const cuttingRouteId = classToRouteId[cuttingRow?.machineClass as string | undefined ?? ''];
+    if (!cuttingRouteId) return; // can't identify the real cutting method — leave Auto rather than guess
+
+    // process_cost_records.operation is the CATALOG's own operation name
+    // (e.g. "Bend Brake", "Deburr") — different from the cost engine's own
+    // process label ("Press Brake", "Deburring") for the exact same machine
+    // class (see the identical duality handled correctly in the Workflow
+    // Builder modal's own restore effect above). Blindly using r.operation
+    // with isReal:true here sent applyCustomRoute a step whose `process`
+    // matched nothing in its engine-keyed availableByName map AND carried no
+    // machineClass (isReal:true steps only send `process`) — confirmed live:
+    // "'Bend Brake' is not a real, geometry-computed operation for this
+    // part... Geometry-computed operations available: ... Press Brake ...".
+    // Resolve the real engine line by machineClass first, same as the modal.
+    const cuttingClasses = cuttingMachineClassesFromRoutes(comparisonForTree.routes ?? []);
+    const pageSharedLines = (comparisonForTree.routes?.[0]?.processLines ?? []).filter(
+      (l) => !cuttingClasses.has(l.machineClass),
+    );
+    const dynamicSteps = sorted.slice(1)
+      .filter((r: any) => r.machineClass && r.operation)
+      .map((r: any) => {
+        const real = pageSharedLines.find((l) => l.machineClass === r.machineClass)
+          ?? pageSharedLines.find((l) => l.process === r.operation);
+        return real
+          ? { process: real.process, machineClass: real.machineClass, isReal: true }
+          : {
+              process: r.operation as string, machineClass: r.machineClass as string, isReal: false,
+              ...(r.processGroup ? { processGroup: r.processGroup as string } : {}),
+              ...(r.processRoute ? { processRoute: r.processRoute as string } : {}),
+            };
+      });
+
+    setSelectedManualRoute({
+      id: `custom-restored-${item.id}`,
+      label: sorted.map((r: any) => r.operation).filter(Boolean).join(' + ') || 'Custom Workflow',
+      complexityLevel: 'standard',
+      isRecommended: false,
+      processes: sorted.map((r: any) => r.operation).filter(Boolean),
+      rationale: 'Custom workflow — restored from applied process costs after reload',
+      dynamicCuttingRouteId: cuttingRouteId,
+      // Same catalog-name-vs-engine-label duality as dynamicSteps above —
+      // resolve the real engine process label for the cutting line too,
+      // rather than sending the raw catalog operation string.
+      ...(cuttingRow?.machineClass && cuttingRow?.operation
+        ? {
+            dynamicCuttingStep: {
+              process: comparisonForTree.routes?.find((r) => r.routeId === cuttingRouteId)
+                ?.processLines.find((l) => l.machineClass === cuttingRow.machineClass)?.process
+                ?? cuttingRow.operation as string,
+              machineClass: cuttingRow.machineClass as string,
+            },
+          }
+        : {}),
+      dynamicSteps,
+    });
+    setProcessRouting('manual');
+  }, [item?.id, procRecordsForTree, comparisonForTree]);
+  const persistedAppliedRouteIdForTree = useMemo(() => {
+    const records = procRecordsForTree?.records ?? [];
+    for (const rec of records) {
+      const m = /^auto_fill_from_route:(.+)$/.exec((rec as any).notes ?? '');
+      if (m) return m[1];
+    }
+    // Same gap as CostSummaryTab's persistedAppliedRouteId (see its own
+    // comment) — a Workflow Builder custom apply stamps `auto_fill_from_
+    // custom_route:<itemId>`, which never matches the regex above. Without
+    // this, the Manufacturing Process tree fell back to showing the auto-
+    // recommended route's lines (and a blank machine for any step, like
+    // Turret Punching, that only exists in the real applied route).
+    const isCustomApply = records.some((r: any) => /^auto_fill_from_custom_route:/.test(r.notes ?? ''));
+    if (isCustomApply && comparisonForTree?.routes) {
+      const sorted = [...records].sort((a: any, b: any) => (a.opNbr || 0) - (b.opNbr || 0));
+      const classToRouteId = cuttingMachineClassToRouteId(comparisonForTree.routes);
+      const cuttingClass = sorted[0]?.machineClass as string | undefined;
+      if (cuttingClass && classToRouteId[cuttingClass]) return classToRouteId[cuttingClass];
+    }
+    return null;
+  }, [procRecordsForTree, comparisonForTree]);
+  const effectiveCostForHeatmap = useMemo(() => {
+    if (!costForHeatmap || !persistedAppliedRouteIdForTree) return costForHeatmap;
+    const appliedRoute = comparisonForTree?.routes.find((r) => r.routeId === persistedAppliedRouteIdForTree);
+    return appliedRoute ? { ...costForHeatmap, processLines: appliedRoute.processLines } : costForHeatmap;
+  }, [costForHeatmap, comparisonForTree, persistedAppliedRouteIdForTree]);
+  // The substitution above only fixes MACHINE/rate lookups. The tree's actual
+  // STEP NAMES (baseRecs inside buildProcessTree) come from fg.processRecommendations
+  // — a CAD-classification default with zero awareness of Route Comparison/Apply
+  // Route — so swapping processLines alone left every step labeled "Fiber Laser
+  // Cutting" etc. even after applying Waterjet. Recover the applied route's own
+  // process names, in order, and feed them through the SAME overrideProcesses
+  // slot the Manual/Auto KB route mechanism already uses — an explicitly applied
+  // route is the most authoritative signal available, so it takes priority over
+  // both that mechanism and the fg default.
+  const appliedRouteProcessNames = useMemo(() => {
+    if (!persistedAppliedRouteIdForTree) return null;
+    const appliedRoute = comparisonForTree?.routes.find((r) => r.routeId === persistedAppliedRouteIdForTree);
+    return appliedRoute ? appliedRoute.processLines.map((l) => l.process) : null;
+  }, [comparisonForTree, persistedAppliedRouteIdForTree]);
+  const effectiveOverrideProcesses = appliedRouteProcessNames ?? activeOverrideProcesses;
 
   const tree = useMemo(
-    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, activeOverrideProcesses, costForHeatmap) : null,
-    [item, fg, summary, factory, activeOverrideProcesses, costForHeatmap],
+    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap) : null,
+    [item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap],
   );
 
   const treeProcessNames = useMemo(() => {
@@ -7621,7 +9690,8 @@ export default function ManufacturingIntelligencePage() {
     };
   }, [selectedCNCFeatureKey, fg]);
 
-  // Direct feature selection from the Feature Analysis panel (bypasses hole/bend group lookup)
+  // Set by the Analysis panel's cost-tab "Feature breakdown" rows (Bend R1mm x2,
+  // Pierces x19, Cut path...) to highlight that exact feature in the 3D viewer.
   const [selectedDirectV2Feature, setSelectedDirectV2Feature] = useState<FeatureNodeV2 | null>(null);
 
   const selectedV2Feature = useMemo(() => {
@@ -7976,8 +10046,30 @@ export default function ManufacturingIntelligencePage() {
     setRefreshing(true);
     try {
       await apiClient.post(`/bom-items/${itemId}/reanalyze`, {}, { timeout: 150_000 });
+      // Also re-run 2D drawing-intelligence extraction (title block, thread
+      // callouts, etc. — cad-engine/drawing_analyzer.py) when a PDF drawing
+      // exists, so one "Refresh Analysis" click refreshes everything this
+      // part knows about itself, not just the 3D geometry. Vector-PDF only;
+      // non-fatal — a drawing-parse failure must never block the geometry
+      // refresh that already succeeded above.
+      if (item.file2dPath?.toLowerCase().endsWith('.pdf')) {
+        try {
+          await apiClient.post(`/bom-items/${itemId}/analyze-drawing`, {}, { timeout: 60_000 });
+        } catch (e: unknown) {
+          toast.error(`Drawing analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ['bom-items', 'detail', itemId] });
       queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'dfm-scores'] });
+      // Reanalyze rewrites featureGraph (geometry, bend lengths, etc.) but
+      // cost-summary/route-comparison are SEPARATE queries computed from that
+      // same featureGraph — without invalidating them too, every derived
+      // number (machine selection, tonnage, cycle times, pricing) kept
+      // showing the pre-reanalyze result until an unrelated full page reload
+      // happened to refetch them. Matches the same invalidation pair already
+      // used by handleApplyRoute/handleCostOverride elsewhere on this page.
+      queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'cost-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'route-comparison'] });
       toast.success('Analysis refreshed');
     } catch (e: unknown) {
       toast.error(`Refresh failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -7988,11 +10080,28 @@ export default function ManufacturingIntelligencePage() {
 
   useEffect(() => {
     if (!item?.file3dPath) return;
+    let cancelled = false;
     setModelScreenshot(null); // clear stale screenshot when model changes
+    setFile3dUrl(null);
+    setFile3dUrlError(null);
     apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/3d`)
-      .then((r) => { if (r?.url) setFile3dUrl(r.url); })
-      .catch(() => {});
-  }, [itemId, item?.file3dPath]);
+      .then((r) => {
+        if (cancelled) return;
+        if (r?.url) setFile3dUrl(r.url);
+        else setFile3dUrlError('No 3D model URL returned by server');
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        // Previously this catch swallowed every failure (timeout, expired signed
+        // URL, 404, auth error) leaving file3dUrl permanently null with no
+        // feedback — the UI would show "Loading 3D model…" forever since that
+        // placeholder has no error state of its own. Surface the failure so the
+        // user gets a message + retry instead of an infinite silent hang.
+        const message = e instanceof ApiError ? e.getUserMessage() : 'Failed to load 3D model URL';
+        setFile3dUrlError(message);
+      });
+    return () => { cancelled = true; };
+  }, [itemId, item?.file3dPath, file3dUrlRetryToken]);
 
   useEffect(() => {
     if (!item?.file2dPath) { setFile2dUrl(null); return; }
@@ -8017,6 +10126,12 @@ export default function ManufacturingIntelligencePage() {
   });
 
   const handleTreeSelect = useCallback((node: ProcessTreeNode) => {
+    // A prior click on a Cost-tab "Feature breakdown" row (Cut path, Pierces...)
+    // sets selectedDirectV2Feature, which wins top priority in the selectedV2Feature
+    // memo — without clearing it here, it permanently masks every later Process
+    // Tree selection (e.g. clicking a hole group would silently keep showing the
+    // old cut-path highlight instead of that group's own occurrences).
+    setSelectedDirectV2Feature(null);
     setSelectedNodeId(node.id);
     const v2Features = fg?.feature_graph_v2?.features ?? [];
     const fm = faceMap ?? [];
@@ -8351,11 +10466,22 @@ export default function ManufacturingIntelligencePage() {
     </div>
   ) : null;
 
+  // Shared by both panels' "click a detected feature to highlight it in the 3D
+  // viewer" rows (Cost tab's Feature breakdown, and the Cost Guide's Detected
+  // Geometry section) — one selection state, so highlighting from either panel
+  // behaves identically.
+  const onSelectHighlight = (node: FeatureNodeV2 | null) => {
+    setSelectedNodeId(null);
+    setSelectedDirectV2Feature(node);
+    setSelectedOccurrenceIndex(null);
+  };
   const costGuideProps = {
     item, fg, summary, batchSize, setBatchSize, productionLife, setProductionLife,
     processRouting, setProcessRouting, factory, setFactory,
+    factoryDraft, setFactoryDraft, batchSizeDraft, setBatchSizeDraft,
+    applyScenario,
     onManualClick: () => setRouteDialogOpen(true),
-    selectedManualRoute,
+    selectedManualRoute, onSelectHighlight,
   };
   const analysisProps = {
     projectId,
@@ -8364,31 +10490,10 @@ export default function ManufacturingIntelligencePage() {
     modelScreenshot, file3dUrl,
     activeTab: rightTab, onTabChange: setRightTab,
     treeProcessNames, vendorHotspotContext,
+    onSelectHighlight,
   };
   const treeProps = { item, fg, tree, expanded: expandedNodes, selectedId: selectedNodeId, onToggle: toggleNode, onSelect: handleTreeSelect, factory, maximized, onMaximize: maximize };
   const driversProps = { tree, summary, fg, selectedId: selectedNodeId, onSelect: setSelectedNodeId, maximized, onMaximize: maximize, selectedHoleGroup, selectedBend, dfmWarnings: fg?.dfmWarnings ?? [], item };
-
-  // Component feature analysis extracted from the stored feature graph JSONB
-  const componentFeatures = ((fg as any)?.component_features ?? null) as ComponentFeatureAnalysis | null;
-
-  const featureAnalysisProps = {
-    fg,
-    componentFeatures,
-    family: fg?.classification?.family ?? null,
-    onSelectFeature: (node: FeatureNodeV2 | null, occIdx?: number) => {
-      if (!node) {
-        setSelectedDirectV2Feature(null);
-        setSelectedNodeId(null);
-        return;
-      }
-      // Clear hole/bend selection (both derived from selectedNodeId) so direct
-      // V2 feature wins in the selectedV2Feature priority chain
-      setSelectedNodeId(null);
-      setSelectedDirectV2Feature(node);
-      if (occIdx != null) setSelectedOccurrenceIndex(occIdx);
-    },
-    selectedFeatureId: selectedV2Feature?.id ?? null,
-  };
 
   // ── Maximized view ──────────────────────────────────────────────────────────
   if (maximized) {
@@ -8423,14 +10528,22 @@ export default function ManufacturingIntelligencePage() {
                       heatmapNormalization={heatmapNorm}
                       onHeatmapInspect={handleHeatmapInspect}
                     />
-                  : <div className="flex items-center justify-center h-full text-sm text-muted-foreground">{item.file3dPath ? 'Loading…' : 'No 3D model'}</div>
+                  : <div className="flex flex-col items-center justify-center h-full gap-2 text-sm text-muted-foreground">
+                      <span>{!item.file3dPath ? 'No 3D model' : file3dUrlError ? file3dUrlError : 'Loading…'}</span>
+                      {item.file3dPath && file3dUrlError && (
+                        <button
+                          type="button"
+                          onClick={() => { setFile3dUrlError(null); setFile3dUrlRetryToken((n) => n + 1); }}
+                          className="text-xs font-medium text-primary hover:underline"
+                        >
+                          Retry
+                        </button>
+                      )}
+                    </div>
             )}
             {maximized === 'right' && <AnalysisTabsPanel {...analysisProps} />}
             {maximized === 'process' && <ProcessTreePanel {...treeProps} />}
             {maximized === 'drivers' && <GeometricCostDriversPanel {...driversProps} />}
-            {maximized === 'features' && (
-              <FeatureAnalysisPanel {...featureAnalysisProps} />
-            )}
           </div>
         </div>
         <RouteSelectionDialog
@@ -8439,16 +10552,24 @@ export default function ManufacturingIntelligencePage() {
             setRouteDialogOpen(false);
             if (!selectedManualRoute) setProcessRouting('auto');
           }}
+          onApplied={() => setRouteDialogOpen(false)}
           partFamily={fg?.classification?.family ?? null}
           currentRouteId={selectedManualRoute?.id ?? null}
+          existingCuttingRouteId={selectedManualRoute?.dynamicCuttingRouteId ?? null}
+          existingSteps={selectedManualRoute?.dynamicSteps}
           onSelectRoute={(route) => {
+            // Staging only — nothing is written here. Apply Scenario performs
+            // the real apply-route/apply-custom-route call (plus any pending
+            // machine overrides) using whatever Digital Factory/Batch Size is
+            // current at that moment. See the parent's applyScenario.
             setSelectedManualRoute(route);
             setProcessRouting('manual');
-            const applyId = KB_TO_APPLY_ROUTE[route.id];
-            if (applyId) applyRoute.mutate({ routeId: applyId, batchSize, location: factory });
           }}
           cost={costForHeatmap ?? null}
-          scoringCtx={summary && item ? { summary, item, batchSize } : null}
+          scoringCtx={summary && item ? { summary, item, batchSize: scenarioDirty ? batchSizeDraft : batchSize } : null}
+          factory={scenarioDirty ? factoryDraft : factory}
+          itemId={item?.id}
+          batchSize={scenarioDirty ? batchSizeDraft : batchSize}
         />
       </div>
     );
@@ -8483,7 +10604,7 @@ export default function ManufacturingIntelligencePage() {
                   <HResizeHandle />
 
                   {/* 3D / 2D Viewer */}
-                  <Panel defaultSize={68} minSize={30} className="flex flex-col overflow-hidden">
+                  <Panel defaultSize={70} minSize={30} className="flex flex-col overflow-hidden">
                     <PanelHeader title="Viewer" panelId="center" maximized={maximized} onMaximize={maximize}>
                       <div className="flex items-center gap-2 min-w-0 w-full">
                         {/* filename — truncates if needed */}
@@ -8544,7 +10665,22 @@ export default function ManufacturingIntelligencePage() {
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
                             <AlertCircle className="h-8 w-8 opacity-30" />
-                            <span className="text-sm">{item.file3dPath ? 'Loading 3D model…' : 'No 3D model attached'}</span>
+                            <span className="text-sm">
+                              {!item.file3dPath
+                                ? 'No 3D model attached'
+                                : file3dUrlError
+                                  ? file3dUrlError
+                                  : 'Loading 3D model…'}
+                            </span>
+                            {item.file3dPath && file3dUrlError && (
+                              <button
+                                type="button"
+                                onClick={() => { setFile3dUrlError(null); setFile3dUrlRetryToken((n) => n + 1); }}
+                                className="text-xs font-medium text-primary hover:underline"
+                              >
+                                Retry
+                              </button>
+                            )}
                           </div>
                         )
                       ) : (
@@ -8570,26 +10706,17 @@ export default function ManufacturingIntelligencePage() {
 
               <VResizeHandle />
 
-              {/* BOTTOM: Process Tree + Feature Analysis + Geometric Cost Drivers */}
+              {/* BOTTOM: Process Tree + Geometric Cost Drivers */}
               <Panel defaultSize={35} minSize={15} className="flex overflow-hidden border-t">
                 <PanelGroup id="mi-bottom-row" direction="horizontal" className="h-full w-full">
 
-                  <Panel defaultSize={42} minSize={25} className="flex flex-col overflow-hidden">
+                  <Panel defaultSize={55} minSize={25} className="flex flex-col overflow-hidden">
                     <ProcessTreePanel {...treeProps} />
                   </Panel>
 
                   <HResizeHandle />
 
-                  <Panel defaultSize={32} minSize={20} className="flex flex-col overflow-hidden border-l">
-                    <PanelHeader title="Feature Analysis" panelId="features" maximized={maximized} onMaximize={maximize} />
-                    <div className="flex-1 overflow-hidden min-h-0">
-                      <FeatureAnalysisPanel {...featureAnalysisProps} />
-                    </div>
-                  </Panel>
-
-                  <HResizeHandle />
-
-                  <Panel defaultSize={26} minSize={18} className="flex flex-col overflow-hidden">
+                  <Panel defaultSize={45} minSize={18} className="flex flex-col overflow-hidden">
                     <GeometricCostDriversPanel {...driversProps} />
                   </Panel>
 
@@ -8618,16 +10745,24 @@ export default function ManufacturingIntelligencePage() {
           setRouteDialogOpen(false);
           if (!selectedManualRoute) setProcessRouting('auto');
         }}
+        onApplied={() => setRouteDialogOpen(false)}
         partFamily={fg?.classification?.family ?? null}
         currentRouteId={selectedManualRoute?.id ?? null}
+        existingCuttingRouteId={selectedManualRoute?.dynamicCuttingRouteId ?? null}
+        existingSteps={selectedManualRoute?.dynamicSteps}
         onSelectRoute={(route) => {
+          // Staging only — nothing is written here. Apply Scenario performs
+          // the real apply-route/apply-custom-route call (plus any pending
+          // machine overrides) using whatever Digital Factory/Batch Size is
+          // current at that moment. See the parent's applyScenario.
           setSelectedManualRoute(route);
           setProcessRouting('manual');
-          const applyId = KB_TO_APPLY_ROUTE[route.id];
-          if (applyId) applyRoute.mutate({ routeId: applyId, batchSize, location: factory });
         }}
         cost={costForHeatmap ?? null}
-        scoringCtx={summary && item ? { summary, item, batchSize } : null}
+        scoringCtx={summary && item ? { summary, item, batchSize: scenarioDirty ? batchSizeDraft : batchSize } : null}
+        factory={scenarioDirty ? factoryDraft : factory}
+        itemId={item?.id}
+        batchSize={scenarioDirty ? batchSizeDraft : batchSize}
       />
     </div>
   );

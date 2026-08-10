@@ -11,6 +11,8 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
+import { getCurrencyForLocation } from '../../mhr/constants/mhr-calculation.constants';
 import {
   CreateProcessCostDto,
   UpdateProcessCostDto,
@@ -30,6 +32,7 @@ export class ProcessCostService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
+    private readonly exchangeRateService: ExchangeRateService,
   ) {
     this.calculationEngine = new ProcessCostCalculationEngine();
   }
@@ -355,15 +358,26 @@ export class ProcessCostService {
   ): Promise<ProcessCostResponseDto> {
     this.logger.log('Creating process cost record', 'ProcessCostService');
 
+    // Every rate/value field here arrives in createDto.location's local currency
+    // (the frontend edits/displays in local currency) but process_cost_records
+    // always stores USD — convert once, here, via the real exchange_rates table,
+    // instead of trusting the caller's `currency` label with no actual
+    // conversion (previously: any non-USA location silently stored wrong-
+    // magnitude numbers mislabeled 'USD'). No location on the DTO defaults to
+    // 'USD' (a no-op conversion), matching this service's existing currency default.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const { currency: createLocalCurrency } = getCurrencyForLocation(createDto.location ?? '');
+    const toUsdCreate = (v: number | undefined): number | undefined => v != null ? rates.toUsd(v, createLocalCurrency) : v;
+
     // Prepare input for calculation engine
     const calculationInput: ProcessCostInput = {
       opNbr: createDto.opNbr,
-      directRate: createDto.directRate,
-      indirectRate: createDto.indirectRate,
-      fringeRate: createDto.fringeRate,
-      machineRate: createDto.machineRate,
-      machineValue: createDto.machineValue,
-      currency: createDto.currency,
+      directRate: toUsdCreate(createDto.directRate)!,
+      indirectRate: toUsdCreate(createDto.indirectRate),
+      fringeRate: toUsdCreate(createDto.fringeRate),
+      machineRate: toUsdCreate(createDto.machineRate),
+      machineValue: toUsdCreate(createDto.machineValue),
+      currency: 'USD',
       shiftPatternHoursPerDay: createDto.shiftPatternHoursPerDay,
       setupManning: createDto.setupManning,
       setupTime: createDto.setupTime,
@@ -395,6 +409,7 @@ export class ProcessCostService {
       process_group: createDto.processGroup,
       process_route: createDto.processRoute,
       operation: createDto.operation,
+      location: createDto.location ?? null,
       mhr_id: createDto.mhrId,
       benchmark_mhr_id: createDto.benchmarkMhrId ?? null,
       machine_name: machineFields.machine_name,
@@ -408,13 +423,13 @@ export class ProcessCostService {
       supplier_location_id: createDto.supplierLocationId,
       facility_id: createDto.facilityId,
       facility_rate_id: createDto.facilityRateId,
-      direct_rate: createDto.directRate,
-      indirect_rate: createDto.indirectRate || 0,
-      fringe_rate: createDto.fringeRate || 0,
-      machine_rate: createDto.machineRate || 0,
-      machine_value: createDto.machineValue || 0,
-      labor_rate: createDto.laborRate || 0,
-      currency: createDto.currency || 'USD',
+      direct_rate: toUsdCreate(createDto.directRate) ?? 0,
+      indirect_rate: toUsdCreate(createDto.indirectRate) || 0,
+      fringe_rate: toUsdCreate(createDto.fringeRate) || 0,
+      machine_rate: toUsdCreate(createDto.machineRate) || 0,
+      machine_value: toUsdCreate(createDto.machineValue) || 0,
+      labor_rate: toUsdCreate(createDto.laborRate) || 0,
+      currency: 'USD',
       shift_pattern_id: createDto.shiftPatternId,
       shift_pattern_hours_per_day: createDto.shiftPatternHoursPerDay,
       setup_manning: createDto.setupManning,
@@ -558,15 +573,31 @@ export class ProcessCostService {
       laborFields = await this.deriveLaborFields(updateDto.lhrId, updateDto.benchmarkLhrId, accessToken);
     }
 
-    // Merge with update values
+    // A rate field present in THIS patch arrives in the local currency for
+    // updateDto.location (or the record's existing location) — convert once,
+    // here — but `existing.*` fallbacks are already USD (create() above and
+    // the applyRoute/applyCustomRoute write path both store USD), so only the
+    // newly-supplied value gets converted, never the already-USD fallback.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const { currency: updateLocalCurrency } = getCurrencyForLocation(updateDto.location ?? existing.location ?? '');
+    const toUsdIfProvided = (v: number | undefined): number | undefined =>
+      v !== undefined ? rates.toUsd(v, updateLocalCurrency) : undefined;
+    const directRateUsd   = toUsdIfProvided(updateDto.directRate)   ?? existing.direct_rate;
+    const indirectRateUsd = toUsdIfProvided(updateDto.indirectRate) ?? existing.indirect_rate;
+    const fringeRateUsd   = toUsdIfProvided(updateDto.fringeRate)   ?? existing.fringe_rate;
+    const machineRateUsd  = toUsdIfProvided(updateDto.machineRate)  ?? existing.machine_rate;
+    const machineValueUsd = toUsdIfProvided(updateDto.machineValue) ?? existing.machine_value;
+    const laborRateUsd    = toUsdIfProvided(updateDto.laborRate)    ?? existing.labor_rate;
+
+    // Merge with update values — already-USD (see toUsdIfProvided above)
     const merged = {
       opNbr: updateDto.opNbr ?? existing.op_nbr,
-      directRate: updateDto.directRate ?? existing.direct_rate,
-      indirectRate: updateDto.indirectRate ?? existing.indirect_rate,
-      fringeRate: updateDto.fringeRate ?? existing.fringe_rate,
-      machineRate: updateDto.machineRate ?? existing.machine_rate,
-      machineValue: updateDto.machineValue ?? existing.machine_value,
-      currency: updateDto.currency ?? existing.currency,
+      directRate: directRateUsd,
+      indirectRate: indirectRateUsd,
+      fringeRate: fringeRateUsd,
+      machineRate: machineRateUsd,
+      machineValue: machineValueUsd,
+      currency: 'USD',
       shiftPatternHoursPerDay: updateDto.shiftPatternHoursPerDay ?? existing.shift_pattern_hours_per_day,
       setupManning: updateDto.setupManning ?? existing.setup_manning,
       setupTime: updateDto.setupTime ?? existing.setup_time,
@@ -591,6 +622,7 @@ export class ProcessCostService {
     if (updateDto.processGroup !== undefined) updateData.process_group = updateDto.processGroup;
     if (updateDto.processRoute !== undefined) updateData.process_route = updateDto.processRoute;
     if (updateDto.operation !== undefined) updateData.operation = updateDto.operation;
+    if (updateDto.location !== undefined) updateData.location = updateDto.location;
     if (updateDto.mhrId !== undefined) updateData.mhr_id = updateDto.mhrId;
     if (updateDto.benchmarkMhrId !== undefined) updateData.benchmark_mhr_id = updateDto.benchmarkMhrId;
     if (machineFields) {
@@ -608,13 +640,13 @@ export class ProcessCostService {
     if (updateDto.supplierLocationId !== undefined) updateData.supplier_location_id = updateDto.supplierLocationId;
     if (updateDto.facilityId !== undefined) updateData.facility_id = updateDto.facilityId;
     if (updateDto.facilityRateId !== undefined) updateData.facility_rate_id = updateDto.facilityRateId;
-    if (updateDto.directRate !== undefined) updateData.direct_rate = updateDto.directRate;
-    if (updateDto.indirectRate !== undefined) updateData.indirect_rate = updateDto.indirectRate;
-    if (updateDto.fringeRate !== undefined) updateData.fringe_rate = updateDto.fringeRate;
-    if (updateDto.machineRate !== undefined) updateData.machine_rate = updateDto.machineRate;
-    if (updateDto.machineValue !== undefined) updateData.machine_value = updateDto.machineValue;
-    if (updateDto.laborRate !== undefined) updateData.labor_rate = updateDto.laborRate;
-    if (updateDto.currency !== undefined) updateData.currency = updateDto.currency;
+    if (updateDto.directRate !== undefined) updateData.direct_rate = directRateUsd;
+    if (updateDto.indirectRate !== undefined) updateData.indirect_rate = indirectRateUsd;
+    if (updateDto.fringeRate !== undefined) updateData.fringe_rate = fringeRateUsd;
+    if (updateDto.machineRate !== undefined) updateData.machine_rate = machineRateUsd;
+    if (updateDto.machineValue !== undefined) updateData.machine_value = machineValueUsd;
+    if (updateDto.laborRate !== undefined) updateData.labor_rate = laborRateUsd;
+    if (updateDto.currency !== undefined) updateData.currency = 'USD';
     if (updateDto.shiftPatternId !== undefined) updateData.shift_pattern_id = updateDto.shiftPatternId;
     if (updateDto.shiftPatternHoursPerDay !== undefined) updateData.shift_pattern_hours_per_day = updateDto.shiftPatternHoursPerDay;
     if (updateDto.setupManning !== undefined) updateData.setup_manning = updateDto.setupManning;
@@ -811,14 +843,13 @@ export class ProcessCostService {
 
     const client = this.supabaseService.getClient(accessToken);
 
-    // Get all active process costs for this BOM item — compute from source fields.
-    // Formula: setupPerPart = (setup_time_min/60 × (MHR + LHR×manning)) / batch_size
-    //          cyclePerPart = (cycle_time_sec/3600 × (MHR + LHR×heads)) / parts_per_cycle
-    //          totalPerPart = (setup + cycle) × (1 + scrap/100)
-    // Never reads stored total_cost_per_part which may be null for AI-applied records.
+    // Prefer the stored total_cost_per_part — every creation path (manual create/update,
+    // process-plan-generator apply) now computes and persists it via the shared
+    // ProcessCostCalculationEngine at write time. Recompute from source fields only as a
+    // fallback for rows saved before that engine existed, where the column is still null.
     const { data: costs, error } = await client
       .from('process_cost_records')
-      .select('machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
+      .select('total_cost_per_part, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
       .eq('bom_item_id', bomItemId)
       .eq('is_active', true);
 
@@ -828,6 +859,8 @@ export class ProcessCostService {
     }
 
     const totalCost = costs?.reduce((sum, r) => {
+      if (r.total_cost_per_part != null) return sum + parseFloat(r.total_cost_per_part);
+
       const mr  = parseFloat(r.machine_rate)    || 0;
       const lr  = parseFloat(r.labor_rate)      || 0;
       const sm  = parseFloat(r.setup_manning)   || 0;
@@ -852,10 +885,13 @@ export class ProcessCostService {
   ): Promise<Record<string, number>> {
     if (bomItemIds.length === 0) return {};
 
+    // Same preference as getTotalCostForBomItem: use the stored total where the
+    // shared engine already computed it, recompute from source fields only as a
+    // fallback for older rows saved before that engine existed.
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('process_cost_records')
-      .select('bom_item_id, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
+      .select('bom_item_id, total_cost_per_part, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
       .in('bom_item_id', bomItemIds)
       .eq('is_active', true);
 
@@ -866,18 +902,23 @@ export class ProcessCostService {
 
     const totals: Record<string, number> = Object.fromEntries(bomItemIds.map(id => [id, 0]));
     for (const row of data ?? []) {
-      const mr  = parseFloat(row.machine_rate)    || 0;
-      const lr  = parseFloat(row.labor_rate)      || 0;
-      const sm  = parseFloat(row.setup_manning)   || 0;
-      const st  = parseFloat(row.setup_time)      || 0;
-      const bs  = parseFloat(row.batch_size)      || 1;
-      const hd  = parseFloat(row.heads)           || 0;
-      const ct  = parseFloat(row.cycle_time)      || 0;
-      const ppc = parseFloat(row.parts_per_cycle) || 1;
-      const sc  = parseFloat(row.scrap)           || 0;
-      const setup = bs > 0 ? (st / 60) * (mr + lr * sm) / bs : 0;
-      const cycle = ppc > 0 ? (ct / 3600) * (mr + lr * hd) / ppc : 0;
-      const computed = (setup + cycle) * (1 + sc / 100);
+      let computed: number;
+      if (row.total_cost_per_part != null) {
+        computed = parseFloat(row.total_cost_per_part);
+      } else {
+        const mr  = parseFloat(row.machine_rate)    || 0;
+        const lr  = parseFloat(row.labor_rate)      || 0;
+        const sm  = parseFloat(row.setup_manning)   || 0;
+        const st  = parseFloat(row.setup_time)      || 0;
+        const bs  = parseFloat(row.batch_size)      || 1;
+        const hd  = parseFloat(row.heads)           || 0;
+        const ct  = parseFloat(row.cycle_time)      || 0;
+        const ppc = parseFloat(row.parts_per_cycle) || 1;
+        const sc  = parseFloat(row.scrap)           || 0;
+        const setup = bs > 0 ? (st / 60) * (mr + lr * sm) / bs : 0;
+        const cycle = ppc > 0 ? (ct / 3600) * (mr + lr * hd) / ppc : 0;
+        computed = (setup + cycle) * (1 + sc / 100);
+      }
       totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + computed;
     }
     return totals;

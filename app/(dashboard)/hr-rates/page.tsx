@@ -88,14 +88,13 @@ export default function HRRatesPage() {
   const [isMhrFormOpen, setIsMhrFormOpen] = useState(false);
   const [editingMhrId, setEditingMhrId] = useState<string | null>(null);
 
-  // When a location filter is active load up to 1000 records (max ~864/location in master file).
-  // With no filter keep limit at 50 to keep the initial load fast.
-  const mhrActiveFilter = !!(mhrLocation || mhrCurrency || mhrSearch);
+  // Load every record in one page — the table itself scrolls, so there's no
+  // pagination UI to advance a "page 2" and no limit should hide rows.
   const { data: mhrData, isLoading: isMhrLoading } = useMHRRecords({
     search: mhrSearch,
     ...(mhrLocation ? { location: mhrLocation } : {}),
     ...(mhrCurrency ? { currency: mhrCurrency } : {}),
-    limit: mhrActiveFilter ? 1000 : 50,
+    limit: 10000,
   });
   const { data: mhrCurrencies = [] } = useMHRCurrencies();
   const deleteMhrMutation = useDeleteMHR();

@@ -391,6 +391,6 @@ export class QueryMHRDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  @Max(1000)
+  @Max(10000)
   limit?: number;
 }

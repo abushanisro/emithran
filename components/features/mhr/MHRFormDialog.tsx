@@ -36,7 +36,7 @@ import { mhrFormSchema, type MHRFormData } from '@/lib/validations/mhrValidation
 
 function getCurrencyInfo(location: string): { currency: string; symbol: string; fxRate: number } {
   const loc = (location || '').toLowerCase();
-  if (loc.includes('india')) return { currency: 'INR', symbol: '$', fxRate: 84.5 };
+  if (loc.includes('india')) return { currency: 'INR', symbol: '₹', fxRate: 84.5 };
   if (loc.includes('china')) return { currency: 'CNY', symbol: '¥', fxRate: 7.25 };
   if (loc.includes('usa') || loc.includes('united states') || loc.includes('america'))
     return { currency: 'USD', symbol: '$', fxRate: 1.0 };
@@ -157,20 +157,26 @@ const MASTER_LOCATIONS = ['China', 'E. Europe', 'France', 'Germany', 'India', 'M
 const MACHINE_CLASS_OPTIONS = ['Heavy', 'Medium', 'Light', 'Micro'];
 const AUTOMATION_LEVEL_OPTIONS = ['Manual', 'Semi-Automatic', 'Automatic', 'CNC', 'Robotic', 'Fully Automated'];
 
+// USD/USA is this app's default currency, not INR/India — see migration
+// 436_default_currency_usd_not_inr.sql's own doc comment for the full trace
+// of why INR ever became the fallback in this codebase. A user opening this
+// dialog to add a brand-new machine, before touching the location field at
+// all, should see USA/USD defaults; India is a real, correct choice like any
+// other once EXPLICITLY selected, never the unselected starting state.
 const getDefaultValues = (): MHRFormData => ({
-  location: 'India',
+  location: 'USA',
   commodityCode: '',
   machineName: '',
   machineDescription: '',
   manufacturer: '',
   model: '',
   specification: '',
-  // India defaults; these get replaced by LOCATION_COST_DEFAULTS when location changes
-  landedMachineCost: 4225000,
+  // USA defaults; these get replaced by LOCATION_COST_DEFAULTS when location changes
+  landedMachineCost: 50000,
   machineFootprintSqm: 10.00,
-  rentPerSqmPerMonth: 100.00,
+  rentPerSqmPerMonth: 15.00,
   powerKwhPerHour: 10.00,
-  electricityCostPerKwh: 8.00,
+  electricityCostPerKwh: 0.12,
   shiftsPerDay: 3.00,
   hoursPerShift: 8.00,
   workingDaysPerYear: 260.00,
@@ -179,7 +185,7 @@ const getDefaultValues = (): MHRFormData => ({
   accessoriesCostPercentage: 8.00,
   installationCostPercentage: 20.00,
   paybackPeriodYears: 10.00,
-  interestRatePercentage: 9.00,
+  interestRatePercentage: 5.50,
   insuranceRatePercentage: 1.50,
   maintenanceCostPercentage: 7.00,
   adminOverheadPercentage: 12.00,
@@ -424,7 +430,7 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
 
   // Derived currency info from selected location
   const { symbol: currSym, fxRate, currency: currCode } = useMemo(
-    () => getCurrencyInfo(locationWatched || 'India'),
+    () => getCurrencyInfo(locationWatched || 'USA'),
     [locationWatched],
   );
 
@@ -446,7 +452,7 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   // overwrites, even over a manually-typed value.
   const handleSkillLevelChange = (skill: LaborSkillLevel) => {
     setLaborSkillLevel(skill);
-    applyLhrTier(locationWatched || 'India', skill);
+    applyLhrTier(locationWatched || 'USA', skill);
   };
 
   // When location changes, apply location-specific defaults (skip during form init from existingRecord)
