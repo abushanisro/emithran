@@ -2063,6 +2063,34 @@ function STLModel({
       return;
     }
 
+    // Guard against an empty or degenerate mesh (e.g. a failed CAD→STL export, or a
+    // placeholder/zero-byte-geometry file). Without this check the loader "succeeds"
+    // with zero (or vanishingly small) triangles: no error is ever shown, the toolbar
+    // still mounts normally, and the viewport just renders nothing — because
+    // CameraFitter's scene.traverse() never finds a non-empty bounding box to fit to,
+    // so the camera never leaves its default position. Surface it as a clear error
+    // instead of a silent black viewport.
+    if (!positionArray || vertexCount === 0) {
+      setLoadingError('This 3D model file contains no geometry data (0 vertices). The file may be corrupted or the CAD export failed — please re-upload or regenerate the 3D model.');
+      setIsLoading(false);
+      return;
+    }
+
+    loadedGeometry.computeBoundingBox();
+    const loadedBBox = loadedGeometry.boundingBox;
+    if (loadedBBox) {
+      const loadedSize = new THREE.Vector3();
+      loadedBBox.getSize(loadedSize);
+      const isDegenerate =
+        !Number.isFinite(loadedSize.x) || !Number.isFinite(loadedSize.y) || !Number.isFinite(loadedSize.z) ||
+        (loadedSize.x < 1e-6 && loadedSize.y < 1e-6 && loadedSize.z < 1e-6);
+      if (isDegenerate) {
+        setLoadingError('This 3D model has zero/degenerate geometry (no measurable volume). The source file may be corrupted or the CAD export failed.');
+        setIsLoading(false);
+        return;
+      }
+    }
+
     setIsLoading(false);
     setLoadingProgress(100);
 
@@ -2901,6 +2929,9 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   highlightColor,
 }: EDrawingsViewerProps) {
   const [loading, setLoading] = useState(true);
+  // Bumped to force a full Canvas remount (fresh WebGL context + geometry reload)
+  // when a lost WebGL context fails to auto-restore — see onLost/onRestored below.
+  const [canvasGeneration, setCanvasGeneration] = useState(0);
   const [modelColor] = useState('#3d7ab5');
   const [showGrid, setShowGrid] = useState(false);
   const [currentView, setCurrentView] = useState<string>('home');
@@ -2938,6 +2969,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
 
   const webglCleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => () => { webglCleanupRef.current?.(); }, []);
+  const contextRecoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
   // Store the current geometry for projected area calculation
@@ -3624,17 +3656,43 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               preserveDrawingBuffer: !!onScreenshotReady,
               failIfMajorPerformanceCaveat: false,
             }}
+            key={canvasGeneration}
             onCreated={(state) => {
               state.gl.localClippingEnabled = true;
               const canvas = state.gl.domElement;
               screenshotCanvasRef.current = canvas;
-              const onLost = (e: Event) => { e.preventDefault(); setLoading(true); };
-              const onRestored = () => setLoading(false);
+              const clearRecoveryTimeout = () => {
+                if (contextRecoveryTimeoutRef.current) {
+                  clearTimeout(contextRecoveryTimeoutRef.current);
+                  contextRecoveryTimeoutRef.current = null;
+                }
+              };
+              const onLost = (e: Event) => {
+                e.preventDefault();
+                setLoading(true);
+                // Browsers don't guarantee 'webglcontextrestored' fires — GPU drivers
+                // commonly reclaim WebGL contexts from backgrounded/idle tabs and may
+                // never restore them. Without this, the viewer would be stuck behind
+                // the loading overlay forever with no way to recover. If restoration
+                // hasn't happened shortly, force a clean remount (new WebGL context +
+                // fresh geometry reload) instead.
+                clearRecoveryTimeout();
+                contextRecoveryTimeoutRef.current = setTimeout(() => {
+                  if (state.gl.getContext().isContextLost()) {
+                    setCanvasGeneration((g) => g + 1);
+                  }
+                }, 5000);
+              };
+              const onRestored = () => {
+                clearRecoveryTimeout();
+                setLoading(false);
+              };
               canvas.addEventListener('webglcontextlost', onLost);
               canvas.addEventListener('webglcontextrestored', onRestored);
               webglCleanupRef.current = () => {
                 canvas.removeEventListener('webglcontextlost', onLost);
                 canvas.removeEventListener('webglcontextrestored', onRestored);
+                clearRecoveryTimeout();
               };
               setLoading(false);
             }}

@@ -21,6 +21,10 @@ import {
 export interface ComboboxOption {
   value: string
   label: string
+  // Extra search terms that don't appear in the visible label (e.g. regional
+  // aliases like "AL6101" for a row labelled "Generic Aluminum, ANSI 6101")
+  // -- matched by cmdk's fuzzy filter alongside value/label, never displayed.
+  keywords?: string[]
 }
 
 interface ComboboxProps {
@@ -69,31 +73,44 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        {/* shouldFilter left at cmdk's default -- Command's own value/
+            onValueChange controls its transient KEYBOARD-CURSOR position
+            (aria-selected, cmdk's bg-accent highlight), a different concept
+            from "which option is actually chosen" (the persistent tint +
+            checkmark below, driven purely by value === option.value).
+            Confirmed live: trying to make cmdk's cursor track the real
+            selection on open raced with cmdk's own hover/scroll handling and
+            landed on the wrong row a few positions off -- not fixable by
+            fighting cmdk's internal state, so the real selection gets its
+            own always-correct marker instead and cmdk's cursor is left to
+            behave normally (starts at the top, moves with arrow keys/hover). */}
         <Command shouldFilter={true}>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList className="max-h-[300px]">
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.label}
-                  keywords={[option.value, option.label]}
-                  onSelect={() => {
-                    onValueChange?.(option.value === value ? "" : option.value)
-                    setOpen(false)
-                  }}
-                  className="text-foreground font-normal"
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4 flex-shrink-0",
-                      value === option.value ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  <span className="truncate">{option.label}</span>
-                </CommandItem>
-              ))}
+              {options.map((option) => {
+                const isSelected = option.value === value
+                return (
+                  <CommandItem
+                    key={option.value}
+                    value={option.label}
+                    keywords={[option.value, option.label, ...(option.keywords ?? [])]}
+                    onSelect={() => {
+                      onValueChange?.(isSelected ? "" : option.value)
+                      setOpen(false)
+                    }}
+                    className={cn("text-foreground font-normal", isSelected && "bg-accent/40")}
+                  >
+                    {/* Only the selected row pays for a Check icon -- with
+                        ~500 options, rendering an always-present opacity-0
+                        SVG per row was real, measurable scroll-perf cost for
+                        ~499 icons nobody ever sees. */}
+                    {isSelected && <Check className="mr-2 h-4 w-4 flex-shrink-0" />}
+                    <span className={cn("truncate", !isSelected && "pl-6")}>{option.label}</span>
+                  </CommandItem>
+                )
+              })}
             </CommandGroup>
           </CommandList>
         </Command>

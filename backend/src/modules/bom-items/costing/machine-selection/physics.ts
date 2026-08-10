@@ -1,19 +1,18 @@
-// Pure physics — no I/O. Each function converts part geometry + material into the
+// Pure physics — no I/O and no material lookup of any kind. Each function
+// converts part geometry + an already-resolved material property into the
 // physical minimum a machine must meet (MachineRequirement) for one process.
+// Callers resolve real material properties ONCE from the raw_materials DB
+// (see BOMItemsService.resolveMaterialForFamily) and pass plain numbers in —
+// this file never sees a grade string or does its own classification/lookup,
+// so machine selection and $ costing can never silently diverge onto two
+// different material values for the same part.
 // Formulas: press brake tonnage per Diebold/Bosch air-bend formula; envelope and
 // lathe margins per the ×1.2 rule; laser thickness limits are material-specific
 // and resolved against the machine's per-material columns by the selector.
 
-// ── Material factor tables ────────────────────────────────────────────────────
-// Press brake K factor (material tensile strength relative to mild steel)
-export const MATERIAL_K: Record<string, number> = {
-  MS: 1.42,
-  SS: 1.75,
-  AL: 1.0,
-  CU: 1.2,
-  OTHER: 1.42, // unknown → treat as mild steel (most common sheet stock)
-};
+import { estimateBendTonnage, estimateBurlTonnage } from '../default-rates';
 
+// ── Material factor tables ────────────────────────────────────────────────────
 // Baseline MRR (cm³/min) at 100% rigidity — used to size VMC spindle demand
 export const MATERIAL_MRR_CM3_MIN: Record<string, number> = {
   MS: 60,
@@ -68,6 +67,13 @@ export interface PressBrakeRequirement {
   thicknessMm: number;
 }
 
+export interface HoleFormingRequirement {
+  kind: 'hole_forming';
+  tonnage: number;        // tons required incl. no margin (selector applies TONNAGE_MARGIN)
+  holeDiameterMm: number;
+  thicknessMm: number;
+}
+
 export interface LaserRequirement {
   kind: 'laser';
   thicknessMm: number;
@@ -112,6 +118,7 @@ export interface InjectionMoldingRequirement {
 
 export type MachineRequirement =
   | PressBrakeRequirement
+  | HoleFormingRequirement
   | LaserRequirement
   | VmcRequirement
   | LatheRequirement
@@ -120,22 +127,39 @@ export type MachineRequirement =
 
 // ── Requirement builders ──────────────────────────────────────────────────────
 
-// Air-bend tonnage: T (tons) = K × C × (t² / V) × L, with die opening V = 8t (mid-range).
-// C calibrated to standard press-brake charts: 3 mm mild steel, V = 24 mm → ~22 t/m
-// (Amada/Trumpf air-bend tables). K = MATERIAL_K (MS = 1.42 baseline).
-const TONNAGE_COEF = 41.3; // tons per metre per (t²/V), t and V in mm
-
+// Air-bend tonnage: F(kN) = (1.42 × UTS(N/mm²) × L(mm) × t²(mm²)) / (1000 × V(mm)),
+// V = 8t (mid-range die opening), tons = F / 9.81 — the SAME estimateBendTonnage
+// used by machine-capability.ts's TONNAGE_EXCEEDED check and by
+// bom-items.service.ts's press-brake cost lookup, so machine SELECTION and the
+// displayed/costed tonnage can never silently disagree (previously this
+// function used a separate, coarser MATERIAL_K bucket table — MS/SS/AL/CU —
+// whose ratios didn't match real per-grade UTS at all: e.g. SS/MS = 1.75/1.42
+// ≈ 1.23 here vs the real UTS ratio SS304/E250 = 620/410 ≈ 1.51).
 export function pressBrakeRequirement(input: {
   bendLengthMm: number;
   thicknessMm: number;
-  materialK: number;
+  utsMpa: number;
 }): PressBrakeRequirement {
-  const { bendLengthMm, thicknessMm, materialK } = input;
+  const { bendLengthMm, thicknessMm, utsMpa } = input;
   const t = Math.max(thicknessMm, 0);
-  const lMetres = Math.max(bendLengthMm, 0) / 1000;
-  const dieOpening = 8 * t;
-  const tonnage = dieOpening > 0 ? materialK * TONNAGE_COEF * ((t * t) / dieOpening) * lMetres : 0;
+  const tonnage = estimateBendTonnage(utsMpa, t, Math.max(bendLengthMm, 0)) ?? 0;
   return { kind: 'press_brake', tonnage, bendLengthMm, thicknessMm: t };
+}
+
+// Hole-extrusion (burl/flange) forming tonnage — real drawing/forming force
+// formula, see estimateBurlTonnage's own doc comment in default-rates.ts for
+// derivation. Same pattern as pressBrakeRequirement above: machine SELECTION
+// and the displayed/costed tonnage share this one formula, so they can never
+// silently disagree.
+export function holeFormingRequirement(input: {
+  holeDiameterMm: number;
+  thicknessMm: number;
+  utsMpa: number;
+}): HoleFormingRequirement {
+  const { holeDiameterMm, thicknessMm, utsMpa } = input;
+  const t = Math.max(thicknessMm, 0);
+  const tonnage = estimateBurlTonnage(utsMpa, t, Math.max(holeDiameterMm, 0)) ?? 0;
+  return { kind: 'hole_forming', tonnage, holeDiameterMm, thicknessMm: t };
 }
 
 export function laserRequirement(input: {

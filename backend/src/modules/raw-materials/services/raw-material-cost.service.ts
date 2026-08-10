@@ -174,10 +174,13 @@ export class RawMaterialCostService {
     // This happens when the material is applied from the BOM item grade without a manual price entry.
     // Looks up the location-specific price column so India materials (cost_india) aren't silently zeroed.
     let resolvedUnitCost = createDto.unitCost ?? 0;
+    let priceLookupFailed = false;
     if (resolvedUnitCost === 0 && createDto.materialName) {
-      resolvedUnitCost = await this.lookupMaterialPrice(
+      const lookup = await this.lookupMaterialPrice(
         accessToken, createDto.materialName, createDto.country ?? '',
       );
+      resolvedUnitCost = lookup.price;
+      priceLookupFailed = !lookup.found;
     }
 
     // Prepare input for calculation engine
@@ -249,7 +252,13 @@ export class RawMaterialCostService {
 
       // Metadata
       is_active: createDto.isActive !== false,
-      notes: createDto.notes,
+      // Disclosed, not silent: a genuinely-missing price (no raw_materials row
+      // matched) must not be indistinguishable from a real, user-entered $0 —
+      // confirmed live: unit_cost was silently persisted as 0 with no trace
+      // of why. Prepended so it survives even if the caller also sent notes.
+      notes: priceLookupFailed
+        ? `⚠ No price found in raw_materials for "${createDto.materialName}" at ${createDto.country || 'this location'} — unit cost defaulted to $0. Add pricing data or enter unit cost manually.${createDto.notes ? ` ${createDto.notes}` : ''}`
+        : createDto.notes,
       user_id: userId,
 
       // Links
@@ -519,13 +528,15 @@ export class RawMaterialCostService {
    * Look up the location-specific unit cost (local currency/kg) for a material grade string.
    * Uses tokenized ILIKE search so compound grades like "IS2062 E250 CRCA" find
    * "Mild Steel IS2062" and "CRCA Steel" even when no row stores the full compound string.
-   * Returns 0 on no match or any error — caller decides whether to surface the gap.
+   * Returns { price: 0, found: false } on no match or any error — the caller MUST disclose
+   * this (see create()'s notes field), since a genuinely-missing price is otherwise
+   * indistinguishable from a real $0 unit cost.
    */
   private async lookupMaterialPrice(
     accessToken: string,
     materialName: string,
     country: string,
-  ): Promise<number> {
+  ): Promise<{ price: number; found: boolean }> {
     // Maps digital-factory country strings to raw_materials price columns
     const PRICE_COL: Record<string, string> = {
       India: 'cost_india', USA: 'cost_usa', Germany: 'cost_germany',
@@ -552,13 +563,13 @@ export class RawMaterialCostService {
         .limit(5);
       for (const row of (data ?? []) as any[]) {
         const locPrice = parseFloat(row[priceCol]);
-        if (isFinite(locPrice) && locPrice > 0) return locPrice;
+        if (isFinite(locPrice) && locPrice > 0) return { price: locPrice, found: true };
         const indiaPrice = parseFloat(row.cost_india);
-        if (isFinite(indiaPrice) && indiaPrice > 0) return indiaPrice;
+        if (isFinite(indiaPrice) && indiaPrice > 0) return { price: indiaPrice, found: true };
       }
-    } catch {
-      // Non-critical — caller falls back to $0 display with a prompt to enter manually
+    } catch (err: any) {
+      this.logger.warn(`Material price lookup failed for "${materialName}" (${country}): ${err?.message}`, 'RawMaterialCostService');
     }
-    return 0;
+    return { price: 0, found: false };
   }
 }

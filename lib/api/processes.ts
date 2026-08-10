@@ -162,6 +162,14 @@ export const processesApi = {
     return apiClient.get<ReferenceTable>(`/processes/reference-tables/${tableId}`);
   },
 
+  // Live sm_lookup_* cost-engine table, by name — used by a calculator
+  // popup's "eye" button (any lookup-backed input) to show the real table a
+  // value came from. Same shape as a ReferenceTable (columnDefinitions/rows)
+  // so callers reuse the identical viewer UI, not a second rendering path.
+  getSmLookupTableByName: async (table: string): Promise<ReferenceTable> => {
+    return apiClient.get<ReferenceTable>(`/processes/sm-lookup-tables/by-name/${encodeURIComponent(table)}`);
+  },
+
   createReferenceTable: async (data: CreateReferenceTableData): Promise<ReferenceTable> => {
     const { processId, ...tableData } = data;
     return apiClient.post<ReferenceTable>(`/processes/${processId}/reference-tables`, tableData);

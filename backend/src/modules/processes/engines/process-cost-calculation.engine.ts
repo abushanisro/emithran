@@ -16,6 +16,7 @@
  */
 
 import { PROCESS_COST_CONSTANTS } from '../constants/process-cost-calculation.constants';
+import { aprioriTerms } from '../../bom-items/costing/cost-engine';
 
 /**
  * Input parameters for process cost calculation
@@ -152,34 +153,11 @@ export class ProcessCostCalculationEngine {
       normalized.partsPerCycle
     );
 
-    // Step 3: Calculate setup costs
-    const setupCosts = this.calculateSetupCosts(
-      timeCalcs.setupTimeHours,
-      normalized.setupManning,
-      normalized.directRate,
-      normalized.indirectRate,
-      normalized.fringeRate,
-      normalized.machineRate,
-      normalized.batchSize
-    );
-
-    // Step 4: Calculate cycle costs
-    const cycleCosts = this.calculateCycleCosts(
-      timeCalcs.cycleTimePerPartHours,
-      normalized.heads,
-      normalized.directRate,
-      normalized.indirectRate,
-      normalized.fringeRate,
-      normalized.machineRate
-    );
-
-    // Step 5: Calculate total cost with scrap adjustment
-    const totalCosts = this.calculateTotalCosts(
-      setupCosts.setupCostPerPart,
-      cycleCosts.totalCycleCostPerPart,
-      normalized.scrap,
-      normalized.batchSize
-    );
+    // Steps 3-5: Setup / cycle / total cost, all via the shared aprioriTerms() kernel —
+    // the same arithmetic the automated (CAD-geometry-driven) cost engine uses, so
+    // setupManning, heads, and scrap% actually drive the total instead of being
+    // validated-but-unused inputs.
+    const { setupCosts, cycleCosts, totalCosts } = this.calculateCosts(normalized, timeCalcs);
 
     // Step 6: Calculate efficiency metrics
     const metrics = this.calculateEfficiencyMetrics(
@@ -291,118 +269,78 @@ export class ProcessCostCalculationEngine {
   }
 
   /**
-   * Calculate setup costs using simplified formula
-   * Formula: Setup Cost = (Setup time in hr × (MHR + LHR)) / Batch Size
+   * Setup / cycle / total cost — all via aprioriTerms(), the same kernel the
+   * automated (CAD-geometry-driven) cost engine uses. setupManning and heads are
+   * distinct, real headcounts (setup crew vs. run crew) mapped onto aprioriTerms'
+   * setupNDL/cycleNDL; scrap% inflates the effective process cost per good part
+   * (no material cost is tracked at this line level — that belongs to the BOM's
+   * overall material costing) instead of being a validated-but-silent no-op.
    */
-  private calculateSetupCosts(
-    setupTimeHours: number,
-    setupManning: number,
-    directRate: number,
-    indirectRate: number,
-    fringeRate: number,
-    machineRate: number,
-    batchSize: number
+  private calculateCosts(
+    normalized: ReturnType<typeof this.normalizeInput>,
+    timeCalcs: ReturnType<typeof this.calculateTimeValues>,
   ) {
-    // LHR = Labor Hour Rate (directRate)
-    const LHR = directRate;
-    
-    // MHR = Machine Hour Rate (machineRate)  
-    const MHR = machineRate;
-    
-    // Setup Cost = (Setup time in hr × (MHR + LHR)) / Batch Size
-    const setupCostPerPart = (setupTimeHours * (MHR + LHR)) / batchSize;
-    
-    // Calculate individual components for breakdown (optional for display)
-    const setupLaborCost = setupTimeHours * LHR;
-    const setupMachineCost = setupTimeHours * MHR;
-    const totalSetupCost = setupTimeHours * (MHR + LHR);
-    const setupOverheadCost = 0; // Not used in simplified formula
+    const MHR = normalized.machineRate;
+    // Total burdened labor rate — direct + indirect + fringe, all real cost components.
+    const LHR = normalized.directRate + normalized.indirectRate + normalized.fringeRate;
 
-    return {
-      setupLaborCost: this.round(setupLaborCost, this.precision.COST),
-      setupOverheadCost: this.round(setupOverheadCost, this.precision.COST),
-      setupMachineCost: this.round(setupMachineCost, this.precision.COST),
-      totalSetupCost: this.round(totalSetupCost, this.precision.COST),
-      setupCostPerPart: this.round(setupCostPerPart, this.precision.COST),
+    const setupTimeMinPerPart = normalized.setupTime / Math.max(normalized.batchSize, 1);
+    const cycleTimeMinPerPart = timeCalcs.cycleTimePerPartHours * this.time.MINUTES_PER_HOUR;
+
+    const terms = aprioriTerms({
+      mhrPerHr: MHR,
+      dlrPerHr: LHR,
+      qairPerHr: 0,
+      setupNDL: normalized.setupManning,
+      cycleNDL: normalized.heads,
+      cycleTimeMin: cycleTimeMinPerPart,
+      setupTimeMin: setupTimeMinPerPart,
+      inspTimeMin: 0,
+      samplingRate: 0,
+      yieldPct: 1 - normalized.scrap / 100,
+      netMatCost: 0,
+      netWeightKg: 0,
+      scrapPricePerKg: 0,
+    });
+
+    const mhrMin = MHR / 60;
+    const dlrMin = LHR / 60;
+
+    const setupCosts = {
+      setupLaborCost: this.round(dlrMin * normalized.setupManning * setupTimeMinPerPart, this.precision.COST),
+      setupOverheadCost: 0,
+      setupMachineCost: this.round(mhrMin * setupTimeMinPerPart, this.precision.COST),
+      totalSetupCost: this.round(terms.setupCost, this.precision.COST),
+      setupCostPerPart: this.round(terms.setupCost, this.precision.COST),
     };
-  }
 
-  /**
-   * Calculate cycle costs using simplified formulas
-   * Labour Cost = LHR × Cycle time in hr
-   * Machine Cost = MHR × Cycle Time in hr
-   */
-  private calculateCycleCosts(
-    cycleTimePerPartHours: number,
-    heads: number,
-    directRate: number,
-    indirectRate: number,
-    fringeRate: number,
-    machineRate: number
-  ) {
-    // LHR = Labor Hour Rate (directRate)
-    const LHR = directRate;
-    
-    // MHR = Machine Hour Rate (machineRate)
-    const MHR = machineRate;
-    
-    // Labour Cost = LHR × Cycle time in hr
-    const cycleLaborCostPerPart = LHR * cycleTimePerPartHours;
-
-    // Machine Cost = MHR × Cycle Time in hr  
-    const cycleMachineCostPerPart = MHR * cycleTimePerPartHours;
-
-    // No overhead cost in simplified formula
-    const cycleOverheadCostPerPart = 0;
-
-    // Total cycle cost per part = Labour Cost + Machine Cost
-    const totalCycleCostPerPart = cycleLaborCostPerPart + cycleMachineCostPerPart;
-
-    return {
-      cycleLaborCostPerPart: this.round(cycleLaborCostPerPart, this.precision.COST),
-      cycleOverheadCostPerPart: this.round(cycleOverheadCostPerPart, this.precision.COST),
-      cycleMachineCostPerPart: this.round(cycleMachineCostPerPart, this.precision.COST),
-      totalCycleCostPerPart: this.round(totalCycleCostPerPart, this.precision.COST),
+    const cycleCosts = {
+      cycleLaborCostPerPart: this.round(dlrMin * normalized.heads * cycleTimeMinPerPart, this.precision.COST),
+      cycleOverheadCostPerPart: 0,
+      cycleMachineCostPerPart: this.round(mhrMin * cycleTimeMinPerPart, this.precision.COST),
+      totalCycleCostPerPart: this.round(terms.machineCost + terms.laborCost, this.precision.COST),
     };
-  }
 
-  /**
-   * Calculate total cost using simplified formula
-   * Total Cost = Setup Cost + Labour Cost + Machine Cost
-   */
-  private calculateTotalCosts(
-    setupCostPerPart: number,
-    cycleCostPerPart: number,
-    scrapPercentage: number,
-    batchSize: number
-  ) {
-    // Total Cost = Setup Cost + Labour Cost + Machine Cost  
-    const totalCostPerPart = setupCostPerPart + cycleCostPerPart;
-    
-    // For simplified formula, we don't apply scrap adjustment
-    const totalCostBeforeScrap = totalCostPerPart;
-    const scrapFactor = 1; // No scrap adjustment
-    const scrapAdjustment = 0; // No additional scrap cost
-
-    // Total cost for entire batch
-    const totalBatchCost = totalCostPerPart * batchSize;
-
-    return {
-      totalCostBeforeScrap: this.round(totalCostBeforeScrap, this.precision.COST),
-      scrapFactor: this.round(scrapFactor, this.precision.PERCENTAGE),
-      scrapAdjustment: this.round(scrapAdjustment, this.precision.COST),
-      totalCostPerPart: this.round(totalCostPerPart, this.precision.COST),
-      totalBatchCost: this.round(totalBatchCost, this.precision.COST),
+    const totalCostPerPart = this.round(terms.total, this.precision.COST);
+    const scrapAdjustment = this.round(terms.yieldCost, this.precision.COST);
+    const totalCosts = {
+      totalCostBeforeScrap: this.round(terms.total - terms.yieldCost, this.precision.COST),
+      scrapFactor: this.round(normalized.scrap > 0 ? 1 / (1 - normalized.scrap / 100) : 1, this.precision.PERCENTAGE),
+      scrapAdjustment,
+      totalCostPerPart,
+      totalBatchCost: this.round(totalCostPerPart * normalized.batchSize, this.precision.COST),
     };
+
+    return { setupCosts, cycleCosts, totalCosts };
   }
 
   /**
    * Calculate efficiency metrics for analysis (simplified approach)
    */
   private calculateEfficiencyMetrics(
-    setupCosts: ReturnType<typeof this.calculateSetupCosts>,
-    cycleCosts: ReturnType<typeof this.calculateCycleCosts>,
-    totalCosts: ReturnType<typeof this.calculateTotalCosts>,
+    setupCosts: ReturnType<typeof this.calculateCosts>['setupCosts'],
+    cycleCosts: ReturnType<typeof this.calculateCosts>['cycleCosts'],
+    totalCosts: ReturnType<typeof this.calculateCosts>['totalCosts'],
     directRate: number,
     indirectRate: number,
     fringeRate: number,
@@ -424,7 +362,7 @@ export class ProcessCostCalculationEngine {
     // Cost breakdown percentages for simplified formula
     const setupTimePercentage = (setupCosts.setupCostPerPart / total) * 100;
     const cycleTimePercentage = (cycleCosts.totalCycleCostPerPart / total) * 100;
-    const scrapCostPercentage = 0; // No scrap adjustment in simplified formula
+    const scrapCostPercentage = (totalCosts.scrapAdjustment / total) * 100;
 
     // Calculate labor and machine costs based on simplified approach
     const totalLaborCost = cycleCosts.cycleLaborCostPerPart; // Only cycle labor cost  
@@ -448,9 +386,9 @@ export class ProcessCostCalculationEngine {
   private buildResult(
     normalized: ReturnType<typeof this.normalizeInput>,
     timeCalcs: ReturnType<typeof this.calculateTimeValues>,
-    setupCosts: ReturnType<typeof this.calculateSetupCosts>,
-    cycleCosts: ReturnType<typeof this.calculateCycleCosts>,
-    totalCosts: ReturnType<typeof this.calculateTotalCosts>,
+    setupCosts: ReturnType<typeof this.calculateCosts>['setupCosts'],
+    cycleCosts: ReturnType<typeof this.calculateCosts>['cycleCosts'],
+    totalCosts: ReturnType<typeof this.calculateCosts>['totalCosts'],
     metrics: ReturnType<typeof this.calculateEfficiencyMetrics>
   ): ProcessCostResult {
     const totalLaborRate = normalized.directRate + normalized.indirectRate + normalized.fringeRate;

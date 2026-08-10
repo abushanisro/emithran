@@ -18,6 +18,7 @@ import type {
 } from '../dto/apply-request.dto';
 
 import { CreditMeterService } from './credit-meter.service';
+import { ProcessCostCalculationEngine } from '../../processes/engines/process-cost-calculation.engine';
 
 /**
  * Stage 4 — transactional apply across the 5 cost-record tables, optional
@@ -34,6 +35,7 @@ import { CreditMeterService } from './credit-meter.service';
 @Injectable()
 export class PersistenceService {
   private readonly logger = new Logger(PersistenceService.name);
+  private readonly costEngine = new ProcessCostCalculationEngine();
 
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -167,6 +169,34 @@ export class PersistenceService {
           }
           case 'process': {
             const processId = line.data.processId ?? (line.data.newMasterRef ? newMasterIdByRef.get(line.data.newMasterRef) : null);
+            // Compute the same total_cost_per_part etc. every other creation path stores,
+            // via the shared engine — never leave this row with a null total that downstream
+            // readers (bulk totals, cost breakdown UI) then have to silently recompute
+            // themselves from raw fields as a separate, duplicate formula. cycleTimeSeconds/
+            // machineRate here come from resolver.service.ts's own priority order (calculator
+            // > feature geometry > planner_physics > LLM hint > bbox estimate > default) —
+            // most lines are geometry-derived, not a model guess; timing_source on the row
+            // records which one actually won for this specific line.
+            let calc: ReturnType<ProcessCostCalculationEngine['calculate']> | null = null;
+            try {
+              calc = this.costEngine.calculate({
+                directRate: line.data.labourRate,
+                machineRate: line.data.machineRate,
+                setupManning: line.data.setupManning,
+                setupTime: line.data.setupTimeMinutes,
+                batchSize: line.data.batchSize,
+                heads: line.data.heads,
+                cycleTime: line.data.cycleTimeSeconds,
+                partsPerCycle: line.data.partsPerCycle,
+                scrap: line.data.scrapPercentage,
+              });
+            } catch (e) {
+              this.logger.warn(
+                `Cost calculation failed for process-plan-generator line (op ${line.data.opNbr}, ` +
+                `timing source: ${line.data.timingSource ?? 'unknown'}) — saving without a computed total: ` +
+                `${e instanceof Error ? e.message : e}`,
+              );
+            }
             const payload = {
               bom_item_id: bomItemId,
               user_id: userId,
@@ -197,6 +227,15 @@ export class PersistenceService {
               location:      appliedLocation,
               is_override:   false,
               timing_source: line.data.timingSource ?? null,
+              ...(calc ? {
+                total_cost_per_part: calc.totalCostPerPart,
+                setup_cost_per_part: calc.setupCostPerPart,
+                total_cycle_cost_per_part: calc.totalCycleCostPerPart,
+                total_cost_before_scrap: calc.totalCostBeforeScrap,
+                scrap_adjustment: calc.scrapAdjustment,
+                total_batch_cost: calc.totalBatchCost,
+                calculation_breakdown: calc,
+              } : {}),
             };
             const { data, error } = await client.from('process_cost_records').insert(payload).select('id').single();
             if (error) throw new Error(`process_cost_records insert failed: ${error.message}`);

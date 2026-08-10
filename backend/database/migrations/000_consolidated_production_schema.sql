@@ -117,7 +117,8 @@ CREATE TABLE IF NOT EXISTS boms (
     total_items INTEGER DEFAULT 0 NOT NULL,
     total_cost DECIMAL(20,4),
     total_cost_inr DECIMAL(15,2) DEFAULT 0 CHECK (total_cost_inr >= 0),
-    currency VARCHAR(3) DEFAULT 'INR' NOT NULL,
+    -- USD is this app's default currency, not INR (see migrations/436_default_currency_usd_not_inr.sql).
+    currency VARCHAR(3) DEFAULT 'USD' NOT NULL,
     approved_by UUID,
     approved_at TIMESTAMP WITH TIME ZONE,
     user_id UUID NOT NULL,

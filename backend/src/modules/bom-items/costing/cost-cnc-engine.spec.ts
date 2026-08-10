@@ -227,10 +227,23 @@ describe('surface treatment line — anodize/plating pricing', () => {
     expect(classifySurfaceTreatment(null)).toBeNull();
   });
 
+  // computeSurfaceTreatmentLine no longer computes area×rate/min-lot itself —
+  // that arithmetic now lives in the real "Post Processing - Surface
+  // Treatment" calculator, resolved by BomItemsService.enrichSurfaceTreatmentRate()
+  // via resolvePhysicsQuantity (no DB access from this pure-function test), so
+  // these fixtures supply totalCostFromCalculatorLocal pre-computed exactly as
+  // that calculator would: max(areaCost, minLotCharge / batchSize).
   it('prices by area when area cost beats the amortized minimum lot charge', () => {
     // 0.04 m² × ₹700/m² = ₹28 vs min-lot ₹1500/60 = ₹25 → area wins
     const result = computeCNCMilledCostSummary(
-      milledInput({ surfaceTreatment: 'Type III Hardcoat Black Anodize', batchSize: 60 }),
+      milledInput({
+        surfaceTreatment: 'Type III Hardcoat Black Anodize',
+        batchSize: 60,
+        surfaceTreatmentDbRate: {
+          treatmentType: 'anodize_type_iii', label: 'Hardcoat Anodize Type III',
+          ratePerM2Local: 700, minLotChargeLocal: 1500, totalCostFromCalculatorLocal: 0.04 * 700,
+        },
+      }),
       'cnc_3ax_vmc',
     );
     const st = result.processLines.find((l) => l.process.startsWith('Surface Treatment'))!;
@@ -241,7 +254,14 @@ describe('surface treatment line — anodize/plating pricing', () => {
   it('charges the amortized minimum lot at small batches', () => {
     // min-lot ₹1500/5 = ₹300 > area ₹28
     const result = computeCNCMilledCostSummary(
-      milledInput({ surfaceTreatment: 'Type III Hardcoat', batchSize: 5 }),
+      milledInput({
+        surfaceTreatment: 'Type III Hardcoat',
+        batchSize: 5,
+        surfaceTreatmentDbRate: {
+          treatmentType: 'anodize_type_iii', label: 'Hardcoat Anodize Type III',
+          ratePerM2Local: 700, minLotChargeLocal: 1500, totalCostFromCalculatorLocal: 1500 / 5,
+        },
+      }),
       'cnc_3ax_vmc',
     );
     const st = result.processLines.find((l) => l.process.startsWith('Surface Treatment'))!;
@@ -262,12 +282,21 @@ describe('surface treatment line — anodize/plating pricing', () => {
     expect(warnings.some((w) => w.includes('not recognized'))).toBe(true);
   });
 
-  it('localizes treatment via the labour-rate ratio, not raw digit reuse', () => {
+  it('uses each location\'s own already-localized calculator result, not a shared/reused rate', () => {
+    // dbRate is resolved (and localized) by the caller per real FX rates before
+    // this function ever runs — it just assembles the line from whatever
+    // totalCostFromCalculatorLocal the calculator produced for THAT location's rate.
     const warnings: string[] = [];
-    const india = computeSurfaceTreatmentLine('anodize', 40_000, 5, 'India', warnings)!;
-    const usa = computeSurfaceTreatmentLine('anodize', 40_000, 5, 'USA', warnings)!;
-    // USA deburr benchmark $30 vs India ₹300 → ratio 0.1
-    expect(usa.totalCost).toBeCloseTo(india.totalCost * (30 / 300), 2);
+    const india = computeSurfaceTreatmentLine('anodize', 40_000, 5, 'India', warnings, {
+      treatmentType: 'zinc_plate', label: 'Zinc Plating',
+      ratePerM2Local: 150, minLotChargeLocal: 600, totalCostFromCalculatorLocal: 0.04 * 150,
+    })!;
+    const usa = computeSurfaceTreatmentLine('anodize', 40_000, 5, 'USA', warnings, {
+      treatmentType: 'zinc_plate', label: 'Zinc Plating',
+      ratePerM2Local: 8, minLotChargeLocal: 25, totalCostFromCalculatorLocal: 0.04 * 8,
+    })!;
+    expect(india.totalCost).toBeCloseTo(0.04 * 150, 2);
+    expect(usa.totalCost).toBeCloseTo(0.04 * 8, 2);
   });
 
   it('adds no surface treatment line when the part has no callout', () => {

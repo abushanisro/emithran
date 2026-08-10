@@ -5,7 +5,7 @@ import { CreateLHRDto, UpdateLHRDto } from './lhr.dto';
 import { validate as isValidUUID } from 'uuid';
 import * as ExcelJS from 'exceljs';
 import { getCurrencyForLocation } from '../mhr/constants/mhr-calculation.constants';
-import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 
 @Injectable()
 export class LHRService {
@@ -17,27 +17,21 @@ export class LHRService {
 
   /**
    * Derives currency from location and computes lhr_usd_effective.
-   * Works for all countries: lhr is always in local currency, conversion rate is
-   * read live from the exchange_rates table (via ExchangeRateService.loadRates,
-   * which the caller must have awaited already) — never a hardcoded FX constant.
+   * Works for all countries: lhr is always in local currency, converted via
+   * the caller's RateSnapshot (one FX read per request — see
+   * ExchangeRateService.getSnapshot) — never a hardcoded FX constant, and
+   * never a silent no-op when the rate is missing (throws instead).
    */
-  private computeLhrCurrencyFields(lhr: number, location: string | undefined | null): {
+  private computeLhrCurrencyFields(lhr: number, location: string | undefined | null, rates: RateSnapshot): {
     currency: string;
     currencySymbol: string;
     lhrUsdEffective: number;
   } {
     const { currency, symbol } = getCurrencyForLocation(location ?? '');
-    const usdPerLocal = this.exchangeRateService.convert(currency, 'USD');
-    if (usdPerLocal == null) {
-      this.logger.warn(
-        `No exchange rate on file for '${currency}' — add it to the exchange_rates table. lhr_usd_effective left unconverted.`,
-        'LHRService',
-      );
-    }
     return {
       currency,
       currencySymbol: symbol,
-      lhrUsdEffective: parseFloat((lhr * (usdPerLocal ?? 1)).toFixed(4)),
+      lhrUsdEffective: parseFloat(rates.toUsd(lhr, currency).toFixed(4)),
     };
   }
 
@@ -56,8 +50,8 @@ export class LHRService {
       throw new ConflictException(`Labour code ${CreateLHRDto.labourCode} already exists`);
     }
 
-    await this.exchangeRateService.loadRates(accessToken);
-    const lhrCurrency = this.computeLhrCurrencyFields(CreateLHRDto.lhr, CreateLHRDto.location);
+    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const lhrCurrency = this.computeLhrCurrencyFields(CreateLHRDto.lhr, CreateLHRDto.location, rates);
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
@@ -276,8 +270,8 @@ export class LHRService {
     // Always recompute currency and lhr_usd_effective from the effective lhr + location
     const effectiveLhr      = UpdateLHRDto.lhr      ?? existingRecord.lhr;
     const effectiveLocation = UpdateLHRDto.location  ?? existingRecord.location;
-    await this.exchangeRateService.loadRates(accessToken);
-    const lhrCurrency = this.computeLhrCurrencyFields(effectiveLhr, effectiveLocation);
+    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const lhrCurrency = this.computeLhrCurrencyFields(effectiveLhr, effectiveLocation, rates);
     updateData.currency          = lhrCurrency.currency;
     updateData.currency_symbol   = lhrCurrency.currencySymbol;
     updateData.lhr_usd_effective = lhrCurrency.lhrUsdEffective;
@@ -345,9 +339,9 @@ export class LHRService {
   async bulkCreate(data: CreateLHRDto[], userId: string, accessToken: string) {
     this.logger.log(`Bulk creating ${data.length} LHR records`, 'LHRService');
 
-    await this.exchangeRateService.loadRates(accessToken);
+    const rates = await this.exchangeRateService.getSnapshot(accessToken);
     const records = data.map(dto => {
-      const lhrCurrency = this.computeLhrCurrencyFields(dto.lhr, dto.location);
+      const lhrCurrency = this.computeLhrCurrencyFields(dto.lhr, dto.location, rates);
       return {
         user_id: userId,
         labour_code: dto.labourCode,
@@ -417,12 +411,15 @@ export class LHRService {
     const toStr = (v: ExcelJS.CellValue, fallback = ''): string =>
       v != null ? String(v).trim() : fallback;
 
-    // Indian standard wages from lhr-db.csv (281 days × 1 shift × 8 hrs = 2248 hrs/year)
+    // Indian standard wages — real, admin-editable table (lhr_wage_benchmarks,
+    // migration 417). Was previously a hardcoded GRADE_DEFAULTS constant with
+    // zero DB backing; kept as a disclosed fallback (same values) only for
+    // the case the table is ever emptied — see the errors.push below.
     const WORKING_HOURS_PER_YEAR = 2248;
     const calcLHR = (monthWage: number, da: number, perks: number) =>
       parseFloat(((monthWage + da) * (1 + perks / 100) * 12 / WORKING_HOURS_PER_YEAR).toFixed(2));
 
-    const GRADE_DEFAULTS: Record<string, { type: string; wagePerDay: number; wagePerMonth: number; da: number; perks: number }> = {
+    const FALLBACK_GRADE_DEFAULTS: Record<string, { type: string; wagePerDay: number; wagePerMonth: number; da: number; perks: number }> = {
       '1':  { type: 'Unskilled',      wagePerDay: 500,   wagePerMonth: 15000, da: 0, perks: 30 },
       '2':  { type: 'Unskilled',      wagePerDay: 500,   wagePerMonth: 15000, da: 0, perks: 30 },
       '3':  { type: 'Semi-Skilled',   wagePerDay: 557.5, wagePerMonth: 16725, da: 0, perks: 30 },
@@ -432,6 +429,31 @@ export class LHRService {
       '11': { type: 'Highly Skilled', wagePerDay: 900,   wagePerMonth: 27000, da: 0, perks: 30 },
       '13': { type: 'Highly Skilled', wagePerDay: 1000,  wagePerMonth: 30000, da: 0, perks: 30 },
     };
+
+    const importErrors: string[] = [];
+    // Disclosed, not silent: a missing/unparseable "perks" cell silently
+    // defaulted to 30% with no warning, feeding straight into calcLHR() —
+    // set for any row that hit that default (see the perksParsed check below).
+    let hadMissingPerks = false;
+    const { data: wageBenchmarkRows } = await this.supabaseService
+      .getClient(accessToken)
+      .from('lhr_wage_benchmarks')
+      .select('grade, labour_type, wage_per_day, wage_per_month, dearness_allowance, perks_pct')
+      .eq('location', 'India - Manufacturing Standard');
+
+    let GRADE_DEFAULTS: Record<string, { type: string; wagePerDay: number; wagePerMonth: number; da: number; perks: number }>;
+    if (wageBenchmarkRows?.length) {
+      GRADE_DEFAULTS = {};
+      for (const r of wageBenchmarkRows as any[]) {
+        GRADE_DEFAULTS[String(r.grade)] = {
+          type: r.labour_type, wagePerDay: Number(r.wage_per_day), wagePerMonth: Number(r.wage_per_month),
+          da: Number(r.dearness_allowance), perks: Number(r.perks_pct),
+        };
+      }
+    } else {
+      GRADE_DEFAULTS = FALLBACK_GRADE_DEFAULTS;
+      importErrors.push('Labour wage benchmarks from fallback — seed lhr_wage_benchmarks for admin-editable wage data.');
+    }
 
     // Sheet candidates: named LHR sheets first, then REF_SKILL_LEVELS
     const namedSheet = workbook.worksheets.find(ws =>
@@ -573,9 +595,13 @@ export class LHRService {
         const monthWage = wageMonthCol ? toNum(row.getCell(wageMonthCol).value, 0) : 0;
         const da        = daCol ? toNum(row.getCell(daCol).value, 0) : 0;
         const perksRaw  = perksCol ? row.getCell(perksCol).value : null;
-        const perks     = perksRaw != null
-          ? parseFloat(String(perksRaw).replace(/[^0-9.-]/g, '')) || 30
-          : 30;
+        const perksParsed = perksRaw != null
+          ? parseFloat(String(perksRaw).replace(/[^0-9.-]/g, ''))
+          : NaN;
+        // `|| 30` previously also overrode a genuine 0% perks value (0 is
+        // falsy) — isFinite check treats 0 as real, only NaN as missing.
+        const perks = isFinite(perksParsed) ? perksParsed : 30;
+        if (!isFinite(perksParsed)) hadMissingPerks = true;
         const lhrStored = lhrCol ? toNum(row.getCell(lhrCol).value, 0) : 0;
         const lhr = lhrStored > 0 ? lhrStored : calcLHR(monthWage, da, perks);
         const wageGradeVal = wageGradeCol2 ? toStr(row.getCell(wageGradeCol2).value) : '';
@@ -647,7 +673,7 @@ export class LHRService {
 
     if (rows.length === 0) {
       this.logger.log('No valid LHR rows found — skipping', 'LHRService');
-      return { imported: 0, skipped: 0, errors: [] };
+      return { imported: 0, skipped: 0, errors: importErrors };
     }
 
     const client = this.supabaseService.getClient(accessToken);
@@ -665,7 +691,7 @@ export class LHRService {
 
     if (newRows.length === 0) {
       this.logger.log(`LHR import complete: 0 imported, ${skipped} skipped`, 'LHRService');
-      return { imported: 0, skipped, errors: [] };
+      return { imported: 0, skipped, errors: importErrors };
     }
 
     const CHUNK_SIZE = 500;
@@ -680,7 +706,7 @@ export class LHRService {
     );
 
     let imported = 0;
-    const errors: string[] = [];
+    const errors: string[] = [...importErrors];
     results.forEach(({ data, error }, i) => {
       if (error) {
         this.logger.error(`LHR import chunk ${i} error: ${error.message}`, 'LHRService');
@@ -689,6 +715,14 @@ export class LHRService {
         imported += (data ?? []).length;
       }
     });
+
+    if (hadMissingPerks) {
+      this.logger.warn('LHR import: one or more rows had a missing/unparseable "perks" cell — defaulted to 30% and fed into calcLHR', 'LHRService');
+      errors.push(
+        'One or more rows had a missing or unparseable "perks" value — defaulted to 30% for those rows, ' +
+        'which feeds directly into the computed LHR. Add real perks data and re-import for accurate rates.',
+      );
+    }
 
     this.logger.log(`LHR import complete: ${imported} imported, ${skipped} skipped`, 'LHRService');
     return { imported, skipped, errors };

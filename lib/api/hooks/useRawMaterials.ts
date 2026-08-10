@@ -61,6 +61,11 @@ export interface RawMaterial {
   hardness?: number;
   hardnessSystem?: string;
   cutCode?: number;
+  elasticModulusGpa?: number;
+  poissonRatio?: number;
+  elongationPct?: number;
+  electricalConductivityIacsPct?: number;
+  thermalConductivityWMk?: number;
 
   // Plastic-specific properties
   regrinding?: string;
@@ -143,6 +148,25 @@ export function useRawMaterials(params?: QueryRawMaterialsParams) {
       return response;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+export interface MaterialAlias {
+  aliasNormalized: string;
+  rawMaterialId: string;
+}
+
+// Alias table is small and rarely changes -- long staleTime. Used by the
+// material-picker dialog, which fetches all materials once and filters
+// client-side, so it needs this map directly rather than server-side search.
+export function useMaterialAliases() {
+  return useQuery({
+    queryKey: ['raw-materials', 'aliases'],
+    queryFn: async () => {
+      const response = await apiClient.get<MaterialAlias[]>('/raw-materials/aliases');
+      return response ?? [];
+    },
+    staleTime: 1000 * 60 * 30, // 30 minutes
   });
 }
 

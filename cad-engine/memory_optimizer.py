@@ -143,7 +143,12 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v19"  # bumped Jul 2026: Phase 4 draft detection axis + undercut threshold fixes
+    CACHE_VERSION = "geo_v41"  # bumped Aug 2026: (18) feature_graph_v2 now carries real "extruded_flange"/"thin_web" feature entries (real OCC face_ids collected during their own detection in _count_holes_with_location, e.g. member[8]/face_idx already used elsewhere in this file -- nothing new derived or guessed) so the frontend's "Detected Geometry" panel can click-to-highlight them in the 3D viewer, the same way holes/bends/cut_profile already could. extruded_flange occurrences are truncated to the counterbore/countersink-corrected count so the highlight list never claims more real occurrences than the reported number.
+    CACHE_VERSION_PRIOR = "geo_v40"  # bumped Aug 2026: (17) extruded_flange_count fix -- real debug data (geo_v39) proved the >=2-members/ratio<=1.6 heuristic exactly backwards on a real burled part: the 2 genuine mirror-symmetric M3 burls (3 coaxial layers each, ratio 2.20 -- boss OD notably larger than tap-drill bore, as a real boss should be) were EXCLUDED by the ratio cap, while 3 unrelated plain holes (2 layers, ratio 1.20 -- a coincidental nearby fillet, not a real boss) were wrongly flagged. Now requires >=3 coaxial layers (matching this method's own long-standing "2-3 layers" docstring prediction) with no ratio cap at all -- correctly yields 2 on the verified part instead of 4. bend_count was investigated in the same pass and found genuine (every candidate pairs cleanly into inner+outer radii exactly one sheet thickness apart, zero overlap with burl geometry) -- no change made there. Prior debug logging (item 16, geo_v39) removed now that both investigations concluded.
+    # bumped Aug 2026 (v38): (13) new internal_profile_count -- a discrete count of internal cutout wires (slots/scalloped profiles/keyholes, anything that isn't the outer boundary or a plain round hole), returned alongside the existing internal_profiles_mm LENGTH from the same panel-wire walk in _compute_cut_length/_face_breakdown -- counting wires directly needs none of the edge-bridging logic corner-turn detection needs, so it's a simple, reliable addition; (14) new extruded_flange_count ("extrusions") -- _cluster_coaxial_hole_entries already recognized stepped/burled holes (tap-drill bore + a formed collar/boss at a different depth, same axis line) as a byproduct but discarded the cluster size; split into _group_coaxial_hole_clusters (returns the raw clusters) + a thin wrapper preserving prior behavior for its 3 existing callers, so _count_holes_with_location can flag clusters with >1 member and a diameter ratio <=1.6x as a real extruded flange -- a heuristic (disclosed limitation: can overlap with counterbore/countersink classification on the same physical hole via two independent topology passes), coarsely corrected in extract() by subtracting already-classified counterbore/countersink counts (no per-hole spatial matching yet); (15) new thin_web_count ("burr regions") -- true edge-to-edge gap (centroid distance minus both radii, not raw centroid distance) between two holes below 1.5x sheet thickness, the same class of thickness-relative DFM threshold small_hole_count already uses (<2x thickness) -- holes already flagged "small" are excluded from this set at the source so a small hole never double-counts as both a small hole and a thin web
+    # bumped Aug 2026 (prior): (1) hole classification now rejects partial-arc cylinders (convex external rounds/fillets misidentified as holes) via a full-circle angular-sweep check, with dedup correctly summing angular coverage across STEP-seam-split fragments instead of taking one fragment's own span; (2) hole-highlight adjacent-rim-face filter now requires both small radial extent AND simple topology, not area alone; (3) feature_graph_v2 now carries a 'cut_profile' feature (every panel's side-wall face_ids, walking EVERY wire not just the outer one, so non-circular cutouts of any shape are covered too) for combined cut-path+holes highlighting; (4) stepped/burled holes (tap-drill + boss/counterbore at different depths, same axis line) now cluster into ONE physical hole (smallest diameter wins) instead of one hole-group entry per diameter layer; (5) cut_length_mm no longer counts fold-transition edges (where a flat panel meets its own bend region, cylinder axis in-plane with the panel normal) as if they were laser-cut edges -- was inflating cut length by up to 28% on a real part; (6) cut_length_mm now also returns cut_length_breakdown (outer_profile_mm / circular_holes_mm / internal_profiles_mm) so the total is independently checkable; (7) new real 2D unfold solver (_compute_flat_pattern_layout) walks the panel/bend adjacency graph to compute the flat pattern's TRUE bounding rectangle -- material_utilization_pct / scrap_area_mm2 -- verified to within 0.2% of a real drawing's flat-pattern dimensions, replacing the earlier parallel-axis-only approximation; (8) _compute_cut_length now also returns longest_continuous_cut_mm -- the single longest unbroken laser path (whole-part outer profile as ONE loop vs. each hole/internal-cutout wire on its own), not the summed total; (9) new _compute_corner_angles returns sharp_corner_count/acute_corner_count by cut-path turn angle, bridging over short CURVED corner-break fillets (which hide their whole turn via G1 tangent continuity at both endpoints) while never bridging short STRAIGHT edges (which can't hide a turn) -- an earlier length-only version wrongly bridged real small notch corners too; (10) new small_hole_count -- holes under 2x sheet thickness in diameter, needing a reduced laser/punch feed rate -- a simple threshold over the existing per-hole diameter list, not a new measurement; (11) new rapid_traverse_sec -- non-cutting head-repositioning time estimated via a nearest-neighbour tour over real hole/slot pierce centroids + one dominant-face reference point for the outer panel; (12) bend_count/bend_radii_mm now come from _collect_dedup_bends (the same clustering _compute_true_flat_pattern_area/_compute_flat_pattern_layout already trusted) instead of the older separate _count_bends_from_full pass, and now also return bend_lengths_mm/bend_angles_deg (real per-bend length/angle, index-aligned with bend_radii_mm) -- previously always null, so press-brake tonnage/machine-selection silently used the flat-pattern's overall bounding dimension as a proxy for bend length instead of each bend's own real length
+    # (was silently dropping every hole not aligned with global Z -- e.g. holes on a
+    # bent-up wall/wing -- and cut length only ever walked one dominant face)
     # NOTE: this version must also be bumped when classification logic in
     # feature_extractors.py changes — detect_part_family output is embedded
     # in the cached result, so a stale entry silently serves old family verdicts.
@@ -572,6 +577,12 @@ class AdvancedCADMemoryOptimizer:
                     face_map=holes.get('face_map', []),
                     face_map_tri_total=holes.get('face_map_tri_total', 0),
                 )
+            # holes= here is the coarse _detect_holes_real count (a classification
+            # signal only — may include bend-radius cylinder faces; see that
+            # method's comment). It will legitimately differ from the precise
+            # "[SheetMetal] ... holes=N" count logged by
+            # feature_extractors.py's SheetMetalFeatureExtractor, which is the
+            # one cost/cycle-time calculations actually use.
             logger.info(
                 f"[mfg_intel] family={detected_family} conf={family_confidence:.2f} "
                 f"flatness={flatness_val} holes={holes.get('count', 0)} "
@@ -672,6 +683,23 @@ class AdvancedCADMemoryOptimizer:
                         round(v_range, 2),   # m[9]: axial patch length mm (bend_length / hole depth)
                         round(u_range_rad, 4),  # m[10]: angular extent in radians (bend angle)
                     ))
+                    # NOTE: this radius-only filter deliberately does NOT exclude
+                    # bend-radius cylinder faces the way feature_extractors.py's
+                    # precise hole count does (SheetMetalFeatureExtractor._count_holes_with_location,
+                    # which additionally checks panel-normal alignment + excludes
+                    # anything _is_bend_cylinder recognizes) -- this method runs
+                    # BEFORE sheet_thickness/dominant_face/panels are known (it's
+                    # the same single early face-walk pass that discovers them),
+                    # so that bend-exclusion logic isn't available here yet.
+                    # 'count' below is used only as a soft signal for
+                    # detect_part_family()'s family-classification heuristic
+                    # (logged as "[mfg_intel] ... holes=N"), NOT for cost/cycle-
+                    # time calculations, which exclusively use the precise
+                    # feature_extractors.py count. Confirmed on a real 3-bend
+                    # bracket: this count = precise_hole_count + 6 (2 concentric
+                    # faces x 3 bends) -- a known, harmless overcount for family
+                    # detection, not a bug to reconcile without reordering this
+                    # whole pipeline for a signal that already classifies correctly.
                     if 0.5 <= radius <= 150.0:
                         hole_radii.append(round(radius, 3))
                         if len(hole_positions) < _MAX_POSITIONS:
@@ -705,11 +733,10 @@ class AdvancedCADMemoryOptimizer:
 
         # Pass 2: adjacent planar faces for hole cylinders.
         # For each vertical cylinder (hole, axis_z >= 0.5), find planar faces sharing an edge.
-        # Area filter excludes the large sheet top/bottom; keeps only the annular rim faces.
+        # Radial-extent filter excludes the large sheet top/bottom; keeps only the annular rim faces.
         # Result: hole face_ids in feature_graph_v2 include the rim — visually prominent from above.
         adjacent_face_ids: Dict[int, List[int]] = {}
         try:
-            import math
             from OCC.Core.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape, TopTools_IndexedMapOfShape  # type: ignore
             from OCC.Core.TopExp import topexp  # type: ignore
             from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
@@ -730,12 +757,20 @@ class AdvancedCADMemoryOptimizer:
                 fe2.Next()
 
             # Only process hole cylinders (vertical axis)
-            hole_cyl_faces = {m[8]: m[0] for m in raw_cylinders_full if m[1] >= 0.5}
-            for cyl_fi, cyl_r in hole_cyl_faces.items():
+            hole_cyl_faces = {m[8]: (m[0], m[2], m[3]) for m in raw_cylinders_full if m[1] >= 0.5}
+            for cyl_fi, (cyl_r, cyl_cx, cyl_cy) in hole_cyl_faces.items():
                 cyl_face_shape = fi_to_face_shape.get(cyl_fi)
                 if cyl_face_shape is None:
                     continue
-                area_threshold = max(500.0, math.pi * cyl_r * cyl_r * 30)
+                # A genuine rim/land face (chamfer relief, counterbore collar) stays within
+                # a small radial band of the hole regardless of hole size; the large sheet
+                # panel the hole is cut into does not. Bounding this by radial extent FROM
+                # THE HOLE AXIS — rather than the previous area<threshold heuristic — is
+                # what actually distinguishes the two: the old formula scaled with the
+                # hole's own cross-section (up to 30x, min 500mm² floor), which let a
+                # modest host panel (e.g. a ~900mm² center web on a small bracket) pass as
+                # if it were a rim and light up the whole panel for one hole selection.
+                max_radial_extent = cyl_r * 2 + 20.0
                 adj_planar: List[int] = []
                 seen_fi: set = set()
                 edge_exp2 = TopExp_Explorer(cyl_face_shape, TopAbs_EDGE)
@@ -754,9 +789,32 @@ class AdvancedCADMemoryOptimizer:
                             seen_fi.add(adj_fi)
                             try:
                                 if BRepAdaptor_Surface(adj_face).GetType() == GeomAbs_Plane:
-                                    props = GProp_GProps()
-                                    brepgprop.SurfaceProperties(adj_face, props)
-                                    if props.Mass() <= area_threshold:
+                                    fbox = Bnd_Box()
+                                    brepbndlib_Add(adj_face, fbox)
+                                    fxmin, fymin, _fzmin, fxmax, fymax, _fzmax = fbox.Get()
+                                    # Farthest corner from the hole axis, in-plane (X/Y) —
+                                    # sheet thickness (Z) is never the discriminator here,
+                                    # since hole_cyl_faces is already vertical-axis-only.
+                                    dx = max(abs(fxmin - cyl_cx), abs(fxmax - cyl_cx))
+                                    dy = max(abs(fymin - cyl_cy), abs(fymax - cyl_cy))
+                                    radial_extent = (dx * dx + dy * dy) ** 0.5
+                                    # Second, independent signal: a genuine rim/land is a
+                                    # plain annulus — one outer + one inner circular edge
+                                    # (a handful more once STEP export splits circles into
+                                    # arcs). A host panel face carries far more edges: its
+                                    # own outer boundary PLUS one inner loop per other hole
+                                    # it contains. Radial extent alone still let a compact
+                                    # panel with just one extra hole through (e.g. the
+                                    # center web on QAtesting/image.png, well within
+                                    # max_radial_extent of its own hole yet clearly the host
+                                    # panel, not a rim) — requiring BOTH low extent AND
+                                    # simple topology is what actually rules that out.
+                                    rim_edge_count = 0
+                                    rim_edge_exp = TopExp_Explorer(adj_face, TopAbs_EDGE)
+                                    while rim_edge_exp.More():
+                                        rim_edge_count += 1
+                                        rim_edge_exp.Next()
+                                    if radial_extent <= max_radial_extent and rim_edge_count <= 8:
                                         adj_planar.append(adj_fi)
                             except Exception:
                                 pass

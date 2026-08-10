@@ -173,14 +173,25 @@ class ApiClient {
   }
 
   /**
-   * Get auth token from Supabase session (NO async calls, NO getSession())
+   * Get auth token from the current Supabase session.
    * @returns Current access token or null
    */
   async getAuthToken(): Promise<string | null> {
     try {
       if (!supabase) return null;
 
-      const { data: { session } } = await supabase.auth.getSession();
+      // supabase-js serializes every getSession()/refreshSession() call in a
+      // tab behind one internal lock. If any prior call anywhere (e.g. the
+      // 401-triggered refreshSession() below) gets wedged, this call — which
+      // every single API request awaits before it can even be sent — would
+      // otherwise hang forever, permanently freezing every request in the tab
+      // with no backend log line ever produced. A bounded timeout guarantees
+      // this always resolves, falling back to "unauthenticated" (which the
+      // normal 401 handling already deals with) instead of hanging the UI.
+      const session = await Promise.race([
+        supabase.auth.getSession().then((r) => r.data.session),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
       return session?.access_token || null;
     } catch (error) {
       return null;

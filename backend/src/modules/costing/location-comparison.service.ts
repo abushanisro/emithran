@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
 import {
   LOCATION_INFO,
 } from '../bom-items/costing/default-rates';
@@ -55,7 +56,10 @@ const ALL_LOCATIONS = [
 
 @Injectable()
 export class LocationComparisonService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly exchangeRateService: ExchangeRateService,
+  ) {}
 
   async computeLocationComparison(
     bomItemId: string,
@@ -65,33 +69,17 @@ export class LocationComparisonService {
     const adminDb = this.supabaseService.getAdminClient();
     const serviceWarnings: string[] = [];
 
-    // 0. Load exchange rates and costing settings from DB (no hardcoded values)
-    const [fxResult, settingsResult] = await Promise.all([
-      adminDb
-        .from('exchange_rates')
-        .select('from_currency, rate')
-        .eq('to_currency', 'INR')
-        .eq('is_active', true),
+    // 0. Load exchange rates (one snapshot for this whole comparison — every
+    // location below converts through the exact same rates) and costing
+    // settings. ExchangeRateService is the single FX source of truth for the
+    // whole app — throws if exchange_rates has no active rates, rather than
+    // silently comparing locations at a stale/guessed rate.
+    const [rates, settingsResult] = await Promise.all([
+      this.exchangeRateService.getSnapshot(token),
       adminDb
         .from('costing_settings')
         .select('key, value'),
     ]);
-
-    // Build currency → INR rate map from DB
-    const fxMap = new Map<string, number>([['INR', 1]]);
-    for (const r of fxResult.data ?? []) {
-      if (r.from_currency && Number(r.rate) > 0) {
-        fxMap.set((r.from_currency as string).toUpperCase(), Number(r.rate));
-      }
-    }
-    if (fxMap.size <= 1) {
-      serviceWarnings.push(
-        'No active exchange rates found in DB — using LOCATION_INFO fallback rates for currency conversion; update the exchange_rates table for accurate location comparison',
-      );
-    }
-
-    // USD is the pivot anchor (everything converts to USD for comparison)
-    const inrPerUsd = fxMap.get('USD') ?? LOCATION_INFO['USA']!.defaultInrRate;
 
     // Load SGA and profit from costing_settings table
     const settingsMap = new Map<string, number>();
@@ -196,9 +184,7 @@ export class LocationComparisonService {
       const [loc, pg] = key.split('||');
       const avgLocal  = acc.sumLocal / acc.count;
       const currCode  = LOCATION_INFO[loc]?.code;
-      // Use DB exchange rate if available; fall back to LOCATION_INFO hardcoded rate with warning
-      const locInrRate = currCode ? (fxMap.get(currCode.toUpperCase()) ?? LOCATION_INFO[loc]?.defaultInrRate ?? inrPerUsd) : inrPerUsd;
-      const usd = avgLocal * locInrRate / inrPerUsd;
+      const usd = currCode ? rates.toUsd(avgLocal, currCode) : avgLocal;
       mhrRateMap.get(loc)?.set(pg, { usd, source: 'db' });
     }
 
@@ -292,10 +278,8 @@ export class LocationComparisonService {
       const sgaCostUsd      = sgaPct != null ? totalMfgCostUsd * sgaPct : 0;
       const sellingPriceUsd = totalMfgCostUsd * (1 + (sgaPct ?? 0) + (profitPct ?? 0));
 
-      // Local-currency process cost — use DB FX rate if available
-      const currCode = locInfo.code;
-      const locInrRate = fxMap.get(currCode.toUpperCase()) ?? locInfo.defaultInrRate;
-      const processCostLocal = processCostUsd * inrPerUsd / locInrRate;
+      // Local-currency process cost
+      const processCostLocal = processCostUsd * rates.convertStrict('USD', locInfo.code);
 
       const avgMhrUsd = lines.length ? lines.reduce((s, l) => s + l.mhrUsd, 0) / lines.length : 0;
       const avgLhrUsd = lines.length ? lines.reduce((s, l) => s + l.lhrUsd, 0) / lines.length : 0;

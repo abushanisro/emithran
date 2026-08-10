@@ -13,6 +13,7 @@ import {
   BulkUpdateTableRowsDto,
 } from './dto/processes.dto';
 import { ProcessResponseDto, ProcessListResponseDto } from './dto/process-response.dto';
+import { getSmLookupBridgeEntries, getAllSmLookupTableNames, SM_LOOKUP_READONLY_COLUMNS } from './sm-lookup-bridge.config';
 import {
   CreateProcessCalculatorMappingDto,
   UpdateProcessCalculatorMappingDto,
@@ -28,6 +29,219 @@ export class ProcessesService {
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
   ) {}
+
+  // process_reference_tables/process_table_rows are real snake_case DB tables
+  // (table_name, column_definitions, is_editable, row_data, row_order, ...),
+  // but the frontend's ReferenceTable/TableRow types are camelCase and
+  // renderEditableTable() reads table.tableName/table.columnDefinitions/
+  // table.isEditable directly — those were always undefined at runtime before
+  // this mapping existed (getReferenceTables/getReferenceTable previously
+  // returned the raw snake_case row with no transform).
+  private mapReferenceTableToResponse(row: any): any {
+    return {
+      id: row.id,
+      processId: row.process_id,
+      tableName: row.table_name,
+      tableDescription: row.table_description ?? undefined,
+      columnDefinitions: row.column_definitions,
+      displayOrder: row.display_order,
+      isEditable: row.is_editable,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      rows: (row.rows ?? []).map((r: any) => this.mapTableRowToResponse(r)),
+    };
+  }
+
+  private mapTableRowToResponse(row: any): any {
+    return {
+      id: row.id,
+      tableId: row.table_id,
+      rowData: row.row_data,
+      rowOrder: row.row_order,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private inferColumnLabel(name: string): string {
+    return name
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+
+  /**
+   * Live, read-only bridge — surfaces the real sm_lookup_* cost-engine tables
+   * (see sm-lookup-bridge.config.ts) for a process route, shaped exactly like
+   * a process_reference_tables entry so the existing "Lookup Tables" dialog
+   * can render them with zero frontend special-casing. Never editable here —
+   * these are the actual tables SheetMetalLookupService queries for real
+   * cost calculations; editing belongs in a migration, not a UI form that
+   * could silently drift the engine's real inputs.
+   */
+  async getSmLookupTables(group: string, route: string, accessToken: string): Promise<any[]> {
+    const entries = getSmLookupBridgeEntries(group, route);
+    if (entries.length === 0) return [];
+
+    const client = this.supabaseService.getClient(accessToken);
+    const results = await Promise.all(
+      entries.map((entry, idx) => this.buildLiveSmLookupTablePayload(
+        client, entry.table, entry.displayName, entry.description, idx, entry.filter, entry.orderBy,
+      )),
+    );
+
+    return results.filter((r): r is NonNullable<typeof r> => r != null);
+  }
+
+  /**
+   * Same row-fetch/shape as one entry of getSmLookupTables above, factored
+   * out so a caller with just a table name (the calculator popup's "eye"
+   * button — see getSmLookupTableByName below) can reuse the identical
+   * payload shape the group/route-scoped admin dialog already renders,
+   * rather than a second, differently-shaped response the frontend would
+   * need its own rendering path for.
+   */
+  private async buildLiveSmLookupTablePayload(
+    client: ReturnType<SupabaseService['getClient']>,
+    table: string,
+    displayName: string,
+    description: string,
+    idx: number,
+    filter?: { column: string; values: string[] },
+    orderBy?: string,
+  ): Promise<any | null> {
+    let query = client.from(table).select('*');
+    if (filter) query = query.in(filter.column, filter.values);
+    if (orderBy) {
+      for (const col of orderBy.split(',')) query = query.order(col, { ascending: true });
+    }
+    const { data, error } = await query;
+    if (error) {
+      this.logger.warn(`sm-lookup-bridge: failed to read ${table}: ${error.message}`, 'ProcessesService');
+      return null;
+    }
+
+    const rows = data ?? [];
+    const excludedCols = new Set(['id', 'created_at', 'updated_at']);
+    const sampleRow = rows[0] ?? {};
+    const columnDefinitions = Object.keys(sampleRow)
+      .filter((c) => !excludedCols.has(c))
+      .map((c) => ({
+        name: c,
+        type: typeof sampleRow[c] === 'number' ? 'number' : 'text',
+        label: this.inferColumnLabel(c),
+      }));
+
+    return {
+      id: `live:${table}`,
+      processId: '',
+      tableName: displayName,
+      tableDescription: description,
+      columnDefinitions,
+      displayOrder: idx,
+      // Editable — see updateSmLookupRow(). Row/table deletion and adding
+      // new rows are intentionally NOT exposed for these (unlike custom
+      // reference tables): this is real, live cost-engine input data, so
+      // edits go through a scoped, allowlisted, per-row UPDATE, never a
+      // delete-and-reinsert of the whole table.
+      isEditable: true,
+      createdAt: '',
+      updatedAt: '',
+      rows: rows.map((r: any, rowIdx: number) => ({
+        // Real primary key — required so updateSmLookupRow can target the
+        // exact row. Stringified since TableRow.id is typed as string but
+        // sm_lookup_* tables use SERIAL (numeric) ids.
+        id: String(r.id),
+        tableId: `live:${table}`,
+        rowData: r,
+        rowOrder: rowIdx,
+        createdAt: '',
+        updatedAt: '',
+      })),
+    };
+  }
+
+  /**
+   * Fetch one sm_lookup_* table directly by name — used by the calculator
+   * popup's "eye" button (any field with dataSource='sheet_metal_lookup', or
+   * the handful of ad-hoc-JS-resolved fields like Laser Cutting's 'Cutting
+   * Speed') to show the real table a lookup-backed input's value came from,
+   * without needing to know which process group/route it's bridged under.
+   * Same allowlist as updateSmLookupRow — `table` must be a real, registered
+   * sm_lookup_* table, never an arbitrary name from the request.
+   */
+  async getSmLookupTableByName(table: string, accessToken: string): Promise<any> {
+    if (!getAllSmLookupTableNames().has(table)) {
+      throw new BadRequestException(`"${table}" is not a recognized cost-engine lookup table`);
+    }
+    const client = this.supabaseService.getClient(accessToken);
+    const payload = await this.buildLiveSmLookupTablePayload(client, table, table, `Live ${table} data`, 0);
+    if (!payload) throw new InternalServerErrorException(`Failed to read ${table}`);
+    return payload;
+  }
+
+  /**
+   * Update one row of a real sm_lookup_* cost-engine table (see
+   * sm-lookup-bridge.config.ts). This writes to the SAME table
+   * SheetMetalLookupService queries for live cost calculations — there is no
+   * separate "draft" copy, so an edit here takes effect on the next quote
+   * that resolves this row. Two allowlists keep this from becoming an
+   * arbitrary-SQL endpoint: `table` must be one of the tables actually
+   * registered in SM_LOOKUP_BRIDGE (never an arbitrary table name from the
+   * request), and every key in `updates` must be a real column already
+   * present on the row being updated, excluding id/created_at/updated_at.
+   */
+  async updateSmLookupRow(
+    table: string,
+    rowId: string,
+    updates: Record<string, unknown>,
+    accessToken: string,
+  ): Promise<any> {
+    if (!getAllSmLookupTableNames().has(table)) {
+      throw new BadRequestException(`"${table}" is not a recognized cost-engine lookup table`);
+    }
+
+    const client = this.supabaseService.getClient(accessToken);
+
+    const { data: existingRow, error: fetchError } = await client
+      .from(table)
+      .select('*')
+      .eq('id', rowId)
+      .single();
+
+    if (fetchError || !existingRow) {
+      throw new NotFoundException(`Row ${rowId} not found in ${table}`);
+    }
+
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (SM_LOOKUP_READONLY_COLUMNS.has(key)) continue;
+      if (!(key in existingRow)) {
+        throw new BadRequestException(`"${key}" is not a real column on ${table}`);
+      }
+      // Coerce to the same JS type the existing value already has, so a
+      // numeric lookup column can never silently become a string.
+      sanitized[key] = typeof existingRow[key] === 'number' ? Number(value) : value;
+    }
+
+    if (Object.keys(sanitized).length === 0) {
+      return { id: String(existingRow.id), tableId: `live:${table}`, rowData: existingRow, rowOrder: 0, createdAt: '', updatedAt: '' };
+    }
+
+    const { data, error } = await client
+      .from(table)
+      .update(sanitized)
+      .eq('id', rowId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      this.logger.error(`Failed to update ${table} row ${rowId}: ${error?.message}`, 'ProcessesService');
+      throw new InternalServerErrorException(`Failed to update row: ${error?.message}`);
+    }
+
+    return { id: String(data.id), tableId: `live:${table}`, rowData: data, rowOrder: 0, createdAt: '', updatedAt: '' };
+  }
 
   async findAll(query: QueryProcessesDto, userId?: string, accessToken?: string): Promise<ProcessListResponseDto> {
     this.logger.log('Fetching all processes', 'ProcessesService');
@@ -250,7 +464,7 @@ export class ProcessesService {
       })
     );
 
-    return tablesWithRows;
+    return tablesWithRows.map((t) => this.mapReferenceTableToResponse(t));
   }
 
   /**
@@ -281,10 +495,10 @@ export class ProcessesService {
 
     if (rowsError) {
       this.logger.error(`Error fetching rows: ${rowsError.message}`, 'ProcessesService');
-      return { ...table, rows: [] };
+      return this.mapReferenceTableToResponse({ ...table, rows: [] });
     }
 
-    return { ...table, rows: rows || [] };
+    return this.mapReferenceTableToResponse({ ...table, rows: rows || [] });
   }
 
   /**

@@ -24,10 +24,26 @@ export interface MachineCandidate {
   capabilityVersion: number | null;
 }
 
+// Structured version of the material/thickness-vs-capacity check — lets the
+// UI render a Material/Thickness/Capacity/Status table instead of parsing a
+// flat "MS 1.5 mm ≤ 12 mm limit" string. materialGrade is the raw grade (e.g.
+// "SECC"), not the classified family used for the limit lookup, so the UI
+// shows what the user actually selected. null when this requirement kind has
+// no single dominant dimensional check (e.g. generic/deburring).
+export interface CapabilityCheck {
+  parameter: string;              // e.g. 'Thickness', 'Tonnage'
+  materialGrade: string | null;
+  value: number;
+  limit: number | null;
+  unit: string;
+  supported: boolean;
+}
+
 export interface MachineRecommendation {
   candidate: MachineCandidate;
   score: number;      // 0-1 composite for the profile
   reasons: string[];  // human-readable "why this machine"
+  capabilityCheck?: CapabilityCheck | null;
 }
 
 export interface MachineSelectionResult {

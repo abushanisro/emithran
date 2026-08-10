@@ -31,6 +31,7 @@ import {
 } from './seed-registry';
 import {
   type AvailabilityStatus,
+  type CapabilityCheck,
   type MachineCandidate,
   type MachineRecommendation,
   type MachineSelectionResult,
@@ -112,11 +113,18 @@ function num(v: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// fully_burdened_local_per_hr is machine + labour combined (mhr.service.ts's
+// calculateMHR: fullyBurdenedLocalPerHr = totalMachineHourRate + lhrPerHr) — never
+// use it here. This rate becomes MachineCandidate.hourlyRate, which feeds
+// aprioriTerms' mhrPerHr in cost-engine.ts, and that formula ALWAYS separately adds
+// its own direct-labour term (dlrPerHr × cycleNDL × cycleTimeMin). Preferring the
+// burdened figure double-counts labour: once inside the "machine" rate, once again
+// as its own line item. total_machine_hour_rate / manual_mhr_value are pure machine
+// cost — the only values this function may return.
 function pickRate(row: RawMachineRow): number {
-  const fb = num(row.fully_burdened_local_per_hr) ?? 0;
   const mhr = num(row.total_machine_hour_rate) ?? 0;
   const man = num(row.manual_mhr_value) ?? 0;
-  return fb > 0 ? fb : mhr > 0 ? mhr : man;
+  return mhr > 0 ? mhr : man;
 }
 
 const ALL_CLASSES_SET = new Set<string>(ALL_CLASSES);
@@ -252,6 +260,22 @@ function hydrateCapability(row: RawMachineRow, cls: MachineClass): {
     }
   }
 
+  // Laser power is deliberately NOT parsed from the machine name here (unlike
+  // press_brake/turret_punch's tonnage-from-name fallback above). A name like
+  // "Salvagnini L3-30 2KW Fiber" states its real power plainly, and it WOULD
+  // parse correctly — but "correctly parseable this time" isn't the same
+  // guarantee a real, verified mhr_records.power_kw value carries, and this
+  // exact regex previously also silently mislabeled a bare guess as
+  // capability_source='seed' (implying real provenance it didn't have).
+  // When power_kw genuinely isn't on file for a real laser, the caller must
+  // see that as a real gap (MISSING_MACHINE_DATA) and resolve it with a
+  // verified capability record, never a number lifted from a string at
+  // calculation time. The regex this used to run (name.match(/(\d+...)\s*
+  // k\s*w\b/i)) is deliberately not defined here anymore — if a one-time
+  // migration/backfill script ever needs it to help IDENTIFY candidate
+  // values for a human to verify against real OEM specs, write it there,
+  // not as a live resolution path in this file.
+
   return {
     capability: { ...EMPTY_CAPABILITY, ...MACHINE_CLASS_DEFAULTS[cls] },
     source: 'default_class',
@@ -353,6 +377,10 @@ export function isCapable(candidate: MachineCandidate, req: MachineRequirement):
       if (cap.maxThicknessMm != null && cap.maxThicknessMm < req.thicknessMm) return false;
       return true;
     }
+    case 'hole_forming': {
+      if (cap.maxTonnage != null && cap.maxTonnage < req.tonnage * TONNAGE_MARGIN) return false;
+      return true;
+    }
     case 'laser': {
       const limit = laserThicknessLimit(cap, req);
       if (limit != null && limit < req.thicknessMm) return false;
@@ -416,6 +444,11 @@ export function fitScore(candidate: MachineCandidate, req: MachineRequirement): 
       const l = ratio(req.bendLengthMm * BED_MARGIN, cap.maxLengthMm);
       if (t != null) parts.push(t);
       if (l != null) parts.push(l);
+      break;
+    }
+    case 'hole_forming': {
+      const t = ratio(req.tonnage * TONNAGE_MARGIN, cap.maxTonnage);
+      if (t != null) parts.push(t);
       break;
     }
     case 'laser': {
@@ -494,9 +527,14 @@ function buildReasons(candidate: MachineCandidate, req: MachineRequirement): str
         (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
       if (cap.maxLengthMm != null) reasons.push(`Bend ${r0(req.bendLengthMm)} mm ≤ ${r0(cap.maxLengthMm)} mm bed`);
       break;
+    case 'hole_forming':
+      reasons.push(`Requires ${r0(req.tonnage * TONNAGE_MARGIN)} t (incl. 15% margin) for Ø${r0(req.holeDiameterMm)} mm hole extrusion` +
+        (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
+      break;
     case 'laser': {
-      const limit = laserThicknessLimit(cap, req);
-      if (limit != null) reasons.push(`${req.materialFamily} ${r0(req.thicknessMm)} mm ≤ ${r0(limit)} mm limit`);
+      // Material/thickness-vs-capacity is surfaced structurally via
+      // buildCapabilityCheck() below (Material/Thickness/Capacity/Status),
+      // not repeated here as flat text.
       if (cap.maxXMm != null && cap.maxYMm != null) {
         reasons.push(`Part ${r0(req.bedLengthMm)}×${r0(req.bedWidthMm)} mm fits ${r0(cap.maxXMm)}×${r0(cap.maxYMm)} mm bed`);
       }
@@ -542,6 +580,47 @@ function buildReasons(candidate: MachineCandidate, req: MachineRequirement): str
   return reasons;
 }
 
+// Structured material/thickness-vs-capacity check for the UI (Material/
+// Thickness/Machine Capacity/Status), replacing the flat "MS 1.5 mm ≤ 12 mm
+// limit" text for the one requirement kind where a single dominant
+// material-dependent dimensional check exists. Other kinds return null —
+// extend here if the same structured view is wanted for tonnage/diameter/etc.
+function buildCapabilityCheck(candidate: MachineCandidate, req: MachineRequirement): CapabilityCheck | null {
+  if (req.kind !== 'laser') return null;
+  const limit = laserThicknessLimit(candidate.capability, req);
+  return {
+    parameter: 'Thickness',
+    materialGrade: req.materialGrade,
+    value: req.thicknessMm,
+    limit,
+    unit: 'mm',
+    supported: limit == null || limit >= req.thicknessMm,
+  };
+}
+
+// Explain one SPECIFIC machine (by ID) against a requirement, independent of
+// whether it's currently top-ranked. Needed because a saved process row's
+// machine can drift out of "balanced/cheapest/fastest" over time (utilization/
+// cost scores shift) without the saved pick itself becoming invalid — showing
+// nothing (or worse, another candidate's reasoning) under that row would be
+// either unhelpful or actively misleading. Searches the FULL class pool, not
+// just eligible candidates, so a since-changed-out-of-spec machine still gets
+// an honest (flagged) explanation rather than silently vanishing.
+export function explainCandidate(
+  pool: MachineCandidate[],
+  machineClass: MachineClass,
+  requirement: MachineRequirement,
+  machineId: string,
+): { candidate: MachineCandidate; reasons: string[]; capabilityCheck: CapabilityCheck | null } | null {
+  const candidate = pool.find((c) => c.machineClass === machineClass && c.machineId === machineId);
+  if (!candidate) return null;
+  const reasons = buildReasons(candidate, requirement);
+  if (!isCapable(candidate, requirement)) {
+    reasons.unshift('⚠ Outside computed capability for this part — verify feasibility');
+  }
+  return { candidate, reasons, capabilityCheck: buildCapabilityCheck(candidate, requirement) };
+}
+
 // ── Selection ─────────────────────────────────────────────────────────────────
 
 interface ProfileWeights { fit: number; util: number; cost: number; avail: number }
@@ -552,13 +631,17 @@ const PROFILES: Record<'balanced' | 'cheapest' | 'fastest', ProfileWeights> = {
   fastest:  { fit: 0.2, util: 0.5, cost: 0.2, avail: 0.1 },
 };
 
-function makeDefaultCandidate(_location: string, cls: MachineClass): MachineCandidate {
+function makeDefaultCandidate(_location: string, cls: MachineClass, fallbackRate = 0): MachineCandidate {
   return {
     machineId: null,
     machineName: null,
     commodityCode: null,
     machineClass: cls,
-    hourlyRate: 0, // no hardcoded fallback — rate: 0 triggers 'no_db_rate' in cost engine
+    // fallbackRate is the real location benchmark rate when the caller has one on
+    // file for this class; 0 only when truly nothing is known (no machine, no
+    // benchmark) — that 0 is what triggers 'no_db_rate' in the cost engine, so it
+    // must stay a genuine zero rather than a value standing in for "unknown".
+    hourlyRate: fallbackRate,
     utilizationPct: 75,
     scheduledLoadPct: null,
     availabilityStatus: 'available',
@@ -578,6 +661,11 @@ export interface SelectMachineInput {
   requirement: MachineRequirement;
   overrideMachineId?: string | null; // user override — short-circuits scoring
   now?: Date;
+  // Location benchmark rate (mhr_benchmark_rates) for this machineClass, if the
+  // caller has one — used ONLY when no capable machine exists in the DB pool, so
+  // the "no machine on file" fallback prices at a real benchmark rate instead of
+  // a hardcoded $0 that then gets displayed/labeled as if it were priced.
+  fallbackRate?: number;
 }
 
 export function selectMachine(input: SelectMachineInput): MachineSelectionResult {
@@ -587,17 +675,24 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
   const classPool = pool.filter((c) => c.machineClass === machineClass);
   const eligible = classPool.filter((c) => isCapable(c, requirement));
 
-  // No capable machine — fall through to location class-default rate
+  // No capable machine — fall through to the location benchmark rate when one is
+  // on file; otherwise the cost is genuinely $0, and the reason must say so rather
+  // than claim a "class default rate" that doesn't exist.
   if (eligible.length === 0 && !input.overrideMachineId) {
-    const fallback = makeDefaultCandidate(location, machineClass);
+    const fallbackRate = input.fallbackRate ?? 0;
+    const fallback = makeDefaultCandidate(location, machineClass, fallbackRate);
+    const noneOfClass = classPool.length === 0;
+    const reason = fallbackRate > 0
+      ? (noneOfClass
+        ? 'No machine of this class in DB — using location benchmark rate'
+        : 'No capable machine in DB — using location benchmark rate')
+      : (noneOfClass
+        ? 'No machine of this class in DB and no benchmark rate on file — cost is $0; add an MHR record'
+        : 'No capable machine in DB and no benchmark rate on file — cost is $0; add an MHR record');
     const rec: MachineRecommendation = {
       candidate: fallback,
       score: 0.4,
-      reasons: [
-        classPool.length === 0
-          ? 'No machine of this class in DB — using class default rate'
-          : 'No capable machine in DB — using class default rate',
-      ],
+      reasons: [reason],
     };
     return {
       balanced: rec, cheapest: rec, fastest: rec,
@@ -633,6 +728,7 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
     candidate: s.candidate,
     score: Math.round((s.fit * weights.fit + s.util * weights.util + s.cost * weights.cost + s.avail * weights.avail) * 1000) / 1000,
     reasons: buildReasons(s.candidate, requirement),
+    capabilityCheck: buildCapabilityCheck(s.candidate, requirement),
   });
 
   // User override: force the pick, even outside the capability filter (their judgment)
@@ -643,6 +739,14 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
   const fastestRanked = rank(PROFILES.fastest);
 
   if (input.overrideMachineId) {
+    // classPool is already scoped to machineClass === machineClass — the
+    // whole-pool fallback below exists so an override ID always resolves to
+    // SOMETHING (never silently drops the override), but it means the found
+    // machine can be from a completely different class (e.g. a 'cleaning'
+    // ultrasonic tank overridden onto a 'deburring' line) — confirmed live
+    // this session. That must never pass through silently: it's flagged
+    // below exactly like the existing capability-mismatch warning, not
+    // treated as an equally-valid pick just because an ID matched.
     const forced = classPool.find((c) => c.machineId === input.overrideMachineId)
       ?? pool.find((c) => c.machineId === input.overrideMachineId);
     if (forced) {
@@ -652,7 +756,14 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
         candidate: forced,
         score: Math.round(fit * 1000) / 1000,
         reasons: ['Manually selected by cost engineer', ...buildReasons(forced, requirement)],
+        capabilityCheck: buildCapabilityCheck(forced, requirement),
       };
+      if (forced.machineClass !== machineClass) {
+        balancedRec.reasons.unshift(
+          `⚠ Manually overridden with a machine from a different class ('${forced.machineClass}', ` +
+          `not '${machineClass}') — verify this is intentional before quoting`,
+        );
+      }
       if (!isCapable(forced, requirement)) {
         balancedRec.reasons.unshift('⚠ Outside computed capability for this part — verify feasibility');
       }

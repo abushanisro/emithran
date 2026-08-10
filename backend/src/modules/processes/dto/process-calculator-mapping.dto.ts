@@ -105,6 +105,9 @@ export class ProcessCalculatorMappingResponseDto {
   @ApiPropertyOptional()
   machineClass?: string;
 
+  @ApiPropertyOptional({ description: 'Real lhr_records/lhr_benchmark_rates process_group this machine class is billed against; undefined means the same as processGroup (migration 424).' })
+  lhrProcessGroup?: string;
+
   @ApiPropertyOptional()
   calculatorId?: string;
 
@@ -130,6 +133,7 @@ export class ProcessCalculatorMappingResponseDto {
       processRoute: row.process_route,
       operation: row.operation,
       machineClass: row.machine_class ?? undefined,
+      lhrProcessGroup: row.lhr_process_group ?? undefined,
       calculatorId: row.calculator_id,
       calculatorName: row.calculator_name,
       isActive: row.is_active,

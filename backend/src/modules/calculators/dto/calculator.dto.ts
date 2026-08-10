@@ -416,7 +416,7 @@ export class QueryCalculatorDto {
  * DTO for sheet metal parameterized lookup table queries
  */
 export class SheetMetalLookupDto {
-  @ApiProperty({ description: 'Table name: stroke_rate | handling_time | tool_setup | manual_stroke | laser_cut | sampling_plan' })
+  @ApiProperty({ description: 'Table name: stroke_rate | handling_time | tool_setup | manual_stroke | laser_cut | waterjet_cut | sampling_plan' })
   @IsString()
   tableName: string;
 

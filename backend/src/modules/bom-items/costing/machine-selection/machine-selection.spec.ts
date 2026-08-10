@@ -4,7 +4,6 @@ import {
   latheRequirement,
   pressBrakeRequirement,
   vmcRequirement,
-  MATERIAL_K,
 } from './physics';
 import { classifyMachineRecord, fitScore, isCapable, selectMachine } from './selector';
 import type { MachineCandidate } from '../../dto/machine-selection.dto';
@@ -49,23 +48,31 @@ describe('physics', () => {
     expect(classifyLaserMaterial(null)).toBe('OTHER');
   });
 
+  // pressBrakeRequirement takes a plain resolved utsMpa (no grade string, no
+  // lookup table) — physics.ts does no material classification of its own;
+  // the real per-part UTS is resolved once from raw_materials by
+  // BOMItemsService.resolveMaterialForFamily and passed in as a number. These
+  // values are the same real per-grade UTS default-rates.ts's MATERIAL_UTS_MPA
+  // table uses as ITS OWN documented last-resort fallback (E250=410, SS304=620,
+  // AL6061=310 MPa) — chosen here to keep this test meaningful, not because
+  // physics.ts knows about grades at all.
   it('computes air-bend tonnage near chart values (3mm MS, 1m bend ≈ 22t)', () => {
-    const req = pressBrakeRequirement({ bendLengthMm: 1000, thicknessMm: 3, materialK: MATERIAL_K.MS });
+    const req = pressBrakeRequirement({ bendLengthMm: 1000, thicknessMm: 3, utsMpa: 410 });
     expect(req.tonnage).toBeGreaterThan(18);
     expect(req.tonnage).toBeLessThan(26);
   });
 
-  it('scales tonnage with material K (SS > MS > AL)', () => {
+  it('scales tonnage with real per-grade UTS (SS304 > E250 > AL6061)', () => {
     const base = { bendLengthMm: 1000, thicknessMm: 3 };
-    const ms = pressBrakeRequirement({ ...base, materialK: MATERIAL_K.MS }).tonnage;
-    const ss = pressBrakeRequirement({ ...base, materialK: MATERIAL_K.SS }).tonnage;
-    const al = pressBrakeRequirement({ ...base, materialK: MATERIAL_K.AL }).tonnage;
+    const ms = pressBrakeRequirement({ ...base, utsMpa: 410 }).tonnage;
+    const ss = pressBrakeRequirement({ ...base, utsMpa: 620 }).tonnage;
+    const al = pressBrakeRequirement({ ...base, utsMpa: 310 }).tonnage;
     expect(ss).toBeGreaterThan(ms);
     expect(al).toBeLessThan(ms);
   });
 
   it('returns zero tonnage for zero thickness instead of dividing by zero', () => {
-    const req = pressBrakeRequirement({ bendLengthMm: 1000, thicknessMm: 0, materialK: 1.42 });
+    const req = pressBrakeRequirement({ bendLengthMm: 1000, thicknessMm: 0, utsMpa: 410 });
     expect(req.tonnage).toBe(0);
   });
 
@@ -133,7 +140,7 @@ describe('classifyMachineRecord', () => {
 
 describe('isCapable', () => {
   it('rejects a press brake with insufficient tonnage', () => {
-    const req = pressBrakeRequirement({ bendLengthMm: 2000, thicknessMm: 6, materialK: MATERIAL_K.MS });
+    const req = pressBrakeRequirement({ bendLengthMm: 2000, thicknessMm: 6, utsMpa: 410 });
     const small = candidate({ machineClass: 'press_brake', hourlyRate: 4, capability: { maxTonnage: 40, maxLengthMm: 2050, maxThicknessMm: 4 } });
     const big = candidate({ machineClass: 'press_brake', hourlyRate: 600, capability: { maxTonnage: 160, maxLengthMm: 3200, maxThicknessMm: 12 } });
     expect(isCapable(small, req)).toBe(false);
@@ -220,17 +227,27 @@ describe('selectMachine', () => {
       machineClass: 'press_brake', hourlyRate: 4,
       capability: { maxTonnage: 5, maxLengthMm: 500, maxThicknessMm: 1 },
     });
+    // This is a pure unit test of selectMachine() in isolation — no DB, no
+    // bom-items.service.ts — so fallbackRate can only be an arbitrary
+    // fixture value here, NOT a real benchmark rate (that's real in
+    // production: bom-items.service.ts resolves it from the actual median
+    // of DB machine hourly rates for this class/location — see
+    // benchmarkMap at bom-items.service.ts:1533). This test's only job is
+    // to verify selectMachine correctly threads whatever fallbackRate it's
+    // given onto the synthetic default-class candidate when nothing pooled
+    // is capable — the exact number is arbitrary and asserted right below.
+    const arbitraryTestFallbackRate = 600;
     const result = selectMachine({
       pool: [tiny],
       location,
       machineClass: 'press_brake',
-      requirement: pressBrakeRequirement({ bendLengthMm: 2000, thicknessMm: 6, materialK: MATERIAL_K.MS }),
+      requirement: pressBrakeRequirement({ bendLengthMm: 2000, thicknessMm: 6, utsMpa: 410 }),
+      fallbackRate: arbitraryTestFallbackRate,
     });
     expect(result.balanced.candidate.machineId).toBeNull();
     expect(result.balanced.candidate.capabilitySource).toBe('default_class');
     expect(result.confidence).toBe(40);
-    // India press brake default rate
-    expect(result.balanced.candidate.hourlyRate).toBe(600);
+    expect(result.balanced.candidate.hourlyRate).toBe(arbitraryTestFallbackRate);
   });
 
   it('cheapest profile picks the lowest-rate capable machine', () => {

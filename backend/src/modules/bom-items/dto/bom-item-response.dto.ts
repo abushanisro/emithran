@@ -87,6 +87,9 @@ export class BOMItemResponseDto {
   @ApiPropertyOptional({ example: 'sheet_metal', description: 'User-set manufacturing family override; null means auto-detect' })
   manufacturingFamilyOverride?: string;
 
+  @ApiPropertyOptional({ example: { sheetThicknessMm: 2 }, description: 'Generic Cost Guide manual-override bag, keyed by scenario input name — see costing/scenario-overrides.ts' })
+  scenarioOverrides?: Record<string, unknown>;
+
   @ApiPropertyOptional({ example: 'drawing' })
   materialSource?: string;
 
@@ -190,6 +193,7 @@ export class BOMItemResponseDto {
     dto.fileDxfPath = row.file_dxf_path || undefined;
     dto.thumbnailUrl = row.thumbnail_url || undefined;
     dto.manufacturingFamilyOverride = row.manufacturing_family_override || undefined;
+    dto.scenarioOverrides = (row.scenario_overrides && typeof row.scenario_overrides === 'object') ? row.scenario_overrides : undefined;
     dto.materialSource     = row.material_source ?? undefined;
     dto.materialConfidence = row.material_confidence !== null && row.material_confidence !== undefined ? Number(row.material_confidence) : undefined;
     dto.sheetThicknessMm   = row.sheet_thickness_mm    !== null && row.sheet_thickness_mm    !== undefined ? Number(row.sheet_thickness_mm)    : undefined;

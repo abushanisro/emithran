@@ -79,6 +79,11 @@ export class CreateProcessCostDto {
   @IsString()
   operation?: string;
 
+  @ApiPropertyOptional({ description: 'Digital Factory location this process was configured for (India, USA, China, ...) — lets Edit Process Cost re-scope its MHR/LHR dropdowns to the right location on reopen', example: 'USA' })
+  @IsOptional()
+  @IsString()
+  location?: string;
+
   // Resource References
   @ApiPropertyOptional({ description: 'Machine Hour Record ID', example: 'uuid' })
   @IsOptional()
@@ -295,6 +300,11 @@ export class UpdateProcessCostDto {
   @IsOptional()
   @IsString()
   operation?: string;
+
+  @ApiPropertyOptional({ description: 'Digital Factory location this process was configured for (India, USA, China, ...) — lets Edit Process Cost re-scope its MHR/LHR dropdowns to the right location on reopen', example: 'USA' })
+  @IsOptional()
+  @IsString()
+  location?: string;
 
   // Resource References
   @ApiPropertyOptional({ description: 'Machine Hour Record ID', example: 'uuid' })

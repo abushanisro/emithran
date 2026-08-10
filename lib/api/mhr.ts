@@ -90,6 +90,17 @@ export type MHRRecord = {
   specs?: Record<string, any>;
   directOverheadRate?: number;
   indirectOverheadRate?: number;
+  // Real machine capability (mhr_records.max_tonnage/power_kw) — used to
+  // auto-fill a calculator's "Selected Tonnage"/"Laser Machine Power" from
+  // the actual selected machine, never inferred from its name string. Not
+  // to be confused with powerKwhPerHour above (electricity consumption).
+  maxTonnage?: number;
+  powerKw?: number;
+  // 'imported' = verified nameplate/OEM record; 'seed' = real, sourced, but
+  // NOT this specific unit's own verified reading (e.g. a documented
+  // typical model config used as a disclosed estimate — migration 459).
+  // Never render maxTonnage/powerKw as "Verified" when this is 'seed'.
+  capabilitySource?: string;
   calculations: MHRCalculationResult;
   createdAt: string;
   updatedAt: string;
@@ -100,7 +111,11 @@ export type MHRRecord = {
 // non-USA-location machine's local-currency rate isn't misread as a USD
 // number. Shared by every UI that lists real MHR records for picking.
 export function resolveMhrUsdRate(r: MHRRecord): number {
-  return r.mhrUsdPerHour ?? r.fullyBurdenedLocalPerHr ?? r.calculations?.totalMachineHourRate ?? r.manualMHRValue ?? 0;
+  // fullyBurdenedLocalPerHr is machine + labour combined (see mhr.service.ts's
+  // calculateMHR) — deliberately excluded here. This rate ends up as the "machine"
+  // side of a formula (ProcessCostDialog, cost-engine.ts) that always separately adds
+  // its own labour term; substituting the burdened figure would double-count labour.
+  return r.mhrUsdPerHour ?? r.calculations?.totalMachineHourRate ?? r.manualMHRValue ?? 0;
 }
 
 export type CreateMHRData = {
@@ -188,7 +203,10 @@ export const mhrApi = {
     const params = new URLSearchParams();
     if (query?.search) params.append('search', query.search);
     if (query?.location) params.append('location', query.location);
+    if (query?.currency) params.append('currency', query.currency);
     if (query?.commodityCode) params.append('commodityCode', query.commodityCode);
+    if (query?.processGroup) params.append('processGroup', query.processGroup);
+    if (query?.machineClass) params.append('machineClass', query.machineClass);
     if (query?.page) params.append('page', query.page.toString());
     if (query?.limit) params.append('limit', query.limit.toString());
 

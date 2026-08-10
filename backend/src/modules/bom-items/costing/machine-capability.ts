@@ -4,7 +4,7 @@
 // override these benchmark defaults without a code deployment.
 
 import type { MachineClass } from "./default-rates";
-import { estimateBendTonnage } from "./default-rates";
+import { estimateBendTonnage, estimateTurretPunchTonnage } from "./default-rates";
 
 export interface MachineCapabilitySpec {
   maxThicknessMm?: number;
@@ -29,8 +29,11 @@ export const MACHINE_CAPABILITY_REGISTRY: Readonly<
   "SM-BRAKE-80T":  { machineClass: "press_brake", spec: { maxThicknessMm: 8,  maxBedLengthMm: 2500, maxTonnage: 80  } },
   "SM-BRAKE-160T": { machineClass: "press_brake", spec: { maxThicknessMm: 12, maxBedLengthMm: 3200, maxTonnage: 160 } },
   "SM-BRAKE-320T": { machineClass: "press_brake", spec: { maxThicknessMm: 20, maxBedLengthMm: 4000, maxTonnage: 320 } },
-  // Turret Punch
-  "SM-PUNCH-CNC": { machineClass: "turret_punch", spec: { maxThicknessMm: 6, maxBedLengthMm: 2500, maxBedWidthMm: 1250 } },
+  // Turret Punch — 30t is a representative job-shop CNC turret punch class,
+  // cited from real machine specs researched this session (Amada Pega 357,
+  // Amada EMK-3612 M2, Murata Centrum 2000/Magnum 1250 — all real 20-33 ton
+  // job-shop turret presses; see migration 414's own citations).
+  "SM-PUNCH-CNC": { machineClass: "turret_punch", spec: { maxThicknessMm: 6, maxBedLengthMm: 2500, maxBedWidthMm: 1250, maxTonnage: 30 } },
   // Waterjet — effectively unconstrained for sheet metal range
   "SM-WATERJET":  { machineClass: "waterjet", spec: { maxThicknessMm: 100, maxBedLengthMm: 6000, maxBedWidthMm: 3000 } },
   // Tapping + Deburring — no dimensional constraints
@@ -46,6 +49,12 @@ export interface PartGeometryForCapability {
   // the longest bend line; the longest flat-pattern edge is a conservative proxy.
   bendLengthMm?: number | null;
   materialUtsMpa?: number | null;
+  // Turret-punch force inputs (optional — tonnage skipped when absent).
+  // punchCutLengthMm is the same real cut/contour length the turret engine's
+  // own nibbling calc already uses (turret-punch-engine.ts) — the "Length Of
+  // Cut (Internal & External)" input to the real TPP Manufacturing formula.
+  punchCutLengthMm?: number | null;
+  materialShearStrengthMpa?: number | null;
 }
 
 export type CapabilityReasonCode =
@@ -82,12 +91,21 @@ export function checkMachineCapability(
   geometry: PartGeometryForCapability,
 ): CapabilityCheck {
   // Bend tonnage — air-bending physics (1.42 × UTS × t² × L / V), press brake only
-  const estimatedTonnage =
+  const bendTonnage =
     machineClass === "press_brake" &&
     geometry.materialUtsMpa != null &&
     geometry.bendLengthMm != null
       ? estimateBendTonnage(geometry.materialUtsMpa, geometry.sheetThicknessMm, geometry.bendLengthMm)
       : null;
+  // Turret punch tonnage — real TPP Manufacturing formula (see
+  // estimateTurretPunchTonnage's own doc comment), turret punch only.
+  const turretTonnage =
+    machineClass === "turret_punch" &&
+    geometry.materialShearStrengthMpa != null &&
+    geometry.punchCutLengthMm != null
+      ? estimateTurretPunchTonnage(geometry.materialShearStrengthMpa, geometry.sheetThicknessMm, geometry.punchCutLengthMm)
+      : null;
+  const estimatedTonnage = bendTonnage ?? turretTonnage;
 
   // NULL dimensions — assume capable, low confidence
   if (geometry.flatPatternLengthMm == null || geometry.flatPatternWidthMm == null) {
@@ -149,9 +167,10 @@ export function checkMachineCapability(
     failures.push({ code: "BED_WIDTH_EXCEEDED", message: `Part width ${geometry.flatPatternWidthMm}mm exceeds machine bed (${spec.maxBedWidthMm}mm)` });
   }
   if (estimatedTonnage != null && spec.maxTonnage != null && estimatedTonnage > spec.maxTonnage) {
+    const forceLabel = machineClass === "turret_punch" ? "Estimated punch force" : "Estimated bend force";
     failures.push({
       code: "TONNAGE_EXCEEDED",
-      message: `Estimated bend force ${estimatedTonnage}t exceeds machine capacity (${spec.maxTonnage}t)`,
+      message: `${forceLabel} ${estimatedTonnage}t exceeds machine capacity (${spec.maxTonnage}t)`,
     });
   }
 

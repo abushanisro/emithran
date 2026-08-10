@@ -76,6 +76,17 @@ function makeSupabaseStub(script: {
 
 const fakeLogger = { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() } as any;
 
+// Test DTOs never set `location`, so getCurrencyForLocation('') always resolves
+// to USD — real toUsd() would already be a no-op (convertStrict('USD','USD')=1)
+// for every case these tests exercise; this stub mirrors that identity directly.
+const fakeExchangeRateService = {
+  getSnapshot: async () => ({
+    toUsd: (amount: number) => amount,
+    convertStrict: () => 1,
+    convertOptional: () => 1,
+  }),
+} as any;
+
 function baseCreateDto(overrides: Partial<CreateProcessCostDto> = {}): CreateProcessCostDto {
   return {
     processGroup: 'Sheet Metal',
@@ -122,7 +133,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
       const supabase = makeSupabaseStub({
         mhrLookup: { data: { machine_name: 'Fiber Laser 2kW', machine_class: 'fiber_laser' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ mhrId: 'mhr-1' }), 'user-1', 'token');
 
@@ -133,7 +144,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
 
     it('stores null machine_name/machine_class and skips the lookup when no mhrId is given', async () => {
       const supabase = makeSupabaseStub({});
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto(), 'user-1', 'token');
 
@@ -145,7 +156,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
 
     it('throws BadRequestException when mhrId does not resolve to any mhr_records row', async () => {
       const supabase = makeSupabaseStub({ mhrLookup: { data: null, error: null } });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await expect(
         service.create(baseCreateDto({ mhrId: 'missing-mhr' }), 'user-1', 'token'),
@@ -157,7 +168,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
       const supabase = makeSupabaseStub({
         benchmarkLookup: { data: { machine_name: 'Fiber Laser 10kW', machine_class: 'fiber_laser' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ benchmarkMhrId: 42 }), 'user-1', 'token');
 
@@ -182,7 +193,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
       const supabase = makeSupabaseStub({
         benchmarkLookup: { data: { machine_name: 'Fiber Laser 10kW', machine_class: 'fiber_laser' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ benchmarkMhrId: 'bm-mhr-42' }), 'user-1', 'token');
 
@@ -205,7 +216,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
       const supabase = makeSupabaseStub({
         benchmarkLookup: { data: { machine_name: 'Fiber Laser 10kW', machine_class: 'fiber_laser' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ benchmarkMhrId: 'bm-mhr-42' }), 'user-1', 'token');
 
@@ -217,7 +228,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
         mhrLookup: { data: { machine_name: 'Real MHR Machine', machine_class: 'press_brake' }, error: null },
         benchmarkLookup: { data: { machine_name: 'Should Not Be Used', machine_class: 'fiber_laser' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ mhrId: 'mhr-1', benchmarkMhrId: 42 }), 'user-1', 'token');
 
@@ -229,7 +240,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
 
     it('throws BadRequestException when benchmarkMhrId does not resolve to any mhr_benchmark_rates row', async () => {
       const supabase = makeSupabaseStub({ benchmarkLookup: { data: null, error: null } });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await expect(
         service.create(baseCreateDto({ benchmarkMhrId: 999 }), 'user-1', 'token'),
@@ -244,7 +255,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
         existingRecord: { data: existingRow({ mhr_id: 'old-mhr', machine_name: 'Old Machine', machine_class: 'press_brake' }), error: null },
         mhrLookup: { data: { machine_name: 'New Laser', machine_class: 'fiber_laser' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.update('existing-id', { mhrId: 'new-mhr' } as UpdateProcessCostDto, 'user-1', 'token');
 
@@ -257,7 +268,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
       const supabase = makeSupabaseStub({
         existingRecord: { data: existingRow({ mhr_id: 'old-mhr', machine_name: 'Old Machine', machine_class: 'press_brake' }), error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.update('existing-id', { setupTime: 20 } as UpdateProcessCostDto, 'user-1', 'token');
 
@@ -271,7 +282,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
       const supabase = makeSupabaseStub({
         existingRecord: { data: existingRow({ mhr_id: 'old-mhr', machine_name: 'Old Machine', machine_class: 'press_brake' }), error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.update('existing-id', { mhrId: null } as unknown as UpdateProcessCostDto, 'user-1', 'token');
 
@@ -285,7 +296,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
         existingRecord: { data: existingRow(), error: null },
         benchmarkLookup: { data: { machine_name: 'Fiber Laser 10kW', machine_class: 'fiber_laser' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.update('existing-id', { benchmarkMhrId: 42 } as UpdateProcessCostDto, 'user-1', 'token');
 
@@ -299,7 +310,7 @@ describe('ProcessCostService — machine_name/machine_class derivation', () => {
         existingRecord: { data: existingRow({ mhr_id: 'old-mhr' }), error: null },
         mhrLookup: { data: null, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await expect(
         service.update('existing-id', { mhrId: 'missing-mhr' } as UpdateProcessCostDto, 'user-1', 'token'),
@@ -322,7 +333,7 @@ describe('ProcessCostService — labor_type derivation', () => {
       const supabase = makeSupabaseStub({
         lhrLookup: { data: { labour_type: 'Skilled' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ lhrId: 'lhr-1' }), 'user-1', 'token');
 
@@ -332,7 +343,7 @@ describe('ProcessCostService — labor_type derivation', () => {
 
     it('stores null labor_type and skips the lookup when neither lhrId nor benchmarkLhrId is given', async () => {
       const supabase = makeSupabaseStub({});
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto(), 'user-1', 'token');
 
@@ -344,7 +355,7 @@ describe('ProcessCostService — labor_type derivation', () => {
 
     it('throws BadRequestException when lhrId does not resolve to any lhr_records row', async () => {
       const supabase = makeSupabaseStub({ lhrLookup: { data: null, error: null } });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await expect(
         service.create(baseCreateDto({ lhrId: 'missing-lhr' }), 'user-1', 'token'),
@@ -356,7 +367,7 @@ describe('ProcessCostService — labor_type derivation', () => {
       const supabase = makeSupabaseStub({
         benchmarkLhrLookup: { data: { labour_type: 'CNC Machinist' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ benchmarkLhrId: 17 }), 'user-1', 'token');
 
@@ -374,7 +385,7 @@ describe('ProcessCostService — labor_type derivation', () => {
       const supabase = makeSupabaseStub({
         benchmarkLhrLookup: { data: { labour_type: 'CNC Machinist' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ benchmarkLhrId: 'bm-lhr-17' }), 'user-1', 'token');
 
@@ -387,7 +398,7 @@ describe('ProcessCostService — labor_type derivation', () => {
       const supabase = makeSupabaseStub({
         benchmarkLhrLookup: { data: { labour_type: 'CNC Machinist' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ benchmarkLhrId: 'bm-lhr-17' }), 'user-1', 'token');
 
@@ -399,7 +410,7 @@ describe('ProcessCostService — labor_type derivation', () => {
         lhrLookup: { data: { labour_type: 'Skilled' }, error: null },
         benchmarkLhrLookup: { data: { labour_type: 'Should Not Be Used' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.create(baseCreateDto({ lhrId: 'lhr-1', benchmarkLhrId: 17 }), 'user-1', 'token');
 
@@ -410,7 +421,7 @@ describe('ProcessCostService — labor_type derivation', () => {
 
     it('throws BadRequestException when benchmarkLhrId does not resolve to any lhr_benchmark_rates row', async () => {
       const supabase = makeSupabaseStub({ benchmarkLhrLookup: { data: null, error: null } });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await expect(
         service.create(baseCreateDto({ benchmarkLhrId: 999 }), 'user-1', 'token'),
@@ -425,7 +436,7 @@ describe('ProcessCostService — labor_type derivation', () => {
         existingRecord: { data: existingRow({ lhr_id: 'old-lhr', labor_type: 'Semi-Skilled' }), error: null },
         lhrLookup: { data: { labour_type: 'Skilled' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.update('existing-id', { lhrId: 'new-lhr' } as UpdateProcessCostDto, 'user-1', 'token');
 
@@ -437,7 +448,7 @@ describe('ProcessCostService — labor_type derivation', () => {
       const supabase = makeSupabaseStub({
         existingRecord: { data: existingRow({ lhr_id: 'old-lhr', labor_type: 'Semi-Skilled' }), error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.update('existing-id', { setupTime: 20 } as UpdateProcessCostDto, 'user-1', 'token');
 
@@ -452,7 +463,7 @@ describe('ProcessCostService — labor_type derivation', () => {
         existingRecord: { data: existingRow(), error: null },
         benchmarkLhrLookup: { data: { labour_type: 'CNC Machinist' }, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await service.update('existing-id', { benchmarkLhrId: 'bm-lhr-17' } as UpdateProcessCostDto, 'user-1', 'token');
 
@@ -465,7 +476,7 @@ describe('ProcessCostService — labor_type derivation', () => {
         existingRecord: { data: existingRow({ lhr_id: 'old-lhr' }), error: null },
         lhrLookup: { data: null, error: null },
       });
-      const service = new ProcessCostService(supabase as any, fakeLogger);
+      const service = new ProcessCostService(supabase as any, fakeLogger, fakeExchangeRateService);
 
       await expect(
         service.update('existing-id', { lhrId: 'missing-lhr' } as UpdateProcessCostDto, 'user-1', 'token'),

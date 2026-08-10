@@ -43,6 +43,9 @@ export type FeatureCategory =
   | 'flange'  // bent-up edge (distinct from bend) — not yet detected
   | 'hem'     // folded-back edge — not yet detected
   | 'bead'    // stiffening rib — not yet detected
+  | 'cut_profile' // side-wall faces along every real cut boundary (outer perimeter + any cutout, any shape) — detected
+  | 'extruded_flange' // burled/extruded hole collar (coaxial stepped-hole cluster, >=3 members) — detected, geo_v40+
+  | 'thin_web'    // pair of holes with true edge-to-edge gap < 1.5x sheet thickness — detected, geo_v40+
   | 'im_undercut'   // injection molding undercut face (DFM)
   | 'im_undrafted'; // injection molding undrafted face (DFM)
 
@@ -80,6 +83,9 @@ export interface HoleFeature extends ManufacturingFeatureBase {
     count: number;
     depth_mm: number | null;               // null until Phase 2 OCC depth extraction
     through: 'through' | 'blind' | null;   // null until Phase 2
+    // Feature-driven routing subtype — see SheetMetalFeatureExtractorService.buildHoleFeatures.
+    // Defaults to 'through' for legacy feature graphs computed before this field existed.
+    hole_type?: 'through' | 'counterbore' | 'countersink';
   };
 }
 
@@ -89,8 +95,8 @@ export interface BendFeature extends ManufacturingFeatureBase {
   recognition: {
     radius_mm: number | null;       // null = unknown (STL or no OCC bend data)
     count: number;
-    angle_deg: number | null;       // null until Phase 2 extracts from OCC edges
-    bend_length_mm: number | null;  // null until Phase 2
+    angle_deg: number | null;       // real per-radius-group average bend angle; null when cad-engine had no per-bend data
+    bend_length_mm: number | null;  // longest real bend line in this radius group (tonnage-sizing-relevant); null when no per-bend data
   };
 }
 
@@ -100,9 +106,24 @@ export interface FlatPatternFeature extends ManufacturingFeatureBase {
   recognition: {
     area_mm2: number;
     cut_length_mm: number;
+    /** Present only when the cad-engine's panel-wire walk produced a breakdown (STEP topology path). */
+    cut_length_breakdown?: { outer_profile_mm: number; circular_holes_mm: number; internal_profiles_mm: number };
+    /** Longest single unbroken laser path — laser machines slow down on long contours. */
+    longest_continuous_cut_mm?: number;
+    /** Corners by turn angle > 60deg (deceleration-relevant); acute (< 30deg interior) is a SUBSET, not a separate bucket. */
+    sharp_corner_count?: number;
+    acute_corner_count?: number;
+    /** Holes under 2x sheet thickness in diameter — needs a reduced laser/punch feed rate. */
+    small_hole_count?: number;
+    /** Nesting metrics from the true 2D unfold solver — absent when it couldn't confidently walk this part's panel/bend graph. */
+    bounding_rect_mm2?: number;
+    material_utilization_pct?: number;
+    scrap_area_mm2?: number;
     pierce_count: number;
     sheet_thickness_mm: number;
     est_laser_time_sec: number;
+    /** Non-cutting head-repositioning time between pierce points, estimated from real hole/slot pierce locations (nearest-neighbour tour) — additive on top of cutting+piercing time, not part of est_laser_time_sec. Absent when there's no dominant-face reference point to anchor the tour on. */
+    rapid_traverse_sec?: number;
   };
 }
 
@@ -175,7 +196,21 @@ export interface FeatureGraphSummary {
   costDrivers?: CostDriver[];
   holeDiameters?: number[];
   holeGroups?: HoleGroup[];
+  counterboreGroups?: HoleGroup[];
+  countersinkGroups?: HoleGroup[];
   bendRadii?: number[];
+  // Real, CAD-detected — computed in cad-engine/feature_extractors.py,
+  // already flowing through to FlatPatternFeature.recognition but not
+  // previously surfaced here for easy top-level access (see the "Detected"
+  // feature-checklist panel in manufacturing-intelligence/page.tsx).
+  sharpCornerCount?: number;
+  acuteCornerCount?: number;
+  smallHoleCount?: number;
+  // New in cad-engine geo_v38 — see memory_optimizer.py's CACHE_VERSION
+  // changelog for full derivation/disclosed-limitation notes.
+  extrudedFlangeCount?: number;
+  thinWebCount?: number;
+  internalProfileCount?: number;
   // Injection-molded Phase-1 features (present when family = injection_molded)
   wallThicknessNominalMm?: number;
   wallThicknessMinMm?: number;

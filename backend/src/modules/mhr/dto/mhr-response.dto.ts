@@ -207,6 +207,29 @@ export class MHRResponseDto {
   @ApiProperty({ nullable: true }) specs?: Record<string, any>;
   @ApiProperty({ nullable: true }) directOverheadRate?: number;
   @ApiProperty({ nullable: true }) indirectOverheadRate?: number;
+  // Press-brake/machine capacity — already used server-side for machine
+  // selection/capability checks (machine-selection/selector.ts's maxTonnage);
+  // exposed here so the interactive calculator can auto-fill "Selected
+  // Tonnage" from the SAME rated capacity, instead of leaving it manual.
+  @ApiProperty({ nullable: true }) maxTonnage?: number;
+  // Real laser/spindle power (kW) — mhr_records.power_kw, migration 324,
+  // backfilled with verified OEM data for the real laser fleet (migration
+  // 450). Same reasoning as maxTonnage above: exposed here so the
+  // interactive calculator's "Laser Machine Power" field can auto-fill from
+  // this REAL capability instead of ever parsing it out of the machine's
+  // name string. Undefined/null means no verified capability is on file —
+  // callers must treat that as a real gap, never a reason to guess.
+  @ApiProperty({ nullable: true }) powerKw?: number;
+  // mhr_records.capability_source — 'imported' (verified nameplate/OEM
+  // data), 'seed' (real, sourced, but not THIS unit's own verified record —
+  // e.g. a documented typical model config used as a disclosed estimate,
+  // migration 459), or unset. Lets the UI show "Estimated" rather than
+  // "Verified" for powerKw/maxTonnage when it isn't the real thing —
+  // machine-selection/selector.ts already renders this same distinction
+  // server-side ("Capability from model seed data — verify against machine
+  // plate"); this just exposes it to callers outside that pipeline (this
+  // dialog's own direct MHR fetch) too.
+  @ApiProperty({ nullable: true }) capabilitySource?: string;
 
   // Calculated Results
   @ApiProperty()
@@ -272,6 +295,9 @@ export class MHRResponseDto {
       specs: row.specs ?? undefined,
       directOverheadRate: row.direct_overhead_rate ? parseFloat(row.direct_overhead_rate) : undefined,
       indirectOverheadRate: row.indirect_overhead_rate ? parseFloat(row.indirect_overhead_rate) : undefined,
+      maxTonnage: row.max_tonnage ? parseFloat(row.max_tonnage) : undefined,
+      powerKw: row.power_kw ? parseFloat(row.power_kw) : undefined,
+      capabilitySource: row.capability_source ?? undefined,
       calculations: JSON.parse(row.calculations || '{}'),
       createdAt: row.created_at,
       updatedAt: row.updated_at,

@@ -366,6 +366,16 @@ class SheetMetalFeatureExtractor:
         bbox_minmax: absolute bounding box dict with xmin/xmax/ymin/ymax/zmin/zmax keys.
           Required for zone classification and occurrence centroid computation.
         """
+        # Collapse cylindrical faces that are exact duplicates of the same
+        # physical hole (a STEP-export seam split, or a bore fragmented into
+        # several partial arcs by an intersecting feature) before ANY
+        # downstream consumer sees them -- hole counting, occurrence-building,
+        # and cut-length all independently walk raw_cylinders_full, so deduping
+        # only one would just relocate the count-mismatch bug fixed earlier to
+        # a different pair of numbers instead of fixing it everywhere at once.
+        if raw_cylinders_full:
+            raw_cylinders_full = self._dedupe_coincident_cylinders(raw_cylinders_full)
+
         # Sheet thickness + dominant blank face + confidence in one topology pass.
         sheet_thickness, dominant_face, thickness_conf, geom_debug = (
             self._extract_sheet_metal_geometry(shape, bbox_dims)
@@ -380,17 +390,86 @@ class SheetMetalFeatureExtractor:
                 logger.warning(f"[SheetMetal] cylindrical face scan failed: {e}")
                 raw_cylinders = []
 
-        cut_length = 0.0
+        # Every real panel (base + every bent-up wall/flange) — computed once,
+        # shared by cut length and hole classification below so both agree on
+        # the exact same panel set instead of each independently re-deriving
+        # (and inconsistently getting) their own.
+        panels: List[Dict[str, Any]] = []
         try:
-            cut_length = self._compute_cut_length(shape, dominant_face)
+            panels = self._identify_panels(shape, sheet_thickness)
+        except Exception as e:
+            logger.warning(f"[SheetMetal] panel identification failed: {e}")
+
+        # Dominant face's own normal — the correct single reference for bend
+        # classification specifically (see _is_bend_cylinder's docstring for
+        # why "any panel" is wrong there, unlike for holes).
+        dominant_normal: Optional[Tuple[float, float, float]] = None
+        if dominant_face is not None:
+            try:
+                from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+                from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
+                dom_adaptor = BRepAdaptor_Surface(dominant_face)
+                if dom_adaptor.GetType() == GeomAbs_Plane:
+                    dn = dom_adaptor.Plane().Axis().Direction()
+                    dnx, dny, dnz = float(dn.X()), float(dn.Y()), float(dn.Z())
+                    dmag = math.sqrt(dnx * dnx + dny * dny + dnz * dnz) or 1.0
+                    dominant_normal = (dnx / dmag, dny / dmag, dnz / dmag)
+            except Exception as e:
+                logger.warning(f"[SheetMetal] dominant normal extraction failed: {e}")
+
+        cut_length = 0.0
+        cut_length_breakdown = {"outer_profile_mm": 0.0, "circular_holes_mm": 0.0, "internal_profiles_mm": 0.0}
+        longest_continuous_cut_mm = 0.0
+        internal_profile_count = 0
+        try:
+            _cl = self._compute_cut_length(
+                shape, dominant_face, panels, raw_cylinders_full, sheet_thickness, dominant_normal,
+            )
+            cut_length = _cl["total_mm"]
+            cut_length_breakdown = {
+                "outer_profile_mm": round(_cl["outer_profile_mm"], 1),
+                "circular_holes_mm": round(_cl["circular_holes_mm"], 1),
+                "internal_profiles_mm": round(_cl["internal_profiles_mm"], 1),
+            }
+            longest_continuous_cut_mm = round(_cl["longest_continuous_cut_mm"], 1)
+            internal_profile_count = _cl.get("internal_profile_count", 0)
         except Exception as e:
             logger.warning(f"[SheetMetal] cut_length failed: {e}")
 
-        bends: Dict[str, Any] = {"count": 0, "radii": [], "all_radii": []}
+        sharp_corner_count = 0
+        acute_corner_count = 0
         try:
-            if raw_cylinders_full:
+            _corners = self._compute_corner_angles(shape, dominant_face, panels, sheet_thickness)
+            sharp_corner_count = _corners["sharp_count"]
+            acute_corner_count = _corners["acute_count"]
+        except Exception as e:
+            logger.warning(f"[SheetMetal] corner_angles failed: {e}")
+
+        bends: Dict[str, Any] = {"count": 0, "radii": [], "all_radii": []}
+        bend_lengths_mm: List[float] = []
+        bend_angles_deg: List[float] = []
+        dedup_bends_for_count: List[Dict[str, Any]] = []
+        try:
+            # Prefer _collect_dedup_bends: the SAME clustering already trusted for
+            # flat-pattern area / cut length / the 2D unfold solver, so bend_count
+            # here can never silently disagree with those, and (unlike
+            # _count_bends_from_full) it also carries each real bend's own
+            # length/angle -- needed for per-bend press-brake tonnage instead of
+            # the flat-pattern's overall-dimension proxy.
+            if dominant_normal is not None:
+                dedup_bends_for_count = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness)
+            if dedup_bends_for_count:
+                radii_rounded = [round(b["radius"], 1) for b in dedup_bends_for_count]
+                bends = {
+                    "count": len(dedup_bends_for_count),
+                    "radii": sorted(set(radii_rounded)),
+                    "all_radii": sorted(radii_rounded),
+                }
+                bend_lengths_mm = [round(b["axial_length"], 1) for b in dedup_bends_for_count]
+                bend_angles_deg = [round(math.degrees(b["angle_rad"]), 1) for b in dedup_bends_for_count]
+            elif raw_cylinders_full:
                 # Full tuples carry axial patch length → profile-radius filtering possible
-                bends = self._count_bends_from_full(raw_cylinders_full, sheet_thickness)
+                bends = self._count_bends_from_full(raw_cylinders_full, sheet_thickness, dominant_normal)
             else:
                 bends = self._count_bends_from_list(raw_cylinders, sheet_thickness)
         except Exception as e:
@@ -410,6 +489,8 @@ class SheetMetalFeatureExtractor:
                         "count": sharp["count"], "radii": [], "all_radii": [],
                         "angles_deg": sharp["angles"],
                     }
+                    bend_lengths_mm = []
+                    bend_angles_deg = []
                     logger.info(
                         f"[SheetMetal] sharp-corner bend fallback: {sharp['count']} fold(s) "
                         f"detected via dihedral angle (no bend-radius cylinders present)"
@@ -429,15 +510,31 @@ class SheetMetalFeatureExtractor:
                 f"min bbox {min_bbox:.1f}mm ~ thickness {sheet_thickness:.1f}mm (flat blank)"
             )
             bends = {"count": 0, "radii": [], "all_radii": []}
+            bend_lengths_mm = []
+            bend_angles_deg = []
 
         holes: Dict[str, Any] = {"count": 0, "diameters": [], "all_diameters": []}
         try:
             if raw_cylinders_full and bbox_minmax:
-                holes = self._count_holes_with_location(raw_cylinders_full, bbox_minmax)
+                holes = self._count_holes_with_location(raw_cylinders_full, bbox_minmax, panels, sheet_thickness, dominant_normal)
             else:
                 holes = self._count_holes_from_list(raw_cylinders)
         except Exception as e:
             logger.warning(f"[SheetMetal] hole detection failed: {e}")
+
+        # Small-hole count: holes whose diameter is under 2x sheet thickness.
+        # A laser (or punch) must run a reduced feed rate piercing these --
+        # below ~2x thickness, heat buildup relative to hole size and taper/
+        # dross risk both increase, so the machine can't hold full cutting
+        # speed. Reuses the SAME per-hole diameter list (post stepped/burled-
+        # hole clustering) hole_count/hole_groups already report -- not a new
+        # measurement, just a threshold over data already computed above.
+        small_hole_count = 0
+        if sheet_thickness > 0:
+            small_hole_count = sum(
+                1 for d in holes.get("all_diameters", holes.get("diameters", []))
+                if isinstance(d, (int, float)) and d > 0 and d < 2.0 * sheet_thickness
+            )
 
         slots: Dict[str, Any] = {"count": 0}
         try:
@@ -449,11 +546,74 @@ class SheetMetalFeatureExtractor:
         except Exception as e:
             logger.warning(f"[SheetMetal] slot detection failed: {e}")
 
+        # Counterbore / countersink: reuses cnc_feature_recognizer's coaxial-face
+        # detection (proven on CNC parts) — same B-Rep topology pattern applies to
+        # sheet metal. Additive only: does NOT change hole_count/pierce_count/laser
+        # cycle time, which are already validated. Requires real STEP topology
+        # (dominant_face + bbox_minmax) — skipped on the STL mesh-inference fallback,
+        # where coaxial face pairs can't be reliably resolved.
+        counterbores: Dict[str, Any] = {"count": 0, "groups": []}
+        countersinks: Dict[str, Any] = {"count": 0, "groups": []}
+        if dominant_face is not None and bbox_minmax:
+            try:
+                counterbores, countersinks = self._detect_counterbore_countersink(
+                    shape, dominant_face, bbox_minmax,
+                )
+            except Exception as e:
+                logger.warning(f"[SheetMetal] counterbore/countersink detection failed: {e}")
+
+        # Reconcile against counterbore/countersink: both that pass and the
+        # coaxial-cluster heuristic above can independently fire on the same
+        # physical stepped hole. Coarse, part-wide correction only (no per-
+        # hole spatial matching yet — _detect_counterbore_countersink's own
+        # _group() helper doesn't carry centroids to match against) — a
+        # documented, disclosed limitation, not a silent guess.
+        extruded_flange_count = max(
+            0, holes.get("extruded_flange_count", 0) - counterbores["count"] - countersinks["count"],
+        )
+        thin_web_count = holes.get("thin_web_count", 0)
+        # Keep highlight occurrences consistent with the corrected count above
+        # (never claim more real occurrences than the reported number) — the
+        # correction has no per-hole spatial matching (see comment above), so
+        # truncating is the honest choice over guessing WHICH occurrence(s)
+        # the correction actually removed.
+        extruded_flange_occurrences = (holes.get("extruded_flange_occurrences", []) or [])[:extruded_flange_count]
+        thin_web_occurrences = holes.get("thin_web_occurrences", []) or []
+
         pierce_count = holes["count"] + slots["count"] + 1  # +1 = initial pierce
 
-        flat_pattern_area_mm2 = 0.0
+        rapid_traverse_sec: Optional[float] = None
         try:
-            flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
+            rapid_traverse_sec = self._estimate_rapid_traverse_sec(dominant_face, holes, slots, bbox_minmax)
+        except Exception as e:
+            logger.warning(f"[SheetMetal] rapid_traverse estimation failed: {e}")
+
+        flat_pattern_area_mm2 = 0.0
+        flat_pattern_area_method = "dominant_face_only"
+        flat_pattern_bounding_rect: Optional[Dict[str, float]] = None
+        try:
+            if bends["count"] > 0:
+                # Multi-panel unfold -- the dominant face alone would miss
+                # every wall/flange folded up from the base.
+                unfold = self._compute_true_flat_pattern_area(shape, dominant_face, sheet_thickness)
+                if unfold["method"] == "true_unfold":
+                    flat_pattern_area_mm2 = unfold["area_mm2"]
+                    flat_pattern_area_method = f"true_unfold ({unfold['bends_used']}/{unfold['bends_total']} bends, {unfold['panel_count']} panels)"
+                    dedup_bends = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness) if dominant_normal else []
+                    flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, dedup_bends)
+                else:
+                    logger.warning(
+                        "[SheetMetal] true_unfold could not resolve panels "
+                        "(non-manifold or unusual import) -- falling back to dominant-face-only, "
+                        "which will UNDERCOUNT area/weight for this bent part"
+                    )
+                    flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
+            else:
+                # No bends -- the part is flat, so the dominant face IS the
+                # whole blank. The simple method is exact here, not an
+                # approximation.
+                flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
+                flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, [])
         except Exception as e:
             logger.warning(f"[SheetMetal] flat_pattern_area failed: {e}")
 
@@ -471,7 +631,33 @@ class SheetMetalFeatureExtractor:
                     slot_occurrences=slots.get('occurrences', []),
                     adjacent_face_ids=adjacent_face_ids,
                     dominant_face=dominant_face,
+                    panels=panels,
+                    dominant_normal=dominant_normal,
                 )
+                cut_boundary_fids = self._compute_cut_boundary_face_ids(shape, panels, dominant_face)
+                if cut_boundary_fids:
+                    v2_features.append({
+                        "id": "cut_profile",
+                        "feature_type": "cut_profile",
+                        "occurrences": [{"centroid": [0, 0, 0], "face_ids": cut_boundary_fids}],
+                    })
+                # Real face_ids for the "Detected Geometry" panel's click-to-
+                # highlight (see migration/CACHE_VERSION geo_v40 notes) —
+                # extruded_flange_occurrences/thin_web_occurrences are real
+                # OCC face indices collected during detection in
+                # _count_holes_with_location, not derived/guessed here.
+                if extruded_flange_occurrences:
+                    v2_features.append({
+                        "id": "extruded_flange",
+                        "feature_type": "extruded_flange",
+                        "occurrences": extruded_flange_occurrences,
+                    })
+                if thin_web_occurrences:
+                    v2_features.append({
+                        "id": "thin_web",
+                        "feature_type": "thin_web",
+                        "occurrences": thin_web_occurrences,
+                    })
                 feature_graph_v2 = {
                     "metadata": {
                         "face_map": face_map or [],
@@ -486,30 +672,85 @@ class SheetMetalFeatureExtractor:
             except Exception as e:
                 logger.warning(f"[SheetMetal] feature_graph_v2 build failed: {e}")
 
+        # Material utilization / nesting metrics — the flat pattern's real
+        # material footprint is its bounding RECTANGLE (what a nesting sheet
+        # actually reserves for it), not its own area; the gap between the
+        # two is scrap. Only available when
+        # _compute_flat_pattern_bounding_rect could resolve a layout (simple
+        # parallel-bend-axis case, or a flat unbent blank); left as 0/None
+        # otherwise rather than reporting a guessed number.
+        bounding_rect_area_mm2 = 0.0
+        material_utilization_pct = 0.0
+        scrap_area_mm2 = 0.0
+        if flat_pattern_bounding_rect:
+            bounding_rect_area_mm2 = flat_pattern_bounding_rect["length_mm"] * flat_pattern_bounding_rect["width_mm"]
+            if bounding_rect_area_mm2 > 0:
+                material_utilization_pct = round(100.0 * flat_pattern_area_mm2 / bounding_rect_area_mm2, 1)
+                scrap_area_mm2 = round(bounding_rect_area_mm2 - flat_pattern_area_mm2, 1)
+
         logger.info(
             f"[SheetMetal] thickness={sheet_thickness:.2f}mm(conf={thickness_conf:.2f}) "
-            f"cut={cut_length:.0f}mm bends={bends['count']} "
-            f"holes={holes['count']} slots={slots['count']} "
-            f"pierces={pierce_count} area={flat_pattern_area_mm2:.0f}mm²"
+            f"cut={cut_length:.0f}mm (outer={cut_length_breakdown['outer_profile_mm']:.0f} "
+            f"holes={cut_length_breakdown['circular_holes_mm']:.0f} "
+            f"internal={cut_length_breakdown['internal_profiles_mm']:.0f}) "
+            f"longest_cut={longest_continuous_cut_mm:.0f}mm "
+            f"corners(sharp={sharp_corner_count},acute={acute_corner_count}) bends={bends['count']} "
+            f"holes={holes['count']}(small={small_hole_count},flanges={extruded_flange_count},webs={thin_web_count}) "
+            f"internal_profiles={internal_profile_count} slots={slots['count']} "
+            f"pierces={pierce_count} rapid_traverse={rapid_traverse_sec}s "
+            f"area={flat_pattern_area_mm2:.0f}mm² "
+            f"bounding_rect={bounding_rect_area_mm2:.0f}mm²(util={material_utilization_pct:.1f}%)"
         )
 
         return {
             "sheet_thickness_mm": round(sheet_thickness, 3),
             "sheet_thickness_confidence": thickness_conf,
             "cut_length_mm": round(cut_length, 1),
+            "cut_length_breakdown": cut_length_breakdown,
+            "internal_profile_count": internal_profile_count,
+            "longest_continuous_cut_mm": longest_continuous_cut_mm,
+            "sharp_corner_count": sharp_corner_count,
+            "acute_corner_count": acute_corner_count,
+            "extruded_flange_count": extruded_flange_count,
+            "thin_web_count": thin_web_count,
             "cut_length_confidence": 0.90,
             "bend_count": bends["count"],
             "bend_radii_mm": bends.get("all_radii", bends["radii"]),
-            "bend_angles_deg": bends.get("angles_deg", []),
+            # Real per-bend angle/length, aligned index-for-index with bend_radii_mm
+            # (all three come from the SAME _collect_dedup_bends clustering pass) —
+            # empty when that pass wasn't usable (falls back to the sharp-fold
+            # dihedral angles, or to nothing, rather than mismatched/guessed data).
+            "bend_angles_deg": bend_angles_deg or bends.get("angles_deg", []),
+            "bend_lengths_mm": bend_lengths_mm,
             "bend_confidence": 0.65 if bends.get("angles_deg") else 0.75,
             "hole_count": holes["count"],
             "hole_diameters_mm": holes.get("all_diameters", holes["diameters"]),
             "hole_groups": holes.get("hole_groups", []),
+            "small_hole_count": small_hole_count,
             "hole_confidence": 0.90,
+            "counterbore_count": counterbores["count"],
+            "counterbore_groups": counterbores["groups"],
+            "countersink_count": countersinks["count"],
+            "countersink_groups": countersinks["groups"],
             "slot_count": slots["count"],
             "slot_confidence": 0.70,
             "pierce_count": pierce_count,
+            "rapid_traverse_sec": rapid_traverse_sec,
             "flat_pattern_area_mm2": flat_pattern_area_mm2,
+            "flat_pattern_area_method": flat_pattern_area_method,
+            "flat_pattern_bounding_rect_mm2": round(bounding_rect_area_mm2, 1) if flat_pattern_bounding_rect else None,
+            # The two dimensions _compute_flat_pattern_layout already returns
+            # (length_mm/width_mm) alongside the area product above -- these
+            # were computed and then discarded before this point, so nesting
+            # (which needs a real rectangle, not just its area) had no way to
+            # consume the true flat-pattern footprint and fell back to the
+            # folded 3D bounding box instead. Same availability gate as the
+            # area/utilization fields above -- None, never guessed, when the
+            # unfold solver couldn't resolve a layout for this part.
+            "flat_pattern_bounding_length_mm": round(flat_pattern_bounding_rect["length_mm"], 2) if flat_pattern_bounding_rect else None,
+            "flat_pattern_bounding_width_mm": round(flat_pattern_bounding_rect["width_mm"], 2) if flat_pattern_bounding_rect else None,
+            "material_utilization_pct": material_utilization_pct if flat_pattern_bounding_rect else None,
+            "scrap_area_mm2": scrap_area_mm2 if flat_pattern_bounding_rect else None,
             "sheet_geometry_debug": {**geom_debug, **validation_debug},
             "feature_graph_v2": feature_graph_v2,
         }
@@ -553,7 +794,7 @@ class SheetMetalFeatureExtractor:
         logger.info("[SheetMetal] _extract_sheet_metal_geometry: running topology-based algorithm (geo_v2)")
         from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
         from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
-        from OCC.Core.TopAbs import TopAbs_FACE  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_FORWARD  # type: ignore
         from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
         from OCC.Core.TopoDS import topods  # type: ignore
         from OCC.Core.BRepGProp import brepgprop  # type: ignore
@@ -593,6 +834,19 @@ class SheetMetalFeatureExtractor:
                         explorer.Next()
                         continue
                     nx, ny, nz = nx / mag, ny / mag, nz / mag
+                    # Geom_Plane's axis direction is the underlying SURFACE's normal,
+                    # independent of how this particular face wraps that surface.
+                    # A face with REVERSED topological orientation has its true
+                    # outward normal pointing the opposite way — without this flip,
+                    # two truly-opposite faces (e.g. top/bottom of a solid produced
+                    # by a boolean Cut, which very commonly emits one of the pair as
+                    # REVERSED) can be reported with the SAME raw normal, so the
+                    # antiparallel-pair test below never recognizes them as a pair
+                    # and thickness/dominant-face detection silently falls back to
+                    # a low-confidence guess. Same convention already used for
+                    # cylinders/cones in cnc_feature_recognizer.py.
+                    if face.Orientation() != TopAbs_FORWARD:
+                        nx, ny, nz = -nx, -ny, -nz
                     loc = plane.Location()
                     plane_d = (
                         nx * float(loc.X())
@@ -887,6 +1141,8 @@ class SheetMetalFeatureExtractor:
         slot_occurrences: Optional[List[Dict]] = None,
         adjacent_face_ids: Optional[Dict[int, List[int]]] = None,
         dominant_face: Any = None,
+        panels: Optional[List[Dict[str, Any]]] = None,
+        dominant_normal: Optional[Tuple[float, float, float]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Build per-instance occurrence data for holes and bends.
@@ -907,18 +1163,33 @@ class SheetMetalFeatureExtractor:
         cy = (bbox_minmax['ymin'] + bbox_minmax['ymax']) / 2
         cz = (bbox_minmax['zmin'] + bbox_minmax['zmax']) / 2
 
-        # Holes: axis roughly Z-aligned (abs_axis_z >= 0.5), radius in fastener/clearance range
-        hole_entries = [
-            c for c in raw_cylinders_full
-            if c[1] >= 0.5 and 0.3 <= c[0] <= 150.0
-        ]
+        # Holes: axis aligned with ANY real panel's normal (base, flange, or
+        # bent-up wall) — same panel-aware test _count_holes_with_location uses
+        # for the aggregate hole count, so occurrences never disagree with it.
+        # Checking only global Z (the previous behaviour) silently dropped
+        # every hole on a panel not oriented near-vertical in the model's
+        # coordinate frame, which is exactly why a hole group's "Count" and its
+        # "Occurrences" could show different numbers (e.g. 21 vs 2) for holes
+        # on a bent wing panel.
+        max_bend_r = max(sheet_thickness * 8, 20.0)
+
+        def _is_occurrence_hole(c: Tuple) -> bool:
+            if not (0.3 <= c[0] <= 150.0):
+                return False
+            if sheet_thickness > 0 and self._is_bend_cylinder(c, sheet_thickness, max_bend_r, dominant_normal):
+                return False
+            if not self._is_full_circle_cylinder(c):
+                return False
+            alignment = self._panel_alignment(c[5], c[6], c[7], panels) if panels else c[1]
+            return alignment >= 0.5
+
+        hole_entries = self._cluster_coaxial_hole_entries([c for c in raw_cylinders_full if _is_occurrence_hole(c)])
         # Bends: axis roughly horizontal (abs_axis_z < 0.5), radius within sheet-thickness
         # range, AND axial length well above sheet thickness — cut-edge profile radii and
         # corner fillets are cylinders too, but only span the thickness of the sheet.
-        max_bend_r = max(sheet_thickness * 8, 20.0)
         bend_entries = [
             c for c in raw_cylinders_full
-            if self._is_bend_cylinder(c, sheet_thickness, max_bend_r)
+            if self._is_bend_cylinder(c, sheet_thickness, max_bend_r, dominant_normal)
         ]
 
         # ── Pre-compute spatial data for per-occurrence metrics ─────────────────
@@ -977,7 +1248,15 @@ class SheetMetalFeatureExtractor:
             xs, ys = [], []
             for m in members:
                 cyl_fi = m[8]
-                adj_fids = (adjacent_face_ids or {}).get(cyl_fi, [])
+                # A deduped entry's index 11 carries EVERY original cylinder face
+                # that got merged into this physical hole (e.g. two half-cylinder
+                # faces split by a STEP-export seam) -- using only cyl_fi here
+                # would highlight just whichever fragment survived dedup, showing
+                # half a ring instead of the full hole.
+                merged_fids = m[11] if len(m) > 11 else (cyl_fi,)
+                adj_fids: List[int] = []
+                for fi in merged_fids:
+                    adj_fids.extend((adjacent_face_ids or {}).get(fi, []))
                 h_cx, h_cy, h_cz = m[2], m[3], m[4]
                 radius_mm = m[0]
                 ec = self._edge_clearance(h_cx, h_cy, h_cz, outer_wire)
@@ -985,8 +1264,8 @@ class SheetMetalFeatureExtractor:
                     ec = round(max(0.0, ec - radius_mm), 2)  # wall-to-edge, not center-to-edge
                 occurrences.append({
                     "centroid": [round(h_cx - cx, 2), round(h_cy - cy, 2), round(h_cz - cz, 2)],
-                    # cylinder wall + adjacent planar rim faces for visible top-down highlight
-                    "face_ids": [cyl_fi] + adj_fids,
+                    # cylinder wall(s) + adjacent planar rim faces for visible top-down highlight
+                    "face_ids": list(merged_fids) + adj_fids,
                     "edge_clearance_mm": ec,
                     "nearest_hole_distance_mm": self._nearest_dist(h_cx, h_cy, h_cz, hole_centroids_abs),
                     "nearest_bend_distance_mm": self._nearest_dist(h_cx, h_cy, h_cz, bend_centroids_abs)
@@ -1083,6 +1362,83 @@ class SheetMetalFeatureExtractor:
         return features
 
     @staticmethod
+    def _dedupe_coincident_cylinders(raw_cylinders_full: List[Tuple]) -> List[Tuple]:
+        """
+        Collapses cylindrical faces at the exact same axis location and radius
+        into a single entry. Physically, two faces can never occupy the
+        identical (radius, x, y, z) unless they're the same real feature split
+        into multiple B-Rep patches -- a STEP-export seam, or an intersecting
+        feature fragmenting one bore into several partial arcs.
+
+        Verified against a real part's STEP file: every diameter exhibiting
+        this signature (identical coordinates across faces) turned out to be
+        one physical hole reported as 2+ "instances" -- confirmed both by a
+        near-zero occurrence spread and by the 3D highlight showing a single
+        ring. Diameters with genuinely separate physical locations (different
+        coordinates each time) were untouched, since they never match this key.
+
+        A pair split into two DIFFERENT partial arcs (e.g. a bore fragmented
+        by an intersecting slot) keeps the wider one as the representative for
+        counting/location purposes -- an arbitrary but harmless pick there,
+        since only the location/radius/type matter for counting, not which
+        specific arc fragment "won". Highlighting is a different story: each
+        deduped entry gains a 12th element (index 11) -- a tuple of EVERY
+        member's own face_idx in the group, not just the representative's --
+        so a physical hole split into two half-cylinder faces still highlights
+        both halves (the full ring) instead of only whichever fragment the
+        representative happened to be.
+        """
+        from collections import defaultdict
+
+        groups: Dict[Tuple, List[Tuple]] = defaultdict(list)
+        for c in raw_cylinders_full:
+            key = (round(c[0], 2), round(c[2], 1), round(c[3], 1), round(c[4], 1))
+            groups[key].append(c)
+
+        deduped: List[Tuple] = []
+        for members in groups.values():
+            best = members[0] if len(members) == 1 else max(members, key=lambda m: m[10] if len(m) > 10 else 0.0)
+            merged_face_idxs = tuple(m[8] for m in members)
+            if len(members) > 1 and len(best) > 10:
+                # A seam-split hole's individual fragments each cover only part
+                # of the full circle (e.g. two half-cylinder faces ~pi rad
+                # each) — the representative's OWN u_range_rad understates the
+                # physical hole's true angular sweep, which would wrongly fail
+                # _is_full_circle_cylinder's closed-circle test. Sum every
+                # member's angular span (capped at a full circle, in case of
+                # overlapping coverage) so that test sees the real total.
+                total_u_range = min(
+                    sum(m[10] for m in members if len(m) > 10 and m[10] is not None),
+                    2 * math.pi,
+                )
+                best = best[:10] + (total_u_range,) + best[11:]
+            deduped.append(best + (merged_face_idxs,))
+        return deduped
+
+    @staticmethod
+    def _panel_alignment(ax: float, ay: float, az: float, panels: List[Dict[str, Any]]) -> float:
+        """
+        Max |dot(cylinder axis, panel normal)| across every real panel
+        (base, flange, bent-up wall) — how aligned this cylinder's axis is
+        with ANY panel's own normal, not just the global Z axis.
+
+        A hole drilled through a panel has its axis aligned with THAT panel's
+        normal, whatever direction that panel actually faces after bending —
+        checking only global Z (the previous behaviour) silently drops every
+        hole on a panel that isn't oriented near-vertical in the model's
+        coordinate frame (e.g. a wall folded up 90° from the base).
+        """
+        if not panels:
+            return 0.0
+        best = 0.0
+        for p in panels:
+            pnx, pny, pnz = p["normal"]
+            d = abs(ax * pnx + ay * pny + az * pnz)
+            if d > best:
+                best = d
+        return best
+
+    @staticmethod
     def _min_bend_line_mm(sheet_thickness: float) -> float:
         """
         Minimum axial length for a cylindrical face to qualify as a bend.
@@ -1102,9 +1458,34 @@ class SheetMetalFeatureExtractor:
         cyl: Tuple,
         sheet_thickness: float,
         max_bend_radius: float,
+        dominant_normal: Optional[Tuple[float, float, float]] = None,
     ) -> bool:
-        """Bend test for a full cylinder tuple (see _build_feature_occurrences)."""
-        if cyl[1] >= 0.5:                       # axis must be in the sheet plane
+        """
+        Bend test for a full cylinder tuple (see _build_feature_occurrences).
+
+        Uses the DOMINANT face's own normal specifically (not "any real
+        panel") — a bend's axis (the fold line) is perpendicular to every
+        panel it connects, one of which is always the dominant panel in a
+        base+wings topology, so this single reference correctly identifies
+        it. Checking against every panel instead (as the sibling hole test
+        correctly does) causes false rejections here: a bend's axis can
+        coincidentally be PARALLEL to some unrelated third panel elsewhere on
+        the part (e.g. a small side tab), which isn't one of the two panels
+        the bend actually connects — this is the one place a single fixed
+        reference direction is the geometrically correct test, not a
+        regression back to the old global-Z bug (dominant_normal is the
+        part's real sheet normal, not an arbitrary world axis).
+
+        Falls back to the original global-Z test (cyl[1]) when no dominant
+        normal is available (e.g. non-manifold import, no planar dominant
+        face found), so this never regresses to rejecting everything.
+        """
+        if dominant_normal is not None:
+            dnx, dny, dnz = dominant_normal
+            axis_alignment = abs(cyl[5] * dnx + cyl[6] * dny + cyl[7] * dnz)
+        else:
+            axis_alignment = cyl[1]
+        if axis_alignment >= 0.5:                # axis aligned with the sheet normal -- a hole, not a bend
             return False
         if not (0.1 <= cyl[0] <= max_bend_radius):
             return False
@@ -1113,24 +1494,170 @@ class SheetMetalFeatureExtractor:
             return False
         return True
 
+    # A real hole is a closed cylindrical surface — its face sweeps the full
+    # 2*pi around the axis. A convex external round (a rounded flange tip, a
+    # rounded corner of a mounting foot) is geometrically a cylindrical face
+    # too, with its axis often aligned with the sheet normal exactly like a
+    # real hole — but it only sweeps a PARTIAL arc (a semicircular end cap is
+    # ~pi, a quarter-round corner is ~pi/2), never a full circle. Neither the
+    # radius/panel-alignment test above nor _is_bend_cylinder (which only
+    # excludes near-horizontal axes) catches this, so a vertical-axis external
+    # round was being reported as a real hole (e.g. "Ø22.0 mm x 2" on a part
+    # whose only Ø22mm cylindrical surfaces are its two rounded end profiles,
+    # not holes at all). 90% of a full circle tolerates STEP-export seam
+    # splits without accepting a genuinely partial arc.
+    _FULL_CIRCLE_MIN_RAD = 2 * math.pi * 0.9
+
+    @classmethod
+    def _is_full_circle_cylinder(cls, cyl: Tuple) -> bool:
+        # m[10] = angular extent in radians — absent on legacy 9/10-tuples;
+        # nothing to check then, so don't reject (would silently drop every
+        # hole on data the pipeline hasn't been upgraded to carry this on yet).
+        if len(cyl) <= 10 or cyl[10] is None:
+            return True
+        return cyl[10] >= cls._FULL_CIRCLE_MIN_RAD
+
+    @staticmethod
+    def _cluster_coaxial_hole_entries(hole_entries: List[Tuple]) -> List[Tuple]:
+        """
+        Collapses a stepped/burled hole's multiple coaxial diameter layers
+        (e.g. a tap-drill bore + a formed boss/counterbore at a different
+        depth, same axis line — a real sheet-metal "burling" feature that
+        extrudes a boss around a tap-drilled hole for more thread engagement)
+        into ONE physical hole, keeping the SMALLEST-diameter member as the
+        representative: the narrowest bore is what actually determines what
+        passes through / the tap-drill size, which is what pierce time and
+        tooling selection care about.
+
+        Without this, a burled M3 hole (drawing note "2X M3 BURLING BACK
+        CONVEX") reports as 2-3 SEPARATE hole-group entries at different
+        diameters (tap-drill, transition chamfer, boss OD) instead of one
+        real hole — confirmed against a real part where this inflated the
+        hole count from ~8 physical holes to 18 reported groups.
+
+        Clusters by axis LINE: direction canonicalized (so an
+        antiparallel-authored face on the same physical line still matches)
+        plus centroid position projected onto the plane PERPENDICULAR to
+        that axis, rounded to 0.5 mm — AND bounded position ALONG the axis
+        (within MAX_ALONG_AXIS_MM of the cluster's first member).
+
+        The along-axis bound is required, not optional: a mirror-symmetric
+        part's two ears sit on PARALLEL panels sharing the exact same axis
+        DIRECTION (e.g. both (0,-1,0)) with identical X/Z, differing only in
+        how far apart they are ALONG that axis (e.g. two ears ~69 mm apart in
+        Y). Projecting out the along-axis component alone would merge those
+        two genuinely different holes into one — confirmed as a real bug
+        during development (two real, ~69mm-apart Ø4.0 ear holes collapsed
+        into a phantom single hole). A stepped hole's own diameter layers
+        (tap-drill + boss) are always within a few mm of each other along
+        the axis (bounded by sheet thickness + boss height), nothing like a
+        cross-part span, so a small bound safely separates the two cases.
+        """
+        clusters = SheetMetalFeatureExtractor._group_coaxial_hole_clusters(hole_entries)
+        return [min(cl["members"], key=lambda m: m[0]) for cl in clusters]
+
+    @staticmethod
+    def _group_coaxial_hole_clusters(hole_entries: List[Tuple]) -> List[Dict[str, Any]]:
+        """
+        Same coaxial-axis-line clustering _cluster_coaxial_hole_entries uses
+        (see that method's docstring for the full rationale/history) — but
+        returns the raw clusters (each a dict with "members": the full list
+        of coaxial diameter layers on that axis line) instead of collapsing
+        each one to its smallest-diameter representative. _cluster_coaxial_
+        hole_entries itself is now a thin wrapper around this, so its 3
+        existing callers are unaffected. A cluster with >1 member is a real
+        stepped/coaxial hole (e.g. tap-drill bore + a formed collar/boss at
+        a different depth on the same axis) — callers that need that fact
+        (extruded-flange detection) read it here instead of re-deriving it.
+        """
+        MAX_ALONG_AXIS_MM = 6.0
+
+        def _perp_key(c: Tuple) -> Tuple[float, ...]:
+            cx, cy, cz, ax, ay, az = c[2], c[3], c[4], c[5], c[6], c[7]
+            if (ax, ay, az) < (0.0, 0.0, 0.0):
+                ax, ay, az = -ax, -ay, -az
+            dot = cx * ax + cy * ay + cz * az
+            px, py, pz = cx - dot * ax, cy - dot * ay, cz - dot * az
+            return (
+                round(ax, 1), round(ay, 1), round(az, 1),
+                round(px * 2) / 2, round(py * 2) / 2, round(pz * 2) / 2,
+            )
+
+        def _along_axis(c: Tuple) -> float:
+            cx, cy, cz, ax, ay, az = c[2], c[3], c[4], c[5], c[6], c[7]
+            if (ax, ay, az) < (0.0, 0.0, 0.0):
+                ax, ay, az = -ax, -ay, -az
+            return cx * ax + cy * ay + cz * az
+
+        clusters: List[Dict[str, Any]] = []
+        for c in hole_entries:
+            perp_key = _perp_key(c)
+            along = _along_axis(c)
+            match = next(
+                (cl for cl in clusters if cl["perp_key"] == perp_key and abs(along - cl["along_ref"]) <= MAX_ALONG_AXIS_MM),
+                None,
+            )
+            if match:
+                match["members"].append(c)
+            else:
+                clusters.append({"perp_key": perp_key, "along_ref": along, "members": [c]})
+
+        return clusters
+
     def _count_bends_from_full(
         self,
         raw_cylinders_full: List[Tuple],
         sheet_thickness: float,
+        dominant_normal: Optional[Tuple[float, float, float]] = None,
     ) -> Dict[str, Any]:
-        """Bend count/radii from full tuples, with profile-radius noise filtered out."""
+        """
+        Bend count/radii from full tuples, with profile-radius noise filtered out.
+
+        Clusters bend-candidate faces by PROXIMITY (same AXIS_TOL_MM=2.0 approach
+        _build_feature_occurrences already uses) to pair each physical bend's
+        inner+outer concentric faces, then reports one entry per cluster using
+        its inner (smaller) radius.
+
+        Previously paired by SORTING ALL radii together and taking every other
+        value (sorted_radii[::2]) — silently wrong whenever more than one bend
+        shares the same inner/outer radius pair (the common case: most parts
+        have several bends of the same radius). Confirmed on a real part: 3
+        physical bends, each inner=0.8mm/outer=2.3mm, sorted to
+        [0.8,0.8,0.8,2.3,2.3,2.3] and every-other-sliced to [0.8,0.8,2.3] —
+        fabricating a phantom "R2.3 x1" bend group that was really the outer
+        face of the third R0.8 bend, while feature_graph_v2's occurrence count
+        (built via proximity clustering, unaffected) correctly showed 3.
+        """
         max_bend_radius = max(sheet_thickness * 8, 20.0)
-        bend_radii: List[float] = [
-            round(c[0], 3)
-            for c in raw_cylinders_full
-            if self._is_bend_cylinder(c, sheet_thickness, max_bend_radius)
+        bend_entries = [
+            c for c in raw_cylinders_full
+            if self._is_bend_cylinder(c, sheet_thickness, max_bend_radius, dominant_normal)
         ]
-        sorted_radii = sorted(round(r, 1) for r in bend_radii)
-        inner_radii = sorted_radii[::2]
+
+        AXIS_TOL_MM = 2.0
+        used = [False] * len(bend_entries)
+        inner_radii: List[float] = []
+        for i, ci in enumerate(bend_entries):
+            if used[i]:
+                continue
+            cluster = [ci]
+            used[i] = True
+            cix, ciy, ciz = ci[2], ci[3], ci[4]
+            for j in range(i + 1, len(bend_entries)):
+                if used[j]:
+                    continue
+                cj = bend_entries[j]
+                dx, dy, dz = cj[2] - cix, cj[3] - ciy, cj[4] - ciz
+                if (dx * dx + dy * dy + dz * dz) ** 0.5 < AXIS_TOL_MM:
+                    cluster.append(cj)
+                    used[j] = True
+            inner = min(cluster, key=lambda m: m[0])
+            inner_radii.append(round(inner[0], 1))
+
         return {
-            "count": len(bend_radii) // 2,
+            "count": len(inner_radii),
             "radii": sorted(set(inner_radii)),
-            "all_radii": inner_radii,
+            "all_radii": sorted(inner_radii),
         }
 
     def _count_bends_from_list(
@@ -1300,6 +1827,9 @@ class SheetMetalFeatureExtractor:
         self,
         raw_cylinders_full: List[Tuple],
         bbox_minmax: Dict[str, float],
+        panels: Optional[List[Dict[str, Any]]] = None,
+        sheet_thickness: float = 0.0,
+        dominant_normal: Optional[Tuple[float, float, float]] = None,
     ) -> Dict[str, Any]:
         """
         Detect holes from full spatial cylinder data and attach per-group location metadata.
@@ -1313,18 +1843,128 @@ class SheetMetalFeatureExtractor:
 
         NOTE: holes of the same diameter on different faces are still merged into one
         group (spatial clustering milestone deferred). bbox captures the spread.
+
+        Panel-aware inclusion filter: a cylinder is a hole candidate if its axis
+        aligns with ANY real panel's normal (base, flange, or bent-up wall) —
+        checking only global Z (the previous behaviour) silently dropped every
+        hole on a panel not oriented near-vertical in the model's coordinate
+        frame. Falls back to the plain global-Z test when no panels were found
+        (non-manifold import) so this never regresses a part where panel
+        detection itself failed. manufacturing_region labeling below still
+        uses global-Z-only heuristics (flat vs flange) — deferred refinement,
+        doesn't affect which holes get counted, only their descriptive label.
+
+        Excludes anything _is_bend_cylinder already recognizes as a bend
+        (given sheet_thickness/dominant_normal): a bend cylinder's axis can
+        legitimately align with some OTHER panel's normal too (see
+        _is_bend_cylinder's docstring), so without this exclusion the same
+        physical bend-radius face gets double-counted — once as a bend, once
+        as a hole of that diameter.
         """
         from collections import defaultdict
 
-        # Filter for holes: abs_axis_z >= 0.5, radius in [0.3, 150] mm
-        # Tuple layout: (radius, abs_axis_z, cx, cy, cz, ax, ay, az)
-        hole_entries = [
-            c for c in raw_cylinders_full
-            if c[1] >= 0.5 and 0.3 <= c[0] <= 150.0
-        ]
+        max_bend_radius = max(sheet_thickness * 8, 20.0) if sheet_thickness > 0 else 20.0
+
+        # Tuple layout: (radius, abs_axis_z, cx, cy, cz, ax, ay, az, ...)
+        def _is_hole(c: Tuple) -> bool:
+            if not (0.3 <= c[0] <= 150.0):
+                return False
+            if sheet_thickness > 0 and self._is_bend_cylinder(c, sheet_thickness, max_bend_radius, dominant_normal):
+                return False
+            if not self._is_full_circle_cylinder(c):
+                return False
+            alignment = self._panel_alignment(c[5], c[6], c[7], panels) if panels else c[1]
+            return alignment >= 0.5
+
+        hole_candidates = [c for c in raw_cylinders_full if _is_hole(c)]
+        coaxial_clusters = self._group_coaxial_hole_clusters(hole_candidates)
+        hole_entries = [min(cl["members"], key=lambda m: m[0]) for cl in coaxial_clusters]
+
+        # Extruded/pierced hole flange ("extrusion"): a REAL burl on this
+        # class of part has 3 coaxial diameter layers (tap-drill bore +
+        # transition chamfer + boss OD — matching this method's own
+        # docstring, "2-3 SEPARATE hole-group entries"), with the boss OD
+        # notably larger than the bore (ratio ~2x+, since a boss is a real
+        # raised collar, not a near-identical-diameter coincidence).
+        #
+        # An earlier version of this check required ONLY >=2 members with
+        # ratio <=1.6 — verified against real debug data (live QA, Aug 2026)
+        # to be exactly backwards on a real burled part: the two genuine
+        # mirror-symmetric M3 burls (3 members each, ratio 2.20) were
+        # EXCLUDED by the <=1.6 cap, while three unrelated, non-mirrored
+        # plain holes (2 members each, ratio 1.20 — almost certainly a
+        # coincidental nearby fillet/edge-break, not a real boss) were
+        # WRONGLY FLAGGED. Requiring >=3 members matches the real evidence:
+        # it correctly captures the 2 real burls and excludes the 3 false
+        # positives. A 2-member cluster is deliberately NOT flagged at all
+        # now — better to undercount a genuine 2-layer burl (if one exists
+        # on some other part) than repeat the false-positive pattern just
+        # confirmed on this one. Revisit if a real, verified 2-layer-only
+        # burl is ever found; until then this is the evidence-backed rule.
+        extruded_flange_count = 0
+        # Real face_ids per flagged cluster (member[8] = face_idx, same tuple
+        # position _build_feature_occurrences already reads elsewhere) — for
+        # the "Detected Geometry" panel's click-to-highlight, not fabricated:
+        # every id here is a real OCC face this cluster's own members sit on.
+        extruded_flange_occurrences: List[Dict[str, Any]] = []
+        for cl in coaxial_clusters:
+            members = cl["members"]
+            if len(members) < 3:
+                continue
+            radii = [m[0] for m in members if m[0] > 0]
+            if len(radii) < 3:
+                continue
+            extruded_flange_count += 1
+            face_ids = [int(m[8]) for m in members if len(m) > 8 and m[8] is not None]
+            centroid = [round(members[0][2], 1), round(members[0][3], 1), round(members[0][4], 1)]
+            if face_ids:
+                extruded_flange_occurrences.append({"centroid": centroid, "face_ids": face_ids})
+
+        # Thin web ("burr region"): true edge-to-edge gap between two holes
+        # (centroid distance minus both radii, NOT raw centroid distance)
+        # below 1.5x sheet thickness -- same class of thickness-relative DFM
+        # threshold small_hole_count already uses (<2x thickness). A hole
+        # already counted as "small" is excluded from this set at the source
+        # (not just left to double-count downstream) so a small hole
+        # contributes to small_hole_count OR thin_web_count, never both.
+        thin_web_count = 0
+        thin_web_occurrences: List[Dict[str, Any]] = []
+        if sheet_thickness > 0 and len(hole_entries) >= 2:
+            web_min_mm = 1.5 * sheet_thickness
+            is_small = [(2 * m[0]) < 2.0 * sheet_thickness for m in hole_entries]
+            thin_web_idxs: set = set()
+            for i in range(len(hole_entries)):
+                if is_small[i]:
+                    continue
+                mi = hole_entries[i]
+                for j in range(i + 1, len(hole_entries)):
+                    if is_small[j]:
+                        continue
+                    mj = hole_entries[j]
+                    dist = math.sqrt(
+                        (mi[2] - mj[2]) ** 2 + (mi[3] - mj[3]) ** 2 + (mi[4] - mj[4]) ** 2
+                    )
+                    gap = dist - mi[0] - mj[0]
+                    if -0.5 <= gap < web_min_mm:
+                        if i not in thin_web_idxs and j not in thin_web_idxs:
+                            # One occurrence per flagged PAIR (both holes' real
+                            # faces), not per hole — matches what a "thin web"
+                            # actually is: the gap BETWEEN two holes.
+                            fids = [int(m[8]) for m in (mi, mj) if len(m) > 8 and m[8] is not None]
+                            if fids:
+                                thin_web_occurrences.append({
+                                    "centroid": [round((mi[2] + mj[2]) / 2, 1), round((mi[3] + mj[3]) / 2, 1), round((mi[4] + mj[4]) / 2, 1)],
+                                    "face_ids": fids,
+                                })
+                        thin_web_idxs.add(i)
+                        thin_web_idxs.add(j)
+            thin_web_count = len(thin_web_idxs)
 
         if not hole_entries:
-            return {"count": 0, "diameters": [], "all_diameters": [], "hole_groups": []}
+            return {
+                "count": 0, "diameters": [], "all_diameters": [], "hole_groups": [], "centroids": [],
+                "extruded_flange_count": 0, "thin_web_count": 0,
+            }
 
         # Group by diameter rounded to 0.1 mm
         groups: Dict[float, List[Tuple]] = defaultdict(list)
@@ -1395,36 +2035,734 @@ class SheetMetalFeatureExtractor:
             "all_diameters": all_diameters_sorted,
             "hole_groups":   hole_groups,
             "tap_candidates": tap_candidates,
+            # One absolute (x, y, z) per real physical hole (post stepped/burled
+            # clustering) -- the pierce location for that hole. Used to estimate
+            # rapid-traverse (head repositioning) time between pierce points.
+            "centroids": [(c[2], c[3], c[4]) for c in hole_entries],
+            "extruded_flange_count": extruded_flange_count,
+            "thin_web_count": thin_web_count,
+            "extruded_flange_occurrences": extruded_flange_occurrences,
+            "thin_web_occurrences": thin_web_occurrences,
         }
+
+    def _detect_counterbore_countersink(
+        self,
+        shape: Any,
+        dominant_face: Any,
+        bbox_minmax: Dict[str, float],
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Detect counterbore (coaxial two-diameter bore pair) and countersink
+        (cone + coaxial bore) features on a sheet-metal part.
+
+        Reuses cnc_feature_recognizer's cylinder/cone collectors and
+        classification helpers directly rather than reimplementing B-Rep
+        topology analysis — the same coaxial-face pattern that already works
+        for CNC-milled parts applies unchanged to a thin sheet; only the
+        through/blind threshold context differs (handled by _collect_cylinders
+        itself via the part_span comparison).
+
+        Returns (counterbores, countersinks), each {"count": int, "groups": [...]}
+        where groups are [{diameter_mm, count}] — same shape as hole_groups.
+        """
+        from cnc_feature_recognizer import CNCFeatureRecognizer, CNCFeature, _detect_counterbores, _classify_cone
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
+
+        adaptor = BRepAdaptor_Surface(dominant_face)
+        if adaptor.GetType() != GeomAbs_Plane:
+            return {"count": 0, "groups": []}, {"count": 0, "groups": []}
+        n = adaptor.Plane().Axis().Direction()
+        nx, ny, nz = float(n.X()), float(n.Y()), float(n.Z())
+        mag = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+        main_axis = (nx / mag, ny / mag, nz / mag)
+
+        recognizer = CNCFeatureRecognizer()
+        bbox = {
+            "xmin": bbox_minmax.get("xmin", 0.0), "xmax": bbox_minmax.get("xmax", 0.0),
+            "ymin": bbox_minmax.get("ymin", 0.0), "ymax": bbox_minmax.get("ymax", 0.0),
+            "zmin": bbox_minmax.get("zmin", 0.0), "zmax": bbox_minmax.get("zmax", 0.0),
+        }
+        cylinders = recognizer._collect_cylinders(shape, main_axis, bbox)
+        cones = recognizer._collect_cones(shape)
+
+        bore_features: List[CNCFeature] = []
+        bore_id_to_cyl: Dict[str, Dict] = {}
+        for idx, cyl in enumerate(cylinders):
+            if cyl["kind"] not in ("through_hole", "blind_hole"):
+                continue
+            fid = f"sm_bore_{idx}"
+            bore_features.append(CNCFeature(
+                id=fid,
+                type=cyl["kind"],
+                params={
+                    "diameter_mm": round(cyl["radius"] * 2.0, 3),
+                    "depth_mm": round(cyl["length"], 3),
+                },
+                confidence=0.75,
+                face_ids=cyl.get("face_indices", []),
+            ))
+            bore_id_to_cyl[fid] = cyl
+
+        # Counterbores: coaxial bore pairs (outer larger + shallower than inner)
+        cb_pairs = _detect_counterbores(bore_features, bore_id_to_cyl)
+        cb_diameters: List[float] = [
+            round(params["counterbore_diameter_mm"], 1) for _, _, params in cb_pairs
+        ]
+
+        # Countersinks: cones with a coaxial adjacent bore
+        cs_diameters: List[float] = []
+        for cone in cones:
+            ftype, params, _conf = _classify_cone(cone, cylinders)
+            if ftype == "countersink":
+                cs_diameters.append(round(params["entry_diameter_mm"], 1))
+
+        def _group(diams: List[float]) -> Dict[str, Any]:
+            from collections import Counter
+            counter = Counter(diams)
+            groups = sorted(
+                [{"diameter_mm": d, "count": c} for d, c in counter.items()],
+                key=lambda x: x["diameter_mm"],
+            )
+            return {"count": len(diams), "groups": groups}
+
+        return _group(cb_diameters), _group(cs_diameters)
 
     # ── Cut length, flat area, slots (accept pre-found dominant face) ─────────
 
-    def _compute_cut_length(self, shape: Any, dominant_face: Any) -> float:
+    def _compute_cut_length(
+        self,
+        shape: Any,
+        dominant_face: Any,
+        panels: Optional[List[Dict[str, Any]]] = None,
+        raw_cylinders_full: Optional[List[Tuple]] = None,
+        sheet_thickness: float = 0.0,
+        dominant_normal: Optional[Tuple[float, float, float]] = None,
+    ) -> Dict[str, float]:
         """
-        Laser cut length = sum of all edge lengths on the dominant blank face.
-        Orientation-independent: uses the face from _extract_sheet_metal_geometry.
-        """
-        if dominant_face is None:
-            return 0.0
+        Laser cut length = sum of all edge lengths across every real panel
+        (base + every bent-up wall/flange), not just the single dominant
+        face — a laser cutting a bent bracket cuts the full outer profile of
+        every panel plus every hole on every panel, not only the one face
+        that happened to score highest in _extract_sheet_metal_geometry.
 
-        from OCC.Core.BRepAdaptor import BRepAdaptor_Curve  # type: ignore
+        Returns {"total_mm", "outer_profile_mm", "circular_holes_mm",
+        "internal_profiles_mm", "longest_continuous_cut_mm"} — a breakdown by
+        category, not just the total, so the total is independently checkable
+        rather than a single opaque number:
+          outer_profile_mm    — each panel's OWN outer boundary wire (wire
+                                 index 0), whatever its shape.
+          circular_holes_mm   — inner wires whose every edge is adjacent to
+                                 a cylindrical face with its axis ALIGNED to
+                                 the panel normal (a real round hole's rim),
+                                 plus the offset-boss/burl rim correction
+                                 below.
+          internal_profiles_mm — every other inner wire: non-circular
+                                 cutouts of any shape (slots, scalloped
+                                 profiles, keyholes — anything that isn't a
+                                 plain round hole).
+
+        Falls back to dominant_face alone when no panels were identified
+        (non-manifold import) — same convention _compute_true_flat_pattern_area
+        already uses for its own fallback; reported entirely as
+        outer_profile_mm since there's no panel structure to sub-categorise.
+
+        Also adds each real hole's own rim circumference (2*pi*radius) to
+        circular_holes_mm for holes that sit on a small offset boss/collar
+        patch (a drawn/extruded hole rim at a different plane depth than its
+        parent panel, common for extra thread engagement) rather than
+        directly on one of the identified panel faces — a bare panel-face
+        walk contributes zero for these. Uses the hole's own known radius
+        directly instead of hunting for the actual small OCC face that hosts
+        it (which may not exist as a clean isolated planar patch at all,
+        depending on how the boss was modeled) — simpler and more robust
+        than face-topology guessing, and applies the exact same
+        hole-classification test _count_holes_with_location uses, so "what
+        counts as a real hole" is answered identically everywhere. Requires
+        raw_cylinders_full/sheet_thickness/dominant_normal; skipped
+        (silently, no double-count risk) when the caller doesn't have them
+        available.
+
+        longest_continuous_cut_mm is the length of the single longest
+        unbroken laser path — the outer profile's own total (already ONE
+        continuous closed loop across every panel: fold-transition edges
+        aren't cut at all, so in the flat, unfolded sheet the boundary
+        segments contributed by adjacent panels join up at the fold line's
+        endpoints into one silhouette — see the module-level convention
+        this file already relies on for a connected panel/bend tree), versus
+        each individual hole rim and each individual internal-cutout wire
+        taken on its OWN (never summed with others — those are separate
+        pierces/loops, not one continuous path). Laser machines physically
+        slow down on long unbroken contours, so the single longest one is
+        the number that matters for cycle-time/DFM, not the sum of everything.
+
+        Excludes FOLD-TRANSITION edges entirely (not counted in any bucket):
+        a panel's own boundary wire includes the edge where it meets its
+        adjacent bend region — the sheet is one continuous piece there
+        before forming, not a laser-cut edge, so blindly summing every
+        boundary edge (the previous behaviour) overcounts cut length by
+        exactly this much. Confirmed on a real part: 754mm computed vs
+        ~209mm (28%) sitting on edges adjacent to a cylindrical face whose
+        axis is roughly IN-PLANE with the panel normal — a bend transition,
+        distinguished from a real hole's rim (also cylindrical, but with
+        its axis roughly ALIGNED to the panel normal instead, same test
+        _panel_alignment already uses elsewhere).
+        """
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface  # type: ignore
         from OCC.Core.GCPnts import GCPnts_AbscissaPoint  # type: ignore
-        from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
-        from OCC.Core.TopAbs import TopAbs_EDGE  # type: ignore
+        from OCC.Core.TopExp import TopExp_Explorer, topexp  # type: ignore
+        from OCC.Core.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_WIRE  # type: ignore
+        from OCC.Core.TopoDS import topods  # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane  # type: ignore
 
-        total = 0.0
-        edge_exp = TopExp_Explorer(dominant_face, TopAbs_EDGE)
-        while edge_exp.More():
+        edge_face_map = None
+        try:
+            edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+            topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_face_map)  # type: ignore
+        except Exception:
+            edge_face_map = None
+
+        def _face_normal(face: Any) -> Optional[Tuple[float, float, float]]:
             try:
-                curve = BRepAdaptor_Curve(edge_exp.Current())
-                total += GCPnts_AbscissaPoint.Length(curve, 1e-3)
+                adaptor = BRepAdaptor_Surface(face)
+                if adaptor.GetType() != GeomAbs_Plane:
+                    return None
+                n = adaptor.Plane().Axis().Direction()
+                return (float(n.X()), float(n.Y()), float(n.Z()))
             except Exception:
-                pass
-            edge_exp.Next()
-        return total
+                return None
+
+        # Classifies an edge by its OTHER adjacent face (not `face` itself):
+        # 'bend' (in-plane-axis cylinder -> fold transition, excluded
+        # entirely), 'hole' (axis aligned with the panel normal -> real round
+        # hole rim), or 'other' (no cylindrical neighbour, or none at all —
+        # a straight/irregular cutout or outer-profile segment).
+        def _edge_category(edge: Any, face: Any, normal: Tuple[float, float, float]) -> str:
+            if edge_face_map is None:
+                return 'other'
+            idx = edge_face_map.FindIndex(edge)
+            if idx <= 0:
+                return 'other'
+            pnx, pny, pnz = normal
+            adj_list = edge_face_map.FindFromIndex(idx)
+            it = TopTools_ListIteratorOfListOfShape(adj_list)
+            while it.More():
+                adj_face = topods.Face(it.Value())
+                it.Next()
+                if adj_face.IsSame(face):
+                    continue
+                try:
+                    adaptor = BRepAdaptor_Surface(adj_face)
+                    if adaptor.GetType() == GeomAbs_Cylinder:
+                        ax_dir = adaptor.Cylinder().Axis().Direction()
+                        alignment = abs(ax_dir.X() * pnx + ax_dir.Y() * pny + ax_dir.Z() * pnz)
+                        return 'bend' if alignment < 0.5 else 'hole'
+                except Exception:
+                    pass
+            return 'other'
+
+        def _face_breakdown(face: Any, normal: Optional[Tuple[float, float, float]]) -> Tuple[float, float, float, float, float, int]:
+            """Returns (outer_mm, circular_holes_mm, internal_profiles_mm, max_hole_wire_mm, max_internal_wire_mm, internal_wire_count) for one face."""
+            outer = 0.0
+            holes = 0.0
+            internal = 0.0
+            max_hole_wire = 0.0
+            max_internal_wire = 0.0
+            internal_wire_count = 0
+            we = TopExp_Explorer(face, TopAbs_WIRE)
+            wire_idx = 0
+            while we.More():
+                wire = topods.Wire(we.Current())
+                wire_len = 0.0
+                wire_is_hole_like = True
+                had_edge = False
+                ee = TopExp_Explorer(wire, TopAbs_EDGE)
+                while ee.More():
+                    edge = topods.Edge(ee.Current())
+                    category = _edge_category(edge, face, normal) if normal is not None else 'other'
+                    if category == 'bend':
+                        ee.Next()
+                        continue  # fold transition — not a cut edge at all
+                    had_edge = True
+                    try:
+                        curve = BRepAdaptor_Curve(edge)
+                        wire_len += GCPnts_AbscissaPoint.Length(curve, 1e-3)
+                    except Exception:
+                        pass
+                    if category != 'hole':
+                        wire_is_hole_like = False
+                    ee.Next()
+                if had_edge:
+                    if wire_idx == 0:
+                        outer += wire_len
+                    elif wire_is_hole_like:
+                        holes += wire_len
+                        max_hole_wire = max(max_hole_wire, wire_len)
+                    else:
+                        internal += wire_len
+                        max_internal_wire = max(max_internal_wire, wire_len)
+                        internal_wire_count += 1
+                wire_idx += 1
+                we.Next()
+            return outer, holes, internal, max_hole_wire, max_internal_wire, internal_wire_count
+
+        if not panels:
+            if dominant_face is None:
+                return {
+                    "total_mm": 0.0, "outer_profile_mm": 0.0, "circular_holes_mm": 0.0,
+                    "internal_profiles_mm": 0.0, "longest_continuous_cut_mm": 0.0,
+                    "internal_profile_count": 0,
+                }
+            outer, holes, internal, max_hole, max_internal, internal_count = _face_breakdown(dominant_face, _face_normal(dominant_face))
+            return {
+                "total_mm": outer + holes + internal,
+                "outer_profile_mm": outer, "circular_holes_mm": holes, "internal_profiles_mm": internal,
+                "longest_continuous_cut_mm": max(outer, max_hole, max_internal),
+                "internal_profile_count": internal_count,
+            }
+
+        outer_total = 0.0
+        holes_total = 0.0
+        internal_total = 0.0
+        max_hole_wire_overall = 0.0
+        max_internal_wire_overall = 0.0
+        internal_profile_count_total = 0
+        for p in panels:
+            o, h, i, mh, mi, internal_count = _face_breakdown(p["face"], p["normal"])
+            outer_total += o
+            holes_total += h
+            internal_total += i
+            max_hole_wire_overall = max(max_hole_wire_overall, mh)
+            max_internal_wire_overall = max(max_internal_wire_overall, mi)
+            internal_profile_count_total += internal_count
+
+        if raw_cylinders_full and sheet_thickness > 0:
+            max_bend_radius = max(sheet_thickness * 8, 20.0)
+            plane_tol = max(0.5, sheet_thickness * 0.5)
+            hole_candidates = [
+                c for c in raw_cylinders_full
+                if 0.3 <= c[0] <= 150.0
+                and not self._is_bend_cylinder(c, sheet_thickness, max_bend_radius, dominant_normal)
+                and self._is_full_circle_cylinder(c)  # else: partial arc (external round/fillet) — already covered by the panel's own outer-edge walk above, not a separate pierced hole
+                and self._panel_alignment(c[5], c[6], c[7], panels) >= 0.5
+            ]
+            # Cluster stepped/burled holes (tap-drill + boss/counterbore, same
+            # axis line, different depth) to ONE physical hole before adding
+            # circumference — otherwise a burled hole whose boss sits off the
+            # panel plane gets its rim circumference added once per diameter
+            # layer instead of once per real hole.
+            for c in self._cluster_coaxial_hole_entries(hole_candidates):
+                radius, cx, cy, cz, ax, ay, az = c[0], c[2], c[3], c[4], c[5], c[6], c[7]
+                on_a_panel = False
+                for p in panels:
+                    pnx, pny, pnz = p["normal"]
+                    if abs(ax * pnx + ay * pny + az * pnz) < 0.5:
+                        continue  # this cylinder isn't aligned with THIS panel specifically
+                    dist = abs(cx * pnx + cy * pny + cz * pnz - p["plane_d"])
+                    if dist <= plane_tol:
+                        on_a_panel = True
+                        break
+                if not on_a_panel:
+                    rim_len = 2 * math.pi * radius
+                    holes_total += rim_len
+                    max_hole_wire_overall = max(max_hole_wire_overall, rim_len)
+
+        return {
+            "total_mm": outer_total + holes_total + internal_total,
+            "outer_profile_mm": outer_total,
+            "circular_holes_mm": holes_total,
+            "internal_profiles_mm": internal_total,
+            "longest_continuous_cut_mm": max(outer_total, max_hole_wire_overall, max_internal_wire_overall),
+            "internal_profile_count": internal_profile_count_total,
+        }
+
+    def _compute_corner_angles(
+        self,
+        shape: Any,
+        dominant_face: Any,
+        panels: Optional[List[Dict[str, Any]]] = None,
+        sheet_thickness: float = 0.0,
+    ) -> Dict[str, int]:
+        """
+        Classifies every real corner (where two consecutive laser-cut
+        segments on one panel's own wire — outer boundary or any internal
+        cutout — meet) by TURN ANGLE: the angle between the direction the
+        cutting head is travelling just before the corner and just after it
+        (0 deg = a perfectly straight continuation, 180 deg = a full
+        reversal). This is the deceleration-relevant number, not the
+        polygon's interior angle — a laser/punch head must slow approaching
+        a sharp turn and re-accelerate leaving it, regardless of which side
+        of the cut material sits on. A smooth curve (a large fillet, or a
+        round hole's own rim, even where OCC represents it as multiple
+        seam-split edges) is tangent-continuous at every shared vertex and
+        naturally scores ~0 deg, so this only flags genuine discrete turns.
+
+        BRIDGES OVER short CURVED connector edges (arc length below
+        max(6.0mm, 4x sheet_thickness) — sized to typical corner-break /
+        deburr fillet radii) rather than treating them as their own
+        near-0-deg "corners". A real corner-rounding fillet is, by
+        construction, TANGENT-CONTINUOUS (G1) with both edges it blends —
+        which means the turn angle AT EACH of its own two endpoints is
+        always ~0 deg, no matter how much the fillet's own curve sweeps
+        internally (confirmed on a real part: a small fillet inserted at a
+        true ~90 deg bracket corner scored 0.0 deg at BOTH its junctions,
+        hiding the entire turn from plain junction-by-junction testing).
+        Only a CURVED edge can hide angle like this — a straight edge has
+        zero curvature, so its full direction is always exactly visible at
+        its two junctions and it is NEVER bridged, regardless of length:
+        bridging short straight edges was an earlier bug in this method
+        that silently swallowed real small square-notch corners (e.g. a
+        bend-relief cut) which were already directly measurable. Bridging
+        compares the tangents of the two flanking SIGNIFICANT (non-bridged,
+        non-bend) edges directly, which is exactly the fillet's net turn.
+        This can undercount a feature that is ENTIRELY short curved edges
+        (e.g. a tiny round-cornered notch smaller than the bridge distance,
+        where every side gets bridged away with nothing significant left to
+        compare) — documented tradeoff, not a silent guess: such a feature
+        is small enough that a laser also can't reach cutting speed across
+        it regardless of its exact corner count.
+
+        Returns {"sharp_count", "acute_count"}:
+          sharp_count — corners with turn angle > 60 deg (ordinary
+                        right-angle-ish corners, the common case in a
+                        rectilinear bracket outline).
+          acute_count — corners with turn angle > 150 deg (interior angle
+                        < 30 deg — a near-reversal spike/notch tip). Always
+                        a SUBSET of sharp_count (150 > 60), flagging the
+                        few corners that need far more deceleration than an
+                        ordinary one, not a separate/overlapping bucket.
+
+        Excludes FOLD-TRANSITION edges (same test _compute_cut_length uses)
+        and skips any corner that would straddle one entirely, rather than
+        guessing: the panel/bend adjacency + 2D unfold transforms needed to
+        correctly evaluate the corner actually formed at a fold line in the
+        true flat, unfolded state aren't threaded through here. This can
+        only ever UNDERCOUNT (miss a handful of fold-adjacent corners),
+        never misclassify one.
+
+        Falls back to dominant_face alone when no panels were identified,
+        same convention every other method in this class already uses.
+        """
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface  # type: ignore
+        from OCC.Core.BRepTools import BRepTools_WireExplorer  # type: ignore
+        from OCC.Core.GCPnts import GCPnts_AbscissaPoint  # type: ignore
+        from OCC.Core.TopExp import TopExp_Explorer, topexp  # type: ignore
+        from OCC.Core.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_WIRE, TopAbs_REVERSED  # type: ignore
+        from OCC.Core.TopoDS import topods  # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Line  # type: ignore
+        from OCC.Core.gp import gp_Vec, gp_Pnt  # type: ignore
+
+        short_edge_mm = max(6.0, sheet_thickness * 4.0)
+
+        edge_face_map = None
+        try:
+            edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+            topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_face_map)  # type: ignore
+        except Exception:
+            edge_face_map = None
+
+        def _face_normal(face: Any) -> Optional[Tuple[float, float, float]]:
+            try:
+                adaptor = BRepAdaptor_Surface(face)
+                if adaptor.GetType() != GeomAbs_Plane:
+                    return None
+                n = adaptor.Plane().Axis().Direction()
+                return (float(n.X()), float(n.Y()), float(n.Z()))
+            except Exception:
+                return None
+
+        def _is_bend_edge(edge: Any, face: Any, normal: Optional[Tuple[float, float, float]]) -> bool:
+            if edge_face_map is None or normal is None:
+                return False
+            idx = edge_face_map.FindIndex(edge)
+            if idx <= 0:
+                return False
+            pnx, pny, pnz = normal
+            adj_list = edge_face_map.FindFromIndex(idx)
+            it = TopTools_ListIteratorOfListOfShape(adj_list)
+            while it.More():
+                adj_face = topods.Face(it.Value())
+                it.Next()
+                if adj_face.IsSame(face):
+                    continue
+                try:
+                    adaptor = BRepAdaptor_Surface(adj_face)
+                    if adaptor.GetType() == GeomAbs_Cylinder:
+                        ax_dir = adaptor.Cylinder().Axis().Direction()
+                        alignment = abs(ax_dir.X() * pnx + ax_dir.Y() * pny + ax_dir.Z() * pnz)
+                        return alignment < 0.5
+                except Exception:
+                    pass
+            return False
+
+        def _traversal_tangent(curve: Any, want_exit: bool, is_reversed: bool) -> Optional[Tuple[float, float, float]]:
+            """Unit tangent in the WIRE-TRAVERSAL direction, at the point where
+            traversal either exits this edge (want_exit=True) or enters it
+            (want_exit=False)."""
+            if want_exit:
+                param = curve.FirstParameter() if is_reversed else curve.LastParameter()
+            else:
+                param = curve.LastParameter() if is_reversed else curve.FirstParameter()
+            pnt = gp_Pnt()
+            vec = gp_Vec()
+            try:
+                curve.D1(param, pnt, vec)
+            except Exception:
+                return None
+            mag = vec.Magnitude()
+            if mag < 1e-9:
+                return None
+            direction = (vec.X() / mag, vec.Y() / mag, vec.Z() / mag)
+            return tuple(-c for c in direction) if is_reversed else direction  # type: ignore
+
+        def _wire_corners(face: Any, normal: Optional[Tuple[float, float, float]]) -> Tuple[int, int]:
+            sharp = 0
+            acute = 0
+            we = TopExp_Explorer(face, TopAbs_WIRE)
+            while we.More():
+                wire = topods.Wire(we.Current())
+                ordered: List[Any] = []
+                try:
+                    wexp = BRepTools_WireExplorer(wire)
+                    while wexp.More():
+                        ordered.append(wexp.Current())
+                        wexp.Next()
+                except Exception:
+                    ordered = []
+                n = len(ordered)
+                if n >= 2:
+                    is_bend = [False] * n
+                    is_short = [False] * n
+                    for i, e in enumerate(ordered):
+                        if _is_bend_edge(e, face, normal):
+                            is_bend[i] = True
+                            continue
+                        try:
+                            curve = BRepAdaptor_Curve(e)
+                            if curve.GetType() == GeomAbs_Line:
+                                continue  # a straight edge can't hide an internal turn -- never bridged
+                            L = GCPnts_AbscissaPoint.Length(curve, 1e-3)
+                            is_short[i] = L < short_edge_mm
+                        except Exception:
+                            pass
+                    significant = [i for i in range(n) if not is_bend[i] and not is_short[i]]
+                    for k, idx_a in enumerate(significant if len(significant) >= 2 else []):
+                        idx_b = significant[(k + 1) % len(significant)]
+                        # a bend edge strictly between idx_a and idx_b (circularly) means
+                        # this "corner" would straddle a fold line -- skip it entirely.
+                        j = (idx_a + 1) % n
+                        straddles_bend = False
+                        while j != idx_b:
+                            if is_bend[j]:
+                                straddles_bend = True
+                                break
+                            j = (j + 1) % n
+                        if straddles_bend:
+                            continue
+                        e_a, e_b = ordered[idx_a], ordered[idx_b]
+                        try:
+                            a_reversed = e_a.Orientation() == TopAbs_REVERSED
+                            b_reversed = e_b.Orientation() == TopAbs_REVERSED
+                            t_in = _traversal_tangent(BRepAdaptor_Curve(e_a), True, a_reversed)
+                            t_out = _traversal_tangent(BRepAdaptor_Curve(e_b), False, b_reversed)
+                        except Exception:
+                            continue
+                        if t_in is None or t_out is None:
+                            continue
+                        dot = t_in[0] * t_out[0] + t_in[1] * t_out[1] + t_in[2] * t_out[2]
+                        dot = max(-1.0, min(1.0, dot))
+                        turn_deg = math.degrees(math.acos(dot))
+                        if turn_deg > 60.0:
+                            sharp += 1
+                        if turn_deg > 150.0:
+                            acute += 1
+                we.Next()
+            return sharp, acute
+
+        if not panels:
+            if dominant_face is None:
+                return {"sharp_count": 0, "acute_count": 0}
+            sharp, acute = _wire_corners(dominant_face, _face_normal(dominant_face))
+            return {"sharp_count": sharp, "acute_count": acute}
+
+        sharp_total = 0
+        acute_total = 0
+        for p in panels:
+            s, a = _wire_corners(p["face"], p["normal"])
+            sharp_total += s
+            acute_total += a
+        return {"sharp_count": sharp_total, "acute_count": acute_total}
+
+    # Typical fiber-laser G0/rapid-traverse rate (non-cutting head movement
+    # between pierce points) -- an assumed industry-typical constant, NOT a
+    # seeded/measured value like LASER_SPEED_MM_PER_MIN's per-thickness
+    # cutting-speed table. Documented explicitly rather than silently mixed
+    # in as if it had the same provenance.
+    _RAPID_TRAVERSE_MM_PER_MIN = 60000.0  # 60 m/min
+
+    def _estimate_rapid_traverse_sec(
+        self,
+        dominant_face: Any,
+        holes: Dict[str, Any],
+        slots: Dict[str, Any],
+        bbox_minmax: Optional[Dict[str, float]],
+    ) -> Optional[float]:
+        """
+        Estimates non-cutting head-repositioning ("rapid traverse" / G0) time
+        between pierce points: one real pierce location per hole (post
+        stepped/burled clustering) + one per slot + a single reference point
+        for the outer profile's own pierce (the dominant panel's centroid,
+        since the true single start point of the connected multi-panel outer
+        loop needs the full 2D-unfold graph and isn't threaded through here).
+
+        Travel order is a GREEDY NEAREST-NEIGHBOUR tour starting from the
+        outer-profile point -- a reasonable, deterministic estimate of total
+        repositioning distance, not the exact sequence a real CAM post-
+        processor would choose (which also optimises for thermal spacing,
+        common-line cutting, etc.). Divides by _RAPID_TRAVERSE_MM_PER_MIN, an
+        assumed typical fiber-laser rapid rate (not a seeded/measured value).
+
+        Returns None (not a guessed number) when there's no dominant_face or
+        bbox_minmax to anchor the outer-profile reference point on, or when
+        there are zero pierce points to route between.
+        """
+        if dominant_face is None or not bbox_minmax:
+            return None
+
+        from OCC.Core.BRepGProp import brepgprop  # type: ignore
+        from OCC.Core.GProp import GProp_GProps  # type: ignore
+
+        try:
+            props = GProp_GProps()
+            brepgprop.SurfaceProperties(dominant_face, props)
+            com = props.CentreOfMass()
+            outer_point = (float(com.X()), float(com.Y()), float(com.Z()))
+        except Exception:
+            return None
+
+        points: List[Tuple[float, float, float]] = [outer_point]
+        points.extend(holes.get("centroids", []))
+
+        cx = (bbox_minmax['xmin'] + bbox_minmax['xmax']) / 2
+        cy = (bbox_minmax['ymin'] + bbox_minmax['ymax']) / 2
+        cz = (bbox_minmax['zmin'] + bbox_minmax['zmax']) / 2
+        for occ in slots.get("occurrences", []):
+            rel = occ.get("centroid")
+            if rel and len(rel) == 3:
+                points.append((rel[0] + cx, rel[1] + cy, rel[2] + cz))
+
+        if len(points) < 2:
+            return 0.0 if points else None
+
+        remaining = points[1:]
+        current = points[0]
+        total_mm = 0.0
+        while remaining:
+            best_i, best_d = 0, None
+            for i, p in enumerate(remaining):
+                d = math.sqrt((p[0]-current[0])**2 + (p[1]-current[1])**2 + (p[2]-current[2])**2)
+                if best_d is None or d < best_d:
+                    best_i, best_d = i, d
+            total_mm += best_d
+            current = remaining.pop(best_i)
+
+        return round((total_mm / self._RAPID_TRAVERSE_MM_PER_MIN) * 60.0, 2)
+
+    def _compute_cut_boundary_face_ids(
+        self,
+        shape: Any,
+        panels: Optional[List[Dict[str, Any]]],
+        dominant_face: Any,
+    ) -> List[int]:
+        """
+        Face IDs of the side-wall faces along every real cut boundary of the
+        part — the physical edge faces a laser/punch actually cuts through,
+        as opposed to the flat top/bottom panel faces themselves. Lets the
+        viewer highlight the full cut path (every real panel's perimeter AND
+        every cutout in it) together with the pierced holes, so selecting
+        Flat Pattern shows the complete laser-cutting operation instead of
+        only the round-hole markers.
+
+        For each real panel (base + every bent-up wall/flange; falls back to
+        dominant_face alone when panel detection failed, same convention
+        _compute_cut_length uses), walks EVERY wire on that panel face — not
+        only the outer contour, but also every inner cutout wire — and finds
+        each edge's OTHER adjacent face (not the panel face itself); that
+        neighbour is the actual side wall the cut passes through.
+
+        Walking every wire (not just the outer one) matters: a cutout doesn't
+        have to be a plain round hole or a simple slot. A confirmed real part
+        has an ear-panel cutout bounded by 16 edges — alternating small R0.8
+        fillets and larger R6/R7 arcs, no dominant circular wall at all — a
+        scalloped/wavy profile the cylindrical-face hole detector can never
+        recognise as a hole (there's no single circular face to find) and
+        the slot detector doesn't match either. Walking every wire finds its
+        side walls regardless of shape, rather than requiring the shape to
+        be pre-classified first. Round holes' own wires get walked too —
+        redundant with their already-highlighted cylindrical face, but
+        harmless (same faces, added to the same highlight set).
+        """
+        panel_faces = [p["face"] for p in panels] if panels else ([dominant_face] if dominant_face is not None else [])
+        if not panel_faces:
+            return []
+
+        try:
+            from OCC.Core.TopTools import (  # type: ignore
+                TopTools_IndexedDataMapOfShapeListOfShape,
+                TopTools_ListIteratorOfListOfShape,
+                TopTools_IndexedMapOfShape,
+            )
+            from OCC.Core.TopExp import topexp, TopExp_Explorer as _WExp  # type: ignore
+            from OCC.Core.TopAbs import TopAbs_WIRE, TopAbs_EDGE, TopAbs_FACE  # type: ignore
+            from OCC.Core.TopoDS import topods as _td  # type: ignore
+
+            edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+            topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_face_map)  # type: ignore
+
+            face_shape_indexed = TopTools_IndexedMapOfShape()
+            fe = _WExp(shape, TopAbs_FACE)
+            while fe.More():
+                face_shape_indexed.Add(fe.Current())
+                fe.Next()
+
+            boundary_fids: set = set()
+            for panel_face in panel_faces:
+                we = _WExp(panel_face, TopAbs_WIRE)
+                while we.More():
+                    wire = _td.Wire(we.Current())
+                    ee = _WExp(wire, TopAbs_EDGE)
+                    while ee.More():
+                        edge = _td.Edge(ee.Current())
+                        idx = edge_face_map.FindIndex(edge)
+                        if idx > 0:
+                            adj_list = edge_face_map.FindFromIndex(idx)
+                            it = TopTools_ListIteratorOfListOfShape(adj_list)
+                            while it.More():
+                                adj_face = _td.Face(it.Value())
+                                it.Next()
+                                if adj_face.IsSame(panel_face):
+                                    continue
+                                adj_fi = face_shape_indexed.FindIndex(adj_face) - 1  # 1-based → 0-based
+                                if adj_fi >= 0:
+                                    boundary_fids.add(adj_fi)
+                        ee.Next()
+                    we.Next()
+            return sorted(boundary_fids)
+        except Exception as e:
+            logger.warning(f"[SheetMetal] outer boundary face computation failed: {e}")
+            return []
 
     def _compute_flat_pattern_area(self, shape: Any, dominant_face: Any) -> float:
-        """Area of the dominant blank face. Orientation-independent."""
+        """Area of the dominant blank face. Orientation-independent.
+
+        Correct ONLY for an unbent flat blank (one face = the whole part).
+        For a part with bends, this misses every wall/flange folded up from
+        the base -- see _compute_true_flat_pattern_area for the real
+        multi-panel calculation, which is what extract() actually calls when
+        bends are present.
+        """
         if dominant_face is None:
             return 0.0
 
@@ -1434,6 +2772,607 @@ class SheetMetalFeatureExtractor:
         props = GProp_GProps()
         brepgprop.SurfaceProperties(dominant_face, props)
         return round(props.Mass(), 1)
+
+    def _identify_panels(
+        self,
+        shape: Any,
+        sheet_thickness: float,
+    ) -> List[Dict[str, Any]]:
+        """
+        Find every real physical panel (base, flange, bent-up wall) in a
+        sheet-metal part — not just the single `dominant_face`.
+
+        Each physical panel is two OCC faces (its top and bottom surface)
+        separated by sheet_thickness; this pairs antiparallel planar faces at
+        that exact separation to find them, the same technique
+        _extract_sheet_metal_geometry already uses to find the single
+        dominant face, just applied to every qualifying pair instead of only
+        the highest-scored one. Extracted out of _compute_true_flat_pattern_area
+        (which used this exact logic inline) so hole/bend classification and
+        cut-length computation can share the SAME panel list instead of each
+        independently (and inconsistently) re-deriving their own notion of
+        "which faces belong to this part's panels".
+
+        Returns a list of {"normal": (nx,ny,nz), "plane_d": float,
+        "face": <TopoDS_Face>, "area": float} — one entry per panel, "face"
+        being the FORWARD-oriented one of the antiparallel pair (avoids
+        double-counting a panel's top+bottom as two separate cuts downstream,
+        same convention _compute_cut_length already used for dominant_face).
+        Unpaired planar faces (no antiparallel partner at sheet_thickness) are
+        excluded — not part of the main sheet body (e.g. a countersink
+        chamfer flat), same filter _extract_sheet_metal_geometry relies on.
+        """
+        if sheet_thickness <= 0:
+            return []
+
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+        from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_FORWARD  # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
+        from OCC.Core.TopoDS import topods  # type: ignore
+        from OCC.Core.BRepGProp import brepgprop  # type: ignore
+        from OCC.Core.GProp import GProp_GProps  # type: ignore
+        from OCC.Core.Bnd import Bnd_Box  # type: ignore
+        from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
+
+        # Minimum area for a planar face pair to count as a real structural
+        # panel, not noise (a boss/collar top, a countersink chamfer flat, an
+        # edge fillet) that happens to also sit ~sheet_thickness from its own
+        # backing face. Same threshold _detect_sharp_bends already uses to
+        # tell a real flange from noise — reused here, not reinvented, so
+        # "what counts as a real panel" is answered the same way everywhere.
+        box = Bnd_Box()
+        brepbndlib.Add(shape, box)
+        xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
+        max_dim = max(xmax - xmin, ymax - ymin, zmax - zmin, 1.0)
+        min_flange_area = max(sheet_thickness * 20.0, (max_dim * 0.15) ** 2 * 0.5)
+
+        # ── 1. Collect planar faces (candidate panels) ─────────────────────
+        planar: List[Tuple[float, float, float, float, float, Any, bool]] = []  # nx,ny,nz,plane_d,area,face,is_forward
+        exp = TopExp_Explorer(shape, TopAbs_FACE)
+        while exp.More():
+            try:
+                face = topods.Face(exp.Current())
+                adaptor = BRepAdaptor_Surface(face)
+                if adaptor.GetType() == GeomAbs_Plane:
+                    plane = adaptor.Plane()
+                    n = plane.Axis().Direction()
+                    nx, ny, nz = float(n.X()), float(n.Y()), float(n.Z())
+                    mag = math.sqrt(nx * nx + ny * ny + nz * nz)
+                    if mag > 1e-9:
+                        nx, ny, nz = nx / mag, ny / mag, nz / mag
+                        is_forward = face.Orientation() == TopAbs_FORWARD
+                        # BRepAdaptor_Surface's raw plane normal ignores face
+                        # orientation -- a REVERSED face (common after a
+                        # boolean Cut/Fuse, as used here for the bend shell)
+                        # reports the same normal as its FORWARD counterpart,
+                        # so the antiparallel-pair test below never recognizes
+                        # true top/bottom panel pairs. Same fix already
+                        # applied in _extract_sheet_metal_geometry.
+                        if not is_forward:
+                            nx, ny, nz = -nx, -ny, -nz
+                        loc = plane.Location()
+                        plane_d = nx * float(loc.X()) + ny * float(loc.Y()) + nz * float(loc.Z())
+                        props = GProp_GProps()
+                        brepgprop.SurfaceProperties(face, props)
+                        area = props.Mass()
+                        if area >= min_flange_area:
+                            planar.append((nx, ny, nz, plane_d, area, face, is_forward))
+            except Exception:
+                pass
+            exp.Next()
+
+        # ── 2. Pair antiparallel planar faces ~sheet_thickness apart ───────
+        tol = max(0.15, sheet_thickness * 0.15)
+        used = [False] * len(planar)
+        panels: List[Dict[str, Any]] = []
+        for i in range(len(planar)):
+            if used[i]:
+                continue
+            ni, di = planar[i][:3], planar[i][3]
+            for j in range(i + 1, len(planar)):
+                if used[j]:
+                    continue
+                nj, dj = planar[j][:3], planar[j][3]
+                dot = ni[0] * nj[0] + ni[1] * nj[1] + ni[2] * nj[2]
+                if dot > -0.92:
+                    continue
+                dist = abs(di + dj)
+                if abs(dist - sheet_thickness) > tol:
+                    continue
+                used[i] = True
+                used[j] = True
+                # Prefer the FORWARD-oriented face of the pair as the
+                # representative — matches _compute_cut_length's existing
+                # single-dominant-face convention (one face per panel, never
+                # both, so a panel's outer/inner wires are counted once, not
+                # twice for top+bottom).
+                rep_idx = i if planar[i][6] else j
+                rep_normal = planar[rep_idx][:3]
+                panels.append({
+                    "normal": rep_normal,
+                    "plane_d": planar[rep_idx][3],
+                    "face": planar[rep_idx][5],
+                    "area": planar[i][4],  # one face's area = the panel's flat area
+                })
+                break
+
+        return panels
+
+    def _collect_dedup_bends(
+        self,
+        shape: Any,
+        dominant_normal: Tuple[float, float, float],
+        sheet_thickness: float,
+    ) -> List[Dict[str, Any]]:
+        """
+        Finds every real bend in the part as one deduped entry each — shared
+        by _compute_true_flat_pattern_area (needs totals) and
+        _compute_flat_pattern_layout (needs each bend's own axis/direction to
+        walk the panel graph), so both agree on exactly the same bend set
+        instead of independently re-deriving it (and risking disagreement).
+
+        Each physical bend is TWO concentric OCC cylindrical faces (inner +
+        outer radius, exactly like a panel's top+bottom are two planar
+        faces); candidates sharing an axis line and a radius difference of
+        ~one sheet thickness are paired into one bend, keeping the INNER
+        (smaller radius) face's data as the representative.
+
+        Returns a list of {"dir": unit direction (sign-normalized),
+        "axis_point": point on the axis closest to the origin, "radius",
+        "angle_rad", "axial_length" (bend line width), "allowance_mm"
+        (flattened developed length via the standard two-tier K-factor:
+        K=0.33 for R<2t, else 0.41)}.
+        """
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+        from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_FACE  # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Cylinder  # type: ignore
+        from OCC.Core.TopoDS import topods  # type: ignore
+        from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
+        from OCC.Core.Bnd import Bnd_Box  # type: ignore
+
+        dnx, dny, dnz = dominant_normal
+        max_bend_radius = max(sheet_thickness * 8, 20.0)
+        min_bend_line = max(2.0 * sheet_thickness, 3.0)
+        candidates: List[Dict[str, Any]] = []
+
+        exp2 = TopExp_Explorer(shape, TopAbs_FACE)
+        while exp2.More():
+            try:
+                face = topods.Face(exp2.Current())
+                adaptor = BRepAdaptor_Surface(face)
+                if adaptor.GetType() == GeomAbs_Cylinder:
+                    cyl = adaptor.Cylinder()
+                    radius = cyl.Radius()
+                    axis = cyl.Axis()
+                    d = axis.Direction()
+                    fx, fy, fz = float(d.X()), float(d.Y()), float(d.Z())
+                    fn = math.sqrt(fx * fx + fy * fy + fz * fz) or 1.0
+                    fx, fy, fz = fx / fn, fy / fn, fz / fn
+                    axis_alignment = abs(fx * dnx + fy * dny + fz * dnz)
+                    if axis_alignment >= 0.5:
+                        exp2.Next()
+                        continue  # aligned with sheet normal -- a hole/boss, not a bend
+                    if not (0.1 <= radius <= max_bend_radius):
+                        exp2.Next()
+                        continue
+
+                    fbox = Bnd_Box()
+                    brepbndlib.Add(face, fbox)
+                    xmin, ymin, zmin, xmax, ymax, zmax = fbox.Get()
+                    corners = [
+                        (xmin, ymin, zmin), (xmax, ymin, zmin), (xmin, ymax, zmin), (xmin, ymin, zmax),
+                        (xmax, ymax, zmin), (xmax, ymin, zmax), (xmin, ymax, zmax), (xmax, ymax, zmax),
+                    ]
+                    projections = [cx * fx + cy * fy + cz * fz for cx, cy, cz in corners]
+                    axial_length = max(projections) - min(projections)
+                    if axial_length < min_bend_line:
+                        exp2.Next()
+                        continue  # too short for a real press-brake bend line (edge fillet noise)
+
+                    angle_rad = abs(adaptor.LastUParameter() - adaptor.FirstUParameter())
+                    if angle_rad <= 0.001 or angle_rad > math.pi:
+                        exp2.Next()
+                        continue  # degenerate, or > 180 deg (not a simple press-brake bend)
+
+                    loc = axis.Location()
+                    lx, ly, lz = float(loc.X()), float(loc.Y()), float(loc.Z())
+                    if (fx, fy, fz) < (0.0, 0.0, 0.0):
+                        fx, fy, fz = -fx, -fy, -fz
+                    along = lx * fx + ly * fy + lz * fz
+                    px, py, pz = lx - along * fx, ly - along * fy, lz - along * fz
+
+                    candidates.append({
+                        "radius": radius,
+                        "angle_rad": angle_rad,
+                        "axial_length": axial_length,
+                        "dir": (fx, fy, fz),
+                        "axis_point": (px, py, pz),
+                    })
+            except Exception:
+                pass
+            exp2.Next()
+
+        # Verified against real debug data (live QA, Aug 2026): every real
+        # bend candidate pairs cleanly into inner+outer radii exactly one
+        # sheet thickness apart, with zero unpaired leftovers and no overlap
+        # with burl/extrusion cylinder geometry (completely different radii
+        # and locations) — bend_count is genuine here, not a misclassified
+        # burl. Left un-guarded by design; a burl's axis is aligned with its
+        # OWN panel's normal, and the axis_alignment>=0.5 test above compares
+        # against the PART's overall dominant_normal, which is a real
+        # theoretical gap on a non-dominant panel — just not one that
+        # manifested on this part's actual geometry.
+        axis_tol = max(0.1, sheet_thickness * 0.1)
+        used_bend = [False] * len(candidates)
+        bends: List[Dict[str, Any]] = []
+        for i in range(len(candidates)):
+            if used_bend[i]:
+                continue
+            ci = candidates[i]
+            partner_j = -1
+            for j in range(i + 1, len(candidates)):
+                if used_bend[j]:
+                    continue
+                cj = candidates[j]
+                ddir = sum(a * b for a, b in zip(ci["dir"], cj["dir"]))
+                if ddir < 0.99:
+                    continue  # not the same axis direction
+                dperp = math.sqrt(sum((a - b) ** 2 for a, b in zip(ci["axis_point"], cj["axis_point"])))
+                if dperp > axis_tol:
+                    continue  # not the same axis line
+                if abs(abs(ci["radius"] - cj["radius"]) - sheet_thickness) > axis_tol:
+                    continue  # radii don't differ by ~one sheet thickness
+                partner_j = j
+                break
+
+            if partner_j >= 0:
+                used_bend[i] = True
+                used_bend[partner_j] = True
+                inner = ci if ci["radius"] < candidates[partner_j]["radius"] else candidates[partner_j]
+            else:
+                used_bend[i] = True
+                inner = ci  # no concentric partner found -- use this face alone
+
+            radius = inner["radius"]
+            k_factor = 0.33 if radius < 2.0 * sheet_thickness else 0.41
+            allowance_mm = inner["angle_rad"] * (radius + k_factor * sheet_thickness)
+            bends.append({
+                "dir": inner["dir"],
+                "axis_point": inner["axis_point"],
+                "radius": radius,
+                "angle_rad": inner["angle_rad"],
+                "axial_length": inner["axial_length"],
+                "allowance_mm": allowance_mm,
+            })
+
+        return bends
+
+    def _compute_true_flat_pattern_area(
+        self,
+        shape: Any,
+        dominant_face: Any,
+        sheet_thickness: float,
+    ) -> Dict[str, Any]:
+        """
+        True flat-pattern (unfolded blank) area for a multi-bend sheet-metal part.
+
+        _compute_flat_pattern_area() only measures the dominant face's own
+        area -- correct for an unbent flat blank, but for a part with N bends
+        it misses every wall/flange folded up from the base, undercounting
+        material usage (and therefore weight/cost) by up to an order of
+        magnitude on typical brackets.
+
+        Physics: total flat area = sum of every distinct panel's own (flat,
+        unstretched) area + sum of each bend's flattened length (bend
+        allowance) x bend width. Bend allowance is the standard formula:
+            BA = angle_rad x (radius + K x thickness)
+        K = 0.33 for tight bends (R < 2t) or 0.41 for looser bends (R >= 2t)
+        -- the standard two-tier K-factor convention used across sheet-metal
+        fabrication (see e.g. thefabricator.com "Analyzing the k-factor in
+        sheet metal bending").
+
+        Deliberately does NOT attempt a full 2D unfold layout (which panel
+        sits where relative to the others) -- only total area is needed for
+        material usage / weight, which doesn't require solving that harder
+        layout problem. Each physical panel is two OCC faces (top + bottom)
+        separated by sheet_thickness; each is counted once via antiparallel
+        pairing, the same technique _extract_sheet_metal_geometry already
+        uses to find the dominant face, just applied to every qualifying
+        pair instead of only the highest-scored one.
+
+        Returns {"area_mm2", "method", "bends_used", "bends_total",
+        "panel_count"}. Caller should fall back to _compute_flat_pattern_area
+        when method == "none" (couldn't confidently re-derive panels, e.g.
+        a non-manifold or unusual import).
+        """
+        none_result = {"area_mm2": 0.0, "method": "none", "bends_used": 0, "bends_total": 0, "panel_count": 0}
+        if dominant_face is None or sheet_thickness <= 0:
+            return none_result
+
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
+
+        # Sheet normal -- a bend's cylinder axis lies IN the sheet plane
+        # (perpendicular to this), a hole's cylinder axis is ALIGNED with it.
+        dom_adaptor = BRepAdaptor_Surface(dominant_face)
+        if dom_adaptor.GetType() != GeomAbs_Plane:
+            return none_result
+        dn = dom_adaptor.Plane().Axis().Direction()
+        dnx, dny, dnz = float(dn.X()), float(dn.Y()), float(dn.Z())
+        dmag = math.sqrt(dnx * dnx + dny * dny + dnz * dnz) or 1.0
+        dominant_normal = (dnx / dmag, dny / dmag, dnz / dmag)
+
+        # ── 1 & 2. Real panels (base + every wall/flange), shared with
+        # hole/bend classification and multi-panel cut length so all three
+        # agree on the exact same panel set instead of independently
+        # re-deriving it.
+        panels = self._identify_panels(shape, sheet_thickness)
+        panel_count = len(panels)
+        panel_area_total = sum(p["area"] for p in panels)
+
+        # Unpaired planar faces (no antiparallel partner at sheet_thickness)
+        # aren't part of the main sheet body (e.g. a countersink chamfer
+        # flat) -- excluded, same filter _extract_sheet_metal_geometry
+        # already relies on to find the dominant face.
+        if panel_count == 0:
+            return none_result
+
+        # ── 3. Bend cylindrical faces: flattened (bend-allowance) area ─────
+        # Each physical bend is ONE shell of material, but OCC represents it
+        # as TWO concentric cylindrical faces (inner + outer radius, exactly
+        # like a panel's top+bottom are two planar faces) -- _collect_dedup_bends
+        # already pairs and dedupes them to one bend each.
+        bends = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness)
+        bend_area_total = sum(b["allowance_mm"] * b["axial_length"] for b in bends)
+        total_area = panel_area_total + bend_area_total
+
+        return {
+            "area_mm2": round(total_area, 1),
+            "method": "true_unfold",
+            "bends_used": len(bends),
+            "bends_total": len(bends),
+            "panel_count": panel_count,
+        }
+
+    def _compute_flat_pattern_layout(
+        self,
+        dominant_face: Any,
+        panels: Optional[List[Dict[str, Any]]],
+        bends: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, float]]:
+        """
+        The flat pattern's TRUE 2D bounding rectangle — for nesting-cost
+        metrics (material utilization, scrap area). This is NOT the 3D
+        part's bounding box: for a bent bracket those are two completely
+        different (and very different-sized) numbers — the nesting envelope
+        is on the FLAT sheet, not the folded 3D shape.
+
+        Walks the real panel/bend adjacency graph and transforms every
+        panel's own geometry into one common unfolded 2D frame — handles
+        ANY bend arrangement (a wing folded around an axis perpendicular to
+        another wing's, not just the simpler case of all-parallel bend
+        axes a prior version of this was restricted to; verified against a
+        real part with exactly that mix: two bends along one axis, one
+        along a perpendicular axis).
+
+        Panel/bend graph: each bend physically joins exactly two panels
+        (its axis lies along their shared fold edge). For N panels
+        connected by a single flat sheet's bends this graph is always a
+        tree (N panels, N-1 bends, no cycles — cutting the sheet apart at
+        any bend would disconnect it, so there's no alternate path to
+        close a loop back to itself).
+
+        Traversal: BFS from the dominant/root panel. Each panel gets a
+        frame — an origin point plus 2 orthonormal in-plane 3D directions —
+        that maps any 3D point X on that panel to a 2D coordinate in the
+        COMMON unfolded frame: 2D = origin_2d + (dot(X - origin_3d, u),
+        dot(X - origin_3d, v)). The root's frame is arbitrary (any in-plane
+        basis, origin_2d = (0,0)); for a child reached via a bend from an
+        already-placed parent:
+          - u_child = the bend's own axis direction — the fold line
+            survives unfolding unchanged in both length and direction, only
+            the material on either side rotates about it.
+          - v_child = child_normal × u_child, sign-chosen to point from the
+            fold line INTO the child panel's own body, so it lands the
+            right way up once unfolded rather than overlapping the parent.
+          - The fold line's own axis_point maps into the PARENT's
+            already-known 2D frame (valid since that point lies on the
+            shared edge, in both panels' planes) — giving the fold line's
+            2D position in the common frame. The child's origin is offset
+            from that point by the bend's flattened allowance length, in
+            the 2D direction perpendicular to the fold line, on the side
+            AWAY from the parent's own material (determined by which side
+            of the fold line the parent's own centroid falls on) — exactly
+            the extra developed length the bend contributes when flattened.
+
+        Once every panel has a frame, every panel's own bounding-box
+        corners are projected through it; the min/max across ALL of them is
+        the common frame's axis-aligned bounding box — the flat pattern's
+        true footprint, matching how a real flat-pattern drawing is
+        dimensioned (against the design's own natural orientation, not
+        rotated to minimize area).
+
+        Returns None when a bend's two connected panels can't be
+        confidently identified, or the graph doesn't fully connect (neither
+        should happen for a real single-sheet part, but non-manifold or
+        unusual imports can break the assumption) — caller must treat that
+        as "can't report this metric," never guess.
+        """
+        if not panels or dominant_face is None:
+            return None
+        from OCC.Core.Bnd import Bnd_Box  # type: ignore
+        from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
+
+        def _bbox_corners(face: Any) -> List[Tuple[float, float, float]]:
+            fbox = Bnd_Box()
+            brepbndlib.Add(face, fbox)
+            xmin, ymin, zmin, xmax, ymax, zmax = fbox.Get()
+            return [
+                (xmin, ymin, zmin), (xmax, ymin, zmin), (xmin, ymax, zmin), (xmin, ymin, zmax),
+                (xmax, ymax, zmin), (xmax, ymin, zmax), (xmin, ymax, zmax), (xmax, ymax, zmax),
+            ]
+
+        def _dot(a: Tuple[float, ...], b: Tuple[float, ...]) -> float:
+            return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+        def _sub(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> Tuple[float, float, float]:
+            return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+        def _cross(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> Tuple[float, float, float]:
+            return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+        def _norm(a: Tuple[float, float, float]) -> Tuple[float, float, float]:
+            m = math.sqrt(_dot(a, a)) or 1.0
+            return (a[0] / m, a[1] / m, a[2] / m)
+
+        n = len(panels)
+        root_idx = 0
+        for i, p in enumerate(panels):
+            if p["face"].IsSame(dominant_face):
+                root_idx = i
+                break
+
+        # Match each bend to the two panels it connects: a panel matches a
+        # bend when the bend's own axis_point lies (within radius + a small
+        # tolerance) on that panel's plane — the two closest panels are its
+        # endpoints.
+        adjacency: List[List[Tuple[int, Dict[str, Any]]]] = [[] for _ in range(n)]
+        for bend in bends:
+            ax_pt = bend["axis_point"]
+            tol = bend["radius"] * 1.5 + 2.0
+            dists = []
+            for i, p in enumerate(panels):
+                nx, ny, nz = p["normal"]
+                dist = abs(ax_pt[0] * nx + ax_pt[1] * ny + ax_pt[2] * nz - p["plane_d"])
+                dists.append((dist, i))
+            dists.sort(key=lambda t: t[0])
+            if len(dists) < 2 or dists[1][0] > tol:
+                continue  # couldn't confidently find both connected panels for this bend
+            i1, i2 = dists[0][1], dists[1][1]
+            adjacency[i1].append((i2, bend))
+            adjacency[i2].append((i1, bend))
+
+        # Per panel: origin_3d (a 3D reference point on the panel) + u_3d/v_3d
+        # (orthonormal in-plane 3D directions) + origin_2d (that reference
+        # point's own position in COMMON coords) + u_img/v_img (where a unit
+        # step along u_3d/v_3d respectively LANDS in COMMON coords). A point
+        # X on the panel maps to COMMON coords as:
+        #   local_u, local_v = dot(X - origin_3d, u_3d), dot(X - origin_3d, v_3d)
+        #   common = origin_2d + local_u * u_img + local_v * v_img
+        # u_img/v_img are NOT simply (1,0)/(0,1) except for the root: a
+        # child's own u_3d (the bend direction) can land along the PARENT's
+        # v-axis instead of its u-axis (confirmed on a real part — panel2's
+        # fold ran along the root's own v-direction, not u), so reusing
+        # (1,0)/(0,1) for every panel silently swapped its dimensions into
+        # the wrong common axis. u_img/v_img make that swap/rotation
+        # explicit and correct for any tree depth, not just direct children
+        # of the root.
+        frame_origin_3d: List[Optional[Tuple[float, float, float]]] = [None] * n
+        frame_u3d: List[Optional[Tuple[float, float, float]]] = [None] * n
+        frame_v3d: List[Optional[Tuple[float, float, float]]] = [None] * n
+        frame_origin_2d: List[Optional[Tuple[float, float]]] = [None] * n
+        frame_u_img: List[Optional[Tuple[float, float]]] = [None] * n
+        frame_v_img: List[Optional[Tuple[float, float]]] = [None] * n
+        visited = [False] * n
+
+        root_normal = panels[root_idx]["normal"]
+        ref = (1.0, 0.0, 0.0) if abs(root_normal[0]) < 0.9 else (0.0, 1.0, 0.0)
+        u0 = _norm(_sub(ref, tuple(c * _dot(ref, root_normal) for c in root_normal)))
+        v0 = _norm(_cross(root_normal, u0))
+        frame_origin_3d[root_idx] = _bbox_corners(panels[root_idx]["face"])[0]
+        frame_u3d[root_idx] = u0
+        frame_v3d[root_idx] = v0
+        frame_origin_2d[root_idx] = (0.0, 0.0)
+        frame_u_img[root_idx] = (1.0, 0.0)
+        frame_v_img[root_idx] = (0.0, 1.0)
+        visited[root_idx] = True
+
+        def _to_2d(idx: int, point: Tuple[float, float, float]) -> Tuple[float, float]:
+            rel = _sub(point, frame_origin_3d[idx])
+            lu, lv = _dot(rel, frame_u3d[idx]), _dot(rel, frame_v3d[idx])
+            ox, oy = frame_origin_2d[idx]
+            uix, uiy = frame_u_img[idx]
+            vix, viy = frame_v_img[idx]
+            return (ox + lu * uix + lv * vix, oy + lu * uiy + lv * viy)
+
+        def _dir_to_2d(idx: int, direction_3d: Tuple[float, float, float]) -> Tuple[float, float]:
+            """Where a 3D direction lying in panel idx's own plane lands in COMMON coords (no origin/translation — a pure direction, not a point)."""
+            lu, lv = _dot(direction_3d, frame_u3d[idx]), _dot(direction_3d, frame_v3d[idx])
+            uix, uiy = frame_u_img[idx]
+            vix, viy = frame_v_img[idx]
+            return (lu * uix + lv * vix, lu * uiy + lv * viy)
+
+        queue = [root_idx]
+        while queue:
+            cur = queue.pop(0)
+            for (nbr, bend) in adjacency[cur]:
+                if visited[nbr]:
+                    continue
+                u_dir = _norm(bend["dir"])
+                child_normal = panels[nbr]["normal"]
+                v_dir = _cross(child_normal, u_dir)
+                vmag = math.sqrt(_dot(v_dir, v_dir))
+                if vmag < 1e-6:
+                    continue  # degenerate -- child normal parallel to the bend axis, shouldn't happen for a real panel
+                v_dir = (v_dir[0] / vmag, v_dir[1] / vmag, v_dir[2] / vmag)
+
+                # Orient v_dir to point from the fold line INTO the child
+                # panel's own body (its bbox center), not toward the parent.
+                child_center = tuple(sum(c[k] for c in _bbox_corners(panels[nbr]["face"])) / 8.0 for k in range(3))
+                if _dot(_sub(child_center, bend["axis_point"]), v_dir) < 0:
+                    v_dir = (-v_dir[0], -v_dir[1], -v_dir[2])
+
+                # Fold line's position in the COMMON frame, via the
+                # PARENT's already-known mapping.
+                fold_2d = _to_2d(cur, bend["axis_point"])
+
+                # Where u_dir (the shared fold direction) lands in COMMON
+                # coords, via the PARENT's own (possibly already-rotated)
+                # mapping — this is the child's u_img.
+                fdx, fdy = _dir_to_2d(cur, u_dir)
+                fdmag = math.sqrt(fdx * fdx + fdy * fdy) or 1.0
+                fdx, fdy = fdx / fdmag, fdy / fdmag
+                # Perpendicular to that in COMMON coords -- candidate v_img,
+                # sign fixed below to point AWAY from the parent's material.
+                px2, py2 = -fdy, fdx
+
+                parent_center = tuple(sum(c[k] for c in _bbox_corners(panels[cur]["face"])) / 8.0 for k in range(3))
+                pcx, pcy = _to_2d(cur, parent_center)
+                if (pcx - fold_2d[0]) * px2 + (pcy - fold_2d[1]) * py2 > 0:
+                    px2, py2 = -px2, -py2  # flip so it points AWAY from the parent
+
+                frame_origin_3d[nbr] = bend["axis_point"]
+                frame_u3d[nbr] = u_dir
+                frame_v3d[nbr] = v_dir
+                frame_u_img[nbr] = (fdx, fdy)
+                frame_v_img[nbr] = (px2, py2)
+                frame_origin_2d[nbr] = (
+                    fold_2d[0] + px2 * bend["allowance_mm"],
+                    fold_2d[1] + py2 * bend["allowance_mm"],
+                )
+                visited[nbr] = True
+                queue.append(nbr)
+
+        if not all(visited):
+            return None  # graph didn't fully connect -- unusual topology, decline rather than guess
+
+        xs: List[float] = []
+        ys: List[float] = []
+        for i, p in enumerate(panels):
+            for corner in _bbox_corners(p["face"]):
+                x2, y2 = _to_2d(i, corner)
+                xs.append(x2)
+                ys.append(y2)
+
+        if not xs:
+            return None
+        length_mm = max(xs) - min(xs)
+        width_mm = max(ys) - min(ys)
+        if length_mm <= 0 or width_mm <= 0:
+            return None
+        return {"length_mm": length_mm, "width_mm": width_mm}
 
     def _detect_slots_v2(
         self,

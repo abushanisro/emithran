@@ -1,12 +1,15 @@
 import type { ProcessLineCost, RouteResultSustainability } from "./cost-breakdown.dto";
 import type { CapabilityReasonCode } from "../costing/machine-capability";
 
-export type RouteId =
-  | "sm-laser" | "sm-turret" | "sm-waterjet"
-  | "cnc-3ax" | "cnc-4ax" | "cnc-5ax"
-  | "cnc-lathe" | "cnc-lathe-lt" | "cnc-mill-turn"
-  | "injection-molding"
-  | "im-small-50t" | "im-standard-200t" | "im-large-500t";
+// Was a closed string-literal union of exactly the route ids known at the
+// time (3 sheet-metal-cutting + CNC/injection-molding families). Widened to
+// `string` so a newly-registered ManufacturingProcessEngine's route id (see
+// manufacturing-process-registry.ts's ROUTE_ID_FOR_CLASS) is valid here with
+// no edit to this file — validation that a given id is actually real/offered
+// happens at the call sites that build/consume it (getRouteComparison's
+// registry+catalog gate, apply-route.dto.ts's VALID_ROUTE_IDS), not via the
+// type system pretending to enumerate every route id that will ever exist.
+export type RouteId = string;
 
 export interface RouteCapability {
   cuttingCapable: boolean;
@@ -56,4 +59,5 @@ export interface RouteComparisonDto {
   comparisonWarnings: string[];
   currency: string;       // ISO 4217 code, e.g. 'USD'
   currencySymbol: string; // display symbol, e.g. '$'
+  toUsdRate?: number;     // amount_local × toUsdRate = amount_usd — always 1, see normalizeRouteComparisonToUsd
 }
