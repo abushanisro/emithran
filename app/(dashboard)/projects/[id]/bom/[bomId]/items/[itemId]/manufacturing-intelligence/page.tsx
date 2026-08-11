@@ -35,7 +35,7 @@ import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, 
 import { useMHRRecords, useMHRBenchmark } from '@/lib/api/hooks/useMHR';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { resolveMhrUsdRate } from '@/lib/api/mhr';
-import type { MaterialCandidate, GdtSeverity, CostSummaryDto, RouteResultDto } from '@/lib/api/hooks/useBOMItems';
+import type { GdtSeverity, CostSummaryDto, RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 import { useRawMaterials, useMaterialAliases } from '@/lib/api/hooks/useRawMaterials';
 import type { RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { useCreateRawMaterialCost, useRawMaterialCosts } from '@/lib/api/hooks/useRawMaterialCosts';
@@ -6172,7 +6172,7 @@ function CostGuidePanel({
   const displayRate = exchangeRateVersion === 'custom' && customExchangeRate
     ? parseFloat(customExchangeRate)
     : (DEFAULT_RATES[currency] ?? 1);
-  const { data: materialCandidates, isLoading: matLoading } = useMaterialIntelligence(item.id);
+  const { data: materialCandidates } = useMaterialIntelligence(item.id);
   const updateBOMItem = useUpdateBOMItem();
   const patchScenarioOverrides = usePatchScenarioOverrides();
 
@@ -6181,24 +6181,9 @@ function CostGuidePanel({
   const { data: dbMaterialsForValidation } = useRawMaterials(
     (materialCandidates?.length ?? 0) > 0 ? { limit: 500 } : undefined,
   );
-  const dbValidatedCandidates = useMemo(() => {
-    if (!materialCandidates?.length) return [];
-    // While the validation fetch is loading, show all candidates to avoid a flash of empty
-    if (!dbMaterialsForValidation?.items) return materialCandidates;
-    return materialCandidates.filter((cand) => {
-      const candGrade = cand.materialGrade || cand.material;
-      return dbMaterialsForValidation.items.some((m) =>
-        m.materialGrade === candGrade ||
-        materialLabel(m.material, m.materialGrade) === materialLabel(cand.material, cand.materialGrade),
-      );
-    });
-  }, [materialCandidates, dbMaterialsForValidation]);
-
   const UNSPECIFIED_MATERIALS = new Set(['Unknown', 'Not specified', 'Not Specified', 'None', '']);
   const drawingMaterial = item.drawingIntelligence?.material;
   const hasDrawingMaterial = !!drawingMaterial && !UNSPECIFIED_MATERIALS.has(drawingMaterial.trim());
-  const isSheetMetalCAD =
-    fg?.classification?.family === 'sheet_metal' || (summary?.sheetThicknessMm ?? 0) > 0;
   const cadThicknessMm = summary?.sheetThicknessMm ?? 0;
 
   // The actual apply logic — previously ran straight from the button's onClick
@@ -7551,7 +7536,7 @@ function BlankDevOptionsDialog({
 
 // ── ValidationTab ─────────────────────────────────────────────────────────────
 
-function ValidationTab({ fg, item, modelScreenshot, file3dUrl }: { fg: FeatureGraph | null; item: BOMItem; modelScreenshot?: string | null; file3dUrl?: string | null }) {
+function ValidationTab({ fg, item, file3dUrl }: { fg: FeatureGraph | null; item: BOMItem; file3dUrl?: string | null }) {
   const [optionsOpen, setOptionsOpen]     = useState(false);
   const [tolerancesOpen, setTolerancesOpen] = useState(false);
   const [machiningOpen, setMachiningOpen]   = useState(false);
@@ -8565,7 +8550,7 @@ function BlankStockSection({ blank, currencySymbol }: { blank: BlankSpecDto; cur
 function AnalysisTabsPanel({
   projectId,
   item, fg, batchSize, productionLife, factory, selectedCNCFeatureKey, onCNCFeatureSelect,
-  modelScreenshot, file3dUrl, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
+  file3dUrl, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
   onSelectHighlight,
 }: {
   projectId: string;
@@ -8573,7 +8558,6 @@ function AnalysisTabsPanel({
   batchSize: number; productionLife: number; factory: string;
   selectedCNCFeatureKey?: string | null;
   onCNCFeatureSelect?: (key: string | null) => void;
-  modelScreenshot?: string | null;
   file3dUrl?: string | null;
   activeTab: RightTabKey;
   onTabChange: (tab: RightTabKey) => void;
@@ -8697,7 +8681,7 @@ function AnalysisTabsPanel({
         )}
 
         {tab === 'validation' && item && (
-          <ValidationTab fg={fg} item={item} modelScreenshot={modelScreenshot ?? null} file3dUrl={file3dUrl ?? null} />
+          <ValidationTab fg={fg} item={item} file3dUrl={file3dUrl ?? null} />
         )}
 
 
@@ -9310,7 +9294,6 @@ export default function ManufacturingIntelligencePage() {
   const [file3dUrlRetryToken, setFile3dUrlRetryToken] = useState(0);
   const [file2dUrl, setFile2dUrl] = useState<string | null>(null);
   const [viewerTab, setViewerTab] = useState<'3d' | '2d'>('3d');
-  const [modelScreenshot, setModelScreenshot] = useState<string | null>(null);
   const [maximized, setMaximized] = useState<PanelId | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
     () => new Set(['root', 'grp_0', 'op_0', 'op_1', 'op_2', 'subop_0', 'subop_1', 'subop_2', 'op_threads', 'subop_threads']),
@@ -10081,7 +10064,6 @@ export default function ManufacturingIntelligencePage() {
   useEffect(() => {
     if (!item?.file3dPath) return;
     let cancelled = false;
-    setModelScreenshot(null); // clear stale screenshot when model changes
     setFile3dUrl(null);
     setFile3dUrlError(null);
     apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/3d`)
@@ -10487,7 +10469,7 @@ export default function ManufacturingIntelligencePage() {
     projectId,
     item, fg, batchSize, productionLife, factory,
     selectedCNCFeatureKey, onCNCFeatureSelect: setSelectedCNCFeatureKey,
-    modelScreenshot, file3dUrl,
+    file3dUrl,
     activeTab: rightTab, onTabChange: setRightTab,
     treeProcessNames, vendorHotspotContext,
     onSelectHighlight,
@@ -10660,7 +10642,6 @@ export default function ManufacturingIntelligencePage() {
                             heatmapSources={heatmapSources}
                             heatmapNormalization={heatmapNorm}
                             onHeatmapInspect={handleHeatmapInspect}
-                            onScreenshotReady={setModelScreenshot}
                           />
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
