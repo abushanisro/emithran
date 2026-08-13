@@ -1371,22 +1371,22 @@ function STLModel({
   sectionPlane: number;
   isTransparent: boolean;
   isWireframe: boolean;
-  isExploded?: boolean;
-  explodeDistance?: number;
+  isExploded?: boolean | undefined;
+  explodeDistance?: number | undefined;
   onLoad?: () => void;
-  onMeasurements?: (data: { volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number; projectedArea?: number }) => void;
-  onGeometryLoad?: (geometry: THREE.BufferGeometry) => void;
-  manufacturingFeatures?: ManufacturingFeature[];
-  selectedFeature?: ManufacturingFeature | null;
-  onFeatureSelect?: (feature: ManufacturingFeature | null) => void;
-  showFeatures?: boolean;
-  selectedBOMItems?: any[];
-  showOnlySelected?: boolean;
+  onMeasurements?: ((data: { volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number; projectedArea?: number }) => void) | undefined;
+  onGeometryLoad?: ((geometry: THREE.BufferGeometry) => void) | undefined;
+  manufacturingFeatures?: ManufacturingFeature[] | undefined;
+  selectedFeature?: ManufacturingFeature | null | undefined;
+  onFeatureSelect?: ((feature: ManufacturingFeature | null) => void) | undefined;
+  showFeatures?: boolean | undefined;
+  selectedBOMItems?: any[] | undefined;
+  showOnlySelected?: boolean | undefined;
   hoveredBOMItem?: any;
-  onPartsDetected?: (parts: any[]) => void;
+  onPartsDetected?: ((parts: any[]) => void) | undefined;
   measureMode?: MeasureMode;
   measureSubMode?: MeasureSubMode;
-  measureSelA?: MeasureSelection | null;
+  measureSelA?: MeasureSelection | null | undefined;
   measureResults?: MeasureResult[];
   selectedResultId?: string | null;
   onMeasureClick?: (sel: MeasureSelection) => void;
@@ -1404,15 +1404,15 @@ function STLModel({
   /** Color for selected occurrence highlight — risk color when scores available, else orange */
   selectedOccurrenceColor: string;
   /** Override the fallback amber (#d97706) group-face color — used for operation-specific visualization */
-  groupHighlightColor?: string;
+  groupHighlightColor?: string | undefined;
   /** When true, vertex color heatmap is active — material uses vertexColors */
-  heatmapActive?: boolean;
+  heatmapActive?: boolean | undefined;
   /** Heatmap sources — when provided, STLModel computes and applies vertex colors */
   heatmapSources?: HeatmapSource[];
   /** Normalization mode for heatmap engine */
   heatmapNormalization?: HeatmapNormalization;
   /** Ref holding per-triangle risk values (0–1) from heatmap engine — for inspector */
-  heatmapRiskValuesRef?: React.RefObject<Float32Array | null>;
+  heatmapRiskValuesRef?: React.RefObject<Float32Array | null> | undefined;
   /** Called when user clicks model surface while heatmap is active */
   onHeatmapInspect?: ((worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void) | undefined;
 }) {
@@ -2772,17 +2772,17 @@ function Scene({
   viewPosition: [number, number, number]; autoFit: boolean; fitCenter: [number, number, number];
   onFit: (distance: number, center: THREE.Vector3) => void; onModelLoad: () => void;
   isAnimating: boolean; sectionPlane: number; isTransparent: boolean; isWireframe: boolean;
-  isExploded?: boolean; explodeDistance?: number;
-  onMeasurements?: (data: { volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number; projectedArea?: number }) => void;
+  isExploded?: boolean | undefined; explodeDistance?: number | undefined;
+  onMeasurements?: ((data: { volume: number; dimensions: { x: number; y: number; z: number }; surfaceArea: number; projectedArea?: number }) => void) | undefined;
   onOrientationChange: (matrix: THREE.Matrix4) => void;
-  manufacturingFeatures?: ManufacturingFeature[]; selectedFeature?: ManufacturingFeature | null;
-  onFeatureSelect?: (feature: ManufacturingFeature | null) => void; showFeatures?: boolean;
-  selectedBOMItems?: any[]; showOnlySelected?: boolean; hoveredBOMItem?: any;
-  onPartsDetected?: (parts: any[]) => void;
+  manufacturingFeatures?: ManufacturingFeature[] | undefined; selectedFeature?: ManufacturingFeature | null | undefined;
+  onFeatureSelect?: ((feature: ManufacturingFeature | null) => void) | undefined; showFeatures?: boolean;
+  selectedBOMItems?: any[] | undefined; showOnlySelected?: boolean; hoveredBOMItem?: any;
+  onPartsDetected?: ((parts: any[]) => void) | undefined;
   onGeometryLoad?: (geometry: THREE.BufferGeometry) => void;
   measureMode: MeasureMode;
   measureSubMode: MeasureSubMode;
-  measureSelA?: MeasureSelection | null;
+  measureSelA?: MeasureSelection | null | undefined;
   measureResults: MeasureResult[];
   selectedResultId: string | null;
   onMeshMeasureClick: (sel: MeasureSelection) => void;
@@ -2790,17 +2790,17 @@ function Scene({
   projectedFaceIndices: number[];
   projectedHighlightColor: string;
   showProjectedHighlight: boolean;
-  highlightOccurrences?: FeatureNodeV2HL | null;
+  highlightOccurrences?: FeatureNodeV2HL | null | undefined;
   selectedOccurrenceIndex: number | null;
   occurrenceFaceIndices: number[];
   groupFaceIndices: number[];
   riskGroups: Array<{ level: string; indices: number[] }>;
   selectedOccurrenceColor: string;
-  groupHighlightColor?: string;
-  heatmapActive?: boolean;
-  heatmapSources?: HeatmapSource[];
-  heatmapNormalization?: HeatmapNormalization;
-  heatmapRiskValuesRef?: React.RefObject<Float32Array | null>;
+  groupHighlightColor?: string | undefined;
+  heatmapActive?: boolean | undefined;
+  heatmapSources?: HeatmapSource[] | undefined;
+  heatmapNormalization?: HeatmapNormalization | undefined;
+  heatmapRiskValuesRef?: React.RefObject<Float32Array | null> | undefined;
   onHeatmapInspect?: ((worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void) | undefined;
 }) {
   return (
@@ -2917,7 +2917,7 @@ function Scene({
 
 export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   fileUrl, fileName, isExploded = false, explodeDistance = 50,
-  onMeasurements, manufacturingFeatures, selectedFeature, onFeatureSelect, showFeatures,
+  onMeasurements, manufacturingFeatures, selectedFeature, onFeatureSelect,
   selectedBOMItems, showOnlySelected = false, hoveredBOMItem, onPartsDetected, dfmAnalysisData,
   cameraPreset, onScreenshotReady,
   highlightOccurrences, selectedOccurrenceIndex = null,
@@ -3767,7 +3767,15 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               };
               const onRestored = () => {
                 clearRecoveryTimeout();
-                setLoading(false);
+                // 'webglcontextrestored' only means the GPU handed back a usable
+                // context — every buffer/texture/program three.js had uploaded is
+                // gone, and it does not automatically re-upload the scene, so
+                // without a remount the renderer draws nothing into the (now empty)
+                // context: canvas goes blank while the loading overlay lifts, which
+                // is exactly the "model shows, then disappears" symptom. Force the
+                // same clean remount used for the give-up path so geometry, materials
+                // and the camera fit are rebuilt from scratch on a fresh context.
+                setCanvasGeneration((g) => g + 1);
               };
               canvas.addEventListener('webglcontextlost', onLost);
               canvas.addEventListener('webglcontextrestored', onRestored);
