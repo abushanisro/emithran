@@ -692,6 +692,23 @@ function resolveFeatureOpHighlight(
   if (op.featureType === 'pierce' || op.featureType === 'deburr_pierce') {
     return mergeFeaturesToHL('fb_holes', v2Features.filter((f) => f.feature_type === 'hole'));
   }
+  if (op.featureType === 'pem_insertion') {
+    // buildPemFeatureBreakdown (bom-items.service.ts) names each row
+    // "<part spec> x<count> (ØXmm, Ys/insertion)" — extract the diameter and
+    // match holes at that diameter (0.3mm tolerance, same as the backend's
+    // own sm_lookup_pem_hardware match tolerance in getPemMatches), same
+    // bucket-matching pattern as bend/radius above. The feature graph has no
+    // separate "this hole is a PEM insertion point" tag, so diameter is the
+    // real, available signal — not a guess.
+    const holeFeatures = v2Features.filter((f) => f.feature_type === 'hole');
+    const m = op.name.match(/Ø([\d.]+)mm/);
+    if (m) {
+      const dia = parseFloat(m[1]!);
+      const matched = holeFeatures.filter((f) => Math.abs((f.diameter_mm ?? 0) - dia) < 0.3);
+      if (matched.length) return mergeFeaturesToHL(`fb_pem_d${dia}`, matched);
+    }
+    return mergeFeaturesToHL('fb_pem_all', holeFeatures);
+  }
   if (op.featureType === 'laser_cut' || op.featureType === 'deburr_edge') {
     return buildFullModelHL('fb_outline', faceMap);
   }
