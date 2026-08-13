@@ -209,6 +209,26 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
       },
     ],
   },
+  // process_calculator_mappings (migration 381) seeds PEM Insertion under
+  // group='Assembly', route='Hardware Insertion' — a genuinely different
+  // group from 'Sheet Metal', not another Sheet Metal route.
+  'Assembly': {
+    'Hardware Insertion': [
+      // machine_class='pem_press' — the "Sheet Metal - PEM Insertion"
+      // calculator's Insertion Cycle Time field is lookup-driven
+      // (sm_lookup_pem_hardware, migration 381/calculator 053), same as
+      // every other bridged process; without an entry here the eye button's
+      // request 400s (getAllSmLookupTableNames() is derived entirely from
+      // this config — an unlisted table is never a real gap in the table
+      // itself, always a missing bridge entry like this one was).
+      {
+        table: 'sm_lookup_pem_hardware',
+        displayName: 'PEM Hardware Insertion Cycle Time',
+        description: 'PEM part spec and insertion cycle time (sec) by hole diameter and sheet thickness — migration 381',
+        orderBy: 'hole_diameter_mm,sheet_thickness_mm',
+      },
+    ],
+  },
 };
 
 export function getSmLookupBridgeEntries(group: string, route: string): SmLookupBridgeEntry[] {

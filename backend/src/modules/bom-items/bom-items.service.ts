@@ -2583,6 +2583,21 @@ export class BOMItemsService {
     return { family: geoFamily, familySource: 'geometry', warning: null };
   }
 
+  // Drawing-intelligence extraction returns a sentinel string like "Not specified"
+  // when the title block has no material field, rather than null. Treated as a real
+  // grade, that sentinel passes the `!grade` scenario gate (it's a non-empty string),
+  // so costing proceeds to look up "Not specified" in raw_materials — which obviously
+  // fails, producing a $0 quote with a warning that misleadingly tells the user to add
+  // a material row named "Not specified". Filtering it here lets the grade resolver
+  // correctly fall through to item.materialGrade/item.material, and — when those are
+  // also empty — hit the real "specify a material" gate instead of a fake match attempt.
+  private static readonly UNSPECIFIED_DRAWING_MATERIAL = new Set(['Unknown', 'Not Specified', 'Not specified', 'None', '']);
+  private sanitizeDrawingGrade(raw: string | null): string | null {
+    const trimmed = raw?.trim() || null;
+    if (!trimmed) return null;
+    return BOMItemsService.UNSPECIFIED_DRAWING_MATERIAL.has(trimmed) ? null : trimmed;
+  }
+
   private async resolveMaterialForFamily(input: {
     accessToken: string;
     grade: string | null;
@@ -3074,6 +3089,33 @@ export class BOMItemsService {
     return result;
   }
 
+  // Build PEM Insertion feature breakdown from the resolved sm_lookup_pem_hardware
+  // matches per hole-diameter group — same match data smPemCount/smPemTotalSecSum
+  // above are already built from, just surfaced as named rows instead of only a
+  // summed total. This is what lets the standalone Calculator dialog (opened via
+  // the cycle-time icon on a saved PEM Insertion line) pre-fill "Insertion Cycle
+  // Time" / "No. of Insertions" from the real match instead of the calculator
+  // schema's blank/"1" placeholder — see ProcessCostDialog.tsx's featureBreakdown
+  // read for the precedent (Inspection calculator does the same from its own
+  // per-feature-type rows).
+  private buildPemFeatureBreakdown(
+    throughHoleGroups: Array<{ diameter_mm: number; count: number }>,
+    pemResolved: Map<number, { partSpec: string; insertionCycleSec: number } | null>,
+  ): FeatureOp[] {
+    const result: FeatureOp[] = [];
+    for (const g of throughHoleGroups) {
+      const match = pemResolved.get(g.diameter_mm);
+      if (!match) continue;
+      result.push({
+        name: `${match.partSpec} ×${g.count} (Ø${g.diameter_mm}mm, ${match.insertionCycleSec}s/insertion)`,
+        timeSec: Math.round(g.count * match.insertionCycleSec),
+        featureType: 'pem_insertion',
+        count: g.count,
+      });
+    }
+    return result;
+  }
+
   /**
    * Build Tapping feature breakdown from resolved thread groups, using the
    * exact same computeTapCycleSec() physics that computeCostSummary already
@@ -3137,12 +3179,12 @@ export class BOMItemsService {
     // Auto-fill material (from geometry heuristics) is a fallback only.
     // Drawing intelligence returns structured fields: { value, confidence } or plain string.
     const rawDiMaterial = (item.drawingIntelligence as any)?.material;
-    const drawingGrade = (
+    const drawingGrade = this.sanitizeDrawingGrade((
       typeof rawDiMaterial === 'string' ? rawDiMaterial :
       rawDiMaterial != null && typeof rawDiMaterial === 'object' ? (rawDiMaterial.value ?? null) :
       null
-    ) as string | null;
-    const grade = (drawingGrade?.trim() || null) ?? item.materialGrade ?? (item as any).material ?? null;
+    ) as string | null);
+    const grade = drawingGrade ?? item.materialGrade ?? (item as any).material ?? null;
 
     // Scenario gate: refuse to cost without a material grade. Silently defaulting to
     // mild steel produces numbers the engineer might quote; a blocked state forces the
@@ -4468,6 +4510,10 @@ export class BOMItemsService {
       if (tappingLine) {
         tappingLine.featureBreakdown = this.buildTappingFeatureBreakdown(threads, sheetThicknessMm, grade);
       }
+      const pemLine = smResult.processLines.find((l) => l.process === 'PEM Insertion');
+      if (pemLine) {
+        pemLine.featureBreakdown = this.buildPemFeatureBreakdown(smThroughHoleGroups, smPemResolved);
+      }
     }
     await this.attachSavedMachineExplanations(smResult.processLines, id, accessToken, location);
     this.appendRateWarnings(smResult, location, mhrRates.benchmarkMap);
@@ -4519,12 +4565,12 @@ export class BOMItemsService {
 
     const sheetThicknessMm = resolveEffectiveSheetThicknessMm(item.scenarioOverrides, summary.sheetThicknessMm, item.sheetThicknessMm ?? 0);
     const rawDiMaterialRC = (item.drawingIntelligence as any)?.material;
-    const drawingGradeRC = (
+    const drawingGradeRC = this.sanitizeDrawingGrade((
       typeof rawDiMaterialRC === 'string' ? rawDiMaterialRC :
       rawDiMaterialRC != null && typeof rawDiMaterialRC === 'object' ? (rawDiMaterialRC.value ?? null) :
       null
-    ) as string | null;
-    const grade = (drawingGradeRC?.trim() || null) ?? item.materialGrade ?? (item as any).material ?? null;
+    ) as string | null);
+    const grade = drawingGradeRC ?? item.materialGrade ?? (item as any).material ?? null;
 
     // Override > material > geometry — same resolver as getCostSummary, by
     // construction (summary ≡ route invariant).
@@ -5662,11 +5708,11 @@ export class BOMItemsService {
     const surfaceArea        = (item.surfaceArea ?? 0) as number;
 
     const rawDiMaterial = (item.drawingIntelligence as any)?.material;
-    const drawingGrade = (
+    const drawingGrade = this.sanitizeDrawingGrade((
       typeof rawDiMaterial === 'string' ? rawDiMaterial :
       rawDiMaterial != null && typeof rawDiMaterial === 'object' ? (rawDiMaterial.value ?? null) : null
-    ) as string | null;
-    const grade = (drawingGrade?.trim() || null) ?? item.materialGrade ?? (item as any).material ?? null;
+    ) as string | null);
+    const grade = drawingGrade ?? item.materialGrade ?? (item as any).material ?? null;
     const { family } = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
 
     const isCNC = family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn';

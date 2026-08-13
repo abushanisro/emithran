@@ -150,6 +150,15 @@ export class CreateMHRDto {
 
   // India 2026 extended fields
   @ApiPropertyOptional() @IsString() @IsOptional() processGroup?: string;
+  // processRoute/operation: the full process-hierarchy identity (mirrors
+  // process_calculator_mappings' own group/route/operation triple) — without
+  // these, the edit dialog can only re-match a saved record's route/operation
+  // by re-searching mappings for one whose `operation` name equals this
+  // record's free-text `specification` field, which is usually unset/
+  // unrelated. Persisting the real selection directly is what lets Edit
+  // actually hydrate instead of reopening with every dropdown unselected.
+  @ApiPropertyOptional() @IsString() @IsOptional() processRoute?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() operation?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() processCategory?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() machineClass?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() automationLevel?: string;
@@ -326,6 +335,8 @@ export class UpdateMHRDto {
 
   // India 2026 extended fields
   @ApiPropertyOptional() @IsString() @IsOptional() processGroup?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() processRoute?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() operation?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() processCategory?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() machineClass?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() automationLevel?: string;

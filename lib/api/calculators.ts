@@ -357,7 +357,7 @@ export const calculatorsApi = {
   },
 
   // Sheet metal parameterized lookup tables
-  sheetMetalLookup: async (tableName: string, params: Record<string, any>): Promise<{ value: number | null; kerf?: number; sampleQty?: number; row?: any }> => {
+  sheetMetalLookup: async (tableName: string, params: Record<string, any>): Promise<{ value: number | null; kerf?: number; sampleQty?: number; setupTimeMin?: number; row?: any }> => {
     return apiClient.post('/calculators/sheet-metal/lookup', { tableName, params }) as Promise<any>;
   },
 

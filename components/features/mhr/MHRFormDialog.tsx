@@ -399,7 +399,18 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
       setLaborSkillLevel('skilled');
       // Use processGroup first (set by Combined-format import); fall back to commodityCode
       const groupFromRecord = existingRecord.processGroup || existingRecord.commodityCode || '';
-      if (allMappings?.mappings) {
+      if (existingRecord.processRoute && existingRecord.operation) {
+        // Real, persisted selection (mhr_records.process_route/operation) —
+        // use directly. Doesn't need allMappings to be loaded at all, so this
+        // hydrates immediately instead of racing the mappings fetch, and
+        // doesn't depend on `specification` (a free-text field, usually
+        // unrelated to the operation name) matching anything.
+        setSelectedGroup(groupFromRecord);
+        setSelectedRoute(existingRecord.processRoute);
+        setSelectedOperation(existingRecord.operation);
+      } else if (allMappings?.mappings) {
+        // Older record saved before processRoute/operation were persisted —
+        // fall back to re-matching by name against the specification field.
         const match = allMappings.mappings.find(m => m.operation === existingRecord.specification);
         if (match) {
           setSelectedGroup(match.processGroup); setSelectedRoute(match.processRoute); setSelectedOperation(match.operation);
@@ -495,6 +506,18 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
           adminOverheadPercentage: 0, profitMarginPercentage: 0, isManualEntry: true, manualMHRValue,
         };
       }
+      // processGroup/processRoute/operation: real dedicated columns
+      // (mhr_records.process_group/process_route/operation), tracked as
+      // component state (selectedGroup/selectedRoute/selectedOperation), not
+      // registered react-hook-form fields — `data` never carries them. This
+      // form previously only ever wrote commodityCode/specification (the
+      // group/operation stand-ins used by the hierarchy pickers below), which
+      // is exactly why re-opening a saved record for Edit couldn't reliably
+      // re-select the route/operation: process_route was never persisted at
+      // all, and matching specification back to an operation name is fragile.
+      submitData.processGroup = selectedGroup;
+      submitData.processRoute = selectedRoute;
+      submitData.operation = selectedOperation;
       if (editingId) {
         await updateMutation.mutateAsync({ id: editingId, data: submitData });
       } else {
