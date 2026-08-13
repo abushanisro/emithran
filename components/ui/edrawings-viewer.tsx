@@ -3427,32 +3427,104 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     screenshotFiredRef.current = false;
   }, [fileUrl]);
 
+  // Captures the current frame, crops it to the model's actual silhouette,
+  // and hands it to onScreenshotReady. Does NOT mark screenshotFiredRef when
+  // no content is found (canvas is still all-background) — that means the
+  // model genuinely hadn't been painted into this frame yet, and firing
+  // anyway would permanently save a blank thumbnail. Leaving the flag false
+  // lets a later call (the retry loop below, or handleFit firing again on
+  // the next fit) try again instead.
+  const captureScreenshot = useCallback(() => {
+    if (!onScreenshotReady || screenshotFiredRef.current) return;
+    const source = screenshotCanvasRef.current;
+    if (!source) return;
+    try {
+      // Composite onto an opaque dark background (WebGL canvas has alpha:true)
+      const offscreen = document.createElement('canvas');
+      offscreen.width  = source.width;
+      offscreen.height = source.height;
+      const ctx = offscreen.getContext('2d');
+      if (!ctx) return;
+      ctx.fillStyle = '#2d2d2d';
+      ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+      ctx.drawImage(source, 0, 0);
+
+      // autoFit's camera distance is tuned for comfortable interactive
+      // orbiting (generous margin so the model never clips while rotating),
+      // not for a thumbnail — captured raw, the model reads as a tiny speck
+      // in a mostly-empty dark frame. Crop to the model's actual silhouette
+      // instead of touching the interactive camera-fit logic: scan for
+      // pixels that differ from the flat #2d2d2d background (model + its
+      // cast shadow), take their bounding box, and re-render just that
+      // region full-frame.
+      const bg = { r: 0x2d, g: 0x2d, b: 0x2d };
+      const threshold = 14;
+      const { width: w, height: h } = offscreen;
+      const { data } = ctx.getImageData(0, 0, w, h);
+      let minX = w, minY = h, maxX = -1, maxY = -1;
+      const step = 2; // sample every other pixel — plenty for a bounding box, 4x fewer reads
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          const i = (y * w + x) * 4;
+          const dr = Math.abs((data[i] ?? 0) - bg.r);
+          const dg = Math.abs((data[i + 1] ?? 0) - bg.g);
+          const db = Math.abs((data[i + 2] ?? 0) - bg.b);
+          if (dr > threshold || dg > threshold || db > threshold) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      // Nothing but background found — the model hasn't actually been
+      // rendered into this frame yet (this is the race a fixed timeout used
+      // to lose). Bail without firing so a later, better-timed call can retry.
+      if (maxX <= minX || maxY <= minY) return;
+
+      const contentW = maxX - minX;
+      const contentH = maxY - minY;
+      const fillsFrame = contentW > w * 0.85 && contentH > h * 0.85;
+      let finalCanvas = offscreen;
+      if (!fillsFrame) {
+        // 12% padding on each side so the model isn't flush against the edge
+        const padX = Math.round(contentW * 0.12) + step;
+        const padY = Math.round(contentH * 0.12) + step;
+        const cropX = Math.max(0, minX - padX);
+        const cropY = Math.max(0, minY - padY);
+        const cropW = Math.min(w, maxX + padX) - cropX;
+        const cropH = Math.min(h, maxY + padY) - cropY;
+        const cropped = document.createElement('canvas');
+        cropped.width = cropW;
+        cropped.height = cropH;
+        const cropCtx = cropped.getContext('2d');
+        if (cropCtx) {
+          cropCtx.fillStyle = '#2d2d2d';
+          cropCtx.fillRect(0, 0, cropW, cropH);
+          cropCtx.drawImage(offscreen, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+          finalCanvas = cropped;
+        }
+      }
+
+      const dataUrl = finalCanvas.toDataURL('image/png');
+      if (dataUrl && dataUrl !== 'data:,') {
+        screenshotFiredRef.current = true;
+        onScreenshotReady(dataUrl);
+      }
+    } catch { /* cross-origin or context lost */ }
+  }, [onScreenshotReady]);
+
   const handleModelLoad = useCallback(() => {
     setLoading(false);
+    // Fallback safety net only — the primary trigger is handleFit below,
+    // which fires exactly when CameraFitter has actually pointed the camera
+    // at the model (see its own comment for why a fixed delay from "model
+    // load" isn't reliable). This just covers autoFit being off.
     if (onScreenshotReady && !screenshotFiredRef.current) {
-      // Wait 600 ms so Three.js has time to render at least a few frames
-      setTimeout(() => {
-        const source = screenshotCanvasRef.current;
-        if (!source) return;
-        try {
-          // Composite onto an opaque dark background (WebGL canvas has alpha:true)
-          const offscreen = document.createElement('canvas');
-          offscreen.width  = source.width;
-          offscreen.height = source.height;
-          const ctx = offscreen.getContext('2d');
-          if (!ctx) return;
-          ctx.fillStyle = '#2d2d2d';
-          ctx.fillRect(0, 0, offscreen.width, offscreen.height);
-          ctx.drawImage(source, 0, 0);
-          const dataUrl = offscreen.toDataURL('image/png');
-          if (dataUrl && dataUrl !== 'data:,') {
-            screenshotFiredRef.current = true;
-            onScreenshotReady(dataUrl);
-          }
-        } catch { /* cross-origin or context lost */ }
-      }, 600);
+      setTimeout(captureScreenshot, 1200);
     }
-  }, [onScreenshotReady]);
+  }, [onScreenshotReady, captureScreenshot]);
   
   const handleGeometryLoad = useCallback((geometry: THREE.BufferGeometry) => {
     setCurrentGeometry(geometry);
@@ -3488,6 +3560,16 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     const dir = new THREE.Vector3(1, 0.7, 1).normalize().multiplyScalar(distance);
     setViewPosition([center.x + dir.x, center.y + dir.y, center.z + dir.z]);
     setAutoFit(false);
+
+    // Primary screenshot trigger — CameraFitter just pointed the camera at
+    // the model for the first time, which is the actual "ready to capture"
+    // moment (not a fixed delay from model-load, which raced ahead of this
+    // on larger/slower-parsing models and produced all-background captures).
+    // Short delay so the next couple of frames actually paint with the new
+    // camera position before preserveDrawingBuffer's retained frame is read.
+    if (onScreenshotReady && !screenshotFiredRef.current) {
+      setTimeout(captureScreenshot, 200);
+    }
   };
 
   useEffect(() => {

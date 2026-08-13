@@ -8,6 +8,7 @@ import {
   ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight,
   AlertCircle, GripVertical, GripHorizontal, RefreshCw,
   Calculator, ShieldCheck, Flame, Crosshair, Loader2, Edit, X, Download,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
@@ -27,6 +28,7 @@ import {
 } from '@/lib/heatmap/sources';
 import type { IMHeatmapFeatures, IMHeatmapSignals } from '@/lib/heatmap/types';
 import { cn } from '@/lib/utils';
+import { downloadBomItemExcel } from '@/lib/utils/download-bom-item-excel';
 import { generateCalculationReportPdf } from '@/lib/utils/calculation-report';
 import { CalculationTracePanel } from '@/components/features/process-planning/CalculationTracePanel';
 import { toast } from 'sonner';
@@ -10011,6 +10013,29 @@ export default function ManufacturingIntelligencePage() {
   }, [heatmapSources, fg, dfmScores, heatmapLayer, costHeatmapWeights, toleranceHeatmapWeights, sustainabilityHeatmapWeights, item?.holeCount, item?.bendCount, item?.sheetThicknessMm]);
 
   const [recalculating, setRecalculating] = useState(false);
+  const [downloadingReport, setDownloadingReport] = useState(false);
+
+  // NOTE: this page deliberately does NOT auto-capture a 3D thumbnail (unlike
+  // process-planning page's handleScreenshotReady). Doing so requires passing
+  // onScreenshotReady into ModelViewer, which flips on WebGL's
+  // preserveDrawingBuffer for this page's viewer (see edrawings-viewer.tsx) —
+  // that caused the live 3D viewer to render blank here. Until there's a
+  // capture method that doesn't need persistent preserveDrawingBuffer, the
+  // Excel cost report's part image only populates for parts that have been
+  // opened on the process-planning page (where this already works safely).
+
+  const handleDownloadCostReport = async () => {
+    if (downloadingReport || !item?.id) return;
+    setDownloadingReport(true);
+    try {
+      await downloadBomItemExcel(item.id, `${item.partNumber ?? item.name ?? 'cost-report'}-Cost-Report.xlsx`, { batchSize, location: factory });
+    } catch (e) {
+      console.error('Cost report download failed', e);
+      toast.error('Failed to download cost report');
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
 
   const handleRecalculateCost = async () => {
     if (recalculating) return;
@@ -10231,6 +10256,17 @@ export default function ManufacturingIntelligencePage() {
       </button>
       <button disabled className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-border opacity-40 cursor-not-allowed shrink-0">
         Compare Versions
+      </button>
+      <button
+        onClick={handleDownloadCostReport}
+        disabled={downloadingReport}
+        title="Download Part Cost Report (.xlsx)"
+        className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+      >
+        {downloadingReport
+          ? <Loader2 className="h-3 w-3 animate-spin" />
+          : <FileSpreadsheet className="h-3 w-3" />}
+        Download Cost Report
       </button>
 
       <div className="w-px h-4 bg-border mx-0.5 shrink-0" />

@@ -14,6 +14,10 @@ export interface ProcessLine {
   operation: string | null;
   processGroup: string | null;
   processRoute: string | null;
+  machineName: string | null;
+  machineClass: string | null;
+  laborType: string | null;
+  location: string | null;
   machineRate: number;
   laborRate: number;
   cycleTimeSec: number;
@@ -37,6 +41,23 @@ export interface MaterialLine {
   grossUsage: number;
   scrap: number;
   overhead: number;
+  reclaimRate: number;
+  // Real 8-step breakdown (matches raw_material_cost_records' own stored
+  // columns exactly — see RawMaterialsSection.tsx's on-screen "Cost Formula
+  // (8-step)" panel, the source of truth this mirrors):
+  //   grossMaterialCost = grossUsage * unitCost
+  //   reclaimValue      = (grossUsage - netUsage) * reclaimRate
+  //   netMaterialCost   = grossMaterialCost - reclaimValue
+  //   scrapAdjustment   = netMaterialCost * (scrap / 100)
+  //   overheadCost      = (netMaterialCost + scrapAdjustment) * (overhead / 100)
+  //   totalCost         = netMaterialCost + scrapAdjustment + overheadCost
+  grossMaterialCost: number;
+  reclaimValue: number;
+  netMaterialCost: number;
+  scrapAdjustment: number;
+  overheadCost: number;
+  materialUtilizationRate: number;
+  effectiveCostPerUnit: number;
   totalCost: number;
 }
 
@@ -101,12 +122,12 @@ export class CostAggregationService {
     ] = await Promise.all([
       client
         .from('raw_material_cost_records')
-        .select('material_name, material_description, unit_cost, gross_usage, net_usage, scrap, overhead')
+        .select('material_name, material_description, unit_cost, gross_usage, net_usage, scrap, overhead, reclaim_rate, gross_material_cost, reclaim_value, net_material_cost, scrap_adjustment, overhead_cost, material_utilization_rate, effective_cost_per_unit, total_cost')
         .eq('bom_item_id', bomItemId)
         .eq('is_active', true),
       client
         .from('process_cost_records')
-        .select('op_nbr, operation, process_group, process_route, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap, mhr_id, lhr_id, feature_type')
+        .select('op_nbr, operation, process_group, process_route, machine_name, machine_class, labor_type, location, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap, mhr_id, lhr_id, feature_type')
         .eq('bom_item_id', bomItemId)
         .eq('is_active', true)
         .order('op_nbr', { ascending: true }),
@@ -133,20 +154,48 @@ export class CostAggregationService {
     if (pkErr) this.logger.warn(`packaging_logistics_cost_records: ${pkErr.message}`, 'CostAggregationService');
     if (ppErr) this.logger.warn(`procured_parts_cost_records: ${ppErr.message}`, 'CostAggregationService');
 
-    // ── Material lines — compute from gross_usage × unit_cost × (1 + overhead/100)
+    // ── Material lines — real 8-step formula (matches raw_material_cost_records'
+    // own stored columns, i.e. the same numbers RawMaterialsSection.tsx shows
+    // on screen as "Cost Formula (8-step)"). Previously this recomputed a
+    // simplified 2-step formula here (gross × unit × (1+overhead/100)) that
+    // silently dropped the scrap adjustment and reclaim value entirely —
+    // every consumer of rawMaterialCost (screen, PDF, Excel) was quietly
+    // wrong by the scrap-adjustment amount. Now: read the server-computed
+    // total_cost directly, recomputing the full 8-step formula only as a
+    // fallback for legacy rows saved before these columns existed.
     const materialLines: MaterialLine[] = (rawMatRows ?? []).map(r => {
-      const grossUsage = parseFloat(r.gross_usage) || 0;
-      const unitCost   = parseFloat(r.unit_cost)   || 0;
-      const overhead   = parseFloat(r.overhead)    || 0;
-      const totalCost  = grossUsage * unitCost * (1 + overhead / 100);
+      const grossUsage  = parseFloat(r.gross_usage)  || 0;
+      const netUsage    = parseFloat(r.net_usage)    || 0;
+      const unitCost    = parseFloat(r.unit_cost)    || 0;
+      const scrap       = parseFloat(r.scrap)        || 0;
+      const overhead    = parseFloat(r.overhead)     || 0;
+      const reclaimRate = parseFloat(r.reclaim_rate) || 0;
+
+      const grossMaterialCost = parseFloat(r.gross_material_cost) || (grossUsage * unitCost);
+      const reclaimValue      = parseFloat(r.reclaim_value)       || ((grossUsage - netUsage) * reclaimRate);
+      const netMaterialCost   = parseFloat(r.net_material_cost)   || (grossMaterialCost - reclaimValue);
+      const scrapAdjustment   = parseFloat(r.scrap_adjustment)    || (netMaterialCost * (scrap / 100));
+      const overheadCost      = parseFloat(r.overhead_cost)       || ((netMaterialCost + scrapAdjustment) * (overhead / 100));
+      const totalCost         = parseFloat(r.total_cost)          || (netMaterialCost + scrapAdjustment + overheadCost);
+      const materialUtilizationRate = parseFloat(r.material_utilization_rate) || (grossUsage > 0 ? (netUsage / grossUsage) * 100 : 0);
+      const effectiveCostPerUnit    = parseFloat(r.effective_cost_per_unit)   || (netUsage > 0 ? totalCost / netUsage : 0);
+
       return {
         materialName:        r.material_name        || '—',
         materialDescription: r.material_description ?? null,
         unitCost,
-        netUsage:  parseFloat(r.net_usage) || 0,
+        netUsage,
         grossUsage,
-        scrap:     parseFloat(r.scrap)     || 0,
+        scrap,
         overhead,
+        reclaimRate,
+        grossMaterialCost,
+        reclaimValue,
+        netMaterialCost,
+        scrapAdjustment,
+        overheadCost,
+        materialUtilizationRate,
+        effectiveCostPerUnit,
         totalCost,
       };
     });
@@ -180,6 +229,10 @@ export class CostAggregationService {
         operation:     r.operation             ?? null,
         processGroup:  r.process_group         ?? null,
         processRoute:  r.process_route         ?? null,
+        machineName:   r.machine_name          ?? null,
+        machineClass:  r.machine_class         ?? null,
+        laborType:     r.labor_type            ?? null,
+        location:      r.location              ?? null,
         machineRate,
         laborRate,
         cycleTimeSec,

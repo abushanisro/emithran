@@ -64,3 +64,4 @@ logs
 *.njsproj
 *.sln
 *.sw?
+.env*

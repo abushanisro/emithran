@@ -17,7 +17,7 @@ import { apiClient } from '@/lib/api/client';
 import { bomItemsApi } from '@/lib/api/bom-items';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon, Loader2, ChevronRight, Zap, Trophy, TrendingDown, CheckCircle2, Ruler } from 'lucide-react';
+import { ArrowLeft, DollarSign, Download, RefreshCw, Image as ImageIcon, FileText as FileTextIcon, FileSpreadsheet, Loader2, ChevronRight, Zap, Trophy, TrendingDown, CheckCircle2, Ruler } from 'lucide-react';
 import { useRouteComparison, useApplyRoute } from '@/lib/api/hooks/useBOMItems';
 import type { RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 
@@ -42,6 +42,7 @@ import { BomCostReportWrapper } from '@/components/features/cost-analysis/BomCos
 import { useBomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
 import { generateEMithranPdf } from '@/lib/utils/generate-emithran-pdf';
 import { generateEMithranImage } from '@/lib/utils/generate-emithran-image';
+import { downloadBomItemExcel } from '@/lib/utils/download-bom-item-excel';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import { toViewerFeature, FEATURE_GROUP_META } from '@/lib/utils/feature-colors';
 import type { FeatureGroup } from '@/lib/utils/feature-colors';
@@ -558,7 +559,7 @@ function ProcessPlanningPageContent() {
 
   const exportReport = useCallback(async (
     _scope: 'part' | 'full',
-    format: 'pdf' | 'image',
+    format: 'pdf' | 'image' | 'excel',
   ) => {
     setExportMenuOpen(false);
     if (isExporting) return;
@@ -572,6 +573,15 @@ function ProcessPlanningPageContent() {
     };
 
     try {
+      if (format === 'excel') {
+        if (!selectedItem?.id) { setIsExporting(false); return; }
+        await downloadBomItemExcel(
+          selectedItem.id,
+          `${selectedItem.partNumber ?? selectedItem.partName ?? 'cost-report'}-Cost-Report.xlsx`,
+        );
+        return;
+      }
+
       if (!exportAnalysis) { setIsExporting(false); return; }
 
       if (format === 'pdf') {
@@ -1642,6 +1652,9 @@ function ProcessPlanningPageContent() {
                     </button>
                     <button onClick={() => exportReport('part', 'image')} className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-left">
                       <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" /> Download Image
+                    </button>
+                    <button onClick={() => exportReport('part', 'excel')} className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-left">
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-muted-foreground" /> Download Excel
                     </button>
                     <div className="my-1 border-t border-border" />
                     <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Full Report</p>
