@@ -96,6 +96,12 @@ function resolveAdHocLookupTableKey(fieldName: string, machineClass: string | un
   if (fieldName === 'Sec Per Metre' || fieldName === 'Sec Per Pierce') {
     return 'sm_lookup_deburr_rate';
   }
+  if (fieldName === 'Insertion Cycle Time') {
+    return 'sm_lookup_pem_hardware';
+  }
+  if (machineClass === 'roll_forming' && (fieldName === 'Line Speed' || fieldName === 'Setup Time')) {
+    return 'sm_lookup_roll_forming';
+  }
   if (fieldName in INSPECTION_FEATURE_BY_FIELD) {
     return 'inspection_operation_defaults';
   }
@@ -138,6 +144,27 @@ function computeAdHocMatchedRow(
     if (!Number.isFinite(num)) return rows.find((r) => r.location === location) ?? null;
     return rows.find((r) => r.location === location &&
       (Math.abs(Number(r.ratePerM2Usd) - num) < 1e-6 || Math.abs(Number(r.minLotChargeUsd) - num) < 1e-6)) ?? null;
+  }
+  if (tableName === 'sm_lookup_pem_hardware') {
+    // Exact match only — when the current value is a weighted average across
+    // multiple matched PEM specs (see ProcessCostDialog's PEM featureBreakdown
+    // block), no single row produced it, so this correctly falls through to
+    // null (no highlight) rather than guessing one of the contributing rows.
+    // Row keys are raw DB columns (snake_case) here, not camelCase — this
+    // table is fetched via getSmLookupTableByName's live passthrough
+    // (buildLiveSmLookupTablePayload's rowData: r), which returns the row
+    // exactly as stored, unlike the other ad-hoc cases above.
+    if (!Number.isFinite(num)) return null;
+    return rows.find((r) => Math.abs(Number(r.insertion_cycle_sec) - num) < 1e-6) ?? null;
+  }
+  if (tableName === 'sm_lookup_roll_forming') {
+    // Single real row (migration 442) — match against whichever column this
+    // field actually reads (Line Speed -> line_speed_m_min, Setup Time ->
+    // setup_time_min) so a manually-overridden value correctly shows no
+    // highlight instead of always pointing at the one row regardless.
+    const col = fieldName === 'Setup Time' ? 'setup_time_min' : 'line_speed_m_min';
+    if (!Number.isFinite(num)) return null;
+    return rows.find((r) => Math.abs(Number(r[col]) - num) < 1e-6) ?? null;
   }
   return null;
 }
@@ -1164,6 +1191,29 @@ export function ProcessCostDialog({
           'Dimension Check Time': dimension?.timeSec ?? 0,
         };
       })() : {}),
+
+      // "Sheet Metal - PEM Insertion" calculator fields — sourced from the real
+      // sm_lookup_pem_hardware match(es) for this line's holes (threaded in via
+      // editData.featureBreakdown's 'pem_insertion' rows — see
+      // bom-items.service.ts's buildPemFeatureBreakdown), not the calculator
+      // schema's blank/"1" placeholder. The calculator only has ONE Insertion
+      // Cycle Time / No Of Insertions pair, so when a part matches more than one
+      // distinct PEM hardware spec (different hole diameters), this collapses to
+      // the total count and a weighted-average per-insertion time — their product
+      // still reproduces the real total seconds; provenance says so explicitly
+      // rather than implying a single uniform spec.
+      ...(Array.isArray(editData?.featureBreakdown) ? (() => {
+        const pemRows = (editData.featureBreakdown as Array<{ name: string; timeSec: number; featureType: string; count: number }>)
+          .filter((f) => f.featureType === 'pem_insertion');
+        if (pemRows.length === 0) return {};
+        const totalCount = pemRows.reduce((s, r) => s + r.count, 0);
+        const totalSec = pemRows.reduce((s, r) => s + r.timeSec, 0);
+        if (totalCount === 0) return {};
+        return {
+          'Insertion Cycle Time': totalSec / totalCount,
+          'No Of Insertions': totalCount,
+        };
+      })() : {}),
     };
 
     // Parallel human-readable source for each bomFieldMapping key above — shown
@@ -1225,6 +1275,20 @@ export function ProcessCostDialog({
       'Thickness Check Time': 'Inspection Engine — Feature breakdown panel',
       'Has Dimension Check': 'Inspection Engine — Feature breakdown panel',
       'Dimension Check Time': 'Inspection Engine — Feature breakdown panel',
+      ...(() => {
+        const pemRows = Array.isArray(editData?.featureBreakdown)
+          ? (editData.featureBreakdown as Array<{ name: string; timeSec: number; featureType: string; count: number }>)
+              .filter((f) => f.featureType === 'pem_insertion')
+          : [];
+        if (pemRows.length === 0) return {};
+        const single = pemRows.length === 1 && pemRows[0]
+          ? `sm_lookup_pem_hardware — ${pemRows[0].name}`
+          : `sm_lookup_pem_hardware — weighted average across ${pemRows.length} matched hardware specs (${pemRows.map((r) => r.name).join('; ')})`;
+        return {
+          'Insertion Cycle Time': single,
+          'No Of Insertions': 'CAD feature extraction — total matched PEM hole count (Feature breakdown panel)',
+        };
+      })(),
     };
 
     const newInputs: Record<string, any> = { ...calculatorInputsRef.current };
@@ -1477,6 +1541,32 @@ export function ProcessCostDialog({
           }
         } catch {
           // No match / lookup failed — leave blank for manual entry.
+        }
+      }
+    }
+
+    // Roll Forming Line Speed / Setup Time (sm_lookup_roll_forming, migration
+    // 442) — single real shop-floor line-speed + tooling-changeover row, the
+    // same table SheetMetalLookupService/cost-engine.ts already resolve for
+    // the automated estimate. Previously this calculator's fields had no
+    // data_source tag at all (pure manual entry) despite the real table
+    // existing and already being bridged for the eye icon.
+    if (selectedMachineClass === 'roll_forming') {
+      const lineSpeedField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Line Speed');
+      const rollSetupField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Setup Time');
+      if ((lineSpeedField && isBlank(newInputs['Line Speed'])) || (rollSetupField && isBlank(newInputs['Setup Time']))) {
+        try {
+          const lookup = await calculatorsApi.sheetMetalLookup('roll_forming', {});
+          if (lineSpeedField && isBlank(newInputs['Line Speed']) && typeof lookup?.value === 'number') {
+            setCalculatorInputs((prev) => (isBlank(prev['Line Speed']) ? { ...prev, 'Line Speed': lookup.value } : prev));
+            setCalculatorInputProvenance((prev) => ({ ...prev, 'Line Speed': 'sm_lookup_roll_forming — achievable shop-floor line speed' }));
+          }
+          if (rollSetupField && isBlank(newInputs['Setup Time']) && typeof lookup?.setupTimeMin === 'number') {
+            setCalculatorInputs((prev) => (isBlank(prev['Setup Time']) ? { ...prev, 'Setup Time': lookup.setupTimeMin } : prev));
+            setCalculatorInputProvenance((prev) => ({ ...prev, 'Setup Time': 'sm_lookup_roll_forming — roll-tooling changeover time' }));
+          }
+        } catch {
+          // No data / lookup failed — leave blank for manual entry.
         }
       }
     }
@@ -2910,6 +3000,20 @@ export function ProcessCostDialog({
 
                         const selectOptions = SELECT_FIELD_OPTIONS[field.fieldName];
 
+                        // A field is "real" (not a manual guess or the calculator
+                        // schema's blank placeholder) when its Why: caption names
+                        // an actual source — every non-manual provenance string in
+                        // this dialog is either a real source name or the one
+                        // literal fallback "Calculator's own default value" (see
+                        // bom-items.service.ts's calculation-trace builder, same
+                        // string). Highlighting on that single check works
+                        // generically for every field, not just PEM's.
+                        const provenance = calculatorInputProvenance[field.fieldName];
+                        const isRealSourcedValue = !!provenance && provenance !== "Calculator's own default value";
+                        const realValueClassName = isRealSourcedValue
+                          ? 'border-blue-400 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-200'
+                          : '';
+
                         return (
                           <div key={field.id} className="space-y-2">
                             <Label htmlFor={field.fieldName}>
@@ -2956,7 +3060,7 @@ export function ProcessCostDialog({
                                     })
                                   }
                                   placeholder={`Enter ${field.displayLabel || field.fieldName}`}
-                                  className="flex-1"
+                                  className={`flex-1 ${realValueClassName}`}
                                 />
                                 <Button
                                   type="button"
@@ -2983,6 +3087,7 @@ export function ProcessCostDialog({
                                   })
                                 }
                                 placeholder={`Enter ${field.displayLabel || field.fieldName}`}
+                                className={realValueClassName}
                               />
                             )}
 

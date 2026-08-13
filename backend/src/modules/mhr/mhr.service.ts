@@ -415,6 +415,8 @@ export class MHRService {
         manual_mhr_value: createMHRDto.manualMHRValue || null,
         // India 2026 extended fields
         process_group: createMHRDto.processGroup || null,
+        process_route: createMHRDto.processRoute || null,
+        operation: createMHRDto.operation || null,
         machine_class: createMHRDto.machineClass || null,
         automation_level: createMHRDto.automationLevel || null,
         operators: createMHRDto.operators || null,
@@ -547,6 +549,8 @@ export class MHRService {
     if (updateMHRDto.manualMHRValue !== undefined) updateData.manual_mhr_value = updateMHRDto.manualMHRValue;
     // India 2026 extended fields
     if (updateMHRDto.processGroup !== undefined) updateData.process_group = updateMHRDto.processGroup;
+    if (updateMHRDto.processRoute !== undefined) updateData.process_route = updateMHRDto.processRoute;
+    if (updateMHRDto.operation !== undefined) updateData.operation = updateMHRDto.operation;
     if (updateMHRDto.machineClass !== undefined) updateData.machine_class = updateMHRDto.machineClass;
     if (updateMHRDto.automationLevel !== undefined) updateData.automation_level = updateMHRDto.automationLevel;
     if (updateMHRDto.operators !== undefined) updateData.operators = updateMHRDto.operators;

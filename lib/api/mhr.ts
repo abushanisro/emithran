@@ -67,6 +67,8 @@ export type MHRRecord = {
   manualMHRValue?: number;
   // India 2026 extended fields
   processGroup?: string;
+  processRoute?: string;
+  operation?: string;
   processCategory?: string;
   machineClass?: string;
   automationLevel?: string;
@@ -148,6 +150,8 @@ export type CreateMHRData = {
   manualMHRValue?: number;
   // India 2026 extended fields
   processGroup?: string;
+  processRoute?: string;
+  operation?: string;
   machineClass?: string;
   automationLevel?: string;
   wageGrade?: string;

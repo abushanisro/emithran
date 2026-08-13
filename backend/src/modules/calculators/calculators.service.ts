@@ -482,6 +482,7 @@ export class CalculatorsServiceV2 {
    *   laser_cut      → params: { material, thickness_mm, laser_power_w }
    *   waterjet_cut   → params: { material, thickness_mm }
    *   sampling_plan  → params: { batch_size, complexity_level (1|2|3) }
+   *   roll_forming   → params: none (single-row table, migration 442)
    */
   async resolveSheetMetalLookup(tableName: string, params: Record<string, any>) {
     const client = this.supabaseService.getAdminClient();
@@ -672,6 +673,25 @@ export class CalculatorsServiceV2 {
           value: (row as any)[pctCol],
           sampleQty: (row as any)[qtyCol],
           row,
+        };
+      }
+
+      case 'roll_forming': {
+        // Single-row table (migration 442) — one shop-floor achievable line
+        // speed + tooling changeover time, no material/thickness axis exists
+        // yet in the source data. `value` = Line Speed (m/min), `setupTimeMin`
+        // = Setup Time (min) — the Roll Forming calculator's two lookup-driven
+        // fields, both sourced from this one row.
+        const { data, error } = await client
+          .from('sm_lookup_roll_forming')
+          .select('line_speed_m_min, setup_time_min')
+          .limit(1)
+          .single();
+        if (error || !data) return { value: null };
+        return {
+          value: (data as any).line_speed_m_min,
+          setupTimeMin: (data as any).setup_time_min,
+          row: data,
         };
       }
 

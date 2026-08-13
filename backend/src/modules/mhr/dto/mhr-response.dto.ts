@@ -184,6 +184,8 @@ export class MHRResponseDto {
 
   // India 2026 extended fields
   @ApiProperty({ nullable: true }) processGroup?: string;
+  @ApiProperty({ nullable: true }) processRoute?: string;
+  @ApiProperty({ nullable: true }) operation?: string;
   @ApiProperty({ nullable: true }) processCategory?: string;
   @ApiProperty({ nullable: true }) machineClass?: string;
   @ApiProperty({ nullable: true }) automationLevel?: string;
@@ -273,6 +275,8 @@ export class MHRResponseDto {
       isManualEntry: row.is_manual_entry || false,
       manualMHRValue: row.manual_mhr_value ? parseFloat(row.manual_mhr_value) : undefined,
       processGroup: row.process_group ?? undefined,
+      processRoute: row.process_route ?? undefined,
+      operation: row.operation ?? undefined,
       processCategory: row.process_category ?? undefined,
       machineClass: row.machine_class ?? undefined,
       automationLevel: row.automation_level ?? undefined,
