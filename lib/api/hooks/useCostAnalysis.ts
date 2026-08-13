@@ -13,6 +13,10 @@ export interface ProcessLine {
   operation: string | null;
   processGroup: string | null;
   processRoute: string | null;
+  machineName: string | null;
+  machineClass: string | null;
+  laborType: string | null;
+  location: string | null;
   machineRate: number;
   laborRate: number;
   cycleTimeSec: number;
@@ -36,6 +40,14 @@ export interface MaterialLine {
   grossUsage: number;
   scrap: number;
   overhead: number;
+  reclaimRate: number;
+  grossMaterialCost: number;
+  reclaimValue: number;
+  netMaterialCost: number;
+  scrapAdjustment: number;
+  overheadCost: number;
+  materialUtilizationRate: number;
+  effectiveCostPerUnit: number;
   totalCost: number;
 }
 
