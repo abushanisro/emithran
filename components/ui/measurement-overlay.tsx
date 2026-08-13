@@ -60,8 +60,8 @@ export interface MeasureResult {
   deltaXMm: number;
   deltaYMm: number;
   deltaZMm: number;
-  normalDistanceMm?: number;
-  isParallel?: boolean;
+  normalDistanceMm?: number | undefined;
+  isParallel?: boolean | undefined;
   lineStart: THREE.Vector3;
   lineEnd: THREE.Vector3;
   createdAt: number;
