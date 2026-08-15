@@ -11,7 +11,6 @@ import {
   CreateBomTrackingDto,
   UpdateBomTrackingDto,
   QueryTrackingDto,
-  TrackingStatus,
   ChangeType,
   EntityType,
 } from '../dto/process-tracking.dto';
@@ -567,8 +566,6 @@ export class ProcessTrackingService {
 
   async bulkUpdateProgress(progressData: any[], userId: string, accessToken: string) {
     this.logger.log(`Bulk updating progress for ${progressData.length} items`, 'ProcessTrackingService');
-
-    const client = this.supabaseService.getClient(accessToken);
 
     const results = [];
 

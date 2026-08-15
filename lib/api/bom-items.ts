@@ -49,11 +49,6 @@ export interface CADAnalysisResult {
   metadata?: { timestamp: string };
 }
 
-export interface AnalyzeCADRequest {
-  strategy?: string;
-  forceReanalysis?: boolean;
-}
-
 export const bomItemsApi = {
   /**
    * Analyze CAD for a BOM item with optional process-specific context

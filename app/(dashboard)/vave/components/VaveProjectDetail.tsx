@@ -63,9 +63,9 @@ export function VaveProjectDetail({ projectId, sourceProjectId, onBack }: Props)
       id: projectId,
       data: {
         name: editForm.name,
-        productFamily: editForm.productFamily || undefined,
-        description: editForm.description || undefined,
         status: editForm.status as any,
+        ...(editForm.productFamily ? { productFamily: editForm.productFamily } : {}),
+        ...(editForm.description ? { description: editForm.description } : {}),
       },
     });
     setEditOpen(false);
@@ -161,7 +161,7 @@ export function VaveProjectDetail({ projectId, sourceProjectId, onBack }: Props)
         </TabsList>
 
         <TabsContent value="bom" className="mt-4">
-          <BOMExplorer projectId={projectId} sourceProjectId={sourceProjectId} />
+          <BOMExplorer projectId={projectId} sourceProjectId={sourceProjectId ?? null} />
         </TabsContent>
         <TabsContent value="cost" className="mt-4">
           <CostAnalysis projectId={projectId} />

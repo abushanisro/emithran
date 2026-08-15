@@ -17,8 +17,6 @@ import {
   Max,
   IsUUID,
   ValidateIf,
-  IsArray,
-  ArrayMinSize,
   ValidationArguments,
   ValidatorConstraint,
   ValidatorConstraintInterface,

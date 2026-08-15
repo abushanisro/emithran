@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { AlertDetectorService } from './alert-detector.service';
-import { AlertRankerService, type RankedAlert } from './alert-ranker.service';
+import { AlertRankerService } from './alert-ranker.service';
 
 import type { AlertDto } from '../dto/alert.dto';
 

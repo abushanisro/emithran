@@ -169,8 +169,6 @@ export const ECHO_TOOLS: EchoToolSchema[] = [
   },
 ];
 
-export type EchoToolName = (typeof ECHO_TOOLS)[number]['name'];
-
 export function filterToolsBySkill(allowed: readonly string[]): EchoToolSchema[] {
   const set = new Set(allowed);
   return ECHO_TOOLS.filter((t) => set.has(t.name));

@@ -437,29 +437,6 @@ export const MANUFACTURING_PROCESSES: ManufacturingProcessOption[] = [
 ];
 
 /**
- * Get manufacturing process label from value
- */
-export function getManufacturingProcessLabel(processValue: string): string {
-  const process = MANUFACTURING_PROCESSES.find(p => p.value === processValue);
-  return process?.label || processValue;
-}
-
-/**
- * Get preset by commodity value
- */
-export function getCommodityPreset(commodityValue: string): CommodityPreset | null {
-  const commodity = COMMODITY_PRESETS.find(c => c.value === commodityValue);
-  return commodity?.preset || null;
-}
-
-/**
- * Get default commodity (Plastic & Rubber)
- */
-export function getDefaultCommodity(): CommodityOption {
-  return COMMODITY_PRESETS[0]!;
-}
-
-/**
  * Get commodity label from value
  */
 export function getCommodityLabel(commodityValue: string): string {

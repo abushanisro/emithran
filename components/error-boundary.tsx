@@ -1,6 +1,7 @@
 'use client';
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
@@ -13,11 +14,11 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error?: Error;
+  error?: Error | undefined;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
+  public override state: State = {
     hasError: false,
   };
 
@@ -25,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  public override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
   }
@@ -38,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
-  public render() {
+  public override render() {
     if (this.state.hasError) {
       // Return custom fallback UI if provided
       if (this.props.fallback) {
@@ -92,7 +93,7 @@ export const withErrorBoundary = <P extends object>(
   onError?: (error: Error, errorInfo: ErrorInfo) => void
 ) => {
   const WrappedComponent = (props: P) => (
-    <ErrorBoundary fallback={fallbackComponent} onError={onError}>
+    <ErrorBoundary fallback={fallbackComponent} {...(onError !== undefined ? { onError } : {})}>
       <Component {...props} />
     </ErrorBoundary>
   );

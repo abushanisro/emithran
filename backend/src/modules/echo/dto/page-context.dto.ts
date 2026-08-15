@@ -5,9 +5,7 @@ import {
   IsString,
   IsUUID,
   MaxLength,
-  ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
 /**
  * Where the user currently is + which entity they are looking at.

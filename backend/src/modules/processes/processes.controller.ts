@@ -36,7 +36,6 @@ import {
 } from './dto/process-calculator-mapping.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
-import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Processes')
 @ApiBearerAuth()

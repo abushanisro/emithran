@@ -18,13 +18,6 @@ import type { AlternativeRoute } from './alternative-route.dto';
  * /packaging-logistics-costs, /procured-parts-costs.
  */
 
-export type DraftLineKind =
-  | 'raw_material'
-  | 'process'
-  | 'tooling'
-  | 'logistics'
-  | 'procured_part';
-
 export interface CandidateConsidered {
   candidateId: string;
   label: string;

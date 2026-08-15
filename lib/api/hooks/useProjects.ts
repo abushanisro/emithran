@@ -27,7 +27,7 @@ export function useProjects(query?: ProjectQuery, options?: { enabled?: boolean 
     queryFn: () => projectsApi.getAll(query),
     staleTime: 1000 * 30, // 30 seconds — cost data should always be fresh
     refetchOnWindowFocus: true,
-    enabled: options?.enabled,
+    ...(options?.enabled !== undefined ? { enabled: options.enabled } : {}),
   });
 }
 

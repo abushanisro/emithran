@@ -1,4 +1,3 @@
-interface User { id: string; email: string; [key: string]: any; }
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CostEngineeringService } from './cost-engineering.service';

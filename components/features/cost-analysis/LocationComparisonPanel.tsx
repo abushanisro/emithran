@@ -32,10 +32,6 @@ const LOCATION_FLAGS: Record<string, string> = {
 
 // ── BOM view: aggregate multiple bomItemIds ────────────────────────────────────
 
-interface BomAggregateProps {
-  bomItemIds: string[];
-}
-
 interface BomLocationRow {
   location: string;
   currencySymbol: string;
@@ -216,7 +212,6 @@ interface Props {
 export const LocationComparisonPanel: React.FC<Props> = ({
   bomItemId,
   bomId,
-  location,
   bomLocationData,
 }) => {
   const [view, setView]         = useState<'part' | 'bom'>('part');

@@ -352,7 +352,7 @@ export function BOMItemDialog({
   const itemRef = useRef(item);
   type FieldLineage = { source: 'cad' | 'drawing' | 'derived'; inputs?: string[] };
   const [fieldLineage, setFieldLineage] = useState<Record<string, FieldLineage>>({});
-  const [fieldConfidences, setFieldConfidences] = useState<Record<string, number>>({});
+  const [, setFieldConfidences] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
     name: '',
     partNumber: '',
@@ -827,7 +827,14 @@ export function BOMItemDialog({
       try {
         const imageBase64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
-          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onload = () => {
+            const base64Part = (reader.result as string).split(',')[1];
+            if (base64Part === undefined) {
+              reject(new Error('Failed to read file as base64 data URL'));
+              return;
+            }
+            resolve(base64Part);
+          };
           reader.onerror = reject;
           reader.readAsDataURL(file);
         });
@@ -879,10 +886,6 @@ export function BOMItemDialog({
           if ((result.bend_count ?? 0) > 0 && !prev.bendCount) {
             patch.bendCount = result.bend_count;
             filled.add('bendCount');
-          }
-          if ((result.hole_count ?? 0) > 0 && !prev.holeCount) {
-            patch.holeCount = (result as any).hole_count;
-            filled.add('holeCount');
           }
 
           // Drawing intelligence fields — persisted as promoted columns + full JSONB cache

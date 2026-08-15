@@ -27,7 +27,7 @@ export function useAuthEnabled(options?: UseAuthEnabledOptions): boolean {
   
   // Listen to app readiness changes
   useEffect(() => {
-    const unsubscribe = appReadiness.addListener((state) => {
+    const unsubscribe = appReadiness.addListener(() => {
       setIsAppReady(appReadiness.isReady());
     });
     return unsubscribe;

@@ -147,7 +147,7 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
   const resolveAlertMutation = useResolveAlert();
 
   const resolveRemarkMutation = useMutation({
-    mutationFn: (remarkId: string) => RemarksApi.updateRemark(remarkId, { status: 'resolved' }),
+    mutationFn: (remarkId: string) => RemarksApi.updateRemark(remarkId, { status: 'RESOLVED' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remarks', lotId] });
     },
@@ -329,7 +329,7 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
   // Also extract BOM requirements from process subtasks to show comprehensive tracking
   const subtaskBomItems = (realProcesses || []).flatMap((process: any) => {
 
-    return (process.subtasks || []).flatMap((subtask: any, subtaskIndex: number) => {
+    return (process.subtasks || []).flatMap((subtask: any) => {
       const bomRequirements = subtask.bom_requirements || subtask.bomRequirements || [];
 
 

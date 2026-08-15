@@ -96,7 +96,7 @@ function computeStages(events: StreamEvent[], generation: GenerationResponse | n
         : failedStage === 'retrieval' ? 'failed'
         : isGenerating ? 'in_progress'
         : 'pending',
-      detail: retrievalDetail,
+      ...(retrievalDetail !== undefined ? { detail: retrievalDetail } : {}),
     },
     {
       label: 'Reason (Claude)',
@@ -106,7 +106,7 @@ function computeStages(events: StreamEvent[], generation: GenerationResponse | n
           : 'in_progress'
         : retrieval ? 'in_progress'
         : 'pending',
-      detail: reasoningDetail,
+      ...(reasoningDetail !== undefined ? { detail: reasoningDetail } : {}),
     },
     {
       label: 'Resolve + validate',
@@ -114,7 +114,7 @@ function computeStages(events: StreamEvent[], generation: GenerationResponse | n
         : failedStage === 'resolver' ? 'failed'
         : reasoningStarted ? 'in_progress'
         : 'pending',
-      detail: resolverDetail,
+      ...(resolverDetail !== undefined ? { detail: resolverDetail } : {}),
     },
     {
       label: finalLabel,

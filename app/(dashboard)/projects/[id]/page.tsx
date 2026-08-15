@@ -196,7 +196,7 @@ export default function ProjectDetail() {
       </div>
 
       {/* Project Modules */}
-      <ProjectModules projectId={id} bomCount={sourcingLists.length} firstBomId={firstBomId} />
+      <ProjectModules projectId={id} bomCount={sourcingLists.length} {...(firstBomId !== undefined ? { firstBomId } : {})} />
     </div>
   );
 }

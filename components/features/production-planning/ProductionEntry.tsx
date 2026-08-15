@@ -37,7 +37,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { productionEntriesApi, CreateProductionEntryRequest } from '@/lib/api/production-entries';
+import { productionEntriesApi } from '@/lib/api/production-entries';
+import type { CreateProductionEntryRequest } from '@/lib/api/production-entries';
 
 interface ProductionEntry {
   id: string;
@@ -217,7 +218,7 @@ export const ProductionEntry = ({ lotId = '' }: ProductionEntryProps) => {
       const entryData: CreateProductionEntryRequest = {
         lot_id: lotId, // This will be extracted for URL path
         productionLotId: lotId,
-        productionProcessId: undefined, // Optional
+        // productionProcessId omitted: optional and not selected in this form
         entryDate: formData.entryDate, // Should be in YYYY-MM-DD format
         entryType: 'daily',
         plannedQuantity: Math.floor(Number(formData.targetQuantity) || 0),
@@ -228,7 +229,7 @@ export const ProductionEntry = ({ lotId = '' }: ProductionEntryProps) => {
         downtimeReason: formData.downtimeReason || '',
         shift: formData.shift,
         operatorsCount: 1,
-        supervisor: undefined,
+        // supervisor omitted: optional and not collected in this form
         remarks: formData.operatorNotes || '',
         issuesEncountered: formData.qualityIssues || ''
       };

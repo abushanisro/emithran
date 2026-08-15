@@ -9,12 +9,6 @@ export interface CapabilityCriteria {
   vendorScores: Record<string, number>;
 }
 
-export interface CapabilityScore {
-  criteriaId: string;
-  vendorId: string;
-  score: number;
-}
-
 /**
  * Get capability scoring data for a nomination
  */
@@ -41,19 +35,6 @@ export async function updateCapabilityScore(
 ): Promise<void> {
   await apiClient.put(`/supplier-nominations/${nominationId}/capability-scores/${criteriaId}/vendor/${vendorId}`, {
     score
-  });
-}
-
-/**
- * Update capability criteria name
- */
-export async function updateCapabilityCriteriaName(
-  nominationId: string,
-  criteriaId: string,
-  criteriaName: string
-): Promise<void> {
-  await apiClient.put(`/supplier-nominations/${nominationId}/capability-scores/${criteriaId}`, {
-    criteriaName
   });
 }
 

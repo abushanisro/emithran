@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,12 +22,10 @@ import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type 
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useExchangeRates } from '@/lib/api/hooks/useExchangeRates';
-import { Loader2, Calculator as CalculatorIcon, Play, Eye, Box, FileText } from 'lucide-react';
+import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ModelViewer } from '@/components/ui/model-viewer';
-import { apiClient } from '@/lib/api/client';
 
 // Static lookup — defined outside component so it is never recreated on re-render
 const CALCULATOR_PROPERTY_MAPPINGS: Record<string, string> = {
@@ -143,12 +140,6 @@ export function RawMaterialDialog({
   // true when netUsage was auto-derived from CAD volume × material density
   const [cadFilled, setCadFilled] = useState(false);
 
-  // Part viewer state
-  const [activeView, setActiveView] = useState<'3d' | '2d'>('3d');
-  const [file3dUrl, setFile3dUrl] = useState<string | null>(null);
-  const [file2dUrl, setFile2dUrl] = useState<string | null>(null);
-  const [viewerLoading, setViewerLoading] = useState(false);
-
   // Calculator state
   const [calculatorOpen, setCalculatorOpen] = useState<boolean>(false);
   const [calculatorTarget, setCalculatorTarget] = useState<'grossUsage' | 'netUsage' | null>(null);
@@ -239,42 +230,6 @@ export function RawMaterialDialog({
     }
   }, [open, selectedCalculatorId, bomItemData?.id]);
 
-  // Fetch signed URLs for 3D/2D part viewer when dialog opens
-  useEffect(() => {
-    if (!open || !bomItemData?.id) {
-      setFile3dUrl(null);
-      setFile2dUrl(null);
-      return;
-    }
-    if (!bomItemData?.file3dPath && !bomItemData?.file2dPath) return;
-
-    setViewerLoading(true);
-    const fetches: Promise<void>[] = [];
-
-    if (bomItemData.file3dPath) {
-      fetches.push(
-        apiClient.get(`/bom-items/${bomItemData.id}/file-url/3d`)
-          .then((res: any) => { if (res?.url) setFile3dUrl(res.url); })
-          .catch(() => {})
-      );
-    }
-    if (bomItemData.file2dPath) {
-      fetches.push(
-        apiClient.get(`/bom-items/${bomItemData.id}/file-url/2d`)
-          .then(async (res: any) => {
-            if (!res?.url) return;
-            // Fetch as blob to bypass Supabase X-Frame-Options header
-            const resp = await fetch(res.url);
-            const blob = await resp.blob();
-            setFile2dUrl(URL.createObjectURL(blob));
-          })
-          .catch(() => {})
-      );
-    }
-
-    Promise.all(fetches).finally(() => setViewerLoading(false));
-  }, [open, bomItemData?.id, bomItemData?.file3dPath, bomItemData?.file2dPath]);
-
   // Handle calculator value selection
   const handleUseCalculatorValue = (value: number) => {
     if (calculatorTarget === 'grossUsage') {
@@ -330,7 +285,7 @@ export function RawMaterialDialog({
           
           if (response?.items) {
             // Transform raw materials data into lookup table format
-            const fieldPropertyMap = {
+            const fieldPropertyMap: Record<string, string> = {
               'meltingTempCelsius': 'Melting Temp (°C)',
               'densityKgM3': 'Density (kg/m³)',
               'costPerKg': 'Cost per kg ($)',
@@ -342,34 +297,36 @@ export function RawMaterialDialog({
               'moldTempCelsiusMin': 'Min Mold Temp (°C)',
               'moldTempCelsiusMax': 'Max Mold Temp (°C)',
             };
-            
+
             // Create column definitions based on available properties
             const columns = [
               { name: 'materialName', key: 'materialName', label: 'Material Name', dataType: 'text' },
               { name: 'materialGrade', key: 'materialGrade', label: 'Grade', dataType: 'text' },
               { name: 'categoryName', key: 'categoryName', label: 'Category', dataType: 'text' }
             ];
-            
+
             // Add the specific property column being looked up
             if (field.sourceProperty && fieldPropertyMap[field.sourceProperty]) {
-              columns.push({ 
+              columns.push({
                 name: field.sourceProperty,
-                key: field.sourceProperty, 
-                label: fieldPropertyMap[field.sourceProperty], 
-                dataType: 'number' 
+                key: field.sourceProperty,
+                label: fieldPropertyMap[field.sourceProperty] || field.sourceProperty,
+                dataType: 'number'
               });
             }
-            
+
             // Transform materials into rows
-            const rows = response.items
-              .filter(material => {
+            const materialItems: Array<Record<string, unknown>> = response.items;
+            const rows = materialItems
+              .filter((material) => {
                 // Filter by property availability
                 if (field.sourceProperty) {
-                  return material[field.sourceProperty] != null && material[field.sourceProperty] > 0;
+                  const v = material[field.sourceProperty];
+                  return v != null && Number(v) > 0;
                 }
                 return true;
               })
-              .map(material => ({
+              .map((material) => ({
                 materialName: material.materialName || '',
                 materialGrade: material.materialGrade || '',
                 categoryName: material.categoryName || '',
@@ -530,11 +487,6 @@ export function RawMaterialDialog({
     return filterOptions?.materialGroups || [];
   }, [filterOptions]);
 
-  // Get unique countries  
-  const countries = useMemo(() => {
-    return filterOptions?.countries || [];
-  }, [filterOptions]);
-
   // Get materials filtered by selected group only.
   // Pricing location (country) only affects which cost column is shown — it does NOT filter the list.
   const materials = useMemo(() => {
@@ -677,7 +629,7 @@ export function RawMaterialDialog({
   // ── Live cost preview ────────────────────────────────────────────────────
   const { previewCost, previewBreakdown } = useMemo(() => {
     const zero = { previewCost: 0, previewBreakdown: null as null | Record<string, number> };
-    if (!((selectedMaterial || editData) && (grossUsage > 0 || (netUsage as number) > 0))) return zero;
+    if (!((selectedMaterial || editData) && (Number(grossUsage) > 0 || (netUsage as number) > 0))) return zero;
     const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
     const unitCostUsd = resolveRegionalUnitCostUsd(selectedMaterial, country, rates);
 
@@ -740,8 +692,8 @@ export function RawMaterialDialog({
     rawMaterialFields?.forEach((field: any) => {
       const sourceProperty   = field.sourceProperty || field.sourceField;
       const actualPropertyName = CALCULATOR_PROPERTY_MAPPINGS[sourceProperty] || sourceProperty;
-      const propertyValue    = selectedMaterial[actualPropertyName];
-      if (propertyValue !== undefined && propertyValue !== null && propertyValue > 0) {
+      const propertyValue    = (selectedMaterial as unknown as Record<string, unknown>)[actualPropertyName];
+      if (propertyValue !== undefined && propertyValue !== null && Number(propertyValue) > 0) {
         updatedInputs[field.fieldName] = propertyValue;
         hasUpdates = true;
       }
@@ -800,7 +752,7 @@ export function RawMaterialDialog({
       if (!selectedMaterialId || !selectedMaterial) {
         return;
       }
-      if (grossUsage <= 0) {
+      if (Number(grossUsage) <= 0) {
         return;
       }
       
@@ -989,7 +941,7 @@ export function RawMaterialDialog({
                   return [selectedMaterial.costEEurope ?? 0, 'EUR', '€'];
                 if (countryLower.includes('china'))
                   return [selectedMaterial.costChina ?? 0, 'CNY', '¥'];
-                const base = selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0;
+                const base = selectedMaterial.unitCost || selectedMaterial.cost || 0;
                 const sym =
                   selectedMaterial.currency === 'EUR' ? '€' :
                   selectedMaterial.currency === 'GBP' ? '£' :
@@ -1000,7 +952,7 @@ export function RawMaterialDialog({
               const [localCost, localCurrency, localSymbol] = getRegionalRate();
               const hasRegionalCost = !!country && localCost > 0;
               const rawLocalCost = hasRegionalCost ? localCost
-                : (selectedMaterial.unitCost || selectedMaterial.cost || selectedMaterial.costPerUnit || selectedMaterial.price || 0);
+                : (selectedMaterial.unitCost || selectedMaterial.cost || 0);
               const effectiveCurrency = hasRegionalCost ? localCurrency : (selectedMaterial.currency || 'USD');
               const inrAmount  = rawLocalCost * (rates[effectiveCurrency] ?? 1);
               const usdPrice   = inrAmount / (rates['USD'] ?? 83.5);
@@ -1118,8 +1070,8 @@ export function RawMaterialDialog({
             })()}
 
             {/* Manual Unit Cost Input (when material has no cost) */}
-            {(selectedMaterialId || editData) && (!selectedMaterial || 
-              (!selectedMaterial.unitCost && !selectedMaterial.cost && !selectedMaterial.costPerUnit && !selectedMaterial.price)) && (
+            {(selectedMaterialId || editData) && (!selectedMaterial ||
+              (!selectedMaterial.unitCost && !selectedMaterial.cost)) && (
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-orange-600">
                   Manual Unit Cost <span className="text-xs text-muted-foreground">(Material has no cost data)</span>
@@ -1285,7 +1237,7 @@ export function RawMaterialDialog({
                   className={previewBreakdown?.reclaimRateInvalid ? 'border-destructive focus-visible:ring-destructive' : ''}
                 />
                 {previewBreakdown?.reclaimRateInvalid ? (
-                  <p className="text-xs text-destructive">Must be less than unit cost (${(previewBreakdown.grossMaterialCost / (previewBreakdown.gross || 1)).toFixed(3)}/kg)</p>
+                  <p className="text-xs text-destructive">Must be less than unit cost (${((previewBreakdown.grossMaterialCost ?? 0) / (previewBreakdown.gross || 1)).toFixed(3)}/kg)</p>
                 ) : null}
               </div>
 
@@ -1405,8 +1357,8 @@ export function RawMaterialDialog({
                 disabled={
                   !!previewBreakdown?.reclaimRateInvalid ||
                   (editData
-                    ? grossUsage <= 0
-                    : !materialGroup || !selectedMaterialId || grossUsage <= 0)
+                    ? Number(grossUsage) <= 0
+                    : !materialGroup || !selectedMaterialId || Number(grossUsage) <= 0)
                 }
               >
                 {editData ? 'Update Material' : 'Add Material'}
@@ -1490,10 +1442,7 @@ export function RawMaterialDialog({
                       ?.filter((field: any) => field.fieldType !== 'calculated')
                       .map((field: any) => {
                         // Only show eye button for fields that are likely to have lookup tables
-                        const labelLower = (field.displayLabel || field.fieldName || '').toLowerCase();
-                        const fieldNameLower = (field.fieldName || '').toLowerCase();
-                        
-                        const isLookupTableField = 
+                        const isLookupTableField =
                           // Show for database lookup fields with processes data source
                           (field.fieldType === 'database_lookup' && field.dataSource === 'processes') ||
                           // Show for fields with sourceField starting with 'from_' (linked to reference tables)

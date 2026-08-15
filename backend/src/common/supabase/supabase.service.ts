@@ -206,7 +206,7 @@ export class SupabaseService {
     
     try {
       // PostgREST exposes a special endpoint to reload its schema cache
-      const response = await fetch(`${this.supabaseUrl}/rest/v1/`, {
+      await fetch(`${this.supabaseUrl}/rest/v1/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.supabaseServiceKey}`,

@@ -9,8 +9,6 @@ import {
   computeInjectionMoldedCostSummary,
   recommendCavityCount,
   recommendMoldClass,
-  computeMoldCost,
-  computeCostConfidence,
 } from './cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from './cost-injection-molding-engine';
 

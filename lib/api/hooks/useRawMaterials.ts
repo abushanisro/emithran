@@ -144,7 +144,7 @@ export function useRawMaterials(params?: QueryRawMaterialsParams) {
   return useQuery({
     queryKey: ['raw-materials', 'list', params],
     queryFn: async () => {
-      const response = await apiClient.get<RawMaterialListResponse>('/raw-materials', { params });
+      const response = await apiClient.get<RawMaterialListResponse>('/raw-materials', { ...(params !== undefined ? { params } : {}) });
       return response;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes

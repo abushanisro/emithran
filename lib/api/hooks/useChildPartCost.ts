@@ -183,7 +183,7 @@ export function useChildPartCosts(params?: {
       // Use silent mode to prevent console errors for expected failures
       const result = await apiClient.get<{ childPartCosts: ChildPartCostRecord[]; count: number; page: number; limit: number } | null>(
         '/child-part-costs',
-        { params, silent: true }
+        { ...(params !== undefined ? { params } : {}), silent: true }
       );
 
       // If result is null (error occurred), return empty data

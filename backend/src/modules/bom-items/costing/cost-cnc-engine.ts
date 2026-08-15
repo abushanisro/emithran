@@ -4,10 +4,8 @@ import {
   CNC_STOCK_ALLOWANCE_PER_SIDE_MM,
   CMM_SETUP_MIN,
   INSPECTION_SAMPLING_DEFAULT,
-  classifySurfaceTreatment,
   type SurfaceTreatmentDbRate,
   type InspectionStagePolicy,
-  type MachineClass,
 } from './default-rates';
 import { deriveGdtSeverity } from './gdt-severity';
 import type { MHRRateInput } from './cost-engine';
@@ -689,16 +687,4 @@ export function pickRecommendedRoute<T extends { totalCost: number; capable: boo
     (a, b) => a.totalCost - b.totalCost || a.setupCount - b.setupCount,
   );
   return ranked[0];
-}
-
-// ── Mill-Turn cost summary ────────────────────────────────────────────────────
-// Separate entry point for mill_turn family.  Currently delegates to the turned
-// engine using the cnc_mill_turn machine class (single-setup, live tooling, full
-// bar removal).  When Y-axis milling, sub-spindle, and live-tool cycle times are
-// modelled, the additional cost lines belong here — not in computeCNCTurnedCostSummary.
-
-export function computeMillTurnCostSummary(
-  input: CNCCostInput,
-): CostSummaryDto {
-  return computeCNCTurnedCostSummary(input, 'cnc_mill_turn');
 }

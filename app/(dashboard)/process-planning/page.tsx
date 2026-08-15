@@ -78,10 +78,10 @@ export default function ProcessPlanningPage() {
       description: item.description || item.name || 'No description',
       itemType: (item.itemType || 'child_part') as 'assembly' | 'sub_assembly' | 'child_part',
       status: 'pending' as 'pending' | 'in_progress' | 'completed',
-      file3dPath: item.file3dPath,
-      maxLength: item.maxLength,
-      maxWidth: item.maxWidth,
-      maxHeight: item.maxHeight,
+      ...(item.file3dPath !== undefined ? { file3dPath: item.file3dPath } : {}),
+      ...(item.maxLength !== undefined ? { maxLength: item.maxLength } : {}),
+      ...(item.maxWidth !== undefined ? { maxWidth: item.maxWidth } : {}),
+      ...(item.maxHeight !== undefined ? { maxHeight: item.maxHeight } : {}),
     }));
   }, [bomItemsData]);
 
@@ -208,9 +208,9 @@ export default function ProcessPlanningPage() {
                         {file3dUrl && selectedPart.file3dPath?.toLowerCase().endsWith('.stl') ? (
                           <PartDimensionViewer
                             fileUrl={file3dUrl}
-                            maxLength={selectedPart.maxLength}
-                            maxWidth={selectedPart.maxWidth}
-                            maxHeight={selectedPart.maxHeight}
+                            maxLength={selectedPart.maxLength ?? null}
+                            maxWidth={selectedPart.maxWidth ?? null}
+                            maxHeight={selectedPart.maxHeight ?? null}
                           />
                         ) : (
                           /* Fallback bounding box rectangle */

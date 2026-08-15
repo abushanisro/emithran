@@ -1,7 +1,7 @@
 import { planInspection, finalizeInspectionLine, type InspectionInput, type InspectionOperationDefaultRow, type InspectionResult } from './inspection-engine';
 import type { MHRRateInput } from './cost-engine';
 import type { InspectionRuleRow } from './gdt-severity';
-import type { LookupGap, UnsupportedOperationGap } from '../dto/cost-breakdown.dto';
+import type { UnsupportedOperationGap } from '../dto/cost-breakdown.dto';
 
 function rate(value: number, overrides: Partial<MHRRateInput> = {}): MHRRateInput {
   return { rate: value, source: 'mhr_database', machineClass: 'cmm', machineName: 'Test CMM', commodityCode: null, ...overrides };

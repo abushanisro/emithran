@@ -122,7 +122,7 @@ export function useProcuredPartsCosts(params?: {
       // Use silent mode to prevent console errors for expected failures
       const response = await apiClient.get<ProcuredPartsCostListResponse>(
         '/procured-parts-costs',
-        { params, silent: true }
+        { ...(params !== undefined ? { params } : {}), silent: true }
       );
 
       // If response is null (error occurred), return empty data

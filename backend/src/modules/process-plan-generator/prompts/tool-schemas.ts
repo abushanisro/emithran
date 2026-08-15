@@ -186,5 +186,3 @@ export const TOOLS = [
     },
   },
 ] as const;
-
-export type ToolName = (typeof TOOLS)[number]['name'];

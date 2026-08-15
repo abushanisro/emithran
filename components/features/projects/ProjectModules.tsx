@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardDescription, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { GlareCard } from '@/components/ui/glare-card';
@@ -24,9 +24,9 @@ interface ModuleCardProps {
 function ModuleCard({
   title,
   description,
-  borderColor,
+  borderColor: _borderColor,
   status,
-  itemCount,
+  itemCount: _itemCount,
   imageOutside = false,
   onClick,
 }: ModuleCardProps) {
@@ -138,7 +138,7 @@ interface ProjectModulesProps {
   firstBomId?: string;
 }
 
-export function ProjectModules({ projectId, bomCount, firstBomId }: ProjectModulesProps) {
+export function ProjectModules({ projectId, bomCount, firstBomId: _firstBomId }: ProjectModulesProps) {
   const router = useRouter();
 
   const modules = [

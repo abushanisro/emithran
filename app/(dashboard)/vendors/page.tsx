@@ -69,13 +69,13 @@ export default function VendorsPage() {
     }
 
     const q: VendorQuery = {
-      search: searchTerm || undefined,
-      process: processFilters.length > 0 ? processFilters : undefined,
-      industries: selectedIndustries.length > 0 ? selectedIndustries : undefined,
-      certifications: selectedCertifications.length > 0 ? selectedCertifications : undefined,
-      city: selectedCity && selectedCity !== 'all' ? selectedCity : undefined,
-      equipmentType: selectedEquipmentType && selectedEquipmentType !== 'all' ? selectedEquipmentType : undefined,
-      minTonnage: minTonnage ? parseFloat(minTonnage) : undefined,
+      ...(searchTerm ? { search: searchTerm } : {}),
+      ...(processFilters.length > 0 ? { process: processFilters } : {}),
+      ...(selectedIndustries.length > 0 ? { industries: selectedIndustries } : {}),
+      ...(selectedCertifications.length > 0 ? { certifications: selectedCertifications } : {}),
+      ...(selectedCity && selectedCity !== 'all' ? { city: selectedCity } : {}),
+      ...(selectedEquipmentType && selectedEquipmentType !== 'all' ? { equipmentType: selectedEquipmentType } : {}),
+      ...(minTonnage ? { minTonnage: parseFloat(minTonnage) } : {}),
       limit: 50,
     };
     return q;
@@ -1060,7 +1060,7 @@ export default function VendorsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Status</label>
                   <Select
-                    value={newVendorData.status}
+                    {...(newVendorData.status !== undefined ? { value: newVendorData.status } : {})}
                     onValueChange={(value: 'active' | 'inactive' | 'pending') =>
                       setNewVendorData({ ...newVendorData, status: value })
                     }
@@ -1078,7 +1078,7 @@ export default function VendorsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Vendor Type</label>
                   <Select
-                    value={newVendorData.vendorType}
+                    {...(newVendorData.vendorType !== undefined ? { value: newVendorData.vendorType } : {})}
                     onValueChange={(value: 'supplier' | 'oem' | 'both') =>
                       setNewVendorData({ ...newVendorData, vendorType: value })
                     }
@@ -1261,7 +1261,7 @@ export default function VendorsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">State</label>
                   <Select
-                    value={newVendorData.state}
+                    {...(newVendorData.state !== undefined ? { value: newVendorData.state } : {})}
                     onValueChange={(value) => {
                       setNewVendorData({ ...newVendorData, state: value, city: '' });
                       setCustomCityMode(false);
@@ -1285,7 +1285,7 @@ export default function VendorsPage() {
                     <>
                       {!customCityMode ? (
                         <Select
-                          value={newVendorData.city}
+                          {...(newVendorData.city !== undefined ? { value: newVendorData.city } : {})}
                           onValueChange={(value) => {
                             if (value === 'custom') {
                               setCustomCityMode(true);
@@ -1342,7 +1342,7 @@ export default function VendorsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Country</label>
                   <Select
-                    value={newVendorData.country}
+                    {...(newVendorData.country !== undefined ? { value: newVendorData.country } : {})}
                     onValueChange={(value) => setNewVendorData({ ...newVendorData, country: value })}
                   >
                     <SelectTrigger>

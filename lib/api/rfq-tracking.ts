@@ -14,6 +14,7 @@ export enum RfqTrackingStatus {
   RESPONDED = 'responded',
   EVALUATED = 'evaluated',
   COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
 }
 
 export type RfqTrackingVendor = {

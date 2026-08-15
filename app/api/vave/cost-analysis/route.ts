@@ -105,7 +105,7 @@ Return this exact JSON structure:
       paretoItems,
       affinityGroups: enrichedGroups,
       focusAreas: aiResult.focusAreas ?? [],
-      qfdMatrix: aiResult.qfdMatrix,
+      ...(aiResult.qfdMatrix !== undefined ? { qfdMatrix: aiResult.qfdMatrix } : {}),
     };
 
     return NextResponse.json(result);

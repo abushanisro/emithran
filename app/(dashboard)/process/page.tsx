@@ -94,8 +94,8 @@ export default function ProcessPage() {
   });
 
   // Filter states
-  const [filterProcessGroup, setFilterProcessGroup] = useState<string>('');
-  const [filterProcessRoute, setFilterProcessRoute] = useState<string>('');
+  const [filterProcessGroup] = useState<string>('');
+  const [filterProcessRoute] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   // Deactivated mappings (is_active=false — retired duplicates/phantom
   // calculator refs, e.g. migration 418's Sheet Metal cleanup) are hidden by
@@ -147,9 +147,9 @@ export default function ProcessPage() {
 
   // Fetch calculator mappings with filters
   const { data: calculatorMappings, isLoading: loadingMappings } = useProcessCalculatorMappings({
-    processGroup: filterProcessGroup && filterProcessGroup !== 'all' ? filterProcessGroup : undefined,
-    processRoute: filterProcessRoute && filterProcessRoute !== 'all' ? filterProcessRoute : undefined,
-    search: searchQuery || undefined,
+    ...(filterProcessGroup && filterProcessGroup !== 'all' ? { processGroup: filterProcessGroup } : {}),
+    ...(filterProcessRoute && filterProcessRoute !== 'all' ? { processRoute: filterProcessRoute } : {}),
+    ...(searchQuery ? { search: searchQuery } : {}),
     ...(showInactive ? {} : { isActive: true as const }),
     limit: 1000,
   });

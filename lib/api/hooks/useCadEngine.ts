@@ -7,7 +7,8 @@
 
 import { useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { cadEngineClient, ConversionResult, CADEngineHealth } from '../cad-engine';
+import { cadEngineClient } from '../cad-engine';
+import type { ConversionResult } from '../cad-engine';
 
 interface ConversionState {
   isConverting: boolean;

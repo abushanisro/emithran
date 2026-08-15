@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { CalculatorsController } from './calculators.controller';
 import { CalculatorsServiceV2 } from './calculators.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';

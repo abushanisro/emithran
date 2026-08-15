@@ -29,10 +29,6 @@ export function getEnginesForFamily(processFamily: string): ManufacturingProcess
   return MANUFACTURING_PROCESS_REGISTRY.filter((e) => e.processFamily === processFamily);
 }
 
-export function getEngineForMachineClass(machineClass: string): ManufacturingProcessEngine | undefined {
-  return MANUFACTURING_PROCESS_REGISTRY.find((e) => e.machineClass === machineClass);
-}
-
 // Route id/label are a cosmetic UX lookup, not a candidacy gate — a machine
 // class registered above but missing here still gets offered (falls back to
 // the raw machine class as both id and label) rather than silently dropped.

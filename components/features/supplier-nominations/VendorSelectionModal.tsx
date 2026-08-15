@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,22 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Plus, Building2 } from 'lucide-react';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 
-interface Vendor {
-  id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  location?: string;
-  category?: string;
-  isActive?: boolean;
-}
-
 interface VendorSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectVendors: (vendorIds: string[]) => Promise<void>;
   selectedVendorIds?: string[];
-  nominationId: string;
 }
 
 export function VendorSelectionModal({
@@ -32,7 +21,6 @@ export function VendorSelectionModal({
   onClose,
   onSelectVendors,
   selectedVendorIds = [],
-  nominationId
 }: VendorSelectionModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>(selectedVendorIds);
@@ -43,13 +31,14 @@ export function VendorSelectionModal({
 
   // Filter vendors based on search term and exclude already selected ones
   const filteredVendors = vendors.filter(vendor => {
+    const vendorLocation = [vendor.city, vendor.state].filter(Boolean).join(', ');
     const matchesSearch = vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         vendor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         vendor.location?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+                         vendor.companyEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         vendorLocation.toLowerCase().includes(searchTerm.toLowerCase());
+
     const notAlreadySelected = !selectedVendorIds.includes(vendor.id);
-    
-    return matchesSearch && notAlreadySelected && vendor.isActive !== false;
+
+    return matchesSearch && notAlreadySelected && vendor.status === 'active';
   });
 
   const handleVendorToggle = (vendorId: string) => {
@@ -125,35 +114,38 @@ export function VendorSelectionModal({
               </div>
             ) : (
               <div className="space-y-2 p-4">
-                {filteredVendors.map(vendor => (
-                  <div
-                    key={vendor.id}
-                    className="flex items-center space-x-3 p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors"
-                  >
-                    <Checkbox
-                      id={vendor.id}
-                      checked={selectedIds.includes(vendor.id)}
-                      onCheckedChange={() => handleVendorToggle(vendor.id)}
-                      className="border-gray-400"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-white font-medium truncate">
-                          {vendor.name}
-                        </h4>
-                        {vendor.category && (
-                          <Badge variant="outline" className="text-xs border-gray-500 text-gray-300">
-                            {vendor.category}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
-                        {vendor.email && <span>{vendor.email}</span>}
-                        {vendor.location && <span>{vendor.location}</span>}
+                {filteredVendors.map(vendor => {
+                  const vendorLocation = [vendor.city, vendor.state].filter(Boolean).join(', ');
+                  return (
+                    <div
+                      key={vendor.id}
+                      className="flex items-center space-x-3 p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors"
+                    >
+                      <Checkbox
+                        id={vendor.id}
+                        checked={selectedIds.includes(vendor.id)}
+                        onCheckedChange={() => handleVendorToggle(vendor.id)}
+                        className="border-gray-400"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-white font-medium truncate">
+                            {vendor.name}
+                          </h4>
+                          {vendor.vendorType && (
+                            <Badge variant="outline" className="text-xs border-gray-500 text-gray-300">
+                              {vendor.vendorType}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
+                          {vendor.companyEmail && <span>{vendor.companyEmail}</span>}
+                          {vendorLocation && <span>{vendorLocation}</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

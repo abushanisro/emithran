@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -228,12 +227,13 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       const lotId = selectedLot || undefined;
       const apiPayload = {
         name: inspectionName,
-        description: inspectionDescription || undefined,
+        ...(inspectionDescription ? { description: inspectionDescription } : {}),
         type: inspectionType,
         projectId: projectId,
+        project_id: projectId,
         bomId: activeBom.id,
         ...(lotId !== undefined ? { lotId } : {}),
-        inspector: inspector || undefined,
+        ...(inspector ? { inspector } : {}),
         plannedDate: plannedDate || undefined,
         selectedItems: activeItems,
         qualityStandards: selectedStandards,

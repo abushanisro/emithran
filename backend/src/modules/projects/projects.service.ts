@@ -3,7 +3,7 @@ import { SupabaseService } from '@/common/supabase/supabase.service';
 import { CreateProjectDto, UpdateProjectDto, QueryProjectsDto } from './dto/projects.dto';
 import { ProjectResponseDto, ProjectListResponseDto } from './dto/project-response.dto';
 import { AddTeamMemberDto, UpdateTeamMemberDto, TeamMemberResponseDto, TeamMembersListResponseDto, TeamMemberRole } from './dto/project-team-member.dto';
-import { ProjectsRepository, ProjectEntity } from './projects.repository';
+import { ProjectsRepository } from './projects.repository';
 import { Logger as CustomLogger } from '@/common/logger/logger.service';
 
 @Injectable()

@@ -5,7 +5,7 @@ import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavig
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, FileText, Send, Users, Calendar, Clock, DollarSign, CheckCircle, Mail, Download, Eye, File, Paperclip, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileText, Send, Users, Calendar, Clock, CheckCircle, Mail, Download, Eye, Paperclip, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRfqs } from '@/lib/api/hooks/useRfq';
 import { useRfqTrackingStats, useRfqTrackingRecords } from '@/lib/api/hooks/useRfqTracking';
@@ -13,7 +13,7 @@ import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
-import { format, formatDistanceToNow, isAfter, addDays } from 'date-fns';
+import { formatDistanceToNow, isAfter } from 'date-fns';
 import { useState } from 'react';
 import { usePageContext } from '@/lib/echo/PageContextProvider';
 
@@ -27,10 +27,10 @@ export default function RFQPage() {
 
   // Fetch real data from APIs
   const { data: rfqs, isLoading: rfqsLoading } = useRfqs({ projectId });
-  const { data: rfqStats, isLoading: statsLoading } = useRfqTrackingStats(projectId);
+  useRfqTrackingStats(projectId);
   const { data: trackingRecords, isLoading: trackingLoading } = useRfqTrackingRecords(projectId);
-  const { data: supplierNominations, isLoading: nominationsLoading } = useSupplierNominations(projectId);
-  const { data: vendors, isLoading: vendorsLoading } = useVendors();
+  useSupplierNominations(projectId);
+  useVendors();
   
   // Get project BOMs first, then get BOM items
   const { data: projectBOMs, isLoading: bomsLoading } = useBOMs({ projectId });
@@ -175,12 +175,12 @@ export default function RFQPage() {
   const getFileName = (filePath: string) => {
     if (!filePath) return null;
     const pathParts = filePath.split('/');
-    let fileName = pathParts[pathParts.length - 1]; // Get the last part (filename)
-    
+    let fileName = pathParts[pathParts.length - 1] ?? filePath; // Get the last part (filename)
+
     // Remove timestamp prefix if present (pattern: numbers_actualname.ext)
     const timestampMatch = fileName.match(/^\d+_(.+)$/);
     if (timestampMatch) {
-      fileName = timestampMatch[1];
+      fileName = timestampMatch[1] ?? fileName;
     }
     
     // Clean up the filename - replace underscores and hyphens with spaces, capitalize
@@ -197,30 +197,6 @@ export default function RFQPage() {
   const getFileExtension = (filePath: string) => {
     if (!filePath) return null;
     return filePath.split('.').pop()?.toLowerCase() || null;
-  };
-
-  // Get file type description
-  const getFileTypeDescription = (filePath: string, fileType: '2d' | '3d') => {
-    if (!filePath) return null;
-    const extension = getFileExtension(filePath);
-    
-    if (fileType === '2d') {
-      switch (extension) {
-        case 'pdf': return 'PDF Drawing';
-        case 'dwg': return 'AutoCAD Drawing';
-        case 'dxf': return 'DXF Drawing';
-        case 'png': case 'jpg': case 'jpeg': return 'Image Drawing';
-        default: return '2D Drawing';
-      }
-    } else {
-      switch (extension) {
-        case 'stp': case 'step': return 'STEP Model';
-        case 'stl': return 'STL Model';
-        case 'obj': return 'OBJ Model';
-        case 'iges': case 'igs': return 'IGES Model';
-        default: return '3D Model';
-      }
-    }
   };
 
   return (
@@ -563,14 +539,16 @@ export default function RFQPage() {
                                 )}
                                 {projectBOMs?.boms && projectBOMs.boms.length > 0 && (
                                   <span className="text-xs text-muted-foreground">
-                                    (Using BOM: {projectBOMs.boms[0].name || 'Primary BOM'})
+                                    (Using BOM: {projectBOMs.boms[0]?.name || 'Primary BOM'})
                                   </span>
                                 )}
                               </h5>
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {trackingRecord.parts?.map((part, index) => {
+                                {trackingRecord.parts?.map((part) => {
                                   const bomItem = getBOMItemDetails(part.partNumber);
-                                  
+                                  const file2dPath = bomItem?.file2dPath;
+                                  const file3dPath = bomItem?.file3dPath;
+
                                   return (
                                     <div key={part.id} className="border rounded-lg p-4 space-y-3">
                                       <div className="flex items-start justify-between">
@@ -601,35 +579,35 @@ export default function RFQPage() {
                                           Attached Files
                                         </p>
                                         <div className="flex flex-wrap gap-2">
-                                          {bomItem?.file2dPath ? (
-                                            <Button 
-                                              variant="outline" 
-                                              size="sm" 
+                                          {bomItem && file2dPath ? (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
                                               className="text-xs max-w-[200px] flex items-center gap-2"
-                                              onClick={() => handleFileDownload(bomItem.id, '2d', getFileName(bomItem.file2dPath) || `${part.partNumber}_2D`, part.partNumber)}
-                                              title={`Download ${getFileName(bomItem.file2dPath)} (${getFileExtension(bomItem.file2dPath)?.toUpperCase()} file)`}
+                                              onClick={() => handleFileDownload(bomItem.id, '2d', getFileName(file2dPath) || `${part.partNumber}_2D`, part.partNumber)}
+                                              title={`Download ${getFileName(file2dPath)} (${getFileExtension(file2dPath)?.toUpperCase()} file)`}
                                             >
                                               <Download className="h-3 w-3 flex-shrink-0" />
-                                              <span className="truncate">{getFileName(bomItem.file2dPath) || 'Drawing'}</span>
+                                              <span className="truncate">{getFileName(file2dPath) || 'Drawing'}</span>
                                               <Badge variant="secondary" className="text-xs ml-1">
-                                                {getFileExtension(bomItem.file2dPath)?.toUpperCase()}
+                                                {getFileExtension(file2dPath)?.toUpperCase()}
                                               </Badge>
                                             </Button>
                                           ) : (
                                             <Badge variant="outline" className="text-xs opacity-50">No 2D File</Badge>
                                           )}
-                                          {bomItem?.file3dPath ? (
-                                            <Button 
-                                              variant="outline" 
-                                              size="sm" 
+                                          {bomItem && file3dPath ? (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
                                               className="text-xs max-w-[200px] flex items-center gap-2"
-                                              onClick={() => handleFileDownload(bomItem.id, '3d', getFileName(bomItem.file3dPath) || `${part.partNumber}_3D`, part.partNumber)}
-                                              title={`Download ${getFileName(bomItem.file3dPath)} (${getFileExtension(bomItem.file3dPath)?.toUpperCase()} file)`}
+                                              onClick={() => handleFileDownload(bomItem.id, '3d', getFileName(file3dPath) || `${part.partNumber}_3D`, part.partNumber)}
+                                              title={`Download ${getFileName(file3dPath)} (${getFileExtension(file3dPath)?.toUpperCase()} file)`}
                                             >
                                               <Download className="h-3 w-3 flex-shrink-0" />
-                                              <span className="truncate">{getFileName(bomItem.file3dPath) || 'Model'}</span>
+                                              <span className="truncate">{getFileName(file3dPath) || 'Model'}</span>
                                               <Badge variant="secondary" className="text-xs ml-1">
-                                                {getFileExtension(bomItem.file3dPath)?.toUpperCase()}
+                                                {getFileExtension(file3dPath)?.toUpperCase()}
                                               </Badge>
                                             </Button>
                                           ) : (

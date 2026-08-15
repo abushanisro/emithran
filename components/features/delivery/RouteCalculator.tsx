@@ -1,16 +1,16 @@
 'use client';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, AlertTriangle } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 
 interface Address {
-  id: string;
+  id?: string;
   addressLine1: string;
   addressLine2?: string;
   city: string;
-  stateProvince: string;
+  stateProvince?: string;
   postalCode: string;
-  country: string;
+  country?: string;
   latitude?: number;
   longitude?: number;
 }

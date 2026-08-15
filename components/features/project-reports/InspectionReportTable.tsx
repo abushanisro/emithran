@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { InspectionReport, InspectionDetail } from '@/lib/api/project-reports';
+import type { InspectionReport, InspectionDetail } from '@/lib/api/project-reports';
 import { Download, Edit, FileText, Printer } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
@@ -107,7 +107,7 @@ function InspectionDetailsTable({
     if (measurements.length === 0) return 'yellow';
     
     const specMatch = specification.match(/(\d+(?:\.\d+)?)/);
-    const target = specMatch ? parseFloat(specMatch[1]) : 0;
+    const target = specMatch && specMatch[1] !== undefined ? parseFloat(specMatch[1]) : 0;
     
     const allInTolerance = measurements.every(value => 
       value >= (target + lt) && value <= (target + gt)
@@ -381,7 +381,7 @@ export default function InspectionReportTable({
           <h3 className="text-lg font-semibold mb-3">Inspection Details Table</h3>
           <InspectionDetailsTable
             inspectionDetails={report.inspection_details}
-            onUpdateDetail={isEditable ? handleUpdateDetail : undefined}
+            {...(isEditable ? { onUpdateDetail: handleUpdateDetail } : {})}
             isEditable={isEditable}
           />
         </div>

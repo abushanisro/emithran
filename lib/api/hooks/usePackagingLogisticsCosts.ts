@@ -116,7 +116,7 @@ export function usePackagingLogisticsCosts(params?: {
       // Use silent mode to prevent console errors for expected failures
       const response = await apiClient.get<PackagingLogisticsCostListResponse>(
         '/packaging-logistics-costs',
-        { params, silent: true }
+        { ...(params !== undefined ? { params } : {}), silent: true }
       );
 
       // If response is null (error occurred), return empty data

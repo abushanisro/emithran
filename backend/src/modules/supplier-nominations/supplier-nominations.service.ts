@@ -30,8 +30,7 @@ import {
 import {
   CostCompetencyAnalysisDto,
   BulkUpdateCostDataDto,
-  UpdateCostValueDto,
-  CostVendorValueDto
+  UpdateCostValueDto
 } from './dto/cost-competency.dto';
 import {
   VendorAssessmentCriteriaDto,
@@ -833,7 +832,7 @@ export class SupplierNominationsService {
 
       // Store Overview section
       if (evaluationData.overview) {
-        const { data: overviewResult, error: overviewError } = await client
+        const { error: overviewError } = await client
           .rpc('save_evaluation_section', {
             p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
             p_vendor_id: evaluation.vendor_id,
@@ -850,7 +849,7 @@ export class SupplierNominationsService {
 
       // Store Cost Analysis section
       if (evaluationData.costAnalysis) {
-        const { data: costResult, error: costError } = await client
+        const { error: costError } = await client
           .rpc('save_evaluation_section', {
             p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
             p_vendor_id: evaluation.vendor_id,
@@ -867,7 +866,7 @@ export class SupplierNominationsService {
 
       // Store Rating Engine section
       if (evaluationData.ratingEngine) {
-        const { data: ratingResult, error: ratingError } = await client
+        const { error: ratingError } = await client
           .rpc('save_evaluation_section', {
             p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
             p_vendor_id: evaluation.vendor_id,
@@ -884,7 +883,7 @@ export class SupplierNominationsService {
 
       // Store Capability section
       if (evaluationData.capability) {
-        const { data: capabilityResult, error: capabilityError } = await client
+        const { error: capabilityError } = await client
           .rpc('save_evaluation_section', {
             p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
             p_vendor_id: evaluation.vendor_id,
@@ -977,7 +976,7 @@ export class SupplierNominationsService {
       }
 
       // Update specific section using clean function
-      const { data, error } = await client
+      const { error } = await client
         .rpc('save_evaluation_section', {
           p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
           p_vendor_id: evaluation.vendor_id,
@@ -1136,7 +1135,7 @@ export class SupplierNominationsService {
         throw new BadRequestException(`Factor weights must sum to 100%. Current sum: ${sum}`);
       }
 
-      const { data, error } = await client
+      const { error } = await client
         .rpc('update_factor_weights', {
           p_nomination_evaluation_id: nominationId,
           p_cost_factor: weights.costFactor,
@@ -1208,7 +1207,7 @@ export class SupplierNominationsService {
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
 
-      const { data, error } = await client
+      const { error } = await client
         .rpc('store_supplier_rankings', { p_nomination_evaluation_id: nominationId });
 
       if (error) {
@@ -2243,7 +2242,7 @@ export class SupplierNominationsService {
           }
         }
 
-      } catch (atomicError) {
+      } catch {
         // Fallback to individual updates if atomic function fails
         const updatePromises = updates.map(async (update) => {
           try {

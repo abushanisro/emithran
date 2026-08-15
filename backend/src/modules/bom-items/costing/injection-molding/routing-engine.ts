@@ -14,7 +14,7 @@
 import {
   IM_OPERATION_REGISTRY, IMOperationId, IMProcessTree, IMRoutedOperation,
   MoldingSubtype,
-  isHygroscopicResin, isSiliconeGrade,
+  isHygroscopicResin,
 } from './process-tree';
 
 // Bump when selection rules change — stored on every routed tree for audit.

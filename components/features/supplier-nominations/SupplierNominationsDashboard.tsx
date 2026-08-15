@@ -11,10 +11,6 @@ import {
   Search,
   Users,
   Award,
-  Calendar,
-  Building2,
-  Factory,
-  Zap,
   Edit2,
   Trash2,
   ArrowLeft,
@@ -22,14 +18,10 @@ import {
   Layers,
   CheckCircle2,
   ArrowUpRight,
-  Loader2,
-  TrendingUp,
-  FolderKanban
 } from 'lucide-react';
 import { useSupplierNominations, useDeleteSupplierNomination } from '@/lib/api/hooks/useSupplierNominations';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import {
-  getStatusColor,
   getStatusText,
   getNominationTypeLabel,
   NominationType,
@@ -334,14 +326,13 @@ export function SupplierNominationsDashboard({
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         projectId={projectId}
-        evaluationGroupId={evaluationGroupId}
         onSuccess={handleCreateSuccess}
+        {...(evaluationGroupId !== undefined ? { evaluationGroupId } : {})}
       />
 
       <EditNominationDialog
         nomination={editingNomination}
         onClose={() => setEditingNomination(null)}
-        projectId={projectId}
       />
     </div>
   );
@@ -355,7 +346,6 @@ interface OEMNominationCardProps {
 }
 
 function OEMNominationCard({ nomination, onClick, onEdit, onDelete }: OEMNominationCardProps) {
-  const statusColor = getStatusColor(nomination.status);
   const statusText = getStatusText(nomination.status);
   const typeLabel = getNominationTypeLabel(nomination.nominationType);
 

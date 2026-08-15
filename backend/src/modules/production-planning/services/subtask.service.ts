@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SupabaseService } from '@/common/supabase/supabase.service';
 import { UuidValidator } from '@/common/validators/uuid.validator';
 import { CreateSubtaskDto, UpdateSubtaskDto, SubtaskResponseDto } from '../dto/subtask.dto';
@@ -168,7 +168,7 @@ export class SubtaskService {
       throw new NotFoundException('Subtask not found or access denied');
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('process_subtasks')
       .update({
         task_name: updateDto.taskName,

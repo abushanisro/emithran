@@ -21,9 +21,9 @@ import {
   useSaveDetailedInspectionReport,
   useDetailedInspectionReport,
   useUpdateQualityInspection,
-  useQualityInspection,
-  DetailedInspectionReport
+  useQualityInspection
 } from '@/lib/api/hooks/useQualityControl';
+import type { DetailedInspectionReport } from '@/lib/api/hooks/useQualityControl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -955,8 +955,8 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                 }}
                 scrolling="no"
                 frameBorder="0"
-                marginHeight="0"
-                marginWidth="0"
+                marginHeight={0}
+                marginWidth={0}
               />
 
               {/* Balloon Overlays filtered for currentPage */}
@@ -1279,7 +1279,7 @@ export default function QualityInspectionPage() {
 
   // Single-part report switcher state
   const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
-  const [partReports, setPartReports] = useState<Record<string, any>>({});
+  const [, setPartReports] = useState<Record<string, any>>({});
 
   const activeBomItem = useMemo(() => {
     if (!bomItems || bomItems.length === 0) return null;
@@ -1630,19 +1630,19 @@ export default function QualityInspectionPage() {
       balloonDrawing: {
         partName,
         material,
-        surfaceTreatment: surfaceTreatment || undefined,
+        ...(surfaceTreatment ? { surfaceTreatment } : {}),
         drawingTitle,
         drawingSize,
         balloonAnnotations: balloons
       },
       finalInspectionReport: {
         companyName: companyName || 'Auto-saved',
-        revisionNumber: revisionNumber || undefined,
+        ...(revisionNumber ? { revisionNumber } : {}),
         inspectionDate: inspectionDate || new Date().toISOString().slice(0, 10),
         rawMaterial: rawMaterial || material,
         inspectionBy: inspectionBy || 'Auto-saved',
-        approvedBy: approvedBy || undefined,
-        generalRemarks: generalRemarks || undefined,
+        ...(approvedBy ? { approvedBy } : {}),
+        ...(generalRemarks ? { generalRemarks } : {}),
         status: 'draft'
       },
       inspectionTable: {
@@ -1710,19 +1710,19 @@ export default function QualityInspectionPage() {
       balloonDrawing: {
         partName,
         material,
-        surfaceTreatment: surfaceTreatment || undefined,
+        ...(surfaceTreatment ? { surfaceTreatment } : {}),
         drawingTitle,
         drawingSize,
         balloonAnnotations: balloons
       },
       finalInspectionReport: {
         companyName,
-        revisionNumber: revisionNumber || undefined,
+        ...(revisionNumber ? { revisionNumber } : {}),
         inspectionDate: inspectionDate || new Date().toISOString().slice(0, 10),
         rawMaterial: rawMaterial || '',
         inspectionBy: inspectionBy || '',
-        approvedBy: approvedBy || undefined,
-        generalRemarks: generalRemarks || undefined,
+        ...(approvedBy ? { approvedBy } : {}),
+        ...(generalRemarks ? { generalRemarks } : {}),
         status: finalStatus as 'draft' | 'release' | 'rejected'
       },
       inspectionTable: {

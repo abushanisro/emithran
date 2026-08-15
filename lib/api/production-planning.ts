@@ -49,7 +49,7 @@ export const productionPlanningApi = {
   /**
    * Get all processes for a production lot
    */
-  getProcessesByLot: async (lotId: string, useCache: boolean = true) => {
+getProcessesByLot: async (lotId: string, _useCache: boolean = true) => {
     return apiClient.get(
       `/production-planning/processes/lot/${lotId}`
     );
@@ -58,7 +58,7 @@ export const productionPlanningApi = {
   /**
    * Get production lot by ID - includes main lot dates
    */
-  getProductionLotById: async (lotId: string, useCache: boolean = true) => {
+  getProductionLotById: async (lotId: string, _useCache: boolean = true) => {
     return apiClient.get(
       `/production-planning/lots/${lotId}`
     );
@@ -72,7 +72,7 @@ export const productionPlanningApi = {
     Promise.all([
       productionPlanningApi.getProductionLotById(lotId),
       productionPlanningApi.getProcessesByLot(lotId),
-    ]).catch(error => {
+    ]).catch(() => {
 
     });
   },
@@ -128,7 +128,7 @@ export const productionPlanningApi = {
   /**
    * Get process templates for production planning
    */
-  getProcessTemplates: async (useCache: boolean = true) => {
+  getProcessTemplates: async (_useCache: boolean = true) => {
     return apiClient.get(
       `/production-planning/process-templates`
     );
@@ -208,8 +208,8 @@ export const updateProcessesWithDates = async (
         {
           planned_start_date: formatDateForAPI(process.startDate),
           planned_end_date: formatDateForAPI(process.endDate),
-          assigned_department: process.department,
-          responsible_person: process.responsiblePerson
+          ...(process.department !== undefined ? { assigned_department: process.department } : {}),
+          ...(process.responsiblePerson !== undefined ? { responsible_person: process.responsiblePerson } : {}),
         }
       );
       results.push(result);

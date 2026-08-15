@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 
 interface BOMFilesTableProps {
   items: BOMItem[];

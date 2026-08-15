@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsInt, Min, Max, IsEnum } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { IsString, IsOptional, IsNumber, Min, Max, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Currency, MaterialShape } from '../constants/material-categories.constants';
 
 export class CreateRawMaterialDto {

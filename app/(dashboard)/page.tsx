@@ -158,7 +158,7 @@ export default function DashboardPage() {
   const statusDistribution = Object.keys(STATUS_LABELS)
     .map(s => ({
       status: s,
-      label: STATUS_LABELS[s],
+      label: STATUS_LABELS[s] ?? s,
       count: projects.filter(p => p.status === s).length,
     }))
     .filter(s => s.count > 0);

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const providers = [
       {
         name: 'nominatim',
-        geocode: async (addr: string) => {
+        geocode: async (addr: string): Promise<GeocodeResponse> => {
           const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1&countrycodes=in`;
           
           const response = await fetch(url, {

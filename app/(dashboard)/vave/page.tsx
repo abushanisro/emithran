@@ -64,10 +64,12 @@ export default function VavePage() {
     if (!form.name.trim()) return;
     setFormLoading(true);
     try {
+      const trimmedProductFamily = form.productFamily.trim();
+      const trimmedDescription = form.description.trim();
       const created = await createProject.mutateAsync({
         name: form.name.trim(),
-        productFamily: form.productFamily.trim() || undefined,
-        description: form.description.trim() || undefined,
+        ...(trimmedProductFamily ? { productFamily: trimmedProductFamily } : {}),
+        ...(trimmedDescription ? { description: trimmedDescription } : {}),
       });
       setCreateOpen(false);
       setForm({ name: '', productFamily: '', description: '' });

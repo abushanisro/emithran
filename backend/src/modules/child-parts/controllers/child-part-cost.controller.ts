@@ -1,4 +1,3 @@
-interface User { id: string; email: string; [key: string]: any; }
 /**
  * Child Part Cost Controller
  *
@@ -27,7 +26,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
 import { ChildPartCostService } from '../services/child-part-cost.service';

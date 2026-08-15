@@ -309,7 +309,7 @@ export class FileStorageService {
     
     for (const bucketName of buckets) {
       try {
-        const { data, error } = await this.supabase.storage
+        const { data } = await this.supabase.storage
           .from(bucketName)
           .list(filePath.substring(0, filePath.lastIndexOf('/')), {
             limit: 1,

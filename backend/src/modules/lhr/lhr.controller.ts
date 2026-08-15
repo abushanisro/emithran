@@ -20,7 +20,6 @@ import { LHRService } from './lhr.service';
 import { CreateLHRDto, UpdateLHRDto } from './lhr.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
-import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('LHR')
 @ApiBearerAuth()

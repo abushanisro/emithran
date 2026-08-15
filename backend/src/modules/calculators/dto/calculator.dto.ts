@@ -8,7 +8,6 @@ import {
   IsNumber,
   IsArray,
   ValidateNested,
-  ArrayMinSize,
   Min,
   Max,
 } from 'class-validator';
@@ -439,52 +438,3 @@ export class ExecuteCalculatorDto {
   databaseReferences?: Record<string, any>;
 }
 
-/**
- * Response DTO for calculator with all nested data
- */
-export class CalculatorResponseDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty()
-  userId: string;
-
-  @ApiProperty()
-  name: string;
-
-  @ApiPropertyOptional()
-  description?: string;
-
-  @ApiPropertyOptional()
-  calcCategory?: CalculatorCategory;
-
-  @ApiProperty()
-  calculatorType: CalculatorType;
-
-  @ApiProperty()
-  isTemplate: boolean;
-
-  @ApiProperty()
-  isPublic: boolean;
-
-  @ApiPropertyOptional()
-  templateCategory?: string;
-
-  @ApiProperty()
-  displayConfig: Record<string, any>;
-
-  @ApiProperty()
-  version: number;
-
-  @ApiProperty({ type: [Object] })
-  fields: any[]; // Will be properly typed based on DB response
-
-  @ApiProperty({ type: [Object] })
-  formulas: any[]; // Will be properly typed based on DB response
-
-  @ApiProperty()
-  createdAt: string;
-
-  @ApiProperty()
-  updatedAt: string;
-}

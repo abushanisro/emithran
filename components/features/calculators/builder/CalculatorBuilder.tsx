@@ -26,6 +26,15 @@ type CalculatorBuilderProps = {
   calculatorId: string;
 };
 
+// Field updates may deliberately clear a lookup-related property back to
+// undefined (e.g. when switching a field's type away from database_lookup),
+// so these three properties explicitly allow assigning undefined.
+type CalculatorFieldUpdate = Partial<Omit<CalculatorField, 'dataSource' | 'sourceTable' | 'sourceField'>> & {
+  dataSource?: DataSource | undefined;
+  sourceTable?: string | undefined;
+  sourceField?: string | undefined;
+};
+
 /**
  * CalculatorBuilder - Enterprise Grade V2
  *
@@ -155,7 +164,7 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
     setEditingFieldIds(prev => new Set(prev).add(newFieldId));
   };
 
-  const handleUpdateField = (index: number, updates: Partial<CalculatorField>) => {
+  const handleUpdateField = (index: number, updates: CalculatorFieldUpdate) => {
     const fields = currentData?.fields;
     const field = fields?.[index];
     if (!field || !fields) return;
@@ -337,18 +346,23 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
       if (!bomField) return null;
       
       const newFieldId = `temp-bom-${Date.now()}-${idx}`;
+      const nowIso = new Date().toISOString();
       return {
         id: newFieldId,
+        calculatorId: currentData.id,
         fieldName: bomField.displayLabel,
         displayLabel: bomField.displayLabel,
         fieldType: bomField.fieldType,
         isRequired: false,
         displayOrder: bomField.displayOrder + idx,
-        unit: bomField.unit,
+        ...(bomField.unit !== undefined ? { unit: bomField.unit } : {}),
         defaultValue: bomField.defaultValue,
         sourceField: '',
         lookupConfig: {},
+        validationRules: {},
         inputConfig: { decimalPlaces: 2 },
+        createdAt: nowIso,
+        updatedAt: nowIso,
       } as CalculatorField;
     }).filter(Boolean) as CalculatorField[];
 
@@ -397,24 +411,25 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
     setSavingFieldId(fieldId);
 
     try {
+      const sourceProperty = field.sourceProperty || field.sourceField;
       const fieldData = {
         fieldName: (field.fieldName || field.displayLabel || '').trim(),
         displayLabel: (field.displayLabel || '').trim(),
         fieldType: field.fieldType,
-        dataSource: field.dataSource,
-        sourceTable: field.sourceTable,
-        sourceField: field.sourceField,
-        sourceProperty: field.sourceProperty || field.sourceField,  // Include sourceProperty for auto-population
+        ...(field.dataSource !== undefined ? { dataSource: field.dataSource } : {}),
+        ...(field.sourceTable !== undefined ? { sourceTable: field.sourceTable } : {}),
+        ...(field.sourceField !== undefined ? { sourceField: field.sourceField } : {}),
+        ...(sourceProperty !== undefined ? { sourceProperty } : {}),  // Include sourceProperty for auto-population
         lookupConfig: field.lookupConfig,
-        defaultValue: field.defaultValue,
-        unit: field.unit,
-        minValue: field.minValue,
-        maxValue: field.maxValue,
+        ...(field.defaultValue !== undefined ? { defaultValue: field.defaultValue } : {}),
+        ...(field.unit !== undefined ? { unit: field.unit } : {}),
+        ...(field.minValue !== undefined ? { minValue: field.minValue } : {}),
+        ...(field.maxValue !== undefined ? { maxValue: field.maxValue } : {}),
         isRequired: field.isRequired,
         validationRules: field.validationRules,
         inputConfig: field.inputConfig,
         displayOrder: field.displayOrder,
-        fieldGroup: field.fieldGroup,
+        ...(field.fieldGroup !== undefined ? { fieldGroup: field.fieldGroup } : {}),
       };
 
       let savedField;
@@ -479,48 +494,48 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
         id: calculatorId,
         data: {
           name: currentData.name,
-          description: currentData.description,
-          calcCategory: currentData.calcCategory || undefined,
+          ...(currentData.description !== undefined ? { description: currentData.description } : {}),
+          ...(currentData.calcCategory ? { calcCategory: currentData.calcCategory } : {}),
           calculatorType: currentData.calculatorType,
           isTemplate: currentData.isTemplate,
           isPublic: currentData.isPublic,
           displayConfig: currentData.displayConfig,
           // ATOMIC: All fields and formulas in one payload
-          fields: currentData.fields?.map(f => ({
+          ...(currentData.fields ? { fields: currentData.fields.map(f => ({
             fieldName: (f.fieldName || f.displayLabel || '').trim(),
             displayLabel: (f.displayLabel || '').trim(),
             fieldType: f.fieldType,
-            dataSource: f.dataSource,
-            sourceTable: f.sourceTable,
-            sourceField: f.sourceField,
+            ...(f.dataSource !== undefined ? { dataSource: f.dataSource } : {}),
+            ...(f.sourceTable !== undefined ? { sourceTable: f.sourceTable } : {}),
+            ...(f.sourceField !== undefined ? { sourceField: f.sourceField } : {}),
             lookupConfig: f.lookupConfig,
-            defaultValue: f.defaultValue,
-            unit: f.unit,
-            minValue: f.minValue,
-            maxValue: f.maxValue,
+            ...(f.defaultValue !== undefined ? { defaultValue: f.defaultValue } : {}),
+            ...(f.unit !== undefined ? { unit: f.unit } : {}),
+            ...(f.minValue !== undefined ? { minValue: f.minValue } : {}),
+            ...(f.maxValue !== undefined ? { maxValue: f.maxValue } : {}),
             isRequired: f.isRequired,
             validationRules: f.validationRules,
             inputConfig: f.inputConfig,
             displayOrder: f.displayOrder,
-            fieldGroup: f.fieldGroup,
-          })),
-          formulas: currentData.formulas?.map(f => ({
+            ...(f.fieldGroup !== undefined ? { fieldGroup: f.fieldGroup } : {}),
+          })) } : {}),
+          ...(currentData.formulas ? { formulas: currentData.formulas.map(f => ({
             formulaName: f.formulaName || f.displayLabel || '',
             displayLabel: f.displayLabel || '',
-            description: f.description,
+            ...(f.description !== undefined ? { description: f.description } : {}),
             formulaType: f.formulaType || 'expression',
             formulaExpression: f.formulaExpression || '',
             visualFormula: f.visualFormula,
             dependsOnFields: f.dependsOnFields,
             dependsOnFormulas: f.dependsOnFormulas,
-            outputUnit: f.outputUnit,
+            ...(f.outputUnit !== undefined ? { outputUnit: f.outputUnit } : {}),
             decimalPlaces: f.decimalPlaces,
             displayFormat: f.displayFormat,
             executionOrder: f.executionOrder,
             displayInResults: f.displayInResults,
             isPrimaryResult: f.isPrimaryResult,
-            resultGroup: f.resultGroup,
-          })),
+            ...(f.resultGroup !== undefined ? { resultGroup: f.resultGroup } : {}),
+          })) } : {}),
         },
       });
 
@@ -889,9 +904,9 @@ export function CalculatorBuilder({ calculatorId }: CalculatorBuilderProps) {
                           {field.dataSource && field.dataSource !== 'manual' && (
                             <DatabaseFieldExtractor
                               dataSource={field.dataSource as DataSource}
-                              selectedField={field.sourceField}
+                              {...(field.sourceField !== undefined ? { selectedField: field.sourceField } : {})}
                               lookupConfig={field.lookupConfig || {}}
-                              associatedProcessId={currentData.associatedProcessId}
+                              {...(currentData.associatedProcessId !== undefined ? { associatedProcessId: currentData.associatedProcessId } : {})}
                               onFieldSelect={(selectedField) => {
                                 handleUpdateField(index, {
                                   sourceField: selectedField,

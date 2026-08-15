@@ -1233,11 +1233,11 @@ export function SupplierNominationPage({
                   nominationId={nominationId}
                   onUpdate={handleUpdateEvaluation}
                   onUpdateScores={handleUpdateScores}
-                  onSelectEvaluation={onSelectEvaluation}
                   weights={weights}
                   costAnalysisData={costAnalysisData}
                   vendorRatingScores={vendorRatingScores[evaluation.vendorId] ?? null}
                   capabilityData={capabilityData}
+                  {...(onSelectEvaluation !== undefined ? { onSelectEvaluation } : {})}
                 />
               ))}
             </div>
@@ -1258,7 +1258,6 @@ export function SupplierNominationPage({
         onClose={() => setAddVendorsOpen(false)}
         onSelectVendors={handleAddVendors}
         selectedVendorIds={nomination.vendorEvaluations.map(e => e.vendorId)}
-        nominationId={nominationId}
       />
     </div>
   );

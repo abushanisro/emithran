@@ -3,30 +3,19 @@
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   Package,
-  Users,
-  FileText,
   Search,
   Plus,
-  ChevronRight,
   Edit,
   Trash2,
   Loader2,
-  ShieldCheck,
   Award,
   Factory,
-  Sparkles,
   Layers,
-  CheckCircle2,
-  Clock,
   ArrowUpRight,
-  Filter,
   Wrench,
-  TrendingUp,
-  FolderKanban
 } from 'lucide-react';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 import { toast } from 'sonner';
@@ -294,7 +283,7 @@ function OEMEvaluationCard({ group, onClick, onEdit }: OEMEvaluationCardProps) {
 
   const status = (group.status || 'draft') as 'draft' | 'active' | 'completed' | 'archived';
 
-  const statusBadgeConfigs: Record<string, { label: string; className: string; dotColor: string }> = {
+  const statusBadgeConfigs: Record<'draft' | 'active' | 'completed' | 'archived', { label: string; className: string; dotColor: string }> = {
     active: {
       label: 'Active Audit',
       className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
@@ -317,7 +306,7 @@ function OEMEvaluationCard({ group, onClick, onEdit }: OEMEvaluationCardProps) {
     }
   };
 
-  const currentStatusConfig = statusBadgeConfigs[status] || statusBadgeConfigs.draft;
+  const currentStatusConfig = statusBadgeConfigs[status];
 
   // Compute qualification funnel stage (for OEM visual indicator)
   const funnelStage = useMemo(() => {

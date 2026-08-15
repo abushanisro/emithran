@@ -603,7 +603,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
     }
   };
 
-  const handleEditRemark = (remark: Remark) => {
+  const handleEditRemark = (_remark: Remark) => {
     // TODO: Implement edit functionality
   };
 

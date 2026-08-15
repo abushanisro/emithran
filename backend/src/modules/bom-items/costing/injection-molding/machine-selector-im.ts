@@ -266,19 +266,3 @@ export function selectIMmachinesByTier(
   });
 }
 
-// Legacy flat selector — kept for callers that don't need tier structure
-export function selectIMmachines(
-  pool: MachineCandidate[],
-  req: IMSelectionRequirements,
-): IMCandidateEvaluation[] {
-  const tiers = selectIMmachinesByTier(pool, req);
-  const result = tiers
-    .map((t) => t.evaluation)
-    .filter((e): e is IMCandidateEvaluation => e !== null);
-
-  if (result.length === 0) {
-    // No DB machines at all — return empty so caller triggers synthetic fallback
-    return [];
-  }
-  return result;
-}

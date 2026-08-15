@@ -85,7 +85,7 @@ export function useSendRfq() {
 
   return useMutation({
     mutationFn: (id: string) => rfqApi.send(id),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Update RFQ status immediately
       queryClient.setQueryData(
         rfqKeys.detail(variables),
@@ -126,7 +126,7 @@ export function useCloseRfq() {
 
   return useMutation({
     mutationFn: (id: string) => rfqApi.close(id),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Update RFQ status immediately
       queryClient.setQueryData(
         rfqKeys.detail(variables),
@@ -190,7 +190,7 @@ export function useCancelRfqTracking() {
       queryClient.invalidateQueries({ queryKey: rfqTrackingKeys.all });
       toast.success('RFQ cancelled successfully');
     },
-    onError: (error, variables, context) => {
+    onError: (error, _variables, context) => {
       // Restore previous data on error
       if (context?.previousData) {
         queryClient.setQueryData(rfqTrackingKeys.all, context.previousData);

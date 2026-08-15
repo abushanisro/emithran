@@ -123,10 +123,10 @@ export function RFQShareForm({ projectId, bomId, onRFQSent, className }: RFQShar
         projectId,
         bomItemIds: formData.selectedParts,
         vendorIds: formData.selectedSuppliers,
-        quoteDeadline: formData.quoteDeadline ? new Date(formData.quoteDeadline) : undefined,
+        ...(formData.quoteDeadline ? { quoteDeadline: new Date(formData.quoteDeadline) } : {}),
         selectionType: formData.selectionType as 'single' | 'multiple' | 'competitive',
-        buyerName: formData.buyerName || undefined,
-        emailBody: formData.emailBody || undefined,
+        ...(formData.buyerName ? { buyerName: formData.buyerName } : {}),
+        ...(formData.emailBody ? { emailBody: formData.emailBody } : {}),
         emailSubject: `RFQ: ${formData.rfqName}`,
       };
 

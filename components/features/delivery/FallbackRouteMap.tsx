@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Navigation, MapPin, Truck, Route, RefreshCw, AlertCircle } from 'lucide-react';
+import { Route, RefreshCw, AlertCircle } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -266,7 +266,7 @@ export default function FallbackRouteMap({
     }
 
     // Fallback 2: Use Indian city coordinates database
-    const indianCities = {
+    const indianCities: Record<string, { lat: number; lng: number }> = {
       'bangalore': { lat: 12.9716, lng: 77.5946 },
       'bengaluru': { lat: 12.9716, lng: 77.5946 },
       'mumbai': { lat: 19.0760, lng: 72.8777 },
@@ -288,143 +288,6 @@ export default function FallbackRouteMap({
     // Final fallback: Default to Bengaluru
     console.error('All geocoding methods failed, using default coordinates');
     return { lat: 12.9716, lng: 77.5946 };
-  };
-
-  // Enhanced routing with multiple providers and fallbacks
-  const calculateRouteWithProviders = async (from: { lat: number; lng: number }, to: { lat: number; lng: number }, mode: string = 'car') => {
-    const currentTransport = transportModes.find(m => m.value === mode);
-
-    // For ship and flight routes, use straight-line calculation with specialized logic
-    if (mode === 'ship' || mode === 'flight') {
-      return calculateSpecializedRoute(from, to, mode, currentTransport);
-    }
-    const providers = [
-      {
-        name: 'api',
-        fetch: async () => {
-          const response = await fetch('/api/route-calculation/route', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from, to, transportMode: mode })
-          });
-          if (response.ok) {
-            const data = await response.json();
-            return {
-              distance: data.distance,
-              duration: data.duration,
-              coordinates: data.coordinates,
-              provider: 'api'
-            };
-          }
-          throw new Error('API route failed');
-        }
-      },
-      {
-        name: 'osrm',
-        fetch: async () => {
-          const response = await fetch(
-            `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=false`,
-            { mode: 'cors' }
-          );
-
-          if (!response.ok) throw new Error('OSRM request failed');
-
-          const data = await response.json();
-          if (data.routes && data.routes.length > 0) {
-            const route = data.routes[0];
-            const coordinates = route.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]]);
-
-            return {
-              distance: (route.distance / 1000).toFixed(1),
-              duration: Math.round(route.duration / 60),
-              coordinates,
-              provider: 'osrm'
-            };
-          }
-          throw new Error('No OSRM route found');
-        }
-      }
-    ];
-
-    // Try each provider with timeout
-    for (const provider of providers) {
-      try {
-        console.log(`Trying routing with ${provider.name}...`);
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`${provider.name} timeout`)), 10000)
-        );
-
-        const result = await Promise.race([
-          provider.fetch(),
-          timeoutPromise
-        ]);
-
-        console.log(`Routing successful with ${provider.name}`);
-        return result;
-      } catch (error) {
-        console.warn(`${provider.name} routing failed:`, error);
-        continue;
-      }
-    }
-
-    throw new Error('All routing providers failed');
-  };
-
-  // Calculate specialized routes for ships and flights
-  const calculateSpecializedRoute = (from: { lat: number; lng: number }, to: { lat: number; lng: number }, mode: string, transport: any) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (to.lat - from.lat) * Math.PI / 180;
-    const dLng = (to.lng - from.lng) * Math.PI / 180;
-
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(from.lat * Math.PI / 180) *
-      Math.cos(to.lat * Math.PI / 180) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    let distance = R * c;
-
-    // Adjust distance based on transport mode
-    if (mode === 'ship') {
-      // Ships follow coastal routes, add 20% to distance
-      distance = distance * 1.2;
-    } else if (mode === 'flight') {
-      // Flights follow great circle routes but add distance for takeoff/landing patterns
-      distance = distance * 1.1;
-    }
-
-    const duration = Math.round((distance / (transport?.avgSpeed || 40)) * 60);
-
-    return {
-      distance: distance.toFixed(1),
-      duration,
-      coordinates: [[from.lat, from.lng], [to.lat, to.lng]],
-      provider: mode === 'ship' ? 'maritime' : mode === 'flight' ? 'aviation' : 'specialized'
-    };
-  };
-
-  // Calculate straight-line distance as fallback
-  const calculateStraightLine = (from: { lat: number; lng: number }, to: { lat: number; lng: number }) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (to.lat - from.lat) * Math.PI / 180;
-    const dLng = (to.lng - from.lng) * Math.PI / 180;
-
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(from.lat * Math.PI / 180) *
-      Math.cos(to.lat * Math.PI / 180) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-
-    return {
-      distance: distance.toFixed(1),
-      duration: Math.round(distance / 40 * 60), // Assume 40 km/h average
-      coordinates: [[from.lat, from.lng], [to.lat, to.lng]],
-      provider: 'straight-line'
-    };
   };
 
   // Main route calculation function — delegates EVERYTHING to the API.

@@ -5,7 +5,6 @@ import type { MachineRequirement } from '../costing/machine-selection/physics';
 
 export type CapabilitySource = 'imported' | 'seed' | 'default_class';
 export type AvailabilityStatus = 'available' | 'maintenance' | 'down' | 'retired' | 'commissioning';
-export type SelectionProfile = 'balanced' | 'cheapest' | 'fastest';
 
 export interface MachineCandidate {
   machineId: string | null;      // mhr_records.id; null for class-default fallback

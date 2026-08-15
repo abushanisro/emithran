@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Edit2, Box, Settings, FileText } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit2, Box, Settings } from 'lucide-react';
 
 interface BOMTreeItem {
   id: string;
@@ -73,19 +73,6 @@ export function HierarchicalBOMTree({
       }
       return newSet;
     });
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'assembly':
-        return <Box className="h-4 w-4" />;
-      case 'sub_assembly':
-        return <Settings className="h-4 w-4" />;
-      case 'child_part':
-        return <FileText className="h-4 w-4" />;
-      default:
-        return <FileText className="h-4 w-4" />;
-    }
   };
 
   const getTypeColor = (type: string) => {

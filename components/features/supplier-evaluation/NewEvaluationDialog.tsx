@@ -127,7 +127,7 @@ export function NewEvaluationDialog({
       const evaluationGroupData = {
         projectId,
         name: data.supplierGroupName,
-        notes: data.notes,
+        ...(data.notes ? { notes: data.notes } : {}),
         bomItems: sanitizedBomItemIds.map(bomItemId => {
           const item = bomItems.find(b => b.id === bomItemId);
           return {

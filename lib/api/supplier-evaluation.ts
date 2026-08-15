@@ -131,7 +131,7 @@ export async function getSupplierEvaluations(
 ): Promise<SupplierEvaluation[]> {
   const response = await apiClient.get<SupplierEvaluation[]>(
     '/supplier-evaluations',
-    { params: query }
+    { ...(query !== undefined ? { params: query } : {}) }
   );
   return response || [];
 }

@@ -9,6 +9,21 @@ import { useCostData } from '@/lib/providers/cost-data-provider';
 import { exportService } from '@/lib/services/export-service';
 import { apiClient } from '@/lib/api/client';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import type { CostCalculationResult } from '@/lib/services/cost-engine';
+
+const EMPTY_COST_BREAKDOWN: CostCalculationResult['breakdown'] = {
+  rawMaterialCost: 0,
+  processCost: 0,
+  toolingCost: 0,
+  packagingLogisticsCost: 0,
+  procuredPartsCost: 0,
+  overheadCost: 0,
+  directCost: 0,
+  sgaCost: 0,
+  profitAmount: 0,
+  totalCost: 0,
+  sellingPrice: 0,
+};
 
 interface BomCostReportWrapperProps {
   bomId: string;
@@ -229,7 +244,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                 {bomItems.length > 0 ? bomItems.map((bomItem, index) => {
                   // Find corresponding cost data for this BOM item
                   const costItem = costData.find(ci => ci.itemId === bomItem.id);
-                  const breakdown = costItem?.breakdown || {};
+                  const breakdown = costItem?.breakdown || EMPTY_COST_BREAKDOWN;
                   
                   const getItemTypeColor = (type: string) => {
                     switch (type) {
@@ -435,7 +450,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       <div className="space-y-2">
                         {assemblies.map((item, index) => {
                           const costItem = costData.find(ci => ci.itemId === item.id);
-                          const itemCost = isNaN(costItem?.breakdown?.totalCost) ? 0 : (costItem?.breakdown?.totalCost || 0);
+                          const itemCost = isNaN(costItem?.breakdown?.totalCost ?? 0) ? 0 : (costItem?.breakdown?.totalCost || 0);
                           return (
                             <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded border border-border/50">
                               <div className="flex flex-col">
@@ -475,7 +490,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       <div className="space-y-2">
                         {subAssemblies.map((item, index) => {
                           const costItem = costData.find(ci => ci.itemId === item.id);
-                          const itemCost = isNaN(costItem?.breakdown?.totalCost) ? 0 : (costItem?.breakdown?.totalCost || 0);
+                          const itemCost = isNaN(costItem?.breakdown?.totalCost ?? 0) ? 0 : (costItem?.breakdown?.totalCost || 0);
                           return (
                             <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded border border-border/50">
                               <div className="flex flex-col">
@@ -515,7 +530,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       <div className="space-y-2">
                         {childParts.map((item, index) => {
                           const costItem = costData.find(ci => ci.itemId === item.id);
-                          const itemCost = isNaN(costItem?.breakdown?.totalCost) ? 0 : (costItem?.breakdown?.totalCost || 0);
+                          const itemCost = isNaN(costItem?.breakdown?.totalCost ?? 0) ? 0 : (costItem?.breakdown?.totalCost || 0);
                           return (
                             <div key={index} className="flex items-center justify-between p-2 bg-primary/10 rounded border border-primary/20">
                               <div className="flex flex-col">

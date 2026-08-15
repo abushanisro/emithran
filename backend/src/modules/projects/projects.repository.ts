@@ -40,8 +40,6 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const startTime = Date.now();
-
     try {
       let query = client
         .from(this.tableName)
@@ -56,8 +54,6 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
       }
 
       const { data, error, count } = await query;
-
-      const duration = Date.now() - startTime;
 
       if (error) {
         this.logger.error(`Database error in ${this.tableName}.findBySearch: ${error.message}`);
@@ -89,8 +85,6 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const startTime = Date.now();
-
     try {
       let query = client
         .from(this.tableName)
@@ -105,8 +99,6 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
       }
 
       const { data, error, count } = await query;
-
-      const duration = Date.now() - startTime;
 
       if (error) {
         this.logger.error(`Database error in ${this.tableName}.findByStatus: ${error.message}`);
@@ -133,8 +125,6 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
     name: string,
     excludeId?: string
   ): Promise<boolean> {
-    const startTime = Date.now();
-
     try {
       let query = client
         .from(this.tableName)
@@ -146,8 +136,6 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
       }
 
       const { data, error } = await query.limit(1);
-
-      const duration = Date.now() - startTime;
 
       if (error) {
         this.logger.error(`Database error in ${this.tableName}.isNameExists: ${error.message}`);

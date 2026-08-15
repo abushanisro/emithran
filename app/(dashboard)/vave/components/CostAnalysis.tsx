@@ -433,7 +433,7 @@ export function CostAnalysis({ projectId }: Props) {
       const result: ShouldCostResult = await res.json();
       await upsertShouldCost.mutateAsync({
         partNumber: item.partNumber,
-        description: item.description ?? undefined,
+        ...(item.description ? { description: item.description } : {}),
         actualCost: item.unitCost,
         shouldCost: result.shouldCost,
         deltaPct: result.deltaPct,

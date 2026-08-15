@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   Sheet,
@@ -308,8 +308,8 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
                         onFieldChange={(field, value) => handleFieldChange(line, field, value)}
                         onRemove={() => handleRemove(line)}
                         featureGraph={generation?.brief?.featureGraph as any}
-                        onFeatureHighlight={onFeatureHighlight}
-                        onFeatureFocus={onFeatureFocus}
+                        {...(onFeatureHighlight !== undefined ? { onFeatureHighlight } : {})}
+                        {...(onFeatureFocus !== undefined ? { onFeatureFocus } : {})}
                       />
                     ))}
                   </div>
@@ -396,7 +396,7 @@ export function GenerateProcessPlanPanel({ open, onClose, generation, isGenerati
             </DialogHeader>
             <ProcessPlanFeedbackForm
               bomItemId={generation.bomItemId}
-              partFamily={generation.partFamily}
+              {...(generation.partFamily !== undefined ? { partFamily: generation.partFamily } : {})}
               aiProcessSequence={
                 draft.draftLines
                   .filter((l) => l.kind === 'process')

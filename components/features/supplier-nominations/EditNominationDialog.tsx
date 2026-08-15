@@ -12,13 +12,11 @@ import { NominationType, type SupplierNominationSummary } from '@/lib/api/suppli
 interface EditNominationDialogProps {
   nomination: SupplierNominationSummary | null;
   onClose: () => void;
-  projectId: string;
 }
 
 export function EditNominationDialog({
   nomination,
-  onClose,
-  projectId
+  onClose
 }: EditNominationDialogProps) {
   const [formData, setFormData] = useState({
     nominationName: '',

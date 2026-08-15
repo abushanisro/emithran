@@ -1,4 +1,3 @@
-interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -7,10 +6,8 @@ import {
   Patch,
   Param,
   Delete,
-  UseGuards,
-  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SupplierEvaluationGroupsService } from './supplier-evaluation-groups.service';
 import {
   CreateSupplierEvaluationGroupDto,

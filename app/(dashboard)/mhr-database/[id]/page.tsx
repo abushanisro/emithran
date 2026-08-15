@@ -49,7 +49,7 @@ function getCurrencyFromLocation(location: string): { currency: string; symbol: 
   return { currency: 'INR', symbol: '$' };
 }
 import { useMHRRecord, useUpdateMHR } from '@/lib/api/hooks';
-import { formatCurrency, formatNumber } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
 import { exportSingleMHRToPDF } from '@/lib/utils/exportMHRToPDF';
 import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
 import { EditableValue } from '@/components/ui/editable-value';

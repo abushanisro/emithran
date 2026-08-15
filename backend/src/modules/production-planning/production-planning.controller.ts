@@ -29,11 +29,8 @@ import {
   UpdateProductionLotDto,
   ProductionLotResponseDto,
 } from './dto/production-lot.dto';
-import {
-  CreateLotVendorAssignmentDto,
-  UpdateLotVendorAssignmentDto,
-  BulkVendorAssignmentDto,
-} from './dto/vendor-assignment.dto';
+
+
 import {
   CreateProductionProcessDto,
   UpdateProductionProcessDto,

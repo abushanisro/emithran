@@ -1,6 +1,7 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/providers/auth';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';

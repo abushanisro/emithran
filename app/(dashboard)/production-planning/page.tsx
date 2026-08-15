@@ -17,8 +17,8 @@ export default function ProductionPlanningPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
 
   const { data: lots = [], isLoading } = useProductionLots({
-    status: statusFilter === 'all' ? undefined : statusFilter,
-    priority: priorityFilter === 'all' ? undefined : priorityFilter,
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+    ...(priorityFilter !== 'all' ? { priority: priorityFilter } : {}),
   });
 
   const { data: dashboardData } = useProductionDashboard();

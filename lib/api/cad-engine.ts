@@ -19,12 +19,6 @@ export interface ConversionResult {
   };
 }
 
-export interface ConversionError {
-  success: false;
-  error: string;
-  detail?: string;
-}
-
 export interface CADEngineHealth {
   status: string;
   opencascade: string;

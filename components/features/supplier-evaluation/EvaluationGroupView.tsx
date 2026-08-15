@@ -7,14 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, MapPin, Clock, Building2, Send, Package, Users, FileText, TrendingUp, Award, Mail, Globe, Phone, Box, Eye, ArrowLeft, X, Check, UserCheck, Trash2, Plus } from 'lucide-react';
+import { Search, MapPin, Building2, Send, Package, FileText, TrendingUp, Award, Mail, Box, ArrowLeft, X, Check, UserCheck, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { useVendors, Vendor } from '@/lib/api/hooks/useVendors';
+import { useVendors } from '@/lib/api/hooks/useVendors';
 import { useCreateRfq, useSendRfq } from '@/lib/api/hooks/useRfq';
 import { useRfqTrackingRecords, useRfqTrackingStats, useInvalidateRfqTracking, useUpdateRfqTrackingStatus, useDeleteRfqTracking, useCreateRfqTracking } from '@/lib/api/hooks/useRfqTracking';
-import { getRfqSummaryText, formatResponseTime, getStatusText, getStatusColor } from '@/lib/api/rfq-tracking';
+import { getRfqSummaryText, formatResponseTime, getStatusText, getStatusColor, RfqTrackingStatus } from '@/lib/api/rfq-tracking';
 import { analyzeTrackingFeature, getFeatureStatusMessage, TrackingFeatureState } from '@/lib/api/features/tracking-feature';
 import { useProcessCosts } from '@/lib/api/hooks/useProcessCosts';
+import type { ProcessCostListResponse, ProcessCostRecord } from '@/lib/api/hooks/useProcessCosts';
 import { useProcesses } from '@/lib/api/hooks/useProcesses';
 import { VendorRatingEngine } from '@/components/features/supplier-nominations/VendorRatingEngine';
 import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
@@ -96,9 +97,6 @@ export function EvaluationGroupView({ projectId, bomParts, evaluationGroupName, 
   const shouldShowTracking = trackingFeatureStatus.isEnabled && rfqTrackingRecords.length > 0;
   const shouldShowFeatureNotice = !trackingFeatureStatus.isEnabled;
   const featureStatusMessage = getFeatureStatusMessage(trackingFeatureStatus);
-  
-  // Check if tracking is available for cache invalidation
-  const isTrackingAvailable = trackingFeatureStatus.isEnabled;
   
   // RFQ mutations and cache invalidation
   const createRfqMutation = useCreateRfq();
@@ -310,7 +308,7 @@ const handlePartToggle = (partId: string, checked: boolean) => {
     try {
       await updateTrackingStatusMutation.mutateAsync({
         trackingId: approveModalOpen,
-        data: { status: 'evaluated' }
+        data: { status: RfqTrackingStatus.EVALUATED }
       });
       toast.success(`RFQ approved with ${selectedApproveVendors.length} selected vendor${selectedApproveVendors.length !== 1 ? 's' : ''}`);
       setApproveModalOpen(null);
@@ -383,19 +381,22 @@ We look forward to your competitive proposal and establishing a successful partn
         projectId,
         rfqName: rfqData.rfqName,
         rfqNumber: createdRfq.rfqNumber,
-        vendors: selectedVendorData.map(v => ({
-          id: v.id,
-          name: v.name,
-          email: v.primaryContacts?.[0]?.email || v.companyEmail,
-        })),
+        vendors: selectedVendorData.map(v => {
+          const email = v.primaryContacts?.[0]?.email || v.companyEmail;
+          return {
+            id: v.id,
+            name: v.name,
+            ...(email !== undefined ? { email } : {}),
+          };
+        }),
         parts: selectedBomParts.map(p => ({
           id: p.id,
           partNumber: p.partNumber,
           description: p.description,
           process: p.process,
           quantity: p.quantity,
-          file2dPath: p.file2dPath,
-          file3dPath: p.file3dPath,
+          ...(p.file2dPath !== undefined ? { file2dPath: p.file2dPath } : {}),
+          ...(p.file3dPath !== undefined ? { file3dPath: p.file3dPath } : {}),
         })),
       });
 
@@ -614,7 +615,7 @@ We look forward to your competitive proposal and establishing a successful partn
                           <p className="text-sm">
                             {bomParts.length === 0 
                               ? 'No BOM parts loaded for this project'
-                              : `No parts match your current search "${partsSearchTerm}" or category "${selectedCategory}"`
+                              : `No parts match your current search "${partsSearchTerm}"`
                             }
                           </p>
                           {bomParts.length === 0 && (
@@ -648,7 +649,7 @@ We look forward to your competitive proposal and establishing a successful partn
                         <ProcessEditor
                           partId={part.id}
                           processes={partProcesses[part.id] || []}
-                          processData={processData}
+                          {...(processData ? { processData } : {})}
                           onProcessesChange={(processes) => {
                             setPartProcesses(prev => ({
                               ...prev,
@@ -810,7 +811,7 @@ We look forward to your competitive proposal and establishing a successful partn
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
-                                <h3 className="font-semibold text-white mb-1">{vendor.name || vendor.companyName}</h3>
+                                <h3 className="font-semibold text-white mb-1">{vendor.name}</h3>
                                 <Badge 
                                   variant={vendor.status === 'active' ? "default" : "secondary"}
                                   className={`text-xs ${vendor.status === 'active' ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'}`}
@@ -829,12 +830,8 @@ We look forward to your competitive proposal and establishing a successful partn
 
                             <div className="mt-3 space-y-2 text-sm text-gray-300">
                               <div className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-teal-400" />
-                                <span>{vendor.leadTime || 'Contact for details'}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
                                 <MapPin className="h-4 w-4 text-teal-400" />
-                                <span>{vendor.location || (vendor.city && vendor.state ? `${vendor.city}, ${vendor.state}` : 'Location TBD')}</span>
+                                <span>{vendor.city && vendor.state ? `${vendor.city}, ${vendor.state}` : 'Location TBD'}</span>
                               </div>
                             </div>
 
@@ -1148,7 +1145,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                 }`}
                                 onClick={() => setSelectedVendorForRating(vendor.id)}
                               >
-                                <div className="font-medium text-white">{vendor.name || vendor.companyName}</div>
+                                <div className="font-medium text-white">{vendor.name}</div>
                                 <div className="text-sm text-gray-400 mt-1">{vendor.city && vendor.state ? `${vendor.city}, ${vendor.state}` : 'Location TBD'}</div>
                                 <div className="flex flex-wrap gap-1 mt-2">
                                   {vendor.process?.slice(0, 2).map((proc) => (
@@ -1168,14 +1165,16 @@ We look forward to your competitive proposal and establishing a successful partn
                         </div>
 
                         {/* Vendor Rating Engine */}
-                        {selectedVendorForRating && (
+                        {selectedVendorForRating && (() => {
+                          const selectedVendorName = matchedVendors.find(v => v.id === selectedVendorForRating)?.name;
+                          return (
                           <div className="bg-gray-800 rounded-lg border border-gray-700">
-                            {supplierNominations && supplierNominations.length > 0 ? (
+                            {supplierNominations && supplierNominations.length > 0 && supplierNominations[0] ? (
                               <VendorRatingEngine
                                 vendorId={selectedVendorForRating}
-                                vendorName={matchedVendors.find(v => v.id === selectedVendorForRating)?.name || matchedVendors.find(v => v.id === selectedVendorForRating)?.companyName}
+                                {...(selectedVendorName !== undefined ? { vendorName: selectedVendorName } : {})}
                                 nominationId={supplierNominations[0].id} // Use the first supplier nomination
-                                onScoreUpdate={(scores) => {
+                                onScoreUpdate={(_scores) => {
                                   // Optional: Handle score updates
                                 }}
                               />
@@ -1203,7 +1202,8 @@ We look forward to your competitive proposal and establishing a successful partn
                               </div>
                             )}
                           </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -1237,7 +1237,7 @@ We look forward to your competitive proposal and establishing a successful partn
                             <Building2 className="h-5 w-5 text-teal-400" />
                           </div>
                           <div>
-                            <h3 className="font-semibold text-white">{vendor.name || vendor.companyName}</h3>
+                            <h3 className="font-semibold text-white">{vendor.name}</h3>
                             <p className="text-sm text-gray-400">{vendor.supplierCode || 'No supplier code'}</p>
                           </div>
                           <Badge className="ml-auto bg-green-600 text-white">
@@ -1266,21 +1266,7 @@ We look forward to your competitive proposal and establishing a successful partn
                           </div>
                         </div>
 
-                        <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <div className="flex items-center gap-1 text-gray-400">
-                              <Clock className="h-4 w-4 text-teal-400" />
-                              <span>Lead Time</span>
-                            </div>
-                            <div className="font-medium text-white">{vendor.leadTime || 'Contact for details'}</div>
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1 text-gray-400">
-                              <Users className="h-4 w-4 text-teal-400" />
-                              <span>MOQ</span>
-                            </div>
-                            <div className="font-medium text-white">{vendor.minOrderQuantity || 'Contact for MOQ'}</div>
-                          </div>
+                        <div className="mt-3 grid grid-cols-1 gap-4 text-sm">
                           <div>
                             <div className="text-gray-400">Certifications</div>
                             <div className="text-xs space-x-2">
@@ -1550,7 +1536,7 @@ interface ProcessEditorProps {
   partId: string;
   processes: string[];
   onProcessesChange: (processes: string[]) => void;
-  processData?: any; // Process planning data from useProcessCosts
+  processData?: ProcessCostListResponse; // Process planning data from useProcessCosts
 }
 
 function ProcessEditor({ partId, processes, onProcessesChange, processData }: ProcessEditorProps) {
@@ -1567,13 +1553,13 @@ function ProcessEditor({ partId, processes, onProcessesChange, processData }: Pr
   // Get existing processes for this specific part
   const partSpecificProcesses = React.useMemo(() => {
     if (!processData?.records) return [];
-    
-    const partRecords = processData.records.filter((record: any) => record.bomItemId === partId);
-    const processNames = partRecords.map((record: any) => 
-      record.description || record.operation || record.processGroup
-    ).filter((name: string) => name && name !== 'Unknown Process');
-    
-    return [...new Set(processNames)];
+
+    const partRecords = processData.records.filter((record: ProcessCostRecord) => record.bomItemId === partId);
+    const processNames = partRecords
+      .map((record: ProcessCostRecord) => record.description || record.operation || record.processGroup)
+      .filter((name): name is string => !!name && name !== 'Unknown Process');
+
+    return Array.from(new Set(processNames));
   }, [processData, partId]);
 
   // Combine all available processes from both sources
@@ -1589,7 +1575,7 @@ function ProcessEditor({ partId, processes, onProcessesChange, processData }: Pr
     
     // Add processes from existing process planning data (all parts)
     if (processData?.records) {
-      processData.records.forEach((record: any) => {
+      processData.records.forEach((record: ProcessCostRecord) => {
         const processName = record.description || record.operation || record.processGroup;
         if (processName && processName !== 'Unknown Process') {
           processSet.add(processName);

@@ -29,7 +29,6 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
-import { Public } from '../../common/decorators/public.decorator';
 import { ProcuredPartsCostService } from './procured-parts-cost.service';
 import {
   CreateProcuredPartsCostDto,

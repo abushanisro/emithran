@@ -1,5 +1,5 @@
 import { IsString, IsUUID, IsOptional, IsArray, IsNumber, IsDateString, IsIn, ValidateNested } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BOMPartRequirementDto {

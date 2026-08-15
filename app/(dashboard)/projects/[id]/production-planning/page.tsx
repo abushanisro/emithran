@@ -50,8 +50,8 @@ export default function ProjectProductionPlanningPage() {
 
   // Get production lots (filter by project BOMs)
   const { data: allLots = [], isLoading } = useProductionLots({
-    status: statusFilter === 'all' ? undefined : statusFilter,
-    priority: priorityFilter === 'all' ? undefined : priorityFilter,
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+    ...(priorityFilter !== 'all' ? { priority: priorityFilter } : {}),
   });
 
   // Filter lots to only show ones for this project's BOMs

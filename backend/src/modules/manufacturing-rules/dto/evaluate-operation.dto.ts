@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsObject, IsEnum } from "class-validator";
+import { IsString, IsOptional, IsObject, IsEnum } from "class-validator";
 import type { QualityLevel, ToolMaterial } from "../interfaces/operation-calculator.interface";
 
 export class EvaluateOperationDto {

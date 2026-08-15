@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,11 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { useDeliveryOrder, useUpdateDeliveryOrder } from '@/lib/api/hooks/useDelivery';
-import { DeliveryOrder } from '@/lib/api/hooks/useDelivery';
+import { useDeliveryOrder } from '@/lib/api/hooks/useDelivery';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { CheckCircle, X, Edit2, Save } from 'lucide-react';
+import { CheckCircle, X } from 'lucide-react';
 
 interface DeliveryOrderDetailDialogProps {
   isOpen: boolean;
@@ -36,7 +35,6 @@ export const DeliveryOrderDetailDialog: React.FC<DeliveryOrderDetailDialogProps>
   orderId
 }) => {
   const { data: order, isLoading, error } = useDeliveryOrder(orderId);
-  const updateDeliveryOrder = useUpdateDeliveryOrder();
 
   // Default audit items constant
   const DEFAULT_AUDIT_ITEMS: AuditItem[] = [
@@ -54,10 +52,9 @@ export const DeliveryOrderDetailDialog: React.FC<DeliveryOrderDetailDialogProps>
   ];
 
   // State for interactive audit sheet - initialize with default data immediately
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing] = useState(false);
   const [auditData, setAuditData] = useState<AuditItem[]>(DEFAULT_AUDIT_ITEMS);
   const [checkedBy, setCheckedBy] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
   // Initialize audit data when order loads
   React.useEffect(() => {
@@ -92,28 +89,6 @@ export const DeliveryOrderDetailDialog: React.FC<DeliveryOrderDetailDialogProps>
       item.id === itemId ? { ...item, [field]: value } : item
     ));
   }, []);
-
-  // Save audit data
-  const handleSaveAudit = useCallback(async () => {
-    setIsSaving(true);
-    try {
-      await updateDeliveryOrder.mutateAsync({
-        id: orderId,
-        data: {
-          dockAudit: auditData,
-          checkedBy: checkedBy,
-        }
-      });
-
-      toast.success('Dock audit data saved successfully');
-      setIsEditing(false);
-    } catch (error) {
-      toast.error('Failed to save audit data');
-      console.error('Error saving audit:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [auditData, checkedBy, orderId, updateDeliveryOrder]);
 
   // Handle file download
   const handleFileDownload = useCallback((file: any, fileName?: string) => {

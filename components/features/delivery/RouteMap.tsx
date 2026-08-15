@@ -59,6 +59,7 @@ export default function RouteMap({ fromAddress, toAddress, transportMode, materi
     script.onload = () => { window.dispatchEvent(new Event('google-maps-loaded')); setMapLoaded(true); };
     script.onerror = () => setGoogleMapsFailed(true);
     document.head.appendChild(script);
+    return undefined;
   }, []);
 
   // Initialize map
@@ -247,11 +248,11 @@ export default function RouteMap({ fromAddress, toAddress, transportMode, materi
       <FallbackRouteMap
         fromAddress={fromAddress}
         toAddress={toAddress}
-        transportMode={transportMode}
-        materialType={materialType}
-        onRouteCalculated={onRouteCalculated}
-        onTransportModeChange={onTransportModeChange}
-        onMaterialTypeChange={onMaterialTypeChange}
+        {...(transportMode !== undefined ? { transportMode } : {})}
+        {...(materialType !== undefined ? { materialType } : {})}
+        {...(onRouteCalculated !== undefined ? { onRouteCalculated } : {})}
+        {...(onTransportModeChange !== undefined ? { onTransportModeChange } : {})}
+        {...(onMaterialTypeChange !== undefined ? { onMaterialTypeChange } : {})}
         className={className}
       />
     );

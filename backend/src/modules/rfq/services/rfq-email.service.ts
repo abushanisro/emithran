@@ -1,8 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { createTransport, Transporter, SendMailOptions } from 'nodemailer';
-import * as handlebars from 'handlebars';
-import * as fs from 'fs';
 import * as path from 'path';
 import { RfqRecord } from '../dto/rfq-response.dto';
 
@@ -488,13 +486,7 @@ ${templateData.companyName}
   private extractFileName(filePath: string, partNumber: string, type: string): string {
     const originalFileName = path.basename(filePath);
     const extension = path.extname(originalFileName);
-    
-    // Remove timestamp prefix if present
-    let cleanFileName = originalFileName;
-    if (originalFileName.includes('_') && /^\d+_/.test(originalFileName)) {
-      cleanFileName = originalFileName.substring(originalFileName.indexOf('_') + 1);
-    }
-    
+
     // Create descriptive filename
     const cleanPartNumber = partNumber.replace(/[^a-zA-Z0-9.-]/g, '_');
     return `${cleanPartNumber}_${type}${extension}`;
