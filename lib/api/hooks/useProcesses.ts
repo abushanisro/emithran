@@ -123,7 +123,7 @@ export function useProcesses(params?: QueryProcessesParams) {
   return useQuery({
     queryKey: ['processes', 'list', params],
     queryFn: async () => {
-      const response = await apiClient.get<ProcessListResponse>('/processes', { params });
+      const response = await apiClient.get<ProcessListResponse>('/processes', { ...(params !== undefined ? { params } : {}) });
       return response;
     },
     enabled: !authLoading && !!user,

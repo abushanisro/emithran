@@ -480,6 +480,7 @@ export function getApiCircuitBreakerStatus() {
     return metrics;
   } catch (error) {
     // Failed to get circuit breaker status
+    return undefined;
   }
 }
 

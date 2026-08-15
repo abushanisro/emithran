@@ -291,7 +291,7 @@ export class SupplierEvaluationGroupsService {
       }
 
       // Check for active RFQs by looking at RFQ tracking records
-      const { data: activeRfqs, count: activeRfqCount } = await supabase
+      const { count: activeRfqCount } = await supabase
         .from('rfq_tracking')
         .select('*', { count: 'exact' })
         .eq('project_id', group.project_id)
@@ -303,7 +303,7 @@ export class SupplierEvaluationGroupsService {
       }
 
       // Check for RFQs under evaluation
-      const { data: evaluatedRfqs, count: evaluatedCount } = await supabase
+      const { count: evaluatedCount } = await supabase
         .from('rfq_tracking')
         .select('*', { count: 'exact' })
         .eq('project_id', group.project_id)
@@ -316,7 +316,7 @@ export class SupplierEvaluationGroupsService {
       }
 
       // Check for completed RFQs (historical data)
-      const { data: completedRfqs, count: completedCount } = await supabase
+      const { count: completedCount } = await supabase
         .from('rfq_tracking')
         .select('*', { count: 'exact' })
         .eq('project_id', group.project_id)

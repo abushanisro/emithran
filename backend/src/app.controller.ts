@@ -1,4 +1,3 @@
-interface User { id: string; email: string; [key: string]: any; }
 import { Controller, Get, Logger, VERSION_NEUTRAL } from '@nestjs/common';
 import { Public } from './common/decorators/public.decorator';
 import { SupabaseService } from './common/supabase/supabase.service';
@@ -57,7 +56,7 @@ export class AppController {
       
       // Test 1: Auth admin endpoint
       try {
-        const { data: authData, error: authError } = await client.auth.admin.listUsers({ page: 1, perPage: 1 });
+        const { error: authError } = await client.auth.admin.listUsers({ page: 1, perPage: 1 });
         tests.push({ name: 'auth.admin.listUsers', success: !authError, error: authError?.message });
       } catch (e) {
         tests.push({ name: 'auth.admin.listUsers', success: false, error: e.message });
@@ -65,7 +64,7 @@ export class AppController {
       
       // Test 2: Simple database query
       try {
-        const { data: dbData, error: dbError } = await client.from('projects').select('count').limit(1);
+        const { error: dbError } = await client.from('projects').select('count').limit(1);
         tests.push({ name: 'projects.select', success: !dbError, error: dbError?.message });
       } catch (e) {
         tests.push({ name: 'projects.select', success: false, error: e.message });

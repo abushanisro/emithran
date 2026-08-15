@@ -31,7 +31,6 @@ import type { InjectionMoldingSignals } from './injection-molding/routing-engine
 import { buildInjectionMoldingRoute } from './injection-molding/routing-engine';
 import {
   computeCycleTime,
-  computeLsrCureTime,
   lookupResinProps,
   type GateType,
 } from './injection-molding/cycle-time';

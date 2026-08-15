@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -17,12 +17,10 @@ import {
   ArrowLeft,
   Save,
   TrendingUp,
-  FileText,
   BarChart3,
   Zap,
   DollarSign,
-  Edit,
-  CheckCircle
+  Edit
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -79,18 +77,6 @@ export function DetailedEvaluationView({
   onBack
 }: DetailedEvaluationViewProps) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'capability' | 'rating' | 'cost'>('dashboard');
-  const [evaluationData, setEvaluationData] = useState({
-    vendorType: evaluation.vendorType,
-    recommendation: evaluation.recommendation,
-    riskLevel: evaluation.riskLevel,
-    riskMitigationPercentage: evaluation.riskMitigationPercentage,
-    minorNcCount: evaluation.minorNcCount,
-    majorNcCount: evaluation.majorNcCount,
-    capabilityPercentage: evaluation.capabilityPercentage,
-    technicalFeasibilityScore: evaluation.technicalFeasibilityScore,
-    evaluationNotes: evaluation.evaluationNotes || '',
-    technicalDiscussion: evaluation.technicalDiscussion || ''
-  });
 
   // State removed - approval functionality has been removed
 
@@ -184,24 +170,6 @@ export function DetailedEvaluationView({
   // }, [evaluation.scores]);
 
   // Load rating engine scores for real-time display
-  // Sync state when evaluation prop changes
-  useEffect(() => {
-    setEvaluationData({
-      vendorType: evaluation.vendorType,
-      recommendation: evaluation.recommendation,
-      riskLevel: evaluation.riskLevel,
-      riskMitigationPercentage: evaluation.riskMitigationPercentage,
-      minorNcCount: evaluation.minorNcCount,
-      majorNcCount: evaluation.majorNcCount,
-      capabilityPercentage: evaluation.capabilityPercentage,
-      technicalFeasibilityScore: evaluation.technicalFeasibilityScore,
-      evaluationNotes: evaluation.evaluationNotes || '',
-      technicalDiscussion: evaluation.technicalDiscussion || ''
-    });
-
-    // Approval data state removed
-  }, [evaluation]);
-
   useEffect(() => {
     const loadRatingEngineScores = async () => {
       if (!nominationId || !evaluation.vendorId) return;
@@ -314,18 +282,6 @@ export function DetailedEvaluationView({
   //     console.error('Save scores error:', error);
   //   }
   // };
-
-  const handleSaveEvaluation = async () => {
-    try {
-      await updateEvaluationMutation.mutateAsync({
-        evaluationId: evaluation.id,
-        data: evaluationData
-      });
-      toast.success('Evaluation updated successfully');
-    } catch (error) {
-      console.error('Save evaluation error:', error);
-    }
-  };
 
   // const hasUnsavedScores = Object.keys(editingScores).length > 0;
 
@@ -842,15 +798,15 @@ export function DetailedEvaluationView({
           {activeTab === 'cost' && (
             <CostCompetencyAnalysis
               nominationId={nominationId}
-              projectId={fullNomination?.projectId} // Using projectId to get BOMs
               vendors={fullNomination?.vendorEvaluations ?
                 fullNomination.vendorEvaluations.map(v => ({
                   id: v.vendorId,
                   name: v.vendorName || `Vendor ${v.vendorId.slice(-4)}`
                 })) : []
               }
-              nominationBomParts={fullNomination?.bomParts} // Pass nomination BOM parts
               onDataUpdate={handleCostDataUpdate}
+              {...(fullNomination?.projectId !== undefined ? { projectId: fullNomination.projectId } : {})}
+              {...(fullNomination?.bomParts !== undefined ? { nominationBomParts: fullNomination.bomParts } : {})}
             />
           )}
         </div>

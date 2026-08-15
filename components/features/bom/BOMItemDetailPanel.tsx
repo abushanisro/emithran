@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { X, Download, FileText, Maximize2, Upload, Loader2, Box, Cpu } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { apiClient } from '@/lib/api/client';
 import { apiConfig } from '@/lib/api/config';
 import { toast } from 'sonner';
@@ -38,10 +38,9 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
   const [selectedFile2d, setSelectedFile2d] = useState<File | null>(null);
   const [selectedFile3d, setSelectedFile3d] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState<'3d' | '2d' | 'intelligence'>('3d');
-  const [manufacturingFeatures, setManufacturingFeatures] = useState<ManufacturingFeature[]>([]);
+  const [manufacturingFeatures] = useState<ManufacturingFeature[]>([]);
   const [selectedFeature, setSelectedFeature] = useState<ManufacturingFeature | null>(null);
-  const [showFeatures, setShowFeatures] = useState(false);
-  const [selectedProcessForHighlight, setSelectedProcessForHighlight] = useState<string | null>(null);
+  const [showFeatures] = useState(false);
   const file2dInputRef = useRef<HTMLInputElement>(null);
   const file3dInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,19 +166,6 @@ interface ManufacturingFeature {
       setUploading(false);
     }
   };
-
-  // Process highlighting handler for BOM analysis
-  const handleProcessHighlight = (process: any) => {
-    const processName = process.processGroup || process.operation || 'Selected Process';
-    setSelectedProcessForHighlight(processName);
-    
-    // Real CAD analysis features would be loaded from the backend
-    // No simulation or mock features - only use real CAD analysis data
-    setManufacturingFeatures([]);
-    setSelectedFeature(null);
-    setShowFeatures(false);
-  };
-
 
   if (!item) return null;
 
@@ -436,7 +422,7 @@ interface ManufacturingFeature {
                   item={item}
                   {...(projectId !== undefined ? { projectId } : {})}
                   {...(bomId !== undefined ? { bomId } : {})}
-                  onFeatureSelect={(selection) => {
+                  onFeatureSelect={(_selection) => {
                     // Phase 2: pass face/edge IDs to ModelViewer for highlighting
                     // For now: switch to 3D view so user can see the model
                     if (item.file3dPath) {

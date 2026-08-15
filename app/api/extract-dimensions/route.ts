@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface BackendDimensionEntry {
+  balloonId: string;
+  dimension: {
+    value: number;
+    unit: string;
+    type: string;
+    tolerance: unknown;
+  };
+  position: unknown;
+  confidence: number;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { pdfUrl, extractionConfig } = body;
+    const { pdfUrl } = body;
 
     if (!pdfUrl) {
       return NextResponse.json({ error: 'PDF URL is required' }, { status: 400 });
@@ -61,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform the result to match the expected format
-    const dimensions = (actualData.dimensions || []).map(dim => ({
+    const dimensions = (actualData.dimensions || []).map((dim: BackendDimensionEntry) => ({
       id: dim.balloonId,
       value: dim.dimension.value,
       unit: dim.dimension.unit,

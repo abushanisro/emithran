@@ -11,8 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Progress } from '@/components/ui/progress';
 import { useCalculator, useExecuteCalculator } from '@/lib/api/hooks';
 import { calculatorsApi } from '@/lib/api/calculators';
 
@@ -159,7 +157,7 @@ function createCalculationSteps(formula: string, values: FieldValues): Array<{st
   
   // Step 3: Show function evaluation breakdown using numerical values
   const numericalSubstituted = substituteNumericalValues(formula, values);
-  const functionBreakdown = evaluateFunctionSteps(numericalSubstituted, values);
+  const functionBreakdown = evaluateFunctionSteps(numericalSubstituted);
   functionBreakdown.forEach(funcStep => {
     steps.push({
       step: stepCount++,
@@ -202,7 +200,7 @@ function createCalculationSteps(formula: string, values: FieldValues): Array<{st
 }
 
 // Enhanced function to break down function evaluations
-function evaluateFunctionSteps(expression: string, values: FieldValues): Array<{description: string, calculation: string, result: string}> {
+function evaluateFunctionSteps(expression: string): Array<{description: string, calculation: string, result: string}> {
   const steps: Array<{description: string, calculation: string, result: string}> = [];
   
   // Look for common functions and evaluate them step by step
@@ -352,17 +350,6 @@ function getTurningFormulaExplanation(formula: string): string | null {
   }
   
   return null;
-}
-
-// Function to simplify formula by removing units for calculation
-function simplifyForCalculation(formula: string): string {
-  return formula
-    .replace(/ mm/g, '')
-    .replace(/ m\/min/g, '')
-    .replace(/ mm\/rev/g, '')
-    .replace(/ min/g, '')
-    .replace(/ rev/g, '')
-    .replace(/π \(3\.14159\)/g, '3.14159');
 }
 
 // Error handling and validation functions
@@ -542,61 +529,6 @@ function getErrorSeverity(type: FieldError['type']): 'error' | 'warning' | 'info
 }
 
 /**
- * Get appropriate icon and styling for error severity levels
- * Following accessibility and visual hierarchy best practices
- */
-function getSeverityDisplay(severity: ErrorSeverityLevel): { 
-  icon: any; 
-  bgColor: string; 
-  textColor: string; 
-  borderColor: string;
-  badgeVariant: 'default' | 'destructive' | 'outline' | 'secondary';
-} {
-  switch (severity) {
-    case 'critical':
-      return {
-        icon: XCircle,
-        bgColor: 'bg-red-50 dark:bg-red-950/20',
-        textColor: 'text-red-800 dark:text-red-200',
-        borderColor: 'border-red-200 dark:border-red-800',
-        badgeVariant: 'destructive'
-      };
-    case 'high':
-      return {
-        icon: AlertTriangle,
-        bgColor: 'bg-orange-50 dark:bg-orange-950/20',
-        textColor: 'text-orange-800 dark:text-orange-200',
-        borderColor: 'border-orange-200 dark:border-orange-800',
-        badgeVariant: 'destructive'
-      };
-    case 'medium':
-      return {
-        icon: AlertCircle,
-        bgColor: 'bg-yellow-50 dark:bg-yellow-950/20',
-        textColor: 'text-yellow-800 dark:text-yellow-200',
-        borderColor: 'border-yellow-200 dark:border-yellow-800',
-        badgeVariant: 'outline'
-      };
-    case 'low':
-      return {
-        icon: Info,
-        bgColor: 'bg-blue-50 dark:bg-blue-950/20',
-        textColor: 'text-blue-800 dark:text-blue-200',
-        borderColor: 'border-blue-200 dark:border-blue-800',
-        badgeVariant: 'secondary'
-      };
-    default:
-      return {
-        icon: AlertCircle,
-        bgColor: 'bg-gray-50 dark:bg-gray-950/20',
-        textColor: 'text-gray-800 dark:text-gray-200',
-        borderColor: 'border-gray-200 dark:border-gray-800',
-        badgeVariant: 'outline'
-      };
-  }
-}
-
-/**
  * Enhanced error categorization following industry UX best practices:
  * - Clear, non-technical language for users
  * - Actionable suggestions with specific steps
@@ -716,33 +648,6 @@ function categorizeError(error: any): EnhancedError {
     recoverable: true,
     helpUrl: '/help/general-issues'
   };
-}
-
-// Helper function to break down formula evaluation into steps
-function evaluateFormulaSteps(expression: string): Array<{description: string, calculation: string}> {
-  const steps: Array<{description: string, calculation: string}> = [];
-  
-  // Look for common patterns and break them down
-  if (expression.includes('(') && expression.includes(')')) {
-    // Handle parentheses first
-    const parenthesesMatch = expression.match(/\(([^)]+)\)/);
-    if (parenthesesMatch) {
-      steps.push({
-        description: "Calculate inside parentheses",
-        calculation: `${parenthesesMatch[1]} = ${tryEvaluate(parenthesesMatch[1])}`
-      });
-    }
-  }
-  
-  // Look for multiplication/division
-  if (expression.includes('*') || expression.includes('/')) {
-    steps.push({
-      description: "Perform multiplication/division",
-      calculation: `= ${tryEvaluate(expression)}`
-    });
-  }
-  
-  return steps;
 }
 
 // Safe evaluation function with mathematical functions
@@ -867,6 +772,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
 
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [calculator, fieldValues]);
 
   // Fetch reference tables for database_lookup fields after process
@@ -1084,7 +990,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
 
         if (hasErrors) {
           const errorResults = Object.entries(result.results).filter(
-            ([key, val]) => val && typeof val === 'object' && (val as any).error
+            ([, val]) => val && typeof val === 'object' && (val as any).error
           );
           
           toast.warning(`Calculation completed with ${errorResults.length} error${errorResults.length > 1 ? 's' : ''}. Check results below.`);
@@ -1115,7 +1021,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
         }
       }
     } catch (err: any) {
-      const { category, userMessage, suggestion } = categorizeError(err);
+      const { userMessage, suggestion } = categorizeError(err);
       setExecutionError(err?.message || 'Failed to execute calculator');
       setRetryCount(prev => prev + 1);
       
@@ -1178,7 +1084,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
 
   // Enhanced error state with recovery options
   if (error || !calculator) {
-    const { category, userMessage, suggestion } = categorizeError(error);
+    const { userMessage, suggestion } = categorizeError(error);
     
     return (
       <div className="flex items-center justify-center h-64">
@@ -1617,6 +1523,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
               {calculator.fields
                 ?.filter((field) => field.fieldType === 'calculated' && field.defaultValue)
                 .map((field) => {
+                  if (!field.defaultValue) return null;
                   const calculationSteps = createCalculationSteps(field.defaultValue, fieldValues);
                   
                   return (

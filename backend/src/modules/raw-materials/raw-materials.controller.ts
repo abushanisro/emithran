@@ -21,7 +21,6 @@ import { MaterialShape } from './constants/material-categories.constants';
 import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-material-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
-import { Public } from '../../common/decorators/public.decorator';
 import * as ExcelJS from 'exceljs';
 
 @ApiTags('Raw Materials')

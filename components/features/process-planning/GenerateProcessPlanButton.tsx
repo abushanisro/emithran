@@ -197,8 +197,8 @@ export function GenerateProcessPlanButton({ bomItemId, hasGeometry, className, o
         isGenerating={isGenerating}
         streamEvents={events}
         startedAt={startedAt}
-        onFeatureHighlight={onFeatureHighlight}
-        onFeatureFocus={onFeatureFocus}
+        {...(onFeatureHighlight !== undefined ? { onFeatureHighlight } : {})}
+        {...(onFeatureFocus !== undefined ? { onFeatureFocus } : {})}
       />
     </>
   );

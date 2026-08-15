@@ -5,18 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
+import {
   MATERIAL_PROPERTY_LABELS,
   MATERIAL_STANDARDS_LABELS,
   COUNTRY_LABELS,
-  CURRENCY_LABELS,
   MATERIAL_SHAPE_LABELS,
-  COUNTRY_DEFAULT_CURRENCY,
-  Country,
-  Currency,
-  MaterialShape,
   getCurrencyForCountry
 } from '@/lib/constants/materials';
+import type { Country, Currency, MaterialShape } from '@/lib/constants/materials';
 
 interface FerrousNonFerrousMaterial {
   // Basic material info
@@ -54,10 +50,10 @@ interface FerrousNonFerrousFormProps {
   isEditing?: boolean;
 }
 
-export function FerrousNonFerrousForm({ 
-  material, 
-  onMaterialChange, 
-  isEditing = false 
+export function FerrousNonFerrousForm({
+  material,
+  onMaterialChange,
+  isEditing: _isEditing = false
 }: FerrousNonFerrousFormProps) {
   const handleChange = (field: keyof FerrousNonFerrousMaterial) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;

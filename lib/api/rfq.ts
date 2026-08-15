@@ -46,6 +46,7 @@ export interface RfqSummary {
   responseCount: number;
   createdAt: Date;
   sentAt?: Date;
+  quoteDeadline?: Date;
 }
 
 export interface RfqQuery {

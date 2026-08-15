@@ -5,7 +5,7 @@ import { CreateRawMaterialDto, UpdateRawMaterialDto, QueryRawMaterialsDto } from
 import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-material-response.dto';
 import { PlasticRubberContainerService } from './containers/plastic-rubber-container.service';
 import { FerrousContainerService } from './containers/ferrous-container.service';
-import { MaterialCategory, MATERIAL_CATEGORY_LABELS } from './constants/material-categories.constants';
+import { MATERIAL_CATEGORY_LABELS } from './constants/material-categories.constants';
 import { shapeRankForFamily } from './constants/material-shape-ranking';
 
 @Injectable()

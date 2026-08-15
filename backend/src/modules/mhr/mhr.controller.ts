@@ -20,7 +20,6 @@ import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
 import { MHRResponseDto, MHRListResponseDto } from './dto/mhr-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
-import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('MHR')
 @ApiBearerAuth()

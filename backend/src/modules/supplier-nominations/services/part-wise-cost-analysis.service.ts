@@ -1,10 +1,8 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import {
   PartWiseCostAnalysisDto,
   PartWiseCostBaseDataDto,
-  CreatePartWiseCostAnalysisDto,
-  CreatePartWiseCostBaseDataDto,
   BulkUpdatePartWiseCostAnalysisDto,
 } from '../dto/part-wise-cost-analysis.dto';
 

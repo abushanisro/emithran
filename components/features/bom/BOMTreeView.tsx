@@ -265,7 +265,7 @@ function calculateHierarchicalPositions(
     const nodeX           = level * levelSpacing;
 
     const position: NodePosition = { x: nodeX, y: nodeY, level };
-    nodes.push({ ...item, position, isExpanded, parentPos });
+    nodes.push({ ...item, position, isExpanded, ...(parentPos !== undefined ? { parentPos } : {}) });
 
     if (isExpanded && item.children && item.children.length > 0) {
       const childResult = calculateHierarchicalPositions(item.children, expandedNodes, currentY, level + 1, position);

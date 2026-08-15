@@ -65,39 +65,6 @@ export class CostCompetencyAnalysisDto {
   vendorValues: CostVendorValueDto[];
 }
 
-export class CreateCostAnalysisDto {
-  @ApiProperty()
-  @IsUUID()
-  nominationEvaluationId: string;
-
-  @ApiProperty()
-  @IsString()
-  costComponent: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  baseValue?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  basePaymentTerm?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  unit?: string;
-
-  @ApiProperty()
-  @IsBoolean()
-  isRanking: boolean;
-
-  @ApiProperty()
-  @IsNumber()
-  sortOrder: number;
-}
-
 export class UpdateCostValueDto {
   @ApiPropertyOptional()
   @IsOptional()

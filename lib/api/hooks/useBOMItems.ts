@@ -827,6 +827,7 @@ export interface RouteResultDto {
   abrasiveCost: number;
   totalProcessCost: number;
   totalCost: number;
+  isFeasible: boolean;       // false when the machine cannot physically produce this part — mirrors backend route-comparison.dto.ts
   cycleTimes: {
     cuttingMin: number;
     pressBrakeMin: number;

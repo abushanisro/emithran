@@ -219,16 +219,6 @@ export const getAllCategories = (): EquipmentCategory[] => {
   return Object.values(EQUIPMENT_CATEGORIES);
 };
 
-// Helper function to search equipment types
-export const searchEquipmentTypes = (query: string): EquipmentType[] => {
-  const lowerQuery = query.toLowerCase();
-  return EQUIPMENT_TYPES.filter(
-    type =>
-      type.name.toLowerCase().includes(lowerQuery) ||
-      type.category.toLowerCase().includes(lowerQuery)
-  );
-};
-
 // Dynamic field configuration for each category
 export interface FieldConfig {
   name: string;

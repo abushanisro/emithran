@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, InternalServerErrorException, Ba
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
-import type { CalculationTraceStep, PhysicsGap, LookupGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, LookupQueryParam, LookupTableRow, ValidatedInput } from './dto/cost-breakdown.dto';
+import type { CalculationTraceStep, PhysicsGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, ValidatedInput } from './dto/cost-breakdown.dto';
 import { computeCostSummary, computeSustainability } from './costing/cost-engine';
 import type { MHRRateInput } from './costing/cost-engine';
 import { planInspection, finalizeInspectionLine } from './costing/inspection-engine';
@@ -32,7 +32,6 @@ import {
 } from './costing/injection-molding/machine-selector-im';
 import {
   MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL,
-  PRESS_BRAKE_SETUP_MIN,
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
   TAPPING_SETUP_MIN, computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC,
   resolveDrillingSpeedFeed, COUNTERSINK_SPEED_FACTOR, HOLE_OP_UNLOAD_SEC,
@@ -49,12 +48,11 @@ import { checkMachineCapability } from './costing/machine-capability';
 import type { CapabilityCheck as MachineCapabilityCheck, PartGeometryForCapability } from './costing/machine-capability';
 import { getEnginesForFamily, ROUTE_ID_FOR_CLASS, ROUTE_LABEL_FOR_CLASS } from './costing/manufacturing-process-registry';
 import { resolveEffectiveSheetThicknessMm } from './costing/scenario-overrides';
-import type { CuttingProcessContext } from './costing/manufacturing-process-engine';
 import type { CostSummaryDto, ProcessLineCost, FeatureOp, CostStatus } from './dto/cost-breakdown.dto';
 import type { BlankSpecDto } from './dto/blank-spec.dto';
 import type { CandidateRouteComparisonDto, CandidateRouteDto } from './dto/candidate-route.dto';
 import type { RouteComparisonDto, RouteResultDto, RouteId, RouteCapability } from './dto/route-comparison.dto';
-import { deriveGdtSeverity, resolveInspectionRule, SEVERITY_RANK } from './costing/gdt-severity';
+import { resolveInspectionRule, SEVERITY_RANK } from './costing/gdt-severity';
 import type { GdtSeverity, InspectionMethod, InspectionRuleRow } from './costing/gdt-severity';
 import type { InspectionStagePolicy } from './costing/default-rates';
 import { InspectionKnowledgeService } from '../manufacturing-knowledge/services/inspection-knowledge.service';

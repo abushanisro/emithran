@@ -349,7 +349,7 @@ function useCopilotChat(
     [bomItemId, isStreaming, messages, getContext],
   );
 
-  return { messages, isStreaming, error, send, reset };
+  return { messages, isStreaming, error, activeMode, send, reset };
 }
 
 // ── Copilot response renderer ──────────────────────────────────────────────────
@@ -451,7 +451,7 @@ function CopilotResponse({ content, showSources }: { content: string; showSource
       nodes.push(
         <div key={i++} className="flex gap-1.5 py-0.5 text-[10px]">
           <span className="text-muted-foreground shrink-0">{kvMatch[1]}:</span>
-          <span className="font-medium text-foreground">{parseInline(kvMatch[2], showSources)}</span>
+          <span className="font-medium text-foreground">{parseInline(kvMatch[2] ?? "", showSources)}</span>
         </div>
       );
       continue;
@@ -546,7 +546,7 @@ export function CopilotPanel({
     [item, fg, batchSize, productionLife, factory, costSummary, routeComparison, activeTab],
   );
 
-  const { messages, isStreaming, error, send, reset } = useCopilotChat(
+  const { messages, isStreaming, error, activeMode, send, reset } = useCopilotChat(
     item.id,
     getContext,
   );
@@ -588,6 +588,14 @@ export function CopilotPanel({
       <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0 bg-muted/30">
         <span className="text-[10px] font-medium text-foreground shrink-0">Manufacturing Copilot</span>
         <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400 border border-violet-200 dark:border-violet-800">BETA</span>
+        {messages.length > 0 && (
+          <span
+            className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border"
+            title="Detected response mode"
+          >
+            {MODE_LABELS[activeMode]}
+          </span>
+        )}
         <div className="flex-1" />
         {messages.length > 0 && (
           <button

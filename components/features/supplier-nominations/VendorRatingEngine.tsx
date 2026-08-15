@@ -1,19 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { 
+import {
   Calculator,
   Edit,
   Save,
@@ -268,7 +259,7 @@ const handleSave = async () => {
       // Save to backend with proper error handling
       try {
         
-        const saveResult = await batchUpdateVendorRatingMatrix(nominationId, vendorId, updates);
+        await batchUpdateVendorRatingMatrix(nominationId, vendorId, updates);
 
 // Add a small delay to allow database triggers to complete
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -347,7 +338,7 @@ const handleSave = async () => {
         setEditingValues({});
         setIsEditing(false);
         
-        if (onScoreUpdate) {
+        if (onScoreUpdate && freshData) {
           onScoreUpdate(freshData);
         }
         
@@ -410,15 +401,6 @@ const handleSave = async () => {
   const getDisplayValue = (value: number | undefined): string => {
     return value !== undefined ? value.toFixed(1) : '0.0';
   };
-
-  // Group data by category
-  const groupedData = ratingData.reduce((acc, item) => {
-    if (!acc[item.category]) {
-      acc[item.category] = [];
-    }
-    acc[item.category].push(item);
-    return acc;
-  }, {} as Record<string, VendorRatingMatrix[]>);
 
   // Remove loading state to show data immediately and prevent duplicate requests
 

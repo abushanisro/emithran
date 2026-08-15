@@ -8,8 +8,6 @@ import {
   updateSupplierEvaluationGroup,
   deleteSupplierEvaluationGroup,
   validateSupplierEvaluationGroupDeletion,
-  type SupplierEvaluationGroup,
-  type SupplierEvaluationGroupSummary,
   type CreateSupplierEvaluationGroupData,
   type UpdateSupplierEvaluationGroupData,
 } from '../supplier-evaluation-groups';

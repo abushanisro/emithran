@@ -1,16 +1,14 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Plus, Upload, Search, ArrowUpDown, Download, Trash2, AlertTriangle, Pencil, FileSpreadsheet } from 'lucide-react';
 import {
@@ -21,7 +19,7 @@ import {
   useUpdateRawMaterial,
   useDeleteRawMaterial,
   useDeleteAllRawMaterials,
-  RawMaterial,
+  type RawMaterial,
 } from '@/lib/api/hooks/useRawMaterials';
 import { FerrousNonFerrousForm } from '@/components/features/raw-materials/FerrousNonFerrousForm';
 import { useMaterialFilters } from '@/lib/hooks/useMaterialFilters';
@@ -29,10 +27,9 @@ import {
   CURRENCY_SYMBOLS,
   COUNTRY_LABELS,
   MATERIAL_SHAPE_LABELS,
-  Currency,
-  Country,
-  MaterialShape,
-  MaterialCategory,
+  type Currency,
+  type Country,
+  type MaterialShape,
   getCurrencyForCountry
 } from '@/lib/constants/materials';
 import {
@@ -44,24 +41,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-interface User { id: string; email: string; [key: string]: any; }
-
-type MaterialContainer = 'plastic-rubber' | 'ferrous-non-ferrous';
+type MaterialContainer = 'plastic-rubber' | 'ferrous-non-ferrous' | 'all';
 
 export default function RawMaterialsPage() {
-  const router = useRouter();
   const [activeContainer, setActiveContainer] = useState<MaterialContainer>('plastic-rubber');
-  
+
   // Enhanced filter system
   const {
     filters,
     queryFilters,
     setSearch,
-    setMaterialCategory,
-    setCurrency,
-    setShape,
-    setCostRange,
-    setLocation,
     setSorting,
     clearFilters,
   } = useMaterialFilters({
@@ -183,7 +172,7 @@ export default function RawMaterialsPage() {
   };
 
   const { data: rawMaterialsData, isLoading } = useRawMaterials(getEnhancedQuery());
-  const { data: filterOptions } = useRawMaterialFilterOptions();
+  useRawMaterialFilterOptions();
   const uploadMutation = useUploadRawMaterialsExcel();
   const createMutation = useCreateRawMaterial();
   const updateMutation = useUpdateRawMaterial();
@@ -220,7 +209,6 @@ export default function RawMaterialsPage() {
   };
 
   const filteredMaterials = getFilteredMaterials();
-  const filteredCount = filteredMaterials.length;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -403,12 +391,7 @@ export default function RawMaterialsPage() {
       country: newMaterial.country || undefined,
       currency: newMaterial.currency || 'USD',
       unitCost: newMaterial.unitCost ? parseFloat(newMaterial.unitCost) : undefined,
-      year: newMaterial.year ? parseInt(newMaterial.year) : undefined,
-      q1Cost: newMaterial.q1Cost ? parseFloat(newMaterial.q1Cost) : undefined,
-      q2Cost: newMaterial.q2Cost ? parseFloat(newMaterial.q2Cost) : undefined,
-      q3Cost: newMaterial.q3Cost ? parseFloat(newMaterial.q3Cost) : undefined,
-      q4Cost: newMaterial.q4Cost ? parseFloat(newMaterial.q4Cost) : undefined,
-      
+
       // Material properties
       density: newMaterial.density ? parseFloat(newMaterial.density) : undefined,
       ultimate_tensile_strength: newMaterial.ultimate_tensile_strength ? parseFloat(newMaterial.ultimate_tensile_strength) : undefined,
@@ -511,18 +494,11 @@ export default function RawMaterialsPage() {
       // Convert any null values to empty strings for React form handling
       materialGrade: material.materialGrade || '',
       regrinding: material.regrinding || '',
-      density: material.density,
-      ultimateTensileStrength: material.ultimateTensileStrength,
-      yieldTensileStrength: material.yieldTensileStrength,
-      shearingStrength: material.shearingStrength,
       astmStandard: material.astmStandard || '',
       dinStandard: material.dinStandard || '',
       enStandard: material.enStandard || '',
       jisStandard: material.jisStandard || '',
-      country: material.country,
-      shape: material.shape,
       currency: material.currency || 'USD',
-      unitCost: material.unitCost,
     };
     
     setEditingMaterial(cleanMaterial);
@@ -535,19 +511,30 @@ export default function RawMaterialsPage() {
       densityKgM3: material.densityKgM3?.toString() || '',
       unitCost: (material.unitCost || material.cost)?.toString() || '',
       country: material.country || '',
-      shape: material.shape || undefined,
-      
+      currency: material.currency || 'USD',
+      shape: material.shape || '',
+
       // Material properties
       density: material.density?.toString() || '',
       ultimate_tensile_strength: material.ultimateTensileStrength?.toString() || '',
       yield_tensile_strength: material.yieldTensileStrength?.toString() || '',
       shearing_strength: material.shearingStrength?.toString() || '',
-      
-      // Standards  
+
+      // Standards
       astm_standard: material.astmStandard || '',
       din_standard: material.dinStandard || '',
       en_standard: material.enStandard || '',
       jis_standard: material.jisStandard || '',
+
+      // Plastic-specific properties
+      regrinding: material.regrinding || '',
+      regrindingPercentage: material.regrindingPercentage?.toString() || '',
+      clampingPressureMpa: material.clampingPressureMpa?.toString() || '',
+      ejectDeflectionTempC: material.ejectDeflectionTempC?.toString() || '',
+      meltingTempC: material.meltingTempC?.toString() || '',
+      moldTempC: material.moldTempC?.toString() || '',
+      specificHeatMelt: material.specificHeatMelt?.toString() || '',
+      thermalConductivityMelt: material.thermalConductivityMelt?.toString() || '',
     });
     
     setEditDialogOpen(true);
@@ -585,7 +572,7 @@ export default function RawMaterialsPage() {
     updateMutation.mutate(
       { id: editingMaterial.id, data: materialData },
       {
-        onSuccess: (updatedMaterial) => {
+        onSuccess: () => {
           setEditDialogOpen(false);
           setEditingMaterial(null);
           resetNewMaterial();
@@ -629,8 +616,6 @@ export default function RawMaterialsPage() {
   };
 
   const { plasticRubberCount, ferrousNonFerrousCount } = getContainerStats();
-
-  const isPlastic = activeContainer === 'plastic-rubber';
 
   // Unique sub-types for filter dropdown
   const subTypes = [...new Set(filteredMaterials.map(m => m.materialType).filter(Boolean))].sort() as string[];
@@ -1575,7 +1560,7 @@ export default function RawMaterialsPage() {
               activeContainer === 'ferrous-non-ferrous' ? (
                 <FerrousNonFerrousForm 
                   material={editingMaterial}
-                  onMaterialChange={(updatedMaterial) => setEditingMaterial(updatedMaterial)}
+                  onMaterialChange={(updatedMaterial) => setEditingMaterial({ ...editingMaterial, ...updatedMaterial })}
                   isEditing={true}
                 />
               ) : (
@@ -1673,10 +1658,10 @@ export default function RawMaterialsPage() {
                           step="0.1"
                           placeholder="e.g., 10.0"
                           value={editingMaterial.regrindingPercentage?.toString() || ''}
-                          onChange={(e) => setEditingMaterial({ 
-                            ...editingMaterial, 
-                            regrindingPercentage: e.target.value ? parseFloat(e.target.value) : undefined 
-                          })}
+                          onChange={(e) => {
+                            const { regrindingPercentage: _regrindingPercentage, ...rest } = editingMaterial;
+                            setEditingMaterial(e.target.value ? { ...rest, regrindingPercentage: parseFloat(e.target.value) } : rest);
+                          }}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1686,10 +1671,10 @@ export default function RawMaterialsPage() {
                           step="0.1"
                           placeholder="e.g., 49.4"
                           value={editingMaterial.clampingPressureMpa?.toString() || ''}
-                          onChange={(e) => setEditingMaterial({ 
-                            ...editingMaterial, 
-                            clampingPressureMpa: e.target.value ? parseFloat(e.target.value) : undefined 
-                          })}
+                          onChange={(e) => {
+                            const { clampingPressureMpa: _clampingPressureMpa, ...rest } = editingMaterial;
+                            setEditingMaterial(e.target.value ? { ...rest, clampingPressureMpa: parseFloat(e.target.value) } : rest);
+                          }}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1699,10 +1684,10 @@ export default function RawMaterialsPage() {
                           step="1"
                           placeholder="e.g., 85"
                           value={editingMaterial.ejectDeflectionTempC?.toString() || ''}
-                          onChange={(e) => setEditingMaterial({ 
-                            ...editingMaterial, 
-                            ejectDeflectionTempC: e.target.value ? parseFloat(e.target.value) : undefined 
-                          })}
+                          onChange={(e) => {
+                            const { ejectDeflectionTempC: _ejectDeflectionTempC, ...rest } = editingMaterial;
+                            setEditingMaterial(e.target.value ? { ...rest, ejectDeflectionTempC: parseFloat(e.target.value) } : rest);
+                          }}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1712,10 +1697,10 @@ export default function RawMaterialsPage() {
                           step="1"
                           placeholder="e.g., 240"
                           value={editingMaterial.meltingTempC?.toString() || ''}
-                          onChange={(e) => setEditingMaterial({ 
-                            ...editingMaterial, 
-                            meltingTempC: e.target.value ? parseFloat(e.target.value) : undefined 
-                          })}
+                          onChange={(e) => {
+                            const { meltingTempC: _meltingTempC, ...rest } = editingMaterial;
+                            setEditingMaterial(e.target.value ? { ...rest, meltingTempC: parseFloat(e.target.value) } : rest);
+                          }}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1725,10 +1710,10 @@ export default function RawMaterialsPage() {
                           step="1"
                           placeholder="e.g., 70"
                           value={editingMaterial.moldTempC?.toString() || ''}
-                          onChange={(e) => setEditingMaterial({ 
-                            ...editingMaterial, 
-                            moldTempC: e.target.value ? parseFloat(e.target.value) : undefined 
-                          })}
+                          onChange={(e) => {
+                            const { moldTempC: _moldTempC, ...rest } = editingMaterial;
+                            setEditingMaterial(e.target.value ? { ...rest, moldTempC: parseFloat(e.target.value) } : rest);
+                          }}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1738,10 +1723,10 @@ export default function RawMaterialsPage() {
                           step="1"
                           placeholder="e.g., 1040"
                           value={editingMaterial.densityKgM3?.toString() || ''}
-                          onChange={(e) => setEditingMaterial({ 
-                            ...editingMaterial, 
-                            densityKgM3: e.target.value ? parseFloat(e.target.value) : undefined 
-                          })}
+                          onChange={(e) => {
+                            const { densityKgM3: _densityKgM3, ...rest } = editingMaterial;
+                            setEditingMaterial(e.target.value ? { ...rest, densityKgM3: parseFloat(e.target.value) } : rest);
+                          }}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1751,10 +1736,10 @@ export default function RawMaterialsPage() {
                           step="0.01"
                           placeholder="e.g., 1.8"
                           value={editingMaterial.specificHeatMelt?.toString() || ''}
-                          onChange={(e) => setEditingMaterial({ 
-                            ...editingMaterial, 
-                            specificHeatMelt: e.target.value ? parseFloat(e.target.value) : undefined 
-                          })}
+                          onChange={(e) => {
+                            const { specificHeatMelt: _specificHeatMelt, ...rest } = editingMaterial;
+                            setEditingMaterial(e.target.value ? { ...rest, specificHeatMelt: parseFloat(e.target.value) } : rest);
+                          }}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1764,10 +1749,10 @@ export default function RawMaterialsPage() {
                           step="0.001"
                           placeholder="e.g., 0.127"
                           value={editingMaterial.thermalConductivityMelt?.toString() || ''}
-                          onChange={(e) => setEditingMaterial({ 
-                            ...editingMaterial, 
-                            thermalConductivityMelt: e.target.value ? parseFloat(e.target.value) : undefined 
-                          })}
+                          onChange={(e) => {
+                            const { thermalConductivityMelt: _thermalConductivityMelt, ...rest } = editingMaterial;
+                            setEditingMaterial(e.target.value ? { ...rest, thermalConductivityMelt: parseFloat(e.target.value) } : rest);
+                          }}
                         />
                       </div>
                     </div>
@@ -1784,10 +1769,10 @@ export default function RawMaterialsPage() {
                           step="0.01"
                           placeholder="e.g., 135.00"
                           value={editingMaterial.unitCost?.toString() || ''}
-                          onChange={(e) => setEditingMaterial({ 
-                            ...editingMaterial, 
-                            unitCost: e.target.value ? parseFloat(e.target.value) : undefined 
-                          })}
+                          onChange={(e) => {
+                            const { unitCost: _unitCost, ...rest } = editingMaterial;
+                            setEditingMaterial(e.target.value ? { ...rest, unitCost: parseFloat(e.target.value) } : rest);
+                          }}
                         />
                       </div>
                     </div>

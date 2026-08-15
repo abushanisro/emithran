@@ -157,12 +157,3 @@ export const getModuleProgress = (currentModuleId: string): number => {
   return currentIndex >= 0 ? ((currentIndex + 1) / WORKFLOW_MODULES.length) * 100 : 0;
 };
 
-export const getCompletedModules = (currentModuleId: string): WorkflowModule[] => {
-  const currentIndex = WORKFLOW_MODULES.findIndex(module => module.id === currentModuleId);
-  return WORKFLOW_MODULES.slice(0, currentIndex);
-};
-
-export const getRemainingModules = (currentModuleId: string): WorkflowModule[] => {
-  const currentIndex = WORKFLOW_MODULES.findIndex(module => module.id === currentModuleId);
-  return WORKFLOW_MODULES.slice(currentIndex + 1);
-};

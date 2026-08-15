@@ -24,7 +24,6 @@ export const INSPECTION_SAMPLING_DEFAULT: InspectionStagePolicy = {
 };
 
 export const MATERIAL_OVERHEAD_PCT = 5;  // nesting skeleton + handling scrap
-export const SCRAP_PCT = 3;              // process scrap
 
 // Fiber laser cutting speed (mm/min) by sheet thickness — mild steel (CRCA / IS2062)
 export const LASER_SPEED_MM_PER_MIN: Record<number, number> = {
@@ -232,11 +231,6 @@ export const TAP_SURFACE_SPEED_M_MIN_BY_MATERIAL: Record<string, number> = {
   __default__: 10,
 };
 
-export function tapSurfaceSpeedMMin(grade: string | null | undefined): number {
-  const family = classifyMaterialFamily(grade);
-  return TAP_SURFACE_SPEED_M_MIN_BY_MATERIAL[family] ?? TAP_SURFACE_SPEED_M_MIN_BY_MATERIAL['__default__']!;
-}
-
 export const TAP_APPROACH_SEC = 1;    // rapid traverse + engage, fixed allowance
 export const TAP_TOOL_CHANGE_SEC = 3; // once per thread-size group (switch tap/holder)
 const TAP_UNLOAD_SEC = 2;      // once per tapping operation (final clear/unload)
@@ -410,9 +404,6 @@ export const COUNTERSINK_SPEED_FACTOR = 0.25;
 // same physical motions. Retract is a rapid withdrawal (not synchronized to
 // the feed rate the way a rigid tap's retract is, which must unscrew), so it
 // mirrors approach, not machining time.
-export const HOLE_OP_APPROACH_SEC = TAP_APPROACH_SEC;
-export const HOLE_OP_RETRACT_SEC = TAP_APPROACH_SEC;
-export const HOLE_OP_TOOL_CHANGE_SEC = TAP_TOOL_CHANGE_SEC;
 export const HOLE_OP_UNLOAD_SEC = TAP_UNLOAD_SEC;
 
 export interface DrillingSpeedFeed {
@@ -466,11 +457,8 @@ export function computeDeburrCycleSec(
 // corresponding sm_lookup_* table (migration 381) has no row for the diameter —
 // same "last-resort safety net" convention as sheet-metal-lookup.service.ts.
 export const COUNTERBORE_SETUP_MIN = 5;
-export const COUNTERBORE_FALLBACK_SEC = 10;
 export const COUNTERSINK_SETUP_MIN = 5;
-export const COUNTERSINK_FALLBACK_SEC = 7;
 export const PEM_INSERTION_SETUP_MIN = 5;
-export const PEM_INSERTION_FALLBACK_SEC = 5;
 // Hole extrusion (burring): die/tool-change setup, same class as counterbore/
 // countersink/PEM above. Cycle time itself comes from sm_lookup_manual_stroke
 // (via estimateBurlTonnage + getManualStrokeTime), not a fallback constant here.
@@ -480,7 +468,6 @@ export const BURRING_SETUP_MIN = 5;
 // in operation-sequencer.ts::injectDrawingIntelligence for the CMM trigger.
 export const TIGHT_TOLERANCE_REAM_THRESHOLD_MM = 0.05;
 export const REAM_SETUP_MIN = 8;
-export const CMM_TIGHT_TOLERANCE_INSPECT_MIN = 5; // per-batch inspection time when reaming is triggered
 
 // Real HSS reaming surface speed by material family — reaming is a distinct
 // finishing operation from drilling/tapping (lower speed, precision-focused,

@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, MapPin, Clock, Users, Star, Award, Building2, Filter } from 'lucide-react';
-import { Vendor } from '@/lib/api/types/vendor';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, MapPin, Users, Award, Building2, Filter } from 'lucide-react';
+import type { Vendor } from '@/lib/api/vendors';
 
 interface VendorSelectionCardProps {
   vendors: Vendor[];
@@ -307,7 +307,8 @@ interface VendorCardProps {
 
 function VendorCard({ vendor, isSelected, onToggle, processes, compact = false }: VendorCardProps) {
   const isActive = vendor.status === 'active';
-  
+  const primaryContact = vendor.primaryContacts?.[0];
+
   return (
     <div
       className={`border rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
@@ -348,26 +349,6 @@ function VendorCard({ vendor, isSelected, onToggle, processes, compact = false }
                 </div>
               )}
               
-              {vendor.rating && (
-                <div className="flex items-center gap-1">
-                  <Star className={`${compact ? 'h-3 w-3' : 'h-4 w-4'} fill-yellow-400 text-yellow-400`} />
-                  <span className="font-medium">{vendor.rating}</span>
-                </div>
-              )}
-              
-              {vendor.leadTime && (
-                <div className="flex items-center gap-1">
-                  <Clock className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
-                  <span>{vendor.leadTime}</span>
-                </div>
-              )}
-              
-              {vendor.minOrderQuantity && (
-                <div className="flex items-center gap-1">
-                  <Users className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
-                  <span>MOQ: {vendor.minOrderQuantity}</span>
-                </div>
-              )}
             </div>
           </div>
           
@@ -388,19 +369,19 @@ function VendorCard({ vendor, isSelected, onToggle, processes, compact = false }
           {/* Vendor Details */}
           <div className="p-4 space-y-3">
             {/* Contact Information */}
-            {(vendor.contactPerson || vendor.email || vendor.phone) && (
+            {(primaryContact?.name || vendor.companyEmail || vendor.companyPhone) && (
               <div className="text-sm">
                 <h4 className="font-medium text-gray-900 mb-1">CONTACT</h4>
                 <div className="text-gray-600 space-y-1">
-                  {vendor.contactPerson && (
-                    <div>{vendor.contactPerson}</div>
+                  {primaryContact?.name && (
+                    <div>{primaryContact.name}</div>
                   )}
                   <div className="flex flex-col sm:flex-row sm:gap-4">
-                    {vendor.email && (
-                      <div>{vendor.email}</div>
+                    {vendor.companyEmail && (
+                      <div>{vendor.companyEmail}</div>
                     )}
-                    {vendor.phone && (
-                      <div>{vendor.phone}</div>
+                    {vendor.companyPhone && (
+                      <div>{vendor.companyPhone}</div>
                     )}
                   </div>
                 </div>
@@ -442,7 +423,7 @@ function VendorCard({ vendor, isSelected, onToggle, processes, compact = false }
                     CERTIFICATIONS
                   </h4>
                   <div className="flex flex-wrap gap-1">
-                    {vendor.certifications.slice(0, 2).map((cert) => (
+                    {vendor.certifications.slice(0, 2).map((cert: string) => (
                       <Badge key={cert} variant="outline" className="text-xs">
                         {cert}
                       </Badge>

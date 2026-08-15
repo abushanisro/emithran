@@ -101,7 +101,7 @@ function BOMManagementContent() {
     try {
       await createBOMMutation.mutateAsync({
         name: bomFormData.name,
-        description: bomFormData.description || undefined,
+        ...(bomFormData.description ? { description: bomFormData.description } : {}),
         projectId: targetProjectId,
         version: bomFormData.version,
         status: bomFormData.status,

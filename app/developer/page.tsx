@@ -105,7 +105,7 @@ export default function DeveloperLandingPage() {
     if (!found) otherGroups.push(group);
   });
 
-  const categories = Object.keys(CATEGORY_MAP).filter((c) => groupsByCategory[c]?.length > 0);
+  const categories = Object.keys(CATEGORY_MAP).filter((c) => (groupsByCategory[c]?.length ?? 0) > 0);
   if (otherGroups.length > 0) categories.push('Other');
 
   return (

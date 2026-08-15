@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const providers = [
       {
         name: 'osrm',
-        route: async () => {
+        route: async (): Promise<RouteResponse> => {
           const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=false`;
           
           const response = await fetch(url, {
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       },
       {
         name: 'graphhopper',
-        route: async () => {
+        route: async (): Promise<RouteResponse> => {
           // GraphHopper free tier (requires API key for production)
           // For now, we'll skip this and rely on OSRM + fallback
           throw new Error('GraphHopper not configured');
@@ -95,12 +95,13 @@ export async function POST(request: NextRequest) {
     const duration = Math.round(distance / 40 * 60); // Assume 40 km/h average
 
     console.log('Using straight-line fallback routing');
-    return NextResponse.json({
+    const fallbackResult: RouteResponse = {
       distance: distance.toFixed(1),
       duration,
       coordinates: [[from.lat, from.lng], [to.lat, to.lng]],
       provider: 'straight-line'
-    });
+    };
+    return NextResponse.json(fallbackResult);
 
   } catch (error) {
     console.error('Routing API error:', error);

@@ -86,7 +86,7 @@ class RequestQueueManager {
       const lowPriorityIndex = this.queue.findIndex(req => req.priority === 'low');
       if (lowPriorityIndex >= 0) {
         const removed = this.queue.splice(lowPriorityIndex, 1)[0];
-        removed.reject(new Error('Request queue full - request was dropped'));
+        removed?.reject(new Error('Request queue full - request was dropped'));
       } else {
         throw new Error('Request queue is full - please try again later');
       }
@@ -126,7 +126,7 @@ class RequestQueueManager {
         const index = this.queue.findIndex(req => req.id === id);
         if (index >= 0) {
           const timedOutRequest = this.queue.splice(index, 1)[0];
-          timedOutRequest.reject(new Error('Request timeout - app took too long to initialize'));
+          timedOutRequest?.reject(new Error('Request timeout - app took too long to initialize'));
           this.notifyListeners();
         }
       }, this.REQUEST_TIMEOUT);
@@ -144,11 +144,14 @@ class RequestQueueManager {
     // Find public/health requests that can be processed early
     for (let i = this.queue.length - 1; i >= 0; i--) {
       const request = this.queue[i];
-      
+      if (!request) continue;
+
       // Check if this is a health check or public endpoint
       if (request.id.includes('health') || request.id.includes('public')) {
         const processedRequest = this.queue.splice(i, 1)[0];
-        this.executeRequest(processedRequest);
+        if (processedRequest) {
+          this.executeRequest(processedRequest);
+        }
         this.notifyListeners();
         break; // Process one at a time
       }

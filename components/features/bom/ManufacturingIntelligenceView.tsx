@@ -6,7 +6,6 @@ import { ChevronDown, ChevronRight, Cpu, AlertCircle, Maximize2 } from 'lucide-r
 import { Badge } from '@/components/ui/badge';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
 import type {
-  FeatureGraph,
   FeatureGraphSummary,
   ProcessRecommendation,
   FamilyClassification,
@@ -167,7 +166,7 @@ function SelectableFeatureLine({
   label: string;
   value: string;
   cost?: string;
-  onFeatureSelect?: (s: FeatureSelection) => void;
+  onFeatureSelect?: ((s: FeatureSelection) => void) | undefined;
 }) {
   const clickable = !!onFeatureSelect;
   return (
@@ -191,7 +190,7 @@ function ManufacturingFeaturesTree({
   onFeatureSelect,
 }: {
   summary: FeatureGraphSummary;
-  onFeatureSelect?: (s: FeatureSelection) => void;
+  onFeatureSelect?: ((s: FeatureSelection) => void) | undefined;
 }) {
   const isSheetMetal = summary.sheetThicknessMm > 0 || summary.cutLengthMm > 0 || summary.bendCount > 0;
 

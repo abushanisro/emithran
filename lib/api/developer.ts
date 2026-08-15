@@ -57,7 +57,7 @@ export const developerApi = {
     apiClient.delete<void>(`/developer/api-keys/${id}/revoke`),
 
   listLogs: (query?: LogsQuery): Promise<{ logs: RequestLog[]; total: number }> =>
-    apiClient.get('/developer/logs', { params: query }),
+    apiClient.get('/developer/logs', { ...(query !== undefined ? { params: query } : {}) }),
 
   getStats: (): Promise<LogStats> =>
     apiClient.get<LogStats>('/developer/logs/stats'),

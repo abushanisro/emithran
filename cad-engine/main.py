@@ -36,7 +36,7 @@ import uvicorn
 from config import AppConfig
 from services import StepReader, ShapeMesher, StlWriter, ConversionService
 from validators import FileValidator
-from memory_optimizer import AdvancedCADMemoryOptimizer, OptimizationResult
+from memory_optimizer import AdvancedCADMemoryOptimizer
 from exceptions import (
     CADEngineException,
     FileValidationError,
@@ -515,12 +515,10 @@ async def convert_step_to_stl_base64(
     finally:
         # Always cleanup
         cleanup_files(step_path, stl_path)
-        
-    raise RuntimeError("Unreachable")
 
 
 # ============================================================================
-# ADVANCED MEMORY OPTIMIZATION ENDPOINTS 
+# ADVANCED MEMORY OPTIMIZATION ENDPOINTS
 # ============================================================================
 
 @app.post("/analyze/geometry")
@@ -753,8 +751,6 @@ async def analyze_geometry_advanced(
 
     finally:
         cleanup_files(step_path)
-        
-    raise RuntimeError("Unreachable")
 
 
 @app.get("/memory/usage-report")
@@ -815,7 +811,6 @@ async def optimize_memory_only(
         Memory optimization metrics and recommendations
     """
     memory_optimizer: AdvancedCADMemoryOptimizer = request.app.state.memory_optimizer
-    conversion_service: ConversionService = request.app.state.conversion_service
     file_validator: FileValidator = request.app.state.file_validator
     
     logger.info(f"Received memory optimization request: {file.filename}")
@@ -874,8 +869,6 @@ async def optimize_memory_only(
         raise HTTPException(status_code=500, detail=f"Memory optimization failed: {str(e)}")
     finally:
         cleanup_files(step_path)
-        
-    raise RuntimeError("Unreachable")
 
 
 # ============================================================================

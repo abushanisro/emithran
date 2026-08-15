@@ -144,7 +144,7 @@ export interface ProductionSummary {
 export const productionPlanningApi = {
   // Production Lots
   getProductionLots: (filters?: { status?: string; bomId?: string; priority?: string; projectId?: string }) =>
-    apiClient.get('/production-planning/lots', { params: filters }),
+    apiClient.get('/production-planning/lots', { ...(filters !== undefined ? { params: filters } : {}) }),
 
   getProductionLotById: (id: string) =>
     apiClient.get(`/production-planning/lots/${id}`),
@@ -176,7 +176,7 @@ export const productionPlanningApi = {
 
   // Production Processes
   getProductionProcesses: (lotId: string, filters?: { status?: string }) =>
-    apiClient.get(`/production-planning/lots/${lotId}/processes`, { params: filters }),
+    apiClient.get(`/production-planning/lots/${lotId}/processes`, { ...(filters !== undefined ? { params: filters } : {}) }),
 
   createProductionProcess: (lotId: string, data: any) =>
     apiClient.post(`/production-planning/lots/${lotId}/processes`, data),
@@ -199,7 +199,7 @@ export const productionPlanningApi = {
 
   // Daily Production Entries
   getDailyProductionEntries: (lotId: string, filters?: { startDate?: string; endDate?: string; entryType?: string }) =>
-    apiClient.get(`/production-planning/lots/${lotId}/production-entries`, { params: filters }),
+    apiClient.get(`/production-planning/lots/${lotId}/production-entries`, { ...(filters !== undefined ? { params: filters } : {}) }),
 
   createDailyProductionEntry: (lotId: string, data: any) =>
     apiClient.post(`/production-planning/lots/${lotId}/production-entries`, data),
@@ -212,7 +212,7 @@ export const productionPlanningApi = {
     apiClient.get(`/production-planning/lots/${lotId}/summary`),
 
   getDashboardData: (filters?: { startDate?: string; endDate?: string }) =>
-    apiClient.get('/production-planning/dashboard', { params: filters }),
+    apiClient.get('/production-planning/dashboard', { ...(filters !== undefined ? { params: filters } : {}) }),
 
   getGanttData: (lotId: string) =>
     apiClient.get(`/production-planning/lots/${lotId}/gantt`),
@@ -378,7 +378,7 @@ export function useUpdateProcessSubtask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, lotId, data }: { id: string; lotId: string; data: any }) =>
+    mutationFn: ({ id, data }: { id: string; lotId: string; data: any }) =>
       productionPlanningApi.updateProcessSubtask(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({

@@ -13,12 +13,6 @@ export interface InvoiceLineItem {
   taxAmountInr: number;
 }
 
-export interface CreateInvoiceRequest {
-  deliveryOrderId: string;
-  invoiceDetails: CreateDeliveryInvoiceDto;
-  lineItems: InvoiceLineItem[];
-}
-
 @Injectable()
 export class InvoiceService {
   private readonly logger = new Logger(InvoiceService.name);

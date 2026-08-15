@@ -2,13 +2,12 @@
 
 
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsEnum, IsUUID, Max, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsEnum, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
   IsProjectName,
   IsOptionalString,
   IsOptionalEnum,
-  IsOptionalPrice,
 } from '../../../common/decorators/validation.decorators';
 
 export enum ProjectStatus {

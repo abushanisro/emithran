@@ -48,13 +48,6 @@ export const REMARK_PRIORITY_LABELS: Record<RemarkPriority, string> = {
   [RemarkPriority.CRITICAL]: 'Critical',
 };
 
-export const REMARK_STATUS_LABELS: Record<RemarkStatus, string> = {
-  [RemarkStatus.OPEN]: 'Open',
-  [RemarkStatus.IN_PROGRESS]: 'In Progress',
-  [RemarkStatus.RESOLVED]: 'Resolved',
-  [RemarkStatus.CLOSED]: 'Closed',
-};
-
 export const REMARK_SCOPE_LABELS: Record<RemarkScope, string> = {
   [RemarkScope.LOT]: 'Entire Lot',
   [RemarkScope.PROCESS]: 'Specific Process',
@@ -98,11 +91,6 @@ export const REMARK_PRIORITY_OPTIONS = Object.values(RemarkPriority).map(priorit
   label: REMARK_PRIORITY_LABELS[priority],
 }));
 
-export const REMARK_STATUS_OPTIONS = Object.values(RemarkStatus).map(status => ({
-  value: status,
-  label: REMARK_STATUS_LABELS[status],
-}));
-
 export const REMARK_SCOPE_OPTIONS = Object.values(RemarkScope).map(scope => ({
   value: scope,
   label: REMARK_SCOPE_LABELS[scope],
@@ -119,73 +107,4 @@ export function getRemarkPriorityColor(priority: RemarkPriority): string {
 
 export function getRemarkStatusColor(status: RemarkStatus): string {
   return REMARK_STATUS_COLORS[status] || REMARK_STATUS_COLORS[RemarkStatus.OPEN];
-}
-
-export function formatRemarkType(type: RemarkType): string {
-  return REMARK_TYPE_LABELS[type] || type;
-}
-
-export function formatRemarkPriority(priority: RemarkPriority): string {
-  return REMARK_PRIORITY_LABELS[priority] || priority;
-}
-
-export function formatRemarkStatus(status: RemarkStatus): string {
-  return REMARK_STATUS_LABELS[status] || status;
-}
-
-export function formatRemarkScope(scope: RemarkScope): string {
-  return REMARK_SCOPE_LABELS[scope] || scope;
-}
-
-// Business logic helpers
-export function isRemarkOverdue(remark: { dueDate?: string; status: RemarkStatus }): boolean {
-  if (!remark.dueDate || remark.status === RemarkStatus.RESOLVED || remark.status === RemarkStatus.CLOSED) {
-    return false;
-  }
-  
-  return new Date(remark.dueDate) < new Date();
-}
-
-export function canEditRemark(remark: { createdBy: string; assignedTo?: string }, userId: string): boolean {
-  return remark.createdBy === userId || remark.assignedTo === userId;
-}
-
-export function canDeleteRemark(remark: { createdBy: string }, userId: string): boolean {
-  return remark.createdBy === userId;
-}
-
-export function getRemarkAge(remark: { reportedDate: string }): string {
-  const reported = new Date(remark.reportedDate);
-  const now = new Date();
-  const diffMs = now.getTime() - reported.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) {
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    return diffHours === 0 ? 'Just now' : `${diffHours}h ago`;
-  } else if (diffDays === 1) {
-    return 'Yesterday';
-  } else if (diffDays < 7) {
-    return `${diffDays} days ago`;
-  } else if (diffDays < 30) {
-    const weeks = Math.floor(diffDays / 7);
-    return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
-  } else {
-    const months = Math.floor(diffDays / 30);
-    return `${months} month${months > 1 ? 's' : ''} ago`;
-  }
-}
-
-export function formatDuration(hours: number): string {
-  if (hours === 0) return '0h';
-  if (hours < 24) return `${hours}h`;
-  
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
-  
-  if (remainingHours === 0) {
-    return `${days}d`;
-  }
-  
-  return `${days}d ${remainingHours}h`;
 }

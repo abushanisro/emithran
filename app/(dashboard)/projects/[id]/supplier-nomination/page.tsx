@@ -81,7 +81,7 @@ export default function SupplierNominationMainPage() {
     <div className="space-y-6">
       <SupplierNominationsDashboard
         projectId={projectId}
-        selectedBomId={selectedBomId || undefined}
+        {...(selectedBomId ? { selectedBomId } : {})}
         onSelectNomination={handleSelectNomination}
       />
 

@@ -1,6 +1,5 @@
-import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../index';
+import { apiClient } from '../client';
 
 // ============================================================================
 // API FUNCTIONS
@@ -109,7 +108,7 @@ export const useUpdateMaterialStatus = () => {
   return useMutation({
     mutationFn: ({ materialId, updateData }: { materialId: string; updateData: any }) =>
       updateMaterialStatus(materialId, updateData),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ['lot-materials'] });
       queryClient.invalidateQueries({ queryKey: ['integrated-dashboard'] });
@@ -125,7 +124,7 @@ export const useRecordProductionMetrics = () => {
   return useMutation({
     mutationFn: ({ lotId, metricsData }: { lotId: string; metricsData: any }) =>
       recordProductionMetrics(lotId, metricsData),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['production-monitoring', variables.lotId] });
       queryClient.invalidateQueries({ queryKey: ['integrated-dashboard', variables.lotId] });
     },
@@ -150,7 +149,7 @@ export const useInitializeLotMaterials = () => {
   
   return useMutation({
     mutationFn: (lotId: string) => initializeLotMaterials(lotId),
-    onSuccess: (data, lotId) => {
+    onSuccess: (_data, lotId) => {
       queryClient.invalidateQueries({ queryKey: ['lot-materials', lotId] });
       queryClient.invalidateQueries({ queryKey: ['integrated-dashboard', lotId] });
     },

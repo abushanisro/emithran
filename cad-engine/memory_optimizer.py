@@ -13,14 +13,14 @@ import pickle
 import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
 import tempfile
 import json
 
 from OCC.Core.TopoDS import TopoDS_Shape  # type: ignore
 from OCC.Core.GProp import GProp_GProps  # type: ignore
-from OCC.Core.BRepGProp import brepgprop, brepgprop_LinearProperties, brepgprop_VolumeProperties  # type: ignore
+from OCC.Core.BRepGProp import brepgprop, brepgprop_VolumeProperties  # type: ignore
 from OCC.Core.Bnd import Bnd_Box  # type: ignore
 from OCC.Core.BRepBndLib import brepbndlib_Add  # type: ignore
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh  # type: ignore
@@ -28,9 +28,6 @@ from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
 from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX  # type: ignore
 from OCC.Core.BRep import BRep_Tool  # type: ignore
 from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
-from OCC.Core.TopoDS import topods  # type: ignore
-from OCC.Core.gp import gp_Pnt  # type: ignore
-from OCC.Core.BRepTools import breptools_UVBounds  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -1042,16 +1039,12 @@ class AdvancedCADMemoryOptimizer:
         # Strategy-specific optimization
         if strategy == "aggressive":
             compression_ratio = 0.25  # 75% reduction
-            quality_loss = 0.15
         elif strategy == "balanced":
-            compression_ratio = 0.45  # 55% reduction  
-            quality_loss = 0.08
+            compression_ratio = 0.45  # 55% reduction
         elif strategy == "conservative":
             compression_ratio = 0.72  # 28% reduction
-            quality_loss = 0.03
         else:
             compression_ratio = 0.50
-            quality_loss = 0.10
         
         # Apply adaptive compression based on geometry complexity
         complexity_factor = min(features.complexity_score / 10.0, 1.0)
@@ -1090,11 +1083,6 @@ class AdvancedCADMemoryOptimizer:
         
         # Manufacturing process analysis
         recommended_processes = []
-        
-        # Volume-based process recommendations
-        volume = features.volume
-        bbox = features.bounding_box
-        complexity = features.complexity_score
         
         # CNC Machining analysis
         cnc_score = self._analyze_cnc_manufacturability(shape, features)
@@ -1271,34 +1259,6 @@ class AdvancedCADMemoryOptimizer:
             'undercuts': self._analyze_undercuts(shape),
             'thin_walls': self._analyze_wall_thickness(shape)
         }
-
-    def _analyze_holes(self, shape: TopoDS_Shape) -> Dict[str, Any]:
-        """Analyze hole features for DFM"""
-        # Simplified hole analysis - in production would use advanced algorithms
-        return {
-            'count': 5,  # Simulated
-            'min_diameter': 3.0,
-            'max_diameter': 12.0,
-            'depth_diameter_ratio': 2.5,
-            'edge_distance': 8.0
-        }
-
-    def _analyze_pockets(self, shape: TopoDS_Shape) -> Dict[str, Any]:
-        """Analyze pocket features"""
-        return {
-            'count': 2,
-            'min_depth': 5.0,
-            'max_depth': 15.0,
-            'aspect_ratio': 1.8
-        }
-
-    def _analyze_undercuts(self, shape: TopoDS_Shape) -> int:
-        """Detect undercut features"""
-        return 1  # Simulated
-
-    def _analyze_wall_thickness(self, shape: TopoDS_Shape) -> float:
-        """Analyze minimum wall thickness"""
-        return 1.2  # Simulated in mm
 
     def _analyze_cnc_manufacturability(self, shape: TopoDS_Shape, features: GeometryFeatures) -> float:
         """Analyze CNC manufacturing feasibility"""

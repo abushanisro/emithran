@@ -11,7 +11,6 @@ import {
   UseGuards,
   ParseUUIDPipe,
   Logger,
-  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';

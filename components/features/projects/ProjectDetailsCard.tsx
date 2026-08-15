@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Edit2, Check, X, Mail, Plus, Trash2, Users, ChevronDown, Shield, Eye, UserCog, Wrench, PenTool, ShoppingCart, ClipboardCheck, DollarSign, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { useProjectTeam, useAddTeamMember, useRemoveTeamMember, useUpdateTeamMember } from '@/lib/api/hooks/useProjectTeam';
-import { TeamMemberRole } from '@/lib/api/project-team';
+import type { TeamMemberRole } from '@/lib/api/project-team';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,8 +18,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { Combobox } from '@/components/ui/combobox';
+import type { ComboboxOption } from '@/components/ui/combobox';
 import { Country, State, City } from 'country-state-city';
+
+/**
+ * The backend's project-team-member DTO (backend/src/modules/projects/dto/project-team-member.dto.ts)
+ * accepts a wider set of manufacturing roles at runtime (validated via class-validator's
+ * @IsEnum(TeamMemberRole) against that same enum) than the frontend's `TeamMemberRole` type in
+ * lib/api/project-team.ts, which only models the legacy 'owner' | 'admin' | 'member' | 'viewer' set.
+ * This UI offers the full manufacturing role set, so we track it locally here.
+ */
+type ManufacturingTeamRole =
+  | TeamMemberRole
+  | 'project_manager'
+  | 'design_engineer'
+  | 'manufacturing_engineer'
+  | 'procurement_manager'
+  | 'quality_engineer'
+  | 'finance_analyst';
 
 interface ProjectDetailsCardProps {
   project: {
@@ -146,8 +163,10 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
     window.location.href = `mailto:${email}`;
   };
 
-  const handleUpdateRole = async (memberId: string, newRole: TeamMemberRole) => {
-    await updateMemberMutation.mutateAsync({ memberId, data: { role: newRole } });
+  const handleUpdateRole = async (memberId: string, newRole: ManufacturingTeamRole) => {
+    // The frontend `TeamMemberRole` type only lists the legacy roles, but the backend DTO
+    // (see ManufacturingTeamRole comment above) accepts the full manufacturing role set.
+    await updateMemberMutation.mutateAsync({ memberId, data: { role: newRole as unknown as TeamMemberRole } });
   };
 
   const handleCountryChange = (countryName: string) => {
@@ -235,13 +254,21 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
 
     setIsSaving(true);
     try {
-      await onUpdate({
-        name: editForm.name !== project.name ? editForm.name : undefined,
-        description: editForm.description !== (project.description || '') ? editForm.description : undefined,
-        country: editForm.country !== (project.country || '') ? editForm.country : undefined,
-        state: editForm.state !== (project.state || '') ? editForm.state : undefined,
-        city: editForm.city !== (project.city || '') ? editForm.city : undefined,
-      });
+      const payload: {
+        name?: string;
+        description?: string;
+        country?: string;
+        state?: string;
+        city?: string;
+      } = {};
+
+      if (editForm.name !== project.name && editForm.name !== undefined) payload.name = editForm.name;
+      if (editForm.description !== (project.description || '') && editForm.description !== undefined) payload.description = editForm.description;
+      if (editForm.country !== (project.country || '') && editForm.country !== undefined) payload.country = editForm.country;
+      if (editForm.state !== (project.state || '') && editForm.state !== undefined) payload.state = editForm.state;
+      if (editForm.city !== (project.city || '') && editForm.city !== undefined) payload.city = editForm.city;
+
+      await onUpdate(payload);
       setIsEditing(false);
     } catch (error) {
       console.error('Failed to update project:', error);
@@ -650,7 +677,12 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
             <div className="space-y-2">
               {teamData.members
                 .filter(m => m.role !== 'owner')
-                .map((member) => (
+                .map((member) => {
+                  // See ManufacturingTeamRole comment above: `member.role` is declared as the
+                  // narrower legacy TeamMemberRole, but the backend can populate it with any of
+                  // the manufacturing roles too.
+                  const memberRole = member.role as unknown as ManufacturingTeamRole;
+                  return (
                   <div
                     key={member.id}
                     className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border hover:border-primary/50 transition-colors"
@@ -673,7 +705,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                           <span className="truncate">{member.email}</span>
                         </button>
                         <div className="text-xs text-muted-foreground mt-0.5">
-                          {getRoleDescription(member.role)}
+                          {getRoleDescription(memberRole)}
                         </div>
                       </div>
                     </div>
@@ -687,8 +719,8 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                             className="h-8 text-xs capitalize"
                             disabled={updateMemberMutation.isPending}
                           >
-                            {getRoleIcon(member.role)}
-                            <span className="ml-1.5">{member.role}</span>
+                            {getRoleIcon(memberRole)}
+                            <span className="ml-1.5">{memberRole}</span>
                             <ChevronDown className="h-3 w-3 ml-1.5 opacity-50" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -698,7 +730,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                           
                           <DropdownMenuItem
                             onClick={() => handleUpdateRole(member.id, 'project_manager')}
-                            disabled={member.role === 'project_manager'}
+                            disabled={memberRole === 'project_manager'}
                           >
                             <Settings className="h-4 w-4 mr-2" />
                             <div>
@@ -711,7 +743,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                           
                           <DropdownMenuItem
                             onClick={() => handleUpdateRole(member.id, 'design_engineer')}
-                            disabled={member.role === 'design_engineer'}
+                            disabled={memberRole === 'design_engineer'}
                           >
                             <PenTool className="h-4 w-4 mr-2" />
                             <div>
@@ -724,7 +756,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                           
                           <DropdownMenuItem
                             onClick={() => handleUpdateRole(member.id, 'manufacturing_engineer')}
-                            disabled={member.role === 'manufacturing_engineer'}
+                            disabled={memberRole === 'manufacturing_engineer'}
                           >
                             <Wrench className="h-4 w-4 mr-2" />
                             <div>
@@ -737,7 +769,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                           
                           <DropdownMenuItem
                             onClick={() => handleUpdateRole(member.id, 'procurement_manager')}
-                            disabled={member.role === 'procurement_manager'}
+                            disabled={memberRole === 'procurement_manager'}
                           >
                             <ShoppingCart className="h-4 w-4 mr-2" />
                             <div>
@@ -750,7 +782,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                           
                           <DropdownMenuItem
                             onClick={() => handleUpdateRole(member.id, 'quality_engineer')}
-                            disabled={member.role === 'quality_engineer'}
+                            disabled={memberRole === 'quality_engineer'}
                           >
                             <ClipboardCheck className="h-4 w-4 mr-2" />
                             <div>
@@ -763,7 +795,7 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                           
                           <DropdownMenuItem
                             onClick={() => handleUpdateRole(member.id, 'finance_analyst')}
-                            disabled={member.role === 'finance_analyst'}
+                            disabled={memberRole === 'finance_analyst'}
                           >
                             <DollarSign className="h-4 w-4 mr-2" />
                             <div>
@@ -804,7 +836,8 @@ export function ProjectDetailsCard({ project, onUpdate }: ProjectDetailsCardProp
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">

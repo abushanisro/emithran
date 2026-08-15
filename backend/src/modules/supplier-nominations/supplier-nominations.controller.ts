@@ -1,4 +1,3 @@
-interface User { id: string; email: string; [key: string]: any; }
 import {
   Controller,
   Get,
@@ -39,15 +38,12 @@ import {
 import {
   VendorRatingMatrixDto,
   BatchVendorRatingUpdateDto,
-  UpdateVendorRatingDto,
   VendorRatingOverallScoresDto,
   UpdateCapabilityCriteriaDto
 } from './dto/vendor-rating-matrix.dto';
 import {
   PartWiseCostAnalysisDto,
   PartWiseCostBaseDataDto,
-  CreatePartWiseCostAnalysisDto,
-  CreatePartWiseCostBaseDataDto,
   BulkUpdatePartWiseCostAnalysisDto
 } from './dto/part-wise-cost-analysis.dto';
 

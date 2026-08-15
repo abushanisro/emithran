@@ -1,4 +1,4 @@
-import { IsUUID, IsOptional, IsDateString, IsEnum, IsInt, IsDecimal, IsString, IsNumber, Min } from 'class-validator';
+import { IsUUID, IsOptional, IsDateString, IsEnum, IsInt, IsString, IsNumber, Min } from 'class-validator';
 
 export enum EntryType {
   DAILY = 'daily',

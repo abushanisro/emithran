@@ -61,7 +61,7 @@ const processCalculatorMappingsApi = {
       count: number;
       page: number;
       limit: number;
-    }>('/processes/calculator-mappings', { params });
+    }>('/processes/calculator-mappings', { ...(params !== undefined ? { params } : {}) });
   },
 
   getOne: async (id: string) => {

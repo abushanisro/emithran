@@ -85,7 +85,7 @@ function CreateBalloonDiagramDialog({
       project_id: projectId,
       bom_id: formData.bomId,
       name: formData.name,
-      cad_file_path: formData.cadFilePath || undefined,
+      ...(formData.cadFilePath ? { cad_file_path: formData.cadFilePath } : {}),
     }, {
       onSuccess: () => {
         setOpen(false);

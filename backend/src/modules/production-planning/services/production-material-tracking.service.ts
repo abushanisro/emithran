@@ -320,8 +320,6 @@ export class ProductionMaterialTrackingService {
   }
 
   async getIntegratedDashboardData(lotId: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getClient();
-
     // Get all data in parallel for better performance
     const [
       lotData,

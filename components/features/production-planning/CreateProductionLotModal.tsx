@@ -129,8 +129,6 @@ export function CreateProductionLotModal({ open, onOpenChange, projectId }: Crea
     });
   };
 
-  const selectedItems = bomItemsData?.items.filter(item => selectedItemIds.includes(item.id)) || [];
-
   useEffect(() => {
     if (open) {
       form.reset({

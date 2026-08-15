@@ -322,7 +322,7 @@ export const ProcessPlanning = ({ lotId }: ProcessPlanningProps) => {
       .filter((item: any) => selectedBOM[item.id]?.selected)
       .map((item: any) => ({
         bom_item_id: item.id,
-        required_quantity: selectedBOM[item.id].quantity,
+        required_quantity: selectedBOM[item.id]?.quantity ?? 0,
         unit: item.unit || 'pcs',
       }));
 

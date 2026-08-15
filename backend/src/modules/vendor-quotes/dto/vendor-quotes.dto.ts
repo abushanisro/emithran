@@ -1,5 +1,5 @@
-import { IsUUID, IsString, IsNumber, IsOptional, IsDate, IsEnum, IsArray, ValidateNested, IsBoolean, Min, Max } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { IsUUID, IsString, IsNumber, IsOptional, IsDate, IsEnum, IsArray, ValidateNested, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum QuoteStatus {

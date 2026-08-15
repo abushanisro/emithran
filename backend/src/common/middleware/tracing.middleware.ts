@@ -122,7 +122,7 @@ export class TracingMiddleware implements NestMiddleware {
       return null;
     }
 
-    const [version, traceId, spanId, flags] = parts;
+    const [, traceId, spanId, flags] = parts;
     
     if (traceId.length !== 32 || spanId.length !== 16 || flags.length !== 2) {
       return null;

@@ -26,11 +26,10 @@ import {
 } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calculator as CalculatorIcon, Eye, Loader2, Play } from 'lucide-react';
-import { 
+import {
   useCalculators,
   useCalculator,
   useExecuteCalculator,
-  useDatabaseLookupOptions 
 } from '@/lib/api/hooks/useCalculators';
 
 interface ToolingCostDialogProps {
@@ -44,7 +43,17 @@ interface ToolingCostDialogProps {
 }
 
 // Manufacturing Process Hierarchy
-const MANUFACTURING_PROCESSES = {
+interface SubProcessDefinition {
+  label: string;
+  toolTypes: string[];
+}
+
+interface ProcessDefinition {
+  label: string;
+  subProcesses: Record<string, SubProcessDefinition>;
+}
+
+const MANUFACTURING_PROCESSES: Record<string, ProcessDefinition> = {
   machining: {
     label: 'Machining',
     subProcesses: {
@@ -418,9 +427,9 @@ export function ToolingCostDialog({
   };
 
   const selectedTooling = TOOLING_TYPES.find(t => t.value === formData.toolingType);
-  const selectedProcessData = MANUFACTURING_PROCESSES[formData.manufacturingProcess as keyof typeof MANUFACTURING_PROCESSES];
+  const selectedProcessData = MANUFACTURING_PROCESSES[formData.manufacturingProcess];
   const availableSubProcesses = selectedProcessData ? Object.entries(selectedProcessData.subProcesses) : [];
-  const selectedSubProcessData = selectedProcessData?.subProcesses[formData.subProcess as keyof typeof selectedProcessData.subProcesses];
+  const selectedSubProcessData: SubProcessDefinition | undefined = selectedProcessData?.subProcesses[formData.subProcess];
 
   // Filter tooling types based on selected sub-process
   const getRecommendedTools = () => {
@@ -446,11 +455,11 @@ export function ToolingCostDialog({
             {selectedProcess && selectedSubProcess && (
               <div className="flex items-center gap-2 mt-2">
                 <Badge variant="secondary" className="text-xs">
-                  {MANUFACTURING_PROCESSES[selectedProcess as keyof typeof MANUFACTURING_PROCESSES]?.label}
+                  {MANUFACTURING_PROCESSES[selectedProcess]?.label}
                 </Badge>
                 <span className="text-xs text-muted-foreground">→</span>
                 <Badge variant="outline" className="text-xs">
-                  {MANUFACTURING_PROCESSES[selectedProcess as keyof typeof MANUFACTURING_PROCESSES]?.subProcesses[selectedSubProcess as keyof typeof MANUFACTURING_PROCESSES[typeof selectedProcess]['subProcesses']]?.label}
+                  {MANUFACTURING_PROCESSES[selectedProcess]?.subProcesses[selectedSubProcess]?.label}
                 </Badge>
               </div>
             )}
@@ -901,7 +910,7 @@ export function ToolingCostDialog({
                                     </span>
                                     <Button
                                       size="sm"
-                                      onClick={() => handleUseCalculatorValue(value, calculatorTarget)}
+                                      onClick={() => handleUseCalculatorValue(value, calculatorTarget ?? undefined)}
                                       disabled={typeof value !== 'number'}
                                     >
                                       Use Value

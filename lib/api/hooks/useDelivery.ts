@@ -134,6 +134,8 @@ export interface TrackingEvent {
 export interface DeliveryAddress {
   id?: string;
   projectId?: string;
+  /** Backend's createDeliveryAddress returns the raw Supabase row (snake_case) unmapped. */
+  project_id?: string;
   addressType?: string;
   companyName?: string;
   contactPerson: string;
@@ -560,7 +562,7 @@ export function useDeleteDeliveryAddress() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ addressId, projectId }: { addressId: string; projectId: string }): Promise<void> => {
+    mutationFn: async ({ addressId }: { addressId: string; projectId: string }): Promise<void> => {
       await apiClient.delete(`/delivery/addresses/${addressId}`);
     },
     onSuccess: (_, variables) => {
@@ -691,7 +693,7 @@ export function useDeleteDeliveryOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, projectId }: { id: string; projectId: string }): Promise<void> => {
+    mutationFn: async ({ id }: { id: string; projectId: string }): Promise<void> => {
       await apiClient.delete(`/delivery/orders/${id}`);
     },
     onSuccess: (_, variables) => {

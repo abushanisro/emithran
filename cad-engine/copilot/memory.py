@@ -11,7 +11,6 @@ import os
 import logging
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

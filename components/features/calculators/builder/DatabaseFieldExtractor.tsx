@@ -409,7 +409,7 @@ export function DatabaseFieldExtractor({
             <DatabaseRecordPicker
               dataSource={dataSource}
               value={selectedRecord}
-              associatedProcessId={associatedProcessId}
+              {...(associatedProcessId !== undefined ? { associatedProcessId } : {})}
               onSelect={(record) => {
                 setSelectedRecord(record?.id || '');
               }}

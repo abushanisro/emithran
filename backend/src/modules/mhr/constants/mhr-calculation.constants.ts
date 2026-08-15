@@ -153,10 +153,3 @@ export const MHR_CALCULATION_CONSTANTS = {
     WEEKS_PER_YEAR: 52,
   },
 } as const;
-
-/**
- * Type definitions for better type safety
- */
-export type CostCategory = keyof typeof MHR_CALCULATION_CONSTANTS.COST_CATEGORIES;
-export type FixedCostType = keyof typeof MHR_CALCULATION_CONSTANTS.COST_CATEGORIES.FIXED;
-export type VariableCostType = keyof typeof MHR_CALCULATION_CONSTANTS.COST_CATEGORIES.VARIABLE;

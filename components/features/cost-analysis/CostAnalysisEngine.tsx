@@ -386,7 +386,7 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
       )}
 
       {/* ── 6. Location Cost Comparison ─────────────────────────────────── */}
-      <LocationComparisonPanel bomItemId={bomItemId} bomId={bomId} location={location} />
+      <LocationComparisonPanel bomItemId={bomItemId} bomId={bomId} {...(location !== undefined ? { location } : {})} />
 
       {/* ── 7. Raw Material Breakdown ────────────────────────────────────── */}
       {analysis.materialLines.length > 0 && (

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Lock, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -37,7 +36,8 @@ export function EndpointContent({ endpoint }: EndpointContentProps) {
   const headerParams = endpoint.parameters.filter((p) => p.in === 'header');
 
   const successResponses = endpoint.responses.filter((r) => r.statusCode >= 200 && r.statusCode < 300);
-  const defaultTab = endpoint.responses.length > 0 ? String(endpoint.responses[0].statusCode) : undefined;
+  const firstResponse = endpoint.responses[0];
+  const defaultTab = firstResponse ? String(firstResponse.statusCode) : undefined;
 
   return (
     <article className="flex-1 overflow-y-auto px-8 py-8 min-w-0">
@@ -144,25 +144,25 @@ export function EndpointContent({ endpoint }: EndpointContentProps) {
             <span className="h-1.5 w-1.5 rounded-full bg-primary" />
             Responses
           </h4>
-          {endpoint.responses.length === 1 ? (
+          {endpoint.responses.length === 1 && firstResponse ? (
             <div className="rounded-lg border border-border/60 overflow-hidden">
               <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/30">
                 <Badge
                   variant="outline"
-                  className={`text-[11px] font-mono ${getStatusColor(endpoint.responses[0].statusCode)}`}
+                  className={`text-[11px] font-mono ${getStatusColor(firstResponse.statusCode)}`}
                 >
-                  {endpoint.responses[0].statusCode}
+                  {firstResponse.statusCode}
                 </Badge>
-                <span className="text-sm text-muted-foreground">{endpoint.responses[0].description}</span>
+                <span className="text-sm text-muted-foreground">{firstResponse.description}</span>
               </div>
-              {endpoint.responses[0].example && (
+              {firstResponse.example && (
                 <pre className="text-xs p-4 overflow-x-auto text-foreground/80 leading-relaxed bg-muted/10">
-                  {JSON.stringify(endpoint.responses[0].example, null, 2)}
+                  {JSON.stringify(firstResponse.example, null, 2)}
                 </pre>
               )}
             </div>
           ) : (
-            <Tabs defaultValue={defaultTab}>
+            <Tabs {...(defaultTab !== undefined ? { defaultValue: defaultTab } : {})}>
               <TabsList className="h-auto flex-wrap gap-1 bg-muted/30 p-1 mb-0 rounded-t-lg rounded-b-none border border-b-0 border-border/60">
                 {endpoint.responses.map((res) => (
                   <TabsTrigger

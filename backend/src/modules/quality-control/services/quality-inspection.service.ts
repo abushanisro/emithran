@@ -6,7 +6,6 @@ import {
   QualityInspectionResponseDto,
   InspectionResultDto,
   InspectionStatus,
-  InspectionResult,
 } from '../dto/quality-inspection.dto';
 import {
   CreateDetailedInspectionReportDto,

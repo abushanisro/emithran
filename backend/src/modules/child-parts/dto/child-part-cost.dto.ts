@@ -18,7 +18,6 @@ import {
   Min,
   Max,
   IsBoolean,
-  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';

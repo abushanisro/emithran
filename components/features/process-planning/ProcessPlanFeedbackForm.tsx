@@ -40,10 +40,10 @@ export function ProcessPlanFeedbackForm({
       {
         bomItemId,
         aiProcessSequence,
-        aiMachines,
         engineerSequence,
-        correctionReason: correctionReason.trim() || undefined,
-        partFamily,
+        ...(aiMachines !== undefined ? { aiMachines } : {}),
+        ...(correctionReason.trim() ? { correctionReason: correctionReason.trim() } : {}),
+        ...(partFamily !== undefined ? { partFamily } : {}),
       },
       {
         onSuccess: () => {

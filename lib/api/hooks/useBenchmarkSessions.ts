@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/providers/auth';
-import {
-  benchmarkSessionsApi,
-  BenchmarkSession,
+import { benchmarkSessionsApi } from '../benchmark-sessions';
+import type {
   CreateBenchmarkSession,
   UpdateBenchmarkSession,
 } from '../benchmark-sessions';

@@ -6,8 +6,6 @@ Refactored with SOLID principles and dependency injection
 
 import os
 import logging
-from typing import Optional
-from pathlib import Path
 
 from OCC.Core.STEPControl import STEPControl_Reader
 from OCC.Core.IFSelect import IFSelect_RetDone

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger, ConflictException } from '@nestjs/common';
 import { UuidValidator } from '@/common/validators/uuid.validator';
 import { SupabaseService } from '@/common/supabase/supabase.service';
 import {

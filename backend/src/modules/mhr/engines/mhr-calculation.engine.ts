@@ -17,37 +17,6 @@ import { MHR_CALCULATION_CONSTANTS } from '../constants/mhr-calculation.constant
 import { CreateMHRDto, UpdateMHRDto } from '../dto/mhr.dto';
 import { MHRCalculationResult } from '../dto/mhr-response.dto';
 
-/**
- * Intermediate calculation results for transparency and debugging
- */
-export interface CalculationBreakdown {
-  // Working Hours
-  workingHoursPerYear: number;
-  availableHoursPerYear: number;
-  effectiveHoursPerYear: number;
-
-  // Capital Investment
-  landedCost: number;
-  accessoriesCost: number;
-  installationCost: number;
-  totalCapitalInvestment: number;
-
-  // Annual Costs
-  depreciationPerAnnum: number;
-  interestPerAnnum: number;
-  insurancePerAnnum: number;
-  rentPerAnnum: number;
-  maintenancePerAnnum: number;
-  electricityPerAnnum: number;
-
-  // Per Hour Costs
-  depreciationPerHour: number;
-  interestPerHour: number;
-  insurancePerHour: number;
-  rentPerHour: number;
-  maintenancePerHour: number;
-  electricityPerHour: number;
-}
 
 export class MHRCalculationEngine {
   private readonly precision = MHR_CALCULATION_CONSTANTS.PRECISION;

@@ -93,15 +93,15 @@ export default function SupplierEvaluationPage() {
       category: item.material || '', // Use actual material or empty
       process: '', // Let users define process based on vendor requirements
       quantity: item.quantity,
-      price: undefined, // No price data in evaluation group
-      file2dPath: undefined,
-      file3dPath: undefined
+      // No price/file data available from evaluation group; omit rather than assign undefined
     }));
+
+    const evaluationGroupName = selectedEvaluationGroup?.name || selectedEvaluationGroupData?.name;
 
     return (
       <EvaluationGroupView
         projectId={projectId}
-        evaluationGroupName={selectedEvaluationGroup?.name || selectedEvaluationGroupData?.name}
+        {...(evaluationGroupName !== undefined ? { evaluationGroupName } : {})}
         bomParts={bomParts}
         onViewFile={handleViewFile}
         onBack={handleBackToDashboard}

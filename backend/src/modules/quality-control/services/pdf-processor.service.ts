@@ -1,11 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PDFDocument, PDFPage } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import pdf2pic from 'pdf2pic';
 import Tesseract from 'tesseract.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { createCanvas, Image } from 'canvas';
 
 export interface PDFTextItem {
   text: string;
@@ -128,9 +127,6 @@ export class PDFProcessorService {
       // Industry best practice: Check if PDF has extractable text
       const pages = pdfDoc.getPages();
       if (pages.length === 0) return false;
-      
-      const firstPage = pages[0];
-      const pageSize = firstPage.getSize();
       
       // Convert first page to image for analysis
       const imageBuffer = await this.convertSinglePageToImage(pdfDoc, 0);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,8 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   getFactorWeights,
-  updateFactorWeights,
-  calculateSupplierRankings,
   getPartWiseCostAnalysis,
   initializePartWiseCostAnalysis,
   bulkUpdatePartWiseCostAnalysis,
@@ -937,77 +935,6 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
     setIsEditingCost(false);
   };
 
-  // Handle weight changes with API integration
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _handleWeightChange = async (type: 'cost' | 'developmentCost' | 'leadTime', value: number) => {
-    const newWeights = { ...factorWeights, [type]: value };
-
-    // Validate weights sum to 100 (with tolerance for floating point precision)
-    const sum = newWeights.cost + newWeights.developmentCost + newWeights.leadTime;
-    if (Math.abs(sum - 100) > 0.1) {
-      // Still allow the change for UI responsiveness
-    }
-
-    setFactorWeights(newWeights);
-
-    // Update via API with rounded values to avoid floating-point precision issues
-    if (nominationId) {
-      try {
-        // Round to 2 decimal places to avoid floating-point precision issues
-        const roundedWeights = {
-          costFactor: Math.round(newWeights.cost * 100) / 100,
-          developmentCostFactor: Math.round(newWeights.developmentCost * 100) / 100,
-          leadTimeFactor: Math.round(newWeights.leadTime * 100) / 100
-        };
-
-        await updateFactorWeights(nominationId, roundedWeights);
-
-        // Recalculate rankings with new weights
-        await handleCalculateRankings();
-      } catch (error) {
-        // Show user-friendly error message
-        if (error instanceof Error && error.message.includes('must sum to 100%')) {
-          // Auto-adjust the last weight to make sum exactly 100
-          const adjustedLeadTime = 100 - newWeights.cost - newWeights.developmentCost;
-          setFactorWeights(prev => ({ ...prev, leadTime: adjustedLeadTime }));
-        }
-      }
-    }
-  };
-
-  // Calculate and update rankings
-  const handleCalculateRankings = async () => {
-    if (!nominationId) return;
-
-    try {
-      const newRankings = await calculateSupplierRankings(nominationId);
-      // setRankings(newRankings); // Removed unused state update
-
-      // Update the cost data with new rankings
-      setCostData(prev => {
-        const newData = [...prev];
-
-        // Update ranking data from API response
-        newRankings.forEach((ranking, index) => {
-          const rankCostRow = newData.find(item => item.costComponent === "Rank-Cost");
-          const rankDevRow = newData.find(item => item.costComponent === "Rank-Development cost");
-          const rankLeadRow = newData.find(item => item.costComponent === "Lead Time Ranking");
-          const totalScoreRow = newData.find(item => item.costComponent === "Total Score");
-          const overallRankRow = newData.find(item => item.costComponent === "Overall Rank");
-
-          if (rankCostRow) rankCostRow.supplierValues[index] = ranking.costRank;
-          if (rankDevRow) rankDevRow.supplierValues[index] = ranking.developmentCostRank;
-          if (rankLeadRow) rankLeadRow.supplierValues[index] = ranking.leadTimeRank;
-          if (totalScoreRow) totalScoreRow.supplierValues[index] = ranking.totalScore;
-          if (overallRankRow) overallRankRow.supplierValues[index] = ranking.overallRank;
-        });
-
-        return newData;
-      });
-    } catch (error) {
-      // Rankings calculation failed
-    }
-  };
 
   // Simplified inline editing - no mode management needed
 
@@ -1025,21 +952,6 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
     "Letter of Credit"
   ];
 
-  const supplierSummary = useMemo(() => {
-    const overallRanking = costData.find(item => item.costComponent === "Overall Rank");
-    const competencyScore = costData.find(item => item.costComponent === "Cost Competency Score");
-    const netPrice = costData.find(item => item.costComponent === "Net Price/unit");
-    const devCost = costData.find(item => item.costComponent === "Development cost");
-
-    const numVendors = vendors.length || 4;
-    return Array(numVendors).fill(0).map((_, index) => ({
-      rank: overallRanking?.supplierValues[index] || 0,
-      score: competencyScore?.supplierValues[index] || 0,
-      netPrice: netPrice?.supplierValues[index] || 0,
-      devCost: devCost?.supplierValues[index] || 0
-    }));
-  }, [costData, vendors]);
-
   const getRankingColor = (rank: number) => {
     switch (rank) {
       case 1: return 'bg-green-500/20 text-green-400 border-green-500';
@@ -1054,19 +966,6 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
     if (rank === 1) return <Award className="h-3 w-3" />;
     if (rank <= 2) return <TrendingUp className="h-3 w-3" />;
     return <TrendingDown className="h-3 w-3" />;
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _getBestSupplier = () => {
-    if (supplierSummary.length === 0) return 'No suppliers';
-
-    const bestRank = Math.min(...supplierSummary.map(s => s.rank));
-    const bestIndex = supplierSummary.findIndex(s => s.rank === bestRank);
-
-    if (vendors[bestIndex]) {
-      return vendors[bestIndex].name;
-    }
-    return `Supplier-${bestIndex + 1}`;
   };
 
   // Remove loading state to show data immediately and prevent duplicate requests

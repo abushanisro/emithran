@@ -198,7 +198,7 @@ export function useCompleteSupplierEvaluation() {
 
   return useMutation({
     mutationFn: (id: string) => completeSupplierEvaluation(id),
-    onSuccess: (data, id) => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY, id] });
       toast.success('Evaluation marked as completed');

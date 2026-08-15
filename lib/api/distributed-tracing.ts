@@ -225,7 +225,9 @@ export class TraceManager {
     span.endTime = Date.now();
     span.duration = span.endTime - span.startTime;
     span.status = status;
-    span.statusMessage = statusMessage;
+    if (statusMessage !== undefined) {
+      span.statusMessage = statusMessage;
+    }
 
     // Notify listeners
     this.notifyListeners(span);
@@ -299,7 +301,7 @@ export class TraceManager {
     traceId: string;
     spans: Array<{
       spanId: string;
-      parentSpanId?: string;
+      parentSpanId?: string | undefined;
       name: string;
       timestamp: number;
       duration: number;

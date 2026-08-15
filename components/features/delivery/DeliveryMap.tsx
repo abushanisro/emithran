@@ -2,16 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
-  MapPin,
   Navigation,
-  Truck,
-  Package,
-  Phone,
-  Clock,
-  Route,
   Crosshair,
 } from 'lucide-react';
 
@@ -85,11 +77,12 @@ export default function DeliveryMap({
           document.head.appendChild(script);
         });
       }
+      return undefined;
     };
 
     loadLeaflet()
       .then(() => setMapLoaded(true))
-      .catch(error => {});
+      .catch(() => {});
   }, []);
 
   // Get user's precise current location - accurate data only
@@ -164,49 +157,6 @@ export default function DeliveryMap({
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
       }).addTo(map);
-
-      // Custom icon styles for different delivery statuses
-      const createCustomIcon = (status: string, type: 'origin' | 'destination' | 'current' = 'current') => {
-        const colors = {
-          origin: '#22c55e', // green
-          destination: '#ef4444', // red
-          pending: '#6b7280', // gray
-          pickup: '#3b82f6', // blue
-          in_transit: '#f59e0b', // yellow
-          out_for_delivery: '#f97316', // orange
-          delivered: '#22c55e', // green
-          failed: '#ef4444', // red
-        };
-
-        const color = type === 'origin' ? colors.origin : 
-                     type === 'destination' ? colors.destination : 
-                     colors[status as keyof typeof colors] || colors.pending;
-
-        const iconHtml = type === 'origin' ? '📦' : 
-                        type === 'destination' ? '🏠' : '🚚';
-
-        return window.L.divIcon({
-          className: 'custom-div-icon',
-          html: `
-            <div style="
-              background-color: ${color};
-              width: 25px;
-              height: 25px;
-              border-radius: 50%;
-              border: 3px solid white;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-              font-size: 12px;
-            ">
-              ${iconHtml}
-            </div>
-          `,
-          iconSize: [25, 25],
-          iconAnchor: [12, 12],
-        });
-      };
 
       mapInstanceRef.current = map;
 

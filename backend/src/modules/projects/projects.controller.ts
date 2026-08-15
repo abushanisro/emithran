@@ -10,7 +10,6 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  UseFilters,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
@@ -19,7 +18,6 @@ import { ProjectResponseDto, ProjectListResponseDto } from './dto/project-respon
 import { AddTeamMemberDto, UpdateTeamMemberDto, TeamMemberResponseDto, TeamMembersListResponseDto } from './dto/project-team-member.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
-import { GlobalExceptionFilter } from '../../common/filters/global-exception.filter';
 
 @ApiTags('Projects')
 @ApiBearerAuth()

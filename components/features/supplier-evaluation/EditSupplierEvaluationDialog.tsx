@@ -89,8 +89,8 @@ export function EditSupplierEvaluationDialog({
         groupId: group.id,
         data: {
           name: data.name,
-          description: data.description,
-          notes: data.notes,
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          ...(data.notes !== undefined ? { notes: data.notes } : {}),
           status: data.status,
         },
       });

@@ -1,7 +1,8 @@
 'use client';
 
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react';
-import { Canvas, useLoader, useThree } from '@react-three/fiber';
+import { Canvas, useLoader } from '@react-three/fiber';
+import type { ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-three/drei';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
@@ -17,15 +18,11 @@ import {
   Box,
   Grid3x3,
   Loader2,
-  Maximize,
-  Plus,
-  Minus,
-  Move3d,
   Save,
   Edit,
   Trash2,
 } from 'lucide-react';
-import { BalloonDiagram, BalloonDiagramAnnotation } from '@/lib/api/project-reports';
+import type { BalloonDiagram, BalloonDiagramAnnotation } from '@/lib/api/project-reports';
 
 interface BalloonDiagramViewerProps {
   diagram: BalloonDiagram;
@@ -163,15 +160,14 @@ function ModelViewer({
 }) {
   const geometry = useLoader(STLLoader, fileUrl);
   const meshRef = useRef<THREE.Mesh>(null);
-  const { raycaster, mouse, camera, gl } = useThree();
 
-  const handleClick = useCallback((event: THREE.Event) => {
+  const handleClick = useCallback((event: ThreeEvent<MouseEvent>) => {
     if (!isEditing || !onAnnotationAdd) return;
 
     event.stopPropagation();
-    
-    if (event.intersections && event.intersections.length > 0) {
-      const intersection = event.intersections[0];
+
+    const intersection = event.intersections?.[0];
+    if (intersection) {
       const worldPosition = intersection.point;
       onAnnotationAdd([worldPosition.x, worldPosition.y, worldPosition.z]);
     }
@@ -199,9 +195,9 @@ function ModelViewer({
         <BalloonAnnotation
           key={annotation.id}
           annotation={annotation}
-          onEdit={onAnnotationEdit}
-          onDelete={onAnnotationDelete}
-          isEditing={isEditing}
+          {...(onAnnotationEdit !== undefined ? { onEdit: onAnnotationEdit } : {})}
+          {...(onAnnotationDelete !== undefined ? { onDelete: onAnnotationDelete } : {})}
+          {...(isEditing !== undefined ? { isEditing } : {})}
         />
       ))}
     </Center>
@@ -222,16 +218,15 @@ function LoadingFallback() {
 export default function BalloonDiagramViewer({
   diagram,
   onAnnotationAdd,
-  onAnnotationUpdate,
   onAnnotationDelete,
   onSaveDiagram,
   isEditing = false,
 }: BalloonDiagramViewerProps) {
-  const [cameraDistance, setCameraDistance] = useState(100);
+  const [cameraDistance] = useState(100);
   const [view, setView] = useState<'home' | 'front' | 'back' | 'top' | 'bottom' | 'right' | 'left' | 'isometric'>('home');
   const [showGrid, setShowGrid] = useState(true);
   const [showWireframe, setShowWireframe] = useState(false);
-  const [selectedAnnotation, setSelectedAnnotation] = useState<string | null>(null);
+  const [, setSelectedAnnotation] = useState<string | null>(null);
   const [newAnnotationData, setNewAnnotationData] = useState({
     balloonNumber: 1,
     text: '',
@@ -243,9 +238,9 @@ export default function BalloonDiagramViewer({
   const annotations: AnnotationMarker[] = diagram.annotations?.map((ann) => ({
     id: ann.id,
     balloonNumber: ann.balloon_number,
-    position: [ann.position_x, ann.position_y, ann.position_z || 0],
-    text: ann.annotation_text,
-    bomItem: ann.bom_item,
+    position: [ann.position_x, ann.position_y, ann.position_z || 0] as [number, number, number],
+    ...(ann.annotation_text !== undefined ? { text: ann.annotation_text } : {}),
+    ...(ann.bom_item !== undefined ? { bomItem: ann.bom_item } : {}),
   })) || [];
 
   const handleAddAnnotation = useCallback((position: [number, number, number]) => {
@@ -376,14 +371,14 @@ export default function BalloonDiagramViewer({
                 intensity={0.3}
               />
 
-              {showGrid && <Grid infiniteGrid size={100} />}
-              
+              {showGrid && <Grid infiniteGrid args={[100, 100]} />}
+
               <ModelViewer
                 fileUrl={diagram.cad_file_path}
                 annotations={annotations}
-                onAnnotationAdd={isEditing ? handleAddAnnotation : undefined}
-                onAnnotationEdit={isEditing ? handleEditAnnotation : undefined}
-                onAnnotationDelete={isEditing ? handleDeleteAnnotation : undefined}
+                {...(isEditing ? { onAnnotationAdd: handleAddAnnotation } : {})}
+                {...(isEditing ? { onAnnotationEdit: handleEditAnnotation } : {})}
+                {...(isEditing ? { onAnnotationDelete: handleDeleteAnnotation } : {})}
                 isEditing={isEditing}
               />
             </Suspense>

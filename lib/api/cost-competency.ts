@@ -147,8 +147,6 @@ export function transformCostAnalysisToComponentData(
   costAnalysis: CostCompetencyAnalysis[],
   vendors: Array<{ id: string; name: string }>
 ) {
-  const _vendorMap = new Map(vendors.map(v => [v.id, v]));
-  
   return costAnalysis.map(analysis => {
     const supplierValues: number[] = [];
     const paymentTerms: string[] = [];

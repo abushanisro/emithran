@@ -381,7 +381,6 @@ class SheetMetalFeatureExtractor:
             self._extract_sheet_metal_geometry(shape, bbox_dims)
         )
 
-        flatness = sheet_thickness / max(max(bbox_dims), 1.0)
         # Use pre-computed cylinder list when available.
         if raw_cylinders is None:
             try:
@@ -805,7 +804,6 @@ class SheetMetalFeatureExtractor:
         #   tight  0.3–6mm   → physical sheet metal (steel/al gauge up to 6mm)
         #   loose  0.3–20%   → fallback for thick plate or unusual geometry
         _GAUGE_TIGHT_MAX = 6.0
-        _HIGHAREA_FRAC   = 0.25   # bin must have ≥ 25% of max bin area to be "high-area"
         max_gauge_loose  = max_dim * 0.20
         bbox_half_diag = math.sqrt(sum(d * d for d in bbox_dims)) / 2.0
         fallback_t = min(d for d in bbox_dims if d > 0)
@@ -913,7 +911,6 @@ class SheetMetalFeatureExtractor:
 
         # ── 3. Modal thickness — thinnest high-area mode, tight range first ──
         total_hist_area = sum(hist.values())
-        max_bin_area    = max(hist.values())
 
         # Log top-10 bins (area descending) for diagnosis
         top10 = sorted(hist.items(), key=lambda x: x[1], reverse=True)[:10]

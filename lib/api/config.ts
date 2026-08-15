@@ -88,14 +88,3 @@ export function validateApiConfig(): boolean {
   }
 }
 
-/**
- * Get service status for monitoring
- */
-export function getServiceInfo() {
-  return {
-    environment: apiConfig.environment,
-    endpoints: apiConfig.endpoints,
-    isValid: validateApiConfig(),
-    timestamp: new Date().toISOString(),
-  };
-}

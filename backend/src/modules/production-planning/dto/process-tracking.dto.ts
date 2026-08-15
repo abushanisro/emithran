@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsUUID, IsNotEmpty, IsOptional, IsString, IsNumber, IsArray, IsObject, IsDate, IsEnum, Min, Max } from 'class-validator';
+import { IsUUID, IsNotEmpty, IsOptional, IsString, IsNumber, IsArray, IsObject, IsEnum, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // =====================================================
@@ -521,57 +521,3 @@ export class QueryTrackingDto {
 // RESPONSE DTOs
 // =====================================================
 
-export class TimelineResponseDto {
-  @ApiProperty({ description: 'Timeline ID' })
-  id: string;
-
-  @ApiProperty({ description: 'Production lot ID' })
-  production_lot_id: string;
-
-  @ApiProperty({ description: 'Timeline start date' })
-  timeline_start_date: string;
-
-  @ApiProperty({ description: 'Timeline end date' })
-  timeline_end_date: string;
-
-  @ApiProperty({ description: 'Total weeks' })
-  total_weeks: number;
-
-  @ApiProperty({ description: 'Week configuration' })
-  week_config: WeekConfigDto[];
-
-  @ApiProperty({ description: 'Created timestamp' })
-  created_at: string;
-
-  @ApiProperty({ description: 'Updated timestamp' })
-  updated_at: string;
-}
-
-export class TrackingHistoryDto {
-  @ApiProperty({ description: 'Change ID' })
-  id: string;
-
-  @ApiProperty({ description: 'Entity type', enum: EntityType })
-  entity_type: EntityType;
-
-  @ApiProperty({ description: 'Entity ID' })
-  entity_id: string;
-
-  @ApiProperty({ description: 'Change type', enum: ChangeType })
-  change_type: ChangeType;
-
-  @ApiProperty({ description: 'Old data before change' })
-  old_data: any;
-
-  @ApiProperty({ description: 'New data after change' })
-  new_data: any;
-
-  @ApiProperty({ description: 'User who made the change' })
-  changed_by: string;
-
-  @ApiProperty({ description: 'Reason for change' })
-  change_reason: string;
-
-  @ApiProperty({ description: 'Change timestamp' })
-  created_at: string;
-}

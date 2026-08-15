@@ -20,7 +20,7 @@ import { BOMItemDialog } from '@/components/features/bom/BOMItemDialog';
 import { useProcessCosts } from '@/lib/api/hooks/useProcessCosts';
 import { ProcessCostDialog } from '@/components/features/process-planning/ProcessCostDialog';
 import { toast } from 'sonner';
-import { Vendor } from '@/lib/api/vendors';
+import type { Vendor } from '@/lib/api/vendors';
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface SimpleEvaluationViewProps {
@@ -83,7 +83,7 @@ export function SimpleEvaluationView({ groupId, onBack }: SimpleEvaluationViewPr
     data: processCostsData,
     error: processCostsError
   } = useProcessCosts({
-    bomItemIds: bomItemIds.length > 0 ? bomItemIds : undefined,
+    ...(bomItemIds.length > 0 ? { bomItemIds } : {}),
     isActive: true,
     enabled: bomItemIds.length > 0,
   });

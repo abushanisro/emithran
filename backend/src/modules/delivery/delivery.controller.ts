@@ -7,7 +7,6 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
   HttpStatus,
   Logger,
   ParseUUIDPipe,
@@ -21,7 +20,6 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
-  ApiBearerAuth,
   ApiBody
 } from '@nestjs/swagger';
 import { DeliveryService } from './delivery.service';

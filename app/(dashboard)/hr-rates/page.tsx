@@ -52,7 +52,6 @@ import {
   useImportMHRFromExcel,
 } from '@/lib/api/hooks';
 import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
-import { formatCurrency } from '@/lib/utils';
 import { exportMHRToPDF } from '@/lib/utils/exportMHRToPDF';
 
 // All 9 locations in the master Excel file — hardcoded so filters always show them

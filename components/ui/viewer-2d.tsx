@@ -138,8 +138,8 @@ export function Viewer2D({ fileUrl, fileName, fileType }: Viewer2DProps) {
                                     title={fileName}
                                     scrolling="no"
                                     frameBorder="0"
-                                    marginHeight="0"
-                                    marginWidth="0"
+                                    marginHeight={0}
+                                    marginWidth={0}
                                 />
                             ) : (
                                 <div className="flex flex-col items-center justify-center p-4 text-center">

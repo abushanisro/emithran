@@ -11,7 +11,6 @@ import {
   UseGuards,
   ParseUUIDPipe,
   Logger,
-  HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';

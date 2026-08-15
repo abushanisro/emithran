@@ -22,16 +22,14 @@ import {
   Calendar,
   Shield,
   Truck,
-  FolderKanban,
-  CircleCheckBig
 } from 'lucide-react';
-import { 
-  WORKFLOW_MODULES, 
-  getNextModule, 
-  getPreviousModule, 
+import {
+  WORKFLOW_MODULES,
+  getNextModule,
+  getPreviousModule,
   getModuleProgress,
-  WorkflowModule 
 } from '@/lib/constants/module-workflow';
+import type { WorkflowModule } from '@/lib/constants/module-workflow';
 
 interface WorkflowNavigationProps {
   currentModuleId: string;
@@ -111,7 +109,7 @@ export const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
           <Progress value={progress} className="mb-6" />
           
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {WORKFLOW_MODULES.map((module, index) => {
+            {WORKFLOW_MODULES.map((module) => {
               const IconComponent = getIcon(module.icon);
               const StatusIcon = getStatusIcon(module.status);
               const isCurrent = module.id === currentModuleId;

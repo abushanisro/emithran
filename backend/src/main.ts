@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 dotenv.config({ override: true });
 
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType, BadRequestException, RequestMethod } from '@nestjs/common';
+import { VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
@@ -128,10 +128,6 @@ async function bootstrap() {
     new TransformInterceptor(),
   );
 
-  // Debug: Check if routes are working after app startup
-  const httpAdapter = app.getHttpAdapter();
-  const server = httpAdapter.getInstance();
-  
   // Test route registration immediately
   setTimeout(async () => {
     logger.log('🧪 Testing route registration...', 'Bootstrap');

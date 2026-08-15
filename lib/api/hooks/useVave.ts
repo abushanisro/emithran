@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/providers/auth';
-import {
-  vaveApi,
+import { vaveApi } from '../vave';
+import type {
   VaveIdea,
   CreateVaveProject,
   UpdateVaveProject,

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Table,
@@ -31,7 +30,8 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ProductionLot, useDeleteProductionLot } from '@/lib/api/hooks/useProductionPlanning';
+import type { ProductionLot } from '@/lib/api/hooks/useProductionPlanning';
+import { useDeleteProductionLot } from '@/lib/api/hooks/useProductionPlanning';
 
 interface ProductionLotsTableProps {
   lots: ProductionLot[];
@@ -40,7 +40,6 @@ interface ProductionLotsTableProps {
 
 export function ProductionLotsTable({ lots, isLoading }: ProductionLotsTableProps) {
   const router = useRouter();
-  const [selectedLot, setSelectedLot] = useState<ProductionLot | null>(null);
   const deleteProductionLot = useDeleteProductionLot();
 
   const getStatusBadge = (status: string) => {

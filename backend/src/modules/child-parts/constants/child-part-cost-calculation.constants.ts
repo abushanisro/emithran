@@ -122,38 +122,9 @@ export const CHILD_PART_COST_ERROR_MESSAGES = {
 } as const;
 
 /**
- * Supported currencies
- */
-export const SUPPORTED_CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'CNY'] as const;
-
-/**
- * Supported unit of measure
- */
-export const SUPPORTED_UOM = [
-  'EA',    // Each (default for child parts)
-  'SET',   // Set
-  'KIT',   // Kit
-  'ASSY',  // Assembly
-  'PC',    // Piece
-] as const;
-
-/**
  * Make/Buy options
  */
 export const MAKE_BUY_OPTIONS = {
   BUY: 'buy',
   MAKE: 'make',
-} as const;
-
-/**
- * Cost component identifiers
- */
-export const COST_COMPONENTS = {
-  BASE_COST: 'baseCost',
-  FREIGHT_COST: 'freightCost',
-  DUTY_COST: 'dutyCost',
-  OVERHEAD_COST: 'overheadCost',
-  SCRAP_ADJUSTMENT: 'scrapAdjustment',
-  DEFECT_ADJUSTMENT: 'defectAdjustment',
-  TOTAL_COST: 'totalCost',
 } as const;

@@ -322,7 +322,6 @@ export class BomItemCostService {
     }
 
     // Build parent-child map
-    const itemMap = new Map(allItems.map(item => [item.id, item]));
     const children = new Map<string, string[]>();
     const roots: string[] = [];
 
@@ -386,7 +385,7 @@ export class BomItemCostService {
     }
 
     // Get cost with full breakdown
-    const { data: cost, error: costError } = await this.supabaseService
+    const { data: cost } = await this.supabaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('total_cost, raw_material_cost, process_cost, tooling_cost, packaging_logistics_cost, procured_parts_cost, direct_children_cost, is_stale')
@@ -395,7 +394,7 @@ export class BomItemCostService {
       .single();
 
     // Get children count
-    const { data: children, error: childrenError } = await this.supabaseService
+    const { data: children } = await this.supabaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('id')

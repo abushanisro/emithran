@@ -41,7 +41,7 @@ import {
   ChevronRight,
   Trash2,
 } from 'lucide-react';
-import type { QualityApprovedItem, DeliveryAddress } from '@/lib/api/hooks/useDelivery';
+import type { QualityApprovedItem, DeliveryAddress, DeliveryOrder } from '@/lib/api/hooks/useDelivery';
 import {
   useAvailableItemsForDelivery,
   useCreateDeliveryOrder,
@@ -65,6 +65,27 @@ const PlacesAutocomplete = dynamic(() => import('./PlacesAutocomplete'), {
   ssr: false,
   loading: () => <div className="h-10 bg-muted animate-pulse rounded-md" />,
 });
+
+// Narrows an unknown catch-block error to a human-readable message, covering
+// both native Error instances and axios-style API errors ({ response: { data: { message } } }).
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response?: unknown }).response === 'object' &&
+    (error as { response?: unknown }).response !== null
+  ) {
+    const { data } = (error as { response: { data?: unknown } }).response;
+    if (typeof data === 'object' && data !== null && typeof (data as { message?: unknown }).message === 'string') {
+      return (data as { message: string }).message;
+    }
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return fallback;
+}
 
 interface DeliveryOrderWorkflowProps {
   projectId: string;
@@ -139,24 +160,6 @@ const INDIAN_STATES = [
   'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
   'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh'
 ];
-
-// Material types available for each transport mode
-const MATERIAL_TYPES_BY_TRANSPORT = {
-  road: [
-    { value: 'box', label: 'Boxes/Packages', description: 'Packaged goods, parcels' },
-    { value: 'metal', label: 'Metal Parts', description: 'Heavy metal components, machinery' },
-    { value: 'bulk', label: 'Bulk Materials', description: 'Raw materials, large quantities' },
-    { value: 'fragile', label: 'Fragile Items', description: 'Delicate, precision parts' }
-  ],
-  air: [
-    { value: 'box', label: 'Express Packages', description: 'Small packages, documents' },
-    { value: 'fragile', label: 'High-Value Items', description: 'Electronics, precision instruments' }
-  ],
-  ship: [
-    { value: 'bulk', label: 'Bulk Cargo', description: 'Large quantities, containers' },
-    { value: 'metal', label: 'Heavy Machinery', description: 'Industrial equipment, steel' }
-  ]
-};
 
 // Carrier configurations by transport mode and material type
 const CARRIER_CONFIG = {
@@ -302,12 +305,6 @@ export default function DeliveryOrderWorkflow({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showPreviewModal, currentImageIndex, currentImageCollection]);
-
-  // Get available material types for selected transport mode
-  const _getAvailableMaterialTypes = () => {
-    if (!formData.transportMode) return [];
-    return MATERIAL_TYPES_BY_TRANSPORT[formData.transportMode as keyof typeof MATERIAL_TYPES_BY_TRANSPORT] || [];
-  };
 
   // Filter carriers based on selected transport mode and material type
   const getAvailableCarriers = () => {
@@ -490,6 +487,7 @@ export default function DeliveryOrderWorkflow({
     }
 
     try {
+      const resolvedMaterialType = formData.materialType || routeData?.materialType;
       const orderData = {
         projectId,
         deliveryAddressId: formData.deliveryAddressId,
@@ -520,10 +518,10 @@ export default function DeliveryOrderWorkflow({
         })),
         // Route and transport data
         transportMode: formData.transportMode,
-        materialType: formData.materialType || routeData?.materialType,
-        routeType: routeData?.optimizationLevel,
-        routeDistanceKm: routeData?.distance,
-        routeTravelTimeMinutes: routeData?.duration,
+        ...(resolvedMaterialType ? { materialType: resolvedMaterialType } : {}),
+        ...(routeData?.optimizationLevel !== undefined ? { routeType: routeData.optimizationLevel } : {}),
+        ...(routeData?.distance !== undefined ? { routeDistanceKm: routeData.distance } : {}),
+        ...(routeData?.duration !== undefined ? { routeTravelTimeMinutes: routeData.duration } : {}),
         routeData: {
           ...routeData,
           originLat: addresses.find(a => a.id === formData.fromAddressId)?.latitude,
@@ -980,10 +978,10 @@ export default function DeliveryOrderWorkflow({
                               onPlaceSelected={(parts) => setNewAddress(prev => ({
                                 ...prev,
                                 addressLine1: parts.addressLine1,
-                                city: parts.city || prev.city,
-                                stateProvince: parts.stateProvince || prev.stateProvince,
-                                postalCode: parts.postalCode || prev.postalCode,
-                                country: parts.country || prev.country,
+                                city: parts.city,
+                                stateProvince: parts.stateProvince,
+                                postalCode: parts.postalCode,
+                                country: parts.country,
                                 latitude: parts.latitude,
                                 longitude: parts.longitude,
                               }))}
@@ -1282,10 +1280,10 @@ export default function DeliveryOrderWorkflow({
                               onPlaceSelected={(parts) => setNewAddress(prev => ({
                                 ...prev,
                                 addressLine1: parts.addressLine1,
-                                city: parts.city || prev.city,
-                                stateProvince: parts.stateProvince || prev.stateProvince,
-                                postalCode: parts.postalCode || prev.postalCode,
-                                country: parts.country || prev.country,
+                                city: parts.city,
+                                stateProvince: parts.stateProvince,
+                                postalCode: parts.postalCode,
+                                country: parts.country,
                                 latitude: parts.latitude,
                                 longitude: parts.longitude,
                               }))}
@@ -1680,7 +1678,9 @@ export default function DeliveryOrderWorkflow({
                           type="button"
                           onClick={() => {
                             const newDockAudit = [...dockAudit];
-                            newDockAudit[idx] = { ...newDockAudit[idx], isOk: !newDockAudit[idx].isOk };
+                            const target = newDockAudit[idx];
+                            if (!target) return;
+                            newDockAudit[idx] = { ...target, isOk: !target.isOk };
                             setDockAudit(newDockAudit);
                           }
                           }
@@ -1705,7 +1705,9 @@ export default function DeliveryOrderWorkflow({
                           value={row.value}
                           onChange={(e) => {
                             const newDockAudit = [...dockAudit];
-                            newDockAudit[idx] = { ...newDockAudit[idx], value: e.target.value };
+                            const target = newDockAudit[idx];
+                            if (!target) return;
+                            newDockAudit[idx] = { ...target, value: e.target.value };
                             setDockAudit(newDockAudit);
                           }
                           }
@@ -2149,7 +2151,7 @@ export default function DeliveryOrderWorkflow({
   <!-- META -->
   <div class="grid2" style="margin-top:3mm">
     <div><b>Priority:</b> ${formData.priority}</div>
-    ${formData.requestedDeliveryDate ? `<div><b>Requested Delivery:</b> ${new Date(formData.requestedDeliveryDate).toLocaleDateString('en-IN')}</div>` : ''}
+    ${formData.requestedDate ? `<div><b>Requested Delivery:</b> ${new Date(formData.requestedDate).toLocaleDateString('en-IN')}</div>` : ''}
     ${formData.specialHandling ? `<div><b>Special Handling:</b> ${formData.specialHandling}</div>` : ''}
   </div>
 
@@ -2499,8 +2501,8 @@ export default function DeliveryOrderWorkflow({
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-sm">
                       <div><span className="text-muted-foreground">Priority:</span> <strong className="capitalize">{formData.priority}</strong></div>
-                      {formData.requestedDeliveryDate && (
-                        <div><span className="text-muted-foreground">Delivery Date:</span> <strong>{new Date(formData.requestedDeliveryDate).toLocaleDateString('en-IN')}</strong></div>
+                      {formData.requestedDate && (
+                        <div><span className="text-muted-foreground">Delivery Date:</span> <strong>{new Date(formData.requestedDate).toLocaleDateString('en-IN')}</strong></div>
                       )}
                       {formData.carrierId && (
                         <div><span className="text-muted-foreground">Carrier:</span> <strong>{getAvailableCarriers().find(c => c.id === formData.carrierId)?.name || '—'}</strong></div>
@@ -2810,7 +2812,7 @@ export default function DeliveryOrderWorkflow({
               </div>
             ) : (
               <div className="space-y-4">
-                {recentOrders.map((order) => (
+                {recentOrders.map((order: DeliveryOrder) => (
                   <div
                     key={order.id}
                     className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
@@ -2821,7 +2823,7 @@ export default function DeliveryOrderWorkflow({
                           <h4 className="font-semibold text-lg">
                             {order.items && order.items.length > 0 ? (
                               order.items.length === 1 
-                                ? `${order.items[0].partNumber} - ${order.items[0].description?.slice(0, 60)}${order.items[0].description?.length > 60 ? '...' : ''}`
+                                ? `${order.items[0]?.partNumber ?? ''} - ${order.items[0]?.description?.slice(0, 60) ?? ''}${(order.items[0]?.description?.length ?? 0) > 60 ? '...' : ''}`
                                 : `${order.items.length} Parts: ${order.items.map(item => item.partNumber).join(', ')}`
                             ) : (
                               order.orderNumber
@@ -2975,8 +2977,7 @@ export default function DeliveryOrderWorkflow({
                                     await deleteOrderMutation.mutateAsync({ id: order.id, projectId: order.projectId });
                                   } catch (error) {
                                     console.error('Failed to delete delivery order:', error);
-                                    const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete delivery order';
-                                    toast.error(errorMessage);
+                                    toast.error(getErrorMessage(error, 'Failed to delete delivery order'));
                                   }
                                 }
                               }}
