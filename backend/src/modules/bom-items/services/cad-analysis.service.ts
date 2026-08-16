@@ -110,7 +110,7 @@ export class CADAnalysisService {
       } else {
         try {
           // Call CAD engine with file + user processes for proper analysis
-          analysisResponse = await this.callCADEngine(fileBuffer, request.strategy || 'balanced', userProcesses);
+          analysisResponse = await this.callCADEngine(fileBuffer, request.strategy || 'balanced', userProcesses, !!request.forceReanalysis);
         } catch (cadError) {
           // If CAD engine returns 500 (e.g. OpenCASCADE parse failure), fall back gracefully
           if (cadError.response?.status === 500 || cadError.message?.includes('500')) {
@@ -504,10 +504,10 @@ export class CADAnalysisService {
     }
   }
 
-  private async callCADEngine(fileBuffer: Buffer, strategy: string, userProcesses: any[] = []): Promise<GeometryAnalysisResponse> {
+  private async callCADEngine(fileBuffer: Buffer, strategy: string, userProcesses: any[] = [], forceReanalysis = false): Promise<GeometryAnalysisResponse> {
     // First attempt with detected format
     try {
-      return await this.attemptCADAnalysis(fileBuffer, strategy, false, userProcesses);
+      return await this.attemptCADAnalysis(fileBuffer, strategy, false, userProcesses, forceReanalysis);
     } catch (error) {
       // Log the actual CAD engine response body for debugging
       if (error.response) {
@@ -518,13 +518,13 @@ export class CADAnalysisService {
           error.response.data?.detail?.includes('File content does not match')) {
         this.logger.warn('Initial format validation failed, attempting with bypass...');
         try {
-          return await this.attemptCADAnalysis(fileBuffer, strategy, true, userProcesses);
+          return await this.attemptCADAnalysis(fileBuffer, strategy, true, userProcesses, forceReanalysis);
         } catch (bypassError) {
           if (bypassError.response) {
             this.logger.error(`CAD engine bypass HTTP ${bypassError.response.status}: ${JSON.stringify(bypassError.response.data)}`);
           }
           this.logger.error('Analysis failed even with bypass, trying different formats...');
-          return await this.tryMultipleFormats(fileBuffer, strategy);
+          return await this.tryMultipleFormats(fileBuffer, strategy, forceReanalysis);
         }
       }
       // For 500 errors from the CAD engine, fall back to STL analysis if possible
@@ -536,7 +536,7 @@ export class CADAnalysisService {
     }
   }
 
-  private async attemptCADAnalysis(fileBuffer: Buffer, strategy: string, forceBypass: boolean, userProcesses: any[] = []): Promise<GeometryAnalysisResponse> {
+  private async attemptCADAnalysis(fileBuffer: Buffer, strategy: string, forceBypass: boolean, userProcesses: any[] = [], forceReanalysis = false): Promise<GeometryAnalysisResponse> {
     // Validate file buffer
     if (!fileBuffer || fileBuffer.length === 0) {
       throw new BadRequestException('Invalid file: Empty file buffer received');
@@ -573,7 +573,15 @@ export class CADAnalysisService {
       contentType
     });
     formData.append('strategy', strategy);
-    formData.append('force_reanalysis', 'false');
+    // Real caller-supplied flag -- was hardcoded 'false' here regardless of
+    // what analyzeBOMItem/the caller actually wanted, meaning cad-engine's
+    // OWN internal cache (in-memory + disk, keyed by file content hash,
+    // survives Uvicorn restarts) could silently keep serving a stale result
+    // forever even after this backend correctly decided a fresh analysis
+    // was needed -- confirmed live: a "Reanalyze" click correctly bypassed
+    // this backend's own analysis-freshness check and re-called cad-engine,
+    // but cad-engine's own cache then served back a pre-fix result anyway.
+    formData.append('force_reanalysis', String(forceReanalysis));
 
     // Attach user's process catalogue for AI-matched DFM analysis
     if (userProcesses && userProcesses.length > 0) {
@@ -607,7 +615,7 @@ export class CADAnalysisService {
     return response.data;
   }
 
-  private async tryMultipleFormats(fileBuffer: Buffer, strategy: string): Promise<GeometryAnalysisResponse> {
+  private async tryMultipleFormats(fileBuffer: Buffer, strategy: string, forceReanalysis = false): Promise<GeometryAnalysisResponse> {
     const formats = [
       { ext: 'stl', contentType: 'model/stl' },
       { ext: 'step', contentType: 'application/step' },
@@ -630,7 +638,7 @@ export class CADAnalysisService {
           contentType: format.contentType
         });
         formData.append('strategy', strategy);
-        formData.append('force_reanalysis', 'false');
+        formData.append('force_reanalysis', String(forceReanalysis));
         formData.append('bypass_format_check', 'true');
 
         const response = await axios.post(
@@ -1287,4 +1295,94 @@ export class CADAnalysisService {
       processingTimeMs
     };
   }
+
+  /**
+   * True (real polygon) 2D nesting placement -- visualization only, NOT a
+   * material-cost source (that remains sheet-metal-nesting.engine.ts's
+   * rectangle-grid computeNesting(), unchanged by this feature). Calls
+   * cad-engine's /nest endpoint with already-extracted outline/hole
+   * geometry (never re-uploads or re-parses the original CAD file --
+   * sheet size/quantity/kerf/margin are order-time parameters, the outline
+   * itself is CAD-static and was already resolved by /analyze/geometry).
+   *
+   * Returns { result: null, reason } (never a fabricated layout) when
+   * cad-engine reports it couldn't compute a nest for this outline/sheet
+   * combination (its own disclosed 422, whose `detail` is cad-engine's
+   * specific diagnostic -- degenerate outline, doesn't fit any rotation,
+   * etc.) or the call otherwise fails -- callers must surface `reason`,
+   * not collapse it into a generic message.
+   */
+  async computeTrueNest(request: TrueNestRequest): Promise<{ result: TrueNestCadEngineResult | null; reason: string }> {
+    try {
+      const response = await axios.post(
+        `${this.cadEngineUrl}/nest`,
+        {
+          outline_points_mm: request.outlinePointsMm,
+          holes_mm: request.holesMm.map((h) => ({ cx_mm: h.cxMm, cy_mm: h.cyMm, diameter_mm: h.diameterMm })),
+          sheet_width_mm: request.sheetWidthMm,
+          sheet_length_mm: request.sheetLengthMm,
+          quantity: request.quantity,
+          kerf_mm: request.kerfMm ?? 0,
+          edge_margin_mm: request.edgeMarginMm ?? 2,
+        },
+        {
+          // 30s was too tight for parts small relative to the sheet -- a
+          // ~53x123mm part on a 2500x5000mm sheet needs ~1,800 placements,
+          // and even after nesting.py's grid-indexed collision test (see
+          // that module for the O(n^2)->O(n) fix) that many real shapely
+          // placements can still legitimately take longer than 30s.
+          timeout: 90000,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
+          },
+        },
+      );
+      return {
+        result: {
+          sheetWidthMm: response.data.sheet_width_mm,
+          sheetLengthMm: response.data.sheet_length_mm,
+          partsPerSheet: response.data.parts_per_sheet,
+          placements: (response.data.placements || []).map((p: any) => ({
+            xMm: p.x_mm,
+            yMm: p.y_mm,
+            rotationDeg: p.rotation_deg,
+          })),
+          utilizationPct: response.data.utilization_pct,
+          sheetsRequired: response.data.sheets_required ?? null,
+          capped: !!response.data.capped,
+        },
+        reason: '',
+      };
+    } catch (error: any) {
+      if (error?.response?.status === 422) {
+        const reason = error.response.data?.detail || 'cad-engine returned 422 with no detail';
+        this.logger.warn(`True-nest could not be computed (cad-engine 422): ${reason}`);
+        return { result: null, reason };
+      }
+      const reason = `cad-engine /nest request failed: ${error.message}`;
+      this.logger.warn(reason);
+      return { result: null, reason };
+    }
+  }
+}
+
+export interface TrueNestRequest {
+  outlinePointsMm: number[][];
+  holesMm: Array<{ cxMm: number; cyMm: number; diameterMm: number }>;
+  sheetWidthMm: number;
+  sheetLengthMm: number;
+  quantity: number;
+  kerfMm?: number;
+  edgeMarginMm?: number;
+}
+
+export interface TrueNestCadEngineResult {
+  sheetWidthMm: number;
+  sheetLengthMm: number;
+  partsPerSheet: number;
+  placements: Array<{ xMm: number; yMm: number; rotationDeg: number }>;
+  utilizationPct: number;
+  sheetsRequired: number | null;
+  capped: boolean;
 }

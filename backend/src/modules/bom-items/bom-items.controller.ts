@@ -358,7 +358,7 @@ export class BOMItemsController {
     }
 
     const fileName = analysisPath.split('/').pop() ?? 'model.stp';
-    const result = await this.autoFillService.analyzeAndSuggest(fileBuffer, fileName, user.id, token);
+    const result = await this.autoFillService.analyzeAndSuggest(fileBuffer, fileName, user.id, token, undefined, true);
 
     const geo = result.geometry;
     const sug = result.suggestions;
@@ -1263,6 +1263,39 @@ export class BOMItemsController {
       batchSize ? parseInt(batchSize, 10) : 1,
       location,
     );
+  }
+
+  @Get(':id/true-nest')
+  @ApiOperation({ summary: 'True (real polygon) 2D nesting placement — visualization only, not a cost source. On-demand; call only when the Nest view opens.' })
+  @ApiResponse({ status: 200, description: 'True nest computed' })
+  async getTrueNest(
+    @Param('id') id: string,
+    @Query('quantity') quantity: string,
+    @Query('sheetWidthMm') sheetWidthMm: string,
+    @Query('sheetLengthMm') sheetLengthMm: string,
+    @Query('kerfMm') kerfMm: string,
+    @Query('edgeMarginMm') edgeMarginMm: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    if (!sheetWidthMm || !sheetLengthMm) {
+      throw new BadRequestException('sheetWidthMm and sheetLengthMm query params are required — pass the sheet already selected by the existing nesting/cost result');
+    }
+    const { result, reason } = await this.bomItemsService.getTrueNest(
+      id,
+      user.id,
+      token,
+      quantity ? parseInt(quantity, 10) : 1,
+      parseFloat(sheetWidthMm),
+      parseFloat(sheetLengthMm),
+      kerfMm ? parseFloat(kerfMm) : undefined,
+      edgeMarginMm ? parseFloat(edgeMarginMm) : undefined,
+    );
+    if (!result) {
+      this.logger.warn(`[true-nest] ${id}: ${reason}`);
+      throw new NotFoundException(`True nest could not be computed for this part: ${reason}`);
+    }
+    return result;
   }
 
   @Get(':id/route-comparison')

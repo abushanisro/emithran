@@ -95,3 +95,67 @@ describe('computeNesting — utilization formula (unchanged by the dimension-sou
     expect(trueFlatResult.partsPerSheet).toBeLessThanOrEqual(foldedResult.partsPerSheet);
   });
 });
+
+describe('computeNesting — sheetsRequired / batch consumption (RTP2 MAG2 FRONTFRAME regression)', () => {
+  // RTP2 MAG2 FRONTFRAME: SECC 1.6mm, flat pattern 432.17x352.31mm, real
+  // netWeightKg for a bracket with cutouts is well below the bounding-rect-
+  // implied weight (hence ~60.5% utilization, not ~94%) -- 1.2335kg reproduces
+  // that ratio for this fixture. Known result: 2500x5000mm sheet, 77
+  // parts/sheet. This block only tests the NEW batch-consumption fields --
+  // partsPerSheet/utilisationPct themselves are covered by the describe
+  // block above and are untouched by this change.
+  const rtp2Common = {
+    flatPatternLengthMm: 432.17,
+    flatPatternWidthMm: 352.31,
+    thicknessMm: 1.6,
+    netWeightKg: 1.2335,
+    densityKgM3: 7850, // SECC
+    shearStrengthMpa: 350,
+    materialPricePerKg: 1.0,
+  };
+
+  it('sheetsRequired/plannedParts/excessPositions are undefined when quantityRequired is omitted', () => {
+    const result = computeNesting(rtp2Common);
+    expect(result.partsPerSheet).toBe(77);
+    expect(result.sheetsRequired).toBeUndefined();
+    expect(result.plannedParts).toBeUndefined();
+    expect(result.excessPositions).toBeUndefined();
+    expect(result.actualBatchGrossMaterialKg).toBeUndefined();
+  });
+
+  it('sheetsRequired/plannedParts/excessPositions are undefined when quantityRequired is <= 0 (never silently 0)', () => {
+    const result = computeNesting({ ...rtp2Common, quantityRequired: 0 });
+    expect(result.sheetsRequired).toBeUndefined();
+    const resultNeg = computeNesting({ ...rtp2Common, quantityRequired: -5 });
+    expect(resultNeg.sheetsRequired).toBeUndefined();
+  });
+
+  it('quantity 250 at 77 parts/sheet requires 4 sheets, 308 planned parts, 58 excess positions', () => {
+    const result = computeNesting({ ...rtp2Common, quantityRequired: 250 });
+    expect(result.partsPerSheet).toBe(77);
+    expect(result.sheetsRequired).toBe(4);
+    expect(result.plannedParts).toBe(308);
+    expect(result.excessPositions).toBe(58);
+    expect(result.actualBatchGrossMaterialKg).toBeCloseTo(result.sheetsRequired! * result.sheetWeightKg, 3);
+  });
+
+  it.each([
+    [1, 1, 77, 76],
+    [77, 1, 77, 0],
+    [78, 2, 154, 76],
+    [154, 2, 154, 0],
+  ])('quantity %i -> sheetsRequired %i, plannedParts %i, excessPositions %i', (qty, sheets, planned, excess) => {
+    const result = computeNesting({ ...rtp2Common, quantityRequired: qty });
+    expect(result.sheetsRequired).toBe(sheets);
+    expect(result.plannedParts).toBe(planned);
+    expect(result.excessPositions).toBe(excess);
+  });
+
+  it('grossWeightPerPartKg (the theoretical per-part figure cost-engine.ts and RawMaterialDialog consume) is identical whether or not quantityRequired is supplied', () => {
+    const withoutQty = computeNesting(rtp2Common);
+    const withQty = computeNesting({ ...rtp2Common, quantityRequired: 250 });
+    expect(withQty.grossWeightPerPartKg).toBe(withoutQty.grossWeightPerPartKg);
+    expect(withQty.netMaterialCost).toBe(withoutQty.netMaterialCost);
+    expect(withQty.utilisationPct).toBe(withoutQty.utilisationPct);
+  });
+});

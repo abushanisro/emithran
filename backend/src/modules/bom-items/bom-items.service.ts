@@ -50,6 +50,7 @@ import { getEnginesForFamily, ROUTE_ID_FOR_CLASS, ROUTE_LABEL_FOR_CLASS } from '
 import { resolveEffectiveSheetThicknessMm } from './costing/scenario-overrides';
 import type { CostSummaryDto, ProcessLineCost, FeatureOp, CostStatus } from './dto/cost-breakdown.dto';
 import type { BlankSpecDto } from './dto/blank-spec.dto';
+import type { TrueNestResultDto } from './dto/true-nest.dto';
 import type { CandidateRouteComparisonDto, CandidateRouteDto } from './dto/candidate-route.dto';
 import type { RouteComparisonDto, RouteResultDto, RouteId, RouteCapability } from './dto/route-comparison.dto';
 import { resolveInspectionRule, SEVERITY_RANK } from './costing/gdt-severity';
@@ -71,6 +72,7 @@ import {
   isDiscouragedShapeForFamily,
 } from '../raw-materials/constants/material-shape-ranking';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { CADAnalysisService } from './services/cad-analysis.service';
 
 @Injectable()
 export class BOMItemsService {
@@ -128,6 +130,7 @@ export class BOMItemsService {
     private readonly blankOptimizer: BlankOptimizerService,
     private readonly smLookup: SheetMetalLookupService,
     private readonly exchangeRateService: ExchangeRateService,
+    private readonly cadAnalysisService: CADAnalysisService,
   ) { }
 
   /**
@@ -4185,6 +4188,7 @@ export class BOMItemsService {
           shearStrengthMpa: smShearStrengthMpa,
           materialPricePerKg: materialCostPerKg,
           scrapPricePerKg: smScrapPricePerKg,
+          quantityRequired: batchSize,
         })
       : undefined;
 
@@ -4529,6 +4533,16 @@ export class BOMItemsService {
           wasteCost:      smNestingResult.scrapWeightPerPartKg * materialCostPerKg,
           nestingDimensionSource,
           nestingDimensionConfidence,
+          // Theoretical per-position basis for grossWeightKg above.
+          sheetWidthMm:   smNestingResult.sheetWidthMm,
+          sheetLengthMm:  smNestingResult.sheetLengthMm,
+          partsPerSheet:  smNestingResult.partsPerSheet,
+          // Actual batch sheet consumption -- distinct from grossWeightKg,
+          // never used to derive it. See NestingResult's own doc comment.
+          sheetsRequired:             smNestingResult.sheetsRequired,
+          plannedParts:               smNestingResult.plannedParts,
+          excessPositions:            smNestingResult.excessPositions,
+          actualBatchGrossMaterialKg: smNestingResult.actualBatchGrossMaterialKg,
         };
       } else {
         const effL = blankLMm > 0 ? blankLMm : Math.sqrt(flatPatternAreaMm2);
@@ -4547,6 +4561,87 @@ export class BOMItemsService {
       }
     }
     return this.normalizeCostSummaryToUsd(smResult, rates, locInfo.code);
+  }
+
+  /**
+   * True (real polygon) 2D nesting placement -- visualization only, NOT a
+   * material-cost source (see true-nest.dto.ts's own header comment).
+   * Deliberately a separate, on-demand endpoint from getCostSummary above
+   * (which is already a synchronous 14-40s-observed path with no job-queue
+   * safety net) -- called only when the Nest view is actually opened, never
+   * on page load or bundled into costing.
+   *
+   * Real flat-pattern outline/hole geometry comes from item.featureGraph.summary
+   * (the exact same object populated by auto-fill.service.ts's
+   * flatPatternOutlinePointsMm/flatPatternHolesMm/flatPatternOutlineSource --
+   * see that file for how cad-engine's wire-walk result lands here). Returns
+   * { result: null, reason } (never a fabricated layout) when that geometry
+   * isn't available for this part, or cad-engine couldn't compute a nest for
+   * it -- `reason` is always a specific, truthful diagnostic, never a
+   * generic placeholder, so the controller can surface exactly which stage
+   * of the pipeline (missing outline vs. cad-engine's own nest failure)
+   * declined rather than collapsing both into one message.
+   */
+  async getTrueNest(
+    id: string,
+    userId: string,
+    accessToken: string,
+    quantity: number,
+    sheetWidthMm: number,
+    sheetLengthMm: number,
+    kerfMm?: number,
+    edgeMarginMm?: number,
+  ): Promise<{ result: TrueNestResultDto | null; reason: string }> {
+    const item = await this.findOne(id, userId, accessToken);
+    const fg = item.featureGraph as any;
+    const summary = fg?.summary ?? {};
+
+    const outlinePointsMm = summary.flatPatternOutlinePointsMm;
+    const outlineSource: 'wire_walk' | 'unavailable' = summary.flatPatternOutlineSource === 'wire_walk' ? 'wire_walk' : 'unavailable';
+    if (!Array.isArray(outlinePointsMm) || outlinePointsMm.length < 3) {
+      // No real outline resolved for this part -- honest gap, not a guess.
+      const reason = outlineSource === 'unavailable'
+        ? `No real flat-pattern outline is stored for this part (featureGraph.summary.flatPatternOutlineSource = 'unavailable'). ` +
+          `cad-engine's wire-walk extractor could not build a valid boundary for this part's topology on the last analysis ` +
+          `(fragmentation, self-intersection, or area-reconciliation failure). Re-run Reanalyze to retry extraction.`
+        : `featureGraph.summary.flatPatternOutlinePointsMm is missing or has fewer than 3 points ` +
+          `(source is reported as '${outlineSource}', but the point array itself is empty/absent) -- ` +
+          `this part has not had CAD analysis run since the true-nest feature was added, or the stored ` +
+          `featureGraph predates it. Re-run Reanalyze.`;
+      return { result: null, reason };
+    }
+    const holesMmRaw: Array<{ cx_mm: number; cy_mm: number; diameter_mm: number }> = Array.isArray(summary.flatPatternHolesMm)
+      ? summary.flatPatternHolesMm
+      : [];
+
+    const { result: cadResult, reason: cadReason } = await this.cadAnalysisService.computeTrueNest({
+      outlinePointsMm,
+      holesMm: holesMmRaw.map((h) => ({ cxMm: h.cx_mm, cyMm: h.cy_mm, diameterMm: h.diameter_mm })),
+      sheetWidthMm,
+      sheetLengthMm,
+      quantity,
+      kerfMm,
+      edgeMarginMm,
+    });
+    if (!cadResult) {
+      return { result: null, reason: `Outline was extracted (${outlinePointsMm.length} points, source '${outlineSource}'), but cad-engine could not nest it on the ${sheetWidthMm}x${sheetLengthMm}mm sheet: ${cadReason}` };
+    }
+
+    return {
+      result: {
+        outlinePointsMm,
+        holesMm: holesMmRaw.map((h) => ({ cxMm: h.cx_mm, cyMm: h.cy_mm, diameterMm: h.diameter_mm })),
+        outlineSource,
+        sheetWidthMm: cadResult.sheetWidthMm,
+        sheetLengthMm: cadResult.sheetLengthMm,
+        partsPerSheet: cadResult.partsPerSheet,
+        placements: cadResult.placements,
+        utilizationPct: cadResult.utilizationPct,
+        sheetsRequired: cadResult.sheetsRequired,
+        capped: cadResult.capped,
+      },
+      reason: '',
+    };
   }
 
   async getRouteComparison(

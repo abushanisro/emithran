@@ -138,6 +138,24 @@ interface ModelViewerProps {
   onHeatmapInspect?: (worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void;
   /** Override the amber group-face highlight color — used for operation-specific visualization */
   highlightColor?: string;
+  /** Nest toolbar toggle (visualization only) — order quantity + the sheet already selected by the existing cost-authoritative nesting result. */
+  nestQuantity?: number | undefined;
+  nestSheetWidthMm?: number | undefined;
+  nestSheetLengthMm?: number | undefined;
+  nestMaterialLabel?: string | undefined;
+  nestGradeLabel?: string | undefined;
+  /** Flat Pattern toolbar toggle (visualization only) — the real unfolded 2D outline for this part. */
+  flatPatternPartName?: string | undefined;
+  flatPatternOutlinePointsMm?: number[][] | undefined;
+  flatPatternHolesMm?: { cx_mm: number; cy_mm: number; diameter_mm: number }[] | undefined;
+  flatPatternOutlineSource?: 'wire_walk' | 'unavailable' | undefined;
+  flatPatternBoundingLengthMm?: number | undefined;
+  flatPatternBoundingWidthMm?: number | undefined;
+  flatPatternCutLengthMm?: number | undefined;
+  flatPatternBendCount?: number | undefined;
+  flatPatternHoleCount?: number | undefined;
+  flatPatternPierceCount?: number | undefined;
+  flatPatternAreaMm2?: number | undefined;
 }
 
 export function ModelViewer({
@@ -170,6 +188,22 @@ export function ModelViewer({
   heatmapNormalization,
   onHeatmapInspect,
   highlightColor,
+  nestQuantity,
+  nestSheetWidthMm,
+  nestSheetLengthMm,
+  nestMaterialLabel,
+  nestGradeLabel,
+  flatPatternPartName,
+  flatPatternOutlinePointsMm,
+  flatPatternHolesMm,
+  flatPatternOutlineSource,
+  flatPatternBoundingLengthMm,
+  flatPatternBoundingWidthMm,
+  flatPatternCutLengthMm,
+  flatPatternBendCount,
+  flatPatternHoleCount,
+  flatPatternPierceCount,
+  flatPatternAreaMm2,
 }: ModelViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
@@ -308,6 +342,23 @@ export function ModelViewer({
               {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
               {...(highlightColor !== undefined ? { highlightColor } : {})}
+              {...(bomItemId ? { bomItemId } : {})}
+              {...(nestQuantity !== undefined ? { nestQuantity } : {})}
+              {...(nestSheetWidthMm !== undefined ? { nestSheetWidthMm } : {})}
+              {...(nestSheetLengthMm !== undefined ? { nestSheetLengthMm } : {})}
+              {...(nestMaterialLabel !== undefined ? { nestMaterialLabel } : {})}
+              {...(nestGradeLabel !== undefined ? { nestGradeLabel } : {})}
+              {...(flatPatternPartName !== undefined ? { flatPatternPartName } : {})}
+              {...(flatPatternOutlinePointsMm !== undefined ? { flatPatternOutlinePointsMm } : {})}
+              {...(flatPatternHolesMm !== undefined ? { flatPatternHolesMm } : {})}
+              {...(flatPatternOutlineSource !== undefined ? { flatPatternOutlineSource } : {})}
+              {...(flatPatternBoundingLengthMm !== undefined ? { flatPatternBoundingLengthMm } : {})}
+              {...(flatPatternBoundingWidthMm !== undefined ? { flatPatternBoundingWidthMm } : {})}
+              {...(flatPatternCutLengthMm !== undefined ? { flatPatternCutLengthMm } : {})}
+              {...(flatPatternBendCount !== undefined ? { flatPatternBendCount } : {})}
+              {...(flatPatternHoleCount !== undefined ? { flatPatternHoleCount } : {})}
+              {...(flatPatternPierceCount !== undefined ? { flatPatternPierceCount } : {})}
+              {...(flatPatternAreaMm2 !== undefined ? { flatPatternAreaMm2 } : {})}
             />
           </ErrorBoundary>
         </Suspense>
@@ -446,6 +497,23 @@ export function ModelViewer({
               {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
               {...(highlightColor !== undefined ? { highlightColor } : {})}
+              {...(bomItemId ? { bomItemId } : {})}
+              {...(nestQuantity !== undefined ? { nestQuantity } : {})}
+              {...(nestSheetWidthMm !== undefined ? { nestSheetWidthMm } : {})}
+              {...(nestSheetLengthMm !== undefined ? { nestSheetLengthMm } : {})}
+              {...(nestMaterialLabel !== undefined ? { nestMaterialLabel } : {})}
+              {...(nestGradeLabel !== undefined ? { nestGradeLabel } : {})}
+              {...(flatPatternPartName !== undefined ? { flatPatternPartName } : {})}
+              {...(flatPatternOutlinePointsMm !== undefined ? { flatPatternOutlinePointsMm } : {})}
+              {...(flatPatternHolesMm !== undefined ? { flatPatternHolesMm } : {})}
+              {...(flatPatternOutlineSource !== undefined ? { flatPatternOutlineSource } : {})}
+              {...(flatPatternBoundingLengthMm !== undefined ? { flatPatternBoundingLengthMm } : {})}
+              {...(flatPatternBoundingWidthMm !== undefined ? { flatPatternBoundingWidthMm } : {})}
+              {...(flatPatternCutLengthMm !== undefined ? { flatPatternCutLengthMm } : {})}
+              {...(flatPatternBendCount !== undefined ? { flatPatternBendCount } : {})}
+              {...(flatPatternHoleCount !== undefined ? { flatPatternHoleCount } : {})}
+              {...(flatPatternPierceCount !== undefined ? { flatPatternPierceCount } : {})}
+              {...(flatPatternAreaMm2 !== undefined ? { flatPatternAreaMm2 } : {})}
             />
           </ErrorBoundary>
         </Suspense>

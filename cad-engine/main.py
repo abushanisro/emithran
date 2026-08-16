@@ -24,7 +24,8 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Security
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Security, Form
+from pydantic import BaseModel
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
@@ -526,9 +527,9 @@ async def convert_step_to_stl_base64(
 async def analyze_geometry_advanced(
     request: Request,
     file: UploadFile = File(...),
-    strategy: str = "balanced",
-    force_reanalysis: bool = False,
-    user_processes: str = "",
+    strategy: str = Form("balanced"),
+    force_reanalysis: bool = Form(False),
+    user_processes: str = Form(""),
     _auth: None = Security(require_api_key)
 ) -> Dict[str, Any]:
     """
@@ -701,9 +702,17 @@ async def analyze_geometry_advanced(
                 from feature_extractors import ComponentFeatureAnalyzer  # type: ignore
                 _gh = optimization_result.geometry_hash
 
-                # Layer 1: in-memory (hot path — same process, any previous call)
-                with _cf_cache_lock:
-                    _cf = _cf_cache.get(_gh)
+                # Layer 1: in-memory (hot path — same process, any previous call).
+                # Gated on force_reanalysis too -- Layer 2 (disk) already was,
+                # but this one wasn't, so within the same server process a
+                # "force reanalysis" request could still be silently served a
+                # stale component-features result computed before a code
+                # change, same bug class just fixed one layer down for
+                # force_reanalysis not reaching cad-engine at all.
+                _cf = None
+                if not force_reanalysis:
+                    with _cf_cache_lock:
+                        _cf = _cf_cache.get(_gh)
 
                 # Layer 2: disk (warm path — survives Uvicorn restarts)
                 if _cf is None and not force_reanalysis:
@@ -753,6 +762,69 @@ async def analyze_geometry_advanced(
         cleanup_files(step_path)
 
 
+class NestHoleIn(BaseModel):
+    cx_mm: float
+    cy_mm: float
+    diameter_mm: float
+
+
+class NestRequest(BaseModel):
+    # Real flat-pattern outline points from /analyze/geometry's
+    # flat_pattern_outline_points_mm -- this endpoint does NOT re-parse a
+    # CAD file; the caller already has the extracted geometry and is only
+    # asking "how would this real shape pack onto this stock/quantity."
+    outline_points_mm: list[list[float]]
+    holes_mm: list[NestHoleIn] = []
+    sheet_width_mm: float
+    sheet_length_mm: float
+    quantity: int
+    kerf_mm: float = 0.0
+    edge_margin_mm: float = 2.0
+    allowed_rotations_deg: Optional[list[float]] = None
+
+
+@app.post("/nest")
+@limiter.limit(f"{config.rate_limit_per_minute}/minute")
+async def nest_true_shape(
+    request: Request,
+    body: NestRequest,
+    _auth: None = Security(require_api_key),
+) -> Dict[str, Any]:
+    """
+    True (real polygon) 2D nesting placement -- visualization only, NOT a
+    material-cost source (see nesting.py's own module docstring for the
+    full rationale). Deliberately separate from /analyze/geometry: this
+    takes already-extracted outline/hole geometry as input rather than a
+    CAD file, since sheet size/quantity/kerf/margin are order-time
+    parameters, not CAD-static ones -- recomputing here is cheap and never
+    needs the original file.
+    """
+    import nesting
+
+    logger.info(
+        f"[nest] request: outline_points={len(body.outline_points_mm)} holes={len(body.holes_mm)} "
+        f"sheet={body.sheet_width_mm}x{body.sheet_length_mm}mm qty={body.quantity} "
+        f"kerf={body.kerf_mm}mm margin={body.edge_margin_mm}mm"
+    )
+    result, reason = nesting.compute_true_nest(
+        outline_points_mm=body.outline_points_mm,
+        holes_mm=[h.model_dump() for h in body.holes_mm],
+        sheet_width_mm=body.sheet_width_mm,
+        sheet_length_mm=body.sheet_length_mm,
+        quantity=body.quantity,
+        kerf_mm=body.kerf_mm,
+        edge_margin_mm=body.edge_margin_mm,
+        allowed_rotations_deg=body.allowed_rotations_deg,
+    )
+    if result is None:
+        # Real, disclosed failure (degenerate/oversized outline, or the
+        # sheet's usable area is non-positive) -- never a fabricated layout.
+        logger.warning(f"[nest] failed: {reason}")
+        raise HTTPException(status_code=422, detail=f"Could not compute a true nest: {reason}")
+    logger.info(f"[nest] success: parts_per_sheet={result['parts_per_sheet']} utilization_pct={result['utilization_pct']} capped={result['capped']}")
+    return result
+
+
 @app.get("/memory/usage-report")
 async def get_memory_usage_report(request: Request) -> Dict[str, Any]:
     """
@@ -794,7 +866,7 @@ async def get_memory_usage_report(request: Request) -> Dict[str, Any]:
 async def optimize_memory_only(
     request: Request,
     file: UploadFile = File(...),
-    strategy: str = "balanced"
+    strategy: str = Form("balanced")
 ) -> Dict[str, Any]:
     """
     Memory-focused optimization without full DFM analysis

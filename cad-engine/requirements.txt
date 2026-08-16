@@ -41,3 +41,6 @@ PyMuPDF>=1.24.0
 
 # SolidWorks COM automation (Windows only — silently skipped on Linux/Railway)
 pywin32>=306; sys_platform == "win32"
+
+# 2D polygon geometry (flat-pattern outline union, true nesting placement/collision)
+shapely>=2.0,<3.0

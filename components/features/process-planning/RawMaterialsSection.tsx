@@ -3,18 +3,20 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2, Loader2, Eye, Database, FlaskConical, TrendingUp } from 'lucide-react';
-import { RawMaterialDialog } from './RawMaterialDialog';
+import { useCostSummary, type BlankSpecDto } from '@/lib/api/hooks/useBOMItems';
 import {
   useRawMaterialCosts,
   useCreateRawMaterialCost,
   useUpdateRawMaterialCost,
   useDeleteRawMaterialCost,
 } from '@/lib/api/hooks/useRawMaterialCosts';
+import { RawMaterialDialog } from './RawMaterialDialog';
 
 interface RawMaterialsSectionProps {
   bomItemId?: string;
   bomItem?: any;
   location?: string;
+  batchSize?: number; // order quantity — drives nesting sheetsRequired disclosure
   compact?: boolean; // render without the outer card chrome (for embedding inside other panels)
   currencySymbol?: string; // e.g. '₹', '$', '€' — default '$'
   conversionRate?: number; // multiply stored USD values by this to get factory currency — default 1
@@ -44,7 +46,7 @@ function BRow({ label, value, sub, highlight, icon }: {
 
 function Divider() { return <div className="border-t border-dashed border-border/60 my-1" />; }
 
-function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1 }: { m: any; currencySymbol?: string; conversionRate?: number }) {
+function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1, blankSpec }: { m: any; currencySymbol?: string; conversionRate?: number; blankSpec?: BlankSpecDto | undefined }) {
   const gross    = Number(m.grossUsage  || 0);
   const net      = Number(m.netUsage    || 0);
   const unitCost = Number(m.unitCost    || 0);
@@ -67,6 +69,30 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1 }: {
   // Convert USD → factory currency for display only
   const c = (v: number) => v * conversionRate;
 
+  // Theoretical per-position nesting basis for the Gross Usage row above —
+  // only shown when nesting is genuinely trustworthy (packed against the
+  // verified true flat pattern). A 'fallback' result (folded 3D bounding
+  // box) is known to overcount capacity for a bent part and is NOT the
+  // source of the displayed Gross Usage figure in that case (RawMaterial-
+  // Dialog only auto-fills from a verified result) — showing its numbers
+  // here would misleadingly imply they explain the saved value.
+  const nestingSub = blankSpec?.form === 'sheet'
+    && blankSpec.nestingDimensionConfidence === 'verified'
+    && typeof blankSpec.sheetWidthMm === 'number'
+    && typeof blankSpec.sheetLengthMm === 'number'
+    && typeof blankSpec.partsPerSheet === 'number'
+    ? `${blankSpec.sheetWidthMm}×${blankSpec.sheetLengthMm}mm · ${blankSpec.partsPerSheet} parts/sheet · ${blankSpec.utilizationPct.toFixed(1)}% util`
+    : undefined;
+  // Actual batch sheet consumption for this order — a distinct concept from
+  // nestingSub above, never merged into the same row. Same verified-only gate.
+  const batchSub = blankSpec?.form === 'sheet'
+    && blankSpec.nestingDimensionConfidence === 'verified'
+    && typeof blankSpec.sheetsRequired === 'number'
+    && typeof blankSpec.plannedParts === 'number'
+    && typeof blankSpec.excessPositions === 'number'
+    ? { sheetsRequired: blankSpec.sheetsRequired, plannedParts: blankSpec.plannedParts, excessPositions: blankSpec.excessPositions }
+    : undefined;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* Inputs */}
@@ -78,7 +104,18 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1 }: {
         )}
         <BRow label="Unit Cost ($/kg)"                 value={`${currencySymbol}${c(unitCost).toFixed(3)}`}   icon="db" />
         <BRow label="Net Usage (kg)"                   value={`${net.toFixed(4)} kg`} />
-        <BRow label="Gross Usage (kg)"                 value={`${gross.toFixed(4)} kg`} />
+        <BRow
+          label="Gross Usage (kg)"
+          value={`${gross.toFixed(4)} kg`}
+          {...(nestingSub ? { sub: nestingSub } : {})}
+        />
+        {batchSub && (
+          <BRow
+            label="Batch (this order)"
+            value={`${batchSub.sheetsRequired} sheet${batchSub.sheetsRequired === 1 ? '' : 's'}`}
+            sub={`${batchSub.plannedParts} planned / ${batchSub.excessPositions} excess`}
+          />
+        )}
         <BRow label="Scrap %"                          value={`${scrap}`} />
         {reclaim > 0 && <BRow label="Reclaim Rate ($/kg)" value={`${currencySymbol}${c(reclaim).toFixed(3)}`} icon="db" />}
         <BRow label="Overhead %"                       value={`${overhead}`} />
@@ -135,7 +172,7 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1 }: {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export function RawMaterialsSection({ bomItemId, bomItem, location, compact, currencySymbol = '$', conversionRate = 1, onAllMaterialsDeleted }: RawMaterialsSectionProps) {
+export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, compact, currencySymbol = '$', conversionRate = 1, onAllMaterialsDeleted }: RawMaterialsSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMaterial, setEditMaterial] = useState<any | null>(null);
   const [openBreakdownId, setOpenBreakdownId] = useState<string | null>(null);
@@ -143,6 +180,12 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, compact, cur
   const { data, isLoading, error } = useRawMaterialCosts(
     bomItemId ? { bomItemId, isActive: true, enabled: true } : { enabled: false },
   );
+
+  // Real nesting result (if any) for the read-only breakdown's Gross Usage
+  // disclosure — same source of truth RawMaterialDialog uses, fetched
+  // independently here (React Query dedupes on the shared query key).
+  const { data: costSummary } = useCostSummary(bomItemId, batchSize ?? 1, location);
+  const blankSpec = costSummary?.blankSpec;
 
   const createMutation = useCreateRawMaterialCost();
   const updateMutation = useUpdateRawMaterialCost();
@@ -280,7 +323,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, compact, cur
               </div>
               {openBreakdownId === m.id && (
                 <div className="px-3 py-2 bg-muted/20 border-b border-border">
-                  <RawMaterialBreakdown m={m} currencySymbol={currencySymbol} conversionRate={conversionRate} />
+                  <RawMaterialBreakdown m={m} currencySymbol={currencySymbol} conversionRate={conversionRate} blankSpec={blankSpec} />
                 </div>
               )}
             </React.Fragment>
@@ -406,7 +449,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, compact, cur
                           {openBreakdownId === material.id && (
                             <tr>
                               <td colSpan={colSpan} className="px-3 py-3 bg-muted/20 border-b border-border">
-                                <RawMaterialBreakdown m={material} currencySymbol={currencySymbol} conversionRate={conversionRate} />
+                                <RawMaterialBreakdown m={material} currencySymbol={currencySymbol} conversionRate={conversionRate} blankSpec={blankSpec} />
                               </td>
                             </tr>
                           )}
@@ -448,6 +491,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, compact, cur
       editData={editMaterial}
       bomItemData={bomItem}
       {...(location !== undefined ? { location } : {})}
+      {...(batchSize !== undefined ? { batchSize } : {})}
     />
   );
 

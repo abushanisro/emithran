@@ -218,6 +218,16 @@ export interface FeatureGraphSummary {
   holeOrBossCount?: number;
   filletCount?: number;
   ribCountProxy?: number;
+  // Real flat-pattern outline/hole geometry (cad-engine's wire-walk
+  // extractor, see feature_extractors.py's _compute_flat_pattern_outline) --
+  // undefined/'unavailable' when the wire-walk/merge couldn't resolve one
+  // for this part's topology. Same fields the true-nest endpoint already
+  // reads (see backend bom-items.service.ts's getTrueNest).
+  flatPatternOutlinePointsMm?: number[][];
+  flatPatternHolesMm?: { cx_mm: number; cy_mm: number; diameter_mm: number }[];
+  flatPatternOutlineSource?: 'wire_walk' | 'unavailable';
+  flatPatternBoundingLengthMm?: number;
+  flatPatternBoundingWidthMm?: number;
 }
 
 export interface FeatureGraph {

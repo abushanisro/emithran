@@ -766,6 +766,19 @@ export interface BlankSpecDto {
   utilizationPct: number;
   wasteKg: number;
   wasteCost: number;
+  nestingDimensionSource?: 'cad_flat_pattern_bounding_rect' | 'folded_3d_bounding_box';
+  nestingDimensionConfidence?: 'verified' | 'fallback';
+  // Theoretical per-position nesting basis for grossWeightKg (the per-part
+  // yield the costing engine actually prices material on).
+  sheetWidthMm?: number;
+  sheetLengthMm?: number;
+  partsPerSheet?: number;
+  // Actual batch sheet consumption -- a distinct concept from grossWeightKg,
+  // disclosure-only. See backend blank-spec.dto.ts for the full explanation.
+  sheetsRequired?: number;
+  plannedParts?: number;
+  excessPositions?: number;
+  actualBatchGrossMaterialKg?: number;
 }
 
 export function useCostSummary(itemId: string | undefined, batchSize: number = 1, location = 'USA') {
@@ -792,6 +805,68 @@ export function useCostSummary(itemId: string | undefined, batchSize: number = 1
     // the identical fix on useMHRRecords in useMHR.ts). Force a fresh fetch on
     // every mount instead so "Recalculate Cost" isn't the only way to see it.
     refetchOnMount: 'always',
+  });
+}
+
+// Mirrors backend true-nest.dto.ts. Visualization only -- NOT a material-
+// cost source; sheet-metal-nesting.engine.ts's rectangle-grid computeNesting()
+// (surfaced via BlankSpecDto above) remains the sole cost basis.
+export interface NestPlacementDto {
+  xMm: number;
+  yMm: number;
+  rotationDeg: number;
+}
+
+export interface TrueNestResultDto {
+  outlinePointsMm: number[][];
+  holesMm: { cxMm: number; cyMm: number; diameterMm: number }[];
+  outlineSource: 'wire_walk' | 'unavailable';
+  sheetWidthMm: number;
+  sheetLengthMm: number;
+  partsPerSheet: number;
+  placements: NestPlacementDto[];
+  // Geometric nest utilization (true polygon area, not bounding-rect-
+  // derived) from THIS heuristic BLF placement only -- not a globally
+  // optimal packing, and a different nester could report a different
+  // figure for the same part/sheet. Display as "True-shape nest
+  // utilization" / "Geometric nest utilization", never "Real utilization".
+  utilizationPct: number;
+  sheetsRequired: number | null;
+  capped: boolean;
+}
+
+// On-demand only (enabled defaults to requiring both sheet dims AND the
+// caller's own `enabled` flag) -- this must never fire on page load or
+// alongside useCostSummary; it's a real synchronous computation with no
+// job-queue backing it (parts/sheet counts can run into the thousands for
+// a small part on a large sheet, ~10-20s observed), so it's only worth
+// calling once the user actually opens a Nest panel.
+export function useTrueNest(
+  itemId: string | undefined,
+  quantity: number,
+  sheetWidthMm: number | undefined,
+  sheetLengthMm: number | undefined,
+  options?: { kerfMm?: number | undefined; edgeMarginMm?: number | undefined; enabled?: boolean | undefined },
+) {
+  const hasSheet = typeof sheetWidthMm === 'number' && sheetWidthMm > 0 && typeof sheetLengthMm === 'number' && sheetLengthMm > 0;
+  return useQuery({
+    queryKey: ['bom-items', itemId, 'true-nest', quantity, sheetWidthMm, sheetLengthMm, options?.kerfMm, options?.edgeMarginMm],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        quantity: String(quantity),
+        sheetWidthMm: String(sheetWidthMm),
+        sheetLengthMm: String(sheetLengthMm),
+      });
+      if (options?.kerfMm !== undefined) params.set('kerfMm', String(options.kerfMm));
+      if (options?.edgeMarginMm !== undefined) params.set('edgeMarginMm', String(options.edgeMarginMm));
+      // Kept above cad-analysis.service.ts's own 90s /nest timeout so the
+      // backend's specific diagnostic reason surfaces before this generic
+      // client-side abort would.
+      return apiClient.get<TrueNestResultDto>(`/bom-items/${itemId ?? ''}/true-nest?${params.toString()}`, { timeout: 95000 });
+    },
+    enabled: useAuthEnabledWith(!!itemId && hasSheet && (options?.enabled ?? true)),
+    staleTime: 1000 * 60 * 5,
+    retry: false, // a 404 here is a real "no outline available" gap, not a transient failure to retry
   });
 }
 
