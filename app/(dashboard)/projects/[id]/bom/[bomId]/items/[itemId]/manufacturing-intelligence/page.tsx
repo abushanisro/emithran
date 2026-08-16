@@ -2495,6 +2495,7 @@ function CostSummaryTab({
           bomItemId={item.id}
           bomItem={item}
           location={factory}
+          batchSize={batchSize}
           compact
           currencySymbol={sym}
           conversionRate={fromUsd}
@@ -10562,6 +10563,22 @@ export default function ManufacturingIntelligencePage() {
                       heatmapSources={heatmapSources}
                       heatmapNormalization={heatmapNorm}
                       onHeatmapInspect={handleHeatmapInspect}
+                      nestQuantity={batchSize}
+                      nestSheetWidthMm={costForHeatmap?.blankSpec?.sheetWidthMm}
+                      nestSheetLengthMm={costForHeatmap?.blankSpec?.sheetLengthMm}
+                      nestMaterialLabel={item.material ?? undefined}
+                      nestGradeLabel={item.materialGrade ?? undefined}
+                      flatPatternPartName={item.partName ?? item.name}
+                      flatPatternOutlinePointsMm={item.featureGraph?.summary?.flatPatternOutlinePointsMm}
+                      flatPatternHolesMm={item.featureGraph?.summary?.flatPatternHolesMm}
+                      flatPatternOutlineSource={item.featureGraph?.summary?.flatPatternOutlineSource}
+                      flatPatternBoundingLengthMm={item.featureGraph?.summary?.flatPatternBoundingLengthMm}
+                      flatPatternBoundingWidthMm={item.featureGraph?.summary?.flatPatternBoundingWidthMm}
+                      flatPatternCutLengthMm={item.cutLengthMm}
+                      flatPatternBendCount={item.bendCount}
+                      flatPatternHoleCount={item.holeCount}
+                      flatPatternPierceCount={item.pierceCount}
+                      flatPatternAreaMm2={item.flatPatternAreaMm2}
                     />
                   : <div className="flex flex-col items-center justify-center h-full gap-2 text-sm text-muted-foreground">
                       <span>{!item.file3dPath ? 'No 3D model' : file3dUrlError ? file3dUrlError : 'Loading…'}</span>
@@ -10695,6 +10712,22 @@ export default function ManufacturingIntelligencePage() {
                             heatmapSources={heatmapSources}
                             heatmapNormalization={heatmapNorm}
                             onHeatmapInspect={handleHeatmapInspect}
+                            nestQuantity={batchSize}
+                            nestSheetWidthMm={costForHeatmap?.blankSpec?.sheetWidthMm}
+                            nestSheetLengthMm={costForHeatmap?.blankSpec?.sheetLengthMm}
+                            nestMaterialLabel={item.material ?? undefined}
+                            nestGradeLabel={item.materialGrade ?? undefined}
+                            flatPatternPartName={item.partName ?? item.name}
+                            flatPatternOutlinePointsMm={item.featureGraph?.summary?.flatPatternOutlinePointsMm}
+                            flatPatternHolesMm={item.featureGraph?.summary?.flatPatternHolesMm}
+                            flatPatternOutlineSource={item.featureGraph?.summary?.flatPatternOutlineSource}
+                            flatPatternBoundingLengthMm={item.featureGraph?.summary?.flatPatternBoundingLengthMm}
+                            flatPatternBoundingWidthMm={item.featureGraph?.summary?.flatPatternBoundingWidthMm}
+                            flatPatternCutLengthMm={item.cutLengthMm}
+                            flatPatternBendCount={item.bendCount}
+                            flatPatternHoleCount={item.holeCount}
+                            flatPatternPierceCount={item.pierceCount}
+                            flatPatternAreaMm2={item.flatPatternAreaMm2}
                           />
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">

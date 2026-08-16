@@ -27,6 +27,12 @@ export interface NestingInput {
   edgeAllowanceMm?: number;      // default 2
   scrapRecoveryPct?: number;     // fraction recovered (default 0.90)
   hasImpressions?: boolean;      // true for stamping (adds 10mm extra)
+  // Real order/batch quantity being costed. Drives sheetsRequired/plannedParts/
+  // excessPositions/actualBatchGrossMaterialKg only -- never guessed, and never
+  // fed back into grossWeightPerPartKg (the theoretical per-position yield the
+  // rest of the costing pipeline already prices material on). Omit or <= 0 to
+  // skip batch-consumption computation entirely (all four outputs undefined).
+  quantityRequired?: number;
 }
 
 export interface NestingResult {
@@ -41,6 +47,15 @@ export interface NestingResult {
   scrapRecoveryCost: number;
   netMaterialCost: number;
   partAllowanceMm: number;
+  // Actual batch sheet consumption -- distinct from grossWeightPerPartKg
+  // (theoretical per-position yield) above. Only populated when the caller
+  // supplied a positive quantityRequired. Informational/disclosure only:
+  // material cost (grossMaterialCost/netMaterialCost) is NOT derived from
+  // these, and never should be without an explicit accounting-policy change.
+  sheetsRequired?: number;             // ceil(quantityRequired / partsPerSheet)
+  plannedParts?: number;               // partsPerSheet * sheetsRequired
+  excessPositions?: number;            // plannedParts - quantityRequired
+  actualBatchGrossMaterialKg?: number; // sheetsRequired * sheetWeightKg
 }
 
 export interface NestingDimensionResolution {
@@ -94,6 +109,7 @@ export function computeNesting(input: NestingInput): NestingResult {
     edgeAllowanceMm = EDGE_ALLOWANCE_MM,
     scrapRecoveryPct = 0.90,
     hasImpressions = false,
+    quantityRequired,
   } = input;
 
   // Part-to-part allowance (punch/draw cushion from spec formula)
@@ -144,6 +160,20 @@ export function computeNesting(input: NestingInput): NestingResult {
   const scrapRecoveryCost = scrapWeightPerPart * scrapPricePerKg * scrapRecoveryPct;
   const netMaterialCost = Math.max(0, grossMaterialCost - scrapRecoveryCost);
 
+  // Actual batch sheet consumption -- kept entirely separate from the
+  // per-part figures above (see NestingResult doc comment). Never rounds
+  // quantityRequired or bestParts, since these must land on exact integers.
+  let sheetsRequired: number | undefined;
+  let plannedParts: number | undefined;
+  let excessPositions: number | undefined;
+  let actualBatchGrossMaterialKg: number | undefined;
+  if (typeof quantityRequired === 'number' && quantityRequired > 0) {
+    sheetsRequired = Math.ceil(quantityRequired / bestParts);
+    plannedParts = bestParts * sheetsRequired;
+    excessPositions = plannedParts - quantityRequired;
+    actualBatchGrossMaterialKg = Math.round(sheetsRequired * sheetWeightKg * 1000) / 1000;
+  }
+
   return {
     sheetLengthMm: sheetL,
     sheetWidthMm: sheetW,
@@ -156,5 +186,9 @@ export function computeNesting(input: NestingInput): NestingResult {
     scrapRecoveryCost: Math.round(scrapRecoveryCost * 100) / 100,
     netMaterialCost: Math.round(netMaterialCost * 100) / 100,
     partAllowanceMm: Math.round(partAllowanceMm * 100) / 100,
+    sheetsRequired,
+    plannedParts,
+    excessPositions,
+    actualBatchGrossMaterialKg,
   };
 }

@@ -590,6 +590,12 @@ class SheetMetalFeatureExtractor:
         flat_pattern_area_mm2 = 0.0
         flat_pattern_area_method = "dominant_face_only"
         flat_pattern_bounding_rect: Optional[Dict[str, float]] = None
+        # Real outline+hole geometry for true (non-rectangle) nesting
+        # visualization -- see _compute_flat_pattern_outline's own docstring.
+        # None (never fabricated) when the wire-walk/merge couldn't resolve
+        # one for this part; failures here never affect flat_pattern_area_mm2
+        # or flat_pattern_bounding_rect above, which are computed independently.
+        flat_pattern_outline: Optional[Dict[str, Any]] = None
         try:
             if bends["count"] > 0:
                 # Multi-panel unfold -- the dominant face alone would miss
@@ -600,6 +606,13 @@ class SheetMetalFeatureExtractor:
                     flat_pattern_area_method = f"true_unfold ({unfold['bends_used']}/{unfold['bends_total']} bends, {unfold['panel_count']} panels)"
                     dedup_bends = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness) if dominant_normal else []
                     flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, dedup_bends)
+                    try:
+                        flat_pattern_outline = self._compute_flat_pattern_outline(
+                            dominant_face, panels, dedup_bends, holes.get("centroids_mm", []),
+                            expected_area_mm2=flat_pattern_area_mm2,
+                        )
+                    except Exception as e:
+                        logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
                 else:
                     logger.warning(
                         "[SheetMetal] true_unfold could not resolve panels "
@@ -613,6 +626,13 @@ class SheetMetalFeatureExtractor:
                 # approximation.
                 flat_pattern_area_mm2 = self._compute_flat_pattern_area(shape, dominant_face)
                 flat_pattern_bounding_rect = self._compute_flat_pattern_layout(dominant_face, panels, [])
+                try:
+                    flat_pattern_outline = self._compute_flat_pattern_outline(
+                        dominant_face, panels, [], holes.get("centroids_mm", []),
+                        expected_area_mm2=flat_pattern_area_mm2,
+                    )
+                except Exception as e:
+                    logger.warning(f"[SheetMetal] flat_pattern_outline failed: {e}")
         except Exception as e:
             logger.warning(f"[SheetMetal] flat_pattern_area failed: {e}")
 
@@ -750,6 +770,15 @@ class SheetMetalFeatureExtractor:
             "flat_pattern_bounding_width_mm": round(flat_pattern_bounding_rect["width_mm"], 2) if flat_pattern_bounding_rect else None,
             "material_utilization_pct": material_utilization_pct if flat_pattern_bounding_rect else None,
             "scrap_area_mm2": scrap_area_mm2 if flat_pattern_bounding_rect else None,
+            # Real flat-pattern outline polygon + hole positions, in the same
+            # unfolded 2D frame as the bounding-rect fields above -- for true
+            # (non-rectangle) nesting visualization. None/'unavailable' (never
+            # a fabricated rectangle-as-outline) when the wire-walk/merge
+            # couldn't resolve one for this part's topology; independent of
+            # whether flat_pattern_bounding_rect itself resolved.
+            "flat_pattern_outline_points_mm": flat_pattern_outline["outline_points_mm"] if flat_pattern_outline else None,
+            "flat_pattern_holes_mm": flat_pattern_outline["holes_mm"] if flat_pattern_outline else None,
+            "flat_pattern_outline_source": "wire_walk" if flat_pattern_outline else "unavailable",
             "sheet_geometry_debug": {**geom_debug, **validation_debug},
             "feature_graph_v2": feature_graph_v2,
         }
@@ -1960,6 +1989,7 @@ class SheetMetalFeatureExtractor:
         if not hole_entries:
             return {
                 "count": 0, "diameters": [], "all_diameters": [], "hole_groups": [], "centroids": [],
+                "centroids_mm": [],
                 "extruded_flange_count": 0, "thin_web_count": 0,
             }
 
@@ -2036,6 +2066,12 @@ class SheetMetalFeatureExtractor:
             # clustering) -- the pierce location for that hole. Used to estimate
             # rapid-traverse (head repositioning) time between pierce points.
             "centroids": [(c[2], c[3], c[4]) for c in hole_entries],
+            # Same real holes as "centroids" above, additionally carrying each
+            # hole's own diameter (c[0] = radius) -- for projecting hole
+            # positions into the flat-pattern 2D frame (_compute_flat_pattern_outline),
+            # which needs diameter alongside position and "centroids" alone
+            # doesn't carry it. Purely additive; "centroids" is unchanged.
+            "centroids_mm": [(c[2], c[3], c[4], c[0] * 2.0) for c in hole_entries],
             "extruded_flange_count": extruded_flange_count,
             "thin_web_count": thin_web_count,
             "extruded_flange_occurrences": extruded_flange_occurrences,
@@ -3370,6 +3406,418 @@ class SheetMetalFeatureExtractor:
         if length_mm <= 0 or width_mm <= 0:
             return None
         return {"length_mm": length_mm, "width_mm": width_mm}
+
+    def _compute_flat_pattern_outline(
+        self,
+        dominant_face: Any,
+        panels: Optional[List[Dict[str, Any]]],
+        bends: List[Dict[str, Any]],
+        hole_centroids_mm: Optional[List[Tuple[float, float, float, float]]] = None,
+        expected_area_mm2: float = 0.0,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        The flat pattern's TRUE outer boundary polygon (not just its bounding
+        rectangle, which _compute_flat_pattern_layout already provides) plus
+        hole positions, all in the same common unfolded 2D frame -- for real
+        (not rectangle-placeholder) nesting visualization.
+
+        `expected_area_mm2`, when supplied, must be the independently-
+        computed true flat-pattern area (_compute_true_flat_pattern_area's
+        panel-area + bend-allowance summation, or the simple dominant-face
+        area for unbent parts) -- the caller's own already-trusted number
+        for this exact quantity, measured via a completely different code
+        path (mass-property summation, not wire-walk + polygon union). The
+        two are reconciled before this function returns anything: a wire-
+        walk that mis-stitched panels, dropped a notch, or had buffer(0)
+        silently "fix" a self-intersection into the wrong shape would still
+        produce a polygon that LOOKS plausible, but its area would disagree
+        with the independently-measured one -- see the reconciliation check
+        near the end of this function for the actual tolerance and the
+        "decline rather than guess" response when it fails.
+
+        Deliberately independent from _compute_flat_pattern_layout (duplicates
+        its panel-frame BFS rather than sharing it): that function is already
+        live in production driving real cost/nesting numbers, with zero
+        existing test coverage anywhere in this file -- refactoring it to
+        share code with this new, separately-tested addition would risk
+        regressing a working, verified feature for no reason. Some
+        duplication is the deliberately safer trade here.
+
+        Per-panel outline: walks each panel face's OUTER wire (BRepTools.OuterWire)
+        edge by edge, tessellating each edge (straight or curved) via
+        GCPnts_UniformDeflection at the same 0.1mm deflection already used
+        for STL/3D-viewer mesh export elsewhere in this service, then maps
+        every sampled point through the panel's own _to_2d transform (the
+        exact same frame math _compute_flat_pattern_layout already uses).
+        Each panel's projected point loop becomes a shapely Polygon; the
+        panels are then merged with shapely's unary_union -- this is what
+        correctly turns each panel's own independent outline (which still
+        includes the shared fold edge as part of its own boundary) into ONE
+        true outer boundary, since the fold edges become interior to the
+        union and disappear, exactly like a real unfolded flat pattern.
+
+        Hole centroids (given as absolute 3D (x,y,z,diameter) tuples) are
+        matched to their owning panel by nearest-plane distance (the same
+        technique already used to match bends to panels above) and projected
+        through that panel's _to_2d the same way.
+
+        Returns None (never a fabricated/rectangle outline) when the
+        panel/bend graph doesn't fully connect, when shapely isn't
+        installed, or when no panel could produce a usable outline --
+        mirroring _compute_flat_pattern_layout's own "decline rather than
+        guess" convention.
+        """
+        if not panels or dominant_face is None:
+            logger.warning(
+                f"[SheetMetal] flat_pattern_outline skipped: "
+                f"{'no panels' if not panels else 'no dominant_face'} resolved for this part"
+            )
+            return None
+        try:
+            from shapely.geometry import Polygon as ShapelyPolygon  # type: ignore
+            from shapely.ops import unary_union  # type: ignore
+        except ImportError:
+            logger.warning("[SheetMetal] shapely not installed -- cannot build flat-pattern outline polygon")
+            return None
+
+        from OCC.Core.BRepTools import breptools, BRepTools_WireExplorer  # type: ignore
+        from OCC.Core.BRep import BRep_Tool  # type: ignore
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Curve  # type: ignore
+        from OCC.Core.GCPnts import GCPnts_UniformDeflection  # type: ignore
+        from OCC.Core.Bnd import Bnd_Box  # type: ignore
+        from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_REVERSED  # type: ignore
+
+        def _dot(a: Tuple[float, ...], b: Tuple[float, ...]) -> float:
+            return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+        def _sub(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> Tuple[float, float, float]:
+            return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+        def _cross(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> Tuple[float, float, float]:
+            return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+        def _norm(a: Tuple[float, float, float]) -> Tuple[float, float, float]:
+            m = math.sqrt(_dot(a, a)) or 1.0
+            return (a[0] / m, a[1] / m, a[2] / m)
+
+        def _bbox_of(face: Any) -> Tuple[float, float, float, float, float, float]:
+            fbox = Bnd_Box()
+            brepbndlib.Add(face, fbox)
+            return fbox.Get()
+
+        def _bbox_corner0(face: Any) -> Tuple[float, float, float]:
+            xmin, ymin, zmin, _xmax, _ymax, _zmax = _bbox_of(face)
+            return (xmin, ymin, zmin)
+
+        def _bbox_center(face: Any) -> Tuple[float, float, float]:
+            xmin, ymin, zmin, xmax, ymax, zmax = _bbox_of(face)
+            return ((xmin + xmax) / 2.0, (ymin + ymax) / 2.0, (zmin + zmax) / 2.0)
+
+        def _bbox_corners(face: Any) -> List[Tuple[float, float, float]]:
+            xmin, ymin, zmin, xmax, ymax, zmax = _bbox_of(face)
+            return [
+                (xmin, ymin, zmin), (xmax, ymin, zmin), (xmin, ymax, zmin), (xmin, ymin, zmax),
+                (xmax, ymax, zmin), (xmax, ymin, zmax), (xmin, ymax, zmax), (xmax, ymax, zmax),
+            ]
+
+        n = len(panels)
+        root_idx = 0
+        for i, p in enumerate(panels):
+            if p["face"].IsSame(dominant_face):
+                root_idx = i
+                break
+
+        # Same bend-to-panel adjacency matching as _compute_flat_pattern_layout.
+        adjacency: List[List[Tuple[int, Dict[str, Any]]]] = [[] for _ in range(n)]
+        for bend in bends:
+            ax_pt = bend["axis_point"]
+            tol = bend["radius"] * 1.5 + 2.0
+            dists = []
+            for i, p in enumerate(panels):
+                nx, ny, nz = p["normal"]
+                dist = abs(ax_pt[0] * nx + ax_pt[1] * ny + ax_pt[2] * nz - p["plane_d"])
+                dists.append((dist, i))
+            dists.sort(key=lambda t: t[0])
+            if len(dists) < 2 or dists[1][0] > tol:
+                continue
+            i1, i2 = dists[0][1], dists[1][1]
+            adjacency[i1].append((i2, bend))
+            adjacency[i2].append((i1, bend))
+
+        frame_origin_3d: List[Optional[Tuple[float, float, float]]] = [None] * n
+        frame_u3d: List[Optional[Tuple[float, float, float]]] = [None] * n
+        frame_v3d: List[Optional[Tuple[float, float, float]]] = [None] * n
+        frame_origin_2d: List[Optional[Tuple[float, float]]] = [None] * n
+        frame_u_img: List[Optional[Tuple[float, float]]] = [None] * n
+        frame_v_img: List[Optional[Tuple[float, float]]] = [None] * n
+        visited = [False] * n
+
+        root_normal = panels[root_idx]["normal"]
+        ref = (1.0, 0.0, 0.0) if abs(root_normal[0]) < 0.9 else (0.0, 1.0, 0.0)
+        u0 = _norm(_sub(ref, tuple(c * _dot(ref, root_normal) for c in root_normal)))
+        v0 = _norm(_cross(root_normal, u0))
+        frame_origin_3d[root_idx] = _bbox_corner0(panels[root_idx]["face"])
+        frame_u3d[root_idx] = u0
+        frame_v3d[root_idx] = v0
+        frame_origin_2d[root_idx] = (0.0, 0.0)
+        frame_u_img[root_idx] = (1.0, 0.0)
+        frame_v_img[root_idx] = (0.0, 1.0)
+        visited[root_idx] = True
+
+        def _to_2d(idx: int, point: Tuple[float, float, float]) -> Tuple[float, float]:
+            rel = _sub(point, frame_origin_3d[idx])
+            lu, lv = _dot(rel, frame_u3d[idx]), _dot(rel, frame_v3d[idx])
+            ox, oy = frame_origin_2d[idx]
+            uix, uiy = frame_u_img[idx]
+            vix, viy = frame_v_img[idx]
+            return (ox + lu * uix + lv * vix, oy + lu * uiy + lv * viy)
+
+        def _dir_to_2d(idx: int, direction_3d: Tuple[float, float, float]) -> Tuple[float, float]:
+            lu, lv = _dot(direction_3d, frame_u3d[idx]), _dot(direction_3d, frame_v3d[idx])
+            uix, uiy = frame_u_img[idx]
+            vix, viy = frame_v_img[idx]
+            return (lu * uix + lv * vix, lu * uiy + lv * viy)
+
+        # Flattened-bend "bridge" strips: two flat panels connected by a bend
+        # are NOT adjacent in 3D -- a curved bend face (a separate, third
+        # face, not part of either panel) sits between them, which unfolds
+        # into a flat rectangular strip (length = bend["axial_length"], the
+        # bend line's own width; depth = bend["allowance_mm"], the developed
+        # bend length -- the SAME two quantities _compute_true_flat_pattern_area
+        # already sums as `allowance_mm * axial_length` per bend, confirming
+        # this is the real flattened bend area, not an invented shape).
+        # Without these strips, each panel's own wire-walk boundary stops
+        # exactly where it meets the bend's cylindrical face, never touching
+        # the neighboring panel's boundary in the common 2D frame -- their
+        # polygons stay genuinely disconnected and unary_union correctly
+        # reports fragmentation (confirmed live on a real 3-bend part: panels
+        # merged into disconnected islands, largest only ~36% of total area,
+        # correctly declined as untrusted before this fix). These bridge
+        # rectangles are what actually connects them into one true outline.
+        bridge_polygons: List[Any] = []
+
+        queue = [root_idx]
+        while queue:
+            cur = queue.pop(0)
+            for (nbr, bend) in adjacency[cur]:
+                if visited[nbr]:
+                    continue
+                u_dir = _norm(bend["dir"])
+                child_normal = panels[nbr]["normal"]
+                v_dir = _cross(child_normal, u_dir)
+                vmag = math.sqrt(_dot(v_dir, v_dir))
+                if vmag < 1e-6:
+                    continue
+                v_dir = (v_dir[0] / vmag, v_dir[1] / vmag, v_dir[2] / vmag)
+
+                child_center = _bbox_center(panels[nbr]["face"])
+                if _dot(_sub(child_center, bend["axis_point"]), v_dir) < 0:
+                    v_dir = (-v_dir[0], -v_dir[1], -v_dir[2])
+
+                fold_2d = _to_2d(cur, bend["axis_point"])
+                fdx, fdy = _dir_to_2d(cur, u_dir)
+                fdmag = math.sqrt(fdx * fdx + fdy * fdy) or 1.0
+                fdx, fdy = fdx / fdmag, fdy / fdmag
+                px2, py2 = -fdy, fdx
+
+                parent_center = _bbox_center(panels[cur]["face"])
+                pcx, pcy = _to_2d(cur, parent_center)
+                if (pcx - fold_2d[0]) * px2 + (pcy - fold_2d[1]) * py2 > 0:
+                    px2, py2 = -px2, -py2
+
+                frame_origin_3d[nbr] = bend["axis_point"]
+                frame_u3d[nbr] = u_dir
+                frame_v3d[nbr] = v_dir
+                frame_u_img[nbr] = (fdx, fdy)
+                frame_v_img[nbr] = (px2, py2)
+                frame_origin_2d[nbr] = (
+                    fold_2d[0] + px2 * bend["allowance_mm"],
+                    fold_2d[1] + py2 * bend["allowance_mm"],
+                )
+
+                # The bridge's extent along the fold direction must come from
+                # the PARENT panel's own real geometry, not from
+                # bend["axis_point"] +/- axial_length/2 -- axis_point is only
+                # documented as "point on the axis closest to the origin"
+                # (an arbitrary reference on the infinite axis line), NOT the
+                # center of the bend's real, finite extent. Assuming it was
+                # centered produced a bridge strip offset from where the
+                # panels actually meet (confirmed live: a bridge built that
+                # way spanned x=[-25,25] when the real shared edge was
+                # x=[0,50], badly misaligned even though total area happened
+                # to still add up). Projecting the parent panel's own bbox
+                # corners onto the fold direction gives the real extent,
+                # independent of wherever axis_point happens to sit.
+                parent_corners_2d = [_to_2d(cur, c) for c in _bbox_corners(panels[cur]["face"])]
+                along_vals = [((x - fold_2d[0]) * fdx + (y - fold_2d[1]) * fdy) for (x, y) in parent_corners_2d]
+                t_min, t_max = min(along_vals), max(along_vals)
+                c1 = (fold_2d[0] + fdx * t_min, fold_2d[1] + fdy * t_min)
+                c2 = (fold_2d[0] + fdx * t_max, fold_2d[1] + fdy * t_max)
+                nbr_origin_2d = frame_origin_2d[nbr]
+                c3 = (nbr_origin_2d[0] + fdx * t_max, nbr_origin_2d[1] + fdy * t_max)
+                c4 = (nbr_origin_2d[0] + fdx * t_min, nbr_origin_2d[1] + fdy * t_min)
+                try:
+                    bridge = ShapelyPolygon([c1, c2, c3, c4]).buffer(0)
+                    if not bridge.is_empty:
+                        bridge_polygons.append(bridge)
+                except Exception as e:
+                    logger.warning(f"[SheetMetal] flat_pattern_outline bend bridge strip failed: {e}")
+
+                visited[nbr] = True
+                queue.append(nbr)
+
+        if not all(visited):
+            unvisited = [i for i, v in enumerate(visited) if not v]
+            logger.warning(
+                f"[SheetMetal] flat_pattern_outline declined: bend/panel graph did not fully connect "
+                f"({len(unvisited)} of {n} panel(s) unreachable from the dominant panel via bend adjacency) "
+                "-- decline rather than guess"
+            )
+            return None
+
+        # Walk each panel's outer wire into an ordered 2D point list.
+        panel_polygons = list(bridge_polygons)
+        for i, p in enumerate(panels):
+            try:
+                outer_wire = breptools.OuterWire(p["face"])
+                pts_2d: List[Tuple[float, float]] = []
+                wexp = BRepTools_WireExplorer(outer_wire)
+                while wexp.More():
+                    edge = wexp.Current()
+                    curve_h, u0e, u1e = BRep_Tool.Curve(edge)
+                    if curve_h is not None:
+                        adaptor_curve = BRepAdaptor_Curve(edge)
+                        sampler = GCPnts_UniformDeflection(adaptor_curve, 0.1, u0e, u1e)
+                        if sampler.IsDone() and sampler.NbPoints() >= 2:
+                            # BRepTools_WireExplorer walks edges in true wire
+                            # (connectivity) order honoring each edge's own
+                            # orientation, but BRep_Tool.Curve's parametrization
+                            # (and this sampler, built on it) always runs in the
+                            # curve's OWN natural direction regardless of that
+                            # orientation flag -- a REVERSED edge's sampled
+                            # points therefore run backwards relative to the
+                            # wire's real traversal and must be flipped, or
+                            # consecutive edges silently don't chain head-to-
+                            # tail (confirmed live: an un-flipped rectangle
+                            # produced a degenerate 3-point triangle here, not
+                            # its real 4 corners).
+                            edge_pts = [
+                                _to_2d(i, (sampler.Value(k).X(), sampler.Value(k).Y(), sampler.Value(k).Z()))
+                                for k in range(1, sampler.NbPoints() + 1)
+                            ]
+                            if edge.Orientation() == TopAbs_REVERSED:
+                                edge_pts.reverse()
+                            pts_2d.extend(edge_pts)
+                    wexp.Next()
+                if len(pts_2d) >= 3:
+                    poly = ShapelyPolygon(pts_2d).buffer(0)
+                    if not poly.is_empty:
+                        panel_polygons.append(poly)
+            except Exception as e:
+                logger.warning(f"[SheetMetal] panel {i} outline wire-walk failed: {e}")
+
+        if not panel_polygons:
+            logger.warning(
+                f"[SheetMetal] flat_pattern_outline declined: wire-walk produced zero usable panel "
+                f"polygons out of {n} panel(s) (each panel's outer-wire walk failed or yielded <3 points -- "
+                "see preceding per-panel warnings above)"
+            )
+            return None
+
+        merged = unary_union(panel_polygons)
+        if merged.is_empty:
+            logger.warning("[SheetMetal] flat_pattern_outline declined: unary_union of panel polygons is empty")
+            return None
+        merged_total_area = merged.area
+        if merged.geom_type == "MultiPolygon":
+            # Panels didn't end up sharing fold edges after projection --
+            # unusual/non-manifold topology. Take the largest piece, but
+            # only if it's the clear majority of the merged result -- a
+            # badly-fragmented union (no single piece dominant) means the
+            # panel stitching itself is unreliable for this part, not just
+            # "slightly reduced coverage." The area-reconciliation check
+            # below catches subtler cases; this catches the gross one early.
+            largest = max(merged.geoms, key=lambda g: g.area)
+            if merged_total_area > 0 and largest.area / merged_total_area < 0.9:
+                logger.warning(
+                    "[SheetMetal] flat_pattern_outline fragmented into multiple "
+                    f"disconnected pieces with no clear majority (largest={largest.area:.1f}mm² "
+                    f"of {merged_total_area:.1f}mm² total) -- declining as untrusted"
+                )
+                return None
+            merged = largest
+        if merged.geom_type != "Polygon" or merged.exterior is None:
+            logger.warning(
+                f"[SheetMetal] flat_pattern_outline declined: merged result is a "
+                f"{merged.geom_type} with no exterior ring, not a simple Polygon"
+            )
+            return None
+
+        # Validity/self-intersection check -- buffer(0) upstream (per panel)
+        # repairs MOST minor topology issues, but is not a guarantee; an
+        # outline that's still invalid after that repair (self-intersecting
+        # rings, degenerate geometry) must not be handed to a caller as if
+        # it were a trustworthy polygon.
+        if not merged.is_valid:
+            logger.warning("[SheetMetal] flat_pattern_outline is not a valid simple polygon after repair -- declining as untrusted")
+            return None
+
+        # Hole projection must happen BEFORE the area reconciliation below --
+        # it needs total hole area to correct for a real, expected
+        # difference (not an extraction error): OuterWire (used above)
+        # deliberately excludes hole boundaries, so `merged.area` is the
+        # GROSS outline area (holes still "filled in"), whereas
+        # expected_area_mm2 (from _compute_true_flat_pattern_area's face
+        # mass-property integration) is the NET area with holes already
+        # subtracted -- the two are expected to differ by exactly the total
+        # hole area, not by extraction error.
+        holes_mm: List[Dict[str, float]] = []
+        for h in (hole_centroids_mm or []):
+            cx, cy, cz, diameter_mm = h[0], h[1], h[2], h[3]
+            best_idx, best_dist = None, float("inf")
+            for i, p in enumerate(panels):
+                nx, ny, nz = p["normal"]
+                dist = abs(cx * nx + cy * ny + cz * nz - p["plane_d"])
+                if dist < best_dist:
+                    best_dist, best_idx = dist, i
+            if best_idx is None or best_dist > max(2.0, diameter_mm / 2.0):
+                continue  # doesn't clearly belong to any known panel plane -- skip rather than guess
+            hx, hy = _to_2d(best_idx, (cx, cy, cz))
+            holes_mm.append({"cx_mm": round(hx, 3), "cy_mm": round(hy, 3), "diameter_mm": round(diameter_mm, 3)})
+
+        # Reconcile against the independently-computed true flat-pattern
+        # area (see this function's docstring for why this check exists and
+        # what it catches), corrected for total hole area (see the comment
+        # above the holes_mm loop -- outline area is gross/hole-inclusive by
+        # construction, expected_area_mm2 is net/hole-excluded). 10%
+        # relative tolerance on the NET figure: generous enough to absorb
+        # real, small differences between mass-property integration and
+        # polygon-area computation (different numerical methods over the
+        # same real geometry), tight enough to catch a wire-walk that
+        # genuinely got the wrong shape (mis-stitched panel, dropped notch,
+        # a buffer(0) repair that silently discarded part of the outline).
+        if expected_area_mm2 > 0:
+            total_hole_area_mm2 = sum(math.pi * (h["diameter_mm"] / 2.0) ** 2 for h in holes_mm)
+            outline_net_area_mm2 = merged.area - total_hole_area_mm2
+            relative_diff = abs(outline_net_area_mm2 - expected_area_mm2) / expected_area_mm2
+            if relative_diff > 0.10:
+                logger.warning(
+                    f"[SheetMetal] flat_pattern_outline net area {outline_net_area_mm2:.1f}mm² "
+                    f"(gross {merged.area:.1f}mm² minus {total_hole_area_mm2:.1f}mm² of holes) disagrees "
+                    f"with independently-computed flat-pattern area {expected_area_mm2:.1f}mm² by "
+                    f"{relative_diff * 100:.1f}% -- declining outline as untrusted rather than "
+                    "returning a shape that doesn't match the part's own known area"
+                )
+                return None
+
+        outline_points_mm = [[round(x, 3), round(y, 3)] for x, y in merged.exterior.coords]
+        minx, miny, maxx, maxy = merged.bounds
+        logger.info(
+            f"[SheetMetal] flat_pattern_outline succeeded: {len(outline_points_mm)} points, "
+            f"{len(holes_mm)} holes, bounds {maxx - minx:.1f}x{maxy - miny:.1f}mm, area {merged.area:.1f}mm²"
+        )
+        return {"outline_points_mm": outline_points_mm, "holes_mm": holes_mm}
 
     def _detect_slots_v2(
         self,

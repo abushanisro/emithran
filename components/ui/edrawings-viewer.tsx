@@ -6,9 +6,10 @@ import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-thr
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Card } from '@/components/ui/card';
 import { computeHeatmap } from '@/lib/heatmap/engine';
 import { MANUFACTURING_RISK_RAMP } from '@/lib/heatmap/ramps';
 import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
@@ -33,7 +34,11 @@ import {
   Layers,
   Ruler,
   X,
+  LayoutGrid,
+  Scan,
 } from 'lucide-react';
+import { NestView } from './nest-view';
+import { FlatPatternView } from './flat-pattern-view';
 import { MeasurementOverlay } from './measurement-overlay';
 import type { MeasureMode, MeasureSubMode, MeasureSelection, MeasureResult, MeasureUnit, ArcSelection } from './measurement-overlay';
 import { getResultColors } from './measurement-overlay';
@@ -118,6 +123,27 @@ interface EDrawingsViewerProps {
   onHeatmapInspect?: (worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void;
   /** Override the amber group-face highlight color — used for operation-specific visualization */
   highlightColor?: string;
+  /** BOM item id — required for the Nest toolbar toggle to fetch a true nest; omit to hide that button entirely. */
+  bomItemId?: string;
+  /** Order quantity for the Nest view's sheets-required figure — defaults to 1 if omitted. */
+  nestQuantity?: number;
+  /** Initial sheet size default, seeded from the existing (rectangle-based, cost-authoritative) nesting result — the Nest view's own sheet-size picker (3 standard stock sizes + custom) starts here but the user can change it; the cost-authoritative sheet/nesting result is never affected either way. */
+  nestSheetWidthMm?: number;
+  nestSheetLengthMm?: number;
+  nestMaterialLabel?: string;
+  nestGradeLabel?: string;
+  /** Flat Pattern toolbar toggle — the real unfolded 2D outline (cad-engine's wire-walk extraction), shown on its own before Nest places copies of it on a sheet. Omit outlinePointsMm to hide the button entirely. */
+  flatPatternPartName?: string;
+  flatPatternOutlinePointsMm?: number[][];
+  flatPatternHolesMm?: { cx_mm: number; cy_mm: number; diameter_mm: number }[];
+  flatPatternOutlineSource?: 'wire_walk' | 'unavailable';
+  flatPatternBoundingLengthMm?: number;
+  flatPatternBoundingWidthMm?: number;
+  flatPatternCutLengthMm?: number;
+  flatPatternBendCount?: number;
+  flatPatternHoleCount?: number;
+  flatPatternPierceCount?: number;
+  flatPatternAreaMm2?: number;
 }
 
 // Helper: safely get BufferAttribute from geometry
@@ -2927,6 +2953,10 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   heatmapNormalization = 'absolute',
   onHeatmapInspect,
   highlightColor,
+  bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestMaterialLabel, nestGradeLabel,
+  flatPatternPartName, flatPatternOutlinePointsMm, flatPatternHolesMm, flatPatternOutlineSource,
+  flatPatternBoundingLengthMm, flatPatternBoundingWidthMm, flatPatternCutLengthMm, flatPatternBendCount,
+  flatPatternHoleCount, flatPatternPierceCount, flatPatternAreaMm2,
 }: EDrawingsViewerProps) {
   const [loading, setLoading] = useState(true);
   // Bumped to force a full Canvas remount (fresh WebGL context + geometry reload)
@@ -2944,6 +2974,13 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   const [isTransparent, setIsTransparent] = useState(false);
   const [isWireframe, setIsWireframe] = useState(false);
   const [showCrossSection, setShowCrossSection] = useState(false);
+  // True (real polygon) nesting visualization -- swaps the R3F <Canvas> for
+  // <NestView> when active; see nest-view.tsx's own doc comments for what
+  // it does and does not affect (visualization only, never material cost).
+  const [showNestView, setShowNestView] = useState(false);
+  // Single unfolded 2D outline for this part, shown on its own before Nest
+  // places multiple copies of it on a sheet -- see flat-pattern-view.tsx.
+  const [showFlatPatternView, setShowFlatPatternView] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [axesRotation, setAxesRotation] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 });
   const [measurements, setMeasurements] = useState<{
@@ -3629,6 +3666,8 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     setShowCrossSection(next);
     setSectionPlane(next ? 0.5 : 0);
   };
+  const toggleNestView = () => setShowNestView(v => !v);
+  const toggleFlatPatternView = () => setShowFlatPatternView(v => !v);
 
   return (
     <div className="h-full w-full flex flex-col bg-[#2d2d2d]">
@@ -3648,6 +3687,18 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               className={`font-medium text-xs ${showCrossSection ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
               <Slice className="h-3.5 w-3.5" />
             </Button>
+            {flatPatternOutlinePointsMm && (
+              <Button variant="outline" size="sm" onClick={toggleFlatPatternView} title="Flat Pattern — the real unfolded 2D outline for this part, before nesting"
+                className={`font-medium text-xs ${showFlatPatternView ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+                <Scan className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {bomItemId && (
+              <Button variant="outline" size="sm" onClick={toggleNestView} title="Nest — true (real-shape) 2D nesting on the selected sheet, visualization only"
+                className={`font-medium text-xs ${showNestView ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </Button>
+            )}
 
             {features.length > 0 && (
               <>
@@ -3727,6 +3778,58 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       <div className="flex-1 flex relative min-h-0 overflow-hidden">
         {/* 3D Viewport */}
         <div ref={canvasContainerRef} className="flex-1 relative bg-gradient-to-b from-[#4a4a4a] to-[#2d2d2d]">
+          {bomItemId && (
+            // Popup rather than an inline overlay: Nest's own sheet-size
+            // picker + custom inputs need real screen space (see
+            // nest-view.tsx), which the 3D viewport doesn't have room for.
+            // Dialog renders via a portal, so its position in this tree
+            // doesn't matter -- the Canvas below keeps rendering unaffected.
+            <Dialog open={showNestView} onOpenChange={setShowNestView}>
+              <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] flex flex-col p-0 gap-0 bg-[#2b2b2b] border-[#555555] text-white">
+                <DialogHeader className="px-4 py-3 border-b border-[#555555] shrink-0">
+                  <DialogTitle className="text-white text-sm font-medium">
+                    Nest — true (real-shape) 2D nesting{nestMaterialLabel ? ` · ${nestMaterialLabel}` : ''}{nestGradeLabel ? ` ${nestGradeLabel}` : ''}
+                  </DialogTitle>
+                </DialogHeader>
+                <NestView
+                  bomItemId={bomItemId}
+                  quantity={nestQuantity}
+                  sheetWidthMm={nestSheetWidthMm}
+                  sheetLengthMm={nestSheetLengthMm}
+                  materialLabel={nestMaterialLabel}
+                  gradeLabel={nestGradeLabel}
+                  thicknessMm={sheetThickness}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
+          {flatPatternOutlinePointsMm && (
+            <Dialog open={showFlatPatternView} onOpenChange={setShowFlatPatternView}>
+              <DialogContent className="max-w-[95vw] w-[1100px] h-[85vh] flex flex-col p-0 gap-0 bg-[#2b2b2b] border-[#555555] text-white">
+                <DialogHeader className="px-4 py-3 border-b border-[#555555] shrink-0">
+                  <DialogTitle className="text-white text-sm font-medium">
+                    Flat Pattern{flatPatternPartName ? ` — ${flatPatternPartName}` : ''}
+                  </DialogTitle>
+                </DialogHeader>
+                <FlatPatternView
+                  partName={flatPatternPartName}
+                  outlinePointsMm={flatPatternOutlinePointsMm}
+                  holesMm={flatPatternHolesMm}
+                  outlineSource={flatPatternOutlineSource}
+                  boundingLengthMm={flatPatternBoundingLengthMm}
+                  boundingWidthMm={flatPatternBoundingWidthMm}
+                  flatPatternAreaMm2={flatPatternAreaMm2}
+                  materialLabel={nestMaterialLabel}
+                  gradeLabel={nestGradeLabel}
+                  thicknessMm={sheetThickness}
+                  cutLengthMm={flatPatternCutLengthMm}
+                  bendCount={flatPatternBendCount}
+                  holeCount={flatPatternHoleCount}
+                  pierceCount={flatPatternPierceCount}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
           <FeatureOverlayCtx.Provider value={{ featureType: highlightOccurrences?.feature_type ?? '', sheetThickness: sheetThickness ?? 2 }}>
           <Canvas
             shadows

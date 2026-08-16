@@ -88,6 +88,15 @@ export interface RawGeometry {
   // undefined-when-unresolved rule as boundingRectMm2 above.
   flatPatternBoundingLengthMm?: number;
   flatPatternBoundingWidthMm?: number;
+  // Real flat-pattern outline polygon (ordered [x,y] mm points, same
+  // unfolded 2D frame as the bounding-length/width fields above) + hole
+  // positions -- for true (non-rectangle) nesting visualization, NOT used
+  // by costing. Undefined when the cad-engine's wire-walk/merge couldn't
+  // resolve one for this part's topology (flatPatternOutlineSource then
+  // reads 'unavailable') -- never a fabricated rectangle standing in.
+  flatPatternOutlinePointsMm?: number[][];
+  flatPatternHolesMm?: Array<{ cx_mm: number; cy_mm: number; diameter_mm: number }>;
+  flatPatternOutlineSource?: 'wire_walk' | 'unavailable';
   materialUtilizationPct?: number;
   scrapAreaMm2?: number;
   sheetThicknessMm: number;
@@ -183,6 +192,7 @@ export class AutoFillService {
     userId: string,
     accessToken: string,
     location?: string,
+    forceReanalysis = false,
   ): Promise<AutoFillResponseDto> {
     let cadEngineAvailable = false;
     let cadEngineError: string | undefined;
@@ -193,7 +203,7 @@ export class AutoFillService {
 
     // 1. Try CAD engine; fall back to STL bounding-box parse
     try {
-      cadResult = await this.callCADEngineStateless(fileBuffer, fileName);
+      cadResult = await this.callCADEngineStateless(fileBuffer, fileName, forceReanalysis);
       cadEngineAvailable = true;
       rawGeometry = this.sanitizeGeometry(this.extractGeometryFromCADResult(cadResult));
       cadFamilyClassification = this.extractFamilyClassification(cadResult);
@@ -523,6 +533,9 @@ export class AutoFillService {
         flatPatternAreaMm2: geo.flatPatternAreaMm2,
         flatPatternBoundingLengthMm: geo.flatPatternBoundingLengthMm,
         flatPatternBoundingWidthMm: geo.flatPatternBoundingWidthMm,
+        flatPatternOutlinePointsMm: geo.flatPatternOutlinePointsMm,
+        flatPatternHolesMm: geo.flatPatternHolesMm,
+        flatPatternOutlineSource: geo.flatPatternOutlineSource,
         costDrivers,
         holeDiameters:      geo.holeDiameters ?? [],
         holeGroups:         (geo.holeGroups ?? []).map((g) => ({
@@ -1003,7 +1016,7 @@ export class AutoFillService {
   // CAD ENGINE (STATELESS)
   // ────────────────────────────────────────────────────────────────────────────
 
-  private async callCADEngineStateless(fileBuffer: Buffer, fileName: string): Promise<any> {
+  private async callCADEngineStateless(fileBuffer: Buffer, fileName: string, forceReanalysis = false): Promise<any> {
     const ext = path.extname(fileName).toLowerCase().replace('.', '') || 'step';
     const contentTypeMap: Record<string, string> = {
       step: 'application/step',
@@ -1022,6 +1035,7 @@ export class AutoFillService {
     });
     form.append('strategy', 'balanced');
     form.append('bypass_format_check', 'true');
+    form.append('force_reanalysis', String(forceReanalysis));
 
     const response = await axios.post(
       `${this.cadEngineUrl}/analyze/geometry`,
@@ -1102,6 +1116,11 @@ export class AutoFillService {
       boundingRectMm2: smf?.flat_pattern_bounding_rect_mm2 ? safe(smf.flat_pattern_bounding_rect_mm2, 0) : undefined,
       flatPatternBoundingLengthMm: smf?.flat_pattern_bounding_length_mm != null ? safe(smf.flat_pattern_bounding_length_mm, 0) : undefined,
       flatPatternBoundingWidthMm: smf?.flat_pattern_bounding_width_mm != null ? safe(smf.flat_pattern_bounding_width_mm, 0) : undefined,
+      flatPatternOutlinePointsMm: Array.isArray(smf?.flat_pattern_outline_points_mm) && smf.flat_pattern_outline_points_mm.length > 0
+        ? smf.flat_pattern_outline_points_mm
+        : undefined,
+      flatPatternHolesMm: Array.isArray(smf?.flat_pattern_holes_mm) ? smf.flat_pattern_holes_mm : undefined,
+      flatPatternOutlineSource: smf?.flat_pattern_outline_source === 'wire_walk' ? 'wire_walk' : 'unavailable',
       materialUtilizationPct: smf?.material_utilization_pct != null ? safe(smf.material_utilization_pct, 0) : undefined,
       scrapAreaMm2: smf?.scrap_area_mm2 != null ? safe(smf.scrap_area_mm2, 0) : undefined,
       sheetThicknessMm: safe(smf?.sheet_thickness_mm, 0),
@@ -1755,6 +1774,9 @@ export class AutoFillService {
       boundingRectMm2: geo.boundingRectMm2,
       flatPatternBoundingLengthMm: geo.flatPatternBoundingLengthMm,
       flatPatternBoundingWidthMm: geo.flatPatternBoundingWidthMm,
+      flatPatternOutlinePointsMm: Array.isArray(geo.flatPatternOutlinePointsMm) ? geo.flatPatternOutlinePointsMm : undefined,
+      flatPatternHolesMm: Array.isArray(geo.flatPatternHolesMm) ? geo.flatPatternHolesMm : undefined,
+      flatPatternOutlineSource: geo.flatPatternOutlineSource,
       materialUtilizationPct: geo.materialUtilizationPct,
       scrapAreaMm2: geo.scrapAreaMm2,
       sheetThicknessMm: clamp(geo.sheetThicknessMm, 50),

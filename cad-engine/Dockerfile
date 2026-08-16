@@ -45,7 +45,8 @@ RUN conda run -n cad-env pip install \
     "openai>=1.35.0" \
     python-magic==0.4.27 \
     "PyMuPDF>=1.24.0" \
-    requests
+    requests \
+    "shapely>=2.0,<3.0"
 
 # Copy all application source (copilot package, feature extractors, converters, knowledge)
 COPY . .

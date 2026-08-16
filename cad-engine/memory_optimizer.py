@@ -20,14 +20,22 @@ import json
 
 from OCC.Core.TopoDS import TopoDS_Shape  # type: ignore
 from OCC.Core.GProp import GProp_GProps  # type: ignore
-from OCC.Core.BRepGProp import brepgprop, brepgprop_VolumeProperties  # type: ignore
+# brepgprop / brepbndlib are the real modern replacements for the deprecated
+# procedural brepgprop_VolumeProperties / brepbndlib_Add functions -- NOT the
+# title-case `BRepGProp`/`BRepBndLib` classes (those do not exist in this
+# pythonocc-core build; verified live, ImportError). This matches exactly
+# what this install's own deprecation warning recommends
+# ("...please rather use the static method brepbndlib.Add") and the same
+# pattern already used in feature_extractors.py.
+from OCC.Core.BRepGProp import brepgprop  # type: ignore
 from OCC.Core.Bnd import Bnd_Box  # type: ignore
-from OCC.Core.BRepBndLib import brepbndlib_Add  # type: ignore
+from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh  # type: ignore
 from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
 from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX  # type: ignore
 from OCC.Core.BRep import BRep_Tool  # type: ignore
 from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
+from OCC.Core.Standard import Standard_Failure  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +226,13 @@ class AdvancedCADMemoryOptimizer:
             Complete optimization result with geometry features, DFM analysis, and memory metrics
         """
         start_time = datetime.now()
+        # Fail fast with a clear, actionable error at the real trust boundary
+        # (an untrusted uploaded file's parsed shape entering this module) --
+        # rather than letting a null shape propagate into hashing/tessellation/
+        # geometry analysis, where a null-shape failure surfaces as a much
+        # more confusing, buried OCC-internal error deep in the call stack.
+        if shape is None or shape.IsNull():
+            raise ValueError("analyze_and_optimize received a null/empty TopoDS_Shape -- the STEP file likely failed to parse into valid geometry")
         try:
             # Generate geometry hash for caching
             geometry_hash = self._calculate_geometry_hash(shape, file_path, file_hash)
@@ -310,7 +325,7 @@ class AdvancedCADMemoryOptimizer:
         volume_props = GProp_GProps()
         surface_props = GProp_GProps()
 
-        brepgprop_VolumeProperties(shape, volume_props)
+        brepgprop.VolumeProperties(shape, volume_props)
         brepgprop.SurfaceProperties(shape, surface_props)
 
         volume = max(volume_props.Mass(), 0.0)
@@ -318,7 +333,7 @@ class AdvancedCADMemoryOptimizer:
 
         # Bounding box
         bbox = Bnd_Box()
-        brepbndlib_Add(shape, bbox)
+        brepbndlib.Add(shape, bbox)
         xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
 
         # Sort dimensions so length >= width >= height regardless of STEP axis orientation.
@@ -384,7 +399,7 @@ class AdvancedCADMemoryOptimizer:
         # Compute OCC bounding box min/max once — used by all detectors
         # to normalize face centroids to [-1, +1] relative to bbox centre.
         bbox_raw = Bnd_Box()
-        brepbndlib_Add(shape, bbox_raw)
+        brepbndlib.Add(shape, bbox_raw)
         xmin, ymin, zmin, xmax, ymax, zmax = bbox_raw.Get()
         bbox_minmax = {
             'xmin': xmin, 'xmax': xmax,
@@ -787,7 +802,7 @@ class AdvancedCADMemoryOptimizer:
                             try:
                                 if BRepAdaptor_Surface(adj_face).GetType() == GeomAbs_Plane:
                                     fbox = Bnd_Box()
-                                    brepbndlib_Add(adj_face, fbox)
+                                    brepbndlib.Add(adj_face, fbox)
                                     fxmin, fymin, _fzmin, fxmax, fymax, _fzmax = fbox.Get()
                                     # Farthest corner from the hole axis, in-plane (X/Y) —
                                     # sheet thickness (Z) is never the discriminator here,
@@ -989,7 +1004,7 @@ class AdvancedCADMemoryOptimizer:
     def _analyze_wall_thickness(self, shape: TopoDS_Shape) -> float:
         """Legacy shim used by DFM scoring — delegates to real implementation."""
         bbox = Bnd_Box()
-        brepbndlib_Add(shape, bbox)
+        brepbndlib.Add(shape, bbox)
         xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
         bb = {'length': xmax-xmin, 'width': ymax-ymin, 'height': zmax-zmin}
         return self._analyze_wall_thickness_real(shape, bb)
@@ -997,7 +1012,7 @@ class AdvancedCADMemoryOptimizer:
     def _analyze_holes(self, shape: TopoDS_Shape) -> dict:
         """Legacy shim — delegates to real hole detector with a neutral bbox."""
         bbox = Bnd_Box()
-        brepbndlib_Add(shape, bbox)
+        brepbndlib.Add(shape, bbox)
         xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
         bb = {'xmin': xmin, 'xmax': xmax, 'ymin': ymin, 'ymax': ymax, 'zmin': zmin, 'zmax': zmax}
         return self._detect_holes_real(shape, bb)
@@ -1005,7 +1020,7 @@ class AdvancedCADMemoryOptimizer:
     def _analyze_pockets(self, shape: TopoDS_Shape) -> dict:
         """Legacy shim — delegates to real pocket detector."""
         bbox = Bnd_Box()
-        brepbndlib_Add(shape, bbox)
+        brepbndlib.Add(shape, bbox)
         xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
         bb = {'xmin': xmin, 'xmax': xmax, 'ymin': ymin, 'ymax': ymax, 'zmin': zmin, 'zmax': zmax}
         return self._detect_pockets_real(shape, bb)
@@ -1013,7 +1028,7 @@ class AdvancedCADMemoryOptimizer:
     def _analyze_undercuts(self, shape: TopoDS_Shape) -> int:
         """Legacy shim."""
         bbox = Bnd_Box()
-        brepbndlib_Add(shape, bbox)
+        brepbndlib.Add(shape, bbox)
         xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
         bb = {'xmin': xmin, 'xmax': xmax, 'ymin': ymin, 'ymax': ymax, 'zmin': zmin, 'zmax': zmax}
         result = self._detect_undercuts_real(shape, bb)

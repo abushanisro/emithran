@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
+import { useCostSummary } from '@/lib/api/hooks/useBOMItems';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useExchangeRates } from '@/lib/api/hooks/useExchangeRates';
@@ -117,6 +118,7 @@ interface RawMaterialDialogProps {
   editData?: any;
   bomItemData?: any;
   location?: string; // pre-selects pricing region (India / USA / Germany …)
+  batchSize?: number; // order quantity — drives nesting sheetsRequired disclosure
 }
 
 export function RawMaterialDialog({
@@ -126,7 +128,42 @@ export function RawMaterialDialog({
   editData,
   bomItemData,
   location,
+  batchSize,
 }: RawMaterialDialogProps) {
+  // Real nesting result for this BOM item, if one exists — the single source
+  // of truth for sheet-metal Gross Usage (see sheet-metal-nesting.engine.ts).
+  // Gated on `open` so the always-mounted dialog doesn't fire this on every
+  // parent render. `partsPerSheet` presence (not just blankSpec existing) is
+  // the reliable "did nesting run at all" signal — it's only ever set in the
+  // backend's `if (smNestingResult)` branch, never the volume-fallback one.
+  const nestingItemId = open ? (bomItemData?.id as string | undefined) : undefined;
+  const { data: nestingCostSummary } = useCostSummary(nestingItemId, batchSize ?? 1, location);
+  const nestingBlankSpec = nestingCostSummary?.blankSpec;
+  const hasRealNesting = nestingBlankSpec?.form === 'sheet' && typeof nestingBlankSpec.partsPerSheet === 'number';
+  // "Nesting ran" is not the same as "nesting is trustworthy": when the true
+  // unfolded flat-pattern rectangle couldn't be resolved, the engine falls
+  // back to packing the part's FOLDED 3D bounding box instead (disclosed via
+  // nestingDimensionConfidence: 'fallback') — for a bent part that box is
+  // much smaller than the real flat blank, so parts/sheet is systematically
+  // OVERCOUNTED (confirmed live: 3640 parts/sheet, 94.5% util on a fallback
+  // result — physically implausible). Only a 'verified' result (packed
+  // against the real CAD-derived flat pattern) is trustworthy enough to lock
+  // Gross Usage to. A fallback result is still disclosed to the user (see
+  // JSX below) but must NOT silently drive a read-only field.
+  const nestingIsTrustworthy = hasRealNesting && nestingBlankSpec.nestingDimensionConfidence === 'verified';
+  // True whenever this BOM item is sheet metal at all (flat-pattern area,
+  // thickness, and density all resolved server-side) -- set on BOTH backend
+  // blankSpec branches (real nesting result AND its own volumetric-fallback
+  // branch), so this is true even when nesting itself didn't run. For any
+  // sheet-metal item, the net÷(1−scrap%) formula must NEVER auto-populate
+  // Gross Usage -- that formula is a guess, and guessing is exactly what
+  // this whole fix exists to stop doing for sheet metal. When nesting isn't
+  // trustworthy, Gross Usage requires real manual entry instead (see JSX):
+  // no computed number, honest empty/gap state. Non-sheet-metal material
+  // records (round bar, billet, casting, ...) are untouched by this rule --
+  // out of scope for the nesting engine, so the pre-existing manual formula
+  // remains their only costing path.
+  const isSheetMetalItem = nestingBlankSpec?.form === 'sheet';
   const [materialGroup, setMaterialGroup] = useState<string>('');
   const [country, setCountry] = useState<string>('');
   const [selectedQuarter, setSelectedQuarter] = useState<string>('q1');
@@ -580,20 +617,22 @@ export function RawMaterialDialog({
       setManualUnitCost(editData.unitCost || 0);
       setSelectedQuarter(editData.quarter || 'q1');
 
-      // Seed net/gross from CAD weight when the auto-created record has zero usage
+      // Seed net/gross from CAD weight when the auto-created record has zero usage.
+      // Gross Usage itself is no longer seeded here with a guessed scrap% divide —
+      // when a real nesting result exists, the dedicated effect below is the sole
+      // writer of grossUsage; when it doesn't, savedGross (or 0) is kept as-is and
+      // the user enters it manually.
       const savedNet = Number(editData.netUsage ?? 0);
       const savedGross = Number(editData.grossUsage ?? 0);
       const cadWeight = Number(bomItemData?.weight ?? 0);
-      if (!savedNet && !savedGross && cadWeight > 0) {
-        const scrapVal = Number(editData.scrap ?? 10);
+      if (!savedNet && cadWeight > 0) {
         const net = parseFloat(cadWeight.toFixed(6));
         setNetUsage(net);
-        setGrossUsage(parseFloat((net / (1 - scrapVal / 100)).toFixed(6)));
         setCadFilled(true);
       } else {
         setNetUsage(savedNet);
-        setGrossUsage(savedGross);
       }
+      setGrossUsage(savedGross);
     } else if (!editData && open) {
       // Reset for new entry — pre-select pricing location from parent context
       setMaterialGroup('');
@@ -641,10 +680,20 @@ export function RawMaterialDialog({
     const overheadPct = typeof overhead  === 'number' ? overhead  : 0;
     const reclaimPct  = typeof reclaimRate === 'number' ? reclaimRate : 0;
 
-    // gross = net ÷ (1 − scrap%), fallback to manual grossUsage
-    const gross = net > 0
-      ? net / Math.max(1 - scrapPct / 100, 0.001)
-      : (typeof grossUsage === 'number' ? grossUsage : 0);
+    // gross: from the real nesting engine ONLY when its result is trustworthy
+    // (packed against the verified true flat-pattern rectangle, not the
+    // folded-3D-bbox fallback — see nestingIsTrustworthy's doc comment).
+    // For sheet-metal items without a trustworthy result, NEVER compute a
+    // guessed number — use only what the user actually typed into Gross
+    // Usage. The net÷(1−scrap%) formula remains solely for genuinely
+    // non-sheet-metal material records (out of scope for the nesting fix).
+    const gross = nestingIsTrustworthy
+      ? nestingBlankSpec.grossWeightKg
+      : isSheetMetalItem
+        ? (typeof grossUsage === 'number' ? grossUsage : 0)
+        : (net > 0
+          ? net / Math.max(1 - scrapPct / 100, 0.001)
+          : (typeof grossUsage === 'number' ? grossUsage : 0));
 
     const grossMaterialCost = gross * finalUnitCost;
     const scrapAmount       = gross - net;
@@ -664,18 +713,35 @@ export function RawMaterialDialog({
       previewCost: totalCostVal,
       previewBreakdown: { gross, grossMaterialCost, scrapAmount, reclaimValue, netMaterialCost, scrapAdjustment: 0, subtotal: netMaterialCost, overheadCost, totalCostVal, utilRate, effPerUnit, reclaimRateInvalid: reclaimRateInvalid ? 1 : 0 },
     };
-  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, reclaimRate, editData, country, exchangeRates]);
+  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, reclaimRate, editData, country, exchangeRates, nestingIsTrustworthy, isSheetMetalItem, nestingBlankSpec]);
 
   const totalCost = previewCost;
 
-  // Auto-derive Gross Usage from Net Usage + Scrap % for display
+  // Auto-derive Gross Usage from Net Usage + Scrap % for display — ONLY for
+  // genuinely non-sheet-metal material records. Sheet-metal items must never
+  // get an auto-computed Gross Usage from this formula, trustworthy nesting
+  // or not — see isSheetMetalItem's doc comment. When trustworthy nesting
+  // exists, the dedicated effect below is the sole writer of grossUsage.
   useEffect(() => {
+    if (isSheetMetalItem) return;
     const net = typeof netUsage === 'number' ? netUsage : 0;
     if (net > 0) {
       const s = typeof scrap === 'number' ? Math.min(scrap, 99.9) : 0;
       setGrossUsage(parseFloat((net / Math.max(1 - s / 100, 0.001)).toFixed(4)));
     }
-  }, [netUsage, scrap]);
+  }, [netUsage, scrap, isSheetMetalItem]);
+
+  // Gross Usage from the real nesting engine's theoretical per-part yield —
+  // the sole writer of grossUsage whenever a TRUSTWORTHY nesting result
+  // exists (verified true flat pattern, not the folded-bbox fallback),
+  // regardless of new entry / edit-with-zero-usage / edit-with-stale-saved-
+  // value. Always wins over any manually-entered or previously-saved figure,
+  // since a manual override would silently diverge from the real cut plan.
+  useEffect(() => {
+    if (nestingIsTrustworthy) {
+      setGrossUsage(nestingBlankSpec.grossWeightKg);
+    }
+  }, [nestingIsTrustworthy, nestingBlankSpec]);
 
   // Auto-populate calculator fields when material is selected
   useEffect(() => {
@@ -1173,7 +1239,13 @@ export function RawMaterialDialog({
               <div className="space-y-2">
                 <label className="text-sm font-semibold flex items-center gap-2">
                   Gross Usage
-                  <span className="text-muted-foreground text-xs font-normal">(kg · auto-calculated)</span>
+                  <span className="text-muted-foreground text-xs font-normal">
+                    {nestingIsTrustworthy
+                      ? '(kg · from nesting engine, per part)'
+                      : isSheetMetalItem
+                        ? '(kg · enter manually)'
+                        : '(kg · auto-calculated)'}
+                  </span>
                 </label>
                 <div className="flex gap-2">
                   <Input
@@ -1184,9 +1256,10 @@ export function RawMaterialDialog({
                       const val = e.target.value;
                       setGrossUsage(val === '' ? '' : parseFloat(val) || 0);
                     }}
-                    placeholder="Enter gross usage"
+                    placeholder={isSheetMetalItem && !nestingIsTrustworthy ? 'Enter gross usage — nesting unavailable/unverified' : 'Enter gross usage'}
                     className="flex-1"
-                    disabled={!selectedMaterialId && !editData}
+                    disabled={nestingIsTrustworthy || (!selectedMaterialId && !editData)}
+                    title={nestingIsTrustworthy ? 'Derived from the real nesting result — not editable' : undefined}
                   />
                   <Button
                     type="button" variant="outline" size="icon"
@@ -1194,12 +1267,33 @@ export function RawMaterialDialog({
                     onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                     title="Use DB Calculator"
-                    disabled={!selectedMaterialId && !editData}
+                    disabled={nestingIsTrustworthy || (!selectedMaterialId && !editData)}
                   >
                     <CalculatorIcon className="h-4 w-4" />
                   </Button>
                 </div>
-                {typeof netUsage === 'number' && netUsage > 0 ? (
+                {nestingIsTrustworthy ? (
+                  <div className="space-y-0.5">
+                    <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                      {nestingBlankSpec.sheetWidthMm}×{nestingBlankSpec.sheetLengthMm}mm sheet · {nestingBlankSpec.partsPerSheet} parts/sheet · {nestingBlankSpec.utilizationPct}% util · verified CAD flat pattern
+                    </p>
+                    {typeof nestingBlankSpec.sheetsRequired === 'number' && (
+                      <p className="text-[11px] text-muted-foreground font-mono">
+                        Batch: {nestingBlankSpec.sheetsRequired} sheet{nestingBlankSpec.sheetsRequired === 1 ? '' : 's'} required · {nestingBlankSpec.plannedParts} planned / {nestingBlankSpec.excessPositions} excess
+                      </p>
+                    )}
+                  </div>
+                ) : hasRealNesting ? (
+                  // Nesting ran but only on the folded-3D-bbox fallback (true flat
+                  // pattern unresolved) — disclosed honestly, but NOT trusted to
+                  // auto-fill anything: for a bent part that box overcounts
+                  // capacity (see nestingIsTrustworthy's doc comment).
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    Nesting ran on an unverified fallback ({nestingBlankSpec.sheetWidthMm}×{nestingBlankSpec.sheetLengthMm}mm sheet, {nestingBlankSpec.partsPerSheet} parts/sheet — folded 3D bounding box, not the true flat pattern) — this typically overcounts capacity for a bent part. Not used to fill Gross Usage; enter the real value manually.
+                  </p>
+                ) : isSheetMetalItem ? (
+                  <p className="text-[11px] text-muted-foreground">Flat-pattern geometry unavailable — nesting could not run for this part. Enter Gross Usage manually.</p>
+                ) : typeof netUsage === 'number' && netUsage > 0 ? (
                   <p className="text-[11px] text-muted-foreground font-mono">
                     {netUsage} ÷ (1 − {typeof scrap === 'number' ? scrap : 0}% / 100)
                   </p>
@@ -1212,15 +1306,24 @@ export function RawMaterialDialog({
             {/* Scrap, Reclaim Rate, Overhead */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-semibold" title="% of gross lost as chips/trim/yield — drives Gross = Net ÷ (1 − scrap%)">
+                <label className="text-sm font-semibold" title={isSheetMetalItem ? 'Derived display: (Gross Usage − Net Usage) / Gross Usage — not an independent input for sheet-metal parts' : '% of gross lost as chips/trim/yield — drives Gross = Net ÷ (1 − scrap%)'}>
                   Scrap / Yield Loss %
                 </label>
                 <Input
                   type="number" step="0.01"
-                  value={scrap === '' ? '' : scrap.toString()}
+                  value={
+                    isSheetMetalItem
+                      ? (() => {
+                        const g = typeof grossUsage === 'number' ? grossUsage : 0;
+                        const n = typeof netUsage === 'number' ? netUsage : 0;
+                        return g > 0 ? (((g - n) / g) * 100).toFixed(2) : '';
+                      })()
+                      : (scrap === '' ? '' : scrap.toString())
+                  }
                   onChange={(e) => { const v = e.target.value; setScrap(v === '' ? '' : parseFloat(v) || 0); }}
-                  placeholder="e.g. 10.5"
-                  disabled={!selectedMaterialId && !editData}
+                  placeholder={isSheetMetalItem ? '—' : 'e.g. 10.5'}
+                  disabled={isSheetMetalItem || (!selectedMaterialId && !editData)}
+                  title={isSheetMetalItem ? 'Derived from Gross Usage and Net Usage — not independently editable for sheet-metal parts' : undefined}
                 />
               </div>
 
