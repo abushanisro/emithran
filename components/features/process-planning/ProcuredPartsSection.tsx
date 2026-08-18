@@ -94,9 +94,20 @@ export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$',
     return base * (1 + scrap / 100 + overhead / 100);
   };
 
+  // Returns a NUMBER, not a pre-rounded string — rounding here (as this used
+  // to, via .toFixed(2)) collapsed any sub-cent total to "0.00" BEFORE the
+  // currency conversion at each display site even ran. Precision is applied
+  // once, at final display, via fmtCurrency below.
   const calculateTotal = () => {
-    return procuredParts.reduce((sum, p) => sum + computePartCost(p), 0).toFixed(2);
+    return procuredParts.reduce((sum, p) => sum + computePartCost(p), 0);
   };
+
+  // Same small-value-aware precision used across the other cost sections
+  // (RawMaterialsSection's fmtCurrency) — a cheap procured part can total
+  // under a cent, which rounds to "0.00" at a flat 2 decimal places even
+  // though the real value is non-zero.
+  const fmtCurrency = (v: number): string =>
+    v > 0 && v < 0.01 ? v.toFixed(4) : v.toFixed(2);
 
   if (compact) {
     return (
@@ -134,7 +145,7 @@ export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$',
               ))}
               <div className="flex justify-between items-center px-3 py-1.5 bg-muted/20">
                 <span className="text-[11px] font-semibold text-muted-foreground">Total</span>
-                <span className="text-xs font-bold tabular-nums">{currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}</span>
+                <span className="text-xs font-bold tabular-nums">{currencySymbol}{fmtCurrency(Number(calculateTotal()) * conversionRate)}</span>
               </div>
             </>
           )}
@@ -181,7 +192,7 @@ export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$',
                   Part
                 </th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
-                  Unit Cost ($)
+                  Unit Cost ({currencySymbol})
                 </th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
                   Quantity
@@ -193,7 +204,7 @@ export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$',
                   Overhead %
                 </th>
                 <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20">
-                  Total Cost ($)
+                  Total Cost ({currencySymbol})
                 </th>
                 <th className="p-3 text-center text-xs font-semibold">
                   Actions
@@ -259,7 +270,7 @@ export function ProcuredPartsSection({ bomItemId, compact, currencySymbol = '$',
                       Total:
                     </td>
                     <td className="p-3 border-r border-border text-xs text-right">
-                      {currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}
+                      {currencySymbol}{fmtCurrency(Number(calculateTotal()) * conversionRate)}
                     </td>
                     <td className="p-3"></td>
                   </tr>

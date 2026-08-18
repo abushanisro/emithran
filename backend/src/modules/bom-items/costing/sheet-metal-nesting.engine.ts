@@ -4,8 +4,12 @@
 //   allowance = 0.1186 = C × 2mm × sqrt(352/10) ⟹ C ≈ 0.0593
 const PART_ALLOWANCE_CONSTANT = 0.0593;
 
-// Standard stock sheet sizes (width × length mm), ascending by area
-const STANDARD_SHEETS: ReadonlyArray<[number, number]> = [
+// Standard stock sheet sizes (width × length mm), ascending by area. Shared
+// by the rectangle-grid engine below AND true-nest-costing.engine.ts's
+// true-shape candidate enumeration -- both must compare the SAME candidate
+// set, or "which sheet sizes are even considered" could silently diverge
+// between the fallback and primary costing paths.
+export const STANDARD_SHEETS: ReadonlyArray<[number, number]> = [
   [1000, 2000],
   [1250, 2500],
   [1500, 3000],
@@ -13,7 +17,57 @@ const STANDARD_SHEETS: ReadonlyArray<[number, number]> = [
   [2500, 5000],
 ];
 
-const EDGE_ALLOWANCE_MM = 2; // minimum clearance from sheet edge
+export const EDGE_ALLOWANCE_MM = 2; // minimum clearance from sheet edge
+
+// Part-to-part allowance (punch/draw cushion, from spec formula) -- shared
+// by the rectangle-grid engine's own packing AND true-nest-costing.engine.ts
+// (as the kerf/spacing value passed to cad-engine's true-shape nest), so
+// both engines assume the same real inter-part clearance for the same part.
+export function computePartAllowanceMm(thicknessMm: number, shearStrengthMpa: number, hasImpressions = false): number {
+  const shearSafe = shearStrengthMpa > 0 ? shearStrengthMpa : 350;
+  return PART_ALLOWANCE_CONSTANT * thicknessMm * Math.sqrt(shearSafe / 10) + (hasImpressions ? 10 : 0);
+}
+
+export interface TrueNestCostingCache {
+  sheetWidthMm: number;
+  sheetLengthMm: number;
+  kerfMm: number;
+  edgeMarginMm: number;
+  partsPerSheet: number;
+  utilizationPct: number;
+  sheetWeightKg: number;
+  grossWeightPerPartKg: number;
+  cachedAt?: string;
+}
+
+// A cached true-shape-nest costing result (bom-items.service.ts's
+// featureGraph.summary.trueNestCostingCache) is only valid for the kerf +
+// edge margin it was computed with -- sheetWidthMm/sheetLengthMm are NOT
+// part of the match criteria because sheet SELECTION is itself part of the
+// cached computation (every viable candidate is compared, the best one
+// wins and is stored) -- there is no external "which sheet" input to
+// validate against here, unlike the old single-candidate design. Pulled out
+// as a pure function so this correctness gate has real unit test coverage
+// without mocking Supabase/cad-engine.
+export function isTrueNestCostingCacheValid(
+  cache: unknown,
+  kerfMm: number,
+  edgeMarginMm: number,
+): cache is TrueNestCostingCache {
+  if (!cache || typeof cache !== 'object') return false;
+  const c = cache as Record<string, unknown>;
+  const closeEnough = (a: unknown, b: number) => typeof a === 'number' && Math.abs(a - b) < 0.01;
+  return (
+    closeEnough(c.kerfMm, kerfMm) &&
+    closeEnough(c.edgeMarginMm, edgeMarginMm) &&
+    typeof c.sheetWidthMm === 'number' && c.sheetWidthMm > 0 &&
+    typeof c.sheetLengthMm === 'number' && c.sheetLengthMm > 0 &&
+    typeof c.partsPerSheet === 'number' && c.partsPerSheet > 0 &&
+    typeof c.utilizationPct === 'number' &&
+    typeof c.sheetWeightKg === 'number' && c.sheetWeightKg > 0 &&
+    typeof c.grossWeightPerPartKg === 'number' && c.grossWeightPerPartKg > 0
+  );
+}
 
 export interface NestingInput {
   flatPatternLengthMm: number;   // unfolded longest dimension
@@ -96,6 +150,20 @@ export function resolveNestingDimensions(
   };
 }
 
+// Utilization is ALWAYS this mass-based ratio -- Net Weight/Part ÷ Gross
+// Weight/Part, per the reference costing algorithm (Sheet-Metal-Cost-Model-
+// Algorithm.md §1.3) -- never a geometry-proxy percentage (e.g. a true-nest
+// polygon's own area ratio, which does not necessarily subtract every
+// internal cutout/window the same way the real CAD net-weight calculation
+// does). Confirmed live: a frame-shaped part's true-nest polygon-area
+// utilization reported 83.9% while its real mass-based utilization was
+// 55.0% -- a costing-breaking discrepancy this shared function exists to
+// make impossible to reintroduce by accident.
+export function computeMassBasedUtilizationPct(netWeightKg: number, grossWeightPerPartKg: number): number {
+  if (netWeightKg <= 0 || grossWeightPerPartKg <= 0) return 0;
+  return Math.min(100, (netWeightKg / grossWeightPerPartKg) * 100);
+}
+
 export function computeNesting(input: NestingInput): NestingResult {
   const {
     flatPatternLengthMm,
@@ -112,11 +180,7 @@ export function computeNesting(input: NestingInput): NestingResult {
     quantityRequired,
   } = input;
 
-  // Part-to-part allowance (punch/draw cushion from spec formula)
-  const shearSafe = shearStrengthMpa > 0 ? shearStrengthMpa : 350;
-  const partAllowanceMm =
-    PART_ALLOWANCE_CONSTANT * thicknessMm * Math.sqrt(shearSafe / 10) +
-    (hasImpressions ? 10 : 0);
+  const partAllowanceMm = computePartAllowanceMm(thicknessMm, shearStrengthMpa, hasImpressions);
 
   const usablePartL = flatPatternLengthMm + partAllowanceMm;
   const usablePartW = flatPatternWidthMm + partAllowanceMm;
@@ -152,9 +216,7 @@ export function computeNesting(input: NestingInput): NestingResult {
   const sheetWeightKg = (sheetVolMm3 / 1e9) * densityKgM3;
   const grossWeightPerPart = sheetWeightKg / bestParts;
   const scrapWeightPerPart = Math.max(0, grossWeightPerPart - netWeightKg);
-  const utilisation = netWeightKg > 0 && grossWeightPerPart > 0
-    ? Math.min(100, (netWeightKg / grossWeightPerPart) * 100)
-    : 0;
+  const utilisation = computeMassBasedUtilizationPct(netWeightKg, grossWeightPerPart);
 
   const grossMaterialCost = grossWeightPerPart * materialPricePerKg;
   const scrapRecoveryCost = scrapWeightPerPart * scrapPricePerKg * scrapRecoveryPct;

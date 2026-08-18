@@ -1,5 +1,5 @@
 import {
-  TAPPING_SETUP_MIN, MATERIAL_OVERHEAD_PCT,
+  TAPPING_SETUP_MIN, MATERIAL_OVERHEAD_PCT, UTILIZATION_ADVISORY_THRESHOLD_PCT,
   RATES_SOURCE_LABEL,
   COUNTERBORE_SETUP_MIN, COUNTERSINK_SETUP_MIN, PEM_INSERTION_SETUP_MIN,
   BURRING_SETUP_MIN,
@@ -24,6 +24,17 @@ export interface MHRRateInput {
   commodityCode: string | null;
   selection?: import('../dto/machine-selection.dto').MachineSelectionResult;
   labourRate?: number | null;
+  // Real mhr_records row id, when this rate came from the user's own imported
+  // fleet (resolveCmmSpecificRate/resolveGenericInspectionRate's realCmm/
+  // realBench branches) — lets a persisted process_cost_records row link back
+  // to it as mhrId, same as every machineSelection-based class already can.
+  mhrRecordId?: string | null;
+  // 'bm-mhr-<id>' — mhr_benchmark_rates row id, prefixed exactly like
+  // mhr.service.ts#getBenchmarkRates() already does, when this rate came from
+  // the benchmark fallback instead of a real imported machine. Without either
+  // id, an Inspection line resolved to a real, priced resource still had no
+  // way to be saved as anything but "not linked to a machine".
+  benchmarkMhrId?: string | null;
 }
 
 export interface CostEngineInput {
@@ -434,11 +445,12 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     // aPriori nesting path — use nesting-derived gross weight
     materialCost = nestingResult.netMaterialCost;
     grossWeightKg = nestingResult.grossWeightPerPartKg;
-    if (nestingResult.utilisationPct < 75) {
+    if (nestingResult.utilisationPct < UTILIZATION_ADVISORY_THRESHOLD_PCT) {
       warnings.push(
-        `Material utilisation ${nestingResult.utilisationPct}% is low — ` +
-        `consider panel nesting optimisation (${nestingResult.partsPerSheet} parts/sheet on ` +
-        `${nestingResult.sheetWidthMm}×${nestingResult.sheetLengthMm}mm)`,
+        `Material utilisation ${nestingResult.utilisationPct}% (${nestingResult.partsPerSheet} parts/sheet on ` +
+        `${nestingResult.sheetWidthMm}×${nestingResult.sheetLengthMm}mm, true-shape nest) -- below the ` +
+        `${UTILIZATION_ADVISORY_THRESHOLD_PCT}% guideline. This can be normal for an irregular flat pattern ` +
+        `and is already reflected in the material cost; panel nesting may improve yield if the geometry allows it.`,
       );
     }
   } else {

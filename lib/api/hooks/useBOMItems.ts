@@ -628,6 +628,12 @@ export interface ProcessLineCost {
   /** Labour hour rate from lhr_benchmark_rates (local currency/hr). Already baked into hourlyRate. */
   labourRate?: number | null;
   machineSelection?: MachineSelectionResult;
+  /** Real mhr_records id / 'bm-mhr-<id>' benchmark id for this line's resolved
+   *  resource, set directly on classes (currently just Inspection) priced via
+   *  a flat single-resource resolver instead of machineSelection's candidate
+   *  list — see backend resolveCmmSpecificRate/resolveGenericInspectionRate. */
+  mhrId?: string | null;
+  benchmarkMhrId?: string | null;
   featureBreakdown?: FeatureOp[];
   /** Full end-to-end audit trail (real inputs + provenance, then calculated
    *  fields + real DB formula string, in evaluation order) — present only for
@@ -750,6 +756,18 @@ export interface CostSummaryDto {
   currency?: string;
   currencySymbol?: string;
   toUsdRate?: number;
+  // amount_usd × usdToDisplayRate = amount in `currency` — for converting
+  // fields read from OTHER, always-USD tables (raw material/packaging/
+  // procured/tooling/process-cost records). NOT the same as toUsdRate above
+  // (which already applies to this DTO's own embedded figures) — see the
+  // backend cost-breakdown.dto.ts's doc comment for why the two differ.
+  usdToDisplayRate?: number;
+  // amount_inr × inrToDisplayRate = amount in `currency` — for converting
+  // frontend constants/estimates denominated in INR regardless of factory
+  // location (e.g. the Investment/NRE tab's fixture/programming/tooling/
+  // inspection tables). Always derived from the live exchange_rates table
+  // server-side — never a hardcoded per-country FX table on the frontend.
+  inrToDisplayRate?: number;
   // Persistent aPriori-style manual overrides already applied to the figures
   // above ('mat_rate' | '<process>::rate' | '<process>::cycleMin') — read-only
   // hint for the "overridden" badge + reset control, not something to re-apply.
@@ -773,24 +791,49 @@ export interface BlankSpecDto {
   sheetWidthMm?: number;
   sheetLengthMm?: number;
   partsPerSheet?: number;
+  // The FULL physical stock-sheet weight -- NOT the same as grossWeightKg
+  // above (already per-part). See backend blank-spec.dto.ts's own doc
+  // comment for why this is exposed separately (a UI showing grossWeightKg
+  // under a "Sheet" label with no full-sheet figure to contrast it against
+  // reads as a physically-impossible sheet weight).
+  sheetWeightKg?: number;
   // Actual batch sheet consumption -- a distinct concept from grossWeightKg,
   // disclosure-only. See backend blank-spec.dto.ts for the full explanation.
   sheetsRequired?: number;
   plannedParts?: number;
   excessPositions?: number;
   actualBatchGrossMaterialKg?: number;
+  // Which nesting engine decided sheetWidthMm/sheetLengthMm/partsPerSheet/
+  // utilizationPct above -- 'true_shape' (real flat-pattern silhouette nest,
+  // compared across every candidate standard sheet) or
+  // 'rectangle_grid_fallback' (no real outline yet, or true-shape nesting
+  // failed for every candidate -- nestingFallbackReason explains why).
+  nestingMethod?: 'true_shape' | 'rectangle_grid_fallback';
+  nestingFallbackReason?: string;
+  // Present only once the "Sheet Metal - Gross Material Usage (Nesting)"
+  // calculator's mapping is resolvable server-side -- absent (never
+  // fabricated client-side) until that migration is applied.
+  calculatorId?: string;
+  calculatorVersion?: number;
+  calculationTrace?: CalculationTraceStep[];
+  confidence?: ConfidenceLevel;
 }
 
 export function useCostSummary(itemId: string | undefined, batchSize: number = 1, location = 'USA') {
   return useQuery({
     queryKey: ['bom-items', itemId, 'cost-summary', batchSize, location],
     queryFn: () =>
-      // Observed taking 14-40s in practice (re-runs nesting/machine-selection),
-      // well past the 15s dev-mode default (lib/config.ts) — same fix as
-      // useApplyRoute's timeout override above.
+      // On a true-shape-nest cache miss, the backend evaluates EVERY viable
+      // standard sheet size (up to 5) via real, synchronous cad-engine
+      // calls before responding -- deliberately never returns an interim
+      // rectangle-grid answer first (costing must be deterministic, see
+      // bom-items.service.ts's resolveTrueShapeNestCosting). Observed
+      // 14-40s even for the OLD single-candidate path, so this timeout
+      // must cover the cumulative worst case across all candidates, not
+      // just one. Once cached, subsequent requests return quickly.
       apiClient.get<CostSummaryDto>(
         `/bom-items/${itemId}/cost-summary?batchSize=${batchSize}&location=${encodeURIComponent(location)}`,
-        { timeout: 60000 },
+        { timeout: 180000 },
       ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
@@ -808,9 +851,14 @@ export function useCostSummary(itemId: string | undefined, batchSize: number = 1
   });
 }
 
-// Mirrors backend true-nest.dto.ts. Visualization only -- NOT a material-
-// cost source; sheet-metal-nesting.engine.ts's rectangle-grid computeNesting()
-// (surfaced via BlankSpecDto above) remains the sole cost basis.
+// Mirrors backend true-nest.dto.ts. This endpoint itself is still
+// visualization-only (the Nest view's on-demand single-sheet placement) --
+// but note that material COSTING now separately runs its own true-shape
+// nest across every candidate sheet (bom-items.service.ts's
+// resolveTrueShapeNestCosting), not the rectangle-grid engine, when a real
+// flat-pattern outline exists. sheet-metal-nesting.engine.ts's
+// computeNesting() is the disclosed fallback only (see BlankSpecDto's
+// nestingMethod/nestingFallbackReason above), not always the cost basis.
 export interface NestPlacementDto {
   xMm: number;
   yMm: number;
@@ -932,6 +980,8 @@ export interface RouteComparisonDto {
   comparisonWarnings: string[];
   currency: string;
   currencySymbol: string;
+  toUsdRate?: number;
+  usdToDisplayRate?: number;
 }
 
 export function useRouteComparison(itemId: string | undefined, batchSize: number = 1, location = 'USA') {

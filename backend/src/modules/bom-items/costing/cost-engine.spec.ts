@@ -1,6 +1,18 @@
 import { computeCostSummary, type CostEngineInput, type MHRRateInput } from './cost-engine';
 import type { LookupGap, UnsupportedOperationGap } from '../dto/cost-breakdown.dto';
 import { planInspection, finalizeInspectionLine, type InspectionInput } from './inspection-engine';
+import type { NestingResult } from './sheet-metal-nesting.engine';
+import { UTILIZATION_ADVISORY_THRESHOLD_PCT } from './default-rates';
+
+function nesting(overrides: Partial<NestingResult> = {}): NestingResult {
+  return {
+    sheetLengthMm: 3000, sheetWidthMm: 1500, partsPerSheet: 672,
+    sheetWeightKg: 53, grossWeightPerPartKg: 0.079, scrapWeightPerPartKg: 0.041,
+    utilisationPct: 48.5, grossMaterialCost: 0.093, scrapRecoveryCost: 0,
+    netMaterialCost: 0.093, partAllowanceMm: 2,
+    ...overrides,
+  };
+}
 
 function rate(value: number, machineClass: string, overrides: Partial<MHRRateInput> = {}): MHRRateInput {
   return {
@@ -454,5 +466,33 @@ describe('computeCostSummary — Manufacturing Physics Calculator pipeline (Ream
     expect(ream.cycleTimeMin).toBe(0);
     expect(ream.physicsGap).toEqual(gap);
     expect(result.warnings.some((w) => w.includes('No real hole-diameter data'))).toBe(true);
+  });
+});
+
+describe('computeCostSummary — material utilisation advisory (RTP2 MAG2 FRONTFRAME-style irregular part)', () => {
+  it('surfaces an informational advisory, not an error, below the configurable threshold', () => {
+    const result = computeCostSummary(baseInput({ nestingResult: nesting({ utilisationPct: 48.5 }) }));
+    const advisory = result.warnings.find((w) => w.includes('Material utilisation'));
+    expect(advisory).toBeDefined();
+    // Reworded away from "is low" / imperative "consider panel nesting optimisation" --
+    // must read as informational context, not an alarm on a legitimately irregular part.
+    expect(advisory).not.toContain('is low');
+    expect(advisory).toContain('can be normal for an irregular flat pattern');
+    expect(advisory).toContain(`${UTILIZATION_ADVISORY_THRESHOLD_PCT}%`);
+    expect(advisory).toContain('672 parts/sheet on 1500×3000mm');
+  });
+
+  it('does not surface the advisory at or above the threshold', () => {
+    const result = computeCostSummary(baseInput({
+      nestingResult: nesting({ utilisationPct: UTILIZATION_ADVISORY_THRESHOLD_PCT }),
+    }));
+    expect(result.warnings.some((w) => w.includes('Material utilisation'))).toBe(false);
+  });
+
+  it('threshold is a single named constant, not re-hardcoded inline', () => {
+    const justBelow = computeCostSummary(baseInput({
+      nestingResult: nesting({ utilisationPct: UTILIZATION_ADVISORY_THRESHOLD_PCT - 0.1 }),
+    }));
+    expect(justBelow.warnings.some((w) => w.includes('Material utilisation'))).toBe(true);
   });
 });

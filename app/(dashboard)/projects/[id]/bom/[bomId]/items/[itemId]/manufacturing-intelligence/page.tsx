@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useGdtAnalysis, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, type BlankSpecDto, type ProcessLineCost, type ApplyCustomRouteStep } from '@/lib/api/hooks/useBOMItems';
 import { useMHRRecords, useMHRBenchmark } from '@/lib/api/hooks/useMHR';
+import { useFactoryCurrency, useFxRate, useRefreshFxRate, useFxRateOnDemand, type FxRateType } from '@/lib/api/hooks/useFx';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { resolveMhrUsdRate } from '@/lib/api/mhr';
 import type { GdtSeverity, CostSummaryDto, RouteResultDto } from '@/lib/api/hooks/useBOMItems';
@@ -2169,6 +2170,20 @@ function CostSummaryTab({
   const deleteProcCost = useDeleteProcessCost();
   const sortedStoredProcs = [...(existingProcRecords?.records ?? [])].sort((a: any, b: any) => (a.opNbr || 0) - (b.opNbr || 0));
 
+  // NOTE: there used to be an auto-resync effect here that re-linked saved
+  // process rows to the current Digital Factory's live machine/labour rates
+  // on every Apply. Removed — it raced against reapplyExistingOrDefaultRoute/
+  // autoAddProcessCosts (top-level, see runApplyScenario), which ALREADY
+  // deactivates and fully recreates every process_cost_records row from the
+  // live engine on every non-manual-routing Apply. Two independent processes
+  // both mutating the same rows in the same Apply click produced exactly the
+  // flip-flopping/inflating numbers this was meant to fix — confirmed live:
+  // "Re-synced 6 process rows..." and "Process cost added successfully" x6
+  // firing together, one process updating rows the other was mid-deactivating.
+  // autoAddProcessCosts's own currency-unit bug (display-currency values sent
+  // as if native-local) is the fix that actually matters, and it now lives
+  // there, the single place that recreates these rows.
+
   const handleOpenEditProc = (line: { process: string; machineClass: string; rate: number; cycleMin: number; setupCost: number; hourlyRate: number; labourRate?: number | null; processGroup?: string; processRoute?: string; operation?: string }, index: number, openCalculator = false) => {
     const batchSz = cost?.batchSize ?? 1;
     // Reverse-compute setup time from amortized setupCost — must divide by the
@@ -2198,16 +2213,34 @@ function CostSummaryTab({
     // Speed, Piercing Time Per Start) can never auto-fill, even though the
     // row itself proves a real candidate is already known.
     const liveCandidate = (line as any).machineSelection?.balanced?.candidate;
+    // Inspection (and any other class priced via a flat resource rate rather
+    // than the CNC/laser-style machineSelection candidate list) carries its
+    // real resolved resource's id directly as line.mhrId/line.benchmarkMhrId
+    // (see finalizeInspectionLine in inspection-engine.ts) — machineSelection
+    // is simply absent for it, not empty. Falling back to liveCandidate alone
+    // dropped that id, so ProcessCostDialog could never pre-select the real
+    // machine/benchmark row, and every such line saved as "not linked to a
+    // machine" despite a real, priced resource already being used for its rate.
     setProcDialogPrefill(existingRecord ?? {
       opNbr: (index + 1) * 10,
       operation: line.operation || line.process,
       processGroup: line.processGroup || deriveProcessGroupFromMachineClass(line.machineClass),
       processRoute: line.processRoute || line.process,
       location: factory,
-      mhrId: liveCandidate?.machineId ?? null,
-      machineName: liveCandidate?.machineName ?? undefined,
-      machineRate: line.rate,
-      laborRate: line.labourRate ?? 0,
+      mhrId: liveCandidate?.machineId ?? (line as any).mhrId ?? null,
+      benchmarkMhrId: (line as any).benchmarkMhrId ?? undefined,
+      machineName: liveCandidate?.machineName ?? (line as any).machineName ?? undefined,
+      // line.rate/labourRate are display-currency (already converted by
+      // normalizeCostSummaryToCurrency). This prefill seeds editData.machineRate/
+      // laborRate, which effectiveMachineRate/effectiveLaborRate in
+      // ProcessCostDialog fall back to ONLY when neither selectedMHR nor
+      // savedMHRRecord resolves — every OTHER branch of that fallback chain
+      // (resolveMhrUsdRate, lhrUsdEffective) is USD, so this must match: USD,
+      // not native-local-currency (dividing by usdToDisplayRate, not
+      // toUsdRate — see handleProcDialogSubmit's own doc comment for why
+      // those are different conversions and which one belongs where).
+      machineRate: line.rate / (cost?.usdToDisplayRate ?? 1),
+      laborRate: (line.labourRate ?? 0) / (cost?.usdToDisplayRate ?? 1),
       // process_cost_records.cycle_time is NUMERIC(12,2) — rounding to a
       // whole integer here silently threw away real precision the schema
       // already supports (confirmed live: a genuine 19.2s line was saved as
@@ -2230,6 +2263,25 @@ function CostSummaryTab({
     const existing = existingProcRecords?.records?.find(
       (r: any) => r.id === procDialogPrefill?.id,
     );
+    // ProcessCostDialog's own rates (data.machineRate/laborRate/directRate/
+    // machineValue) are USD internally — effectiveMachineRate/effectiveLaborRate
+    // there are built entirely from USD sources (resolveMhrUsdRate,
+    // lhrUsdEffective). The backend's create()/update() do the OPPOSITE
+    // conversion: they always treat an incoming rate as being in `location`'s
+    // own NATIVE currency and convert native->USD via toUsdCreate/
+    // toUsdIfProvided (using the live BUDGET exchange rate, not the
+    // scenario's reference rate). Sending a true-USD number straight through
+    // got it divided a second time — confirmed live: a real $13.41/hr Quality
+    // Inspector rate was silently re-priced to ~$1.85/hr (÷7.25, the exact
+    // CNY budget rate) after editing and saving this exact row.
+    //
+    // usdToDisplayRate = budgetUSDtoLocal * referenceLocalToDisplay,
+    // toUsdRate = referenceLocalToDisplay (native->display) -- dividing
+    // cancels the reference rate cleanly regardless of its value, leaving
+    // exactly budgetUSDtoLocal, the one factor the backend's own conversion
+    // needs to invert back to the original USD figure.
+    const usdToNativeLocal = (cost?.usdToDisplayRate ?? 1) / (cost?.toUsdRate ?? 1);
+    const toNativeLocal = (usdValue: number) => usdValue * usdToNativeLocal;
     try {
       if (existing?.id) {
         await updateProcCost.mutateAsync({
@@ -2244,12 +2296,12 @@ function CostSummaryTab({
             benchmarkMhrId: data.benchmarkMhrId || undefined,
             lhrId: data.lhrId || undefined,
             benchmarkLhrId: data.benchmarkLhrId || undefined,
-            directRate: data.directRate || data.laborRate || 0,
+            directRate: toNativeLocal(data.directRate || data.laborRate || 0),
             indirectRate: data.indirectRate || 0,
             fringeRate: data.fringeRate || 0,
-            machineRate: data.machineRate || 0,
-            machineValue: data.machineValue || 0,
-            laborRate: data.laborRate || 0,
+            machineRate: toNativeLocal(data.machineRate || 0),
+            machineValue: toNativeLocal(data.machineValue || 0),
+            laborRate: toNativeLocal(data.laborRate || 0),
             shiftPatternHoursPerDay: data.shiftPatternHoursPerDay || 8,
             setupManning: data.setupManning,
             setupTime: data.setupTime,
@@ -2272,12 +2324,12 @@ function CostSummaryTab({
           benchmarkMhrId: data.benchmarkMhrId || undefined,
           lhrId: data.lhrId || undefined,
           benchmarkLhrId: data.benchmarkLhrId || undefined,
-          directRate: data.directRate || data.laborRate || 0,
+          directRate: toNativeLocal(data.directRate || data.laborRate || 0),
           indirectRate: data.indirectRate || 0,
           fringeRate: data.fringeRate || 0,
-          machineRate: data.machineRate || 0,
-          machineValue: data.machineValue || 0,
-          laborRate: data.laborRate || 0,
+          machineRate: toNativeLocal(data.machineRate || 0),
+          machineValue: toNativeLocal(data.machineValue || 0),
+          laborRate: toNativeLocal(data.laborRate || 0),
           shiftPatternHoursPerDay: data.shiftPatternHoursPerDay || 8,
           setupManning: data.setupManning,
           setupTime: data.setupTime,
@@ -2314,9 +2366,15 @@ function CostSummaryTab({
 
   const sym = cost.currencySymbol ?? '$';
   const showUsd = (cost.currency ?? 'INR') !== 'USD';
-  const toUsd = cost.toUsdRate ?? (1 / 83.5);
-  // multiply stored USD values by this to convert to factory currency (e.g. 83.5 for India)
-  const fromUsd = 1 / toUsd;
+  // amount_usd × fromUsd = amount in `sym`'s currency — for converting fields
+  // that are ALWAYS stored in USD regardless of factory (raw material/
+  // packaging/procured/tooling/process-cost records). Deliberately NOT
+  // derived from cost.toUsdRate (that rate converts the factory's own
+  // native-currency figures already embedded in `cost`, a different
+  // conversion — conflating the two is exactly how a real $1.175/kg got
+  // relabeled ₹1.175/kg instead of converted). See cost-breakdown.dto.ts's
+  // usdToDisplayRate doc comment.
+  const fromUsd = cost.usdToDisplayRate ?? 1;
   // A real, non-zero cost this small (e.g. Hole Extrusion (Burring) at
   // $0.28/hr machine + $1.73/hr labour, 2.1s cycle, batch 250 — a genuine
   // ~$0.0019/part) rounds to "$0.00" at the default 2dp, reading as broken/
@@ -2328,7 +2386,7 @@ function CostSummaryTab({
     return `${sym}${v.toLocaleString(undefined, { minimumFractionDigits: effectiveD, maximumFractionDigits: effectiveD })}`;
   };
   const fmtUsd = (v: number) =>
-    `$${(v * toUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `$${(v / fromUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   // Grand total: engine estimate (process + material) + stored records converted to factory currency
   const hasStoredMat = (storedRawMat?.records?.length ?? 0) > 0;
@@ -3073,18 +3131,35 @@ function CostSummaryTab({
                     processKey={proc.machineClass ?? ''}
                     selection={ms}
                     currencySymbol={sym}
+                    conversionRate={fromUsd}
                     location={factory}
                     currentMachine={{ mhrId: proc.mhrId ?? null, machineName: proc.machineName ?? null, machineRate: proc.machineRate ?? null }}
                     savedExplanation={proc.mhrId ? matchedEngineLine?.savedMachineExplanations?.[proc.mhrId] ?? null : null}
                     applyPending={updateProcCost.isPending}
                     applyError={updateProcCost.isError}
                     onApply={(candidate) => {
+                      // candidate.hourlyRate is already converted to the
+                      // scenario's DISPLAY currency (convertMachineSelectionCost) —
+                      // process_cost_records.machineRate is always USD, and the
+                      // PUT endpoint re-derives USD itself via toUsdIfProvided,
+                      // assuming whatever number it's sent is in THIS row's
+                      // location's own native currency. Dividing by
+                      // cost.toUsdRate recovers that native-currency figure —
+                      // but the backend also needs `location` in the payload to
+                      // know WHICH currency that is; without it (and with the
+                      // existing row's own location column also often null) it
+                      // falls back to getCurrencyForLocation('') -> 'USD',
+                      // making the conversion a no-op and storing the native
+                      // value verbatim mislabeled USD. Same root cause fixed in
+                      // autoAddProcessCosts above.
+                      const displayRate = candidate?.hourlyRate ?? 0;
                       updateProcCost.mutate({
                         id: proc.id,
                         data: {
                           mhrId: candidate?.machineId ?? null,
                           benchmarkMhrId: null,
-                          machineRate: candidate?.hourlyRate ?? 0,
+                          machineRate: displayRate / (cost.toUsdRate ?? 1),
+                          location: factory,
                         } as any,
                       });
                     }}
@@ -3197,6 +3272,7 @@ function CostSummaryTab({
         existingProcesses={existingProcRecords?.records ?? []}
         defaultLocation={factory}
         currencySymbol={sym}
+        conversionRate={fromUsd}
         autoOpenCalculator={procDialogAutoOpenCalculator}
       />
 
@@ -5513,15 +5589,19 @@ function MaterialPickerDialog({
     sel?.jisStandard  ? `JIS: ${sel.jisStandard}`   : null,
   ].filter(Boolean).join(' · ') || null;
 
-  const regionalCosts: { label: string; value: number | undefined }[] = [
-    { label: 'India', value: sel?.costIndia },
-    { label: 'China', value: sel?.costChina },
-    { label: 'USA',   value: sel?.costUsa },
-    { label: 'Germany', value: sel?.costGermany },
-    { label: 'France',  value: sel?.costFrance },
-    { label: 'W. Europe', value: sel?.costWEurope },
-    { label: 'E. Europe', value: sel?.costEEurope },
-    { label: 'Mexico', value: sel?.costMexico },
+  // Each column is a real, distinct raw_materials price in THAT country's own
+  // native currency (cost_india is ₹, cost_china is ¥, ...) — never a single
+  // shared currency. Labeling every row '$' regardless of which column it
+  // came from silently mislabeled a ₹/¥/€ figure as dollars.
+  const regionalCosts: { label: string; value: number | undefined; symbol: string }[] = [
+    { label: 'India', value: sel?.costIndia, symbol: '₹' },
+    { label: 'China', value: sel?.costChina, symbol: '¥' },
+    { label: 'USA',   value: sel?.costUsa, symbol: '$' },
+    { label: 'Germany', value: sel?.costGermany, symbol: '€' },
+    { label: 'France',  value: sel?.costFrance, symbol: '€' },
+    { label: 'W. Europe', value: sel?.costWEurope, symbol: '€' },
+    { label: 'E. Europe', value: sel?.costEEurope, symbol: '€' },
+    { label: 'Mexico', value: sel?.costMexico, symbol: 'MX$' },
   ];
   const hasAnyCost = regionalCosts.some((r) => r.value != null);
 
@@ -5704,12 +5784,12 @@ function MaterialPickerDialog({
 
                 {/* Regional costs */}
                 <div className="border-t pt-3">
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Regional Cost ($/kg)</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Regional Cost (native currency/kg)</p>
                   {hasAnyCost ? (
                     regionalCosts.map((r) => r.value != null ? (
                       <div key={r.label} className="flex items-center justify-between py-0.5">
                         <span className="text-[10px] text-muted-foreground">{r.label}</span>
-                        <span className="text-[10px] font-medium">${r.value.toFixed(2)}/kg</span>
+                        <span className="text-[10px] font-medium">{r.symbol}{r.value.toFixed(2)}/kg</span>
                       </div>
                     ) : null)
                   ) : (
@@ -5747,6 +5827,17 @@ function MaterialPickerDialog({
   );
 }
 
+// Scenario currency options for the Currency & Ask Price widget — the same
+// six currencies backend/LOCATION_INFO resolves Digital Factory locations to
+// (CURRENCY_SYMBOLS in default-rates.ts), so every option here is guaranteed
+// resolvable by the FX service. Fixes the old widget's INR: '$' bug.
+const SCENARIO_CURRENCY_SYMBOLS: Record<string, string> = {
+  INR: '₹', USD: '$', EUR: '€', GBP: '£', CNY: '¥', MXN: 'MX$',
+};
+const SCENARIO_CURRENCY_LABELS: Record<string, string> = {
+  INR: 'Indian Rupee', USD: 'US Dollar', EUR: 'Euro', GBP: 'British Pound', CNY: 'Chinese Yuan', MXN: 'Mexican Peso',
+};
+
 // ── CostGuidePanel (Left) ──────────────────────────────────────────────────────
 
 function CostGuidePanel({
@@ -5780,8 +5871,6 @@ function CostGuidePanel({
   const [leftAppliedRouteId, setLeftAppliedRouteId] = useState<string | null>(null);
   const applyRoute = useApplyRoute(item.id);
   const [productLine, setProductLine] = useState('');
-  const [currency, setCurrency] = useState('USD');
-  const [askPrice, setAskPrice] = useState('');
   const [matPickerOpen, setMatPickerOpen] = useState(false);
   // Apply Scenario confirmation + progress — the apply-route/apply-custom-route
   // round trip re-runs the whole route-comparison engine server-side (observed
@@ -5875,9 +5964,37 @@ function CostGuidePanel({
   // (React Query cache can be stale between two fast consecutive calls)
   const autoAddLock = useRef<Set<string>>(new Set());
 
-  const autoAddProcessCosts = async () => {
+  // `factory` is a prop, captured by value in whatever render created the
+  // currently-executing async closure. runApplyScenario calls applyScenario()
+  // (which does setFactory(factoryDraft) in the PARENT) and then, in the SAME
+  // tick, calls autoAddMaterialCost/reapplyExistingOrDefaultRoute below —
+  // long before the parent's re-render can flow the new `factory` prop back
+  // down here. Reading bare `factory` at that point silently uses the
+  // location the user just switched AWAY from. locationOverride lets
+  // runApplyScenario pass factoryDraft (the value `factory` is actively
+  // becoming) explicitly instead of waiting on a prop update that hasn't
+  // happened yet — the same class of stale-closure hazard already handled
+  // for applyManualMachineOverride/AnalysisTabsPanel via `scenarioDirty ?
+  // factoryDraft : factory` at the ManufacturingIntelligencePage level.
+  const fetchFreshCostSummary = async (loc: string) => {
+    try {
+      return await queryClient.fetchQuery<CostSummaryDto>({
+        queryKey: ['bom-items', item.id, 'cost-summary', batchSize, loc],
+        queryFn: () => apiClient.get<CostSummaryDto>(
+          `/bom-items/${item.id}/cost-summary?batchSize=${batchSize}&location=${encodeURIComponent(loc)}`,
+          { timeout: 180000 },
+        ),
+        staleTime: 1000 * 60 * 5,
+      });
+    } catch {
+      return undefined;
+    }
+  };
+
+  const autoAddProcessCosts = async (locationOverride?: string) => {
     if (autoAddLock.current.has('process')) return;
     autoAddLock.current.add('process');
+    const loc = locationOverride ?? factory;
     try {
       // Fresh server check so stale React Query cache doesn't block re-creation
       // after a material-grade change (when the Apply button has already deactivated old records).
@@ -5890,11 +6007,37 @@ function CostGuidePanel({
 
       // Always read from the live query cache — the closure-captured cgpCostSummary
       // was fetched before material grade was set and has empty processLines.
+      // When `loc` differs from the still-stale `factory` prop, the cache was
+      // never populated under this key either — fetch it fresh so the machine/
+      // labour selection below reflects the NEW location, not the old one.
       const liveSummary = queryClient.getQueryData<typeof cgpCostSummary>(
-        ['bom-items', item.id, 'cost-summary', batchSize, factory],
+        ['bom-items', item.id, 'cost-summary', batchSize, loc],
       );
-      const lines = (liveSummary ?? cgpCostSummary)?.processLines ?? [];
+      const freshSummaryForProcess = liveSummary ?? (loc !== factory ? await fetchFreshCostSummary(loc) : cgpCostSummary);
+      const lines = freshSummaryForProcess?.processLines ?? [];
       if (!lines.length) return;
+      // line.hourlyRate/labourRate/machineSelection candidates are already
+      // converted to the scenario's DISPLAY currency (see
+      // normalizeCostSummaryToCurrency) — e.g. ₹ for an India/China factory
+      // scenario priced in INR. process_cost_records.machineRate/laborRate
+      // must always be USD; the create endpoint re-derives USD itself via
+      // toUsdCreate(value, rowLocation), treating whatever number it's given
+      // as ALREADY being in that row's location's OWN native currency (¥ for
+      // China) — never the scenario's display currency. Sending a display
+      // value straight through was silently mis-converted every time a route
+      // got (re)applied (confirmed live: a real $21.26/hr China machine was
+      // persisted as machineRate≈$301.7/hr — an ~14x inflation, the exact
+      // CNY→INR reference rate — repeating on every Apply since this
+      // function recreates every row from scratch). Dividing by toUsdRate
+      // (the same native→display factor normalizeCostSummaryToCurrency
+      // itself used) recovers the real native-currency figure the backend
+      // expects, so it converts back to the correct USD value.
+      // `?? 1` alone doesn't catch a literal 0 (nullish coalescing only
+      // replaces null/undefined) — dividing by a real 0 would send Infinity
+      // as machineRate/laborRate, which a NUMERIC DB column rejects outright,
+      // silently failing the whole row's creation.
+      const toUsdRateForProcess = freshSummaryForProcess?.toUsdRate || 1;
+      const toNativeLocalForProcess = (displayValue: number) => displayValue / toUsdRateForProcess;
       for (const [i, line] of lines.entries()) {
         // process_cost_records.cycle_time is NUMERIC(12,2) — round to 2dp,
         // not to a whole integer (see the matching fix on the Calculator
@@ -5917,15 +6060,26 @@ function CostGuidePanel({
         // auto-created row reads "Manual rate — not linked to a machine"
         // even though a specific real machine was already identified for it.
         const recommendedCandidate = line.machineSelection?.balanced?.candidate;
+        const machineRateDisplay = recommendedCandidate?.hourlyRate ?? line.hourlyRate;
+        const laborRateDisplay = line.labourRate ?? 0;
         const payload: CreateProcessCostDto = {
           bomItemId: item.id,
           opNbr: (i + 1) * 10,
           operation: line.operation || line.process,
           processGroup: line.processGroup || deriveProcessGroupFromMachineClass(line.machineClass),
           processRoute: line.processRoute || line.process,
-          machineRate: recommendedCandidate?.hourlyRate ?? line.hourlyRate,
-          laborRate: line.labourRate ?? 0,
-          directRate: recommendedCandidate?.hourlyRate ?? line.hourlyRate,
+          // ROOT CAUSE (confirmed live): without this, the backend's own
+          // create() does getCurrencyForLocation(undefined ?? '') -> 'USD',
+          // making toUsdCreate a no-op (rate * convertStrict('USD','USD') =
+          // rate * 1) -- so the native-currency value below (correctly
+          // recovered from the display-currency line via toNativeLocalForProcess)
+          // was being stored VERBATIM and mislabeled currency='USD' instead of
+          // actually being converted. Every "inflated rate" bug this session
+          // traced back to this one missing field, not the conversion math.
+          location: loc,
+          machineRate: toNativeLocalForProcess(machineRateDisplay),
+          laborRate: toNativeLocalForProcess(laborRateDisplay),
+          directRate: toNativeLocalForProcess(machineRateDisplay),
           indirectRate: 0,
           fringeRate: 0,
           machineValue: 0,
@@ -5940,43 +6094,121 @@ function CostGuidePanel({
           isActive: true,
         };
         if (recommendedCandidate?.machineId) payload.mhrId = recommendedCandidate.machineId;
+        // Inspection (and any other class priced via a flat resource rate,
+        // not the CNC/laser-style machineSelection candidate list) has no
+        // machineSelection candidate, but DOES carry a real resolved
+        // mhrId/benchmarkMhrId directly on the line (see finalizeInspectionLine
+        // in inspection-engine.ts). Without this, every such auto-created row
+        // persisted with no machine link at all, so it displayed "Manual rate
+        // — not linked to a machine" forever, even though a real, priced
+        // resource was used for its rate. machineName itself is never sent —
+        // the backend always derives it server-side from mhrId/benchmarkMhrId.
+        if (!payload.mhrId && (line as any).mhrId) payload.mhrId = (line as any).mhrId;
+        if (!payload.mhrId && (line as any).benchmarkMhrId) payload.benchmarkMhrId = (line as any).benchmarkMhrId;
         try {
           await createProcessCost.mutateAsync(payload);
-        } catch { /* individual line failure is non-fatal */ }
+        } catch (err) {
+          // Individual line failure is non-fatal to the rest of the loop, but
+          // silently swallowing it left "· not saved" with no way to tell WHY
+          // (bad payload value, validation error, etc.) — log it so the real
+          // cause is visible instead of having to guess blind.
+          console.error(`[autoAddProcessCosts] failed to create "${payload.operation}":`, err, payload);
+        }
       }
     } finally {
       autoAddLock.current.delete('process');
     }
   };
 
-  const autoAddMaterialCost = async (grade: string) => {
+  const autoAddMaterialCost = async (grade: string, locationOverride?: string) => {
     if (autoAddLock.current.has('material')) return;
     autoAddLock.current.add('material');
+    const loc = locationOverride ?? factory;
 
     try {
+      // Live nesting-derived weights -- fetched BEFORE the existing-record
+      // guard below, so that guard can detect when a persisted record has
+      // gone stale relative to the CURRENT nesting/costing result, not just
+      // when material grade changed. Confirmed live: a record created
+      // before this true-shape costing fix landed kept reporting its OLD
+      // netUsage/scrap% forever (grossUsage happened to already be correct,
+      // so comparing gross alone would NOT have caught this -- netUsage is
+      // the field that actually goes stale here).
+      const liveSummaryForStaleness = queryClient.getQueryData<typeof cgpCostSummary>(
+        ['bom-items', item.id, 'cost-summary', batchSize, loc],
+      );
+      const freshSummaryForStaleness = liveSummaryForStaleness ?? (loc !== factory ? await fetchFreshCostSummary(loc) : cgpCostSummary);
+      const rawLiveGrossKgForStaleness = freshSummaryForStaleness?.grossWeightKg ?? 0;
+      const liveGrossKgForStaleness = rawLiveGrossKgForStaleness > 0 ? rawLiveGrossKgForStaleness : null;
+      const rawLiveNetKgForStaleness = freshSummaryForStaleness?.blankSpec?.netWeightKg ?? 0;
+      const liveNetKgForStaleness = rawLiveNetKgForStaleness > 0 ? rawLiveNetKgForStaleness : null;
+
       // Fresh server check — stale React Query cache after a deletion would incorrectly
       // block creation if we relied on `existingRawCosts` (stale until background refetch).
       // Only bail out if there's a record with a meaningful cost (totalCost > 0).
       // Zero-cost records from before the weight fix must be ignored so the correct
       // record can be created (the zero records are cleaned up server-side by the replace).
+      let fresh: { records: any[] } | undefined;
       try {
-        const fresh = await apiClient.get<{ records: any[] }>('/raw-material-costs', {
+        fresh = await apiClient.get<{ records: any[] }>('/raw-material-costs', {
           params: { bomItemId: item.id, isActive: true, page: 1, limit: 10 },
         });
+      } catch (e) {
+        // raw-material-costs.service.ts's create() has no server-side "deactivate
+        // existing active rows for this bom item first" step — it always inserts a
+        // fresh active row. Proceeding here on a failed pre-check (as this used to,
+        // trusting the server to "enforce uniqueness" — it doesn't) would create a
+        // second active material cost row alongside whatever is already active,
+        // doubling Direct Material Costs. Abort instead.
+        console.error('[autoAddMaterialCost] failed to read existing raw material costs:', e);
+        toast.error('Could not verify the current material cost record — Apply was aborted to avoid a duplicate. Please retry.');
+        return;
+      }
+      {
         const records = fresh?.records ?? [];
-        // Only skip if there is already a valid (totalCost > 0) record for THIS EXACT grade.
-        // A valid record for a DIFFERENT grade means material changed — we must replace it.
-        const hasValidRecordForThisGrade = records.some(
-          (r: any) => (r.totalCost ?? 0) > 0 && r.materialName === grade,
+        const existingForGrade = records.find((r: any) => (r.totalCost ?? 0) > 0 && r.materialName === grade);
+        // A record for this grade is only "still valid" if its stored
+        // net/gross usage still agree with the CURRENT live nesting result
+        // -- not merely because the grade hasn't changed. A >1% relative
+        // disagreement on EITHER means the underlying nesting/costing
+        // result has moved on since this record was created (a geometry
+        // re-analysis, a sheet-size change, or a costing-formula fix like
+        // this one), and the record must be rebuilt, never left frozen.
+        const relDiff = (stored: number, live: number) => (live > 0 ? Math.abs(stored - live) / live : 0);
+        const staleAgainstLiveNesting = !!existingForGrade && (
+          (liveGrossKgForStaleness !== null && relDiff(Number(existingForGrade.grossUsage ?? 0), liveGrossKgForStaleness) > 0.01) ||
+          (liveNetKgForStaleness !== null && relDiff(Number(existingForGrade.netUsage ?? 0), liveNetKgForStaleness) > 0.01)
         );
+        // Geometry (gross/net usage) doesn't change when only the Digital
+        // Factory location changes -- the price PER KG does. Without this,
+        // switching factory and clicking Apply left the material's unit_cost
+        // frozen at whatever location it was originally priced for forever,
+        // since the geometry-only staleness check above always still agreed.
+        const staleAgainstLocation = !!existingForGrade && (existingForGrade.country ?? '') !== loc;
+        const hasValidRecordForThisGrade = !!existingForGrade && !staleAgainstLiveNesting && !staleAgainstLocation;
         if (hasValidRecordForThisGrade) return;
-        // Mark ALL active records inactive — the grade changed (or they had $0 cost).
-        // This replaces stale material records cleanly without leaving ghost entries.
+        // Mark ALL active records inactive — the grade changed, the record
+        // is stale against the live nesting result or the Digital Factory
+        // location, or it had $0 cost. This replaces stale material records
+        // cleanly without leaving ghost entries.
         const staleIds = records.map((r: any) => r.id as string).filter(Boolean);
+        const failedIds: string[] = [];
         for (const id of staleIds) {
-          try { await apiClient.put(`/raw-material-costs/${id}`, { isActive: false }); } catch { /* best-effort */ }
+          try {
+            await apiClient.put(`/raw-material-costs/${id}`, { isActive: false });
+          } catch (e) {
+            failedIds.push(id);
+            console.error(`[autoAddMaterialCost] failed to deactivate raw material cost ${id}:`, e);
+          }
         }
-      } catch { /* pre-check network failure — fall through and let server enforce uniqueness */ }
+        if (failedIds.length > 0) {
+          // create() below always inserts a new active row with no server-side
+          // dedup — proceeding while a stale row is still active produces two
+          // active material cost records for this bom item.
+          toast.error(`Could not clear ${failedIds.length} existing material cost row(s) — Apply was aborted to avoid a duplicate. Please retry.`);
+          return;
+        }
+      }
       // Look up material — exact match first, then tokenized fallback for compound
       // grade strings like "IS2062 E250 CRCA" that span multiple DB rows
       // ("Mild Steel IS2062" + "CRCA Steel"). At least 2 tokens must match.
@@ -6021,7 +6253,6 @@ function CostGuidePanel({
       }
 
       const density = mat?.densityKgM3 ?? null;
-      const scrap = 10;
 
       // Weight chain — order depends on part family:
       //
@@ -6052,55 +6283,91 @@ function CostGuidePanel({
       // material grade was set), so grossWeightKg there is 0. After Apply triggers a refetch,
       // the cache holds the correct value even though the closure variable hasn't updated.
       const liveSummary = queryClient.getQueryData<typeof cgpCostSummary>(
-        ['bom-items', item.id, 'cost-summary', batchSize, factory],
+        ['bom-items', item.id, 'cost-summary', batchSize, loc],
       );
-      const freshSummary = liveSummary ?? cgpCostSummary;
-      const engineGrossKg = (freshSummary?.grossWeightKg ?? 0) > 0 ? freshSummary!.grossWeightKg : null;
+      const freshSummary = liveSummary ?? (loc !== factory ? await fetchFreshCostSummary(loc) : cgpCostSummary);
+      const rawEngineGrossKg = freshSummary?.grossWeightKg ?? 0;
+      const engineGrossKg = rawEngineGrossKg > 0 ? rawEngineGrossKg : null;
+      // Real per-part net weight straight from the nesting engine
+      // (computeNesting's mass-based formula, or the true-shape override --
+      // see bom-items.service.ts's blankSpec construction) -- NEVER derived
+      // from an assumed scrap% here. Confirmed live: deriving net weight as
+      // grossUsage*(1-10%) instead of reading this real value silently
+      // discarded the part's actual CAD net weight, and a real ~40% scrap
+      // (59.7% utilization on an irregular frame part) got recorded to
+      // Direct Material Costs as a fake, frozen 10%.
+      const rawEngineNetKg = freshSummary?.blankSpec?.netWeightKg ?? 0;
+      const engineNetKg = rawEngineNetKg > 0 ? rawEngineNetKg : null;
       const cadWeight = typeof item.weight === 'number' && item.weight > 0 ? item.weight : null;
       const isSheetMetalPart = fg?.classification?.family === 'sheet_metal' || (summary?.sheetThicknessMm ?? 0) > 0;
+      // Only a genuine fallback -- used when the nesting engine hasn't
+      // resolved a real net weight for this part yet (cost summary still
+      // loading, or a non-sheet-metal part with no nesting concept at all).
+      // Never silently substituted when the real net weight IS available,
+      // which was the bug this whole block exists to fix.
+      const FALLBACK_SCRAP_PCT = 10;
       let netUsage: number;
       let grossUsage: number;
-      if (isSheetMetalPart && engineGrossKg != null) {
+      let scrap: number;
+      if (isSheetMetalPart && engineGrossKg !== null && engineNetKg !== null) {
         grossUsage = parseFloat(engineGrossKg.toFixed(6));
-        netUsage   = parseFloat((grossUsage * (1 - scrap / 100)).toFixed(6));
+        netUsage   = parseFloat(engineNetKg.toFixed(6));
+        // Real scrap %, derived from the nesting engine's own gross/net
+        // weights -- never assumed. For an irregular part with real
+        // internal cutouts this can legitimately be far higher than 10%.
+        scrap = grossUsage > 0 ? parseFloat((((grossUsage - netUsage) / grossUsage) * 100).toFixed(2)) : 0;
       } else if (item.volume && density) {
         netUsage  = parseFloat(((item.volume * density) / 1e9).toFixed(6));
-        grossUsage = parseFloat((netUsage / (1 - scrap / 100)).toFixed(6));
+        grossUsage = parseFloat((netUsage / (1 - FALLBACK_SCRAP_PCT / 100)).toFixed(6));
+        scrap = FALLBACK_SCRAP_PCT;
       } else if (cadWeight != null) {
         netUsage  = parseFloat(cadWeight.toFixed(6));
-        grossUsage = parseFloat((netUsage / (1 - scrap / 100)).toFixed(6));
+        grossUsage = parseFloat((netUsage / (1 - FALLBACK_SCRAP_PCT / 100)).toFixed(6));
+        scrap = FALLBACK_SCRAP_PCT;
       } else if (engineGrossKg != null) {
         grossUsage = parseFloat(engineGrossKg.toFixed(6));
-        netUsage   = parseFloat((grossUsage * (1 - scrap / 100)).toFixed(6));
+        netUsage   = parseFloat((grossUsage * (1 - FALLBACK_SCRAP_PCT / 100)).toFixed(6));
+        scrap = FALLBACK_SCRAP_PCT;
       } else {
         netUsage = 0;
         grossUsage = 0;
+        scrap = 0;
       }
 
-      // Location-based pricing — same INR-pivot conversion as RawMaterialDialog
-      const DEFAULT_FX: Record<string, number> = { INR: 1, USD: 83.5, EUR: 89.0, GBP: 104.0, CNY: 11.5 };
+      // Location-based pricing. localCurr always matches the CURRENT factory's
+      // own native currency (parsed from the same `factory` string as the
+      // regional column pick below), so freshSummary's own live rates convert
+      // it correctly — never a hardcoded per-currency table that drifts out
+      // of date against the real exchange_rates data (the exact bug already
+      // fixed in RawMaterialDialog.tsx/useExchangeRates.ts this session).
+      // toUsdRate = native->display, usdToDisplayRate = USD->display, so
+      // toUsdRate/usdToDisplayRate = native->USD.
       let unitCost = 0;
       if (mat) {
-        const loc = (factory || '').toLowerCase();
+        const locLower = (loc || '').toLowerCase();
         let localAmt = 0;
-        let localCurr = 'USD';
-        if      (loc.includes('india'))       { localAmt = mat.costIndia   ?? 0; localCurr = 'INR'; }
-        else if (loc.includes('usa'))         { localAmt = mat.costUsa     ?? 0; localCurr = 'USD'; }
-        else if (loc.includes('china'))       { localAmt = mat.costChina   ?? 0; localCurr = 'CNY'; }
-        else if (loc.includes('germany'))     { localAmt = mat.costGermany ?? 0; localCurr = 'EUR'; }
-        else if (loc.includes('france'))      { localAmt = mat.costFrance  ?? 0; localCurr = 'EUR'; }
-        else if (loc.includes('w. europe') || loc.includes('western europe')) { localAmt = mat.costWEurope ?? 0; localCurr = 'EUR'; }
-        else if (loc.includes('e. europe') || loc.includes('eastern europe')) { localAmt = mat.costEEurope ?? 0; localCurr = 'EUR'; }
-        else if (loc.includes('mexico'))      { localAmt = mat.costMexico  ?? 0; localCurr = 'USD'; }
+        if      (locLower.includes('india'))       { localAmt = mat.costIndia   ?? 0; }
+        else if (locLower.includes('usa'))         { localAmt = mat.costUsa     ?? 0; }
+        else if (locLower.includes('china'))       { localAmt = mat.costChina   ?? 0; }
+        else if (locLower.includes('germany'))     { localAmt = mat.costGermany ?? 0; }
+        else if (locLower.includes('france'))      { localAmt = mat.costFrance  ?? 0; }
+        else if (locLower.includes('w. europe') || locLower.includes('western europe')) { localAmt = mat.costWEurope ?? 0; }
+        else if (locLower.includes('e. europe') || locLower.includes('eastern europe')) { localAmt = mat.costEEurope ?? 0; }
+        else if (locLower.includes('mexico'))      { localAmt = mat.costMexico  ?? 0; }
         if (!localAmt) localAmt = Number(mat.cost ?? mat.unitCost ?? 0);
-        // Convert to USD via INR pivot (matches RawMaterialDialog submit logic)
-        unitCost = (localAmt * (DEFAULT_FX[localCurr] ?? 1)) / (DEFAULT_FX['USD'] ?? 83.5);
+        const nativeToUsd = (freshSummary?.toUsdRate ?? 1) / (freshSummary?.usdToDisplayRate ?? 1);
+        unitCost = localAmt * nativeToUsd;
       }
 
-      // Fallback: DB has no pricing — use the engine's materialCostPerKg (factory currency → USD)
+      // Fallback: DB has no pricing — use the engine's materialCostPerKg, which
+      // is already in the DISPLAY currency (cost.currency), converted back to
+      // USD for storage (raw_material_cost_records.unit_cost is always USD).
+      // Dividing by usdToDisplayRate (USD→display), NOT multiplying by
+      // toUsdRate (which converts a DIFFERENT thing — the factory's own
+      // native-currency figures — see cost-breakdown.dto.ts's doc comment).
       if (!unitCost) {
-        const toUsd = freshSummary?.toUsdRate ?? (1 / 83.5);
-        unitCost = (freshSummary?.materialCostPerKg ?? 0) * toUsd;
+        const usdToDisplay = freshSummary?.usdToDisplayRate ?? 1;
+        unitCost = (freshSummary?.materialCostPerKg ?? 0) / usdToDisplay;
       }
 
       await createRawMatCost.mutateAsync({
@@ -6110,7 +6377,7 @@ function CostGuidePanel({
         materialGroup: mat?.materialGroup,
         materialType: mat?.materialType,
         materialDescription: mat?.materialDescription,
-        country: factory,
+        country: loc,
         netUsage,
         grossUsage,
         scrap,
@@ -6144,33 +6411,70 @@ function CostGuidePanel({
   // default route. Shared by reapplyEffectiveRoute below and the bottom
   // "Apply" button's own material-grade branch (which has already called
   // applyScenario() itself when a route WAS staged, so it skips this).
-  const reapplyExistingOrDefaultRoute = async () => {
-    let existingRouteId: string | null = null;
-    let freshProcs: { records: any[] } | undefined;
+  const reapplyExistingOrDefaultRoute = async (locationOverride?: string) => {
+    // Guards the WHOLE deactivate-then-recreate sequence, not just the create
+    // step inside autoAddProcessCosts — without this, two overlapping calls
+    // (a real double-click, or a scenario Apply landing while a material-grade
+    // quick-apply from the sidebar is still in flight) could each fetch the
+    // same still-active rows, each deactivate them, then each independently
+    // recreate a full set — producing two active rows per operation with no
+    // error, since neither call ever saw the other's writes.
+    if (autoAddLock.current.has('route')) return;
+    autoAddLock.current.add('route');
+    const loc = locationOverride ?? factory;
     try {
-      freshProcs = await apiClient.get<{ records: any[] }>('/process-costs', {
-        params: { bomItemId: item.id, isActive: true, page: 1, limit: 50 },
-      });
-      for (const r of (freshProcs?.records ?? [])) {
-        const m = /^auto_fill_from_route:(.+)$/.exec(r?.notes ?? '');
-        if (m) { existingRouteId = m[1] ?? null; break; }
-      }
-    } catch { /* non-fatal — falls through to the default-route path below */ }
-
-    if (existingRouteId) {
+      let existingRouteId: string | null = null;
+      let freshProcs: { records: any[] } | undefined;
       try {
-        await applyRoute.mutateAsync({ routeId: existingRouteId, batchSize, location: factory });
-      } catch { /* errors surfaced by the mutation's own onError toast */ }
-    } else {
-      try {
+        freshProcs = await apiClient.get<{ records: any[] }>('/process-costs', {
+          params: { bomItemId: item.id, isActive: true, page: 1, limit: 50 },
+        });
         for (const r of (freshProcs?.records ?? [])) {
-          if (r?.id) {
-            try { await apiClient.put(`/process-costs/${r.id}`, { isActive: false }); } catch { /* best-effort */ }
+          const m = /^auto_fill_from_route:(.+)$/.exec(r?.notes ?? '');
+          if (m) { existingRouteId = m[1] ?? null; break; }
+        }
+      } catch (e) {
+        // Can't tell whether a route is already applied — do NOT fall through
+        // to the "no route" default-create path below, which would add a
+        // second full set of rows on top of whatever is already active.
+        console.error('[reapplyExistingOrDefaultRoute] failed to read existing process costs:', e);
+        toast.error('Could not verify the current process routing — Apply was aborted to avoid creating duplicate rows. Please retry.');
+        return;
+      }
+
+      if (existingRouteId) {
+        // applyRoute's backend endpoint deletes ALL active rows and inserts the
+        // new set in one request (writeProcessLinesAsRecords) — atomic from the
+        // client's point of view, no separate deactivation step needed here.
+        try {
+          await applyRoute.mutateAsync({ routeId: existingRouteId, batchSize, location: loc });
+        } catch { /* errors surfaced by the mutation's own onError toast */ }
+      } else {
+        // No backend bulk-replace exists for the ad-hoc "engine default route"
+        // path, so deactivation happens client-side, one row at a time. A
+        // failed deactivation here must NOT be swallowed — proceeding to
+        // autoAddProcessCosts afterward would leave that row active while a
+        // freshly recreated duplicate of the same operation also becomes
+        // active, which is exactly the "duplicate rows after Apply" defect.
+        const staleRows = (freshProcs?.records ?? []).filter((r) => !!r?.id);
+        const failedIds: string[] = [];
+        for (const r of staleRows) {
+          try {
+            await apiClient.put(`/process-costs/${r.id}`, { isActive: false });
+          } catch (e) {
+            failedIds.push(r.id);
+            console.error(`[reapplyExistingOrDefaultRoute] failed to deactivate process cost ${r.id}:`, e);
           }
         }
         queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });
-      } catch { /* non-fatal */ }
-      await autoAddProcessCosts();
+        if (failedIds.length > 0) {
+          toast.error(`Could not clear ${failedIds.length} existing process cost row(s) — Apply was aborted to avoid duplicates. Please retry.`);
+          return;
+        }
+        await autoAddProcessCosts(loc);
+      }
+    } finally {
+      autoAddLock.current.delete('route');
     }
   };
   const reapplyEffectiveRoute = async () => {
@@ -6181,17 +6485,93 @@ function CostGuidePanel({
     await reapplyExistingOrDefaultRoute();
   };
 
-  const [exchangeRateVersion, setExchangeRateVersion] = useState<'default' | 'budget' | 'custom'>('default');
-  const [customExchangeRate, setCustomExchangeRate] = useState('');
-  const CURRENCY_SYMBOLS: Record<string, string> = {
-    INR: '$', USD: '$', EUR: '€', GBP: '£', JPY: '¥', AED: 'د.إ',
+  // ── Currency & Ask Price — real FX architecture ────────────────────────────
+  // Factory currency is resolved server-side from LOCATION_INFO (the same
+  // table real costing uses) via factoryDraft, never inferred/hardcoded here.
+  const { data: factoryCurrencyInfo } = useFactoryCurrency(factoryDraft);
+  const savedScenarioCurrency = typeof item.scenarioOverrides?.scenarioCurrency === 'string'
+    ? item.scenarioOverrides.scenarioCurrency as string : null;
+  const savedFxSnapshot = item.scenarioOverrides?.fxSnapshot as {
+    factoryCurrency: string; scenarioCurrency: string; provider: string | null; source: string | null;
+    rate: number; rateDate: string | null; rateType: FxRateType; retrievedAt: string; customReason?: string;
+  } | undefined;
+  const savedAskPrice = item.scenarioOverrides?.askPrice as { amount: number; currency: string } | undefined;
+
+  const [scenarioCurrencyDraft, setScenarioCurrencyDraft] = useState(savedScenarioCurrency ?? 'USD');
+  const [rateTypeDraft, setRateTypeDraft] = useState<FxRateType>(savedFxSnapshot?.rateType ?? 'reference');
+  const [customRateDraft, setCustomRateDraft] = useState(savedFxSnapshot?.rateType === 'custom' ? String(savedFxSnapshot.rate) : '');
+  const [customReasonDraft, setCustomReasonDraft] = useState(savedFxSnapshot?.customReason ?? '');
+  const [askPriceDraft, setAskPriceDraft] = useState(savedAskPrice ? String(savedAskPrice.amount) : '');
+  // Ask Price is entered directly in the scenario currency — changing that
+  // currency must never silently reinterpret an already-entered number as a
+  // different currency. This banner is the explicit prompt: convert now at
+  // today's rate, or clear and re-enter.
+  const [askPriceConvertBanner, setAskPriceConvertBanner] = useState<{ from: string; to: string } | null>(null);
+  useEffect(() => {
+    setScenarioCurrencyDraft(savedScenarioCurrency ?? 'USD');
+    setRateTypeDraft(savedFxSnapshot?.rateType ?? 'reference');
+    setCustomRateDraft(savedFxSnapshot?.rateType === 'custom' ? String(savedFxSnapshot.rate) : '');
+    setCustomReasonDraft(savedFxSnapshot?.customReason ?? '');
+    setAskPriceDraft(savedAskPrice ? String(savedAskPrice.amount) : '');
+    setAskPriceConvertBanner(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedScenarioCurrency, savedFxSnapshot?.rate, savedFxSnapshot?.rateType, savedFxSnapshot?.customReason, savedAskPrice?.amount, savedAskPrice?.currency]);
+
+  const isIdentityCurrency = !!factoryCurrencyInfo && factoryCurrencyInfo.code === scenarioCurrencyDraft;
+  const { data: liveFxRate, isFetching: isFxRateLoading, error: fxRateError } = useFxRate({
+    base: factoryCurrencyInfo?.code,
+    quote: scenarioCurrencyDraft,
+    rateType: rateTypeDraft,
+    enabled: rateTypeDraft !== 'custom' && !isIdentityCurrency,
+  });
+  // Always-on informational rate (1 USD → factory currency) — shown
+  // regardless of the scenario currency choice, including the identity case
+  // (factory currency === scenario currency) where the conversion rate above
+  // is trivially 1 and carries no source/date info. This is purely
+  // disclosure — it never feeds into any cost calculation. Tracks the
+  // CURRENTLY SELECTED rate type (Reference or Budget) rather than always
+  // querying Reference — otherwise switching to Budget would still show the
+  // identical Frankfurter number, silently ignoring the Rate Type selector.
+  // Custom has no USD-pivot meaning (it's a direct user-entered local→
+  // scenario rate), so this falls back to Reference for that case only.
+  const usdReferenceRateType = rateTypeDraft === 'custom' ? 'reference' : rateTypeDraft;
+  const usdReferenceEnabled = !!factoryCurrencyInfo && factoryCurrencyInfo.code !== 'USD';
+  const { data: usdReferenceRate } = useFxRate({
+    base: 'USD',
+    quote: factoryCurrencyInfo?.code,
+    rateType: usdReferenceRateType,
+    enabled: usdReferenceEnabled,
+  });
+  const customRateNum = parseFloat(customRateDraft);
+  const resolvedFxRate: { rate: number; source: string | null; provider: string | null; rateDate: string | null; stale: boolean } | null =
+    isIdentityCurrency
+      ? { rate: 1, source: 'identity', provider: null, rateDate: null, stale: false }
+      : rateTypeDraft === 'custom'
+        ? (Number.isFinite(customRateNum) && customRateNum > 0 && customReasonDraft.trim()
+            ? { rate: customRateNum, source: `user-entered — ${customReasonDraft.trim()}`, provider: null, rateDate: null, stale: false }
+            : null)
+        : (liveFxRate ?? null);
+  const refreshFxRate = useRefreshFxRate();
+  const fxRateOnDemand = useFxRateOnDemand();
+  const handleScenarioCurrencyChange = (next: string) => {
+    if (askPriceDraft.trim() && next !== scenarioCurrencyDraft) {
+      setAskPriceConvertBanner({ from: scenarioCurrencyDraft, to: next });
+    }
+    setScenarioCurrencyDraft(next);
   };
-  const DEFAULT_RATES: Record<string, number> = {
-    INR: 1, USD: 0.01198, EUR: 0.01109, GBP: 0.00945, JPY: 1.801, AED: 0.044,
+  const convertAskPriceNow = async () => {
+    if (!askPriceConvertBanner) return;
+    const { from, to } = askPriceConvertBanner;
+    try {
+      const result = await fxRateOnDemand.mutateAsync({ base: from, quote: to });
+      const amount = parseFloat(askPriceDraft);
+      if (Number.isFinite(amount)) setAskPriceDraft((amount * result.rate).toFixed(2));
+    } catch {
+      toast.error('Could not fetch a conversion rate for Ask Price — clear and re-enter it instead.');
+    } finally {
+      setAskPriceConvertBanner(null);
+    }
   };
-  const displayRate = exchangeRateVersion === 'custom' && customExchangeRate
-    ? parseFloat(customExchangeRate)
-    : (DEFAULT_RATES[currency] ?? 1);
   const { data: materialCandidates } = useMaterialIntelligence(item.id);
   const updateBOMItem = useUpdateBOMItem();
   const patchScenarioOverrides = usePatchScenarioOverrides();
@@ -6216,6 +6596,50 @@ function CostGuidePanel({
       try {
         const routeStagedThisSession = processRouting === 'manual' && !!selectedManualRoute;
         await applyScenario();
+
+        // Persist Currency & Ask Price alongside factory/batch size — same
+        // scenario_overrides bag, one atomic merge (merge_scenario_overrides).
+        // Only written when a real rate resolved (identity, live reference/
+        // budget, or a complete custom rate+reason) — never a fabricated
+        // number under the applied scenario's identity.
+        if (resolvedFxRate) {
+          const fxSnapshot = {
+            factoryCurrency: factoryCurrencyInfo?.code ?? '',
+            scenarioCurrency: scenarioCurrencyDraft,
+            provider: resolvedFxRate.provider,
+            source: resolvedFxRate.source,
+            rate: resolvedFxRate.rate,
+            rateDate: resolvedFxRate.rateDate,
+            rateType: rateTypeDraft,
+            retrievedAt: new Date().toISOString(),
+            ...(rateTypeDraft === 'custom' ? { customReason: customReasonDraft.trim() } : {}),
+          };
+          // If the user changed Scenario Currency and hasn't yet resolved the
+          // ask-price-convert prompt (convert vs. clear), do NOT write Ask
+          // Price at all — silently stamping the old, unconverted number with
+          // the new currency would misrepresent it. The previously saved
+          // Ask Price (if any) is simply left untouched.
+          if (askPriceConvertBanner) {
+            toast.warning('Ask Price left unchanged — resolve the currency-change prompt (Convert or Clear) before it is saved under the new currency.');
+          }
+          const trimmedAskPrice = askPriceDraft.trim();
+          const askPriceNum = parseFloat(trimmedAskPrice);
+          const askPricePatch: { amount: number; currency: string } | null | undefined =
+            askPriceConvertBanner
+              ? undefined // unresolved convert/clear prompt — leave the existing saved value untouched
+              : trimmedAskPrice === ''
+                ? null // explicit clear
+                : Number.isFinite(askPriceNum)
+                  ? { amount: askPriceNum, currency: scenarioCurrencyDraft }
+                  : undefined; // invalid/mid-typing — leave the existing saved value untouched
+          patchScenarioOverrides.mutate({
+            id: item.id,
+            patch: {
+              scenarioCurrency: scenarioCurrencyDraft, fxSnapshot,
+              ...(askPricePatch !== undefined ? { askPrice: askPricePatch } : {}),
+            },
+          });
+        }
         setApplyProgress({ step: 'Saving material grade…', pct: 40 });
 
         const pendingGrade = matInputValue.trim();
@@ -6234,11 +6658,18 @@ function CostGuidePanel({
         const currentGrade = pendingGrade || item.materialGrade;
         if (currentGrade) {
           setApplyProgress({ step: 'Updating material cost…', pct: 80 });
-          await autoAddMaterialCost(currentGrade);
+          // Pass factoryDraft explicitly rather than relying on the `factory`
+          // prop: applyScenario() above just called setFactory(factoryDraft)
+          // in the parent, but that state update hasn't flowed back down as
+          // a new `factory` prop yet — this closure is still running against
+          // the render that started it. Without this, switching Digital
+          // Factory and clicking Apply silently re-priced material/machine/
+          // labour against the OLD location every time.
+          await autoAddMaterialCost(currentGrade, factoryDraft);
 
           if (!routeStagedThisSession) {
             setApplyProgress({ step: 'Re-applying process route…', pct: 90 });
-            await reapplyExistingOrDefaultRoute();
+            await reapplyExistingOrDefaultRoute(factoryDraft);
           }
         }
 
@@ -6276,77 +6707,6 @@ function CostGuidePanel({
       <div className="flex-1 overflow-y-auto">
         {tab === 'scenario' && (
           <>
-            <Section title="Currency &amp; Ask Price">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-20 shrink-0">Currency</span>
-                  <select
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
-                  >
-                    {Object.keys(CURRENCY_SYMBOLS).map((c) => (
-                      <option key={c} value={c}>{c} — {c === 'INR' ? 'Indian Rupee' : c === 'USD' ? 'US Dollar' : c === 'EUR' ? 'Euro' : c === 'GBP' ? 'British Pound' : c === 'JPY' ? 'Japanese Yen' : 'UAE Dirham'}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-20 shrink-0">Exch. Rate</span>
-                  <select
-                    value={exchangeRateVersion}
-                    onChange={(e) => setExchangeRateVersion(e.target.value as 'default' | 'budget' | 'custom')}
-                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
-                  >
-                    <option value="default">Default (Spot)</option>
-                    <option value="budget">Budget 2026</option>
-                    <option value="custom">Custom</option>
-                  </select>
-                </div>
-                {exchangeRateVersion === 'custom' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-20 shrink-0">Rate</span>
-                    <input
-                      type="number" min="0" step="0.0001" placeholder={`INR → ${currency} rate`}
-                      value={customExchangeRate}
-                      onChange={(e) => setCustomExchangeRate(e.target.value)}
-                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    />
-                    <button
-                      onClick={() => { setExchangeRateVersion('default'); setCustomExchangeRate(''); }}
-                      className="text-[10px] text-violet-400 hover:text-violet-300 shrink-0"
-                    >Default</button>
-                  </div>
-                )}
-                {currency !== 'INR' && (
-                  <p className="text-[10px] text-muted-foreground/60 leading-tight">
-                    1 INR = {displayRate.toFixed(5)} {currency}
-                  </p>
-                )}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-20 shrink-0">Ask Price</span>
-                  <div className="relative flex-1">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none select-none">
-                      {CURRENCY_SYMBOLS[currency] ?? currency}
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Target / quoted price"
-                      value={askPrice}
-                      onChange={(e) => setAskPrice(e.target.value)}
-                      className="w-full text-xs border border-border rounded pl-6 pr-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    />
-                  </div>
-                </div>
-                {askPrice && !isNaN(parseFloat(askPrice)) && (
-                  <p className="text-[10px] text-amber-400/80 leading-tight">
-                    Ask {CURRENCY_SYMBOLS[currency]}{parseFloat(askPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — shown alongside cost for margin tracking
-                  </p>
-                )}
-              </div>
-            </Section>
-
             <Section title="Digital Factory">
               <select
                 value={factoryDraft}
@@ -6363,6 +6723,145 @@ function CostGuidePanel({
                 <option value="Mexico">Mexico</option>
                 <option value="Other">Other</option>
               </select>
+              {factoryCurrencyInfo && (
+                <p className="text-[10px] text-muted-foreground/60 leading-tight mt-1">
+                  Native factory currency: <span className="font-medium text-foreground">{factoryCurrencyInfo.code}</span> ({factoryCurrencyInfo.symbol})
+                </p>
+              )}
+            </Section>
+
+            <Section title="Currency &amp; Ask Price">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-20 shrink-0">Currency</span>
+                  <select
+                    value={scenarioCurrencyDraft}
+                    onChange={(e) => handleScenarioCurrencyChange(e.target.value)}
+                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                  >
+                    {Object.keys(SCENARIO_CURRENCY_SYMBOLS).map((c) => (
+                      <option key={c} value={c}>{c} — {SCENARIO_CURRENCY_LABELS[c]}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {askPriceConvertBanner && (
+                  <div className="rounded border border-amber-500/40 bg-amber-500/10 p-2 space-y-1.5">
+                    <p className="text-[10px] text-amber-400 leading-tight">
+                      Ask Price was entered in {askPriceConvertBanner.from} — scenario currency is now {askPriceConvertBanner.to}. Convert it, or clear and re-enter.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => void convertAskPriceNow()}
+                        disabled={fxRateOnDemand.isPending}
+                        className="text-[10px] font-medium text-amber-300 hover:text-amber-200 border border-amber-500/40 rounded px-1.5 py-0.5 disabled:opacity-50"
+                      >{fxRateOnDemand.isPending ? 'Converting…' : `Convert to ${askPriceConvertBanner.to} now`}</button>
+                      <button
+                        onClick={() => { setAskPriceDraft(''); setAskPriceConvertBanner(null); }}
+                        className="text-[10px] text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5"
+                      >Clear and re-enter</button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-20 shrink-0">Rate Type</span>
+                  <select
+                    value={rateTypeDraft}
+                    onChange={(e) => setRateTypeDraft(e.target.value as FxRateType)}
+                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                  >
+                    <option value="reference">Reference (latest available FX rate)</option>
+                    <option value="budget">Budget (admin-set rate)</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+
+                {rateTypeDraft === 'custom' ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-20 shrink-0">Rate</span>
+                    <input
+                      type="number" min="0" step="0.0001"
+                      placeholder={factoryCurrencyInfo ? `${factoryCurrencyInfo.code} → ${scenarioCurrencyDraft} rate` : 'rate'}
+                      value={customRateDraft}
+                      onChange={(e) => setCustomRateDraft(e.target.value)}
+                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                  </div>
+                ) : null}
+                {rateTypeDraft === 'custom' ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-20 shrink-0">Reason</span>
+                    <input
+                      type="text" placeholder="Required — e.g. contract-locked rate"
+                      value={customReasonDraft}
+                      onChange={(e) => setCustomReasonDraft(e.target.value)}
+                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                  </div>
+                ) : null}
+
+                {!isIdentityCurrency && rateTypeDraft !== 'custom' && isFxRateLoading && (
+                  <p className="text-[10px] text-muted-foreground/60 leading-tight">Resolving rate…</p>
+                )}
+                {!isIdentityCurrency && rateTypeDraft !== 'custom' && !isFxRateLoading && fxRateError && (
+                  <p className="text-[10px] text-red-400 leading-tight">
+                    {fxRateError instanceof ApiError ? fxRateError.message : 'Rate unavailable for this pair — try Reference or Custom.'}
+                  </p>
+                )}
+                {resolvedFxRate && factoryCurrencyInfo && !isIdentityCurrency && (
+                  <div className="text-[10px] text-muted-foreground/70 leading-tight space-y-0.5">
+                    <p>1 {factoryCurrencyInfo.code} = {resolvedFxRate.rate.toFixed(5)} {scenarioCurrencyDraft}</p>
+                    <p className="text-muted-foreground/50">
+                      {resolvedFxRate.source ?? 'source unknown'}
+                      {resolvedFxRate.rateDate ? ` · ${resolvedFxRate.rateDate}` : ''}
+                      {resolvedFxRate.stale ? ' · stale (provider unavailable)' : ''}
+                    </p>
+                  </div>
+                )}
+                {/* Informational only — never used for costing. Always shown
+                    (including when scenario currency = factory currency,
+                    where the conversion rate above is trivially 1 and has no
+                    source/date to disclose) so the live reference source is
+                    always visible somewhere in this widget. */}
+                {usdReferenceEnabled && usdReferenceRate && (
+                  <p className="text-[10px] text-muted-foreground/50 leading-tight">
+                    {usdReferenceRateType === 'budget' ? 'Budget' : 'Reference'}: 1 USD = {usdReferenceRate.rate.toFixed(4)} {factoryCurrencyInfo?.code}
+                    {usdReferenceRate.source ? ` · ${usdReferenceRate.source}` : ''}
+                    {usdReferenceRate.rateDate ? ` · ${usdReferenceRate.rateDate}` : ''}
+                  </p>
+                )}
+                {rateTypeDraft !== 'custom' && !isIdentityCurrency && factoryCurrencyInfo && (
+                  <button
+                    onClick={() => refreshFxRate.mutate({ base: factoryCurrencyInfo.code, quote: scenarioCurrencyDraft })}
+                    disabled={refreshFxRate.isPending}
+                    className="text-[10px] text-violet-400 hover:text-violet-300 disabled:opacity-50"
+                  >{refreshFxRate.isPending ? 'Refreshing…' : 'Refresh FX'}</button>
+                )}
+
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-xs text-muted-foreground w-20 shrink-0">Ask Price</span>
+                  <div className="relative flex-1">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none select-none">
+                      {SCENARIO_CURRENCY_SYMBOLS[scenarioCurrencyDraft] ?? scenarioCurrencyDraft}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Target / quoted price"
+                      value={askPriceDraft}
+                      onChange={(e) => setAskPriceDraft(e.target.value)}
+                      className="w-full text-xs border border-border rounded pl-6 pr-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                  </div>
+                </div>
+                {askPriceDraft && !isNaN(parseFloat(askPriceDraft)) && (
+                  <p className="text-[10px] text-amber-400/80 leading-tight">
+                    Ask {SCENARIO_CURRENCY_SYMBOLS[scenarioCurrencyDraft] ?? scenarioCurrencyDraft}{parseFloat(askPriceDraft).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — shown alongside cost for margin tracking. Saved on Apply Scenario.
+                  </p>
+                )}
+              </div>
             </Section>
 
             <Section title="Process Routing">
@@ -6661,6 +7160,15 @@ function CostGuidePanel({
               {matInputValue.trim() && (
                 <li>Material: <span className="text-foreground font-medium">{matInputValue.trim()}</span></li>
               )}
+              <li>
+                Currency: <span className="text-foreground font-medium">{scenarioCurrencyDraft}</span>
+                {resolvedFxRate && factoryCurrencyInfo && !isIdentityCurrency && (
+                  <span className="text-muted-foreground"> (1 {factoryCurrencyInfo.code} = {resolvedFxRate.rate.toFixed(4)} {scenarioCurrencyDraft}, {rateTypeDraft})</span>
+                )}
+              </li>
+              {askPriceDraft.trim() && !isNaN(parseFloat(askPriceDraft)) && (
+                <li>Ask Price: <span className="text-foreground font-medium">{SCENARIO_CURRENCY_SYMBOLS[scenarioCurrencyDraft] ?? scenarioCurrencyDraft}{parseFloat(askPriceDraft).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></li>
+              )}
             </ul>
             <p className="text-xs">Any process whose cycle time can't be resolved will be reported below rather than saved.</p>
           </div>
@@ -6693,8 +7201,14 @@ function CostGuidePanel({
 
 // ── SustainabilityTab ─────────────────────────────────────────────────────────
 
-function SustainabilityTab({ item, batchSize }: { item: BOMItem; batchSize: number }) {
-  const { data: cost, isLoading } = useCostSummary(item.id, batchSize);
+function SustainabilityTab({ item, batchSize, factory }: { item: BOMItem; batchSize: number; factory: string }) {
+  // Was omitting location entirely — useCostSummary defaults to 'USA' when
+  // no location is passed, so this tab silently ran a full second cost
+  // computation for USA on every load/Apply regardless of the actual
+  // Digital Factory, doubling backend costing work for no reason (its own
+  // numbers were never even shown — CostSummaryTab right next to it already
+  // fetches the real, factory-scoped cost correctly).
+  const { data: cost, isLoading } = useCostSummary(item.id, batchSize, factory);
 
   if (isLoading) {
     return (
@@ -8163,19 +8677,11 @@ function DrawingIntelligenceTab({ item }: { item: BOMItem }) {
   );
 }
 
-// ── NRE Investment constants (INR base; converted at render time) ──────────────
-
-const INV_LOC_RATE: Record<string, { symbol: string; inrRate: number }> = {
-  'India':     { symbol: '$', inrRate: 1 },
-  'USA':       { symbol: '$', inrRate: 83.5 },
-  'China':     { symbol: '¥', inrRate: 11.52 },
-  'Germany':   { symbol: '€', inrRate: 90.8 },
-  'France':    { symbol: '€', inrRate: 90.8 },
-  'W. Europe': { symbol: '€', inrRate: 90.8 },
-  'E. Europe': { symbol: '€', inrRate: 90.8 },
-  'Mexico':    { symbol: 'MX$', inrRate: 4.77 },
-  'Other':     { symbol: '$', inrRate: 83.5 },
-};
+// ── NRE Investment constants (INR base; converted at render time via the
+// live cost-summary's currencySymbol/inrToDisplayRate — see fmtC in
+// InvestmentTab below. No per-country FX table here: the Digital Factory's
+// chosen currency and the real exchange_rates-backed conversion are the only
+// source, exactly like every other cost figure in this page.) ─────────────
 
 const INV_FIXTURE_NRE: Record<string, number> = {
   cnc_3ax_vmc: 25_000, cnc_4ax_vmc: 45_000, cnc_5ax_mc: 85_000,
@@ -8234,12 +8740,6 @@ function InvestmentTab({
   const uniqueDrillDiams  = holeGroups.length || ((fg?.summary?.holeCount ?? 0) > 0 ? 3 : 0);
   const uniqueThreadSizes = new Set(threads.map((t) => t.size)).size;
 
-  const loc = (INV_LOC_RATE[factory] ?? INV_LOC_RATE['India'])!;
-  const fmtC = (inr: number, dec = 0) =>
-    `${loc.symbol}${(inr / loc.inrRate).toLocaleString(undefined, {
-      minimumFractionDigits: dec, maximumFractionDigits: dec,
-    })}`;
-
   if (!fg) {
     return (
       <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
@@ -8248,6 +8748,24 @@ function InvestmentTab({
       </div>
     );
   }
+
+  // Symbol + FX come from this Digital Factory's live cost-summary — never a
+  // per-country constant — so a location this tab has never seen before still
+  // renders correctly the moment the scenario/exchange_rates table knows it.
+  if (!cost?.currencySymbol || cost.inrToDisplayRate == null) {
+    return (
+      <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
+        <Loader2 className="h-5 w-5 animate-spin opacity-40" />
+        <p className="text-xs text-center">Loading {factory} rates…</p>
+      </div>
+    );
+  }
+  const invSymbol = cost.currencySymbol;
+  const invInrRate = cost.inrToDisplayRate;
+  const fmtC = (inr: number, dec = 0) =>
+    `${invSymbol}${(inr * invInrRate).toLocaleString(undefined, {
+      minimumFractionDigits: dec, maximumFractionDigits: dec,
+    })}`;
 
   // ── Fixture ──
   const fixtureBase   = INV_FIXTURE_NRE[machineClass] ?? 25_000;
@@ -8346,11 +8864,6 @@ function InvestmentTab({
           <p className="text-2xl font-bold tabular-nums leading-tight text-foreground">
             {fmtC(totalNRE)}
           </p>
-          {loc.symbol !== '$' && (
-            <p className="text-sm text-muted-foreground tabular-nums mt-0.5">
-              ${totalNRE.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            </p>
-          )}
         </div>
       </div>
 
@@ -8590,7 +9103,11 @@ function AnalysisTabsPanel({
   const cls = fg?.classification;
   const cncSummary: Record<string, number> | null = (fg as any)?.cnc_features?.feature_summary ?? null;
   const lifetimeVol = (item.annualVolume ?? 0) * productionLife;
-  const { data: summaryForPartTab } = useCostSummary(item.id, batchSize);
+  // Same fix as SustainabilityTab — omitting location silently defaulted to
+  // 'USA' (useCostSummary's own fallback), running a second, wasted full
+  // cost computation on every load/Apply regardless of the real Digital
+  // Factory. `factory` is already a real prop on this component.
+  const { data: summaryForPartTab } = useCostSummary(item.id, batchSize, factory);
 
   return (
     <div className="flex flex-col h-full">
@@ -8706,7 +9223,7 @@ function AnalysisTabsPanel({
 
 
         {tab === 'sustainability' && (
-          <SustainabilityTab item={item} batchSize={batchSize} />
+          <SustainabilityTab item={item} batchSize={batchSize} factory={factory} />
         )}
 
         {tab === 'detail' && (
@@ -9507,7 +10024,11 @@ export default function ManufacturingIntelligencePage() {
   // Real, backend-computed process lines (with per-feature cycle-time breakdown)
   // — reused by the Properties tree below instead of hardcoded per-feature rates.
   // React Query deduplicates this: free if the Cost tab has already loaded it.
-  const { data: costForHeatmap } = useCostSummary(item?.id ?? '', batchSize);
+  // Same fix as SustainabilityTab/AnalysisTabsPanel above — omitting location
+  // silently defaulted to 'USA' (useCostSummary's own fallback), running a
+  // third wasted full cost computation on every load/Apply regardless of the
+  // real Digital Factory.
+  const { data: costForHeatmap } = useCostSummary(item?.id ?? '', batchSize, factory);
   // costForHeatmap.processLines always reflects the cost engine's OWN default-
   // recommended route (e.g. Fiber Laser Cutting), never whatever route the
   // engineer actually applied (e.g. Waterjet Cutting) -- same root cause

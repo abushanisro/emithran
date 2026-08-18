@@ -25,6 +25,14 @@ export const INSPECTION_SAMPLING_DEFAULT: InspectionStagePolicy = {
 
 export const MATERIAL_OVERHEAD_PCT = 5;  // nesting skeleton + handling scrap
 
+// Mass-based utilization below which a panel-nesting advisory is shown
+// alongside the material cost. This is informational, not an error --
+// genuinely irregular flat patterns (large internal cutouts, long/thin
+// brackets) can legitimately nest below this and are still costed
+// correctly from the real flat-pattern silhouette. Tune per shop-floor
+// manufacturing standard, not per part.
+export const UTILIZATION_ADVISORY_THRESHOLD_PCT = 75;
+
 // Fiber laser cutting speed (mm/min) by sheet thickness — mild steel (CRCA / IS2062)
 export const LASER_SPEED_MM_PER_MIN: Record<number, number> = {
   0.8: 8000, 1.0: 6000, 1.2: 5000, 1.5: 4000,
@@ -730,15 +738,37 @@ export const LOCATION_INFO: Readonly<Record<string, LocationCurrencyInfo>> = {
   'Other':     { code: 'USD', symbol: '$', materialCol: 'cost_usa'      },
 } as const;
 
-// ── Rate plausibility guard ────────────────────────────────────────────────────
-// A DB machine rate far outside the location benchmark band almost always means a
-// broken import (currency not converted, overhead-only rate, benchmark-sheet noise)
-// — the class of bug migration 327 backfilled. The DB stays authoritative (we never
-// silently clamp a rate the user entered), but the deviation must be VISIBLE on the
-// cost summary so bad data cannot silently reach a quote.
+// Derived from LOCATION_INFO so a currency's display symbol has exactly one
+// source — used wherever a currency CODE (not a Digital Factory location) is
+// the only thing on hand, e.g. resolving the symbol for a scenario currency
+// the user picked in the Currency & Ask Price widget.
+export const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.values(LOCATION_INFO).map((info) => [info.code, info.symbol]),
+);
 
-const RATE_WARN_LOW_FRACTION = 0.5;   // below 50% of benchmark → suspicious
-const RATE_WARN_HIGH_FRACTION = 3.0;  // above 300% of benchmark → suspicious
+// ── Rate plausibility guard ────────────────────────────────────────────────────
+// A DB machine/labour rate far outside the location benchmark band almost
+// always means a broken import (currency not converted, overhead-only rate,
+// benchmark-sheet noise) — the class of bug migration 327 backfilled for MHR,
+// and migration 348 for LHR. The DB stays authoritative (we never silently
+// clamp a rate the user entered), but the deviation must be VISIBLE on the
+// cost summary so bad data cannot silently reach a quote.
+//
+// The fractions themselves are business/costing POLICY, not an algorithmic
+// constant — they belong in the database (`costing_settings`, migration 473:
+// 'rate_warn_low_fraction'/'rate_warn_high_fraction'), read once per request
+// by the caller (mirroring how sga_pct/profit_pct are already loaded in
+// cost-aggregation.service.ts/location-comparison.service.ts) and passed in
+// here. These two functions contain only the generic comparison — no DB
+// access, no hardcoded policy — and DEFAULT_RATE_WARN_THRESHOLDS below is
+// strictly the last-resort fallback for when that table is ever empty
+// (same "fallback + disclosed warning" convention as SGA/profit).
+export interface RateWarnThresholds {
+  lowFraction: number;   // below this fraction of benchmark → suspicious (e.g. 0.5 = 50%)
+  highFraction: number;  // above this multiple of benchmark → suspicious (e.g. 3.0 = 300%)
+}
+
+export const DEFAULT_RATE_WARN_THRESHOLDS: RateWarnThresholds = { lowFraction: 0.5, highFraction: 3.0 };
 
 // benchmark: resolved from mhr_benchmark_rates (Pass 4 in resolveMHRRates).
 // Returns null when no benchmark is available so the guard degrades gracefully.
@@ -748,17 +778,50 @@ export function benchmarkRateWarning(
   rate: number,
   machineName: string | null,
   benchmark: number | undefined,
+  thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
 ): string | null {
   if (benchmark == null || benchmark <= 0 || rate <= 0) return null;
 
   const symbol = LOCATION_INFO[location]?.symbol ?? '';
   const name = machineName ?? machineClass.replace(/_/g, ' ');
-  if (rate < benchmark * RATE_WARN_LOW_FRACTION) {
+  if (rate < benchmark * thresholds.lowFraction) {
     const pct = Math.round((1 - rate / benchmark) * 100);
     return `${name} rate ${symbol}${rate}/hr is ${pct}% below the ${location} ${machineClass.replace(/_/g, ' ')} benchmark (${symbol}${benchmark}/hr) — verify the MHR record before quoting`;
   }
-  if (rate > benchmark * RATE_WARN_HIGH_FRACTION) {
-    return `${name} rate ${symbol}${rate}/hr is over ${RATE_WARN_HIGH_FRACTION}× the ${location} ${machineClass.replace(/_/g, ' ')} benchmark (${symbol}${benchmark}/hr) — verify the MHR record before quoting`;
+  if (rate > benchmark * thresholds.highFraction) {
+    return `${name} rate ${symbol}${rate}/hr is over ${thresholds.highFraction}× the ${location} ${machineClass.replace(/_/g, ' ')} benchmark (${symbol}${benchmark}/hr) — verify the MHR record before quoting`;
+  }
+  return null;
+}
+
+// Same plausibility guard as benchmarkRateWarning above, for LABOUR rates —
+// no equivalent existed until now, which is exactly how a stale lhr_records
+// import artifact (migration 348: a USD-denominated import multiplying an
+// already-INR India rate by ~83.5 again) reached a live quote as a real
+// ₹12,062/hr labour rate with no warning at all, while the analogous
+// machine-rate case has been caught since migration 327.
+//
+// processGroup: the resolved lhr_process_group (or process_group fallback)
+// this rate was billed under — used only for the warning text, not lookup.
+// benchmark: resolved from lhr_benchmark_rates for the SAME location+group
+// this rate was actually billed under (see resolveLHRRates). Returns null
+// when no benchmark is available so the guard degrades gracefully.
+export function lhrRateWarning(
+  processGroup: string,
+  location: string,
+  rate: number,
+  benchmark: number | undefined,
+  thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
+): string | null {
+  if (benchmark == null || benchmark <= 0 || rate <= 0) return null;
+
+  const symbol = LOCATION_INFO[location]?.symbol ?? '';
+  if (rate < benchmark * thresholds.lowFraction) {
+    const pct = Math.round((1 - rate / benchmark) * 100);
+    return `${processGroup} labour rate ${symbol}${rate}/hr is ${pct}% below the ${location} ${processGroup} benchmark (${symbol}${benchmark}/hr) — verify the LHR record before quoting`;
+  }
+  if (rate > benchmark * thresholds.highFraction) {
+    return `${processGroup} labour rate ${symbol}${rate}/hr is over ${thresholds.highFraction}× the ${location} ${processGroup} benchmark (${symbol}${benchmark}/hr) — verify the LHR record before quoting`;
   }
   return null;
 }

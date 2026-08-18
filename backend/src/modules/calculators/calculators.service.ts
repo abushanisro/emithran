@@ -4,6 +4,8 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { evaluateCalculatorFormulas } from './calculator-formula-evaluator';
 import { PHYSICS_REGISTRY } from './physics-registry';
 import { SheetMetalLookupService, normaliseLaserMaterial } from '../bom-items/costing/sheet-metal-lookup.service';
+import { BOMItemsService } from '../bom-items/bom-items.service';
+import { resolveNetUsagePhysics } from '../bom-items/costing/sheet-metal-net-usage.physics';
 import {
   CreateCalculatorDto,
   UpdateCalculatorDto,
@@ -31,6 +33,7 @@ export class CalculatorsServiceV2 {
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
     private readonly sheetMetalLookup: SheetMetalLookupService,
+    private readonly bomItemsService: BOMItemsService,
   ) { }
 
   /**
@@ -59,7 +62,12 @@ export class CalculatorsServiceV2 {
       `,
         { count: 'exact' },
       )
-      .or(`user_id.eq.${userId},is_global.eq.true`)
+      // Fixed pre-existing bug: `is_global` is not a real column on
+      // calculators (only `is_public`, plus now `user_id IS NULL` for
+      // global calculators seeded by migration 470) -- this `.or()` used to
+      // reference a nonexistent column, so the "show me public/global
+      // calculators too" fallback was silently broken.
+      .or(`user_id.eq.${userId},is_public.eq.true,user_id.is.null`)
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -119,7 +127,12 @@ export class CalculatorsServiceV2 {
       `,
       )
       .eq('id', id)
-      .or(`user_id.eq.${userId},is_global.eq.true`)
+      // Fixed pre-existing bug: `is_global` is not a real column on
+      // calculators (only `is_public`, plus now `user_id IS NULL` for
+      // global calculators seeded by migration 470) -- this `.or()` used to
+      // reference a nonexistent column, so the "show me public/global
+      // calculators too" fallback was silently broken.
+      .or(`user_id.eq.${userId},is_public.eq.true,user_id.is.null`)
       .single();
 
     if (error || !data) {
@@ -440,28 +453,44 @@ export class CalculatorsServiceV2 {
     // of evaluating this calculator's own calculator_fields formula strings.
     // Eliminates the possibility of this calculator's numbers drifting from
     // the live cost engine's numbers for these processes — see migration 056.
-    const physicsFn = (calculator as any).physics_key ? PHYSICS_REGISTRY[(calculator as any).physics_key] : undefined;
-    const rawResults = physicsFn
-      ? physicsFn(dto.inputValues)
-      : evaluateCalculatorFormulas(fields, formulas, dto.inputValues, {
-          log: (m) => this.logger.log(m, 'CalculatorsServiceV2'),
-          error: (m) => this.logger.error(m, 'CalculatorsServiceV2'),
-          warn: (m) => this.logger.warn(m, 'CalculatorsServiceV2'),
-        }).results;
+    const physicsKey = (calculator as any).physics_key as string | null | undefined;
+    let rawResults: Record<string, any>;
+    if (physicsKey === 'sheet_metal_net_usage') {
+      rawResults = resolveNetUsagePhysics(dto.inputValues);
+    } else if (physicsKey === 'sheet_metal_gross_usage_nesting') {
+      // Same implementation the cost-engine path (bom-items.service.ts's
+      // evaluateCalculatorFields) dispatches to -- the two can never drift.
+      rawResults = await this.bomItemsService.resolveGrossUsageForCalculator(dto.inputValues, {
+        itemId: dto.itemId, userId, accessToken,
+      });
+    } else {
+      const physicsFn = physicsKey ? PHYSICS_REGISTRY[physicsKey] : undefined;
+      rawResults = physicsFn
+        ? physicsFn(dto.inputValues)
+        : evaluateCalculatorFormulas(fields, formulas, dto.inputValues, {
+            log: (m) => this.logger.log(m, 'CalculatorsServiceV2'),
+            error: (m) => this.logger.error(m, 'CalculatorsServiceV2'),
+            warn: (m) => this.logger.warn(m, 'CalculatorsServiceV2'),
+          }).results;
+    }
     // Disclosed, not silent: a physics function's `_warnings` (e.g. "no MHR
     // rate provided — Machine Cost computed as $0") is metadata, not a
     // calculator field — lifted out of `results` into its own response key
     // so it doesn't pollute the displayed field list, but isn't dropped either.
-    const { _warnings, ...results } = rawResults as Record<string, any>;
-    if (_warnings?.length > 0) {
-      for (const w of _warnings) this.logger.warn(`Calculator ${id}: ${w}`, 'CalculatorsServiceV2');
+    // `_gapReason` (sheet-metal gross-usage only) is the same kind of
+    // metadata — the exact "Unable to calculate true-shape gross usage —
+    // verified flat pattern required" message, never a calculator field.
+    const { _warnings, _gapReason, _internalReason, ...results } = rawResults as Record<string, any>;
+    const warnings: string[] = [...(_warnings ?? []), ...(_gapReason ? [_gapReason] : [])];
+    if (warnings.length > 0) {
+      for (const w of warnings) this.logger.warn(`Calculator ${id}: ${w}`, 'CalculatorsServiceV2');
     }
     const duration = Date.now() - startTime;
 
     return {
       success: true,
       results,
-      ...(_warnings?.length > 0 ? { warnings: _warnings } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
       durationMs: duration,
     };
   }

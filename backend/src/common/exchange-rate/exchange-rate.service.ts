@@ -62,6 +62,19 @@ function makeSnapshot(rates: ReadonlyMap<string, number>): RateSnapshot {
  * flows that report gaps per-row instead of aborting the whole batch).
  *
  * All rates are from_currency → INR. INR itself has a rate of 1.
+ *
+ * Intended default (not yet implemented — there is currently no admin UI or
+ * write endpoint for exchange_rates at all; every row today comes from a
+ * hand-written SQL migration): when an admin CREATES a new Budget rate for a
+ * currency pair, it should default/prefill to the live Reference rate
+ * (common/fx/fx.service.ts's 'reference' rate type, via FxRateCacheService)
+ * minus 2% — a conservative planning buffer, standard practice for FX
+ * budget rates. This is a one-time suggested DEFAULT only: once saved, the
+ * row is independently admin-controlled and stable for the fiscal year
+ * exactly as today — Budget must never become a live-derived, silently
+ * recalculated rate (that would defeat the entire point of this table; see
+ * FxService's own "Reference ≠ Budget ≠ Custom, never silently substitute"
+ * rule). Build this once a real admin surface for exchange_rates exists.
  */
 @Injectable()
 export class ExchangeRateService {

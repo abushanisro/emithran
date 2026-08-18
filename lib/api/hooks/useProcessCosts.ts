@@ -69,6 +69,10 @@ export interface ProcessCostRecord {
   operation?: string;
   mhrId?: string;
   lhrId?: string;
+  /** mhr_benchmark_rates row id ('bm-mhr-<id>'), when this row's machine is a benchmark (★) pick rather than a real mhr_records row */
+  benchmarkMhrId?: string | number;
+  /** lhr_benchmark_rates row id ('bm-lhr-<id>'), when this row's labour is a benchmark (★) pick rather than a real lhr_records row */
+  benchmarkLhrId?: string | number;
   /** Machine name resolved from the linked MHR record */
   machineName?: string;
   /** Machine class key resolved from the linked MHR record (e.g. 'fiber_laser') */
@@ -298,6 +302,13 @@ export function useProcessCosts(options: {
       return data;
     },
     enabled: enabled && (!!bomItemId || (!!bomItemIds && bomItemIds.length > 0)),
+    // Same fix as useMHRRecords/useLHR/useRawMaterialCosts for the exact same
+    // bug: the global QueryClient default (refetchOnMount: false, staleTime:
+    // 5min) means once this exact filter combination is fetched, it stays
+    // cached regardless of what changes server-side — e.g. a machine_rate
+    // backfill migration correcting a stale rate never shows up here without
+    // this, even though the DB row is already fixed.
+    refetchOnMount: 'always',
   });
 }
 
@@ -313,5 +324,7 @@ export function useProcessCost(id?: string) {
       return result;
     },
     enabled: !!id,
+    // Same staleness class as useProcessCosts above.
+    refetchOnMount: 'always',
   });
 }

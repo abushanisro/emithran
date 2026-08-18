@@ -1756,6 +1756,12 @@ export class BOMItemsController {
       process: string; machineClass: string; machineName?: string | null; hourlyRate: number;
       cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } };
       physicsGap?: PhysicsGap | null;
+      // Inspection (and any other class priced via a flat resolved resource
+      // rate, not the CNC/laser-style machineSelection candidate list) has no
+      // machineSelection candidate at all — finalizeInspectionLine() sets
+      // these directly on the line instead (see inspection-engine.ts).
+      mhrId?: string | null;
+      benchmarkMhrId?: string | number | null;
     }>,
     batchSize: number,
     location: string,
@@ -1908,7 +1914,21 @@ export class BOMItemsController {
         // pre-select it on the next load. Without this, only machine_name (a
         // display string) was stored and the dropdown always showed "no
         // machine selected" for a route-applied line.
-        mhr_id:         line.machineSelection?.balanced?.candidate?.machineId ?? null,
+        //
+        // Inspection-class lines have no machineSelection candidate at all —
+        // falling back to line.mhrId/benchmarkMhrId (set directly by
+        // finalizeInspectionLine, see inspection-engine.ts) is required, or
+        // this always wrote NULL for them. Confirmed live: an Inspect line's
+        // real, resolved CMM/bench machine link was correctly written on the
+        // FIRST apply (via autoAddProcessCosts, the frontend's own ad-hoc
+        // default-route path, which already had this same fallback), then
+        // silently dropped back to "Manual rate — not linked to a machine"
+        // on every SUBSEQUENT apply, once an auto_fill_from_route note
+        // existed and this endpoint (missing the fallback) took over.
+        mhr_id:         line.machineSelection?.balanced?.candidate?.machineId ?? line.mhrId ?? null,
+        benchmark_mhr_id: (!line.machineSelection?.balanced?.candidate?.machineId && !line.mhrId)
+          ? (line.benchmarkMhrId ?? null)
+          : null,
         machine_rate:   machineRate,
         labor_rate:     lhr.lhr,
         lhr_id:         null,

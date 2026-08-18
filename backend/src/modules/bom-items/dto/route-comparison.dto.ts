@@ -57,7 +57,8 @@ export interface RouteComparisonDto {
   materialSource: "db" | "default";
   routes: RouteResultDto[];
   comparisonWarnings: string[];
-  currency: string;       // ISO 4217 code, e.g. 'USD'
-  currencySymbol: string; // display symbol, e.g. '$'
-  toUsdRate?: number;     // amount_local × toUsdRate = amount_usd — always 1, see normalizeRouteComparisonToUsd
+  currency: string;       // ISO 4217 code of the CURRENT display currency, e.g. 'USD'
+  currencySymbol: string; // display symbol for `currency`, e.g. '$'
+  toUsdRate?: number;     // amount_local × toUsdRate = amount in `currency` — see normalizeRouteComparisonToCurrency
+  usdToDisplayRate?: number; // amount_usd × usdToDisplayRate = amount in `currency` — see cost-breakdown.dto.ts's own doc comment for why this differs from toUsdRate
 }

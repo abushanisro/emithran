@@ -637,6 +637,7 @@ export class RawMaterialsService {
         densityKgM3: item.density_kg_m3 || null,
         utsMpa: item.ultimate_tensile_strength || item.uts_mpa || null,
         ytsMpa: item.yield_tensile_strength || item.yts_mpa || null,
+        shearingStrength: item.shearing_strength || null,
         elasticModulusGpa: item.elastic_modulus_gpa || null,
         hardnessValue: item.hardness_value || null,
         hardnessScale: item.hardness_scale || null,

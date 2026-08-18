@@ -13,8 +13,15 @@ export const RAW_MATERIAL_COST_CONSTANTS = {
    * Precision settings for rounding calculations
    */
   PRECISION: {
-    COST: 3,            // 3 decimal places for costs in INR (e.g., ₹222.552)
-    RATE: 4,            // 4 decimal places for rates in INR (e.g., ₹81.0000/KG)
+    // 6 decimal places: costs are stored in USD per the engine's actual callers
+    // (raw-material-cost.service.ts always resolves unitCost to USD before
+    // calling calculate()). A cheap per-kg material in a low-value-currency
+    // location (e.g. India, ~$0.0137/kg) produces sub-cent intermediate costs
+    // (overheadCost ~$0.00005) that collapse to exactly 0 at 3-4 decimal
+    // places — 6 keeps them representable. Matches the widened DECIMAL(18,6)
+    // columns from migration 476.
+    COST: 6,
+    RATE: 6,
     USAGE: 2,           // 2 decimal places for usage amounts (e.g., 247.28 KG)
     PERCENTAGE: 2,      // 2 decimal places for percentages (e.g., 36.70%)
   },

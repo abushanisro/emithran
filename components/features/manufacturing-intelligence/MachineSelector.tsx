@@ -45,6 +45,7 @@ export function MachineSelector({
   processKey,
   selection,
   currencySymbol,
+  conversionRate = 1,
   location,
   onApply,
   applyPending,
@@ -56,6 +57,12 @@ export function MachineSelector({
   processKey: string;
   selection: MachineSelectionResult;
   currencySymbol: string;
+  // amount_usd × conversionRate = amount in `currencySymbol`'s currency.
+  // Applied ONLY to currentMachine.machineRate below (a raw, always-USD
+  // process_cost_records column) — `selection`'s own candidates are already
+  // converted server-side (see bom-items.service.ts's convertMachineSelectionCost),
+  // so applying this rate to them again would double-convert.
+  conversionRate?: number;
   location: string;
   // When provided, a pick persists via this callback instead of the
   // location+processKey-scoped /machine-override endpoint — used when this
@@ -106,7 +113,7 @@ export function MachineSelector({
         machineName: currentMachine?.machineName ?? null,
         commodityCode: null,
         machineClass: liveRecommended.machineClass,
-        hourlyRate: Number(currentMachine?.machineRate ?? 0),
+        hourlyRate: Number(currentMachine?.machineRate ?? 0) * conversionRate,
         utilizationPct: 0,
         scheduledLoadPct: null,
         availabilityStatus: 'available',

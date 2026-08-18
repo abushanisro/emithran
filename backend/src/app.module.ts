@@ -41,6 +41,7 @@ import { ShouldCostModule } from './modules/should-cost/should-cost.module';
 import { CostingModule } from './modules/costing/costing.module';
 import { EchoModule } from './modules/echo/echo.module';
 import { ManufacturingRulesModule } from './modules/manufacturing-rules/manufacturing-rules.module';
+import { FxModule } from './common/fx/fx.module';
 import { RequestLogInterceptor } from './modules/developer/interceptors/request-log.interceptor';
 import { LoggerModule } from './common/logger/logger.module';
 import { SupabaseService } from './common/supabase/supabase.service';
@@ -114,6 +115,7 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     CostingModule,
     EchoModule,
     ManufacturingRulesModule,
+    FxModule,
   ],
   controllers: [AppController],
   providers: [

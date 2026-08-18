@@ -205,6 +205,13 @@ interface ProcessCostDialogProps {
   existingProcesses?: any[];
   defaultLocation?: string | undefined;
   currencySymbol?: string;
+  // amount_usd × conversionRate = amount in `currencySymbol`'s currency —
+  // machineRate/laborRate/totalCost computed in this dialog are always in
+  // USD (process_cost_records' own rate columns, and the /process-costs/
+  // calculate engine that operates on them) regardless of Digital Factory,
+  // so displaying them under a non-USD currencySymbol requires this to
+  // actually convert them, not just relabel them.
+  conversionRate?: number;
   // When true, the dialog opens straight into the Cycle Time calculator (auto-
   // selected calculator, auto-filled from BOM data) instead of the plain edit
   // form — for callers whose entry point IS the cycle-time calculator icon.
@@ -220,10 +227,21 @@ export function ProcessCostDialog({
   existingProcesses = [],
   defaultLocation,
   currencySymbol = '$',
+  conversionRate = 1,
   autoOpenCalculator,
 }: ProcessCostDialogProps) {
   const [opNbr, setOpNbr] = useState<number>(0);
-  const [location, setLocation] = useState<string>('');
+  // Locked to the Digital Factory location — no independent state. A free
+  // per-row location override (formerly a Select with "🌍 All locations" +
+  // 10 hardcoded countries) let a process line's MHR resolve against India
+  // while its LHR silently fell through to an unscoped cross-country
+  // benchmark (e.g. China) — the exact "MHR India / LHR China, doubled
+  // total cost" bug. The rest of this dialog (filteredMHR/filteredLHR,
+  // resolveMHRRates/resolveLHRRates server-side) already refuses to widen
+  // across location once one is set; the only leak was this field letting
+  // `location` become '' ("all locations") or a country the Digital Factory
+  // isn't even set to. Deriving it directly from defaultLocation closes that.
+  const location = defaultLocation ?? '';
   // Hierarchical selections
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedRoute, setSelectedRoute] = useState<string>('');
@@ -686,14 +704,14 @@ export function ProcessCostDialog({
     const bmResult = bmMatch.length > 0 ? bmMatch : (bmLoc.length > 0 && !operationFullySelected ? bmLoc : []);
     if (bmResult.length > 0) return withSaved(bmResult);
 
-    // 5 — Cross-location fallback: all user records regardless of factory location.
-    //     Prevents the "No MHR records" empty state when the user has records for
-    //     a different location (e.g. India records shown for a USA factory).
-    //     Only applies before a full operation is selected — once an operation
-    //     is chosen, an unmatched machine_class should show zero machines, not
-    //     silently widen to "every machine anywhere."
-    if (!operationFullySelected && base.length > 0) return withSaved(base);
-
+    // Deliberately NO cross-location fallback here. A Digital Factory is
+    // always set on the costed item, so "no machine for this location/class"
+    // must show as an empty dropdown (with the manual-entry escape hatch
+    // below), never silently widen to every country's machines — that silent
+    // widening is exactly how a China labour rate ended up auto-selected for
+    // an India-costed part. The explicit "🌍 All locations" option above
+    // remains available for a user who deliberately wants to browse across
+    // countries — this only removes the SILENT, automatic version of that.
     return withSaved([]);
   }, [mhrData, benchmarkMHR, location, selectedMachineClass, savedMHRRecord, savedBenchmarkMHRRecord, operationFullySelected, isNonMachineOperation]);
 
@@ -820,13 +838,10 @@ export function ProcessCostDialog({
     const bmResult = bmMatch.length > 0 ? bmMatch : (bmLoc.length > 0 && !operationFullySelected ? bmLoc : []);
     if ((bmResult as any[]).length > 0) return withSaved(bmResult as any[]);
 
-    // 5 — Cross-location fallback: all user LHR records regardless of factory
-    // location. Only applies before a full operation is selected — once an
-    // operation is chosen, an unmatched process group should show zero labour
-    // options (with the manual-entry escape hatch below), not silently widen to
-    // every location's records.
-    if (!operationFullySelected && records.length > 0) return withSaved(records);
-
+    // Deliberately NO cross-location fallback here — same rationale as
+    // filteredMHR above. An unmatched location/group shows zero labour
+    // options (with the manual-entry escape hatch below), never silently
+    // widens to every country's labour records.
     return withSaved([]);
   }, [lhrData, benchmarkLHR, location, selectedGroup, selectedLhrGroup, selectedMachineClass, savedLHRRecord, savedBenchmarkLHRRecord, operationFullySelected]);
 
@@ -1991,7 +2006,12 @@ export function ProcessCostDialog({
       setUserOverrodeMHR(false);
       setUserOverrodeLHR(false);
       setOpNbr(editData.opNbr || 0);
-      setLocation(editData.location || defaultLocation || '');
+      // location is always the CURRENT Digital Factory (see the `location`
+      // derivation above) — otherwise reopening a process saved under a
+      // different factory would silently re-resolve machines/rates for the
+      // wrong location. The live Cost Summary engine always treats location
+      // as current-request-authoritative; this editor matches it exactly,
+      // with no per-row override.
       setSelectedGroup(editData.processGroup || '');
       setSelectedRoute(editData.processRoute || '');
       setSelectedOperation(editData.operation || '');
@@ -2021,7 +2041,10 @@ export function ProcessCostDialog({
       setCycleTime(editData.cycleTime || 0);
       setPartsPerCycle(editData.partsPerCycle || 1);
       setScrap(editData.scrap || 0);
-      setMachineValue(editData.machineValue || 0);
+      // Never coerce an unresolved/never-set value to 0 — that's indistinguishable
+      // from a genuinely saved zero rate. Keep it blank (renders the placeholder)
+      // exactly like manualMhrRate/manualLhrRate below already correctly do.
+      setMachineValue(editData.machineValue ?? '');
       setManualMhrRate(editData.machineRate || '');
       setManualLhrRate(editData.laborRate  || '');
       setFacilityId(editData.facilityId);
@@ -2034,7 +2057,6 @@ export function ProcessCostDialog({
       setEditDataApplied(false);
       // Reset for new entry - suggest next operation number but user can change it
       setOpNbr(getSuggestedOpNbr()); // Suggest next operation number but user can enter any number
-      setLocation(defaultLocation ?? '');
       setSelectedGroup('');
       setSelectedRoute('');
       setSelectedOperation('');
@@ -2071,12 +2093,25 @@ export function ProcessCostDialog({
       // a non-USA machine's local-currency number is never fed into this
       // USD-denominated cost preview/save as if it already were dollars.
       ? resolveMhrUsdRate(selectedMHR)
-      : (typeof manualMhrRate === 'number' && manualMhrRate > 0 ? manualMhrRate : (Number(editData?.machineRate) || 0));
+      : savedMHRRecord
+        // selectedMHR can be unset even though this row's saved machine DID
+        // resolve (e.g. a transient class-mismatch reset, or a cross-location
+        // saved pick not yet reflected in filteredMHR) — prefer the real,
+        // live-fetched record over a static/possibly-stale editData.machineRate
+        // snapshot. Falling through to that stale snapshot (often genuinely 0
+        // on older rows) is exactly what produced "MHR = $0.00/hr" for a
+        // machine that actually has a valid rate on file.
+        ? resolveMhrUsdRate(savedMHRRecord)
+        : (typeof manualMhrRate === 'number' && manualMhrRate > 0 ? manualMhrRate : (Number(editData?.machineRate) || 0));
   // For benchmark records lhr is already in USD (= lhrUsdEffective). For user records
   // lhrUsdEffective is the correct USD value; fall back to lhr when it is missing.
   const effectiveLaborRate = selectedLHR
     ? (Number((selectedLHR as any).lhrUsdEffective) || Number((selectedLHR as any).lhr) || 0)
-    : (typeof manualLhrRate === 'number' && manualLhrRate > 0 ? manualLhrRate : (Number(editData?.laborRate) || 0));
+    : savedLHRRecord
+      // Same fallback as effectiveMachineRate above — prefer the real,
+      // live-fetched labour record over a stale editData.laborRate snapshot.
+      ? (Number((savedLHRRecord as any).lhrUsdEffective) || Number((savedLHRRecord as any).lhr) || 0)
+      : (typeof manualLhrRate === 'number' && manualLhrRate > 0 ? manualLhrRate : (Number(editData?.laborRate) || 0));
 
   // Cost preview: calls the exact same aprioriTerms()-based engine that computes the
   // saved record server-side (POST /process-costs/calculate → ProcessCostCalculationEngine),
@@ -2459,34 +2494,18 @@ export function ProcessCostDialog({
                       <CardTitle className="text-md">Resources & Location</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {/* Location Filter */}
+                      {/* Location — locked to the Digital Factory (Scenario tab). No
+                          per-row override: MHR/LHR must always resolve against the
+                          same location, or a labour rate can silently come from a
+                          different country than the machine rate. */}
                       <div className="space-y-2">
-                        <Label>Location <span className="text-muted-foreground text-xs">(Optional)</span></Label>
-                        <Select
-                          value={location || '__all__'}
-                          onValueChange={(v) => {
-                            setLocation(v === '__all__' ? '' : v);
-                            setSelectedMHRId('');
-                            setSelectedLHRId('');
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="All locations" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__all__">🌍 All locations</SelectItem>
-                            <SelectItem value="India">🇮🇳 India</SelectItem>
-                            <SelectItem value="USA">🇺🇸 USA</SelectItem>
-                            <SelectItem value="China">🇨🇳 China</SelectItem>
-                            <SelectItem value="Germany">🇩🇪 Germany</SelectItem>
-                            <SelectItem value="France">🇫🇷 France</SelectItem>
-                            <SelectItem value="W. Europe">🇪🇺 W. Europe</SelectItem>
-                            <SelectItem value="E. Europe">🇪🇺 E. Europe</SelectItem>
-                            <SelectItem value="UK">🇬🇧 UK</SelectItem>
-                            <SelectItem value="Vietnam">🇻🇳 Vietnam</SelectItem>
-                            <SelectItem value="Mexico">🇲🇽 Mexico</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label>Location</Label>
+                        <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                          <span>{location || 'No Digital Factory location set'}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Set on the Scenario tab — change it there, not per process.
+                        </p>
                       </div>
 
                       {/* Machine Hour Rate override */}
@@ -2541,6 +2560,15 @@ export function ProcessCostDialog({
                           {filteredMHR.some((r: any) => r.isBenchmark) && (
                             <p className="text-xs text-muted-foreground">
                               ★ Benchmark rates — add custom rates in HR Rates to override
+                            </p>
+                          )}
+                          {/* This machine's own record is from a different location than the
+                              current Digital Factory — a deliberate cross-location selection
+                              REMAINS possible, but must never look like the local resource
+                              (see selector.ts's identical warning for a class mismatch). */}
+                          {selectedMHR?.location && location && selectedMHR.location.toLowerCase() !== location.toLowerCase() && (
+                            <p className="text-xs text-amber-600 dark:text-amber-500">
+                              ⚠ Cross-location manual selection — this machine is from {selectedMHR.location}, not the current Digital Factory ({location}).
                             </p>
                           )}
                           </>
@@ -2608,6 +2636,11 @@ export function ProcessCostDialog({
                                 ★ Benchmark rates — add custom rates in HR Rates to override
                               </p>
                             )}
+                            {(selectedLHR as any)?.location && location && (selectedLHR as any).location.toLowerCase() !== location.toLowerCase() && (
+                              <p className="text-xs text-amber-600 dark:text-amber-500">
+                                ⚠ Cross-location manual selection — this labour rate is from {(selectedLHR as any).location}, not the current Digital Factory ({location}).
+                              </p>
+                            )}
                           </>
                         ) : (
                           <div className="space-y-1">
@@ -2668,11 +2701,15 @@ export function ProcessCostDialog({
                               : location
                                 ? ` · ${location}`
                                 : ''}
+                          {(selectedMHR as any)?.isBenchmark ? ' ★' : ''}
                         </span>
-                        <span className="text-primary font-bold">${effectiveMachineRate.toFixed(2)}/hr</span>
+                        <span className="text-primary font-bold">{currencySymbol}{(effectiveMachineRate * conversionRate).toFixed(2)}/hr</span>
                       </>
                     ) : (
-                      <span className="text-muted-foreground italic">Not set</span>
+                      <>
+                        <span className="text-muted-foreground italic">Not configured</span>
+                        <span className="text-[10px] text-amber-600 dark:text-amber-500">⚠ Cost cannot be calculated from machine time</span>
+                      </>
                     )}
                   </div>
                   {/* Labour */}
@@ -2707,10 +2744,13 @@ export function ProcessCostDialog({
                                 : ''}
                           {(selectedLHR as any)?.isBenchmark ? ' ★' : ''}
                         </span>
-                        <span className="text-primary font-bold">${effectiveLaborRate.toFixed(2)}/hr</span>
+                        <span className="text-primary font-bold">{currencySymbol}{(effectiveLaborRate * conversionRate).toFixed(2)}/hr</span>
                       </>
                     ) : (
-                      <span className="text-muted-foreground italic">Not set</span>
+                      <>
+                        <span className="text-muted-foreground italic">Not configured</span>
+                        <span className="text-[10px] text-amber-600 dark:text-amber-500">⚠ Cost cannot be calculated from labour time</span>
+                      </>
                     )}
                   </div>
                 </CardContent>
@@ -2849,7 +2889,10 @@ export function ProcessCostDialog({
                   <Label className="block mb-2">Total Cost</Label>
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-bold text-primary">
-                      {currencySymbol}{totalCost > 0 && totalCost < 0.01 ? totalCost.toFixed(4) : totalCost.toFixed(2)}
+                      {currencySymbol}{(() => {
+                        const displayTotal = totalCost * conversionRate;
+                        return displayTotal > 0 && displayTotal < 0.01 ? displayTotal.toFixed(4) : displayTotal.toFixed(2);
+                      })()}
                     </span>
                   </div>
                 </CardContent>

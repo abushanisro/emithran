@@ -1,3 +1,5 @@
+import type { CalculationTraceStep, ConfidenceLevel } from './cost-breakdown.dto';
+
 export interface BlankSpecDto {
   form: 'sheet' | 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'billet' | 'extrusion' | 'casting' | 'granules';
   sizeLabel: string;
@@ -22,6 +24,15 @@ export interface BlankSpecDto {
   sheetWidthMm?: number;
   sheetLengthMm?: number;
   partsPerSheet?: number;
+  // The FULL physical stock-sheet weight (sheetWidthMm x sheetLengthMm x
+  // thickness x density) -- a genuinely different quantity from grossWeightKg
+  // above (which is already divided by partsPerSheet). Exposed explicitly so
+  // callers never have to multiply grossWeightKg back out by partsPerSheet
+  // (or worse, mistake grossWeightKg itself for the sheet's total weight --
+  // confirmed live: a UI panel labeled "Sheet > Gross weight" displayed
+  // grossWeightKg's per-part value with no full-sheet figure anywhere to
+  // contrast it against, reading as a physically-impossible sheet weight).
+  sheetWeightKg?: number;
   // Actual batch sheet consumption for the quantity this cost summary was
   // computed for -- a DIFFERENT concept from grossWeightKg above, not a
   // replacement for it. sheetsRequired sheets will, in practice, produce
@@ -33,4 +44,24 @@ export interface BlankSpecDto {
   plannedParts?: number;
   excessPositions?: number;
   actualBatchGrossMaterialKg?: number;
+  // Which nesting engine actually decided sheetWidthMm/sheetLengthMm/
+  // partsPerSheet/utilizationPct above -- 'true_shape' when a real flat-
+  // pattern outline exists and cad-engine's true-shape nest succeeded for at
+  // least one candidate standard sheet (compared across ALL viable
+  // candidates by lowest gross weight/part, never rectangle-grid-prefiltered);
+  // 'rectangle_grid_fallback' when no real outline exists yet, or true-shape
+  // nesting failed for every candidate -- sheet-metal-nesting.engine.ts's
+  // computeNesting() is the fallback source in that case. Never silent:
+  // nestingFallbackReason is set whenever this is 'rectangle_grid_fallback'.
+  nestingMethod?: 'true_shape' | 'rectangle_grid_fallback';
+  nestingFallbackReason?: string;
+  // Present only once the "Sheet Metal - Gross Material Usage (Nesting)"
+  // calculator's process_calculator_mappings row is resolvable on this DB --
+  // absent (never fabricated) until that migration is applied, in which
+  // case grossWeightKg above still came from the same underlying
+  // evaluation, just without this audit-trail metadata attached.
+  calculatorId?: string;
+  calculatorVersion?: number;
+  calculationTrace?: CalculationTraceStep[];
+  confidence?: ConfidenceLevel;
 }

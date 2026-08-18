@@ -162,6 +162,10 @@ export type ExecuteCalculatorData = {
   calculatorId: string;
   inputValues: Record<string, any>;
   databaseReferences?: Record<string, any>;
+  // Only consumed by the sheet-metal net/gross-usage physics_keys -- the
+  // BOM item this Calculate is bound to (Gross Usage needs the item's
+  // stored CAD outline/cache). Every other calculator ignores it.
+  itemId?: string;
 };
 
 export type SaveExecutionData = {
@@ -234,6 +238,7 @@ export type ExecutionResult = {
   results: Record<string, any>;
   durationMs: number;
   error?: string;
+  warnings?: string[];
 };
 
 export type FormulaValidationResult = {

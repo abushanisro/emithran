@@ -1,7 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import type { ProcessLineCost, ConfidenceLevel, PhysicsGap, LookupTableRow } from '@/lib/api/hooks/useBOMItems';
+import type { ConfidenceLevel, PhysicsGap, LookupTableRow, CalculationTraceStep } from '@/lib/api/hooks/useBOMItems';
+
+// Narrower than ProcessLineCost -- lets non-process callers (e.g. a material
+// usage trace with no machine/labour rate) feed the same trace renderer
+// without fabricating unrelated process fields just to satisfy the type.
+export type CalculationTraceLine = {
+  calculationTrace?: CalculationTraceStep[];
+  calculatorId?: string;
+  calculatorVersion?: number;
+  physicsGap?: PhysicsGap;
+  confidence?: ConfidenceLevel;
+};
 
 // Distinct from the numeric 0-1 `ConfidenceBadge` already used elsewhere on
 // this page for DFM risk scoring — this one maps the Manufacturing Physics
@@ -126,7 +137,7 @@ function PhysicsGapPanel({ gap }: { gap: PhysicsGap }) {
  * migrated onto the Manufacturing Physics Calculator pipeline (no trace, no
  * gap, no confidence at all) — never a fabricated placeholder.
  */
-export function CalculationTracePanel({ line }: { line: ProcessLineCost }) {
+export function CalculationTracePanel({ line }: { line: CalculationTraceLine }) {
   const [showSteps, setShowSteps] = useState(false);
   const trace = line.calculationTrace ?? [];
   if (!trace.length && !line.physicsGap && !line.confidence) return null;
