@@ -339,6 +339,8 @@ export function finalizeInspectionLine(input: InspectionInput, plan: InspectionP
     machineName: rate.machineName,
     commodityCode: rate.commodityCode,
     labourRate: qairPerHr || null,
+    mhrId: rate.mhrRecordId ?? null,
+    benchmarkMhrId: rate.benchmarkMhrId ?? null,
     featureBreakdown: plan.featureBreakdown,
     ...(resolved.calculatorId ? { calculatorId: resolved.calculatorId } : {}),
     ...(resolved.calculatorVersion != null ? { calculatorVersion: resolved.calculatorVersion } : {}),

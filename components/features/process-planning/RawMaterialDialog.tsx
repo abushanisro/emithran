@@ -19,7 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
-import { useCostSummary } from '@/lib/api/hooks/useBOMItems';
+import { useCostSummary, type CalculationTraceStep, type ConfidenceLevel } from '@/lib/api/hooks/useBOMItems';
+import { CalculationTracePanel } from './CalculationTracePanel';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useExchangeRates } from '@/lib/api/hooks/useExchangeRates';
@@ -107,7 +108,40 @@ function resolveRegionalUnitCostUsd(
     if (material.costIndia) { localAmount = material.costIndia; localCurrency = 'INR'; }
     else { localAmount = (material as any).unitCost || (material as any).cost || 0; localCurrency = (material as any).currency || 'USD'; }
   }
-  return (localAmount * (rates[localCurrency] ?? 1)) / (rates['USD'] ?? 83.5);
+  if (!localAmount) return 0;
+  // Never guess a missing FX leg (localCurrency->INR or USD->INR) as 1 —
+  // that silently mispriced any material whose regional currency wasn't yet
+  // loaded from the live exchange_rates table. 0 here reads the same as "no
+  // price on file", which callers already handle honestly.
+  const toInr = rates[localCurrency];
+  const usdToInr = rates['USD'];
+  if (!toInr || !usdToInr) return 0;
+  return (localAmount * toInr) / usdToInr;
+}
+
+// Substitutes every {Field Name} token in a calculator_fields.default_value
+// formula string with the actual value that produced this result -- the
+// real DB formula (documentation-only once physics_key drives the value,
+// but genuinely the same formula the backend function implements, verified
+// field-by-field), never a re-derived or approximated caption. Prose-only
+// default_value strings (e.g. "evaluated across every viable standard
+// sheet...") have no {tokens} to replace and pass through unchanged.
+function formatFormulaWithValues(
+  formula: string | null | undefined,
+  results: Record<string, any>,
+  inputs: Record<string, any>,
+): string | null {
+  if (!formula) return null;
+  return formula.replace(/\{([^}]+)\}/g, (_match, name: string) => {
+    const raw = results[name] !== undefined ? results[name] : inputs[name];
+    const val = raw?.value !== undefined ? raw.value : raw;
+    if (typeof val === 'number') {
+      const fixed = val.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+      return fixed || '0';
+    }
+    if (typeof val === 'string' && val !== '') return val;
+    return `{${name}}`; // unresolved — keep the token visible rather than silently dropping it
+  });
 }
 
 interface RawMaterialDialogProps {
@@ -173,6 +207,16 @@ export function RawMaterialDialog({
   const [scrap, setScrap] = useState<number | ''>('');
   const [overhead, setOverhead] = useState<number | ''>('');
   const [manualUnitCost, setManualUnitCost] = useState<number>(0);
+  // Digital Factory's own live scenario currency + FX — reuses nestingCostSummary
+  // (already fetched above for the same location/batchSize), never a hardcoded
+  // '$'/USD table. manualUnitCost itself is always stored in USD internally
+  // (matches resolveRegionalUnitCostUsd's convention, which every downstream
+  // consumer — submit payload, preview calc — already assumes); only the
+  // FIELD the engineer types into is shown/edited in the real display
+  // currency, converted both ways through usdToDisplay.
+  const displaySymbol = nestingCostSummary?.currencySymbol;
+  const usdToDisplay = nestingCostSummary?.usdToDisplayRate;
+  const hasDisplayCurrency = !!displaySymbol && usdToDisplay != null;
   const [reclaimRate, setReclaimRate] = useState<number | ''>(0);
   // true when netUsage was auto-derived from CAD volume × material density
   const [cadFilled, setCadFilled] = useState(false);
@@ -183,6 +227,20 @@ export function RawMaterialDialog({
   const [selectedCalculatorId, setSelectedCalculatorId] = useState<string>('');
   const [calculatorInputs, setCalculatorInputs] = useState<Record<string, any>>({});
   const [calculatorResults, setCalculatorResults] = useState<Record<string, any> | null>(null);
+  const [calculatorWarnings, setCalculatorWarnings] = useState<string[]>([]);
+
+  // Gross Usage manual-override state. `grossUsageOverridden` starts false
+  // every time the dialog opens (the calculator-computed value is always
+  // trusted first) and flips true only when the user explicitly applies an
+  // override with a reason -- at which point the auto-sync effect below
+  // must stop overwriting it on every nesting refetch. Persisted (Apply
+  // Override writes these into the raw-material-cost record) so the "⚠
+  // Manual Override" state survives a reopen, not just this session.
+  const [grossUsageOverridden, setGrossUsageOverridden] = useState(false);
+  const [grossUsageOverrideReason, setGrossUsageOverrideReason] = useState('');
+  const [grossUsageEditOpen, setGrossUsageEditOpen] = useState(false);
+  const [grossUsageEditDraft, setGrossUsageEditDraft] = useState('');
+  const [grossUsageEditReasonDraft, setGrossUsageEditReasonDraft] = useState('');
 
   // Lookup table state
   const [selectedLookupField, setSelectedLookupField] = useState<any>(null);
@@ -193,6 +251,53 @@ export function RawMaterialDialog({
   const { data: calculatorsData } = useCalculators();
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
   const executeCalculator = useExecuteCalculator();
+
+  // The two global (user_id NULL, is_public) sheet-metal material-usage
+  // calculators seeded by migrations 057/058 -- looked up by name, never a
+  // hardcoded UUID (same "no hardcoded identity" discipline as the seed
+  // migrations themselves). Absent until those migrations are applied on
+  // this DB, in which case the calculator icon falls back to the generic
+  // any-calculator picker exactly as it always has.
+  const grossUsageCalculator = calculatorsData?.calculators?.find(
+    (c: any) => c.name === 'Sheet Metal - Gross Material Usage (Nesting)',
+  );
+  const netUsageCalculator = calculatorsData?.calculators?.find(
+    (c: any) => c.name === 'Sheet Metal - Net Material Usage',
+  );
+
+  // Explicit, honest auto-population for the two sheet-metal usage
+  // calculators -- deliberately separate from autoPopulateFromBOM below
+  // (which maps calculator fields to bomItemData properties by name/label
+  // heuristics). Only sets a field when this dialog genuinely has the real
+  // value in scope. bomItemData.sheetThicknessMm and .flatPatternAreaMm2 are
+  // real, stored CAD-analysis fields (backend/src/modules/bom-items/dto/
+  // bom-item-response.dto.ts) -- not derived/estimated here. Shear Strength
+  // comes straight from the selected material's own shearingStrength
+  // property (lib/api/hooks/useRawMaterials.ts).
+  const autoPopulateUsageCalculatorInputs = (target: 'grossUsage' | 'netUsage') => {
+    const materialLabel = selectedMaterial ? (selectedMaterial.materialGrade || selectedMaterial.material || '') : '';
+    const thicknessMm = bomItemData?.sheetThicknessMm;
+    if (target === 'netUsage') {
+      setCalculatorInputs((prev) => ({
+        ...prev,
+        ...(materialLabel && { 'Material': materialLabel }),
+        ...(bomItemData?.flatPatternAreaMm2 != null && bomItemData.flatPatternAreaMm2 > 0 && { 'Flat Pattern Area': bomItemData.flatPatternAreaMm2 }),
+        ...(typeof thicknessMm === 'number' && thicknessMm > 0 && { 'Thickness': thicknessMm }),
+        ...(matDensityKgM3 != null && { 'Material Density': matDensityKgM3 }),
+      }));
+    } else {
+      setCalculatorInputs((prev) => ({
+        ...prev,
+        ...(materialLabel && { 'Material': materialLabel }),
+        ...(typeof thicknessMm === 'number' && thicknessMm > 0 && { 'Thickness': thicknessMm }),
+        ...(selectedMaterial?.shearingStrength != null && selectedMaterial.shearingStrength > 0 && { 'Shear Strength': selectedMaterial.shearingStrength }),
+        ...(matDensityKgM3 != null && { 'Material Density': matDensityKgM3 }),
+        ...(typeof netUsage === 'number' && netUsage > 0 && { 'Net Weight Per Part': netUsage }),
+        'Edge Allowance': 2,
+        ...(typeof batchSize === 'number' && batchSize > 0 && { 'Batch Quantity': batchSize }),
+      }));
+    }
+  };
 
   // Exchange rates for currency conversion (USD/EUR/GBP → INR)
   const { data: exchangeRates } = useExchangeRates();
@@ -277,6 +382,7 @@ export function RawMaterialDialog({
     // Close calculator when "Use" button is clicked
     setCalculatorOpen(false);
     setCalculatorResults(null);
+    setCalculatorWarnings([]);
     setCalculatorInputs({});
     setSelectedCalculatorId('');
   };
@@ -289,10 +395,12 @@ export function RawMaterialDialog({
       const result = await executeCalculator.mutateAsync({
         calculatorId: selectedCalculatorId,
         inputValues: calculatorInputs,
+        ...(bomItemData?.id && { itemId: bomItemData.id }),
       });
 
       if (result.success) {
         setCalculatorResults(result.results);
+        setCalculatorWarnings(result.warnings ?? []);
       }
     } catch (error) {
     }
@@ -329,6 +437,7 @@ export function RawMaterialDialog({
               'costPerUnit': 'Cost per unit ($)',
               'utsMpa': 'UTS (MPa)',
               'ytsMpa': 'YTS (MPa)',
+              'shearingStrength': 'Shear Strength (MPa)',
               'thermalConductivityWMK': 'Thermal Conductivity (W/mK)',
               'specificHeatJGK': 'Specific Heat (J/gK)',
               'moldTempCelsiusMin': 'Min Mold Temp (°C)',
@@ -537,6 +646,18 @@ export function RawMaterialDialog({
     return materials.find(m => m.id === selectedMaterialId);
   }, [selectedMaterialId, materials]);
 
+  const usageCalculatorInputProvenance: Record<string, string> = {
+    'Material': 'Selected material',
+    'Flat Pattern Area': 'CAD flat-pattern geometry (bom_items.flat_pattern_area_mm2)',
+    'Thickness': 'Effective sheet thickness (bom_items.sheet_thickness_mm)',
+    'Shear Strength': `raw_materials lookup${selectedMaterial ? ` — ${selectedMaterial.materialGrade || selectedMaterial.material}` : ''} (shearingStrength)`,
+    'Material Density': `raw_materials lookup${selectedMaterial ? ` — ${selectedMaterial.materialGrade || selectedMaterial.material}` : ''} (densityKgM3)`,
+    'Net Weight Per Part': 'Net Usage calculator result',
+    'Edge Allowance': 'Sheet-metal nesting configuration',
+    'Batch Quantity': 'Order/batch quantity',
+    'Flat Pattern Outline': 'Resolved server-side from CAD wire-walk extraction — not user-enterable',
+  };
+
   // Combobox options -- alias keywords let a search for "AL6101" (or any other
   // regional/shorthand designation from material_aliases) find its real row
   // even though that text never appears in the row's own displayed label.
@@ -604,11 +725,18 @@ export function RawMaterialDialog({
 
       if (materialToUse) {
         setMaterialGroup(materialToUse.materialGroup || '');
-        // Prefer saved country; fall back to location prop
-        setCountry(editData.country || (materialToUse as any).country || location || '');
+        // Digital Factory (location prop) always wins — same rule as
+        // ProcessCostDialog's location field: reopening a material saved
+        // under a stale country (or a raw_materials catalog row whose own
+        // metadata `country` has nothing to do with THIS item's costing
+        // location) must never silently re-price against the wrong country.
+        // Confirmed live: a SECC record kept pricing against 'USA' after the
+        // Digital Factory was set to India, because materialToUse.country
+        // ('USA', catalog metadata) outranked the current location here.
+        setCountry(location || editData.country || (materialToUse as any).country || '');
       } else {
         setMaterialGroup(editData.materialGroup || '');
-        setCountry(editData.country || location || '');
+        setCountry(location || editData.country || '');
         setSelectedMaterialId('');
       }
 
@@ -669,7 +797,11 @@ export function RawMaterialDialog({
   const { previewCost, previewBreakdown } = useMemo(() => {
     const zero = { previewCost: 0, previewBreakdown: null as null | Record<string, number> };
     if (!((selectedMaterial || editData) && (Number(grossUsage) > 0 || (netUsage as number) > 0))) return zero;
-    const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
+    // No fabricated FX table while the real exchange_rates fetch is in
+    // flight — an empty map makes resolveRegionalUnitCostUsd honestly return
+    // 0 (falls through to manualUnitCost below) instead of pricing against a
+    // guessed rate.
+    const rates = exchangeRates ?? {};
     const unitCostUsd = resolveRegionalUnitCostUsd(selectedMaterial, country, rates);
 
     const finalUnitCost = unitCostUsd || manualUnitCost || 0;
@@ -736,12 +868,24 @@ export function RawMaterialDialog({
   // exists (verified true flat pattern, not the folded-bbox fallback),
   // regardless of new entry / edit-with-zero-usage / edit-with-stale-saved-
   // value. Always wins over any manually-entered or previously-saved figure,
-  // since a manual override would silently diverge from the real cut plan.
+  // since a manual override would silently diverge from the real cut plan --
+  // UNLESS the user has explicitly applied an override via the "Justify
+  // Gross Usage" panel (grossUsageOverridden), in which case their entry is
+  // the whole point and must not be silently clobbered on the next refetch.
   useEffect(() => {
-    if (nestingIsTrustworthy) {
+    if (nestingIsTrustworthy && !grossUsageOverridden) {
       setGrossUsage(nestingBlankSpec.grossWeightKg);
     }
-  }, [nestingIsTrustworthy, nestingBlankSpec]);
+  }, [nestingIsTrustworthy, nestingBlankSpec, grossUsageOverridden]);
+
+  // Real, server-built audit trail for Gross Usage -- once
+  // "Sheet Metal - Gross Material Usage (Nesting)" calculator's mapping is
+  // resolvable (see bom-items.service.ts's resolvePhysicsQuantity), blankSpec
+  // carries the SAME calculationTrace/confidence/calculatorId shape as any
+  // Laser/Bend process line, sourced from the real true-shape nest -- no
+  // client-side approximation needed anymore.
+  const grossUsageTrace: CalculationTraceStep[] = nestingBlankSpec?.calculationTrace ?? [];
+  const grossUsageConfidence: ConfidenceLevel | undefined = nestingBlankSpec?.confidence;
 
   // Auto-populate calculator fields when material is selected
   useEffect(() => {
@@ -792,14 +936,31 @@ export function RawMaterialDialog({
         material: materialInfo.material,
         materialType: materialInfo.materialType || '',
         materialDescription: materialInfo.materialDescription || '',
-        country: materialInfo.country || '',
+        // Same fix as unitCost below — the persisted `country` must reflect
+        // the price actually used (this dialog's own live `country` state,
+        // tracking the Digital Factory), never the catalog row's unrelated
+        // metadata. Otherwise the raw material record's own staleness check
+        // (autoAddMaterialCost's staleAgainstLocation) would keep comparing
+        // against the wrong stored country too.
+        country: country || materialInfo.country || '',
         quarter: selectedQuarter,
         // Freshly-resolved live price first -- editData.unitCost is whatever
         // was last SAVED, often stale $0 from before this material's regional
         // cost column existed. Preferring it here (as this used to) meant
         // every edit just re-persisted the old $0 forever, even once the
         // live preview above was already showing the real resolved cost.
-        unitCost: resolveRegionalUnitCostUsd(selectedMaterial, materialInfo.country || country, exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 })
+        //
+        // `country` (this dialog's own live state -- defaults to, and tracks,
+        // the current Digital Factory; see the load-edit-data effect above)
+        // must always win over materialInfo.country -- when selectedMaterial
+        // has loaded, materialInfo IS selectedMaterial, and .country there is
+        // just the raw_materials catalog row's own metadata (e.g. wherever
+        // this SECC entry happened to be tagged from), completely unrelated
+        // to which Digital Factory the part is actually being costed under.
+        // Checking it first silently re-priced an India-scenario edit against
+        // China (or whatever the catalog tag was) even though the dialog's
+        // own price matrix was showing India, ₹1.14/kg, selected the whole time.
+        unitCost: resolveRegionalUnitCostUsd(selectedMaterial, country || materialInfo.country, exchangeRates ?? {})
           || manualUnitCost
           || editData.unitCost
           || 0,
@@ -809,6 +970,8 @@ export function RawMaterialDialog({
         overhead,
         reclaimRate: Number(reclaimRate) || 0,
         totalCost,
+        grossUsageIsOverridden: grossUsageOverridden,
+        ...(grossUsageOverridden && { grossUsageOverrideReason }),
       });
     } else {
       // For new material, require selectedMaterial
@@ -823,11 +986,15 @@ export function RawMaterialDialog({
       }
       
       // Get unit cost in USD for the selected country (mirrors getRegionalRate + INR pivot)
-      const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
+      const rates = exchangeRates ?? {};
       const materialUnitCost = resolveRegionalUnitCostUsd(selectedMaterial, country, rates);
 
       if (!materialUnitCost && !manualUnitCost) {
-        alert('Please enter a unit cost. The selected material has no cost data available.');
+        alert(
+          exchangeRates
+            ? 'Please enter a unit cost. The selected material has no cost data available.'
+            : 'Exchange rates are still loading — please wait a moment and try again.',
+        );
         return;
       }
       
@@ -861,6 +1028,8 @@ export function RawMaterialDialog({
         overhead,
         reclaimRate: Number(reclaimRate) || 0,
         totalCost,
+        grossUsageIsOverridden: grossUsageOverridden,
+        ...(grossUsageOverridden && { grossUsageOverrideReason }),
       });
     }
 
@@ -989,7 +1158,11 @@ export function RawMaterialDialog({
             {/* Material Details + Location Price Matrix + Unit Cost (single guard) */}
             {selectedMaterial && (() => {
               // ── Rate calculations ──────────────────────────────────────────────
-              const rates = exchangeRates ?? { INR: 1, USD: 83.50, EUR: 89.00, GBP: 104.00 };
+              // No fabricated FX table while the real exchange_rates fetch is
+              // in flight (matches the other exchangeRates ?? {} sites in this
+              // file) — usdPrice/toUsdPrice below fall back to 0 rather than a
+              // guessed rate when a specific currency isn't loaded yet.
+              const rates = exchangeRates ?? {};
               const countryLower = (country || '').toLowerCase();
 
               const getRegionalRate = (): [number, string, string] => {
@@ -1021,7 +1194,7 @@ export function RawMaterialDialog({
                 : (selectedMaterial.unitCost || selectedMaterial.cost || 0);
               const effectiveCurrency = hasRegionalCost ? localCurrency : (selectedMaterial.currency || 'USD');
               const inrAmount  = rawLocalCost * (rates[effectiveCurrency] ?? 1);
-              const usdPrice   = inrAmount / (rates['USD'] ?? 83.5);
+              const usdPrice   = rates['USD'] ? inrAmount / rates['USD'] : 0;
               const showLocalLine = effectiveCurrency !== 'USD' && rawLocalCost > 0;
 
               // ── Price matrix ───────────────────────────────────────────────────
@@ -1037,7 +1210,7 @@ export function RawMaterialDialog({
               ].filter(p => p.cost && p.cost > 0);
 
               const toUsdPrice = (lc: number, curr: string) =>
-                (lc * (rates[curr] ?? 1)) / (rates['USD'] ?? 83.5);
+                rates['USD'] ? (lc * (rates[curr] ?? 1)) / rates['USD'] : 0;
 
               return (
                 <div className="space-y-3">
@@ -1077,6 +1250,11 @@ export function RawMaterialDialog({
                           {locationPrices.map(p => {
                             const isSelected = country === p.label;
                             const locUsd = toUsdPrice(p.cost!, p.currency);
+                            // Also gate on exchangeRates itself (not just
+                            // hasDisplayCurrency) — locUsd honestly falls back
+                            // to 0 while the live rates are still loading, and
+                            // that must read as "—", never as a real ₹0.00.
+                            const locDisplay = hasDisplayCurrency && exchangeRates ? locUsd * usdToDisplay! : null;
                             return (
                               <button
                                 key={p.label}
@@ -1090,8 +1268,10 @@ export function RawMaterialDialog({
                               >
                                 <span>{p.flag} {p.label}</span>
                                 <div className="text-right ml-2">
-                                  <div className="font-mono tabular-nums">${locUsd.toFixed(2)}</div>
-                                  {p.currency !== 'USD' && (
+                                  <div className="font-mono tabular-nums">
+                                    {locDisplay != null ? `${displaySymbol}${locDisplay.toFixed(2)}` : '—'}
+                                  </div>
+                                  {p.currency !== nestingCostSummary?.currency && (
                                     <div className={`text-[9px] tabular-nums ${isSelected ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                                       {p.symbol}{p.cost!.toFixed(2)} {p.currency}
                                     </div>
@@ -1101,7 +1281,10 @@ export function RawMaterialDialog({
                             );
                           })}
                         </div>
-                        <p className="text-[10px] text-muted-foreground mt-1.5">Click a location to use that price · All prices in USD</p>
+                        <p className="text-[10px] text-muted-foreground mt-1.5">
+                          Click a location to use that price
+                          {nestingCostSummary?.currency ? ` · Converted to ${nestingCostSummary.currency} at the live Digital Factory rate` : ''}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1112,10 +1295,10 @@ export function RawMaterialDialog({
                     <div className="p-4 border-2 border-primary/20 bg-primary/5 rounded-lg space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-primary">
-                          Price (USD){country ? ` · ${country}` : ''}:
+                          Price{nestingCostSummary?.currency ? ` (${nestingCostSummary.currency})` : ''}{country ? ` · ${country}` : ''}:
                         </span>
                         <span className="text-lg font-bold text-primary">
-                          ${usdPrice.toFixed(2)} / kg
+                          {hasDisplayCurrency && exchangeRates ? `${displaySymbol}${(usdPrice * usdToDisplay!).toFixed(2)} / kg` : 'Loading Digital Factory rate…'}
                         </span>
                       </div>
                       {showLocalLine && (
@@ -1144,16 +1327,24 @@ export function RawMaterialDialog({
                 </label>
                 <div className="p-4 border-2 border-orange-200 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm">$</span>
+                    <span className="text-sm">{hasDisplayCurrency ? displaySymbol : '…'}</span>
                     <Input
                       type="number"
                       step="0.01"
-                      value={manualUnitCost === 0 ? '' : manualUnitCost}
+                      disabled={!hasDisplayCurrency}
+                      // Typed and shown in the live Digital Factory currency;
+                      // stored internally as USD (manualUnitCost's own
+                      // convention — matches resolveRegionalUnitCostUsd and
+                      // every other cost this dialog computes) via the same
+                      // real FX rate used everywhere else on this page, never
+                      // a second hardcoded table.
+                      value={manualUnitCost === 0 ? '' : hasDisplayCurrency ? manualUnitCost * usdToDisplay! : manualUnitCost}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setManualUnitCost(val === '' ? 0 : parseFloat(val) || 0);
+                        const parsed = val === '' ? 0 : parseFloat(val) || 0;
+                        setManualUnitCost(hasDisplayCurrency ? parsed / usdToDisplay! : parsed);
                       }}
-                      placeholder="Enter unit cost"
+                      placeholder={hasDisplayCurrency ? 'Enter unit cost' : 'Loading Digital Factory rate…'}
                       className="flex-1"
                     />
                     <span className="text-xs text-muted-foreground">per unit</span>
@@ -1218,7 +1409,18 @@ export function RawMaterialDialog({
                   />
                   <Button
                     type="button" variant="outline" size="icon"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); setCalculatorTarget('netUsage'); setCalculatorOpen(true); }}
+                    onClick={(e) => {
+                      e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.();
+                      setCalculatorTarget('netUsage');
+                      setCalculatorResults(null);
+                      setCalculatorWarnings([]);
+                      if (isSheetMetalItem && netUsageCalculator) {
+                        setSelectedCalculatorId(netUsageCalculator.id);
+                        setCalculatorInputs({});
+                        autoPopulateUsageCalculatorInputs('netUsage');
+                      }
+                      setCalculatorOpen(true);
+                    }}
                     onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                     title="Use DB Calculator"
@@ -1240,11 +1442,13 @@ export function RawMaterialDialog({
                 <label className="text-sm font-semibold flex items-center gap-2">
                   Gross Usage
                   <span className="text-muted-foreground text-xs font-normal">
-                    {nestingIsTrustworthy
-                      ? '(kg · from nesting engine, per part)'
-                      : isSheetMetalItem
-                        ? '(kg · enter manually)'
-                        : '(kg · auto-calculated)'}
+                    {grossUsageOverridden
+                      ? '(kg · manually overridden)'
+                      : nestingIsTrustworthy
+                        ? '(kg · from nesting engine, per part)'
+                        : isSheetMetalItem
+                          ? '(kg · enter manually)'
+                          : '(kg · auto-calculated)'}
                   </span>
                 </label>
                 <div className="flex gap-2">
@@ -1258,16 +1462,27 @@ export function RawMaterialDialog({
                     }}
                     placeholder={isSheetMetalItem && !nestingIsTrustworthy ? 'Enter gross usage — nesting unavailable/unverified' : 'Enter gross usage'}
                     className="flex-1"
-                    disabled={nestingIsTrustworthy || (!selectedMaterialId && !editData)}
-                    title={nestingIsTrustworthy ? 'Derived from the real nesting result — not editable' : undefined}
+                    disabled={(nestingIsTrustworthy && !grossUsageOverridden) || (!selectedMaterialId && !editData)}
+                    title={nestingIsTrustworthy && !grossUsageOverridden ? 'Derived from the real nesting result — click the calculator icon to view the justification or override' : undefined}
                   />
                   <Button
                     type="button" variant="outline" size="icon"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); setCalculatorTarget('grossUsage'); setCalculatorOpen(true); }}
+                    onClick={(e) => {
+                      e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.();
+                      setCalculatorTarget('grossUsage');
+                      setCalculatorResults(null);
+                      setCalculatorWarnings([]);
+                      if (isSheetMetalItem && grossUsageCalculator) {
+                        setSelectedCalculatorId(grossUsageCalculator.id);
+                        setCalculatorInputs({});
+                        autoPopulateUsageCalculatorInputs('grossUsage');
+                      }
+                      setCalculatorOpen(true);
+                    }}
                     onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); e.nativeEvent?.stopImmediatePropagation?.(); }}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    title="Use DB Calculator"
-                    disabled={nestingIsTrustworthy || (!selectedMaterialId && !editData)}
+                    title={isSheetMetalItem && grossUsageCalculator ? 'View calculation & override' : 'Use DB Calculator'}
+                    disabled={!selectedMaterialId && !editData}
                   >
                     <CalculatorIcon className="h-4 w-4" />
                   </Button>
@@ -1281,6 +1496,83 @@ export function RawMaterialDialog({
                       <p className="text-[11px] text-muted-foreground font-mono">
                         Batch: {nestingBlankSpec.sheetsRequired} sheet{nestingBlankSpec.sheetsRequired === 1 ? '' : 's'} required · {nestingBlankSpec.plannedParts} planned / {nestingBlankSpec.excessPositions} excess
                       </p>
+                    )}
+                    {grossUsageOverridden ? (
+                      <div className="rounded border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-0.5">
+                        <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                          ⚠ Manual Override — {typeof grossUsage === 'number' ? grossUsage.toFixed(4) : '—'} kg/part
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Calculated value: {nestingBlankSpec.grossWeightKg.toFixed(4)} kg/part
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Difference: {typeof grossUsage === 'number'
+                            ? `${grossUsage - nestingBlankSpec.grossWeightKg >= 0 ? '+' : ''}${(grossUsage - nestingBlankSpec.grossWeightKg).toFixed(4)}`
+                            : '—'} kg/part
+                        </p>
+                        {grossUsageOverrideReason && (
+                          <p className="text-[11px] text-muted-foreground italic">Reason: {grossUsageOverrideReason}</p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { setGrossUsageOverridden(false); setGrossUsageOverrideReason(''); }}
+                          className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline"
+                        >
+                          Clear override — use calculated value
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGrossUsageEditDraft(nestingBlankSpec.grossWeightKg.toFixed(4));
+                          setGrossUsageEditReasonDraft('');
+                          setGrossUsageEditOpen((v) => !v);
+                        }}
+                        className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                      >
+                        {grossUsageEditOpen ? 'Cancel edit' : 'Edit — override manually'}
+                      </button>
+                    )}
+                    {grossUsageEditOpen && !grossUsageOverridden && (
+                      <div className="rounded border border-border bg-muted/20 p-2 space-y-2">
+                        <div>
+                          <Label className="text-[10px]">Calculated Value</Label>
+                          <p className="text-[11px] font-mono tabular-nums">{nestingBlankSpec.grossWeightKg.toFixed(4)} kg/part</p>
+                        </div>
+                        <div>
+                          <Label className="text-[10px]">Manual Override (kg/part)</Label>
+                          <Input
+                            type="number" step="0.000001" className="h-7 text-xs"
+                            value={grossUsageEditDraft}
+                            onChange={(e) => setGrossUsageEditDraft(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px]">Reason</Label>
+                          <Input
+                            type="text" className="h-7 text-xs"
+                            placeholder="e.g. Customer-supplied material allocation"
+                            value={grossUsageEditReasonDraft}
+                            onChange={(e) => setGrossUsageEditReasonDraft(e.target.value)}
+                          />
+                        </div>
+                        <Button
+                          type="button" size="sm" className="h-7 text-xs"
+                          disabled={!grossUsageEditReasonDraft.trim()}
+                          onClick={() => {
+                            const parsed = parseFloat(grossUsageEditDraft);
+                            if (!Number.isNaN(parsed) && parsed > 0) {
+                              setGrossUsage(parsed);
+                              setGrossUsageOverrideReason(grossUsageEditReasonDraft.trim());
+                              setGrossUsageOverridden(true);
+                            }
+                            setGrossUsageEditOpen(false);
+                          }}
+                        >
+                          Apply Override
+                        </Button>
+                      </div>
                     )}
                   </div>
                 ) : hasRealNesting ? (
@@ -1340,7 +1632,11 @@ export function RawMaterialDialog({
                   className={previewBreakdown?.reclaimRateInvalid ? 'border-destructive focus-visible:ring-destructive' : ''}
                 />
                 {previewBreakdown?.reclaimRateInvalid ? (
-                  <p className="text-xs text-destructive">Must be less than unit cost (${((previewBreakdown.grossMaterialCost ?? 0) / (previewBreakdown.gross || 1)).toFixed(3)}/kg)</p>
+                  <p className="text-xs text-destructive">
+                    Must be less than unit cost ({hasDisplayCurrency
+                      ? `${displaySymbol}${(((previewBreakdown.grossMaterialCost ?? 0) / (previewBreakdown.gross || 1)) * usdToDisplay!).toFixed(3)}/kg`
+                      : '…'})
+                  </p>
                 ) : null}
               </div>
 
@@ -1360,18 +1656,25 @@ export function RawMaterialDialog({
             {(() => {
               const b = previewBreakdown;
               const dim = 'text-muted-foreground/40';
-              const val = (n: number | undefined, d = 4) => b ? `$${(n ?? 0).toFixed(d)}` : '—';
-              const unitCostDisplay = b ? `$${((b.grossMaterialCost ?? 0) / (b.gross || 1)).toFixed(3)}/kg` : '—';
+              // b's own fields (grossMaterialCost, totalCostVal, ...) are USD
+              // internally, same as everywhere else in this dialog — convert
+              // to the live Digital Factory display currency here, never a
+              // hardcoded '$'. When the rate hasn't loaded yet, show '—'
+              // rather than a guessed symbol/number.
+              const sym = hasDisplayCurrency ? displaySymbol! : null;
+              const dsp = (n: number) => (usdToDisplay ?? 0) * n;
+              const val = (n: number | undefined, d = 4) => (b && sym) ? `${sym}${dsp(n ?? 0).toFixed(d)}` : '—';
+              const unitCostDisplay = (b && sym) ? `${sym}${dsp((b.grossMaterialCost ?? 0) / (b.gross || 1)).toFixed(3)}/kg` : '—';
               const grossKg = b ? `${(b.gross ?? 0).toFixed(4)} kg` : '— kg';
               const scrapKg = b ? `${(b.scrapAmount ?? 0).toFixed(4)} kg` : '— kg';
-              const reclaimRateDisplay = b ? `$${Number(reclaimRate || 0).toFixed(3)}/kg` : '—';
+              const reclaimRateDisplay = (b && sym) ? `${sym}${dsp(Number(reclaimRate || 0)).toFixed(3)}/kg` : '—';
               return (
                 <div className="rounded-lg border border-border bg-muted/20 overflow-hidden">
                   {/* header */}
                   <div className="px-4 py-2 border-b border-border flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Live Cost Breakdown</span>
                     <span className={`text-xl font-bold tabular-nums ${b ? 'text-foreground' : dim}`}>
-                      {b ? `$${(b.totalCostVal ?? 0).toFixed(4)}` : '$0.0000'}
+                      {(b && sym) ? `${sym}${dsp(b.totalCostVal ?? 0).toFixed(4)}` : '—'}
                     </span>
                   </div>
 
@@ -1394,7 +1697,7 @@ export function RawMaterialDialog({
                         {scrapKg} × {reclaimRateDisplay}
                       </span>
                       <span className="tabular-nums font-mono shrink-0">
-                        {b ? `−$${(b.reclaimValue ?? 0).toFixed(4)}` : '—'}
+                        {(b && sym) ? `−${sym}${dsp(b.reclaimValue ?? 0).toFixed(4)}` : '—'}
                       </span>
                     </div>
 
@@ -1414,7 +1717,7 @@ export function RawMaterialDialog({
                         net × {Number(overhead || 0)}%
                       </span>
                       <span className="tabular-nums font-mono shrink-0">
-                        {b ? `+$${(b.overheadCost ?? 0).toFixed(4)}` : '—'}
+                        {(b && sym) ? `+${sym}${dsp(b.overheadCost ?? 0).toFixed(4)}` : '—'}
                       </span>
                     </div>
 
@@ -1422,7 +1725,7 @@ export function RawMaterialDialog({
                     <div className="border-t border-border mt-1 pt-2 flex items-baseline justify-between font-bold">
                       <span>Total cost</span>
                       <span className={`tabular-nums font-mono text-sm ${b ? 'text-foreground' : dim}`}>
-                        {b ? `$${(b.totalCostVal ?? 0).toFixed(4)}` : '$0.0000'}
+                        {(b && sym) ? `${sym}${dsp(b.totalCostVal ?? 0).toFixed(4)}` : '—'}
                       </span>
                     </div>
 
@@ -1435,8 +1738,8 @@ export function RawMaterialDialog({
                         </strong>
                       </span>
                       <span>
-                        Eff. $/kg:{' '}
-                        <strong>{b ? `$${(b.effPerUnit ?? 0).toFixed(3)}` : '—'}</strong>
+                        Eff. {nestingCostSummary?.currency ? `${nestingCostSummary.currency}/kg` : '$/kg'}:{' '}
+                        <strong>{(b && sym) ? `${sym}${dsp(b.effPerUnit ?? 0).toFixed(3)}` : '—'}</strong>
                       </span>
                     </div>
 
@@ -1499,7 +1802,14 @@ export function RawMaterialDialog({
             {/* Calculator Selector */}
             <div className="space-y-2">
               <Label>Select Calculator</Label>
-              <Select value={selectedCalculatorId} onValueChange={setSelectedCalculatorId}>
+              <Select
+                value={selectedCalculatorId}
+                onValueChange={(id) => {
+                  setSelectedCalculatorId(id);
+                  setCalculatorResults(null);
+                  setCalculatorWarnings([]);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a calculator" />
                 </SelectTrigger>
@@ -1541,16 +1851,54 @@ export function RawMaterialDialog({
                     <CardTitle className="text-lg">Input Values</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Resolved Geometry — required by the real evaluation, but not a
+                        calculator-form scalar. Rendered read-only/greyed, distinct from
+                        the genuinely editable Input Values below, never an <Input>. */}
                     {selectedCalculator.fields
-                      ?.filter((field: any) => field.fieldType !== 'calculated')
+                      ?.filter((field: any) => field.fieldName === 'Flat Pattern Outline')
+                      .map((field: any) => (
+                        <div key={field.id} className="space-y-1 rounded border border-dashed border-border/60 bg-muted/20 p-2">
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            Resolved Geometry — required, not editable
+                          </Label>
+                          <p className="text-xs">
+                            {hasRealNesting ? (
+                              <span className="text-emerald-600 dark:text-emerald-400">
+                                Verified CAD flat-pattern outline resolved
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 dark:text-amber-400">
+                                Unavailable — no verified flat-pattern outline for this part yet
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">{usageCalculatorInputProvenance['Flat Pattern Outline']}</p>
+                        </div>
+                      ))}
+                    {selectedCalculator.fields
+                      ?.filter((field: any) => field.fieldType !== 'calculated' && field.fieldName !== 'Flat Pattern Outline')
                       .map((field: any) => {
                         // Only show eye button for fields that are likely to have lookup tables
                         const isLookupTableField =
                           // Show for database lookup fields with processes data source
                           (field.fieldType === 'database_lookup' && field.dataSource === 'processes') ||
                           // Show for fields with sourceField starting with 'from_' (linked to reference tables)
-                          (field.sourceField && field.sourceField.startsWith('from_'));
-                          // Note: Raw materials fields now auto-populate, no eye icon needed
+                          (field.sourceField && field.sourceField.startsWith('from_')) ||
+                          // Note: Raw materials fields now auto-populate, no eye icon needed --
+                          // except the two sheet-metal usage calculators' own raw_materials
+                          // fields, where seeing/verifying the matched material row was
+                          // explicitly requested.
+                          field.fieldName === 'Shear Strength' || field.fieldName === 'Material Density';
+                        // These two fields' calculator_fields rows don't carry a
+                        // source_property column (seeded generically) -- map it here
+                        // instead of guessing a DB column that was never set.
+                        const rawMaterialSourceProperty: Record<string, string> = {
+                          'Shear Strength': 'shearingStrength',
+                          'Material Density': 'densityKgM3',
+                        };
+                        const lookupField = rawMaterialSourceProperty[field.fieldName]
+                          ? { ...field, dataSource: 'raw_materials', sourceProperty: rawMaterialSourceProperty[field.fieldName] }
+                          : field;
 
                         return (
                           <div key={field.id} className="space-y-2">
@@ -1652,7 +2000,7 @@ export function RawMaterialDialog({
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    handleViewLookupTable(field);
+                                    handleViewLookupTable(lookupField);
                                   }}
                                   onMouseDown={(e) => {
                                     e.preventDefault();
@@ -1664,6 +2012,14 @@ export function RawMaterialDialog({
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               </div>
+                            ) : field.fieldType === 'text' ? (
+                              <Input
+                                id={field.fieldName}
+                                type="text"
+                                value={calculatorInputs[field.fieldName] || ''}
+                                onChange={(e) => setCalculatorInputs({ ...calculatorInputs, [field.fieldName]: e.target.value })}
+                                placeholder={`Enter ${field.displayLabel || field.fieldName}`}
+                              />
                             ) : (
                               // Regular input field only
                               <Input
@@ -1679,6 +2035,11 @@ export function RawMaterialDialog({
                                 }
                                 placeholder={`Enter ${field.displayLabel || field.fieldName}`}
                               />
+                            )}
+                            {usageCalculatorInputProvenance[field.fieldName] && (
+                              <p className="text-[10px] text-muted-foreground">
+                                Why: {usageCalculatorInputProvenance[field.fieldName]}
+                              </p>
                             )}
                           </div>
                         );
@@ -1696,10 +2057,27 @@ export function RawMaterialDialog({
                 </Card>
 
                 {/* Calculator Results */}
-                {calculatorResults && (
+                {calculatorWarnings.length > 0 && (
+                  <Card className="border-amber-400">
+                    <CardContent className="p-3 space-y-1">
+                      {calculatorWarnings.map((w, i) => (
+                        <p key={i} className="text-xs text-amber-700 dark:text-amber-400">{w}</p>
+                      ))}
+                      {calculatorTarget === 'grossUsage' && !nestingIsTrustworthy && (
+                        <p className="text-xs text-muted-foreground">
+                          Enter Gross Usage manually in the field above, or disclose the rectangle-grid fallback
+                          already shown there if the cost summary used it.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+                {calculatorResults && Object.keys(calculatorResults).length > 0 && (
                   <Card className="border-primary">
                     <CardHeader>
-                      <CardTitle className="text-lg">Results</CardTitle>
+                      <CardTitle className="text-lg">
+                        {(selectedCalculator.name === 'Sheet Metal - Gross Material Usage (Nesting)') ? 'Nesting Result' : 'Results'}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {selectedCalculator.fields
@@ -1707,34 +2085,68 @@ export function RawMaterialDialog({
                         .map((field: any) => {
                           const result = calculatorResults[field.fieldName];
                           const value = result?.value !== undefined ? result.value : result;
+                          if (value === undefined) return null;
+                          // For the two sheet-metal usage calculators, only the field
+                          // that actually feeds this dialog's target usage input gets
+                          // a "Use" button -- showing it on every calculated field
+                          // (Parts Per Sheet, Sheet Weight, ...) would let a click
+                          // silently overwrite Gross/Net Usage with the wrong number.
+                          const isUsageCalculator = selectedCalculator.name === 'Sheet Metal - Gross Material Usage (Nesting)'
+                            || selectedCalculator.name === 'Sheet Metal - Net Material Usage';
+                          const isPrimaryOutput = calculatorTarget === 'grossUsage'
+                            ? field.fieldName === 'Gross Weight Per Part'
+                            : field.fieldName === 'Net Usage';
+                          const showUseButton = !isUsageCalculator || isPrimaryOutput;
+                          // The real DB formula string (calculator_fields.default_value)
+                          // with every {Field Name} token substituted for the actual
+                          // value that produced this result -- the same real backend
+                          // logic (physics_key), not a re-derived/approximated caption.
+                          const formulaLine = formatFormulaWithValues(field.default_value, calculatorResults, calculatorInputs);
 
                           return (
                             <div
                               key={field.id}
-                              className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg"
+                              className="p-3 bg-secondary/50 rounded-lg space-y-1"
                             >
-                              <div>
-                                <div className="font-medium">{field.displayName || field.fieldName}</div>
-                                {field.unit && (
-                                  <div className="text-xs text-muted-foreground">{field.unit}</div>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="text-lg font-bold text-primary">
-                                  {typeof value === 'number' ? value.toFixed(4) : value || 'N/A'}
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium">{field.displayLabel || field.fieldName}</div>
+                                  {field.unit && (
+                                    <div className="text-xs text-muted-foreground">{field.unit}</div>
+                                  )}
                                 </div>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleUseCalculatorValue(value)}
-                                  disabled={typeof value !== 'number'}
-                                >
-                                  Use
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                  <div className="text-lg font-bold text-primary">
+                                    {typeof value === 'number' ? value.toFixed(4) : value || 'N/A'}
+                                  </div>
+                                  {showUseButton && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleUseCalculatorValue(value)}
+                                      disabled={typeof value !== 'number'}
+                                    >
+                                      Use
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
+                              {formulaLine && (
+                                <p className="text-[10px] font-mono text-muted-foreground/80 break-all">= {formulaLine}</p>
+                              )}
                             </div>
                           );
                         })}
+                    </CardContent>
+                  </Card>
+                )}
+                {calculatorTarget === 'grossUsage' && grossUsageTrace.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Calculation Trace</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <CalculationTracePanel line={{ calculationTrace: grossUsageTrace, ...(grossUsageConfidence ? { confidence: grossUsageConfidence } : {}) }} />
                     </CardContent>
                   </Card>
                 )}
@@ -1743,6 +2155,7 @@ export function RawMaterialDialog({
           </div>
         </SheetContent>
       </Sheet>
+
 
       {/* Lookup Table Panel */}
       {showLookupTable && lookupTableData && (() => {
@@ -1846,10 +2259,17 @@ export function RawMaterialDialog({
                           return row[col.name] !== undefined ? row[col.name] : row[camel];
                         };
                         const outputValue = outputCol ? getVal(outputCol) : undefined;
+                        // Highlight the row matching the material actually selected in
+                        // this dialog, so a user opening the lookup table can see exactly
+                        // which real raw_materials row the auto-filled value came from.
+                        const isSelectedMaterialRow = !!selectedMaterial && (
+                          (row.materialGrade && row.materialGrade === selectedMaterial.materialGrade) ||
+                          (row.materialName && row.materialName === selectedMaterial.material)
+                        );
                         return (
                           <tr
                             key={rowIndex}
-                            className="hover:bg-primary/10 cursor-pointer transition-colors"
+                            className={`hover:bg-primary/10 cursor-pointer transition-colors ${isSelectedMaterialRow ? 'bg-emerald-100 dark:bg-emerald-950/50 font-semibold' : ''}`}
                             onMouseDown={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
@@ -1878,7 +2298,10 @@ export function RawMaterialDialog({
                               
                               return false;
                             }}
-                            title={outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`}
+                            title={
+                              (isSelectedMaterialRow ? 'This is the currently selected material. ' : '') +
+                              (outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`)
+                            }
                           >
                             <td className="border border-border text-center text-xs py-1 px-1 text-muted-foreground font-mono bg-muted/20">
                               {rowIndex + 1}

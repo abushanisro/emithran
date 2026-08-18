@@ -436,5 +436,14 @@ export class ExecuteCalculatorDto {
   @IsObject()
   @IsOptional()
   databaseReferences?: Record<string, any>;
+
+  // Only consumed by the sheet-metal net/gross-usage physics_keys -- the
+  // BOM item this Calculate is bound to, needed for Gross Usage to read the
+  // item's stored CAD outline/cache (a polygon isn't a value a calculator
+  // form can hold as a scalar input). Every other calculator ignores it.
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  itemId?: string;
 }
 

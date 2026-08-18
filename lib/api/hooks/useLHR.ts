@@ -31,7 +31,17 @@ export const useLHRBenchmark = (location?: string) => {
     queryFn: () => lhrApi.getBenchmarkRates(location),
     staleTime: 10 * 60 * 1000,   // benchmark rates rarely change
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    // Same fix as useMHRBenchmark/useMHRRecords (useMHR.ts) for the exact
+    // same bug: whichever process group/location this was queried for BEFORE
+    // an admin edit or a data-gap migration landed permanently caches that
+    // empty/stale result for the rest of the browser tab's life — nothing
+    // else in this config (staleTime elapsing, window refocus, dialog
+    // close/reopen without a real unmount) ever forces a re-fetch of an
+    // already-cached key. Confirmed live: a real China "Sheet Metal" LHR
+    // benchmark row existed in the DB the whole time, but the dialog kept
+    // showing "No labour rate configured" and fell back to a manual $/hr
+    // input because this query's cached result was never re-verified.
+    refetchOnMount: 'always',
     throwOnError: false,
     select: (data) => data ?? [],
   });
@@ -44,7 +54,8 @@ export const useLHR = (search?: string) => {
     retry: false,
     staleTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    // Same reasoning as useLHRBenchmark above.
+    refetchOnMount: 'always',
     throwOnError: false,
     select: (data) => data ?? { records: [], total: 0 },
   });

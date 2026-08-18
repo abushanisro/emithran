@@ -1,4 +1,4 @@
-import { computeNesting, resolveNestingDimensions } from './sheet-metal-nesting.engine';
+import { computeNesting, resolveNestingDimensions, isTrueNestCostingCacheValid, computeMassBasedUtilizationPct } from './sheet-metal-nesting.engine';
 
 describe('resolveNestingDimensions', () => {
   // A. If flat-pattern dimensions exist, nesting uses them.
@@ -157,5 +157,77 @@ describe('computeNesting — sheetsRequired / batch consumption (RTP2 MAG2 FRONT
     expect(withQty.grossWeightPerPartKg).toBe(withoutQty.grossWeightPerPartKg);
     expect(withQty.netMaterialCost).toBe(withoutQty.netMaterialCost);
     expect(withQty.utilisationPct).toBe(withoutQty.utilisationPct);
+  });
+});
+
+describe('isTrueNestCostingCacheValid — true-shape nest costing cache correctness gate', () => {
+  // sheetWidthMm/sheetLengthMm are NOT match criteria here -- sheet
+  // selection is part of what got cached (every viable candidate was
+  // already compared when this was computed); only kerf/edge-margin (the
+  // request-time inputs to that computation) and the presence of every
+  // required result field are checked.
+  const validCache = {
+    sheetWidthMm: 2500, sheetLengthMm: 5000, kerfMm: 0.56, edgeMarginMm: 2,
+    partsPerSheet: 91, utilizationPct: 71.8, sheetWeightKg: 157.0, grossWeightPerPartKg: 1.725,
+    cachedAt: '2026-08-17T00:00:00.000Z',
+  };
+
+  it('accepts a cache entry that exactly matches the requested kerf/margin', () => {
+    expect(isTrueNestCostingCacheValid(validCache, 0.56, 2)).toBe(true);
+  });
+
+  it('rejects a cache entry computed with a different kerf or edge margin', () => {
+    expect(isTrueNestCostingCacheValid(validCache, 1.0, 2)).toBe(false);
+    expect(isTrueNestCostingCacheValid(validCache, 0.56, 3)).toBe(false);
+  });
+
+  it('rejects missing, null, or malformed cache values rather than throwing', () => {
+    expect(isTrueNestCostingCacheValid(undefined, 0.56, 2)).toBe(false);
+    expect(isTrueNestCostingCacheValid(null, 0.56, 2)).toBe(false);
+    expect(isTrueNestCostingCacheValid({}, 0.56, 2)).toBe(false);
+    expect(isTrueNestCostingCacheValid({ ...validCache, partsPerSheet: 0 }, 0.56, 2)).toBe(false);
+    expect(isTrueNestCostingCacheValid({ ...validCache, utilizationPct: 'high' }, 0.56, 2)).toBe(false);
+    expect(isTrueNestCostingCacheValid({ ...validCache, sheetWeightKg: undefined }, 0.56, 2)).toBe(false);
+    expect(isTrueNestCostingCacheValid({ ...validCache, grossWeightPerPartKg: 0 }, 0.56, 2)).toBe(false);
+  });
+
+  it('tolerates float rounding noise (sub-0.01) in kerf/margin matching', () => {
+    expect(isTrueNestCostingCacheValid(validCache, 0.5600001, 2)).toBe(true);
+  });
+});
+
+describe('computeMassBasedUtilizationPct — regression for the true-nest costing utilization bug', () => {
+  // RTP2 MAG2 FRONTFRAME, live production case: 2500x5000mm sheet, 157.0kg
+  // sheet weight, 1.234kg real net weight/part. Rectangle-grid found 77
+  // parts/sheet (60.5% mass-based utilization); the true-shape nest found
+  // only 70 real non-overlapping placements, but cad-engine's OWN
+  // utilizationPct for that placement (computed from the outline polygon's
+  // area, not real part mass) reported 83.9% -- inconsistent with the part's
+  // real net weight, since this frame-shaped part's polygon silhouette does
+  // not subtract internal cutout area the same way real CAD mass does. The
+  // bug this guards: costing must use this function's mass-based ratio
+  // (55.0%), never cad-engine's own polygon-area utilizationPct (83.9%).
+  it('recomputes the correct mass-based 55.0% instead of trusting a polygon-area 83.9%', () => {
+    const sheetWeightKg = 157.0;
+    const netWeightKg = 1.234;
+    const truePartsPerSheet = 70;
+    const grossWeightPerPartKg = sheetWeightKg / truePartsPerSheet;
+    const pct = computeMassBasedUtilizationPct(netWeightKg, grossWeightPerPartKg);
+    expect(Math.round(pct * 10) / 10).toBeCloseTo(55.0, 1);
+    expect(pct).toBeLessThan(83.9); // the wrong, polygon-area-based figure this replaces
+  });
+
+  it('matches the rectangle-grid figure at 77 parts/sheet (60.5%) -- same formula, same inputs', () => {
+    const sheetWeightKg = 157.0;
+    const netWeightKg = 1.234;
+    const grossWeightPerPartKg = sheetWeightKg / 77;
+    const pct = computeMassBasedUtilizationPct(netWeightKg, grossWeightPerPartKg);
+    expect(Math.round(pct * 10) / 10).toBeCloseTo(60.5, 1);
+  });
+
+  it('never exceeds 100% and never divides by zero', () => {
+    expect(computeMassBasedUtilizationPct(5, 1)).toBe(100);
+    expect(computeMassBasedUtilizationPct(0, 10)).toBe(0);
+    expect(computeMassBasedUtilizationPct(10, 0)).toBe(0);
   });
 });

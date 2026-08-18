@@ -11,6 +11,7 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import {
   CreateRawMaterialCostDto,
   UpdateRawMaterialCostDto,
@@ -30,6 +31,7 @@ export class RawMaterialCostService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
+    private readonly exchangeRateService: ExchangeRateService,
   ) {
     this.calculationEngine = new RawMaterialCostCalculationEngine();
   }
@@ -179,7 +181,26 @@ export class RawMaterialCostService {
       const lookup = await this.lookupMaterialPrice(
         accessToken, createDto.materialName, createDto.country ?? '',
       );
-      resolvedUnitCost = lookup.price;
+      // lookupMaterialPrice returns the raw regional column (cost_india,
+      // cost_china, ...) in lookup.currency, not USD. unit_cost/total_cost on
+      // this table are always USD everywhere else (RawMaterialsSection.tsx's
+      // own conversionRate prop: "multiply stored USD values by this to get
+      // factory currency") -- storing the local figure unconverted silently
+      // mispriced every auto-populated record by the local<->USD FX ratio
+      // (confirmed live: an ~84x inflation for India materials once a
+      // non-INR Digital Factory display currency was selected). Converts
+      // here, once, at the single place this table's unit_cost ever gets
+      // auto-derived from a regional column. Uses lookup.currency, NOT
+      // getCurrencyForLocation(createDto.country) -- the lookup can fall
+      // back to the India column even when country is e.g. 'China', and
+      // guessing the currency from country alone would then convert an INR
+      // price as if it were CNY.
+      if (lookup.found && lookup.price > 0) {
+        const rates = await this.exchangeRateService.getSnapshot(accessToken);
+        resolvedUnitCost = rates.toUsd(lookup.price, lookup.currency);
+      } else {
+        resolvedUnitCost = lookup.price;
+      }
       priceLookupFailed = !lookup.found;
     }
 
@@ -234,6 +255,8 @@ export class RawMaterialCostService {
       net_usage: createDto.netUsage,
       scrap: createDto.scrap,
       overhead: createDto.overhead,
+      gross_usage_is_overridden: createDto.grossUsageIsOverridden ?? false,
+      gross_usage_override_reason: createDto.grossUsageIsOverridden ? (createDto.grossUsageOverrideReason ?? null) : null,
 
       // Calculated Results
       total_cost: calculationResult.totalCost,
@@ -355,6 +378,10 @@ export class RawMaterialCostService {
     if (updateDto.overhead !== undefined) updateData.overhead = updateDto.overhead;
     if (updateDto.isActive !== undefined) updateData.is_active = updateDto.isActive;
     if (updateDto.notes !== undefined) updateData.notes = updateDto.notes;
+    if (updateDto.grossUsageIsOverridden !== undefined) {
+      updateData.gross_usage_is_overridden = updateDto.grossUsageIsOverridden;
+      updateData.gross_usage_override_reason = updateDto.grossUsageIsOverridden ? (updateDto.grossUsageOverrideReason ?? null) : null;
+    }
     if (updateDto.bomItemId !== undefined) updateData.bom_item_id = updateDto.bomItemId;
     if (updateDto.processRouteId !== undefined) updateData.process_route_id = updateDto.processRouteId;
     if (updateDto.projectId !== undefined) updateData.project_id = updateDto.projectId;
@@ -531,19 +558,36 @@ export class RawMaterialCostService {
    * Returns { price: 0, found: false } on no match or any error — the caller MUST disclose
    * this (see create()'s notes field), since a genuinely-missing price is otherwise
    * indistinguishable from a real $0 unit cost.
+   *
+   * Also returns which currency the returned `price` is actually denominated
+   * in — NOT simply "whatever getCurrencyForLocation(country) says", since
+   * this can fall back to the cost_india column (INR) either because
+   * `country` itself matched no known column, or because the requested
+   * country's own column was empty for this specific material. Callers must
+   * convert using THIS currency, not a guess derived from `country`, or an
+   * India-fallback price silently gets treated as if it were already in the
+   * requesting country's currency.
    */
   private async lookupMaterialPrice(
     accessToken: string,
     materialName: string,
     country: string,
-  ): Promise<{ price: number; found: boolean }> {
+  ): Promise<{ price: number; found: boolean; currency: string }> {
     // Maps digital-factory country strings to raw_materials price columns
-    const PRICE_COL: Record<string, string> = {
-      India: 'cost_india', USA: 'cost_usa', Germany: 'cost_germany',
-      France: 'cost_france', 'W. Europe': 'cost_europe', 'E. Europe': 'cost_e_europe',
-      UK: 'cost_uk', China: 'cost_china', Vietnam: 'cost_vietnam', Mexico: 'cost_mexico',
+    // (and the real currency each column is denominated in).
+    const PRICE_COL: Record<string, { col: string; currency: string }> = {
+      India: { col: 'cost_india', currency: 'INR' },
+      USA: { col: 'cost_usa', currency: 'USD' },
+      Germany: { col: 'cost_germany', currency: 'EUR' },
+      France: { col: 'cost_france', currency: 'EUR' },
+      'W. Europe': { col: 'cost_europe', currency: 'EUR' },
+      'E. Europe': { col: 'cost_e_europe', currency: 'EUR' },
+      UK: { col: 'cost_uk', currency: 'GBP' },
+      China: { col: 'cost_china', currency: 'CNY' },
+      Vietnam: { col: 'cost_vietnam', currency: 'VND' },
+      Mexico: { col: 'cost_mexico', currency: 'MXN' },
     };
-    const priceCol = PRICE_COL[country] ?? 'cost_india';
+    const { col: priceCol, currency: priceCurrency } = PRICE_COL[country] ?? PRICE_COL['India']!;
     try {
       const g = materialName.trim();
       const tokens = g.split(/[\s\-\/]+/).filter((t) => t.length >= 3);
@@ -563,13 +607,13 @@ export class RawMaterialCostService {
         .limit(5);
       for (const row of (data ?? []) as any[]) {
         const locPrice = parseFloat(row[priceCol]);
-        if (isFinite(locPrice) && locPrice > 0) return { price: locPrice, found: true };
+        if (isFinite(locPrice) && locPrice > 0) return { price: locPrice, found: true, currency: priceCurrency };
         const indiaPrice = parseFloat(row.cost_india);
-        if (isFinite(indiaPrice) && indiaPrice > 0) return { price: indiaPrice, found: true };
+        if (isFinite(indiaPrice) && indiaPrice > 0) return { price: indiaPrice, found: true, currency: 'INR' };
       }
     } catch (err: any) {
       this.logger.warn(`Material price lookup failed for "${materialName}" (${country}): ${err?.message}`, 'RawMaterialCostService');
     }
-    return { price: 0, found: false };
+    return { price: 0, found: false, currency: priceCurrency };
   }
 }

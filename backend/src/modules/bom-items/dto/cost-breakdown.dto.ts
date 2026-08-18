@@ -287,6 +287,15 @@ export interface ProcessLineCost {
   // Physics-based selection result (recommendation + alternatives + profiles).
   // Attached by BOMItemsService when ENABLE_PHYSICS_MACHINE_SELECTION is on.
   machineSelection?: MachineSelectionResult;
+  // Real mhr_records id / 'bm-mhr-<id>' benchmark id for this line's resolved
+  // resource — set directly (not via machineSelection) on classes priced
+  // through a flat single-resource resolver instead of the full candidate-
+  // list machine selection (currently just Inspection — see
+  // resolveCmmSpecificRate/resolveGenericInspectionRate). Lets the frontend
+  // persist a real machine link for these lines instead of always saving
+  // "not linked to a machine" even when a real, priced resource was used.
+  mhrId?: string | null;
+  benchmarkMhrId?: string | null;
   // aPriori-style per-feature operation breakdown. Present on CNC Milling (per hole/pocket/tap),
   // Laser Cutting (cut path + pierces), and Press Brake (per bend group). Absent on Setup/Deburr/Inspect.
   featureBreakdown?: FeatureOp[];
@@ -413,10 +422,29 @@ export interface CostSummaryDto {
     blankAreaSource: 'cad' | 'reconstructed';
   };
 
-  // Location currency (set by getCostSummary; undefined = legacy INR response)
-  currency?: string;         // ISO 4217 code: 'INR', 'USD', 'EUR', 'CNY'
-  currencySymbol?: string;   // display symbol: '₹', '$', '€', '¥'
-  toUsdRate?: number;        // amount_local × toUsdRate = amount_usd
+  // Display currency (set by getCostSummary; undefined = legacy INR response).
+  // Defaults to USD when the scenario has no saved FX snapshot (Currency &
+  // Ask Price widget) for this item's current factory currency — see
+  // normalizeCostSummaryToCurrency/resolveDisplayCurrency in bom-items.service.ts.
+  currency?: string;         // ISO 4217 code of the CURRENT display currency, e.g. 'INR', 'USD', 'EUR', 'CNY'
+  currencySymbol?: string;   // display symbol for `currency`: '₹', '$', '€', '¥'
+  toUsdRate?: number;        // amount_local × toUsdRate = amount in `currency` (name predates scenario currencies; no longer always USD)
+  // amount_usd × usdToDisplayRate = amount in `currency`. DIFFERENT from toUsdRate
+  // above (which converts the factory's own native-currency figures already
+  // embedded in this DTO) — this one is for the frontend to convert fields it
+  // reads from OTHER, always-USD-denominated tables (raw_material_cost_records.
+  // unit_cost, packaging/procured/tooling totals, process_cost_records rates).
+  // Conflating the two is exactly how a real $1.175/kg got relabeled ₹1.175/kg
+  // instead of converted — see bom-items.service.ts's resolveDisplayCurrency.
+  usdToDisplayRate?: number;
+  // amount_inr × inrToDisplayRate = amount in `currency`. Same idea as
+  // usdToDisplayRate above, for frontend constants/estimates that are
+  // denominated in INR regardless of factory location (e.g. the NRE/
+  // Investment tab's fixture/programming/tooling/inspection cost tables) —
+  // without this, converting an INR-based estimate required either a
+  // duplicate hardcoded FX table on the frontend or silently mislabeling the
+  // INR number under whatever symbol the factory happened to be using.
+  inrToDisplayRate?: number;
 
   // Persistent aPriori-style manual overrides applied to this response, keyed
   // by 'mat_rate' | '<process>::rate' | '<process>::cycleMin'. materialCost /

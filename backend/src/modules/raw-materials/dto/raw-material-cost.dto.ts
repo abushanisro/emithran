@@ -142,6 +142,19 @@ export class CreateRawMaterialCostDto {
   @IsString()
   notes?: string;
 
+  // Explicit, auditable Calculated-vs-Override distinction for Gross Usage
+  // (RawMaterialDialog's "Edit — override manually" flow) -- never silent,
+  // never modifies the underlying nesting result.
+  @ApiPropertyOptional({ description: 'Whether Gross Usage was manually overridden rather than calculator-computed', example: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  grossUsageIsOverridden?: boolean;
+
+  @ApiPropertyOptional({ description: 'Reason for the Gross Usage manual override' })
+  @IsOptional()
+  @IsString()
+  grossUsageOverrideReason?: string;
+
   // Optional linking
   @ApiPropertyOptional({ description: 'BOM item ID to link this cost to' })
   @IsOptional()
@@ -299,6 +312,16 @@ export class UpdateRawMaterialCostDto {
   @IsOptional()
   @IsUUID()
   projectId?: string;
+
+  @ApiPropertyOptional({ description: 'Whether Gross Usage was manually overridden rather than calculator-computed', example: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  grossUsageIsOverridden?: boolean;
+
+  @ApiPropertyOptional({ description: 'Reason for the Gross Usage manual override' })
+  @IsOptional()
+  @IsString()
+  grossUsageOverrideReason?: string;
 }
 
 /**

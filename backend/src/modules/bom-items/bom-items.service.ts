@@ -12,7 +12,10 @@ import type { CalculatorFieldRow } from '../calculators/calculator-formula-evalu
 import { PHYSICS_REGISTRY } from '../calculators/physics-registry';
 import { SheetMetalLookupService, roundUpToStandardTonnageClass } from './costing/sheet-metal-lookup.service';
 import type { LaserCutParams } from './costing/sheet-metal-lookup.service';
-import { computeNesting, resolveNestingDimensions } from './costing/sheet-metal-nesting.engine';
+import { computeNesting, resolveNestingDimensions, EDGE_ALLOWANCE_MM, STANDARD_SHEETS, isTrueNestCostingCacheValid, computePartAllowanceMm } from './costing/sheet-metal-nesting.engine';
+import { selectBestTrueNestCandidate } from './costing/true-nest-costing.engine';
+import { resolveNetUsagePhysics } from './costing/sheet-metal-net-usage.physics';
+import type { TrueNestCandidate, TrueNestCostingSelection } from './costing/true-nest-costing.engine';
 import {
   computeCNCMilledCostSummary, computeCNCTurnedCostSummary,
   checkCNCCapability, computeRouteComplexityScore,
@@ -36,8 +39,9 @@ import {
   TAPPING_SETUP_MIN, computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC,
   resolveDrillingSpeedFeed, COUNTERSINK_SPEED_FACTOR, HOLE_OP_UNLOAD_SEC,
   resolveReamPhysicsInputs, TIGHT_TOLERANCE_REAM_THRESHOLD_MM,
-  MACHINE_REGISTRY, LOCATION_INFO,
-  DEFAULT_COSTING_LOCATION, benchmarkRateWarning,
+  MACHINE_REGISTRY, LOCATION_INFO, CURRENCY_SYMBOLS,
+  DEFAULT_COSTING_LOCATION, benchmarkRateWarning, lhrRateWarning,
+  type RateWarnThresholds, DEFAULT_RATE_WARN_THRESHOLDS,
   resolveUtsMpa, isSheetFormableMaterial, estimateBendTonnage,
   estimateBurlTonnage, estimateBurlDiameterMm, BURRING_SETUP_MIN,
   type SurfaceTreatmentDbRate, classifySurfaceTreatment,
@@ -47,7 +51,7 @@ import type { MachineClass } from './costing/default-rates';
 import { checkMachineCapability } from './costing/machine-capability';
 import type { CapabilityCheck as MachineCapabilityCheck, PartGeometryForCapability } from './costing/machine-capability';
 import { getEnginesForFamily, ROUTE_ID_FOR_CLASS, ROUTE_LABEL_FOR_CLASS } from './costing/manufacturing-process-registry';
-import { resolveEffectiveSheetThicknessMm } from './costing/scenario-overrides';
+import { resolveEffectiveSheetThicknessMm, resolveScenarioFxSnapshot } from './costing/scenario-overrides';
 import type { CostSummaryDto, ProcessLineCost, FeatureOp, CostStatus } from './dto/cost-breakdown.dto';
 import type { BlankSpecDto } from './dto/blank-spec.dto';
 import type { TrueNestResultDto } from './dto/true-nest.dto';
@@ -938,27 +942,96 @@ export class BOMItemsService {
   // straight off mhr_records — local currency, same convention as every other
   // internal rate here — and that raw number ends up on EVERY MachineCandidate
   // this attaches to a process line (balanced/cheapest/fastest picks, plus the
-  // alternates list). Confirmed live: normalizeCostSummaryToUsd only ever
+  // alternates list). Confirmed live: normalizeCostSummaryToCurrency only ever
   // walked the process line's OWN setupCost/runCost/totalCost/hourlyRate, never
   // this nested machineSelection structure — so for a non-USD location these
   // candidate rates (and the "swap machine" list built from them) stayed in
   // local currency while everything else on the same line got converted,
   // showing e.g. a real ₹2000/hr India CMM as "$2000.00/hr" once the
   // now-USD-labelled response reached the frontend.
-  private usdMachineSelection(ms: MachineSelectionResult | undefined, usd: (v: number) => number): MachineSelectionResult | undefined {
+  private convertMachineSelectionCost(ms: MachineSelectionResult | undefined, conv: (v: number) => number): MachineSelectionResult | undefined {
     if (!ms) return ms;
-    const usdCandidate = (c: MachineCandidate): MachineCandidate => ({ ...c, hourlyRate: usd(c.hourlyRate) });
-    const usdRecommendation = (r: MachineRecommendation): MachineRecommendation => ({ ...r, candidate: usdCandidate(r.candidate) });
+    const convCandidate = (c: MachineCandidate): MachineCandidate => ({ ...c, hourlyRate: conv(c.hourlyRate) });
+    const convRecommendation = (r: MachineRecommendation): MachineRecommendation => ({ ...r, candidate: convCandidate(r.candidate) });
     return {
       ...ms,
-      balanced: usdRecommendation(ms.balanced),
-      cheapest: usdRecommendation(ms.cheapest),
-      fastest: usdRecommendation(ms.fastest),
-      alternatives: ms.alternatives.map(usdCandidate),
+      balanced: convRecommendation(ms.balanced),
+      cheapest: convRecommendation(ms.cheapest),
+      fastest: convRecommendation(ms.fastest),
+      alternatives: ms.alternatives.map(convCandidate),
     };
   }
 
-  private normalizeCostSummaryToUsd(dto: CostSummaryDto, rates: RateSnapshot, localCurrencyCode: string): CostSummaryDto {
+  // The display currency for a costing response: the scenario's saved FX
+  // snapshot (Currency & Ask Price widget) when one is on file AND its
+  // factoryCurrency still matches this request's actual local currency —
+  // using its EXACT stored rate, never re-derived, so reopening a scenario
+  // reproduces the same cost even if today's rate has since changed (see
+  // resolveScenarioFxSnapshot's own doc comment). A stale snapshot from a
+  // Digital Factory that has since changed is deliberately ignored rather
+  // than misapplied to the wrong native currency.
+  //
+  // With no usable snapshot — the pre-existing, undocumented default every
+  // caller already depended on — falls back to USD via the live admin
+  // budget rate, identical to what normalizeCostSummaryToUsd always did.
+  //
+  // usdToDisplayRate is a SEPARATE concept from `rate`/toUsdRate below — it
+  // answers "how many units of the display currency is 1 USD worth?", for
+  // converting fields that are ALWAYS stored in USD regardless of factory
+  // (raw_material_cost_records.unit_cost, packaging/procured/tooling totals,
+  // process_cost_records.machineRate/laborRate — see process-cost.service.ts,
+  // which always writes these in USD via toUsdCreate/toUsdIfProvided). Do not
+  // confuse it with `rate` (local-native-currency → display), which is what
+  // the DTO's own already-computed fields below are converted through — a
+  // frontend bug conflated the two (assumed toUsdRate always meant "→USD"),
+  // which is exactly how a real $1.175/kg got relabeled ₹1.175/kg instead of
+  // converted when the factory's native currency was itself the display
+  // currency (toUsdRate/rate correctly = 1 there, but usdToDisplayRate is not).
+  private resolveDisplayCurrency(
+    scenarioOverrides: Record<string, unknown> | null | undefined,
+    localCurrencyCode: string,
+    rates: RateSnapshot,
+  ): { currency: string; currencySymbol: string; rate: number; usdToDisplayRate: number; inrToDisplayRate?: number } {
+    // inrToDisplayRate uses convertOptional (never convertStrict) — it's an
+    // additive convenience for frontend consumers converting INR-denominated
+    // constants (e.g. the Investment/NRE tab), not something every cost-
+    // summary request depends on. A factory whose local currency is already
+    // USD has always worked with zero exchange_rates dependency (see the
+    // localCurrencyCode === 'USD' branch below, pre-existing); requiring an
+    // INR->USD rate on file just to compute this one optional field would be
+    // a new, unrelated way for the whole request to fail loudly.
+    const snapshot = resolveScenarioFxSnapshot(scenarioOverrides);
+    if (snapshot && snapshot.factoryCurrency === localCurrencyCode) {
+      const currency = snapshot.scenarioCurrency;
+      const inrToCurrency = currency === 'INR' ? 1 : rates.convertOptional('INR', localCurrencyCode);
+      return {
+        currency,
+        currencySymbol: CURRENCY_SYMBOLS[currency] ?? currency,
+        rate: snapshot.rate,
+        usdToDisplayRate: currency === 'USD' ? 1 : rates.convertStrict('USD', localCurrencyCode) * snapshot.rate,
+        inrToDisplayRate: inrToCurrency == null ? undefined : inrToCurrency * snapshot.rate,
+      };
+    }
+    if (localCurrencyCode === 'USD') {
+      return {
+        currency: 'USD', currencySymbol: '$', rate: 1, usdToDisplayRate: 1,
+        inrToDisplayRate: rates.convertOptional('INR', 'USD') ?? undefined,
+      };
+    }
+    return {
+      currency: 'USD', currencySymbol: '$',
+      rate: rates.convertStrict(localCurrencyCode, 'USD'),
+      usdToDisplayRate: 1,
+      inrToDisplayRate: rates.convertOptional('INR', 'USD') ?? undefined,
+    };
+  }
+
+  private normalizeCostSummaryToCurrency(
+    dto: CostSummaryDto,
+    rates: RateSnapshot,
+    localCurrencyCode: string,
+    scenarioOverrides: Record<string, unknown> | null | undefined,
+  ): CostSummaryDto {
     // costStatus/incompleteProcesses — see CostStatus's own doc comment. Computed
     // here (the single point every family's getCostSummary path already funnels
     // through) rather than per-family, so CNC/injection-molding/sheet-metal can
@@ -966,73 +1039,83 @@ export class BOMItemsService {
     // computed before either return branch below.
     const incompleteProcesses = dto.processLines.filter((l) => !!l.physicsGap).map((l) => l.process);
     const costStatus: CostStatus = incompleteProcesses.length > 0 ? 'incomplete' : 'complete';
-    if (localCurrencyCode === 'USD') {
+    const { currency, currencySymbol, rate, usdToDisplayRate, inrToDisplayRate } = this.resolveDisplayCurrency(scenarioOverrides, localCurrencyCode, rates);
+    if (currency === localCurrencyCode) {
       return {
-        ...dto, currency: 'USD', currencySymbol: '$', toUsdRate: 1,
+        ...dto, currency, currencySymbol, toUsdRate: 1, usdToDisplayRate, inrToDisplayRate,
         costStatus, incompleteProcesses: incompleteProcesses.length ? incompleteProcesses : undefined,
       };
     }
-    const usd = (v: number) => rates.toUsd(v, localCurrencyCode);
+    const conv = (v: number) => v * rate;
     return {
       ...dto,
       costStatus,
       incompleteProcesses: incompleteProcesses.length ? incompleteProcesses : undefined,
-      materialCost: usd(dto.materialCost),
-      materialCostPerKg: usd(dto.materialCostPerKg),
+      materialCost: conv(dto.materialCost),
+      materialCostPerKg: conv(dto.materialCostPerKg),
       processLines: dto.processLines.map((l) => ({
         ...l,
-        setupCost: usd(l.setupCost),
-        runCost: usd(l.runCost),
-        totalCost: usd(l.totalCost),
-        hourlyRate: usd(l.hourlyRate),
-        labourRate: l.labourRate != null ? usd(l.labourRate) : l.labourRate,
-        machineSelection: this.usdMachineSelection(l.machineSelection, usd),
+        setupCost: conv(l.setupCost),
+        runCost: conv(l.runCost),
+        totalCost: conv(l.totalCost),
+        hourlyRate: conv(l.hourlyRate),
+        labourRate: l.labourRate != null ? conv(l.labourRate) : l.labourRate,
+        machineSelection: this.convertMachineSelectionCost(l.machineSelection, conv),
       })),
-      totalProcessCost: usd(dto.totalProcessCost),
-      totalCost: usd(dto.totalCost),
-      blankSpec: dto.blankSpec ? { ...dto.blankSpec, wasteCost: usd(dto.blankSpec.wasteCost) } : dto.blankSpec,
-      sustainability: { ...dto.sustainability, wasteCostInr: usd(dto.sustainability.wasteCostInr) },
+      totalProcessCost: conv(dto.totalProcessCost),
+      totalCost: conv(dto.totalCost),
+      blankSpec: dto.blankSpec ? { ...dto.blankSpec, wasteCost: conv(dto.blankSpec.wasteCost) } : dto.blankSpec,
+      sustainability: { ...dto.sustainability, wasteCostInr: conv(dto.sustainability.wasteCostInr) },
       costOverrides: dto.costOverrides
-        ? Object.fromEntries(Object.entries(dto.costOverrides).map(([k, v]) => [k, usd(v)]))
+        ? Object.fromEntries(Object.entries(dto.costOverrides).map(([k, v]) => [k, conv(v)]))
         : dto.costOverrides,
-      currency: 'USD',
-      currencySymbol: '$',
-      toUsdRate: 1,
+      currency,
+      currencySymbol,
+      toUsdRate: rate,
+      usdToDisplayRate,
+      inrToDisplayRate,
     };
   }
 
-  // Same purpose as normalizeCostSummaryToUsd, for getRouteComparison's response
-  // shape — each RouteResultDto's own processLines/materialCost/totalCost, plus
-  // the top-level material fields, computed in local currency internally,
-  // converted once here via the caller's RateSnapshot.
-  private normalizeRouteComparisonToUsd(dto: RouteComparisonDto, rates: RateSnapshot, localCurrencyCode: string): RouteComparisonDto {
-    if (localCurrencyCode === 'USD') {
-      return { ...dto, currency: 'USD', currencySymbol: '$', toUsdRate: 1 };
+  // Same purpose as normalizeCostSummaryToCurrency, for getRouteComparison's
+  // response shape — each RouteResultDto's own processLines/materialCost/
+  // totalCost, plus the top-level material fields, computed in local currency
+  // internally, converted once here via the caller's RateSnapshot.
+  private normalizeRouteComparisonToCurrency(
+    dto: RouteComparisonDto,
+    rates: RateSnapshot,
+    localCurrencyCode: string,
+    scenarioOverrides: Record<string, unknown> | null | undefined,
+  ): RouteComparisonDto {
+    const { currency, currencySymbol, rate, usdToDisplayRate } = this.resolveDisplayCurrency(scenarioOverrides, localCurrencyCode, rates);
+    if (currency === localCurrencyCode) {
+      return { ...dto, currency, currencySymbol, toUsdRate: 1, usdToDisplayRate };
     }
-    const usd = (v: number) => rates.toUsd(v, localCurrencyCode);
+    const conv = (v: number) => v * rate;
     return {
       ...dto,
-      materialCost: usd(dto.materialCost),
-      materialCostPerKg: usd(dto.materialCostPerKg),
+      materialCost: conv(dto.materialCost),
+      materialCostPerKg: conv(dto.materialCostPerKg),
       routes: dto.routes.map((route) => ({
         ...route,
         processLines: route.processLines.map((l) => ({
           ...l,
-          setupCost: usd(l.setupCost),
-          runCost: usd(l.runCost),
-          totalCost: usd(l.totalCost),
-          hourlyRate: usd(l.hourlyRate),
-          labourRate: l.labourRate != null ? usd(l.labourRate) : l.labourRate,
-          machineSelection: this.usdMachineSelection(l.machineSelection, usd),
+          setupCost: conv(l.setupCost),
+          runCost: conv(l.runCost),
+          totalCost: conv(l.totalCost),
+          hourlyRate: conv(l.hourlyRate),
+          labourRate: l.labourRate != null ? conv(l.labourRate) : l.labourRate,
+          machineSelection: this.convertMachineSelectionCost(l.machineSelection, conv),
         })),
-        materialCost: usd(route.materialCost),
-        abrasiveCost: usd(route.abrasiveCost),
-        totalProcessCost: usd(route.totalProcessCost),
-        totalCost: route.totalCost != null ? usd(route.totalCost) : route.totalCost,
+        materialCost: conv(route.materialCost),
+        abrasiveCost: conv(route.abrasiveCost),
+        totalProcessCost: conv(route.totalProcessCost),
+        totalCost: route.totalCost != null ? conv(route.totalCost) : route.totalCost,
       })),
-      currency: 'USD',
-      currencySymbol: '$',
-      toUsdRate: 1,
+      currency,
+      currencySymbol,
+      toUsdRate: rate,
+      usdToDisplayRate,
     };
   }
 
@@ -1641,6 +1724,8 @@ export class BOMItemsService {
     } | undefined,
     family: string | undefined,
     fxRates: RateSnapshot,
+    warnings: string[] = [],
+    thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
   ): Promise<{
     laser: MHRRateInput;
     pressBrake: MHRRateInput;
@@ -1664,7 +1749,7 @@ export class BOMItemsService {
     qaInspectorRate: number | null;   // Quality inspector rate (Quality process group)
   }> {
     // Kick off LHR benchmark lookup immediately so it overlaps with the MHR DB round-trip
-    const lhrRatesPromise = this.resolveLHRRates(accessToken, location, family, fxRates);
+    const lhrRatesPromise = this.resolveLHRRates(accessToken, location, family, fxRates, warnings, thresholds);
 
     // Pass 4 placeholder — populated after the mhr_benchmark_rates query below.
     // benchmarkMap is used by both makeDefault() and applyBenchmarkOverrideIfNeeded().
@@ -2187,12 +2272,13 @@ export class BOMItemsService {
         return {
           rate: realCmm.rate, source: 'mhr_database', machineClass: 'cmm',
           machineName: realCmm.machineName, commodityCode: realCmm.commodityCode,
+          mhrRecordId: realCmm.id,
         };
       }
 
       const { data: benchRows } = await client
         .from('mhr_benchmark_rates')
-        .select('machine_name, mhr_usd, process_group, machine_class')
+        .select('id, machine_name, mhr_usd, process_group, machine_class')
         .eq('location', location);
       const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
       const qualityPgKws = MACHINE_REGISTRY.cmm.processGroupKeywords;
@@ -2200,13 +2286,13 @@ export class BOMItemsService {
         .filter((r: any) =>
           classifyInspectionResource(r.machine_class, r.machine_name) === 'CMM' && Number(r.mhr_usd ?? 0) > 0 &&
           qualityPgKws.some((kw) => (r.process_group ?? '').toLowerCase().includes(kw.toLowerCase())))
-        .map((r: any) => Number(r.mhr_usd))
-        .sort((a, b) => a - b)[0];
+        .sort((a: any, b: any) => Number(a.mhr_usd) - Number(b.mhr_usd))[0];
       if (cmmBench != null) {
         return {
-          rate: cmmBench * rates.convertStrict('USD', localCurrencyCode),
+          rate: Number(cmmBench.mhr_usd) * rates.convertStrict('USD', localCurrencyCode),
           source: 'benchmark_override', machineClass: 'cmm',
           machineName: 'CMM Machine (benchmark)', commodityCode: null,
+          benchmarkMhrId: `bm-mhr-${cmmBench.id}`,
         };
       }
     } catch {
@@ -2264,12 +2350,13 @@ export class BOMItemsService {
         return {
           rate: realBench.rate, source: 'mhr_database', machineClass: 'cmm',
           machineName: realBench.machineName, commodityCode: realBench.commodityCode,
+          mhrRecordId: realBench.id,
         };
       }
 
       const { data: benchRows } = await client
         .from('mhr_benchmark_rates')
-        .select('machine_name, mhr_usd, process_group, machine_class')
+        .select('id, machine_name, mhr_usd, process_group, machine_class')
         .eq('location', location);
       const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
       const qualityPgKws = MACHINE_REGISTRY.cmm.processGroupKeywords;
@@ -2283,6 +2370,7 @@ export class BOMItemsService {
           rate: Number(benchOnly.mhr_usd) * rates.convertStrict('USD', localCurrencyCode),
           source: 'benchmark_override', machineClass: 'cmm',
           machineName: `${benchOnly.machine_name} (benchmark)`, commodityCode: null,
+          benchmarkMhrId: `bm-mhr-${benchOnly.id}`,
         };
       }
     } catch {
@@ -2403,7 +2491,14 @@ export class BOMItemsService {
    * its resolved processGroup is correct per-family with no special case
    * needed here.
    */
-  private async resolveLHRRates(accessToken: string, location: string, family: string | undefined, fxRates: RateSnapshot): Promise<Map<string, number>> {
+  private async resolveLHRRates(
+    accessToken: string,
+    location: string,
+    family: string | undefined,
+    fxRates: RateSnapshot,
+    warnings: string[] = [],
+    thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
+  ): Promise<Map<string, number>> {
     const identities = await this.resolveProcessIdentities(accessToken, undefined, family);
     const classGroups = new Map<string, string>();
     for (const [cls, identity] of Object.entries(identities)) {
@@ -2455,10 +2550,10 @@ export class BOMItemsService {
       // exchange_rates (a static local-currency seed column would).
       const allGroups = [...new Set(classGroups.values())];
       const missingGroups = allGroups.filter((pg) => !pgRate.has(pg));
+      const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
+      const usdToLocal = fxRates.convertStrict('USD', localCurrencyCode);
 
       if (missingGroups.length > 0) {
-        const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
-        const usdToLocal = fxRates.convertStrict('USD', localCurrencyCode);
         const { data: benchRows } = await client
           .from('lhr_benchmark_rates')
           .select('process_group, lhr_usd_effective')
@@ -2510,6 +2605,37 @@ export class BOMItemsService {
           for (const [pg, { sum, count }] of p3LocalSum) {
             if (!pgRate.has(pg) && !p3UsdSum.has(pg)) pgRate.set(pg, sum / count);
           }
+        }
+      }
+
+      // ── Pass 4: plausibility guard — compare whatever won (Pass 1/2/3)
+      // against this SAME location+group's real benchmark, regardless of
+      // which pass actually resolved it. This is the check that would have
+      // caught the ₹12,062/hr live bug: Pass 1 (lhr_records) can silently
+      // win with a stale/corrupted import row, which short-circuits Pass 2
+      // (benchmark) entirely since the group is no longer "missing" — so the
+      // correct benchmark must be fetched here unconditionally, purely as a
+      // comparison reference, never as a value that gets applied.
+      const resolvedGroups = [...pgRate.keys()];
+      if (resolvedGroups.length > 0) {
+        const { data: allBenchRows } = await client
+          .from('lhr_benchmark_rates')
+          .select('process_group, lhr_usd_effective')
+          .eq('location', location)
+          .in('process_group', resolvedGroups);
+
+        const benchmarkByGroup = new Map<string, number>();
+        for (const row of (allBenchRows ?? []) as any[]) {
+          const usdRate = Number((row as any).lhr_usd_effective ?? 0);
+          const pg = ((row as any).process_group as string | null)?.trim();
+          if (usdRate > 0 && pg) benchmarkByGroup.set(pg, usdRate * usdToLocal);
+        }
+
+        for (const pg of resolvedGroups) {
+          const rate = pgRate.get(pg);
+          if (rate == null) continue;
+          const warning = lhrRateWarning(pg, location, rate, benchmarkByGroup.get(pg), thresholds);
+          if (warning && !warnings.includes(warning)) warnings.push(warning);
         }
       }
 
@@ -2806,6 +2932,38 @@ export class BOMItemsService {
     };
   }
 
+  // MHR/LHR plausibility-guard thresholds are business/costing POLICY, not an
+  // algorithmic constant — read once per request from `costing_settings`
+  // (migration 473), the SAME table/convention cost-aggregation.service.ts
+  // and location-comparison.service.ts already use for sga_pct/profit_pct.
+  // Falls back to DEFAULT_RATE_WARN_THRESHOLDS with a disclosed warning only
+  // if the table is empty — identical convention to SGA/profit's own fallback.
+  private async loadRateWarnThresholds(accessToken: string, warnings: string[]): Promise<RateWarnThresholds> {
+    try {
+      const { data } = await this.supabaseService
+        .getClient(accessToken)
+        .from('costing_settings')
+        .select('key, value')
+        .in('key', ['rate_warn_low_fraction', 'rate_warn_high_fraction']);
+
+      const settingsMap = new Map<string, number>();
+      for (const row of data ?? []) settingsMap.set(row.key as string, Number(row.value));
+
+      const lowFraction = settingsMap.get('rate_warn_low_fraction');
+      const highFraction = settingsMap.get('rate_warn_high_fraction');
+      if (lowFraction == null || highFraction == null) {
+        warnings.push(
+          'rate_warn_low_fraction/rate_warn_high_fraction not found in costing_settings — using built-in defaults (50%/300%); deploy migration 473 to make these configurable.',
+        );
+        return DEFAULT_RATE_WARN_THRESHOLDS;
+      }
+      return { lowFraction, highFraction };
+    } catch {
+      warnings.push('costing_settings unavailable — MHR/LHR plausibility thresholds using built-in defaults (50%/300%).');
+      return DEFAULT_RATE_WARN_THRESHOLDS;
+    }
+  }
+
   // Surface implausible DB rates (broken imports — the migration-327 bug class)
   // and benchmark-priced lines on the summary. Never clamps: the MHR DB stays
   // authoritative, but a rate 50%+ off the location benchmark must be visible
@@ -2814,6 +2972,7 @@ export class BOMItemsService {
     result: { processLines: ProcessLineCost[]; warnings: string[] },
     location: string,
     benchmarkMap?: Map<string, number>,
+    thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
   ): void {
     const seen = new Set<string>();
     const benchmarkPriced: string[] = [];
@@ -2828,7 +2987,7 @@ export class BOMItemsService {
       if (seen.has(key)) continue;
       seen.add(key);
       if (line.rateSource === 'mhr_database') {
-        const warning = benchmarkRateWarning(line.machineClass, location, line.hourlyRate, line.machineName, benchmarkMap?.get(line.machineClass));
+        const warning = benchmarkRateWarning(line.machineClass, location, line.hourlyRate, line.machineName, benchmarkMap?.get(line.machineClass), thresholds);
         if (warning && !result.warnings.includes(warning)) result.warnings.push(warning);
       } else if (line.rateSource === 'benchmark_override') {
         // DB rate was anomalously low (< 50% of benchmark) — overridden to location benchmark.
@@ -3162,6 +3321,195 @@ export class BOMItemsService {
     return result;
   }
 
+  /**
+   * Real (true-shape) nest as the material-costing source of truth, when a
+   * real flat-pattern outline exists for this part. Evaluates EVERY viable
+   * standard sheet size (STANDARD_SHEETS, shared with sheet-metal-nesting.
+   * engine.ts's rectangle-grid fallback) via cad-engine's real true-shape
+   * nest, and selects the winner by lowest gross weight/part (laser_cutting_
+   * costing_params.md §6a, via true-nest-costing.engine.ts) -- NEVER
+   * pre-filtered by the rectangle-grid's own ranking, since a smaller sheet
+   * can genuinely interlock an irregular part better than a larger one
+   * packs its bounding rectangle.
+   *
+   * Deterministic by construction: on a cache miss, every candidate is
+   * evaluated and the winner cached SYNCHRONOUSLY, before this method
+   * returns -- there is no "return an interim answer, upgrade it later"
+   * path. Costing is a financial calculation; the same inputs (geometry +
+   * kerf + edge margin) always produce the same result whether this is the
+   * very first request or the hundredth. A real cad-engine call is slow
+   * (10-20s+ per candidate for small-part/large-sheet cases, up to 5
+   * candidates), so this request legitimately blocks for that long on a
+   * cache miss -- costing correctness matters more than this one request's
+   * latency, and the result is cached for every request after it.
+   *
+   * Returns { selection: null, reason } (never a fabricated/estimated
+   * result) when no real outline exists yet, or every candidate sheet
+   * genuinely failed -- the caller falls back to rectangle-grid and
+   * discloses this via nestingMethod/nestingFallbackReason, never silently.
+   */
+  async resolveTrueShapeNestCosting(
+    itemId: string,
+    summary: any,
+    netWeightKg: number,
+    densityKgM3: number,
+    thicknessMm: number,
+    kerfMm: number,
+    edgeMarginMm: number,
+    userId: string,
+    accessToken: string,
+  ): Promise<{ selection: TrueNestCostingSelection; reason?: undefined } | { selection: null; reason: string }> {
+    const outlinePointsMm = summary?.flatPatternOutlinePointsMm;
+    if (!Array.isArray(outlinePointsMm) || outlinePointsMm.length < 3) {
+      return { selection: null, reason: "no real flat-pattern outline available for this part yet -- re-run Reanalyze" };
+    }
+
+    const cache = summary?.trueNestCostingCache;
+    if (isTrueNestCostingCacheValid(cache, kerfMm, edgeMarginMm)) {
+      return {
+        selection: {
+          sheetWidthMm: cache.sheetWidthMm, sheetLengthMm: cache.sheetLengthMm,
+          partsPerSheet: cache.partsPerSheet, sheetWeightKg: cache.sheetWeightKg,
+          grossWeightPerPartKg: cache.grossWeightPerPartKg, utilisationPct: cache.utilizationPct,
+        },
+      };
+    }
+
+    const holesMmRaw: Array<{ cx_mm: number; cy_mm: number; diameter_mm: number }> =
+      Array.isArray(summary.flatPatternHolesMm) ? summary.flatPatternHolesMm : [];
+    const holesMm = holesMmRaw.map((h) => ({ cxMm: h.cx_mm, cyMm: h.cy_mm, diameterMm: h.diameter_mm }));
+
+    // Evaluate EVERY viable candidate sheet -- sequentially (cad-engine's
+    // /nest endpoint is not thread-pool-wrapped, see cad-engine/main.py, so
+    // concurrent calls would serialize on its single event loop anyway) and
+    // synchronously (this request blocks until the full comparison is done
+    // -- see this method's own doc comment for why that's correct here).
+    const candidates: TrueNestCandidate[] = [];
+    const perCandidateReasons: string[] = [];
+    for (const [w, l] of STANDARD_SHEETS) {
+      const { result, reason } = await this.cadAnalysisService.computeTrueNest({
+        outlinePointsMm, holesMm, sheetWidthMm: w, sheetLengthMm: l,
+        quantity: 1, // partsPerSheet/utilization are quantity-independent -- see nesting.py
+        kerfMm, edgeMarginMm,
+      });
+      if (result && result.partsPerSheet > 0) {
+        const sheetWeightKg = (w * l * thicknessMm / 1e9) * densityKgM3;
+        candidates.push({ sheetWidthMm: w, sheetLengthMm: l, partsPerSheet: result.partsPerSheet, sheetWeightKg });
+      } else {
+        perCandidateReasons.push(`${w}x${l}mm: ${reason}`);
+      }
+    }
+
+    const best = selectBestTrueNestCandidate(candidates, netWeightKg);
+    if (!best) {
+      return {
+        selection: null,
+        reason: `true-shape nest failed for every candidate standard sheet -- ${perCandidateReasons.join('; ')}`,
+      };
+    }
+
+    // Persist BEFORE returning -- this is what makes the result
+    // deterministic for every subsequent request, not just an optimization.
+    const fresh = await this.findOne(itemId, userId, accessToken);
+    const freshFg = (fresh.featureGraph as any) ?? {};
+    const freshSummary = freshFg.summary ?? {};
+    await this.update(itemId, {
+      featureGraph: {
+        ...freshFg,
+        summary: {
+          ...freshSummary,
+          trueNestCostingCache: {
+            sheetWidthMm: best.sheetWidthMm, sheetLengthMm: best.sheetLengthMm,
+            kerfMm, edgeMarginMm,
+            partsPerSheet: best.partsPerSheet, utilizationPct: best.utilisationPct,
+            sheetWeightKg: best.sheetWeightKg, grossWeightPerPartKg: best.grossWeightPerPartKg,
+            cachedAt: new Date().toISOString(),
+          },
+        },
+      },
+    }, userId, accessToken);
+    this.logger.log(
+      `[true-nest-costing] selected ${best.sheetWidthMm}x${best.sheetLengthMm}mm: ${best.partsPerSheet} parts/sheet, ` +
+      `${best.utilisationPct}% utilization for item ${itemId} (${candidates.length}/${STANDARD_SHEETS.length} candidates viable)`,
+    );
+    return { selection: best };
+  }
+
+  // The single exact wording surfaced to the user (RawMaterialDialog's
+  // "Gross Usage" calculator panel) whenever true-shape nesting genuinely
+  // can't run -- never a rectangle-grid number or a scrap%-derived guess
+  // dressed up as this calculator's own result. getCostSummary()'s separate,
+  // pre-existing rectangle-grid fallback (nestingMethod:
+  // 'rectangle_grid_fallback') is untouched and remains its own, differently
+  // labeled path -- this calculator represents the true-shape half only.
+  static readonly GROSS_USAGE_GAP_REASON =
+    'Unable to calculate true-shape gross usage — verified flat pattern required';
+
+  /**
+   * "Sheet Metal - Gross Material Usage (Nesting)" calculator's physics_key
+   * implementation -- called from both evaluateCalculatorFields() (the
+   * cost-engine/getCostSummary path, via resolvePhysicsQuantity) and
+   * CalculatorsServiceV2.execute() (the interactive "Calculate" button in
+   * RawMaterialDialog). Both paths share this single implementation so they
+   * can never drift. Inputs are the calculator's own editable field_names
+   * (Thickness, Shear Strength, Net Weight Per Part, Material Density, Edge
+   * Allowance, Batch Quantity) -- the real flat-pattern outline is NOT one
+   * of them (see the calculator's own field-verification notes): it's read
+   * here directly off the bound BOM item's stored CAD summary, since a
+   * polygon outline isn't a value a calculator form can hold as a scalar.
+   */
+  async resolveGrossUsageForCalculator(
+    inputValues: Record<string, any>,
+    ctx: { itemId?: string; userId: string; accessToken: string },
+  ): Promise<Record<string, any>> {
+    const GAP_REASON = BOMItemsService.GROSS_USAGE_GAP_REASON;
+    if (!ctx.itemId) return { _gapReason: GAP_REASON };
+
+    const thicknessMm = Number(inputValues['Thickness'] ?? 0);
+    const shearStrengthMpa = Number(inputValues['Shear Strength'] ?? 0);
+    const netWeightKg = Number(inputValues['Net Weight Per Part'] ?? 0);
+    const densityKgM3 = Number(inputValues['Material Density'] ?? 0);
+    const edgeMarginMm = inputValues['Edge Allowance'] != null ? Number(inputValues['Edge Allowance']) : EDGE_ALLOWANCE_MM;
+    const batchQuantity = inputValues['Batch Quantity'] != null ? Number(inputValues['Batch Quantity']) : undefined;
+    if (thicknessMm <= 0 || netWeightKg <= 0 || densityKgM3 <= 0) {
+      return { _gapReason: GAP_REASON };
+    }
+
+    const item = await this.findOne(ctx.itemId, ctx.userId, ctx.accessToken);
+    const summary = ((item.featureGraph as any)?.summary) ?? {};
+
+    const kerfMm = computePartAllowanceMm(thicknessMm, shearStrengthMpa);
+    const trueShape = await this.resolveTrueShapeNestCosting(
+      ctx.itemId, summary, netWeightKg, densityKgM3, thicknessMm,
+      kerfMm, edgeMarginMm, ctx.userId, ctx.accessToken,
+    );
+    if (!trueShape.selection) {
+      return { _gapReason: GAP_REASON, _internalReason: trueShape.reason };
+    }
+
+    const best = trueShape.selection;
+    const scrapWeightPerPartKg = Math.max(0, best.grossWeightPerPartKg - netWeightKg);
+    const result: Record<string, any> = {
+      'Nest Method': 'True Shape',
+      'Part To Part Allowance': Math.round(kerfMm * 100) / 100,
+      'Selected Sheet Width': best.sheetWidthMm,
+      'Selected Sheet Length': best.sheetLengthMm,
+      'Parts Per Sheet': best.partsPerSheet,
+      'Sheet Weight': Math.round(best.sheetWeightKg * 1000) / 1000,
+      'Gross Weight Per Part': Math.round(best.grossWeightPerPartKg * 1000) / 1000,
+      'Scrap Weight Per Part': Math.round(scrapWeightPerPartKg * 1000) / 1000,
+      'Utilisation': best.utilisationPct,
+    };
+    if (typeof batchQuantity === 'number' && batchQuantity > 0) {
+      const sheetsRequired = Math.ceil(batchQuantity / best.partsPerSheet);
+      result['Sheets Required'] = sheetsRequired;
+      result['Planned Parts'] = best.partsPerSheet * sheetsRequired;
+      result['Excess Positions'] = best.partsPerSheet * sheetsRequired - batchQuantity;
+      result['Actual Batch Gross Material'] = Math.round(sheetsRequired * best.sheetWeightKg * 1000) / 1000;
+    }
+    return result;
+  }
+
   async getCostSummary(
     id: string,
     userId: string,
@@ -3192,9 +3540,11 @@ export class BOMItemsService {
     // explicit Apply action and eliminates ambiguous estimates.
     if (!grade) {
       // All money fields below are 0 (no material grade = no scenario to price
-      // yet) — nothing to convert, so this response is always USD/$ directly,
-      // no FX lookup needed. (The priced path below always normalizes to USD
-      // too — see normalizeCostSummaryToUsd — so this stays consistent with it.)
+      // yet) — nothing to convert, so this response is USD/$ directly, no FX
+      // lookup needed. (Once a grade is set, the priced path below normalizes
+      // to the scenario's chosen currency, or USD by default — see
+      // normalizeCostSummaryToCurrency — but there is nothing to display
+      // differently here since every figure is 0 either way.)
       return {
         scenarioReady: false,
         missingInputs: ['materialGrade'],
@@ -3257,11 +3607,13 @@ export class BOMItemsService {
 
     const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['Other'];
     // One FX snapshot for this whole request — every conversion below (material,
-    // each process line, at the final normalizeCostSummaryToUsd call) uses these
-    // exact rates, never a re-fetched/possibly-different one mid-request.
+    // each process line, at the final normalizeCostSummaryToCurrency call) uses
+    // these exact rates, never a re-fetched/possibly-different one mid-request.
+    // (Only used as the budget-rate fallback when no scenario FX snapshot
+    // applies — see resolveDisplayCurrency.)
     const rates = await this.exchangeRateService.getSnapshot(accessToken);
     // Placeholder — the real, final currency/toUsdRate is set by
-    // normalizeCostSummaryToUsd right before each return below.
+    // normalizeCostSummaryToCurrency right before each return below.
     const currencyMeta = { currency: locInfo.code, currencySymbol: locInfo.symbol, toUsdRate: 1 };
 
     const materialWarnings: string[] = [];
@@ -3302,7 +3654,8 @@ export class BOMItemsService {
         }
       : undefined;
 
-    const mhrRates = await this.resolveMHRRates(accessToken, location, physics, family, rates);
+    const rateWarnThresholds = await this.loadRateWarnThresholds(accessToken, materialWarnings);
+    const mhrRates = await this.resolveMHRRates(accessToken, location, physics, family, rates, materialWarnings, rateWarnThresholds);
 
     // Audit trail — non-blocking; costing must never wait on or fail with it
     if (physics) void this.writeSelectionSnapshots(id, accessToken, mhrRates, location);
@@ -3500,7 +3853,7 @@ export class BOMItemsService {
           if (line.process === 'Tapping') line.machineSelection = tapSelection;
         }
       }
-      this.appendRateWarnings(cncResult, location, mhrRates.benchmarkMap);
+      this.appendRateWarnings(cncResult, location, mhrRates.benchmarkMap, rateWarnThresholds);
       this.applyCostOverrides(cncResult, costOverrides);
       if (costOverrides.size > 0) cncResult.costOverrides = Object.fromEntries(costOverrides);
       if (materialDensityKgM3 > 0 && blankResult.billetVolMm3 > 0) {
@@ -3519,7 +3872,7 @@ export class BOMItemsService {
           wasteCost:      this.r2(blankWasteKg * materialCostPerKg),
         };
       }
-      return this.normalizeCostSummaryToUsd(cncResult, rates, locInfo.code);
+      return this.normalizeCostSummaryToCurrency(cncResult, rates, locInfo.code, item.scenarioOverrides);
     }
 
     if (family === 'injection_molded') {
@@ -3590,10 +3943,10 @@ export class BOMItemsService {
       const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       imResult.warnings.push(...materialWarnings);
       this.attachMachineSelections(imResult.processLines, mhrRates);
-      this.appendRateWarnings(imResult, location, mhrRates.benchmarkMap);
+      this.appendRateWarnings(imResult, location, mhrRates.benchmarkMap, rateWarnThresholds);
       this.applyCostOverrides(imResult, costOverrides);
       if (costOverrides.size > 0) imResult.costOverrides = Object.fromEntries(costOverrides);
-      return this.normalizeCostSummaryToUsd(imResult, rates, locInfo.code);
+      return this.normalizeCostSummaryToCurrency(imResult, rates, locInfo.code, item.scenarioOverrides);
     }
 
     // ── Sheet Metal: pre-resolve lookup tables and run nesting engine ──────────
@@ -4175,10 +4528,37 @@ export class BOMItemsService {
     const nestLMm = nestingDims.lengthMm;
     const nestWMm = nestingDims.widthMm;
     const hasValidDimensions = nestLMm > 0 && nestWMm > 0 && sheetThicknessMm > 0 && materialDensityKgM3 > 0;
-    const smNetWeightKg = hasValidDimensions
-      ? (flatPatternAreaMm2 * sheetThicknessMm / 1e9) * materialDensityKgM3
-      : 0;
-    const smNestingResult = hasValidDimensions && smNetWeightKg > 0
+    // Net weight resolves through the "Sheet Metal - Net Material Usage"
+    // calculator (physics_key='sheet_metal_net_usage') -- the SAME real
+    // formula this line always computed (area × thickness / 1e9 × density),
+    // now the calculator's own authoritative implementation instead of a
+    // second, independent copy of the arithmetic here. If the calculator
+    // mapping genuinely isn't resolvable yet (gap), fall back to computing
+    // the identical formula directly -- never a degraded approximation, and
+    // never a silent $0 that would break every downstream nesting/costing
+    // calculation below.
+    const smNetWeightCalc = hasValidDimensions
+      ? await this.resolvePhysicsQuantity(accessToken, {
+          machineClass: 'sheet_metal_net_usage',
+          process: 'Net Usage',
+          targetFieldNames: ['Net Usage'],
+          seedScope: {
+            'Flat Pattern Area': flatPatternAreaMm2,
+            'Thickness': sheetThicknessMm,
+            'Material Density': materialDensityKgM3,
+          },
+          seedProvenance: {
+            'Flat Pattern Area': 'CAD flat-pattern geometry',
+            'Thickness': 'Effective CAD thickness (override-aware)',
+            'Material Density': 'raw_materials lookup',
+          },
+        })
+      : null;
+    const smNetWeightKg = !hasValidDimensions
+      ? 0
+      : smNetWeightCalc?.outputs['Net Usage'] ??
+        (flatPatternAreaMm2 * sheetThicknessMm / 1e9) * materialDensityKgM3;
+    let smNestingResult = hasValidDimensions && smNetWeightKg > 0
       ? computeNesting({
           flatPatternLengthMm: nestLMm,
           flatPatternWidthMm: nestWMm || Math.sqrt(flatPatternAreaMm2),
@@ -4191,6 +4571,129 @@ export class BOMItemsService {
           quantityRequired: batchSize,
         })
       : undefined;
+
+    // Real (true-shape) nest is the material-costing source of truth --
+    // evaluated across EVERY viable standard sheet (never rectangle-grid-
+    // prefiltered) and selected by lowest gross weight/part, per
+    // resolveTrueShapeNestCosting's own doc comment. Rectangle-grid
+    // (smNestingResult, computed above, unchanged) is kept as-is and used
+    // ONLY as the disclosed fallback when no real outline exists yet or
+    // every true-shape candidate genuinely fails.
+    let smNestingMethod: 'true_shape' | 'rectangle_grid_fallback' = 'rectangle_grid_fallback';
+    let smNestingFallbackReason: string | undefined;
+    let smCalculatorId: string | undefined;
+    let smCalculatorVersion: number | undefined;
+    let smCalculationTrace: CalculationTraceStep[] | undefined;
+    let smCalculatorConfidence: ConfidenceLevel | undefined;
+    if (hasValidDimensions && smNetWeightKg > 0) {
+      const partAllowanceMm = computePartAllowanceMm(sheetThicknessMm, smShearStrengthMpa);
+      const hasQty = typeof batchSize === 'number' && batchSize > 0;
+      // Gross usage resolves through the "Sheet Metal - Gross Material Usage
+      // (Nesting)" calculator (physics_key='sheet_metal_gross_usage_nesting')
+      // -- the SAME resolveTrueShapeNestCosting evaluation this always ran,
+      // now the calculator's own authoritative implementation. If the
+      // calculator mapping itself isn't resolvable yet (calculatorId null --
+      // e.g. its migration hasn't been applied to this DB yet), fall back to
+      // calling the underlying evaluation directly: never a degraded
+      // approximation, never a regression versus today's behavior, just a
+      // temporary loss of the calculator-audit-trail metadata below until
+      // the migration lands. A genuine domain gap from a RESOLVED calculator
+      // (no verified CAD outline, or every candidate sheet failed) keeps
+      // falling through to the pre-existing, separately-labeled
+      // rectangle-grid fallback exactly as it always has.
+      const trueShapeCalc = await this.resolvePhysicsQuantity(accessToken, {
+        machineClass: 'sheet_metal_gross_usage_nesting',
+        process: 'Gross Usage',
+        targetFieldNames: [
+          'Selected Sheet Width', 'Selected Sheet Length', 'Parts Per Sheet', 'Sheet Weight',
+          'Gross Weight Per Part', 'Scrap Weight Per Part', 'Utilisation',
+          ...(hasQty ? ['Sheets Required', 'Planned Parts', 'Excess Positions', 'Actual Batch Gross Material'] : []),
+        ],
+        seedScope: {
+          'Thickness': sheetThicknessMm,
+          'Shear Strength': smShearStrengthMpa,
+          'Net Weight Per Part': smNetWeightKg,
+          'Material Density': materialDensityKgM3,
+          'Edge Allowance': EDGE_ALLOWANCE_MM,
+          ...(hasQty ? { 'Batch Quantity': batchSize } : {}),
+        },
+        seedProvenance: {
+          'Thickness': 'Effective CAD thickness (override-aware)',
+          'Shear Strength': 'raw_materials lookup',
+          'Net Weight Per Part': 'Sheet Metal - Net Material Usage calculator',
+          'Material Density': 'raw_materials lookup',
+          'Edge Allowance': 'Sheet-metal nesting configuration',
+          ...(hasQty ? { 'Batch Quantity': 'Order/batch quantity' } : {}),
+        },
+        itemId: item.id,
+        userId,
+      });
+
+      const trueShape = trueShapeCalc.calculatorId === null
+        // Safety net: calculator mapping not resolvable (e.g. migration not
+        // yet applied to this DB) -- call the same underlying evaluation the
+        // calculator itself wraps, exactly as before this reroute existed.
+        ? await this.resolveTrueShapeNestCosting(
+            item.id, summary, smNetWeightKg, materialDensityKgM3, sheetThicknessMm,
+            partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken,
+          )
+        : trueShapeCalc.gap
+          ? { selection: null as null, reason: trueShapeCalc.gap.gapType === 'unsupported_operation' ? trueShapeCalc.gap.reason : `${trueShapeCalc.gap.gapType} — see calculator ${trueShapeCalc.calculatorId}` }
+          : {
+              selection: {
+                sheetWidthMm: trueShapeCalc.outputs['Selected Sheet Width']!,
+                sheetLengthMm: trueShapeCalc.outputs['Selected Sheet Length']!,
+                partsPerSheet: trueShapeCalc.outputs['Parts Per Sheet']!,
+                sheetWeightKg: trueShapeCalc.outputs['Sheet Weight']!,
+                grossWeightPerPartKg: trueShapeCalc.outputs['Gross Weight Per Part']!,
+                utilisationPct: trueShapeCalc.outputs['Utilisation']!,
+              },
+            };
+
+      if (trueShapeCalc.calculatorId !== null && !trueShapeCalc.gap) {
+        smCalculatorId = trueShapeCalc.calculatorId ?? undefined;
+        smCalculatorVersion = trueShapeCalc.calculatorVersion ?? undefined;
+        smCalculationTrace = trueShapeCalc.trace;
+        smCalculatorConfidence = trueShapeCalc.confidence;
+      }
+
+      if (trueShape.selection) {
+        const best = trueShape.selection;
+        smNestingMethod = 'true_shape';
+        const trueScrapWeightPerPartKg = Math.max(0, best.grossWeightPerPartKg - smNetWeightKg);
+        const trueGrossMaterialCost = best.grossWeightPerPartKg * materialCostPerKg;
+        const trueScrapRecoveryCost = trueScrapWeightPerPartKg * (smScrapPricePerKg ?? 0) * 0.90;
+        const trueNetMaterialCost = Math.max(0, trueGrossMaterialCost - trueScrapRecoveryCost);
+        const trueSheetsRequired = hasQty ? Math.ceil(batchSize / best.partsPerSheet) : undefined;
+        materialWarnings.push(
+          `Material cost computed from the real flat-pattern silhouette nest (cad-engine), evaluated across ` +
+          `all viable standard sheet sizes -- selected ${best.sheetWidthMm}x${best.sheetLengthMm}mm at ` +
+          `${best.partsPerSheet} parts/sheet, ${best.utilisationPct}% utilization (net/gross weight).`,
+        );
+        smNestingResult = smNestingResult ? {
+          ...smNestingResult,
+          sheetWidthMm: best.sheetWidthMm,
+          sheetLengthMm: best.sheetLengthMm,
+          partsPerSheet: best.partsPerSheet,
+          sheetWeightKg: Math.round(best.sheetWeightKg * 1000) / 1000,
+          utilisationPct: best.utilisationPct,
+          grossWeightPerPartKg: Math.round(best.grossWeightPerPartKg * 1000) / 1000,
+          scrapWeightPerPartKg: Math.round(trueScrapWeightPerPartKg * 1000) / 1000,
+          grossMaterialCost: Math.round(trueGrossMaterialCost * 100) / 100,
+          scrapRecoveryCost: Math.round(trueScrapRecoveryCost * 100) / 100,
+          netMaterialCost: Math.round(trueNetMaterialCost * 100) / 100,
+          sheetsRequired: trueSheetsRequired,
+          plannedParts: trueSheetsRequired != null ? best.partsPerSheet * trueSheetsRequired : undefined,
+          excessPositions: trueSheetsRequired != null ? best.partsPerSheet * trueSheetsRequired - batchSize : undefined,
+          actualBatchGrossMaterialKg: trueSheetsRequired != null
+            ? Math.round(trueSheetsRequired * best.sheetWeightKg * 1000) / 1000
+            : undefined,
+        } : undefined;
+      } else {
+        smNestingFallbackReason = trueShape.reason;
+        materialWarnings.push(`Material cost computed from rectangle-grid nesting (fallback) -- ${trueShape.reason}.`);
+      }
+    }
 
     const smTreatment = this.resolveSurfaceTreatment(item);
     const smSurfaceTreatmentDbRate = await this.resolveSurfaceTreatmentDbRate(
@@ -4518,7 +5021,7 @@ export class BOMItemsService {
       }
     }
     await this.attachSavedMachineExplanations(smResult.processLines, id, accessToken, location);
-    this.appendRateWarnings(smResult, location, mhrRates.benchmarkMap);
+    this.appendRateWarnings(smResult, location, mhrRates.benchmarkMap, rateWarnThresholds);
     this.applyCostOverrides(smResult, costOverrides);
     if (costOverrides.size > 0) smResult.costOverrides = Object.fromEntries(costOverrides);
     if (flatPatternAreaMm2 > 0 && sheetThicknessMm > 0 && materialDensityKgM3 > 0) {
@@ -4537,12 +5040,26 @@ export class BOMItemsService {
           sheetWidthMm:   smNestingResult.sheetWidthMm,
           sheetLengthMm:  smNestingResult.sheetLengthMm,
           partsPerSheet:  smNestingResult.partsPerSheet,
+          // The FULL physical stock-sheet weight -- see BlankSpecDto's own
+          // doc comment for why this is exposed separately from
+          // grossWeightKg (which is already per-part).
+          sheetWeightKg:  smNestingResult.sheetWeightKg,
           // Actual batch sheet consumption -- distinct from grossWeightKg,
           // never used to derive it. See NestingResult's own doc comment.
           sheetsRequired:             smNestingResult.sheetsRequired,
           plannedParts:               smNestingResult.plannedParts,
           excessPositions:            smNestingResult.excessPositions,
           actualBatchGrossMaterialKg: smNestingResult.actualBatchGrossMaterialKg,
+          nestingMethod: smNestingMethod,
+          ...(smNestingFallbackReason && { nestingFallbackReason: smNestingFallbackReason }),
+          // Present only once the "Sheet Metal - Gross Material Usage
+          // (Nesting)" calculator's mapping is resolvable on this DB (see
+          // resolvePhysicsQuantity's calculatorId===null safety net above) --
+          // absent, never fabricated, until that migration is applied.
+          ...(smCalculatorId && { calculatorId: smCalculatorId }),
+          ...(smCalculatorVersion != null && { calculatorVersion: smCalculatorVersion }),
+          ...(smCalculationTrace && { calculationTrace: smCalculationTrace }),
+          ...(smCalculatorConfidence && { confidence: smCalculatorConfidence }),
         };
       } else {
         const effL = blankLMm > 0 ? blankLMm : Math.sqrt(flatPatternAreaMm2);
@@ -4560,7 +5077,7 @@ export class BOMItemsService {
         };
       }
     }
-    return this.normalizeCostSummaryToUsd(smResult, rates, locInfo.code);
+    return this.normalizeCostSummaryToCurrency(smResult, rates, locInfo.code, item.scenarioOverrides);
   }
 
   /**
@@ -4758,7 +5275,30 @@ export class BOMItemsService {
     const thk = sheetThicknessMm > 0 ? sheetThicknessMm : 2.0;
     const volumeMm3 = flatPatternAreaMm2 * thk;
     const netWeightKg = (volumeMm3 / 1e9) * materialDensityKgM3;
-    const grossWeightKg = netWeightKg * (1 + MATERIAL_OVERHEAD_PCT / 100);
+    // Sheet metal: use the SAME true-shape nesting result getCostSummary uses
+    // as its material-costing source of truth (resolveTrueShapeNestCosting —
+    // sheet weight ÷ parts-per-sheet, no extra markup) rather than this
+    // endpoint's own independent flat markup, so Route Comparison and Cost
+    // Summary can never silently disagree on gross usage/utilization for the
+    // identical part. resolveTrueShapeNestCosting caches its result on the
+    // item (trueNestCostingCache), so when getCostSummary has already run
+    // for this item/thickness/allowance this is a cache hit, not a second
+    // expensive nest evaluation. Falls back to the flat MATERIAL_OVERHEAD_PCT
+    // markup only when no real flat-pattern outline exists yet or every
+    // candidate sheet genuinely fails — same last-resort role this constant
+    // already plays in cost-engine.ts — never a substitute for a resolvable
+    // true-shape result.
+    let grossWeightKg = netWeightKg * (1 + MATERIAL_OVERHEAD_PCT / 100);
+    if (family === 'sheet_metal' && netWeightKg > 0) {
+      const partAllowanceMm = computePartAllowanceMm(sheetThicknessMm, rcShearStrengthMpa);
+      const trueShape = await this.resolveTrueShapeNestCosting(
+        item.id, summary, netWeightKg, materialDensityKgM3, sheetThicknessMm,
+        partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken,
+      );
+      if (trueShape.selection) {
+        grossWeightKg = trueShape.selection.grossWeightPerPartKg;
+      }
+    }
     const materialCost = this.r2(grossWeightKg * materialCostPerKg);
 
     // ── MHR rates ──────────────────────────────────────────────────────────────
@@ -4785,7 +5325,8 @@ export class BOMItemsService {
         }
       : undefined;
 
-    const mhrRates = await this.resolveMHRRates(accessToken, location, physics, family, rates);
+    const rateWarnThresholds = await this.loadRateWarnThresholds(accessToken, comparisonWarnings);
+    const mhrRates = await this.resolveMHRRates(accessToken, location, physics, family, rates, comparisonWarnings, rateWarnThresholds);
 
     // Derive laser power from machine selection (same pattern as getCostSummary
     // — real mhr_records.power_kw only, no hardcoded class-wide assumption, no
@@ -4907,8 +5448,9 @@ export class BOMItemsService {
         { processLines: dto.routes.flatMap((r) => r.processLines), warnings: dto.comparisonWarnings },
         location,
         mhrRates.benchmarkMap,
+        rateWarnThresholds,
       );
-      return this.normalizeRouteComparisonToUsd(dto, rates, locInfo.code);
+      return this.normalizeRouteComparisonToCurrency(dto, rates, locInfo.code, item.scenarioOverrides);
     };
 
     // Resolve surface treatment and waterjet abrasive from DB — used by CNC and SM route paths.
@@ -6634,7 +7176,12 @@ export class BOMItemsService {
     // seedScope — real audit-trail text, the same "Why:" reasoning already
     // shown in the interactive calculator dialog, not fabricated for display.
     seedProvenance: Record<string, string> = {},
-  ): Promise<{ values: Record<string, number | undefined>; trace: CalculationTraceStep[] }> {
+    // Only consumed by the sheet-metal net/gross-usage physics_keys below
+    // (they need the bound BOM item's stored CAD outline/cache, which isn't
+    // a value a calculator form can hold as a scalar input) -- every other
+    // physics_key/formula calculator ignores this.
+    ctx?: { itemId?: string; userId?: string },
+  ): Promise<{ values: Record<string, number | undefined>; trace: CalculationTraceStep[]; gapReasonOverride?: string }> {
     const emptyValues = Object.fromEntries(targetFieldNames.map((n) => [n, undefined])) as Record<string, number | undefined>;
     try {
       const [{ data: calcFields, error }, { data: calcRow }] = await Promise.all([
@@ -6665,19 +7212,44 @@ export class BOMItemsService {
       // function would silently regress accuracy relative to cost-engine.ts's
       // own pre-migration numbers, not just duplicate them.
       const physicsKey = (calcRow as any)?.physics_key as string | null | undefined;
-      const physicsFn = physicsKey ? PHYSICS_REGISTRY[physicsKey] : undefined;
-
+      // Sheet-metal net/gross material usage: dispatched here, BEFORE the
+      // generic PHYSICS_REGISTRY lookup, because their implementation needs
+      // async DB access (the bound BOM item's stored CAD outline/cache) --
+      // PHYSICS_REGISTRY's contract (tapping/deburring) is plain sync math
+      // with no I/O, so these two can't live there. Both calculators'
+      // physics_key values route through this same branch as
+      // CalculatorsServiceV2.execute() (the interactive dialog), so the two
+      // paths can never drift from each other.
+      let gapReasonOverride: string | undefined;
       let scope: Record<string, any>;
-      if (physicsFn) {
-        const { _warnings, ...rawResults } = physicsFn(seedScope) as Record<string, any>;
-        scope = rawResults;
+      // true for every path that returns a flat object keyed by the exact
+      // calculator_fields.field_name strings (all three physics paths);
+      // false only for the string-formula evaluator, whose scope is keyed
+      // by normalizeFieldName() instead.
+      let usesExactFieldNames = true;
+      if (physicsKey === 'sheet_metal_net_usage') {
+        scope = resolveNetUsagePhysics(seedScope);
+      } else if (physicsKey === 'sheet_metal_gross_usage_nesting') {
+        const raw = await this.resolveGrossUsageForCalculator(seedScope, {
+          itemId: ctx?.itemId, userId: ctx?.userId ?? '', accessToken,
+        });
+        const { _gapReason, _internalReason, ...rest } = raw;
+        gapReasonOverride = _gapReason as string | undefined;
+        scope = rest;
       } else {
-        scope = evaluateCalculatorFormulas(calcFields as CalculatorFieldRow[], [], seedScope).scope;
+        const physicsFn = physicsKey ? PHYSICS_REGISTRY[physicsKey] : undefined;
+        if (physicsFn) {
+          const { _warnings, ...rawResults } = physicsFn(seedScope) as Record<string, any>;
+          scope = rawResults;
+        } else {
+          usesExactFieldNames = false;
+          scope = evaluateCalculatorFormulas(calcFields as CalculatorFieldRow[], [], seedScope).scope;
+        }
       }
 
       const values: Record<string, number | undefined> = { ...emptyValues };
       for (const name of targetFieldNames) {
-        const val = physicsFn ? scope[name] : scope[normalizeFieldName(name)];
+        const val = usesExactFieldNames ? scope[name] : scope[normalizeFieldName(name)];
         values[name] = typeof val === 'number' && Number.isFinite(val) ? val : undefined;
       }
 
@@ -6687,7 +7259,7 @@ export class BOMItemsService {
       // above).
       const trace: CalculationTraceStep[] = [];
       for (const f of calcFields as any[]) {
-        const val = physicsFn ? scope[f.field_name] : scope[normalizeFieldName(f.field_name)];
+        const val = usesExactFieldNames ? scope[f.field_name] : scope[normalizeFieldName(f.field_name)];
         if (f.field_type !== 'calculated') {
           const hasSeed = seedScope[f.field_name] !== undefined;
           const hasDefault = f.default_value !== undefined && f.default_value !== null && f.default_value !== '';
@@ -6696,7 +7268,7 @@ export class BOMItemsService {
             fieldName: f.field_name,
             displayLabel: f.display_label ?? f.field_name,
             kind: 'input',
-            value: hasSeed ? (seedScope[f.field_name] as any) : (typeof val === 'number' ? val : (val ?? f.default_value)),
+            value: hasSeed ? (seedScope[f.field_name] as any) : (typeof val === 'number' || typeof val === 'string' ? val : (val ?? f.default_value)),
             unit: f.unit ?? null,
             source: seedProvenance[f.field_name] ?? (hasSeed ? 'Provided value' : "Calculator's own default value"),
           });
@@ -6706,14 +7278,14 @@ export class BOMItemsService {
             fieldName: f.field_name,
             displayLabel: f.display_label ?? f.field_name,
             kind: 'calculated',
-            value: typeof val === 'number' ? val : null,
+            value: typeof val === 'number' || typeof val === 'string' ? val : null,
             unit: f.unit ?? null,
             formula: f.default_value ?? undefined,
           });
         }
       }
 
-      return { values, trace };
+      return { values, trace, ...(gapReasonOverride ? { gapReasonOverride } : {}) };
     } catch {
       return { values: emptyValues, trace: [] };
     }
@@ -6868,6 +7440,11 @@ export class BOMItemsService {
       // Omitted for machine classes with only one calculator-bearing
       // operation (fiber_laser, press_brake, tapping, deburring today).
       operation?: string;
+      // Only consumed by the sheet-metal net/gross-usage machine classes
+      // (their physics_key implementation needs the bound BOM item's stored
+      // CAD outline/cache) -- every other machine class ignores it.
+      itemId?: string;
+      userId?: string;
     },
   ): Promise<ManufacturingPhysicsResult> {
     const emptyOutputs = Object.fromEntries(params.targetFieldNames.map((n) => [n, undefined])) as Record<string, number | undefined>;
@@ -6946,8 +7523,9 @@ export class BOMItemsService {
       .single();
     const calculatorVersion = (calcRow as any)?.version ?? 1;
 
-    const { values, trace: rawTrace } = await this.evaluateCalculatorFields(
+    const { values, trace: rawTrace, gapReasonOverride } = await this.evaluateCalculatorFields(
       accessToken, calculatorId, params.seedScope, params.targetFieldNames, params.seedProvenance,
+      { itemId: params.itemId, userId: params.userId },
     );
 
     // Tag each step physics/lookup (rule 3): a 'calculated' step is a
@@ -7062,7 +7640,13 @@ export class BOMItemsService {
         gapType: 'unsupported_operation',
         process: params.process,
         machineClass: params.machineClass,
-        reason: `Calculator '${calculatorId}' (v${calculatorVersion}) did not resolve ${unresolved.join(', ')} from the given inputs — check the calculator's formula/fields, not a missing lookup row.`,
+        // gapReasonOverride: the sheet-metal net/gross-usage physics_keys
+        // supply their own exact, user-facing reason (e.g. "Unable to
+        // calculate true-shape gross usage — verified flat pattern
+        // required") instead of this generic template -- every other
+        // machine class is unaffected (evaluateCalculatorFields only sets
+        // this for those two physics_keys).
+        reason: gapReasonOverride ?? `Calculator '${calculatorId}' (v${calculatorVersion}) did not resolve ${unresolved.join(', ')} from the given inputs — check the calculator's formula/fields, not a missing lookup row.`,
       };
     }
     void this.recordLookupCoverageGap(gap);

@@ -30,6 +30,11 @@ export interface RawMaterialCostInput {
   quarter?: string;
   notes?: string;
   isActive?: boolean;
+  // Explicit, auditable Calculated-vs-Override distinction for Gross Usage
+  // (Net Usage override support can follow the same shape later) -- see
+  // RawMaterialDialog's "Edit — override manually" flow.
+  grossUsageIsOverridden?: boolean;
+  grossUsageOverrideReason?: string;
 }
 
 export interface CreateRawMaterialCostDto extends RawMaterialCostInput {
@@ -74,6 +79,8 @@ export interface RawMaterialCostRecord {
   quarter?: string;
   notes?: string;
   isActive: boolean;
+  grossUsageIsOverridden?: boolean;
+  grossUsageOverrideReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -115,6 +122,18 @@ export function useRawMaterialCosts(options: UseRawMaterialCostsOptions = {}) {
       return data;
     },
     enabled: enabled && !!bomItemId,
+    // Same fix as useMHRRecords/useMHRBenchmark/useLHR/useLHRBenchmark for the
+    // exact same bug: the global QueryClient default (refetchOnMount: false,
+    // staleTime: 5min — lib/providers/query-provider.tsx) means once this
+    // exact (bomItemId, isActive, page, limit) key is fetched, it stays
+    // cached for the rest of the browser tab's life regardless of what
+    // changes server-side. Confirmed live: a material's overhead_cost/
+    // total_cost were 0.0000 under the old INR-precision engine bug, got
+    // fixed and recomputed server-side (a fresh unit_cost + overhead save),
+    // but this panel kept showing the old ₹0.00 total because the list
+    // query itself was never re-verified — only the record's own edit
+    // dialog (a different query key) had fresh data.
+    refetchOnMount: 'always',
   });
 }
 
@@ -130,6 +149,8 @@ export function useRawMaterialCost(id?: string) {
       return data;
     },
     enabled: !!id,
+    // Same staleness class as useRawMaterialCosts above.
+    refetchOnMount: 'always',
   });
 }
 

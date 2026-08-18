@@ -54,18 +54,27 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1, bla
   const overhead = Number(m.overhead    || 0);
   const reclaim  = Number(m.reclaimRate || 0);
 
-  // Prefer server-computed values; derive locally only for legacy records that
-  // pre-date the reclaimRate / 8-step engine (they will have totalCost = 0).
-  const grossMatCost  = Number(m.grossMaterialCost) || gross * unitCost;
+  // Prefer server-computed values, or derive locally for legacy records that
+  // pre-date the reclaimRate / 8-step engine (they have totalCost = 0) --
+  // but as ONE atomic choice per record, never mixed field-by-field. The
+  // engine intentionally computes scrapAdjustment = 0 for every record now
+  // (scrap is already captured in gross-vs-net usage; applying scrap% again
+  // as a cost multiplier would double-count the yield loss). A per-field
+  // `Number(m.scrapAdjustment) || localFallback` treated that legitimate
+  // zero as "missing" and silently resurrected the double-counted amount,
+  // which is why the 8-step breakdown summed to more than the displayed
+  // total cost per part.
+  const hasServerCalc = Number(m.totalCost) > 0;
   const scrapAmt      = gross - net;
-  const reclaimValue  = Number(m.reclaimValue)  || scrapAmt * reclaim;
-  const netMatCost    = Number(m.netMaterialCost) || grossMatCost - reclaimValue;
-  const scrapAdj      = Number(m.scrapAdjustment) || netMatCost * (scrap / 100);
+  const grossMatCost  = hasServerCalc ? Number(m.grossMaterialCost) : gross * unitCost;
+  const reclaimValue  = hasServerCalc ? Number(m.reclaimValue)      : scrapAmt * reclaim;
+  const netMatCost    = hasServerCalc ? Number(m.netMaterialCost)   : grossMatCost - reclaimValue;
+  const scrapAdj      = hasServerCalc ? Number(m.scrapAdjustment)   : netMatCost * (scrap / 100);
   const subtotal      = netMatCost + scrapAdj;
-  const overheadCost  = Number(m.overheadCost)  || subtotal * (overhead / 100);
-  const total         = Number(m.totalCost)      || subtotal + overheadCost;
-  const utilRate      = Number(m.materialUtilizationRate) || (gross > 0 ? (net / gross) * 100 : 0);
-  const effPerUnit    = Number(m.effectiveCostPerUnit) || (net > 0 ? total / net : 0);
+  const overheadCost  = hasServerCalc ? Number(m.overheadCost)      : subtotal * (overhead / 100);
+  const total         = hasServerCalc ? Number(m.totalCost)         : subtotal + overheadCost;
+  const utilRate      = hasServerCalc ? Number(m.materialUtilizationRate) : (gross > 0 ? (net / gross) * 100 : 0);
+  const effPerUnit    = hasServerCalc ? Number(m.effectiveCostPerUnit)    : (net > 0 ? total / net : 0);
   // Convert USD → factory currency for display only
   const c = (v: number) => v * conversionRate;
 
@@ -90,7 +99,18 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1, bla
     && typeof blankSpec.sheetsRequired === 'number'
     && typeof blankSpec.plannedParts === 'number'
     && typeof blankSpec.excessPositions === 'number'
-    ? { sheetsRequired: blankSpec.sheetsRequired, plannedParts: blankSpec.plannedParts, excessPositions: blankSpec.excessPositions }
+    ? {
+        sheetsRequired: blankSpec.sheetsRequired,
+        plannedParts: blankSpec.plannedParts,
+        excessPositions: blankSpec.excessPositions,
+        // Physical sheet weight actually consumed for this batch -- distinct
+        // from grossWeightKg above, which is the theoretical per-part nesting
+        // allocation (sheetWeightKg / partsPerSheet). Only defined when the
+        // engine had a batch quantity to plan sheets against.
+        actualBatchGrossMaterialKg: typeof blankSpec.actualBatchGrossMaterialKg === 'number'
+          ? blankSpec.actualBatchGrossMaterialKg
+          : undefined,
+      }
     : undefined;
 
   return (
@@ -102,7 +122,7 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1, bla
         {m.materialDescription && (
           <BRow label="Grade / Spec"                   value={m.materialDescription} />
         )}
-        <BRow label="Unit Cost ($/kg)"                 value={`${currencySymbol}${c(unitCost).toFixed(3)}`}   icon="db" />
+        <BRow label={`Unit Cost (${currencySymbol}/kg)`} value={`${currencySymbol}${c(unitCost).toFixed(3)}`}   icon="db" />
         <BRow label="Net Usage (kg)"                   value={`${net.toFixed(4)} kg`} />
         <BRow
           label="Gross Usage (kg)"
@@ -116,12 +136,19 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1, bla
             sub={`${batchSub.plannedParts} planned / ${batchSub.excessPositions} excess`}
           />
         )}
+        {batchSub && typeof batchSub.actualBatchGrossMaterialKg === 'number' && (
+          <BRow
+            label="Actual batch material"
+            value={`${batchSub.actualBatchGrossMaterialKg.toFixed(2)} kg`}
+            sub={`${batchSub.sheetsRequired} sheet${batchSub.sheetsRequired === 1 ? '' : 's'} physically consumed (vs. ${gross.toFixed(4)} kg/part theoretical allocation)`}
+          />
+        )}
         <BRow label="Scrap %"                          value={`${scrap}`} />
-        {reclaim > 0 && <BRow label="Reclaim Rate ($/kg)" value={`${currencySymbol}${c(reclaim).toFixed(3)}`} icon="db" />}
+        {reclaim > 0 && <BRow label={`Reclaim Rate (${currencySymbol}/kg)`} value={`${currencySymbol}${c(reclaim).toFixed(3)}`} icon="db" />}
         <BRow label="Overhead %"                       value={`${overhead}`} />
         <Divider />
         <BRow label="Material Utilization"             value={`${utilRate.toFixed(1)}%`} />
-        <BRow label="Effective $/kg (net)"             value={`${currencySymbol}${c(effPerUnit).toFixed(3)}`} />
+        <BRow label={`Effective ${currencySymbol}/kg (net)`} value={`${currencySymbol}${c(effPerUnit).toFixed(3)}`} />
       </div>
 
       {/* 8-step formula breakdown */}
@@ -147,7 +174,7 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1, bla
           {...(reclaimValue > 0 ? { sub: `= ${currencySymbol}${c(grossMatCost).toFixed(4)} − ${currencySymbol}${c(reclaimValue).toFixed(4)}` } : {})}
           icon="formula"
         />
-        {scrap > 0 && (
+        {scrapAdj > 0 && (
           <BRow
             label={`+ Scrap adjustment (${scrap}%)`}
             value={`+${currencySymbol}${c(scrapAdj).toFixed(4)}`}
@@ -220,6 +247,8 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
       overhead:            data.overhead,
       reclaimRate:         data.reclaimRate ?? 0,
       notes:               data.notes,
+      grossUsageIsOverridden: data.grossUsageIsOverridden ?? false,
+      ...(data.grossUsageOverrideReason && { grossUsageOverrideReason: data.grossUsageOverrideReason }),
     };
     try {
       if (editMaterial?.id) {
@@ -251,12 +280,25 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
     return n > 0 && n < 0.01 ? n.toFixed(4) : n.toFixed(2);
   };
 
+  // Same small-value-aware precision as fmtUsage, for currency amounts —
+  // these materials are USD-denominated per kg (raw-material-cost.service.ts
+  // always resolves unitCost to USD before persisting), so a cheap material
+  // in a low-value-currency location (e.g. $0.0011/part) rounds to exactly
+  // "0.00" at a flat 2 decimal places even though the real value is non-zero.
+  const fmtCurrency = (v: number): string =>
+    v > 0 && v < 0.01 ? v.toFixed(4) : v.toFixed(2);
+
   // Use the server-computed 8-step total — falls back to simplified estimate for
   // legacy records that pre-date the reclaim/scrap-adjustment engine.
   const computeMatCost = (m: any): number => Number(m.totalCost) || 0;
 
+  // Returns a NUMBER, not a pre-rounded string — rounding here (as this used
+  // to, via .toFixed(2)) collapsed any sub-cent USD total to "0.00" BEFORE
+  // the currency conversion below even ran, making the displayed Total
+  // permanently $0.00/₹0.00 for cheap materials regardless of scenario
+  // currency. Precision is applied once, at final display, via fmtCurrency.
   const calculateTotal = () =>
-    materials.reduce((sum, m) => sum + computeMatCost(m), 0).toFixed(2);
+    materials.reduce((sum, m) => sum + computeMatCost(m), 0);
 
   if (!bomItemId) {
     if (compact) return (
@@ -330,7 +372,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
           ))}
           <div className="flex justify-between items-center px-3 py-1.5 bg-muted/20">
             <span className="text-[11px] font-semibold text-muted-foreground">Total</span>
-            <span className="text-xs font-bold tabular-nums">{currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}</span>
+            <span className="text-xs font-bold tabular-nums">{currencySymbol}{fmtCurrency(calculateTotal() * conversionRate)}</span>
           </div>
         </div>
       )}
@@ -373,12 +415,12 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
                     <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-16">Scrap%</th>
                     <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-16">OH%</th>
                   </>}
-                  <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-24">Total ($)</th>
+                  <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-24">Total ({currencySymbol})</th>
                   {compact ? null : <>
                     <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-16">
                       <span className="flex items-center justify-end gap-0.5"><TrendingUp className="h-3 w-3" />Util%</span>
                     </th>
-                    <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-20">$/kg net</th>
+                    <th className="px-2 py-2 text-right text-[11px] font-semibold border-r border-primary-foreground/20 w-20">{currencySymbol}/kg net</th>
                   </>}
                   <th className="px-2 py-2 text-center text-[11px] font-semibold w-16">Act.</th>
                 </tr>
@@ -459,7 +501,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
 
                     <tr className="bg-secondary/30 font-semibold">
                       <td colSpan={compact ? 2 : 8} className="px-2 py-2 text-right border-r border-border text-xs">Total:</td>
-                      <td colSpan={compact ? 1 : 2} className="px-2 py-2 border-r border-border text-xs text-right tabular-nums">{currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}</td>
+                      <td colSpan={compact ? 1 : 2} className="px-2 py-2 border-r border-border text-xs text-right tabular-nums">{currencySymbol}{fmtCurrency(calculateTotal() * conversionRate)}</td>
                       <td className="px-2 py-2" />
                     </tr>
                   </>

@@ -350,8 +350,14 @@ export function ManufacturingProcessSection({
     return subtotal * (1 + scrap / 100);
   };
 
+  // Returns a NUMBER, not a pre-rounded string — see RawMaterialsSection's
+  // fmtCurrency comment: rounding here before currency conversion collapses
+  // any sub-cent total to "0.00" regardless of the real value.
   const calculateTotal = () =>
-    sortedProcesses.reduce((sum, p) => sum + computeProcCost(p), 0).toFixed(2);
+    sortedProcesses.reduce((sum, p) => sum + computeProcCost(p), 0);
+
+  const fmtCurrency = (v: number): string =>
+    v > 0 && v < 0.01 ? v.toFixed(4) : v.toFixed(2);
 
   if (compact) {
     return (
@@ -424,7 +430,7 @@ export function ManufacturingProcessSection({
               })}
               <div className="flex justify-between items-center px-3 py-1.5 bg-muted/20">
                 <span className="text-[11px] font-semibold text-muted-foreground">Total</span>
-                <span className="text-xs font-bold tabular-nums">{currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}</span>
+                <span className="text-xs font-bold tabular-nums">{currencySymbol}{fmtCurrency(Number(calculateTotal()) * conversionRate)}</span>
               </div>
             </>
           )}
@@ -659,7 +665,7 @@ export function ManufacturingProcessSection({
                         Total Process Cost:
                       </td>
                       <td className="p-3 border-r border-border text-xs text-right">
-                        {currencySymbol}{(Number(calculateTotal()) * conversionRate).toFixed(2)}
+                        {currencySymbol}{fmtCurrency(Number(calculateTotal()) * conversionRate)}
                       </td>
                       <td className="p-3 border-r border-border"></td>
                       <td className="p-3"></td>

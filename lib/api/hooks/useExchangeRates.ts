@@ -13,23 +13,20 @@ export function useExchangeRates() {
         .eq('is_active', true)
         .eq('to_currency', 'INR');
 
-      const rates: ExchangeRateMap = { INR: 1 };
-
-      if (!error) {
-        for (const row of data ?? []) {
-          if (row.from_currency && Number(row.rate) > 0) {
-            rates[row.from_currency.toUpperCase()] = Number(row.rate);
-          }
-        }
+      if (error) {
+        throw new Error(`Exchange rates unavailable — failed to read exchange_rates: ${error.message}`);
       }
 
-      // FY2026-27 fallback defaults — matches ExchangeRateService.applyDefaults()
-      if (Object.keys(rates).length === 1) {
-        rates.USD = 83.50;
-        rates.EUR = 89.00;
-        rates.GBP = 104.00;
-        rates.AED = 22.75;
-        rates.SGD = 61.50;
+      // No hardcoded fallback table: a currency missing from exchange_rates
+      // must read as "conversion unavailable for this currency" to the
+      // caller, never a guessed FY-fixed number — see the identical rule in
+      // backend ExchangeRateService.loadRates(). INR is 1 by definition
+      // (every row is from_currency -> INR), not a guess.
+      const rates: ExchangeRateMap = { INR: 1 };
+      for (const row of data ?? []) {
+        if (row.from_currency && Number(row.rate) > 0) {
+          rates[row.from_currency.toUpperCase()] = Number(row.rate);
+        }
       }
 
       return rates;

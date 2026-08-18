@@ -2,7 +2,9 @@
 
 import { Loader2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
+import { Button } from '@/components/ui/button';
 import { FlatPatternDrawing, normalizeFlatPattern } from '@/components/ui/flat-pattern-drawing';
 import { Input } from '@/components/ui/input';
 import { useSvgPanZoom } from '@/components/ui/use-svg-pan-zoom';
@@ -140,6 +142,74 @@ export function NestView({
   // layout each time, so a stale `index` could point at the wrong part.
   const changeSheetMode = (key: string) => { setSheetMode(key); setSelected(null); };
 
+  // ── Apply this view's sheet selection to the Raw Material record ─────────
+  // Self-contained: resolves the material's real density and the item's
+  // active raw-material-cost record itself (same lookups already used
+  // elsewhere in this app -- RawMaterialDialog's material search,
+  // autoAddMaterialCost's raw-material-cost fetch), rather than threading
+  // new props through the 3D viewer components above this one. Writes an
+  // explicit, auditable OVERRIDE (never silently) -- exactly the same
+  // grossUsageIsOverridden/grossUsageOverrideReason mechanism the "Edit —
+  // override manually" flow in RawMaterialDialog's Gross Usage calculator
+  // uses, so both entry points produce a record in the same shape.
+  const queryClient = useQueryClient();
+  const [applyState, setApplyState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [applyMessage, setApplyMessage] = useState<string>('');
+
+  const handleApplyToRawMaterial = async () => {
+    if (!data || data.partsPerSheet <= 0 || typeof thicknessMm !== 'number' || thicknessMm <= 0) return;
+    setApplyState('loading');
+    setApplyMessage('');
+    try {
+      const { apiClient } = await import('@/lib/api/client');
+
+      // Resolve the real material density -- never fabricated. Same
+      // exact-then-tokenized search convention used elsewhere in this app.
+      const grade = gradeLabel || materialLabel;
+      if (!grade) throw new Error('No material/grade selected for this part yet.');
+      const matResp = await apiClient.get<{ items: Array<{ material?: string; materialGrade?: string; densityKgM3?: number }> }>(
+        '/raw-materials', { params: { search: grade, limit: 10 } },
+      );
+      const items = matResp?.items ?? [];
+      const exact = items.find((m) => m.materialGrade === grade || m.material === grade);
+      const density = (exact ?? items[0])?.densityKgM3;
+      if (!density || density <= 0) {
+        throw new Error(`No real density on file for "${grade}" — add it to raw_materials before applying.`);
+      }
+
+      const sheetWeightKg = (data.sheetWidthMm * data.sheetLengthMm * thicknessMm / 1e9) * density;
+      const grossWeightPerPartKg = sheetWeightKg / data.partsPerSheet;
+
+      // Find the item's current active raw-material-cost record -- update it
+      // in place (never create a duplicate, never silently pick one of many).
+      const costResp = await apiClient.get<{ records: Array<{ id: string; materialName?: string }> }>(
+        '/raw-material-costs', { params: { bomItemId, isActive: true, page: 1, limit: 10 } },
+      );
+      const records = costResp?.records ?? [];
+      const target = records.find((r) => r.materialName === grade) ?? records[0];
+      if (!target) {
+        throw new Error('No raw material record exists for this part yet — add one in Raw Materials first.');
+      }
+
+      const reason = `Selected via Nest view — ${data.sheetWidthMm}×${data.sheetLengthMm}mm sheet, ` +
+        `${data.partsPerSheet} parts/sheet (true-shape nest, ${data.utilizationPct}% utilization).`;
+      await apiClient.put(`/raw-material-costs/${target.id}`, {
+        grossUsage: parseFloat(grossWeightPerPartKg.toFixed(6)),
+        grossUsageIsOverridden: true,
+        grossUsageOverrideReason: reason,
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ['raw-material-costs'] });
+      await queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'cost-summary'] });
+
+      setApplyState('success');
+      setApplyMessage(`Applied — Gross Usage set to ${grossWeightPerPartKg.toFixed(4)} kg/part (override).`);
+    } catch (err) {
+      setApplyState('error');
+      setApplyMessage(err instanceof Error ? err.message : 'Failed to apply this sheet selection to the raw material record.');
+    }
+  };
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="shrink-0 border-b border-[#555555] bg-[#3a3a3a] text-white px-4 py-3 space-y-3">
@@ -266,7 +336,10 @@ export function NestView({
               {selected?.type === 'part' ? (
                 <PartDetail data={data} index={selected.index} materialLabel={materialLabel} gradeLabel={gradeLabel} thicknessMm={thicknessMm} />
               ) : (
-                <SheetDetail data={data} materialLabel={materialLabel} gradeLabel={gradeLabel} thicknessMm={thicknessMm} quantity={qty} />
+                <SheetDetail
+                  data={data} materialLabel={materialLabel} gradeLabel={gradeLabel} thicknessMm={thicknessMm} quantity={qty}
+                  onApply={handleApplyToRawMaterial} applyState={applyState} applyMessage={applyMessage}
+                />
               )}
             </div>
           </>
@@ -299,12 +372,14 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function SheetDetail({ data, materialLabel, gradeLabel, thicknessMm, quantity }: {
+function SheetDetail({ data, materialLabel, gradeLabel, thicknessMm, quantity, onApply, applyState, applyMessage }: {
   data: TrueNestResultDto; materialLabel?: string | undefined; gradeLabel?: string | undefined; thicknessMm?: number | undefined; quantity: number;
+  onApply: () => void; applyState: 'idle' | 'loading' | 'success' | 'error'; applyMessage: string;
 }) {
+  const canApply = data.partsPerSheet > 0 && typeof thicknessMm === 'number' && thicknessMm > 0;
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold mb-1.5">Visualization only — heuristic nest</p>
+      <p className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold mb-1.5">Visualization — heuristic placement</p>
       {materialLabel && <Row label="Material" value={materialLabel} />}
       {gradeLabel && <Row label="Grade" value={gradeLabel} />}
       {typeof thicknessMm === 'number' && <Row label="Thickness" value={`${thicknessMm.toString()} mm`} />}
@@ -315,8 +390,30 @@ function SheetDetail({ data, materialLabel, gradeLabel, thicknessMm, quantity }:
       <Row label="True-shape nest utilization" value={`${data.utilizationPct.toString()}%`} />
       <Row label="Outline source" value={data.outlineSource === 'wire_walk' ? 'verified geometry' : 'unavailable'} />
       <p className="text-[10px] text-white/40 mt-2 leading-snug">
-        This is a heuristic (bottom-left-fill) placement, not a globally optimal packing — a different nester could report a different figure for the same part and sheet. "True-shape nest utilization" is computed from the real part silhouette area, not a bounding rectangle. This entire view is visualization only: it does not replace or affect the material-cost figures (parts/sheet, utilization%) shown in Cost Summary.
+        This is a heuristic (bottom-left-fill) placement, not a globally optimal packing — a different nester could report a different figure for the same part and sheet. "True-shape nest utilization" is computed from the real part silhouette area, not a bounding rectangle.
       </p>
+
+      <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
+        <Button
+          size="sm"
+          className="w-full h-7 text-xs"
+          disabled={!canApply || applyState === 'loading'}
+          onClick={onApply}
+        >
+          {applyState === 'loading' ? 'Applying…' : 'Apply this sheet to Raw Material'}
+        </Button>
+        {applyMessage && (
+          <p className={`text-[10px] leading-snug ${applyState === 'success' ? 'text-emerald-400' : applyState === 'error' ? 'text-red-400' : 'text-white/60'}`}>
+            {applyMessage}
+          </p>
+        )}
+        <p className="text-[9px] text-white/30 leading-snug">
+          Applying writes an explicit, auditable Gross Usage override (real gross weight/part for THIS sheet ÷
+          parts/sheet, from real material density) to the raw material record — same mechanism as the "Edit —
+          override manually" flow in the Gross Usage calculator. It does not change the true-shape costing
+          algorithm's own automatic sheet selection; clear the override there to return to it.
+        </p>
+      </div>
     </div>
   );
 }

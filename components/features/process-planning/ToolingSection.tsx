@@ -171,6 +171,12 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
     return tooling.reduce((sum, item) => sum + computeToolCost(item), 0);
   };
 
+  // Same small-value-aware precision used across the other cost sections
+  // (RawMaterialsSection's fmtCurrency) — a flat 2 decimal places rounds any
+  // sub-cent total to "0.00" even though the real value is non-zero.
+  const fmtCurrency = (v: number): string =>
+    v > 0 && v < 0.01 ? v.toFixed(4) : v.toFixed(2);
+
   if (compact) {
     return (
       <div>
@@ -214,7 +220,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
               })}
               <div className="flex justify-between items-center px-3 py-1.5 bg-muted/20">
                 <span className="text-[11px] font-semibold text-muted-foreground">Total</span>
-                <span className="text-xs font-bold tabular-nums">{currencySymbol}{(calculateTotal() * conversionRate).toFixed(2)}</span>
+                <span className="text-xs font-bold tabular-nums">{currencySymbol}{fmtCurrency(calculateTotal() * conversionRate)}</span>
               </div>
             </>
           )}
@@ -247,7 +253,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
           </h6>
           <div className="flex items-center gap-3">
             <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground">
-              Total: {currencySymbol}{(calculateTotal() * conversionRate).toFixed(2)}
+              Total: {currencySymbol}{fmtCurrency(calculateTotal() * conversionRate)}
             </Badge>
           </div>
         </div>
@@ -276,7 +282,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
                           Process
                         </th>
                         <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
-                          Unit Cost ($)
+                          Unit Cost ({currencySymbol})
                         </th>
                         <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-28">
                           Quantity
@@ -288,7 +294,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
                           Usage %
                         </th>
                         <th className="p-3 text-left text-xs font-semibold border-r border-primary-foreground/20 w-32">
-                          Total Cost ($)
+                          Total Cost ({currencySymbol})
                         </th>
                         <th className="p-3 text-center text-xs font-semibold w-24">
                           Actions
@@ -399,7 +405,7 @@ export function ToolingSection({ bomItemId, bomItem, compact, currencySymbol = '
                               Total:
                             </td>
                             <td className="p-3 border-r border-border text-xs text-right">
-                              {currencySymbol}{(calculateTotal() * conversionRate).toFixed(2)}
+                              {currencySymbol}{fmtCurrency(calculateTotal() * conversionRate)}
                             </td>
                             <td className="p-3"></td>
                           </tr>
