@@ -39,7 +39,7 @@ import { type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { bomItemsApi as bomAPI } from '@/lib/api/bom-items';
 import { BOMItemType } from '@/lib/types/bom.types';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+import { addAoaSheet, createWorkbook, downloadWorkbook, readWorkbookFile, worksheetToAoa } from '@/lib/utils/excel-browser';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -591,7 +591,7 @@ export default function BOMDetailPage() {
   // Handlers — export
   // -------------------------------------------------------------------------
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
     try {
       const headers = [
         'Level', 'Part Number', 'Name', 'Description', 'Type',
@@ -612,11 +612,9 @@ export default function BOMDetailPage() {
         [2, 'PRT-006', 'Bolt M8x20', 'Hex head bolt', 'child_part', 8, 'pcs', 'Steel', 'Grade 8.8', 80000, 'buy', 0.50, 'ASM-002'],
       ];
 
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-      ws['!cols'] = headers.map((_, i) => ({ wch: i === 3 ? 25 : i === 2 ? 20 : 12 }));
-      XLSX.utils.book_append_sheet(wb, ws, 'BOM Template');
-      XLSX.writeFile(wb, 'BOM_Import_Template_with_Hierarchy.xlsx');
+      const wb = createWorkbook();
+      addAoaSheet(wb, 'BOM Template', [headers, ...rows], headers.map((_, i) => (i === 3 ? 25 : i === 2 ? 20 : 12)));
+      await downloadWorkbook(wb, 'BOM_Import_Template_with_Hierarchy.xlsx');
       toast.success('Excel template downloaded');
     } catch {
       toast.error('Failed to download template');
@@ -727,41 +725,30 @@ export default function BOMDetailPage() {
     return items;
   };
 
-  const parseExcelFile = async (file: File): Promise<any[]> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
+  const parseExcelFile = async (file: File): Promise<any[]> => {
+    try {
+      const wb = await readWorkbookFile(file);
+      const worksheet = wb.worksheets[0];
+      if (!worksheet) throw new Error('No worksheets found');
 
-      reader.onload = e => {
-        try {
-          const wb = XLSX.read(e.target?.result, { type: 'binary' });
-          const sheetName = wb.SheetNames[0];
-          if (!sheetName) throw new Error('No worksheets found');
+      const rows = worksheetToAoa(worksheet);
+      if (rows.length < 2) throw new Error('No data rows found');
 
-          const ws = wb.Sheets[sheetName];
-          if (!ws) throw new Error(`Worksheet "${sheetName}" missing`);
+      const headers = (rows[0] as any[]).map(h => String(h ?? '').trim());
+      const items: any[] = [];
 
-          const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1 });
-          if (rows.length < 2) throw new Error('No data rows found');
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i] as any[];
+        if (!row?.length) continue;
+        const item = parseRowData(headers, row.map(v => String(v ?? '').trim()), i);
+        if (item.name) items.push(item);
+      }
 
-          const headers = (rows[0] as any[]).map(h => String(h ?? '').trim());
-          const items: any[] = [];
-
-          for (let i = 1; i < rows.length; i++) {
-            const row = rows[i] as any[];
-            if (!row?.length) continue;
-            const item = parseRowData(headers, row.map(v => String(v ?? '').trim()), i);
-            if (item.name) items.push(item);
-          }
-
-          resolve(items);
-        } catch (err) {
-          reject(new Error('Failed to parse Excel: ' + (err as Error).message));
-        }
-      };
-
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsBinaryString(file);
-    });
+      return items;
+    } catch (err) {
+      throw new Error('Failed to parse Excel: ' + (err as Error).message);
+    }
+  };
 
   const importWithHierarchy = async (items: any[]) => {
     const createdItems = new Map<string, string>();
@@ -1003,7 +990,7 @@ export default function BOMDetailPage() {
             Back to BOM Management
           </Button>
 
-          <Button variant="outline" className="gap-2" onClick={handleDownloadTemplate}>
+          <Button variant="outline" className="gap-2" onClick={() => { void handleDownloadTemplate(); }}>
             <FileDown className="h-4 w-4" />
             Excel Template
           </Button>

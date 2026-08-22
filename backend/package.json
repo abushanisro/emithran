@@ -38,7 +38,7 @@
     "@nestjs/swagger": "^11.2.6",
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/throttler": "^5.1.1",
-    "@nestjs/typeorm": "^10.0.2",
+    "@nestjs/typeorm": "^11.0.3",
     "@supabase/supabase-js": "^2.89.0",
     "@types/handlebars": "^4.0.40",
     "@types/mathjs": "^9.4.1",
@@ -50,7 +50,6 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^16.6.1",
-    "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
     "form-data": "^4.0.5",
     "handlebars": "^4.7.8",
@@ -59,7 +58,7 @@
     "mathjs": "^15.1.0",
     "nestjs-knex": "^3.0.0",
     "node-fetch": "^2.7.0",
-    "nodemailer": "^7.0.12",
+    "nodemailer": "^9.0.5",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdf-lib": "^1.17.1",
@@ -69,18 +68,18 @@
     "redis": "^4.6.12",
     "reflect-metadata": "^0.1.14",
     "rxjs": "^7.8.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.3",
     "snake-case": "^3.0.4",
     "tesseract.js": "^7.0.0",
     "typeorm": "^0.3.28",
     "undici": "^7.22.0",
-    "uuid": "^9.0.0",
+    "uuid": "^11.1.1",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.16",
-    "@nestjs/schematics": "^10.1.0",
+    "@nestjs/schematics": "^11.1.0",
     "@nestjs/testing": "^11.0.1",
     "@types/exceljs": "^0.5.3",
     "@types/express": "^4.17.21",
@@ -89,10 +88,9 @@
     "@types/pg": "^8.16.0",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "@typescript-eslint/parser": "^6.19.0",
+    "@typescript-eslint/eslint-plugin": "^8.67.0",
+    "@typescript-eslint/parser": "^8.67.0",
     "cross-env": "^10.1.0",
-    "drizzle-kit": "^0.31.10",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.3",
@@ -124,5 +122,10 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

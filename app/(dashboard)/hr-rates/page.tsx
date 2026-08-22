@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import * as XLSX from 'xlsx';
+import { addAoaSheet, createWorkbook, downloadWorkbook } from '@/lib/utils/excel-browser';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
@@ -214,7 +214,7 @@ export default function HRRatesPage() {
   };
 
   // ─── Template download ────────────────────────────────────────────────────
-  const downloadMhrTemplate = () => {
+  const downloadMhrTemplate = async () => {
     const headers = [
       'Machine Name', 'Location', 'Process Group', 'Process Category',
       'Machine Class', 'Automation Level', 'Wage Grade', 'Operators',
@@ -246,11 +246,9 @@ export default function HRRatesPage() {
       'Ø300mm × 800mm', '±0.02', '1.6',
       'Steel,Aluminium', 'Shafts,Flanges', '',
     ];
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
-    ws['!cols'] = headers.map(() => ({ wch: 22 }));
-    XLSX.utils.book_append_sheet(wb, ws, 'MHR');
-    XLSX.writeFile(wb, 'MHR_Import_Template.xlsx');
+    const wb = createWorkbook();
+    addAoaSheet(wb, 'MHR', [headers, sample], headers.map(() => 22));
+    await downloadWorkbook(wb, 'MHR_Import_Template.xlsx');
   };
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -321,7 +319,7 @@ export default function HRRatesPage() {
             <Button variant={mhrViewMode === 'calculator' ? 'secondary' : 'ghost'} size="sm" className="rounded-none h-9 text-xs px-3 border-0 border-l border-border" onClick={() => setMhrViewMode('calculator')}>Calculator</Button>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={downloadMhrTemplate}>
+            <Button size="sm" variant="outline" onClick={() => { void downloadMhrTemplate(); }}>
               <FileDown className="h-3.5 w-3.5 mr-1.5" />Template
             </Button>
             <Button size="sm" variant="outline" onClick={handleMhrExportCsv} disabled={!mhrData?.records?.length}>

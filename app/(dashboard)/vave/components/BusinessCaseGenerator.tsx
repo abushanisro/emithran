@@ -446,10 +446,10 @@ export function BusinessCaseGenerator({ projectId }: Props) {
 
   const handlePrint = () => window.print();
 
-  const handleExcelDownload = () => {
+  const handleExcelDownload = async () => {
     try {
-      const XLSX = require('xlsx') as typeof import('xlsx');
-      const wb = XLSX.utils.book_new();
+      const { addAoaSheet, addJsonSheet, createWorkbook, downloadWorkbook } = await import('@/lib/utils/excel-browser');
+      const wb = createWorkbook();
 
       const ideasRows = selectedIdeas.map((idea) => ({
         'Title': idea.title,
@@ -462,7 +462,7 @@ export function BusinessCaseGenerator({ projectId }: Props) {
         'Status': idea.status,
         'Timeline (months)': idea.timeToImplementMonths ?? 3,
       }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ideasRows), 'VAVE Ideas');
+      addJsonSheet(wb, 'VAVE Ideas', ideasRows);
 
       const roiRows = [
         ['Annual Savings', annualSavings],
@@ -473,9 +473,9 @@ export function BusinessCaseGenerator({ projectId }: Props) {
         ['IRR (%)', irr?.toFixed(1) ?? 'N/A'],
         ['ROI (%)', roi?.toFixed(1) ?? 'N/A'],
       ];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(roiRows), 'ROI Summary');
+      addAoaSheet(wb, 'ROI Summary', roiRows);
 
-      XLSX.writeFile(wb, 'vave-business-case.xlsx');
+      await downloadWorkbook(wb, 'vave-business-case.xlsx');
       toast.success('Excel exported');
     } catch {
       toast.error('Export failed');
@@ -764,7 +764,7 @@ export function BusinessCaseGenerator({ projectId }: Props) {
                 <Printer className="h-3.5 w-3.5 mr-1.5" />
                 Print / PDF
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExcelDownload}>
+              <Button variant="outline" size="sm" onClick={() => { void handleExcelDownload(); }}>
                 <Download className="h-3.5 w-3.5 mr-1.5" />
                 Export Excel
               </Button>

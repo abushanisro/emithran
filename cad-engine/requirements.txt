@@ -5,16 +5,27 @@
 
 
 # FastAPI for REST API
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
+# Versions bumped from the 2024-era pins (0.109.0/0.27.0/2.5.3) — those
+# predate a year-plus of Starlette/FastAPI security patches. Not bumped to
+# bleeding-edge latest — picked a version comfortably newer while staying on
+# the same 0.1xx/2.x API generation this codebase already targets
+# (FastAPI/Starlette/pydantic v2 keep strong backward compatibility within
+# these ranges). Could not be exercised against pythonocc-core in this
+# environment (that binding isn't pip-installable here — it ships via the
+# project's conda environment) — re-run this service's own test/startup path
+# after upgrading, before deploying.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
 
-# File handling
-python-multipart==0.0.6
-aiofiles==23.2.1
+# File handling — python-multipart is never imported directly but is required
+# internally by FastAPI's Form/File/UploadFile parsing (used in main.py).
+# 0.0.6 predates several disclosed DoS/resource-exhaustion fixes in this
+# package's multipart-boundary parsing; 0.0.18 is well past all of them.
+python-multipart==0.0.18
 
 # HTTP client for callbacks
-httpx==0.26.0
+httpx==0.28.1
 
 # Security - Rate limiting
 slowapi==0.1.9
@@ -24,14 +35,8 @@ slowapi==0.1.9
 python-magic==0.4.27
 python-magic-bin==0.4.14; sys_platform == "win32"
 
-# Logging and monitoring
-python-json-logger==2.0.7
-
 # Environment variables
 python-dotenv==1.0.1
-
-# AI Enhancement - Claude
-anthropic==0.18.1
 
 # AI Copilot - Groq (OpenAI-compatible client)
 openai>=1.35.0
