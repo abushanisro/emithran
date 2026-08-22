@@ -92,12 +92,43 @@ export type MHRRecord = {
   specs?: Record<string, any>;
   directOverheadRate?: number;
   indirectOverheadRate?: number;
+  // Economics provenance (Phase 1, "Machine Economics" initiative, see
+  // backend's economics-resolver.ts) — one tier per rate field:
+  // 'shop_override' (human-entered) | 'imported' (Excel bulk import) |
+  // 'benchmark' (machine_library.json reference data) | 'generic_fallback'
+  // (no data on file). Never render a 'benchmark'/'generic_fallback' value
+  // as if it were this shop's own confirmed rate.
+  directOverheadSource?: string;
+  indirectOverheadSource?: string;
+  laborRateSource?: string;
+  economicsVersion?: number;
+  // Industry-benchmark lane — present once a machine_library.json match
+  // exists, even after a real value supersedes it above, so the UI can show
+  // "your rate vs. the benchmark".
+  benchmarkDirectOverheadRateUsdHr?: number;
+  benchmarkIndirectOverheadRateUsdHr?: number;
+  benchmarkLaborRateUsdHr?: number;
   // Real machine capability (mhr_records.max_tonnage/power_kw) — used to
   // auto-fill a calculator's "Selected Tonnage"/"Laser Machine Power" from
   // the actual selected machine, never inferred from its name string. Not
   // to be confused with powerKwhPerHour above (electricity consumption).
   maxTonnage?: number;
   powerKw?: number;
+  // Remaining capability columns (migration 324/339) — same real data
+  // machine-selection/selector.ts's fetchMachinePool() reads for ranking.
+  maxXMm?: number;
+  maxYMm?: number;
+  maxZMm?: number;
+  maxDiameterMm?: number;
+  maxLengthMm?: number;
+  maxThicknessMm?: number;
+  maxWorkpieceWeightKg?: number;
+  maxThicknessMsMm?: number;
+  maxThicknessSsMm?: number;
+  maxThicknessAlMm?: number;
+  maxThicknessCuMm?: number;
+  cuttableMaterials?: string[];
+  capabilityVersion?: number;
   // 'imported' = verified nameplate/OEM record; 'seed' = real, sourced, but
   // NOT this specific unit's own verified reading (e.g. a documented
   // typical model config used as a disclosed estimate — migration 459).
@@ -166,6 +197,22 @@ export type CreateMHRData = {
   usdLhrTotal?: number;
   directOverheadRate?: number;
   indirectOverheadRate?: number;
+  specs?: Record<string, any>;
+  // Machine capability — see MHRRecord's identical block for context.
+  maxXMm?: number;
+  maxYMm?: number;
+  maxZMm?: number;
+  maxDiameterMm?: number;
+  maxLengthMm?: number;
+  maxTonnage?: number;
+  maxThicknessMm?: number;
+  maxWorkpieceWeightKg?: number;
+  powerKw?: number;
+  maxThicknessMsMm?: number;
+  maxThicknessSsMm?: number;
+  maxThicknessAlMm?: number;
+  maxThicknessCuMm?: number;
+  cuttableMaterials?: string[];
 };
 
 export type UpdateMHRData = Partial<CreateMHRData>;

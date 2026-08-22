@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -30,122 +30,8 @@ import { useCreateMHR, useUpdateMHR, useMHRRecord } from '@/lib/api/hooks';
 import { toast } from 'sonner';
 import { useProcessHierarchy, useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { mhrFormSchema, type MHRFormData } from '@/lib/validations/mhrValidation';
-
-// ── Currency helpers (mirrors backend mhr-calculation.constants.ts) ──────────
-
-
-function getCurrencyInfo(location: string): { currency: string; symbol: string; fxRate: number } {
-  const loc = (location || '').toLowerCase();
-  if (loc.includes('india')) return { currency: 'INR', symbol: '₹', fxRate: 84.5 };
-  if (loc.includes('china')) return { currency: 'CNY', symbol: '¥', fxRate: 7.25 };
-  if (loc.includes('usa') || loc.includes('united states') || loc.includes('america'))
-    return { currency: 'USD', symbol: '$', fxRate: 1.0 };
-  if (loc.includes('germany') || loc.includes('france') || loc.includes('europe')
-    || loc.includes('w. europe') || loc.includes('e. europe'))
-    return { currency: 'EUR', symbol: '€', fxRate: 0.92 };
-  if (loc.includes('uk') || loc.includes('britain') || loc.includes('england'))
-    return { currency: 'GBP', symbol: '£', fxRate: 0.79 };
-  if (loc.includes('mexico')) return { currency: 'MXN', symbol: 'MX$', fxRate: 17.5 };
-  if (loc.includes('japan')) return { currency: 'JPY', symbol: '¥', fxRate: 154.0 };
-  if (loc.includes('korea')) return { currency: 'KRW', symbol: '₩', fxRate: 1380 };
-  if (loc.includes('australia')) return { currency: 'AUD', symbol: 'A$', fxRate: 1.56 };
-  if (loc.includes('canada')) return { currency: 'CAD', symbol: 'CA$', fxRate: 1.37 };
-  return { currency: 'USD', symbol: '$', fxRate: 1.0 };
-}
-
-// ── Location-wise cost defaults (in local currency) ───────────────────────────
-// Machine cost ≈ $50k USD equivalent; rent, electricity at local market rates
-const LOCATION_COST_DEFAULTS: Record<string, {
-  landedMachineCost: number; rentPerSqmPerMonth: number;
-  electricityCostPerKwh: number; interestRatePercentage: number;
-}> = {
-  'India':     { landedMachineCost: 4225000, rentPerSqmPerMonth: 100,  electricityCostPerKwh: 8.0,   interestRatePercentage: 9.0  },
-  'China':     { landedMachineCost: 362500,  rentPerSqmPerMonth: 80,   electricityCostPerKwh: 0.8,   interestRatePercentage: 4.5  },
-  'USA':       { landedMachineCost: 50000,   rentPerSqmPerMonth: 15,   electricityCostPerKwh: 0.12,  interestRatePercentage: 5.5  },
-  'Germany':   { landedMachineCost: 46000,   rentPerSqmPerMonth: 15,   electricityCostPerKwh: 0.35,  interestRatePercentage: 3.5  },
-  'France':    { landedMachineCost: 46000,   rentPerSqmPerMonth: 12,   electricityCostPerKwh: 0.22,  interestRatePercentage: 3.5  },
-  'W. Europe': { landedMachineCost: 46000,   rentPerSqmPerMonth: 14,   electricityCostPerKwh: 0.28,  interestRatePercentage: 3.5  },
-  'E. Europe': { landedMachineCost: 41000,   rentPerSqmPerMonth: 8,    electricityCostPerKwh: 0.18,  interestRatePercentage: 5.0  },
-  'Mexico':    { landedMachineCost: 875000,  rentPerSqmPerMonth: 200,  electricityCostPerKwh: 1.5,   interestRatePercentage: 11.0 },
-  'Other':     { landedMachineCost: 50000,   rentPerSqmPerMonth: 15,   electricityCostPerKwh: 0.15,  interestRatePercentage: 6.0  },
-};
-
-// ── LHR defaults in USD, tiered by labour skill level ─────────────────────────
-// 'skilled' is the original baseline for each location (CNC operator / setter-
-// equivalent — matches the "Skill-Based Labour Rate" already used in process
-// costing). 'semi_skilled' and 'unskilled' scale that baseline by a multiplier
-// derived from two verified anchors:
-//   - India statutory minimum wage (Delhi, effective 2025-04-01): unskilled
-//     $18,456 : semi-skilled $20,371 : skilled $22,411/month ≈ 0.82 : 0.91 : 1.00
-//     (a wage-FLOOR ratio — compressed by law, narrower than real shop-floor pay)
-//   - US BLS OEWS (May 2024): machine feeders/offbearers $18.12/hr vs
-//     machinists $27.00/hr ≈ 0.67 : 1.00; CNC operators $24.02/hr ≈ 0.89 : 1.00
-//     (a market-productivity ratio — wider, reflects actual skill premium)
-// 0.60 (unskilled) / 0.80 (semi-skilled) sits between those two verified bands
-// and is applied uniformly across all locations — per-country skill-tier wage
-// data isn't available at this granularity for every location on this form.
-// Base/Burden split preserves each location's own Base+Burden=Total identity
-// (burden scales with base wage, matching how statutory contributions work).
-export type LaborSkillLevel = 'unskilled' | 'semi_skilled' | 'skilled';
-
-export const LABOR_SKILL_LEVEL_OPTIONS: Array<{ value: LaborSkillLevel; label: string }> = [
-  { value: 'unskilled', label: 'Unskilled' },
-  { value: 'semi_skilled', label: 'Semi-Skilled' },
-  { value: 'skilled', label: 'Skilled' },
-];
-
-interface LhrTierRates {
-  lhrInrPerHr: number; usdLaborRatePerHr: number;
-  usdLhrBase: number; usdLhrBurden: number; usdLhrTotal: number;
-}
-
-const LOCATION_LHR_DEFAULTS: Record<string, Record<LaborSkillLevel, LhrTierRates>> = {
-  'India':     {
-    skilled:      { lhrInrPerHr: 180, usdLaborRatePerHr: 2.16, usdLhrBase: 1.50, usdLhrBurden: 0.66, usdLhrTotal: 2.16 },
-    semi_skilled: { lhrInrPerHr: 144, usdLaborRatePerHr: 1.73, usdLhrBase: 1.20, usdLhrBurden: 0.53, usdLhrTotal: 1.73 },
-    unskilled:    { lhrInrPerHr: 108, usdLaborRatePerHr: 1.30, usdLhrBase: 0.90, usdLhrBurden: 0.40, usdLhrTotal: 1.30 },
-  },
-  'China':     {
-    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 8.00, usdLhrBase: 6.00,  usdLhrBurden: 2.00, usdLhrTotal: 8.00  },
-    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 6.40, usdLhrBase: 4.80,  usdLhrBurden: 1.60, usdLhrTotal: 6.40  },
-    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 4.80, usdLhrBase: 3.60,  usdLhrBurden: 1.20, usdLhrTotal: 4.80  },
-  },
-  'USA':       {
-    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 22.00, usdLhrBase: 16.00, usdLhrBurden: 6.00, usdLhrTotal: 22.00 },
-    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 17.60, usdLhrBase: 12.80, usdLhrBurden: 4.80, usdLhrTotal: 17.60 },
-    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 13.20, usdLhrBase: 9.60,  usdLhrBurden: 3.60, usdLhrTotal: 13.20 },
-  },
-  'Germany':   {
-    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 28.00, usdLhrBase: 20.00, usdLhrBurden: 8.00, usdLhrTotal: 28.00 },
-    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 22.40, usdLhrBase: 16.00, usdLhrBurden: 6.40, usdLhrTotal: 22.40 },
-    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 16.80, usdLhrBase: 12.00, usdLhrBurden: 4.80, usdLhrTotal: 16.80 },
-  },
-  'France':    {
-    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 25.00, usdLhrBase: 18.00, usdLhrBurden: 7.00, usdLhrTotal: 25.00 },
-    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 20.00, usdLhrBase: 14.40, usdLhrBurden: 5.60, usdLhrTotal: 20.00 },
-    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 15.00, usdLhrBase: 10.80, usdLhrBurden: 4.20, usdLhrTotal: 15.00 },
-  },
-  'W. Europe': {
-    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 26.00, usdLhrBase: 19.00, usdLhrBurden: 7.00, usdLhrTotal: 26.00 },
-    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 20.80, usdLhrBase: 15.20, usdLhrBurden: 5.60, usdLhrTotal: 20.80 },
-    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 15.60, usdLhrBase: 11.40, usdLhrBurden: 4.20, usdLhrTotal: 15.60 },
-  },
-  'E. Europe': {
-    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 12.00, usdLhrBase: 9.00, usdLhrBurden: 3.00, usdLhrTotal: 12.00 },
-    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 9.60,  usdLhrBase: 7.20, usdLhrBurden: 2.40, usdLhrTotal: 9.60  },
-    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 7.20,  usdLhrBase: 5.40, usdLhrBurden: 1.80, usdLhrTotal: 7.20  },
-  },
-  'Mexico':    {
-    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 5.00, usdLhrBase: 3.50, usdLhrBurden: 1.50, usdLhrTotal: 5.00 },
-    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 4.00, usdLhrBase: 2.80, usdLhrBurden: 1.20, usdLhrTotal: 4.00 },
-    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 3.00, usdLhrBase: 2.10, usdLhrBurden: 0.90, usdLhrTotal: 3.00 },
-  },
-  'Other':     {
-    skilled:      { lhrInrPerHr: 0, usdLaborRatePerHr: 10.00, usdLhrBase: 7.00, usdLhrBurden: 3.00, usdLhrTotal: 10.00 },
-    semi_skilled: { lhrInrPerHr: 0, usdLaborRatePerHr: 8.00,  usdLhrBase: 5.60, usdLhrBurden: 2.40, usdLhrTotal: 8.00  },
-    unskilled:    { lhrInrPerHr: 0, usdLaborRatePerHr: 6.00,  usdLhrBase: 4.20, usdLhrBurden: 1.80, usdLhrTotal: 6.00  },
-  },
-};
+import { getCurrencyForLocation as getCurrencyInfo } from '@/lib/utils/currency-locale';
+import { useFxRate } from '@/lib/api/hooks/useFx';
 
 interface MHRFormDialogProps {
   open: boolean;
@@ -171,7 +57,10 @@ const getDefaultValues = (): MHRFormData => ({
   manufacturer: '',
   model: '',
   specification: '',
-  // USA defaults; these get replaced by LOCATION_COST_DEFAULTS when location changes
+  // USA defaults — starting point only; no per-location fabricated
+  // substitute is applied when the location changes (removed, see the
+  // "Machine Economics" initiative in CLAUDE.md). The user enters real
+  // figures for whatever location they pick.
   landedMachineCost: 50000,
   machineFootprintSqm: 10.00,
   rentPerSqmPerMonth: 15.00,
@@ -190,6 +79,8 @@ const getDefaultValues = (): MHRFormData => ({
   maintenanceCostPercentage: 7.00,
   adminOverheadPercentage: 12.00,
   profitMarginPercentage: 15.00,
+  cuttableMaterials: '',
+  specsJson: '',
 });
 
 // ── Location combobox: preset options + free-form typing ─────────────────────
@@ -278,6 +169,25 @@ function UsdHint({ localVal, fxRate }: { localVal: number; fxRate: number }) {
   );
 }
 
+// Economics provenance caveat (Phase 1, "Machine Economics" initiative) —
+// only surfaces a note for the two non-authoritative tiers, mirroring
+// machine-selection/selector.ts's reasons() convention of staying silent for
+// 'imported'/real data and only speaking up for a benchmark or fallback
+// value, so the source is never mistaken for this shop's own confirmed rate.
+function EconomicsSourceNote({ source, benchmarkValue }: { source?: string | undefined; benchmarkValue?: number | undefined }) {
+  if (source === 'benchmark') {
+    return (
+      <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-tight">
+        Industry benchmark{benchmarkValue !== undefined && benchmarkValue !== null ? ` ($${benchmarkValue.toFixed(2)}/hr)` : ''} — verify against this shop&apos;s actual cost.
+      </p>
+    );
+  }
+  if (source === 'generic_fallback') {
+    return <p className="text-[11px] text-muted-foreground leading-tight">No rate on file — generic fallback applied.</p>;
+  }
+  return null;
+}
+
 export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogProps) {
   const { data: existingRecord } = useMHRRecord(editingId || '', { enabled: !!editingId });
   const createMutation = useCreateMHR();
@@ -291,14 +201,6 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   const [selectedOperation, setSelectedOperation] = useState('');
   const [isManualMode, setIsManualMode] = useState(false);
   const [manualMHRValue, setManualMHRValue] = useState(0);
-  // Convenience tier picker for the Labour tab — not persisted (mirrors how
-  // location defaults work: a lookup that fills the real, persisted LHR
-  // fields below). Defaults to 'skilled' so a brand-new record's auto-fill
-  // behaviour is unchanged from before this tier picker existed.
-  const [laborSkillLevel, setLaborSkillLevel] = useState<LaborSkillLevel>('skilled');
-
-  // Prevent location-watch effect from overwriting values during form reset
-  const isInitializingRef = useRef(false);
 
   const HEADER_SKIP = new Set(['s.no', 'sno', 's no', 'sl no', 'basic info', 'location',
     'process group', 'process route', 'operation', 'name', 'type', 'category', 'description']);
@@ -352,7 +254,6 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
 
   useEffect(() => {
     if (existingRecord) {
-      isInitializingRef.current = true;
       reset({
         location: existingRecord.location,
         commodityCode: existingRecord.commodityCode,
@@ -391,12 +292,27 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
         usdLhrBase: existingRecord.usdLhrBase ?? undefined,
         usdLhrBurden: existingRecord.usdLhrBurden ?? undefined,
         usdLhrTotal: existingRecord.usdLhrTotal ?? undefined,
+        directOverheadRate: existingRecord.directOverheadRate ?? undefined,
+        indirectOverheadRate: existingRecord.indirectOverheadRate ?? undefined,
+        maxXMm: existingRecord.maxXMm ?? undefined,
+        maxYMm: existingRecord.maxYMm ?? undefined,
+        maxZMm: existingRecord.maxZMm ?? undefined,
+        maxDiameterMm: existingRecord.maxDiameterMm ?? undefined,
+        maxLengthMm: existingRecord.maxLengthMm ?? undefined,
+        maxTonnage: existingRecord.maxTonnage ?? undefined,
+        maxThicknessMm: existingRecord.maxThicknessMm ?? undefined,
+        maxWorkpieceWeightKg: existingRecord.maxWorkpieceWeightKg ?? undefined,
+        powerKw: existingRecord.powerKw ?? undefined,
+        maxThicknessMsMm: existingRecord.maxThicknessMsMm ?? undefined,
+        maxThicknessSsMm: existingRecord.maxThicknessSsMm ?? undefined,
+        maxThicknessAlMm: existingRecord.maxThicknessAlMm ?? undefined,
+        maxThicknessCuMm: existingRecord.maxThicknessCuMm ?? undefined,
+        cuttableMaterials: existingRecord.cuttableMaterials?.join(', ') ?? '',
+        specsJson: existingRecord.specs && Object.keys(existingRecord.specs).length
+          ? JSON.stringify(existingRecord.specs, null, 2) : '',
       });
       setIsManualMode(Boolean(existingRecord.isManualEntry || (existingRecord as any).is_manual_entry));
       setManualMHRValue(Number(existingRecord.manualMHRValue || (existingRecord as any).manual_mhr_value || 0));
-      // Skill tier isn't persisted (see field comment) — an existing record's
-      // numbers stay exactly as saved; the picker just resets to its default.
-      setLaborSkillLevel('skilled');
       // Use processGroup first (set by Combined-format import); fall back to commodityCode
       const groupFromRecord = existingRecord.processGroup || existingRecord.commodityCode || '';
       if (existingRecord.processRoute && existingRecord.operation) {
@@ -421,66 +337,28 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
         // allMappings still loading — set group immediately so the Select isn't blank
         setSelectedGroup(groupFromRecord);
       }
-      // Clear the init flag after one event-loop tick so the location watch doesn't fire
-      setTimeout(() => { isInitializingRef.current = false; }, 50);
     } else {
       reset(getDefaultValues());
       setIsManualMode(false); setManualMHRValue(0);
       setSelectedGroup(''); setSelectedRoute(''); setSelectedOperation('');
-      setLaborSkillLevel('skilled');
     }
   }, [existingRecord, reset, allMappings]);
 
   // ── Watched values for live USD hints ─────────────────────────────────────
   const locationWatched      = watch('location');
-  const currentLhrTotal      = watch('usdLhrTotal');
   const landedCostWatched    = watch('landedMachineCost') || 0;
   const rentWatched          = watch('rentPerSqmPerMonth') || 0;
   const electricityWatched   = watch('electricityCostPerKwh') || 0;
   const manualMHRWatched     = manualMHRValue || 0;
 
-  // Derived currency info from selected location
-  const { symbol: currSym, fxRate, currency: currCode } = useMemo(
-    () => getCurrencyInfo(locationWatched || 'USA'),
-    [locationWatched],
-  );
-
-  // Writes one skill tier's rates into the four LHR fields (+ local-currency
-  // rate where the location has one, e.g. India). Shared by the location-change
-  // auto-fill (blank-only) and the tier picker (explicit — always overwrites).
-  const applyLhrTier = (loc: string, skill: LaborSkillLevel) => {
-    const lhrDefs = LOCATION_LHR_DEFAULTS[loc]?.[skill];
-    if (!lhrDefs) return;
-    if (lhrDefs.lhrInrPerHr) setValue('lhrInrPerHr', lhrDefs.lhrInrPerHr);
-    setValue('usdLaborRatePerHr', lhrDefs.usdLaborRatePerHr);
-    setValue('usdLhrBase', lhrDefs.usdLhrBase);
-    setValue('usdLhrBurden', lhrDefs.usdLhrBurden);
-    setValue('usdLhrTotal', lhrDefs.usdLhrTotal, { shouldValidate: true, shouldDirty: true });
-  };
-
-  // Explicit tier selection: the whole point of picking a tier is to (re)fill
-  // the four rates below, so — unlike the location auto-fill — this always
-  // overwrites, even over a manually-typed value.
-  const handleSkillLevelChange = (skill: LaborSkillLevel) => {
-    setLaborSkillLevel(skill);
-    applyLhrTier(locationWatched || 'USA', skill);
-  };
-
-  // When location changes, apply location-specific defaults (skip during form init from existingRecord)
-  useEffect(() => {
-    if (!locationWatched || isInitializingRef.current) return;
-    const costDefs = LOCATION_COST_DEFAULTS[locationWatched];
-    if (costDefs) {
-      setValue('landedMachineCost', costDefs.landedMachineCost);
-      setValue('rentPerSqmPerMonth', costDefs.rentPerSqmPerMonth);
-      setValue('electricityCostPerKwh', costDefs.electricityCostPerKwh);
-      setValue('interestRatePercentage', costDefs.interestRatePercentage);
-    }
-    // Only auto-fill LHR when blank (don't overwrite user-entered values) —
-    // sourced from the currently selected skill tier.
-    if (!currentLhrTotal) applyLhrTier(locationWatched, laborSkillLevel);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationWatched]);
+  // Derived currency info from selected location. fxRate is a live
+  // ECB/Frankfurter reference rate (useFxRate) — never a hardcoded number.
+  // Falls back to 1 (same sentinel already used for USD itself) while the
+  // real rate is loading, which just hides the conversion hint rather than
+  // showing a wrong one; it flips to the true rate once it arrives.
+  const { symbol: currSym, currency: currCode } = getCurrencyInfo(locationWatched || 'USA');
+  const { data: liveFxForForm } = useFxRate({ base: 'USD', quote: currCode, rateType: 'reference', enabled: currCode !== 'USD' });
+  const fxRate = currCode === 'USD' ? 1 : (liveFxForForm?.rate ?? 1);
 
   const onSubmit = async (data: MHRFormData) => {
     try {
@@ -497,6 +375,7 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
           operators: data.operators, machinePriceUsd: data.machinePriceUsd,
           lhrInrPerHr: data.lhrInrPerHr, usdLaborRatePerHr: data.usdLaborRatePerHr,
           usdLhrBase: data.usdLhrBase, usdLhrBurden: data.usdLhrBurden, usdLhrTotal: data.usdLhrTotal,
+          directOverheadRate: data.directOverheadRate, indirectOverheadRate: data.indirectOverheadRate,
           shiftsPerDay: 1, hoursPerShift: 8, workingDaysPerYear: 250,
           plannedMaintenanceHoursPerYear: 0, capacityUtilizationRate: 85,
           landedMachineCost: manualMHRValue, accessoriesCostPercentage: 0,
@@ -504,8 +383,25 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
           insuranceRatePercentage: 0, maintenanceCostPercentage: 0, machineFootprintSqm: 0,
           rentPerSqmPerMonth: 0, powerKwhPerHour: 0, electricityCostPerKwh: 0,
           adminOverheadPercentage: 0, profitMarginPercentage: 0, isManualEntry: true, manualMHRValue,
+          // Capability is orthogonal to manual-vs-calculated MHR mode — a
+          // manually-priced machine still has real physical limits worth
+          // recording for machine selection.
+          maxXMm: data.maxXMm, maxYMm: data.maxYMm, maxZMm: data.maxZMm,
+          maxDiameterMm: data.maxDiameterMm, maxLengthMm: data.maxLengthMm,
+          maxTonnage: data.maxTonnage, maxThicknessMm: data.maxThicknessMm,
+          maxWorkpieceWeightKg: data.maxWorkpieceWeightKg, powerKw: data.powerKw,
+          maxThicknessMsMm: data.maxThicknessMsMm, maxThicknessSsMm: data.maxThicknessSsMm,
+          maxThicknessAlMm: data.maxThicknessAlMm, maxThicknessCuMm: data.maxThicknessCuMm,
         };
       }
+      // cuttableMaterials/specsJson are form-only representations (comma text /
+      // raw JSON text) of the API's string[]/object shapes — convert once here
+      // for both the manual and calculated submitData paths.
+      submitData.cuttableMaterials = data.cuttableMaterials
+        ? data.cuttableMaterials.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined;
+      submitData.specs = data.specsJson && data.specsJson.trim() ? JSON.parse(data.specsJson) : undefined;
+      delete submitData.specsJson;
       // processGroup/processRoute/operation: real dedicated columns
       // (mhr_records.process_group/process_route/operation), tracked as
       // component state (selectedGroup/selectedRoute/selectedOperation), not
@@ -564,13 +460,14 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="operation" disabled={isManualMode}>Operation</TabsTrigger>
               <TabsTrigger value="costs" disabled={isManualMode}>Costs</TabsTrigger>
               <TabsTrigger value="utilities" disabled={isManualMode}>Utilities</TabsTrigger>
               <TabsTrigger value="margins" disabled={isManualMode}>Margins</TabsTrigger>
               <TabsTrigger value="labour" className="text-green-700 dark:text-green-400">Labour</TabsTrigger>
+              <TabsTrigger value="capability" className="text-blue-700 dark:text-blue-400">Capability</TabsTrigger>
             </TabsList>
 
             {/* ── Basic Info ── */}
@@ -847,23 +744,32 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
             <TabsContent value="labour" className="space-y-4 mt-4">
               <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 px-4 py-2.5 mb-1">
                 <p className="text-xs text-green-800 dark:text-green-300">
-                  Pick a labour skill level to fill the four rates below from location defaults, or type your own.
                   All LHR values are in <strong>USD</strong>.
-                  <span className="font-semibold"> LHR Total ($/hr)</span> is the Skill-Based Labour Rate used in process costing.
+                  <span className="font-semibold"> LHR Total ($/hr)</span> is the Skill-Based Labour Rate shown in the Rate Table.
+                  Leave a rate blank to have it resolved from an industry benchmark (if this machine name matches one) on save.
                 </p>
               </div>
+
               <div className="space-y-2">
-                <Label>Labour Skill Level</Label>
-                <Select value={laborSkillLevel} onValueChange={(v) => handleSkillLevelChange(v as LaborSkillLevel)}>
-                  <SelectTrigger><SelectValue placeholder="Select skill level" /></SelectTrigger>
-                  <SelectContent>
-                    {LABOR_SKILL_LEVEL_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Selecting a level recalculates the rates below for the current location — this replaces any values already entered.
-                </p>
+                <Label className="text-sm font-medium">Overhead Rates</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="directOverheadRate">Direct Overhead Rate ($/hr)</Label>
+                    <Input id="directOverheadRate" type="number" step="0.01" min="0"
+                      {...register('directOverheadRate', { valueAsNumber: true })}
+                      placeholder="e.g., 19.60" />
+                    <EconomicsSourceNote source={existingRecord?.directOverheadSource} benchmarkValue={existingRecord?.benchmarkDirectOverheadRateUsdHr} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="indirectOverheadRate">Indirect Overhead Rate ($/hr)</Label>
+                    <Input id="indirectOverheadRate" type="number" step="0.01" min="0"
+                      {...register('indirectOverheadRate', { valueAsNumber: true })}
+                      placeholder="e.g., 8.40" />
+                    <EconomicsSourceNote source={existingRecord?.indirectOverheadSource} benchmarkValue={existingRecord?.benchmarkIndirectOverheadRateUsdHr} />
+                  </div>
+                </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="lhrInrPerHr">LHR Local Rate ({currSym}/hr)</Label>
@@ -898,7 +804,67 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
                     placeholder="e.g., 2.16"
                     className="border-green-300 focus:border-green-500" />
                   <p className="text-xs text-muted-foreground">Key LHR value shown in Rate Table and used in process cost calculations</p>
+                  <EconomicsSourceNote source={existingRecord?.laborRateSource} benchmarkValue={existingRecord?.benchmarkLaborRateUsdHr} />
+                  <p className="text-[11px] text-muted-foreground/70 leading-tight">
+                    Note: this value drives the Rate Table display and exports only — real quote costing resolves labour rate independently from the LHR database by location + process group.
+                  </p>
                 </div>
+              </div>
+            </TabsContent>
+
+            {/* ── Capability (machine-selection/selector.ts's real capability
+                 columns, migration 324/339) — previously settable only via
+                 Excel import or a raw SQL migration; a shop can now confirm a
+                 specific machine's real physical limits directly here. ── */}
+            <TabsContent value="capability" className="space-y-4 mt-4">
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 px-4 py-2.5 mb-1">
+                <p className="text-xs text-blue-800 dark:text-blue-300">
+                  These are the real physical limits machine selection uses to decide which jobs this machine can run.
+                  Leave blank if unknown — an unset limit is never treated as a gate.
+                  {existingRecord?.capabilitySource && (
+                    <span className="block mt-1 text-[11px] opacity-80">
+                      Current source: <strong>{existingRecord.capabilitySource}</strong>
+                      {existingRecord.capabilitySource === 'seed' && ' — a model-typical estimate, not this unit’s own verified spec.'}
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {numField('maxTonnage', 'Max Tonnage (t)')}
+                {numField('powerKw', 'Power (kW)')}
+                {numField('maxXMm', 'Bed/Envelope X (mm)')}
+                {numField('maxYMm', 'Bed/Envelope Y (mm)')}
+                {numField('maxZMm', 'Envelope Z (mm)')}
+                {numField('maxDiameterMm', 'Max Diameter (mm, turning)')}
+                {numField('maxLengthMm', 'Max Length (mm, bending/turning)')}
+                {numField('maxWorkpieceWeightKg', 'Max Workpiece Weight (kg)')}
+                {numField('maxThicknessMm', 'Max Thickness — generic (mm)')}
+                {numField('maxThicknessMsMm', 'Max Thickness — Mild Steel (mm)')}
+                {numField('maxThicknessSsMm', 'Max Thickness — Stainless (mm)')}
+                {numField('maxThicknessAlMm', 'Max Thickness — Aluminum (mm)')}
+                {numField('maxThicknessCuMm', 'Max Thickness — Copper (mm)')}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cuttableMaterials">Cuttable Materials (comma-separated)</Label>
+                <Input id="cuttableMaterials" {...register('cuttableMaterials')} placeholder="e.g., SS304, AL6061, CRCA" />
+              </div>
+
+              <div className="space-y-2 border-t pt-4">
+                <Label htmlFor="specsJson">Additional Specifications (JSON)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Category-specific fields with no dedicated input yet — press force, roll diameter, RPM, etc.
+                  Stored as-is, not read by any live calculation today.
+                </p>
+                <textarea
+                  id="specsJson"
+                  {...register('specsJson')}
+                  rows={5}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+                  placeholder={'{\n  "press_force_kn": 300,\n  "bed_length_mm": 3050\n}'}
+                />
+                {errors.specsJson && <span className="text-xs text-destructive">{errors.specsJson.message}</span>}
               </div>
             </TabsContent>
           </Tabs>

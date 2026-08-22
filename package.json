@@ -14,7 +14,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
-    "test": "echo 'No tests specified' && exit 0",
+    "test": "vitest run",
     "switch:dev": "copy .env.development .env && echo Switched to development environment",
     "switch:prod": "copy .env.production .env && echo Switched to production environment"
   },
@@ -117,6 +117,7 @@
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^17.6.0",
     "prettier": "^3.8.3",
-    "typescript-eslint": "^8.59.4"
+    "typescript-eslint": "^8.59.4",
+    "vitest": "2.1.9"
   }
 }
