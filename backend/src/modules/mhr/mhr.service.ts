@@ -8,6 +8,7 @@ import { MHRCalculationEngine } from './engines/mhr-calculation.engine';
 import { MHRInputValidator } from './validators/mhr-input.validator';
 import { getCurrencyForLocation, MHR_CALCULATION_CONSTANTS } from './constants/mhr-calculation.constants';
 import { invalidateMachinePools } from '../bom-items/costing/machine-selection/pool-cache';
+import { resolveMachineEconomics } from '../bom-items/costing/machine-selection/economics-resolver';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import * as ExcelJS from 'exceljs';
 
@@ -285,7 +286,7 @@ export class MHRService {
       if (row.is_manual_entry && row.manual_mhr_value) {
         calculations = this.createManualEntryCalculation(parseFloat(row.manual_mhr_value), row);
       } else if (Number(row.total_machine_hour_rate ?? 0) > 0) {
-        // Use stored total (covers both import/aPriori records and full-capex records).
+        // Use stored total (covers both import/eMithran records and full-capex records).
         // createManualEntryCalculation picks up stored fixed/variable/annual from the row object.
         calculations = this.createManualEntryCalculation(Number(row.total_machine_hour_rate), row);
       } else {
@@ -342,13 +343,92 @@ export class MHRService {
       (data.landed_machine_cost == null || Number(data.landed_machine_cost) === 0) &&
       Number(data.total_machine_hour_rate ?? 0) > 0
     ) {
-      // Import/aPriori record: use stored total directly (same logic as findAll).
+      // Import/eMithran record: use stored total directly (same logic as findAll).
       calculations = this.createManualEntryCalculation(Number(data.total_machine_hour_rate), data);
     } else {
       calculations = this.calculateMHR(this.mapRowToDto(data), true);
     }
 
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
+  }
+
+  // ── Machine Economics provenance (Phase 1, see CLAUDE.md "Machine Economics") ──
+
+  /**
+   * Live, unambiguous exact-name lookup against sm_reference_data's staged
+   * machine_library.json (category='machine') — the same matching discipline
+   * migration 537's one-time bulk promotion uses, done live so a machine
+   * created/renamed AFTER that migration still gets matched. Returns all-null
+   * on no match OR an ambiguous match (>1 row with this name) — never guesses.
+   */
+  private async lookupMachineLibraryBenchmark(
+    accessToken: string,
+    machineName: string | undefined,
+  ): Promise<{ direct: number | null; indirect: number | null; labor: number | null; sourceKey: string | null }> {
+    const empty = { direct: null, indirect: null, labor: null, sourceKey: null };
+    if (!machineName?.trim()) return empty;
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('sm_reference_data')
+      .select('key, raw')
+      .eq('category', 'machine');
+    if (error || !data) return empty;
+
+    const nameLower = machineName.trim().toLowerCase();
+    const matches = data.filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+    if (matches.length !== 1) return empty;
+
+    const raw = matches[0].raw ?? {};
+    const numOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    return {
+      direct: numOrNull(raw.direct_overhead_rate_usd_hr),
+      indirect: numOrNull(raw.indirect_overhead_rate_usd_hr),
+      labor: numOrNull(raw.labor_rate_usd_hr),
+      sourceKey: matches[0].key ?? null,
+    };
+  }
+
+  /**
+   * Resolves direct/indirect overhead + labor rate for a CREATE, with
+   * provenance — see economics-resolver.ts's doc comment. Only queries
+   * sm_reference_data when at least one of the three fields was left blank
+   * by the caller (an explicit value from the form is always 'shop_override'
+   * and never needs a benchmark lookup).
+   */
+  private async resolveEconomicsForCreate(
+    accessToken: string,
+    machineName: string | undefined,
+    explicit: { directOverheadRate?: number | null; indirectOverheadRate?: number | null; usdLhrTotal?: number | null },
+  ) {
+    const needsBenchmark = explicit.directOverheadRate == null || explicit.indirectOverheadRate == null || explicit.usdLhrTotal == null;
+    const benchmark = needsBenchmark
+      ? await this.lookupMachineLibraryBenchmark(accessToken, machineName)
+      : { direct: null, indirect: null, labor: null, sourceKey: null };
+
+    const resolved = resolveMachineEconomics({
+      direct_overhead_rate: explicit.directOverheadRate ?? null,
+      direct_overhead_source: explicit.directOverheadRate != null ? 'shop_override' : null,
+      indirect_overhead_rate: explicit.indirectOverheadRate ?? null,
+      indirect_overhead_source: explicit.indirectOverheadRate != null ? 'shop_override' : null,
+      usd_lhr_total: explicit.usdLhrTotal ?? null,
+      labor_rate_source: explicit.usdLhrTotal != null ? 'shop_override' : null,
+      benchmark_direct_overhead_rate_usd_hr: benchmark.direct,
+      benchmark_indirect_overhead_rate_usd_hr: benchmark.indirect,
+      benchmark_labor_rate_usd_hr: benchmark.labor,
+    });
+
+    return {
+      direct_overhead_rate: resolved.directOverheadRate.value,
+      direct_overhead_source: resolved.directOverheadRate.source,
+      indirect_overhead_rate: resolved.indirectOverheadRate.value,
+      indirect_overhead_source: resolved.indirectOverheadRate.source,
+      usd_lhr_total: resolved.laborRateUsdHr.value,
+      labor_rate_source: resolved.laborRateUsdHr.source,
+      benchmark_direct_overhead_rate_usd_hr: benchmark.direct,
+      benchmark_indirect_overhead_rate_usd_hr: benchmark.indirect,
+      benchmark_labor_rate_usd_hr: benchmark.labor,
+      benchmark_source_key: benchmark.sourceKey,
+    };
   }
 
   async create(createMHRDto: CreateMHRDto, userId: string, accessToken: string): Promise<MHRResponseDto> {
@@ -372,14 +452,42 @@ export class MHRService {
       calculations = this.calculateMHR(createMHRDto);
     }
 
+    const economicsFields = await this.resolveEconomicsForCreate(accessToken, createMHRDto.machineName, {
+      directOverheadRate: createMHRDto.directOverheadRate,
+      indirectOverheadRate: createMHRDto.indirectOverheadRate,
+      usdLhrTotal: createMHRDto.usdLhrTotal,
+    });
+
     const rates = await this.exchangeRateService.getSnapshot(accessToken);
     const usdRates = this.computeUsdAndBurdenedRates(
       calculations.totalMachineHourRate,
       createMHRDto.location,
       rates,
       createMHRDto.lhrInrPerHr ?? null,
-      createMHRDto.usdLhrTotal ?? null,
+      economicsFields.usd_lhr_total,
     );
+
+    // Machine capability — same shape/convention as importFromExcel()'s
+    // `capability`/`hasCapability` (see that method's own comment): a human
+    // explicitly entering a real limit via this dialog is exactly as real as
+    // an imported one, so it gets the same 'imported' tag, never a guess.
+    const capability = {
+      max_x_mm: createMHRDto.maxXMm ?? null,
+      max_y_mm: createMHRDto.maxYMm ?? null,
+      max_z_mm: createMHRDto.maxZMm ?? null,
+      max_diameter_mm: createMHRDto.maxDiameterMm ?? null,
+      max_length_mm: createMHRDto.maxLengthMm ?? null,
+      max_tonnage: createMHRDto.maxTonnage ?? null,
+      max_thickness_mm: createMHRDto.maxThicknessMm ?? null,
+      max_workpiece_weight_kg: createMHRDto.maxWorkpieceWeightKg ?? null,
+      power_kw: createMHRDto.powerKw ?? null,
+      max_thickness_ms_mm: createMHRDto.maxThicknessMsMm ?? null,
+      max_thickness_ss_mm: createMHRDto.maxThicknessSsMm ?? null,
+      max_thickness_al_mm: createMHRDto.maxThicknessAlMm ?? null,
+      max_thickness_cu_mm: createMHRDto.maxThicknessCuMm ?? null,
+      cuttable_materials: createMHRDto.cuttableMaterials?.length ? createMHRDto.cuttableMaterials : null,
+    };
+    const hasCapability = Object.values(capability).some((v) => v != null);
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
@@ -428,9 +536,25 @@ export class MHRService {
         usd_labor_rate_per_hr: createMHRDto.usdLaborRatePerHr || null,
         usd_lhr_base: createMHRDto.usdLhrBase || null,
         usd_lhr_burden: createMHRDto.usdLhrBurden || null,
-        usd_lhr_total: createMHRDto.usdLhrTotal || null,
-        direct_overhead_rate: createMHRDto.directOverheadRate ?? null,
-        indirect_overhead_rate: createMHRDto.indirectOverheadRate ?? null,
+        usd_lhr_total: economicsFields.usd_lhr_total,
+        direct_overhead_rate: economicsFields.direct_overhead_rate,
+        indirect_overhead_rate: economicsFields.indirect_overhead_rate,
+        direct_overhead_source: economicsFields.direct_overhead_source,
+        indirect_overhead_source: economicsFields.indirect_overhead_source,
+        labor_rate_source: economicsFields.labor_rate_source,
+        benchmark_direct_overhead_rate_usd_hr: economicsFields.benchmark_direct_overhead_rate_usd_hr,
+        benchmark_indirect_overhead_rate_usd_hr: economicsFields.benchmark_indirect_overhead_rate_usd_hr,
+        benchmark_labor_rate_usd_hr: economicsFields.benchmark_labor_rate_usd_hr,
+        benchmark_source_key: economicsFields.benchmark_source_key,
+        economics_version: 1,
+        economics_updated_at: new Date().toISOString(),
+        economics_updated_by: userId,
+        specs: createMHRDto.specs && Object.keys(createMHRDto.specs).length ? createMHRDto.specs : null,
+        ...capability,
+        capability_source: hasCapability ? 'imported' : null,
+        capability_version: hasCapability ? 1 : null,
+        capability_updated_at: hasCapability ? new Date().toISOString() : null,
+        capability_updated_by: hasCapability ? userId : null,
         // Derived currency and USD rates from location
         currency:                    usdRates.currency,
         currency_symbol:             usdRates.currencySymbol,
@@ -562,9 +686,67 @@ export class MHRService {
     if (updateMHRDto.usdLaborRatePerHr !== undefined) updateData.usd_labor_rate_per_hr = updateMHRDto.usdLaborRatePerHr;
     if (updateMHRDto.usdLhrBase !== undefined) updateData.usd_lhr_base = updateMHRDto.usdLhrBase;
     if (updateMHRDto.usdLhrBurden !== undefined) updateData.usd_lhr_burden = updateMHRDto.usdLhrBurden;
-    if (updateMHRDto.usdLhrTotal !== undefined) updateData.usd_lhr_total = updateMHRDto.usdLhrTotal;
-    if (updateMHRDto.directOverheadRate !== undefined) updateData.direct_overhead_rate = updateMHRDto.directOverheadRate;
-    if (updateMHRDto.indirectOverheadRate !== undefined) updateData.indirect_overhead_rate = updateMHRDto.indirectOverheadRate;
+    // Economics provenance: a value explicitly present in this PATCH is a
+    // human confirming it right now, so it's always 'shop_override' — never
+    // a benchmark lookup on update (that only applies to a brand-new record
+    // via resolveEconomicsForCreate). An explicit null clears both the value
+    // and its source, rather than mislabeling "cleared" as "shop-confirmed".
+    let economicsTouched = false;
+    if (updateMHRDto.usdLhrTotal !== undefined) {
+      updateData.usd_lhr_total = updateMHRDto.usdLhrTotal;
+      updateData.labor_rate_source = updateMHRDto.usdLhrTotal != null ? 'shop_override' : null;
+      economicsTouched = true;
+    }
+    if (updateMHRDto.directOverheadRate !== undefined) {
+      updateData.direct_overhead_rate = updateMHRDto.directOverheadRate;
+      updateData.direct_overhead_source = updateMHRDto.directOverheadRate != null ? 'shop_override' : null;
+      economicsTouched = true;
+    }
+    if (updateMHRDto.indirectOverheadRate !== undefined) {
+      updateData.indirect_overhead_rate = updateMHRDto.indirectOverheadRate;
+      updateData.indirect_overhead_source = updateMHRDto.indirectOverheadRate != null ? 'shop_override' : null;
+      economicsTouched = true;
+    }
+    if (economicsTouched) {
+      updateData.economics_version = ((existing as any).economicsVersion ?? 0) + 1;
+      updateData.economics_updated_at = new Date().toISOString();
+      updateData.economics_updated_by = userId;
+    }
+
+    if (updateMHRDto.specs !== undefined) {
+      updateData.specs = updateMHRDto.specs && Object.keys(updateMHRDto.specs).length ? updateMHRDto.specs : null;
+    }
+
+    // Machine capability — a value explicitly present in this PATCH is a
+    // human confirming it right now, tagged 'imported' (same convention as
+    // create(), matching the Excel-import path's own capability tagging —
+    // real is real regardless of which of the three write paths it came
+    // through). Bumps capability_version, mirroring economics_version above.
+    let capabilityTouched = false;
+    const capabilityFieldMap: Array<[keyof UpdateMHRDto, string]> = [
+      ['maxXMm', 'max_x_mm'], ['maxYMm', 'max_y_mm'], ['maxZMm', 'max_z_mm'],
+      ['maxDiameterMm', 'max_diameter_mm'], ['maxLengthMm', 'max_length_mm'],
+      ['maxTonnage', 'max_tonnage'], ['maxThicknessMm', 'max_thickness_mm'],
+      ['maxWorkpieceWeightKg', 'max_workpiece_weight_kg'], ['powerKw', 'power_kw'],
+      ['maxThicknessMsMm', 'max_thickness_ms_mm'], ['maxThicknessSsMm', 'max_thickness_ss_mm'],
+      ['maxThicknessAlMm', 'max_thickness_al_mm'], ['maxThicknessCuMm', 'max_thickness_cu_mm'],
+    ];
+    for (const [dtoKey, column] of capabilityFieldMap) {
+      if (updateMHRDto[dtoKey] !== undefined) {
+        (updateData as any)[column] = updateMHRDto[dtoKey];
+        capabilityTouched = true;
+      }
+    }
+    if (updateMHRDto.cuttableMaterials !== undefined) {
+      updateData.cuttable_materials = updateMHRDto.cuttableMaterials?.length ? updateMHRDto.cuttableMaterials : null;
+      capabilityTouched = true;
+    }
+    if (capabilityTouched) {
+      updateData.capability_source = 'imported';
+      updateData.capability_version = ((existing as any).capabilityVersion ?? 0) + 1;
+      updateData.capability_updated_at = new Date().toISOString();
+      updateData.capability_updated_by = userId;
+    }
 
     // Recompute currency and USD rates based on (possibly updated) location
     const effectiveLocation = updateMHRDto.location ?? existing.location;
@@ -687,7 +869,7 @@ export class MHRService {
     ) as ArrayBuffer;
     await workbook.xlsx.load(arrayBuffer);
 
-    // Sheet name → commodity code for the multi-sheet aPriori format
+    // Sheet name → commodity code for the multi-sheet eMithran format
     const SHEET_COMMODITY: Record<string, string> = {
       '01_machining': 'CNC Machining', '02_sheet_metal': 'Sheet Metal',
       '03_die_casting': 'Die Casting', '04_invest_cast': 'Investment Casting',
@@ -743,7 +925,7 @@ export class MHRService {
         return null;
       };
 
-      // Support both standard format ("Machine Name") and aPriori multi-sheet format ("Primary ID")
+      // Support both standard format ("Machine Name") and eMithran multi-sheet format ("Primary ID")
       const machineNameCol      = getCol('machine name', 'primary id', 'name');
       if (!machineNameCol) continue;
 
@@ -838,7 +1020,7 @@ export class MHRService {
       // Machine capability columns (optional — physics-based machine selection)
       const maxXCol             = getCol('max x mm', 'max x', 'bed length mm');
       const maxYCol             = getCol('max y mm', 'max y', 'bed width mm');
-      const maxZCol             = getCol('max z mm', 'max z');
+      const maxZCol             = getCol('max z mm', 'max z', 'bed height mm');
       const maxDiaCol           = getCol('max diameter mm', 'max diameter', 'swing mm');
       const maxLenCol           = getCol('max length mm', 'max length', 'bend length mm');
       const maxTonnageCol       = getCol('max tonnage', 'tonnage');
@@ -863,6 +1045,14 @@ export class MHRService {
       const materialsCol        = getCol('material compatibility', 'material_compatibility');
       const applicationsCol     = getCol('typical applications', 'typical_applications');
       const processNotesCol     = getCol('process notes', 'process_notes');
+      // Generic catch-all: any machine-category-specific field that doesn't have
+      // its own dedicated column (press_force_kn, roll_working_length_mm, bed
+      // dimensions, etc. — see memory/sheetmetal/machine/machine_library.json)
+      // rides through as one JSON blob per row, merged into specs below. This is
+      // the durable, re-importable counterpart to one-off SQL backfills: any
+      // future re-export of machine_library.json that includes this column
+      // carries its full category-specific data through import automatically.
+      const specsJsonCol        = getCol('specs json', 'specs_json', 'machine specs json');
 
       let isHeaderRow = true;
       sheet.eachRow(row => {
@@ -874,7 +1064,7 @@ export class MHRService {
         const mhrRaw = mhrValueCol ? row.getCell(mhrValueCol).value : null;
         const mhrNum = mhrRaw != null ? parseFloat(String(mhrRaw).replace(/[^0-9.-]/g, '')) : NaN;
 
-        // Skip sub-header rows (row 2 in aPriori sheets has labels like "Name", "Labor Rate (USD/hr)")
+        // Skip sub-header rows (row 2 in eMithran sheets has labels like "Name", "Labor Rate (USD/hr)")
         // Detected by: mhrValueCol exists but cell is a non-numeric string
         if (mhrValueCol && typeof mhrRaw === 'string' && isNaN(mhrNum)) return;
 
@@ -882,7 +1072,7 @@ export class MHRService {
         const rawLandedCost = landedCostCol ? toNum(row.getCell(landedCostCol).value, 0) : 0;
         const rawMachinePriceUsd = machinePriceUsdCol ? toNum(row.getCell(machinePriceUsdCol).value, 0) : 0;
 
-        // Derive utilization: aPriori stores it as 0-1 fraction, convert to percentage
+        // Derive utilization: eMithran stores it as 0-1 fraction, convert to percentage
         let utilRaw = utilCol ? toNum(row.getCell(utilCol).value, 0.85) : 0.85;
         if (utilRaw > 0 && utilRaw <= 1) utilRaw = utilRaw * 100; // 0.5 → 50%
 
@@ -894,6 +1084,20 @@ export class MHRService {
         if (materialsCol)     { const v = toStr(row.getCell(materialsCol).value);      if (v) specsObj.material_compatibility = v; }
         if (applicationsCol)  { const v = toStr(row.getCell(applicationsCol).value);   if (v) specsObj.typical_applications = v; }
         if (processNotesCol)  { const v = toStr(row.getCell(processNotesCol).value);   if (v) specsObj.process_notes = v; }
+        if (specsJsonCol) {
+          const raw = toStr(row.getCell(specsJsonCol).value);
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) Object.assign(specsObj, parsed);
+            } catch {
+              this.logger.warn(
+                `${machineName}: Specs JSON column contains invalid JSON — ignored: ${raw.slice(0, 80)}`,
+                'MHRService.importFromExcel',
+              );
+            }
+          }
+        }
 
         const preCalcValues = (depPerHrCol || intPerHrCol || mhrUsdCol) ? {
           depPerHr:       depPerHrCol ? toNum(row.getCell(depPerHrCol).value, 0) : 0,
@@ -1318,7 +1522,7 @@ export class MHRService {
       .getAdminClient()
       .from('mhr_records')
       .delete()
-      .not('id', 'is', null)
+      .eq('user_id', userId)
       .select('id');
 
     if (error) {

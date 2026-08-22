@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { resolveMachineEconomics } from '../../bom-items/costing/machine-selection/economics-resolver';
 
 export class MHRCalculationResult {
   // Working Hours Calculations
@@ -209,6 +210,22 @@ export class MHRResponseDto {
   @ApiProperty({ nullable: true }) specs?: Record<string, any>;
   @ApiProperty({ nullable: true }) directOverheadRate?: number;
   @ApiProperty({ nullable: true }) indirectOverheadRate?: number;
+  // Economics provenance (Phase 1, "Machine Economics" initiative) — mirrors
+  // capabilitySource below, one tier per rate field: 'shop_override'
+  // (human-entered) | 'imported' (Excel bulk import) | 'benchmark'
+  // (machine_library.json reference data) | 'generic_fallback' (no data on
+  // file). Lets the UI show a provenance badge instead of presenting a
+  // reference-benchmark number as if it were this shop's real rate.
+  @ApiProperty({ nullable: true }) directOverheadSource?: string;
+  @ApiProperty({ nullable: true }) indirectOverheadSource?: string;
+  @ApiProperty({ nullable: true }) laborRateSource?: string;
+  @ApiProperty({ nullable: true }) economicsVersion?: number;
+  // Industry-benchmark lane — always present when a machine_library.json
+  // match exists, even once a real shop/imported value has superseded it in
+  // the fields above, so the UI can show "your rate vs. the benchmark".
+  @ApiProperty({ nullable: true }) benchmarkDirectOverheadRateUsdHr?: number;
+  @ApiProperty({ nullable: true }) benchmarkIndirectOverheadRateUsdHr?: number;
+  @ApiProperty({ nullable: true }) benchmarkLaborRateUsdHr?: number;
   // Press-brake/machine capacity — already used server-side for machine
   // selection/capability checks (machine-selection/selector.ts's maxTonnage);
   // exposed here so the interactive calculator can auto-fill "Selected
@@ -222,6 +239,23 @@ export class MHRResponseDto {
   // name string. Undefined/null means no verified capability is on file —
   // callers must treat that as a real gap, never a reason to guess.
   @ApiProperty({ nullable: true }) powerKw?: number;
+  // Remaining capability columns (migration 324/339) — same real data
+  // machine-selection/selector.ts's fetchMachinePool() reads for ranking;
+  // previously exposed nowhere in this DTO at all (only maxTonnage/powerKw
+  // were), so the dialog had no way to show or edit them even read-only.
+  @ApiProperty({ nullable: true }) maxXMm?: number;
+  @ApiProperty({ nullable: true }) maxYMm?: number;
+  @ApiProperty({ nullable: true }) maxZMm?: number;
+  @ApiProperty({ nullable: true }) maxDiameterMm?: number;
+  @ApiProperty({ nullable: true }) maxLengthMm?: number;
+  @ApiProperty({ nullable: true }) maxThicknessMm?: number;
+  @ApiProperty({ nullable: true }) maxWorkpieceWeightKg?: number;
+  @ApiProperty({ nullable: true }) maxThicknessMsMm?: number;
+  @ApiProperty({ nullable: true }) maxThicknessSsMm?: number;
+  @ApiProperty({ nullable: true }) maxThicknessAlMm?: number;
+  @ApiProperty({ nullable: true }) maxThicknessCuMm?: number;
+  @ApiProperty({ nullable: true, type: [String] }) cuttableMaterials?: string[];
+  @ApiProperty({ nullable: true }) capabilityVersion?: number;
   // mhr_records.capability_source — 'imported' (verified nameplate/OEM
   // data), 'seed' (real, sourced, but not THIS unit's own verified record —
   // e.g. a documented typical model config used as a disclosed estimate,
@@ -244,6 +278,16 @@ export class MHRResponseDto {
   updatedAt: string;
 
   static fromDatabase(row: any): MHRResponseDto {
+    // Read-time resolution (Phase 1, "Machine Economics" initiative) — covers
+    // rows created/updated BEFORE this initiative shipped, whose
+    // direct_overhead_rate/indirect_overhead_rate/usd_lhr_total may be real
+    // (just missing a source tag — resolveMachineEconomics defensively
+    // defaults that to 'imported', same as capabilitySource's own convention)
+    // or genuinely blank (resolved live from benchmark_*/generic fallback
+    // instead of staying "-" until someone happens to re-save the record).
+    // A row saved via mhr.service.ts going forward already has these
+    // persisted with a real source tag, so this is idempotent for those.
+    const resolved = resolveMachineEconomics(row);
     return {
       id: row.id,
       userId: row.user_id,
@@ -289,7 +333,12 @@ export class MHRResponseDto {
       usdLaborRatePerHr: row.usd_labor_rate_per_hr ? parseFloat(row.usd_labor_rate_per_hr) : undefined,
       usdLhrBase: row.usd_lhr_base ? parseFloat(row.usd_lhr_base) : undefined,
       usdLhrBurden: row.usd_lhr_burden ? parseFloat(row.usd_lhr_burden) : undefined,
-      usdLhrTotal: row.usd_lhr_total ? parseFloat(row.usd_lhr_total) : undefined,
+      // 'generic_fallback' maps to undefined here (renders as "-", not a
+      // misleading "$0.00") — the resolver itself always returns a concrete
+      // number for internal/persistence consistency; this is a display-only
+      // decision. 'benchmark' DOES show its real (non-zero) number, with
+      // laborRateSource below telling the UI to caveat it.
+      usdLhrTotal: resolved.laborRateUsdHr.source === 'generic_fallback' ? undefined : resolved.laborRateUsdHr.value ?? undefined,
       currency: row.currency ?? undefined,
       currencySymbol: row.currency_symbol ?? undefined,
       mhrUsdPerHour: row.mhr_usd_per_hour ? parseFloat(row.mhr_usd_per_hour) : undefined,
@@ -297,10 +346,30 @@ export class MHRResponseDto {
       fullyBurdenedUsdPerHr: row.fully_burdened_usd_per_hr ? parseFloat(row.fully_burdened_usd_per_hr) : undefined,
       lhrUsdEffective: row.lhr_usd_effective ? parseFloat(row.lhr_usd_effective) : undefined,
       specs: row.specs ?? undefined,
-      directOverheadRate: row.direct_overhead_rate ? parseFloat(row.direct_overhead_rate) : undefined,
-      indirectOverheadRate: row.indirect_overhead_rate ? parseFloat(row.indirect_overhead_rate) : undefined,
+      directOverheadRate: resolved.directOverheadRate.source === 'generic_fallback' ? undefined : resolved.directOverheadRate.value ?? undefined,
+      indirectOverheadRate: resolved.indirectOverheadRate.source === 'generic_fallback' ? undefined : resolved.indirectOverheadRate.value ?? undefined,
+      directOverheadSource: resolved.directOverheadRate.source,
+      indirectOverheadSource: resolved.indirectOverheadRate.source,
+      laborRateSource: resolved.laborRateUsdHr.source,
+      economicsVersion: row.economics_version ?? undefined,
+      benchmarkDirectOverheadRateUsdHr: row.benchmark_direct_overhead_rate_usd_hr ? parseFloat(row.benchmark_direct_overhead_rate_usd_hr) : undefined,
+      benchmarkIndirectOverheadRateUsdHr: row.benchmark_indirect_overhead_rate_usd_hr ? parseFloat(row.benchmark_indirect_overhead_rate_usd_hr) : undefined,
+      benchmarkLaborRateUsdHr: row.benchmark_labor_rate_usd_hr ? parseFloat(row.benchmark_labor_rate_usd_hr) : undefined,
       maxTonnage: row.max_tonnage ? parseFloat(row.max_tonnage) : undefined,
       powerKw: row.power_kw ? parseFloat(row.power_kw) : undefined,
+      maxXMm: row.max_x_mm ? parseFloat(row.max_x_mm) : undefined,
+      maxYMm: row.max_y_mm ? parseFloat(row.max_y_mm) : undefined,
+      maxZMm: row.max_z_mm ? parseFloat(row.max_z_mm) : undefined,
+      maxDiameterMm: row.max_diameter_mm ? parseFloat(row.max_diameter_mm) : undefined,
+      maxLengthMm: row.max_length_mm ? parseFloat(row.max_length_mm) : undefined,
+      maxThicknessMm: row.max_thickness_mm ? parseFloat(row.max_thickness_mm) : undefined,
+      maxWorkpieceWeightKg: row.max_workpiece_weight_kg ? parseFloat(row.max_workpiece_weight_kg) : undefined,
+      maxThicknessMsMm: row.max_thickness_ms_mm ? parseFloat(row.max_thickness_ms_mm) : undefined,
+      maxThicknessSsMm: row.max_thickness_ss_mm ? parseFloat(row.max_thickness_ss_mm) : undefined,
+      maxThicknessAlMm: row.max_thickness_al_mm ? parseFloat(row.max_thickness_al_mm) : undefined,
+      maxThicknessCuMm: row.max_thickness_cu_mm ? parseFloat(row.max_thickness_cu_mm) : undefined,
+      cuttableMaterials: row.cuttable_materials ?? undefined,
+      capabilityVersion: row.capability_version ?? undefined,
       capabilitySource: row.capability_source ?? undefined,
       calculations: JSON.parse(row.calculations || '{}'),
       createdAt: row.created_at,

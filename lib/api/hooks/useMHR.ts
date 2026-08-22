@@ -9,6 +9,8 @@ import type {
   UpdateMHRData,
   MHRQuery,
   MHRBenchmarkEntry,
+  MHRListResponse,
+  MHRRecord,
 } from '../mhr';
 import { ApiError } from '../client';
 import { toast } from 'sonner';
@@ -147,18 +149,64 @@ export function useCreateMHR() {
   });
 }
 
+type UpdateMHRVariables = {
+  id: string;
+  data: UpdateMHRData;
+  // Set by the Excel-like grid's inline cell editors — a toast per keystroke
+  // commit would be unusable at spreadsheet editing speed. Dialog-driven
+  // edits (MHRFormDialog) never pass this, so their existing toast behavior
+  // is unchanged.
+  silent?: boolean;
+};
+
+type UpdateMHRContext = {
+  previousLists: Array<[readonly unknown[], MHRListResponse | undefined]>;
+  previousDetail: MHRRecord | undefined;
+};
+
 export function useUpdateMHR() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateMHRData }) =>
-      mhrApi.update(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: mhrKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: mhrKeys.detail(variables.id) });
-      toast.success('MHR record updated successfully');
+  return useMutation<MHRRecord, ApiError, UpdateMHRVariables, UpdateMHRContext>({
+    mutationFn: ({ id, data }) => mhrApi.update(id, data),
+    // Optimistic update: the grid's inline editors need instant feedback
+    // (real spreadsheet behaviour) rather than waiting on a network round
+    // trip + invalidate. Patches every cached list matching this record's id
+    // plus the detail cache; onSettled reconciles with the server's
+    // recalculated fields (source tiers, `calculations`, etc.) shortly after.
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: mhrKeys.lists() });
+      await queryClient.cancelQueries({ queryKey: mhrKeys.detail(id) });
+
+      const previousLists = queryClient.getQueriesData<MHRListResponse>({ queryKey: mhrKeys.lists() });
+      const previousDetail = queryClient.getQueryData<MHRRecord>(mhrKeys.detail(id));
+
+      queryClient.setQueriesData<MHRListResponse | undefined>({ queryKey: mhrKeys.lists() }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          records: old.records.map((r) => (r.id === id ? { ...r, ...data } : r)),
+        };
+      });
+      if (previousDetail) {
+        queryClient.setQueryData<MHRRecord>(mhrKeys.detail(id), { ...previousDetail, ...data });
+      }
+
+      return { previousLists, previousDetail };
     },
-    onError: (error: ApiError) => {
+    onError: (error, variables, context) => {
+      // Roll back to the pre-edit snapshot — an inline edit that fails must
+      // visibly revert, never silently keep a value the server rejected.
+      context?.previousLists.forEach(([queryKey, data]) => {
+        queryClient.setQueryData(queryKey, data);
+      });
+      if (context?.previousDetail) {
+        queryClient.setQueryData(mhrKeys.detail(variables.id), context.previousDetail);
+      }
+      if (variables.silent) {
+        toast.error('Change reverted — could not save to the server.');
+        return;
+      }
       if (error.status === 400) {
         toast.error('Please check that all MHR record information is valid.');
       } else if (error.status === 404) {
@@ -172,6 +220,13 @@ export function useUpdateMHR() {
       } else {
         toast.error('Unable to update MHR record. Please try again or contact support.');
       }
+    },
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({ queryKey: mhrKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: mhrKeys.detail(variables.id) });
+    },
+    onSuccess: (_data, variables) => {
+      if (!variables.silent) toast.success('MHR record updated successfully');
     },
   });
 }

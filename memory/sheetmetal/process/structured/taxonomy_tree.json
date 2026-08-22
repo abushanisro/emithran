@@ -1,0 +1,2413 @@
+{
+  "2 Axis Router": {
+    "Router Cutting": {
+      "Blank": {
+        "_raw": [
+          "2 Axis Router:Router Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "2 Axis Router:Router Cutting//ComplexHole"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "2 Axis Router:Router Cutting//SimpleHole"
+        ]
+      }
+    }
+  },
+  "2 Roll Bending": {
+    "2 Roll Bending": {
+      "StraightBend": {
+        "_raw": [
+          "2 Roll Bending:2 Roll Bending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "2 Roll Bending:2 Roll Bending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "2 Roll Bending:2 Roll Bending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "3 Roll Bending": {
+    "3 Roll Bending": {
+      "Form": {
+        "_raw": [
+          "3 Roll Bending:3 Roll Bending//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "3 Roll Bending:3 Roll Bending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "3 Roll Bending:3 Roll Bending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "3 Roll Bending:3 Roll Bending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Coil Uncoil": {
+      "_none": {
+        "_raw": [
+          "3 Roll Bending:Coil Uncoil"
+        ]
+      }
+    }
+  },
+  "3D Laser": {
+    "3D Laser Cutting": {
+      "ComplexHole": {
+        "_raw": [
+          "3D Laser:3D Laser Cutting//ComplexHole"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "3D Laser:3D Laser Cutting//SimpleHole"
+        ]
+      }
+    }
+  },
+  "4 Roll Bending": {
+    "4 Roll Bending": {
+      "Form": {
+        "_raw": [
+          "4 Roll Bending:4 Roll Bending//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "4 Roll Bending:4 Roll Bending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "4 Roll Bending:4 Roll Bending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "4 Roll Bending:4 Roll Bending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "Bend Brake": {
+    "Bending": {
+      "Form": {
+        "_raw": [
+          "Bend Brake:Bending//Form"
+        ]
+      },
+      "MultiBend": {
+        "_raw": [
+          "Bend Brake:Bending//MultiBend"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Bend Brake:Bending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Bend Brake:Bending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Bend Brake:Bending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "Deslag": {
+    "Deslag": {
+      "Blank": {
+        "_raw": [
+          "Deslag:Deslag//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Deslag:Deslag//ComplexHole"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Deslag:Deslag//SimpleHole"
+        ]
+      }
+    }
+  },
+  "Fiber Laser Cut": {
+    "Fiber Laser Bevel Cutting": {
+      "Blank": {
+        "_raw": [
+          "Fiber Laser Cut:Fiber Laser Bevel Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Fiber Laser Cut:Fiber Laser Bevel Cutting//ComplexHole"
+        ]
+      },
+      "Edge": {
+        "_raw": [
+          "Fiber Laser Cut:Fiber Laser Bevel Cutting//Edge"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Fiber Laser Cut:Fiber Laser Bevel Cutting//SimpleHole"
+        ]
+      }
+    },
+    "Fiber Laser Cut": {
+      "MultiStepHole": {
+        "_raw": [
+          "Fiber Laser Cut:Fiber Laser Cut//MultiStepHole"
+        ]
+      }
+    },
+    "Fiber Laser Cutting": {
+      "Blank": {
+        "_raw": [
+          "Fiber Laser Cut:Fiber Laser Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Fiber Laser Cut:Fiber Laser Cutting//ComplexHole"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Fiber Laser Cut:Fiber Laser Cutting//SimpleHole"
+        ]
+      }
+    }
+  },
+  "Generic Press": {
+    "As Formed": {
+      "CurvedSurface": {
+        "_raw": [
+          "Generic Press:As Formed//CurvedSurface"
+        ]
+      },
+      "CurvedWall": {
+        "_raw": [
+          "Generic Press:As Formed//CurvedWall"
+        ]
+      },
+      "PlanarFace": {
+        "_raw": [
+          "Generic Press:As Formed//PlanarFace"
+        ]
+      }
+    },
+    "Bending": {
+      "Form": {
+        "_raw": [
+          "Generic Press:Bending//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Generic Press:Bending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Generic Press:Bending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Generic Press:Bending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Blanking": {
+      "Blank": {
+        "_raw": [
+          "Generic Press:Blanking//Blank"
+        ]
+      }
+    },
+    "Cam Action Bending": {
+      "Form": {
+        "_raw": [
+          "Generic Press:Cam Action Bending//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Generic Press:Cam Action Bending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Generic Press:Cam Action Bending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Generic Press:Cam Action Bending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "CamOverBending": {
+      "StraightBend": {
+        "_raw": [
+          "Generic Press:CamOverBending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Generic Press:CamOverBending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Generic Press:CamOverBending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Coining": {
+      "Blank": {
+        "_raw": [
+          "Generic Press:Coining//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Generic Press:Coining//ComplexHole"
+        ]
+      }
+    },
+    "CounterSinking": {
+      "SimpleHole": {
+        "_raw": [
+          "Generic Press:CounterSinking//SimpleHole"
+        ]
+      }
+    },
+    "DownOverBending": {
+      "Form": {
+        "_raw": [
+          "Generic Press:DownOverBending//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Generic Press:DownOverBending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Generic Press:DownOverBending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Generic Press:DownOverBending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Embossing": {
+      "Form": {
+        "_raw": [
+          "Generic Press:Embossing//Form"
+        ]
+      },
+      "MultiBend": {
+        "_raw": [
+          "Generic Press:Embossing//MultiBend"
+        ]
+      },
+      "ShearForm": {
+        "_raw": [
+          "Generic Press:Embossing//ShearForm"
+        ]
+      }
+    },
+    "Extruding": {
+      "ComplexHole": {
+        "_raw": [
+          "Generic Press:Extruding//ComplexHole"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Generic Press:Extruding//SimpleHole"
+        ]
+      }
+    },
+    "Forming": {
+      "Form": {
+        "_raw": [
+          "Generic Press:Forming//Form"
+        ]
+      },
+      "MultiBend": {
+        "_raw": [
+          "Generic Press:Forming//MultiBend"
+        ]
+      },
+      "ShearForm": {
+        "_raw": [
+          "Generic Press:Forming//ShearForm"
+        ]
+      }
+    },
+    "Lancing/Lance": {
+      "_none": {
+        "_raw": [
+          "Generic Press:Lancing/Lance"
+        ]
+      }
+    },
+    "Piercing": {
+      "ComplexHole": {
+        "_raw": [
+          "Generic Press:Piercing//ComplexHole"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Generic Press:Piercing//SimpleHole"
+        ]
+      }
+    },
+    "Restriking": {
+      "Form": {
+        "_raw": [
+          "Generic Press:Restriking//Form"
+        ]
+      },
+      "MultiBend": {
+        "_raw": [
+          "Generic Press:Restriking//MultiBend"
+        ]
+      },
+      "ShearForm": {
+        "_raw": [
+          "Generic Press:Restriking//ShearForm"
+        ]
+      }
+    },
+    "Scoring": {
+      "Form": {
+        "_raw": [
+          "Generic Press:Scoring//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Generic Press:Scoring//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Generic Press:Scoring//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Generic Press:Scoring//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Setting": {
+      "Form": {
+        "_raw": [
+          "Generic Press:Setting//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Generic Press:Setting//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Generic Press:Setting//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Generic Press:Setting//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Side Action Forming": {
+      "Form": {
+        "_raw": [
+          "Generic Press:Side Action Forming//Form"
+        ]
+      }
+    },
+    "Stamping": {
+      "Form": {
+        "_raw": [
+          "Generic Press:Stamping//Form"
+        ]
+      },
+      "ShearForm": {
+        "_raw": [
+          "Generic Press:Stamping//ShearForm"
+        ]
+      }
+    },
+    "Trimming": {
+      "Blank": {
+        "_raw": [
+          "Generic Press:Trimming//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Generic Press:Trimming//ComplexHole"
+        ]
+      }
+    }
+  },
+  "Laser Cut": {
+    "Laser Bevel Cutting": {
+      "Blank": {
+        "_raw": [
+          "Laser Cut:Laser Bevel Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Laser Cut:Laser Bevel Cutting//ComplexHole"
+        ]
+      },
+      "Edge": {
+        "_raw": [
+          "Laser Cut:Laser Bevel Cutting//Edge"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Laser Cut:Laser Bevel Cutting//SimpleHole"
+        ]
+      }
+    },
+    "Laser Cut": {
+      "MultiStepHole": {
+        "_raw": [
+          "Laser Cut:Laser Cut//MultiStepHole"
+        ]
+      }
+    },
+    "Laser Cutting": {
+      "Blank": {
+        "_raw": [
+          "Laser Cut:Laser Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Laser Cut:Laser Cutting//ComplexHole"
+        ]
+      },
+      "Perimeter": {
+        "_raw": [
+          "Laser Cut:Laser Cutting//Perimeter"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Laser Cut:Laser Cutting//SimpleHole"
+        ]
+      }
+    }
+  },
+  "Laser Punch": {
+    "Countersinking": {
+      "_none": {
+        "_raw": [
+          "Laser Punch:Countersinking"
+        ],
+        "Countersinking": {
+          "ComplexHole": {
+            "_raw": [
+              "Laser Punch:Countersinking:Countersinking//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Laser Punch:Countersinking:Countersinking//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Flanging": {
+      "_none": {
+        "_raw": [
+          "Laser Punch:Flanging"
+        ],
+        "Flanging": {
+          "ComplexHole": {
+            "_raw": [
+              "Laser Punch:Flanging:Flanging//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Laser Punch:Flanging:Flanging//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Forming": {
+      "_none": {
+        "_raw": [
+          "Laser Punch:Forming"
+        ],
+        "Forming": {
+          "Form": {
+            "_raw": [
+              "Laser Punch:Forming:Forming//Form"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Laser Punch:Forming:Forming//Form:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Laser Punch:Forming:Forming//Form:As Formed//CurvedWall"
+                ]
+              },
+              "PlanarFace": {
+                "_raw": [
+                  "Laser Punch:Forming:Forming//Form:As Formed//PlanarFace"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Lancing": {
+      "_none": {
+        "_raw": [
+          "Laser Punch:Lancing"
+        ],
+        "Lancing": {
+          "Form": {
+            "_raw": [
+              "Laser Punch:Lancing:Lancing//Form"
+            ]
+          },
+          "Lance": {
+            "_raw": [
+              "Laser Punch:Lancing:Lancing//Lance"
+            ]
+          }
+        }
+      }
+    },
+    "Laser Cut": {
+      "_none": {
+        "_raw": [
+          "Laser Punch:Laser Cut"
+        ],
+        "Laser Cutting": {
+          "Blank": {
+            "_raw": [
+              "Laser Punch:Laser Cut:Laser Cutting//Blank"
+            ],
+            "Laser Cutting": {
+              "Edge": {
+                "_raw": [
+                  "Laser Punch:Laser Cut:Laser Cutting//Blank:Laser Cutting//Edge"
+                ]
+              }
+            }
+          },
+          "ComplexHole": {
+            "_raw": [
+              "Laser Punch:Laser Cut:Laser Cutting//ComplexHole"
+            ],
+            "Laser Cutting": {
+              "Edge": {
+                "_raw": [
+                  "Laser Punch:Laser Cut:Laser Cutting//ComplexHole:Laser Cutting//Edge"
+                ]
+              }
+            }
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Laser Punch:Laser Cut:Laser Cutting//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Nibbling": {
+      "_none": {
+        "_raw": [
+          "Laser Punch:Nibbling"
+        ],
+        "Nibbling": {
+          "Blank": {
+            "_raw": [
+              "Laser Punch:Nibbling:Nibbling//Blank"
+            ],
+            "Nibbling": {
+              "Edge": {
+                "_raw": [
+                  "Laser Punch:Nibbling:Nibbling//Blank:Nibbling//Edge"
+                ]
+              }
+            }
+          },
+          "ComplexHole": {
+            "_raw": [
+              "Laser Punch:Nibbling:Nibbling//ComplexHole"
+            ],
+            "Nibbling": {
+              "Edge": {
+                "_raw": [
+                  "Laser Punch:Nibbling:Nibbling//ComplexHole:Nibbling//Edge"
+                ]
+              }
+            }
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Laser Punch:Nibbling:Nibbling//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Perforating": {
+      "_none": {
+        "_raw": [
+          "Laser Punch:Perforating"
+        ],
+        "Perforating": {
+          "ComplexHole": {
+            "_raw": [
+              "Laser Punch:Perforating:Perforating//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Laser Punch:Perforating:Perforating//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Punching": {
+      "_none": {
+        "_raw": [
+          "Laser Punch:Punching"
+        ],
+        "Punching": {
+          "ComplexHole": {
+            "_raw": [
+              "Laser Punch:Punching:Punching//ComplexHole"
+            ],
+            "Punching": {
+              "Edge": {
+                "_raw": [
+                  "Laser Punch:Punching:Punching//ComplexHole:Punching//Edge"
+                ]
+              }
+            }
+          },
+          "MultiStepHole": {
+            "_raw": [
+              "Laser Punch:Punching:Punching//MultiStepHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Laser Punch:Punching:Punching//SimpleHole"
+            ],
+            "Punching": {
+              "Edge": {
+                "_raw": [
+                  "Laser Punch:Punching:Punching//SimpleHole:Punching//Edge"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Tapping": {
+      "_none": {
+        "_raw": [
+          "Laser Punch:Tapping"
+        ],
+        "Tapping": {
+          "SimpleHole": {
+            "_raw": [
+              "Laser Punch:Tapping:Tapping//SimpleHole"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "Material Stock": {
+    "As Supplied": {
+      "Blank": {
+        "_raw": [
+          "Material Stock:As Supplied//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Material Stock:As Supplied//ComplexHole"
+        ]
+      },
+      "CurvedSurface": {
+        "_raw": [
+          "Material Stock:As Supplied//CurvedSurface"
+        ]
+      },
+      "CurvedWall": {
+        "_raw": [
+          "Material Stock:As Supplied//CurvedWall"
+        ]
+      },
+      "PlanarFace": {
+        "_raw": [
+          "Material Stock:As Supplied//PlanarFace"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Material Stock:As Supplied//SimpleHole"
+        ]
+      }
+    }
+  },
+  "No Cost Feature": {
+    "No Cost Feature": {
+      "Blank": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//ComplexHole"
+        ]
+      },
+      "Edge": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//Edge"
+        ]
+      },
+      "Form": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//Form"
+        ]
+      },
+      "Lance": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//Lance"
+        ]
+      },
+      "MultiBend": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//MultiBend"
+        ]
+      },
+      "MultiStepHole": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//MultiStepHole"
+        ]
+      },
+      "NotSupported": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//NotSupported"
+        ]
+      },
+      "ShearForm": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//ShearForm"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//SimpleHole"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "No Cost Feature:No Cost Feature//StraightBend"
+        ]
+      }
+    }
+  },
+  "OxyFuel Cut": {
+    "OxyFuel Bevel Cutting": {
+      "Blank": {
+        "_raw": [
+          "OxyFuel Cut:OxyFuel Bevel Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "OxyFuel Cut:OxyFuel Bevel Cutting//ComplexHole"
+        ]
+      },
+      "Edge": {
+        "_raw": [
+          "OxyFuel Cut:OxyFuel Bevel Cutting//Edge"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "OxyFuel Cut:OxyFuel Bevel Cutting//SimpleHole"
+        ]
+      }
+    },
+    "OxyFuel Cutting": {
+      "Blank": {
+        "_raw": [
+          "OxyFuel Cut:OxyFuel Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "OxyFuel Cut:OxyFuel Cutting//ComplexHole"
+        ]
+      },
+      "MultiStepHole": {
+        "_raw": [
+          "OxyFuel Cut:OxyFuel Cutting//MultiStepHole"
+        ]
+      },
+      "Perimeter": {
+        "_raw": [
+          "OxyFuel Cut:OxyFuel Cutting//Perimeter"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "OxyFuel Cut:OxyFuel Cutting//SimpleHole"
+        ]
+      }
+    }
+  },
+  "Plasma Cut": {
+    "Plasma Bevel Cutting": {
+      "Blank": {
+        "_raw": [
+          "Plasma Cut:Plasma Bevel Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Plasma Cut:Plasma Bevel Cutting//ComplexHole"
+        ]
+      },
+      "Edge": {
+        "_raw": [
+          "Plasma Cut:Plasma Bevel Cutting//Edge"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Plasma Cut:Plasma Bevel Cutting//SimpleHole"
+        ]
+      }
+    },
+    "Plasma Cut": {
+      "MultiStepHole": {
+        "_raw": [
+          "Plasma Cut:Plasma Cut//MultiStepHole"
+        ]
+      }
+    },
+    "Plasma Cutting": {
+      "Blank": {
+        "_raw": [
+          "Plasma Cut:Plasma Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Plasma Cut:Plasma Cutting//ComplexHole"
+        ]
+      },
+      "Perimeter": {
+        "_raw": [
+          "Plasma Cut:Plasma Cutting//Perimeter"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Plasma Cut:Plasma Cutting//SimpleHole"
+        ]
+      }
+    }
+  },
+  "Plasma Punch": {
+    "Countersinking": {
+      "_none": {
+        "_raw": [
+          "Plasma Punch:Countersinking"
+        ],
+        "Countersinking": {
+          "ComplexHole": {
+            "_raw": [
+              "Plasma Punch:Countersinking:Countersinking//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Plasma Punch:Countersinking:Countersinking//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Flanging": {
+      "_none": {
+        "_raw": [
+          "Plasma Punch:Flanging"
+        ],
+        "Flanging": {
+          "ComplexHole": {
+            "_raw": [
+              "Plasma Punch:Flanging:Flanging//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Plasma Punch:Flanging:Flanging//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Forming": {
+      "_none": {
+        "_raw": [
+          "Plasma Punch:Forming"
+        ],
+        "Forming": {
+          "Form": {
+            "_raw": [
+              "Plasma Punch:Forming:Forming//Form"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Plasma Punch:Forming:Forming//Form:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Plasma Punch:Forming:Forming//Form:As Formed//CurvedWall"
+                ]
+              },
+              "PlanarFace": {
+                "_raw": [
+                  "Plasma Punch:Forming:Forming//Form:As Formed//PlanarFace"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Lancing": {
+      "_none": {
+        "_raw": [
+          "Plasma Punch:Lancing"
+        ],
+        "Lancing": {
+          "Form": {
+            "_raw": [
+              "Plasma Punch:Lancing:Lancing//Form"
+            ]
+          },
+          "Lance": {
+            "_raw": [
+              "Plasma Punch:Lancing:Lancing//Lance"
+            ]
+          }
+        }
+      }
+    },
+    "Nibbling": {
+      "_none": {
+        "_raw": [
+          "Plasma Punch:Nibbling"
+        ],
+        "Nibbling": {
+          "Blank": {
+            "_raw": [
+              "Plasma Punch:Nibbling:Nibbling//Blank"
+            ],
+            "Nibbling": {
+              "Edge": {
+                "_raw": [
+                  "Plasma Punch:Nibbling:Nibbling//Blank:Nibbling//Edge"
+                ]
+              }
+            }
+          },
+          "ComplexHole": {
+            "_raw": [
+              "Plasma Punch:Nibbling:Nibbling//ComplexHole"
+            ],
+            "Nibbling": {
+              "Edge": {
+                "_raw": [
+                  "Plasma Punch:Nibbling:Nibbling//ComplexHole:Nibbling//Edge"
+                ]
+              }
+            }
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Plasma Punch:Nibbling:Nibbling//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Perforating": {
+      "_none": {
+        "_raw": [
+          "Plasma Punch:Perforating"
+        ],
+        "Perforating": {
+          "ComplexHole": {
+            "_raw": [
+              "Plasma Punch:Perforating:Perforating//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Plasma Punch:Perforating:Perforating//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Plasma Cut": {
+      "_none": {
+        "_raw": [
+          "Plasma Punch:Plasma Cut"
+        ],
+        "Plasma Cutting": {
+          "Blank": {
+            "_raw": [
+              "Plasma Punch:Plasma Cut:Plasma Cutting//Blank"
+            ],
+            "Plasma Cutting": {
+              "Edge": {
+                "_raw": [
+                  "Plasma Punch:Plasma Cut:Plasma Cutting//Blank:Plasma Cutting//Edge"
+                ]
+              }
+            }
+          },
+          "ComplexHole": {
+            "_raw": [
+              "Plasma Punch:Plasma Cut:Plasma Cutting//ComplexHole"
+            ],
+            "Plasma Cutting": {
+              "Edge": {
+                "_raw": [
+                  "Plasma Punch:Plasma Cut:Plasma Cutting//ComplexHole:Plasma Cutting//Edge"
+                ]
+              }
+            }
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Plasma Punch:Plasma Cut:Plasma Cutting//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Punching": {
+      "_none": {
+        "_raw": [
+          "Plasma Punch:Punching"
+        ],
+        "Punching": {
+          "ComplexHole": {
+            "_raw": [
+              "Plasma Punch:Punching:Punching//ComplexHole"
+            ],
+            "Punching": {
+              "Edge": {
+                "_raw": [
+                  "Plasma Punch:Punching:Punching//ComplexHole:Punching//Edge"
+                ]
+              }
+            }
+          },
+          "MultiStepHole": {
+            "_raw": [
+              "Plasma Punch:Punching:Punching//MultiStepHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Plasma Punch:Punching:Punching//SimpleHole"
+            ],
+            "Punching": {
+              "Edge": {
+                "_raw": [
+                  "Plasma Punch:Punching:Punching//SimpleHole:Punching//Edge"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Tapping": {
+      "_none": {
+        "_raw": [
+          "Plasma Punch:Tapping"
+        ],
+        "Tapping": {
+          "SimpleHole": {
+            "_raw": [
+              "Plasma Punch:Tapping:Tapping//SimpleHole"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "Progressive Die": {
+    "Die Station": {
+      "_none": {
+        "_raw": [
+          "Progressive Die:Die Station"
+        ],
+        "Addendum Trimming Post-Forming": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Addendum Trimming Post-Forming//Blank"
+            ]
+          }
+        },
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Progressive Die:Die Station:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Progressive Die:Die Station:As Formed//CurvedWall"
+            ]
+          },
+          "PlanarFace": {
+            "_raw": [
+              "Progressive Die:Die Station:As Formed//PlanarFace"
+            ]
+          }
+        },
+        "Bending": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Bending//Form"
+            ]
+          },
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Bending//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:Bending//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:Bending//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Blanking Piloting": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Blanking Piloting//Blank"
+            ]
+          }
+        },
+        "Blanking": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Blanking//Blank"
+            ]
+          }
+        },
+        "Cam Action Bending": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Cam Action Bending//Form"
+            ]
+          },
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Cam Action Bending//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:Cam Action Bending//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:Cam Action Bending//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Cam Action Piercing": {
+          "ComplexHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Cam Action Piercing//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Cam Action Piercing//SimpleHole"
+            ]
+          }
+        },
+        "Cam Action Trimming": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Cam Action Trimming//Blank"
+            ]
+          }
+        },
+        "CamOverBending": {
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:CamOverBending//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:CamOverBending//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:CamOverBending//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Coining": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Coining//Blank"
+            ]
+          },
+          "ComplexHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Coining//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Coining//SimpleHole"
+            ]
+          }
+        },
+        "CounterSinking": {
+          "SimpleHole": {
+            "_raw": [
+              "Progressive Die:Die Station:CounterSinking//SimpleHole"
+            ]
+          }
+        },
+        "Cutoff": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Cutoff//Blank"
+            ]
+          }
+        },
+        "Deep Drawing": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Deep Drawing//Form"
+            ]
+          }
+        },
+        "DownOverBending": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:DownOverBending//Form"
+            ]
+          },
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:DownOverBending//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:DownOverBending//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:DownOverBending//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Drawing": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Drawing//Form"
+            ]
+          }
+        },
+        "Edge Trimming": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Edge Trimming//Blank"
+            ]
+          }
+        },
+        "Embossing": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Embossing//Form"
+            ]
+          },
+          "MultiBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Embossing//MultiBend"
+            ]
+          },
+          "ShearForm": {
+            "_raw": [
+              "Progressive Die:Die Station:Embossing//ShearForm"
+            ]
+          }
+        },
+        "Extruding": {
+          "ComplexHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Extruding//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Extruding//SimpleHole"
+            ]
+          }
+        },
+        "Forming": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Forming//Form"
+            ]
+          },
+          "MultiBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Forming//MultiBend"
+            ]
+          },
+          "ShearForm": {
+            "_raw": [
+              "Progressive Die:Die Station:Forming//ShearForm"
+            ]
+          }
+        },
+        "Full Blanking": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Full Blanking//Blank"
+            ]
+          }
+        },
+        "Gusset Bending": {
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Gusset Bending//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:Gusset Bending//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:Gusset Bending//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Gusset Forming": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Gusset Forming//Form"
+            ]
+          },
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Gusset Forming//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:Gusset Forming//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:Gusset Forming//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Idle": {
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Idle//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:Idle//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:Idle//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Lancing/Lance": {
+          "_none": {
+            "_raw": [
+              "Progressive Die:Die Station:Lancing/Lance"
+            ]
+          }
+        },
+        "Piercing": {
+          "ComplexHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Piercing//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Piercing//SimpleHole"
+            ]
+          }
+        },
+        "Piloting Edge Trimming": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Piloting Edge Trimming//Blank"
+            ]
+          }
+        },
+        "Piloting": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Piloting//Blank"
+            ]
+          }
+        },
+        "Post Form Trimming": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Post Form Trimming//Blank"
+            ]
+          }
+        },
+        "Re Piloting": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Re Piloting//Blank"
+            ]
+          }
+        },
+        "Restriking": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Restriking//Form"
+            ]
+          },
+          "MultiBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Restriking//MultiBend"
+            ]
+          },
+          "ShearForm": {
+            "_raw": [
+              "Progressive Die:Die Station:Restriking//ShearForm"
+            ]
+          },
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Restriking//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:Restriking//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:Restriking//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Scoring": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Scoring//Form"
+            ]
+          },
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Scoring//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:Scoring//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:Scoring//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Setting": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Setting//Form"
+            ]
+          },
+          "StraightBend": {
+            "_raw": [
+              "Progressive Die:Die Station:Setting//StraightBend"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Progressive Die:Die Station:Setting//StraightBend:As Formed//CurvedSurface"
+                ]
+              },
+              "CurvedWall": {
+                "_raw": [
+                  "Progressive Die:Die Station:Setting//StraightBend:As Formed//CurvedWall"
+                ]
+              }
+            }
+          }
+        },
+        "Shaving": {
+          "SimpleHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Shaving//SimpleHole"
+            ]
+          }
+        },
+        "Side Action Forming": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Side Action Forming//Form"
+            ]
+          }
+        },
+        "Stamping": {
+          "Form": {
+            "_raw": [
+              "Progressive Die:Die Station:Stamping//Form"
+            ]
+          },
+          "ShearForm": {
+            "_raw": [
+              "Progressive Die:Die Station:Stamping//ShearForm"
+            ]
+          }
+        },
+        "Tapping": {
+          "SimpleHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Tapping//SimpleHole"
+            ]
+          }
+        },
+        "Tipping Back": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Tipping Back//Blank"
+            ]
+          }
+        },
+        "Tipping": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Tipping//Blank"
+            ]
+          }
+        },
+        "Trimming Piloting": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Trimming Piloting//Blank"
+            ]
+          }
+        },
+        "Trimming": {
+          "Blank": {
+            "_raw": [
+              "Progressive Die:Die Station:Trimming//Blank"
+            ]
+          },
+          "ComplexHole": {
+            "_raw": [
+              "Progressive Die:Die Station:Trimming//ComplexHole"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "Shear": {
+    "Shear": {
+      "Blank": {
+        "_raw": [
+          "Shear:Shear//Blank"
+        ]
+      }
+    }
+  },
+  "Std Press": {
+    "As Formed": {
+      "CurvedSurface": {
+        "_raw": [
+          "Std Press:As Formed//CurvedSurface"
+        ]
+      },
+      "CurvedWall": {
+        "_raw": [
+          "Std Press:As Formed//CurvedWall"
+        ]
+      },
+      "PlanarFace": {
+        "_raw": [
+          "Std Press:As Formed//PlanarFace"
+        ]
+      }
+    },
+    "Std Press": {
+      "Blank": {
+        "_raw": [
+          "Std Press:Std Press//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Std Press:Std Press//ComplexHole"
+        ]
+      },
+      "Form": {
+        "_raw": [
+          "Std Press:Std Press//Form"
+        ]
+      },
+      "Lance": {
+        "_raw": [
+          "Std Press:Std Press//Lance"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Std Press:Std Press//SimpleHole"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Std Press:Std Press//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Std Press:Std Press//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Std Press:Std Press//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "Tandem Press": {
+    "As Formed": {
+      "CurvedSurface": {
+        "_raw": [
+          "Tandem Press:As Formed//CurvedSurface"
+        ]
+      },
+      "CurvedWall": {
+        "_raw": [
+          "Tandem Press:As Formed//CurvedWall"
+        ]
+      },
+      "PlanarFace": {
+        "_raw": [
+          "Tandem Press:As Formed//PlanarFace"
+        ]
+      }
+    },
+    "Bending": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:Bending//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Tandem Press:Bending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Tandem Press:Bending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Tandem Press:Bending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Blanking": {
+      "Blank": {
+        "_raw": [
+          "Tandem Press:Blanking//Blank"
+        ]
+      }
+    },
+    "Cam Action Bending": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:Cam Action Bending//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Tandem Press:Cam Action Bending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Tandem Press:Cam Action Bending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Tandem Press:Cam Action Bending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "CamOverBending": {
+      "StraightBend": {
+        "_raw": [
+          "Tandem Press:CamOverBending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Tandem Press:CamOverBending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Tandem Press:CamOverBending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Coining": {
+      "Blank": {
+        "_raw": [
+          "Tandem Press:Coining//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Tandem Press:Coining//ComplexHole"
+        ]
+      }
+    },
+    "CounterSinking": {
+      "SimpleHole": {
+        "_raw": [
+          "Tandem Press:CounterSinking//SimpleHole"
+        ]
+      }
+    },
+    "DownOverBending": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:DownOverBending//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Tandem Press:DownOverBending//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Tandem Press:DownOverBending//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Tandem Press:DownOverBending//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Embossing": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:Embossing//Form"
+        ]
+      },
+      "MultiBend": {
+        "_raw": [
+          "Tandem Press:Embossing//MultiBend"
+        ]
+      },
+      "ShearForm": {
+        "_raw": [
+          "Tandem Press:Embossing//ShearForm"
+        ]
+      }
+    },
+    "Extruding": {
+      "ComplexHole": {
+        "_raw": [
+          "Tandem Press:Extruding//ComplexHole"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Tandem Press:Extruding//SimpleHole"
+        ]
+      }
+    },
+    "Forming": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:Forming//Form"
+        ]
+      },
+      "MultiBend": {
+        "_raw": [
+          "Tandem Press:Forming//MultiBend"
+        ]
+      },
+      "ShearForm": {
+        "_raw": [
+          "Tandem Press:Forming//ShearForm"
+        ]
+      }
+    },
+    "Lancing/Lance": {
+      "_none": {
+        "_raw": [
+          "Tandem Press:Lancing/Lance"
+        ]
+      }
+    },
+    "Piercing": {
+      "ComplexHole": {
+        "_raw": [
+          "Tandem Press:Piercing//ComplexHole"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Tandem Press:Piercing//SimpleHole"
+        ]
+      }
+    },
+    "Restriking": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:Restriking//Form"
+        ]
+      },
+      "MultiBend": {
+        "_raw": [
+          "Tandem Press:Restriking//MultiBend"
+        ]
+      },
+      "ShearForm": {
+        "_raw": [
+          "Tandem Press:Restriking//ShearForm"
+        ]
+      }
+    },
+    "Scoring": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:Scoring//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Tandem Press:Scoring//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Tandem Press:Scoring//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Tandem Press:Scoring//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Setting": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:Setting//Form"
+        ]
+      },
+      "StraightBend": {
+        "_raw": [
+          "Tandem Press:Setting//StraightBend"
+        ],
+        "As Formed": {
+          "CurvedSurface": {
+            "_raw": [
+              "Tandem Press:Setting//StraightBend:As Formed//CurvedSurface"
+            ]
+          },
+          "CurvedWall": {
+            "_raw": [
+              "Tandem Press:Setting//StraightBend:As Formed//CurvedWall"
+            ]
+          }
+        }
+      }
+    },
+    "Side Action Forming": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:Side Action Forming//Form"
+        ]
+      }
+    },
+    "Stamping": {
+      "Form": {
+        "_raw": [
+          "Tandem Press:Stamping//Form"
+        ]
+      },
+      "ShearForm": {
+        "_raw": [
+          "Tandem Press:Stamping//ShearForm"
+        ]
+      }
+    },
+    "Trimming": {
+      "Blank": {
+        "_raw": [
+          "Tandem Press:Trimming//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Tandem Press:Trimming//ComplexHole"
+        ]
+      }
+    }
+  },
+  "Turret Press": {
+    "As Formed": {
+      "CurvedSurface": {
+        "_raw": [
+          "Turret Press:As Formed//CurvedSurface"
+        ]
+      },
+      "CurvedWall": {
+        "_raw": [
+          "Turret Press:As Formed//CurvedWall"
+        ]
+      },
+      "PlanarFace": {
+        "_raw": [
+          "Turret Press:As Formed//PlanarFace"
+        ]
+      }
+    },
+    "Countersinking": {
+      "_none": {
+        "_raw": [
+          "Turret Press:Countersinking"
+        ],
+        "Countersinking": {
+          "ComplexHole": {
+            "_raw": [
+              "Turret Press:Countersinking:Countersinking//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Turret Press:Countersinking:Countersinking//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Flanging": {
+      "_none": {
+        "_raw": [
+          "Turret Press:Flanging"
+        ],
+        "Flanging": {
+          "ComplexHole": {
+            "_raw": [
+              "Turret Press:Flanging:Flanging//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Turret Press:Flanging:Flanging//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Forming": {
+      "_none": {
+        "_raw": [
+          "Turret Press:Forming"
+        ],
+        "Forming": {
+          "Form": {
+            "_raw": [
+              "Turret Press:Forming:Forming//Form"
+            ],
+            "As Formed": {
+              "CurvedSurface": {
+                "_raw": [
+                  "Turret Press:Forming:Forming//Form:As Formed//CurvedSurface"
+                ]
+              },
+              "PlanarFace": {
+                "_raw": [
+                  "Turret Press:Forming:Forming//Form:As Formed//PlanarFace"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Lancing": {
+      "_none": {
+        "_raw": [
+          "Turret Press:Lancing"
+        ],
+        "Lancing": {
+          "Form": {
+            "_raw": [
+              "Turret Press:Lancing:Lancing//Form"
+            ]
+          },
+          "Lance": {
+            "_raw": [
+              "Turret Press:Lancing:Lancing//Lance"
+            ]
+          }
+        }
+      }
+    },
+    "Nibbling": {
+      "_none": {
+        "_raw": [
+          "Turret Press:Nibbling"
+        ],
+        "Nibbling": {
+          "Blank": {
+            "_raw": [
+              "Turret Press:Nibbling:Nibbling//Blank"
+            ],
+            "Nibbling": {
+              "Edge": {
+                "_raw": [
+                  "Turret Press:Nibbling:Nibbling//Blank:Nibbling//Edge"
+                ]
+              }
+            }
+          },
+          "ComplexHole": {
+            "_raw": [
+              "Turret Press:Nibbling:Nibbling//ComplexHole"
+            ],
+            "Nibbling": {
+              "Edge": {
+                "_raw": [
+                  "Turret Press:Nibbling:Nibbling//ComplexHole:Nibbling//Edge"
+                ]
+              }
+            }
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Turret Press:Nibbling:Nibbling//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Perforating": {
+      "_none": {
+        "_raw": [
+          "Turret Press:Perforating"
+        ],
+        "Perforating": {
+          "ComplexHole": {
+            "_raw": [
+              "Turret Press:Perforating:Perforating//ComplexHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Turret Press:Perforating:Perforating//SimpleHole"
+            ]
+          }
+        }
+      }
+    },
+    "Punching": {
+      "_none": {
+        "_raw": [
+          "Turret Press:Punching"
+        ],
+        "Punching": {
+          "Blank": {
+            "_raw": [
+              "Turret Press:Punching:Punching//Blank"
+            ],
+            "Punching": {
+              "Edge": {
+                "_raw": [
+                  "Turret Press:Punching:Punching//Blank:Punching//Edge"
+                ]
+              }
+            }
+          },
+          "ComplexHole": {
+            "_raw": [
+              "Turret Press:Punching:Punching//ComplexHole"
+            ],
+            "Punching": {
+              "Edge": {
+                "_raw": [
+                  "Turret Press:Punching:Punching//ComplexHole:Punching//Edge"
+                ]
+              }
+            }
+          },
+          "MultiStepHole": {
+            "_raw": [
+              "Turret Press:Punching:Punching//MultiStepHole"
+            ]
+          },
+          "SimpleHole": {
+            "_raw": [
+              "Turret Press:Punching:Punching//SimpleHole"
+            ],
+            "Punching": {
+              "Edge": {
+                "_raw": [
+                  "Turret Press:Punching:Punching//SimpleHole:Punching//Edge"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Tapping": {
+      "_none": {
+        "_raw": [
+          "Turret Press:Tapping"
+        ],
+        "Tapping": {
+          "SimpleHole": {
+            "_raw": [
+              "Turret Press:Tapping:Tapping//SimpleHole"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "Waterjet Cut": {
+    "Waterjet Bevel Cutting": {
+      "Blank": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Bevel Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Bevel Cutting//ComplexHole"
+        ]
+      },
+      "Edge": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Bevel Cutting//Edge"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Bevel Cutting//SimpleHole"
+        ]
+      }
+    },
+    "Waterjet Cut": {
+      "MultiStepHole": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Cut//MultiStepHole"
+        ]
+      }
+    },
+    "Waterjet Cutting": {
+      "Blank": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Cutting//Blank"
+        ]
+      },
+      "ComplexHole": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Cutting//ComplexHole"
+        ]
+      },
+      "FinishedPart": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Cutting//FinishedPart"
+        ]
+      },
+      "PartingLine": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Cutting//PartingLine"
+        ]
+      },
+      "Perimeter": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Cutting//Perimeter"
+        ]
+      },
+      "SimpleHole": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Cutting//SimpleHole"
+        ]
+      },
+      "Void": {
+        "_raw": [
+          "Waterjet Cut:Waterjet Cutting//Void"
+        ]
+      }
+    }
+  }
+}

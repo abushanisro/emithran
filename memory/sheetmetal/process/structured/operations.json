@@ -1,0 +1,6049 @@
+[
+  {
+    "raw": "2 Axis Router:Router Cutting//Blank",
+    "process": "2 Axis Router",
+    "levels": [
+      {
+        "operation": "Router Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Router Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "2 Axis Router:Router Cutting//ComplexHole",
+    "process": "2 Axis Router",
+    "levels": [
+      {
+        "operation": "Router Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Router Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Router"
+  },
+  {
+    "raw": "2 Axis Router:Router Cutting//SimpleHole",
+    "process": "2 Axis Router",
+    "levels": [
+      {
+        "operation": "Router Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Router Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Router"
+  },
+  {
+    "raw": "2 Roll Bending:2 Roll Bending//StraightBend",
+    "process": "2 Roll Bending",
+    "levels": [
+      {
+        "operation": "2 Roll Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "2 Roll Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "2 Roll Bending:2 Roll Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "2 Roll Bending",
+    "levels": [
+      {
+        "operation": "2 Roll Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "2 Roll Bending:2 Roll Bending//StraightBend:As Formed//CurvedWall",
+    "process": "2 Roll Bending",
+    "levels": [
+      {
+        "operation": "2 Roll Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "3 Roll Bending:3 Roll Bending//Form",
+    "process": "3 Roll Bending",
+    "levels": [
+      {
+        "operation": "3 Roll Bending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "3 Roll Bending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "3 Roll Bending:3 Roll Bending//StraightBend",
+    "process": "3 Roll Bending",
+    "levels": [
+      {
+        "operation": "3 Roll Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "3 Roll Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "3 Roll Bending:3 Roll Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "3 Roll Bending",
+    "levels": [
+      {
+        "operation": "3 Roll Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "3 Roll Bending:3 Roll Bending//StraightBend:As Formed//CurvedWall",
+    "process": "3 Roll Bending",
+    "levels": [
+      {
+        "operation": "3 Roll Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "3 Roll Bending:Coil Uncoil",
+    "process": "3 Roll Bending",
+    "levels": [
+      {
+        "operation": "Coil Uncoil",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Coil Uncoil",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "3D Laser:3D Laser Cutting//ComplexHole",
+    "process": "3D Laser",
+    "levels": [
+      {
+        "operation": "3D Laser Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "3D Laser Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "3D Laser Cutting"
+  },
+  {
+    "raw": "3D Laser:3D Laser Cutting//SimpleHole",
+    "process": "3D Laser",
+    "levels": [
+      {
+        "operation": "3D Laser Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "3D Laser Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "3D Laser Cutting"
+  },
+  {
+    "raw": "4 Roll Bending:4 Roll Bending//Form",
+    "process": "4 Roll Bending",
+    "levels": [
+      {
+        "operation": "4 Roll Bending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "4 Roll Bending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "4 Roll Bending:4 Roll Bending//StraightBend",
+    "process": "4 Roll Bending",
+    "levels": [
+      {
+        "operation": "4 Roll Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "4 Roll Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "4 Roll Bending:4 Roll Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "4 Roll Bending",
+    "levels": [
+      {
+        "operation": "4 Roll Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "4 Roll Bending:4 Roll Bending//StraightBend:As Formed//CurvedWall",
+    "process": "4 Roll Bending",
+    "levels": [
+      {
+        "operation": "4 Roll Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Bend Brake:Bending//Form",
+    "process": "Bend Brake",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Bending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Bend Brake:Bending//MultiBend",
+    "process": "Bend Brake",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Bending",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": "Bend Brake"
+  },
+  {
+    "raw": "Bend Brake:Bending//StraightBend",
+    "process": "Bend Brake",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": "Bend Brake"
+  },
+  {
+    "raw": "Bend Brake:Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "Bend Brake",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Bend Brake:Bending//StraightBend:As Formed//CurvedWall",
+    "process": "Bend Brake",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Deslag:Deslag//Blank",
+    "process": "Deslag",
+    "levels": [
+      {
+        "operation": "Deslag",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Deslag",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Deslag:Deslag//ComplexHole",
+    "process": "Deslag",
+    "levels": [
+      {
+        "operation": "Deslag",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Deslag",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Deslag:Deslag//SimpleHole",
+    "process": "Deslag",
+    "levels": [
+      {
+        "operation": "Deslag",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Deslag",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Fiber Laser Cut:Fiber Laser Bevel Cutting//Blank",
+    "process": "Fiber Laser Cut",
+    "levels": [
+      {
+        "operation": "Fiber Laser Bevel Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Fiber Laser Bevel Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Fiber Laser Cut:Fiber Laser Bevel Cutting//ComplexHole",
+    "process": "Fiber Laser Cut",
+    "levels": [
+      {
+        "operation": "Fiber Laser Bevel Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Fiber Laser Bevel Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Fiber Laser Cut:Fiber Laser Bevel Cutting//Edge",
+    "process": "Fiber Laser Cut",
+    "levels": [
+      {
+        "operation": "Fiber Laser Bevel Cutting",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Fiber Laser Bevel Cutting",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Fiber Laser Cut:Fiber Laser Bevel Cutting//SimpleHole",
+    "process": "Fiber Laser Cut",
+    "levels": [
+      {
+        "operation": "Fiber Laser Bevel Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Fiber Laser Bevel Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Fiber Laser Cut:Fiber Laser Cut//MultiStepHole",
+    "process": "Fiber Laser Cut",
+    "levels": [
+      {
+        "operation": "Fiber Laser Cut",
+        "feature": "MultiStepHole"
+      }
+    ],
+    "leaf_operation": "Fiber Laser Cut",
+    "leaf_feature": "MultiStepHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Fiber Laser Cut:Fiber Laser Cutting//Blank",
+    "process": "Fiber Laser Cut",
+    "levels": [
+      {
+        "operation": "Fiber Laser Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Fiber Laser Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Fiber Laser Cut:Fiber Laser Cutting//ComplexHole",
+    "process": "Fiber Laser Cut",
+    "levels": [
+      {
+        "operation": "Fiber Laser Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Fiber Laser Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Laser Cutting"
+  },
+  {
+    "raw": "Fiber Laser Cut:Fiber Laser Cutting//SimpleHole",
+    "process": "Fiber Laser Cut",
+    "levels": [
+      {
+        "operation": "Fiber Laser Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Fiber Laser Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Laser Cutting"
+  },
+  {
+    "raw": "Generic Press:As Formed//CurvedSurface",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:As Formed//CurvedWall",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:As Formed//PlanarFace",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "PlanarFace"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "PlanarFace",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Bending//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Bending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Bending//StraightBend",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Bending//StraightBend:As Formed//CurvedWall",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Blanking//Blank",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Blanking",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Blanking",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Cam Action Bending//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Cam Action Bending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Cam Action Bending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Cam Action Bending//StraightBend",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Cam Action Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Cam Action Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Cam Action Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Cam Action Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Cam Action Bending//StraightBend:As Formed//CurvedWall",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Cam Action Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:CamOverBending//StraightBend",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "CamOverBending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "CamOverBending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:CamOverBending//StraightBend:As Formed//CurvedSurface",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "CamOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:CamOverBending//StraightBend:As Formed//CurvedWall",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "CamOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Coining//Blank",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Coining",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Coining",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Coining//ComplexHole",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Coining",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Coining",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:CounterSinking//SimpleHole",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "CounterSinking",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "CounterSinking",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:DownOverBending//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "DownOverBending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "DownOverBending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:DownOverBending//StraightBend",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "DownOverBending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "DownOverBending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:DownOverBending//StraightBend:As Formed//CurvedSurface",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "DownOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:DownOverBending//StraightBend:As Formed//CurvedWall",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "DownOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Embossing//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Embossing",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Embossing",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Embossing//MultiBend",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Embossing",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Embossing",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Embossing//ShearForm",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Embossing",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Embossing",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Extruding//ComplexHole",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Extruding",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Extruding",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Extruding//SimpleHole",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Extruding",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Extruding",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Forming//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Forming//MultiBend",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Forming//ShearForm",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Lancing/Lance",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Lancing/Lance",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Lancing/Lance",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Piercing//ComplexHole",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Piercing",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Piercing",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Generic Press Piercing"
+  },
+  {
+    "raw": "Generic Press:Piercing//SimpleHole",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Piercing",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Piercing",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Generic Press Piercing"
+  },
+  {
+    "raw": "Generic Press:Restriking//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Restriking",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Restriking//MultiBend",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Restriking",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Restriking//ShearForm",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Restriking",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Scoring//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Scoring",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Scoring",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Scoring//StraightBend",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Scoring",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Scoring",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Scoring//StraightBend:As Formed//CurvedSurface",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Scoring",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Scoring//StraightBend:As Formed//CurvedWall",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Scoring",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Setting//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Setting",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Setting",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Setting//StraightBend",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Setting",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Setting",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Setting//StraightBend:As Formed//CurvedSurface",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Setting",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Setting//StraightBend:As Formed//CurvedWall",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Setting",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Side Action Forming//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Side Action Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Side Action Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Stamping//Form",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Stamping",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Stamping",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Stamping//ShearForm",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Stamping",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Stamping",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Trimming//Blank",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Trimming",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Trimming",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Generic Press:Trimming//ComplexHole",
+    "process": "Generic Press",
+    "levels": [
+      {
+        "operation": "Trimming",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Trimming",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Cut:Laser Bevel Cutting//Blank",
+    "process": "Laser Cut",
+    "levels": [
+      {
+        "operation": "Laser Bevel Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Laser Bevel Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Cut:Laser Bevel Cutting//ComplexHole",
+    "process": "Laser Cut",
+    "levels": [
+      {
+        "operation": "Laser Bevel Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Laser Bevel Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Cut:Laser Bevel Cutting//Edge",
+    "process": "Laser Cut",
+    "levels": [
+      {
+        "operation": "Laser Bevel Cutting",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Laser Bevel Cutting",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Cut:Laser Bevel Cutting//SimpleHole",
+    "process": "Laser Cut",
+    "levels": [
+      {
+        "operation": "Laser Bevel Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Laser Bevel Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Cut:Laser Cut//MultiStepHole",
+    "process": "Laser Cut",
+    "levels": [
+      {
+        "operation": "Laser Cut",
+        "feature": "MultiStepHole"
+      }
+    ],
+    "leaf_operation": "Laser Cut",
+    "leaf_feature": "MultiStepHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Cut:Laser Cutting//Blank",
+    "process": "Laser Cut",
+    "levels": [
+      {
+        "operation": "Laser Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Laser Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Cut:Laser Cutting//ComplexHole",
+    "process": "Laser Cut",
+    "levels": [
+      {
+        "operation": "Laser Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Laser Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Laser Cutting"
+  },
+  {
+    "raw": "Laser Cut:Laser Cutting//Perimeter",
+    "process": "Laser Cut",
+    "levels": [
+      {
+        "operation": "Laser Cutting",
+        "feature": "Perimeter"
+      }
+    ],
+    "leaf_operation": "Laser Cutting",
+    "leaf_feature": "Perimeter",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Cut:Laser Cutting//SimpleHole",
+    "process": "Laser Cut",
+    "levels": [
+      {
+        "operation": "Laser Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Laser Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Laser Cutting"
+  },
+  {
+    "raw": "Laser Punch:Countersinking",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Countersinking",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Countersinking",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Countersinking:Countersinking//ComplexHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Countersinking",
+        "feature": null
+      },
+      {
+        "operation": "Countersinking",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Countersinking",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Countersinking:Countersinking//SimpleHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Countersinking",
+        "feature": null
+      },
+      {
+        "operation": "Countersinking",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Countersinking",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Flanging",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Flanging",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Flanging",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Flanging:Flanging//ComplexHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Flanging",
+        "feature": null
+      },
+      {
+        "operation": "Flanging",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Flanging",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Flanging:Flanging//SimpleHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Flanging",
+        "feature": null
+      },
+      {
+        "operation": "Flanging",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Flanging",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Forming",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Forming:Forming//Form",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Forming:Forming//Form:As Formed//CurvedSurface",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Forming:Forming//Form:As Formed//CurvedWall",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Forming:Forming//Form:As Formed//PlanarFace",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "PlanarFace"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "PlanarFace",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Lancing",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Lancing",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Lancing",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Lancing:Lancing//Form",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Lancing",
+        "feature": null
+      },
+      {
+        "operation": "Lancing",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Lancing",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Lancing:Lancing//Lance",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Lancing",
+        "feature": null
+      },
+      {
+        "operation": "Lancing",
+        "feature": "Lance"
+      }
+    ],
+    "leaf_operation": "Lancing",
+    "leaf_feature": "Lance",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Laser Cut",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Laser Cut",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Laser Cut",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Laser Cut:Laser Cutting//Blank",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Laser Cut",
+        "feature": null
+      },
+      {
+        "operation": "Laser Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Laser Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Laser Cut:Laser Cutting//Blank:Laser Cutting//Edge",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Laser Cut",
+        "feature": null
+      },
+      {
+        "operation": "Laser Cutting",
+        "feature": "Blank"
+      },
+      {
+        "operation": "Laser Cutting",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Laser Cutting",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Laser Cut:Laser Cutting//ComplexHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Laser Cut",
+        "feature": null
+      },
+      {
+        "operation": "Laser Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Laser Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Laser Cutting"
+  },
+  {
+    "raw": "Laser Punch:Laser Cut:Laser Cutting//ComplexHole:Laser Cutting//Edge",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Laser Cut",
+        "feature": null
+      },
+      {
+        "operation": "Laser Cutting",
+        "feature": "ComplexHole"
+      },
+      {
+        "operation": "Laser Cutting",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Laser Cutting",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Laser Cut:Laser Cutting//SimpleHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Laser Cut",
+        "feature": null
+      },
+      {
+        "operation": "Laser Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Laser Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Laser Cutting"
+  },
+  {
+    "raw": "Laser Punch:Nibbling",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Nibbling:Nibbling//Blank",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Nibbling:Nibbling//Blank:Nibbling//Edge",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Blank"
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Nibbling:Nibbling//ComplexHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Combi Punch"
+  },
+  {
+    "raw": "Laser Punch:Nibbling:Nibbling//ComplexHole:Nibbling//Edge",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "ComplexHole"
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Nibbling:Nibbling//SimpleHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Combi Punch"
+  },
+  {
+    "raw": "Laser Punch:Perforating",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Perforating",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Perforating",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Perforating:Perforating//ComplexHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Perforating",
+        "feature": null
+      },
+      {
+        "operation": "Perforating",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Perforating",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Combi Perforating"
+  },
+  {
+    "raw": "Laser Punch:Perforating:Perforating//SimpleHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Perforating",
+        "feature": null
+      },
+      {
+        "operation": "Perforating",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Perforating",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Combi Perforating"
+  },
+  {
+    "raw": "Laser Punch:Punching",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Punching:Punching//ComplexHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Combi Punch"
+  },
+  {
+    "raw": "Laser Punch:Punching:Punching//ComplexHole:Punching//Edge",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "ComplexHole"
+      },
+      {
+        "operation": "Punching",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Punching:Punching//MultiStepHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "MultiStepHole"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "MultiStepHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Punching:Punching//SimpleHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Combi Punch"
+  },
+  {
+    "raw": "Laser Punch:Punching:Punching//SimpleHole:Punching//Edge",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "SimpleHole"
+      },
+      {
+        "operation": "Punching",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Tapping",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Tapping",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Tapping",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Laser Punch:Tapping:Tapping//SimpleHole",
+    "process": "Laser Punch",
+    "levels": [
+      {
+        "operation": "Tapping",
+        "feature": null
+      },
+      {
+        "operation": "Tapping",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Tapping",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Material Stock:As Supplied//Blank",
+    "process": "Material Stock",
+    "levels": [
+      {
+        "operation": "As Supplied",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "As Supplied",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Material Stock:As Supplied//ComplexHole",
+    "process": "Material Stock",
+    "levels": [
+      {
+        "operation": "As Supplied",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "As Supplied",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Material Stock:As Supplied//CurvedSurface",
+    "process": "Material Stock",
+    "levels": [
+      {
+        "operation": "As Supplied",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Supplied",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Material Stock:As Supplied//CurvedWall",
+    "process": "Material Stock",
+    "levels": [
+      {
+        "operation": "As Supplied",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Supplied",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Material Stock:As Supplied//PlanarFace",
+    "process": "Material Stock",
+    "levels": [
+      {
+        "operation": "As Supplied",
+        "feature": "PlanarFace"
+      }
+    ],
+    "leaf_operation": "As Supplied",
+    "leaf_feature": "PlanarFace",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Material Stock:As Supplied//SimpleHole",
+    "process": "Material Stock",
+    "levels": [
+      {
+        "operation": "As Supplied",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "As Supplied",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//Blank",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//ComplexHole",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//Edge",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//Form",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//Lance",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "Lance"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "Lance",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//MultiBend",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//MultiStepHole",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "MultiStepHole"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "MultiStepHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//NotSupported",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "NotSupported"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "NotSupported",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//ShearForm",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//SimpleHole",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "No Cost Feature:No Cost Feature//StraightBend",
+    "process": "No Cost Feature",
+    "levels": [
+      {
+        "operation": "No Cost Feature",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "No Cost Feature",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "OxyFuel Cut:OxyFuel Bevel Cutting//Blank",
+    "process": "OxyFuel Cut",
+    "levels": [
+      {
+        "operation": "OxyFuel Bevel Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "OxyFuel Bevel Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "OxyFuel Cut:OxyFuel Bevel Cutting//ComplexHole",
+    "process": "OxyFuel Cut",
+    "levels": [
+      {
+        "operation": "OxyFuel Bevel Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "OxyFuel Bevel Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "OxyFuel Cut:OxyFuel Bevel Cutting//Edge",
+    "process": "OxyFuel Cut",
+    "levels": [
+      {
+        "operation": "OxyFuel Bevel Cutting",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "OxyFuel Bevel Cutting",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "OxyFuel Cut:OxyFuel Bevel Cutting//SimpleHole",
+    "process": "OxyFuel Cut",
+    "levels": [
+      {
+        "operation": "OxyFuel Bevel Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "OxyFuel Bevel Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "OxyFuel Cut:OxyFuel Cutting//Blank",
+    "process": "OxyFuel Cut",
+    "levels": [
+      {
+        "operation": "OxyFuel Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "OxyFuel Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "OxyFuel Cut:OxyFuel Cutting//ComplexHole",
+    "process": "OxyFuel Cut",
+    "levels": [
+      {
+        "operation": "OxyFuel Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "OxyFuel Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Oxyfuel Cutting"
+  },
+  {
+    "raw": "OxyFuel Cut:OxyFuel Cutting//MultiStepHole",
+    "process": "OxyFuel Cut",
+    "levels": [
+      {
+        "operation": "OxyFuel Cutting",
+        "feature": "MultiStepHole"
+      }
+    ],
+    "leaf_operation": "OxyFuel Cutting",
+    "leaf_feature": "MultiStepHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "OxyFuel Cut:OxyFuel Cutting//Perimeter",
+    "process": "OxyFuel Cut",
+    "levels": [
+      {
+        "operation": "OxyFuel Cutting",
+        "feature": "Perimeter"
+      }
+    ],
+    "leaf_operation": "OxyFuel Cutting",
+    "leaf_feature": "Perimeter",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "OxyFuel Cut:OxyFuel Cutting//SimpleHole",
+    "process": "OxyFuel Cut",
+    "levels": [
+      {
+        "operation": "OxyFuel Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "OxyFuel Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Oxyfuel Cutting"
+  },
+  {
+    "raw": "Plasma Cut:Plasma Bevel Cutting//Blank",
+    "process": "Plasma Cut",
+    "levels": [
+      {
+        "operation": "Plasma Bevel Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Plasma Bevel Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Cut:Plasma Bevel Cutting//ComplexHole",
+    "process": "Plasma Cut",
+    "levels": [
+      {
+        "operation": "Plasma Bevel Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Plasma Bevel Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Cut:Plasma Bevel Cutting//Edge",
+    "process": "Plasma Cut",
+    "levels": [
+      {
+        "operation": "Plasma Bevel Cutting",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Plasma Bevel Cutting",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Cut:Plasma Bevel Cutting//SimpleHole",
+    "process": "Plasma Cut",
+    "levels": [
+      {
+        "operation": "Plasma Bevel Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Plasma Bevel Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Cut:Plasma Cut//MultiStepHole",
+    "process": "Plasma Cut",
+    "levels": [
+      {
+        "operation": "Plasma Cut",
+        "feature": "MultiStepHole"
+      }
+    ],
+    "leaf_operation": "Plasma Cut",
+    "leaf_feature": "MultiStepHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Cut:Plasma Cutting//Blank",
+    "process": "Plasma Cut",
+    "levels": [
+      {
+        "operation": "Plasma Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Plasma Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Cut:Plasma Cutting//ComplexHole",
+    "process": "Plasma Cut",
+    "levels": [
+      {
+        "operation": "Plasma Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Plasma Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Plasma Cutting"
+  },
+  {
+    "raw": "Plasma Cut:Plasma Cutting//Perimeter",
+    "process": "Plasma Cut",
+    "levels": [
+      {
+        "operation": "Plasma Cutting",
+        "feature": "Perimeter"
+      }
+    ],
+    "leaf_operation": "Plasma Cutting",
+    "leaf_feature": "Perimeter",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Cut:Plasma Cutting//SimpleHole",
+    "process": "Plasma Cut",
+    "levels": [
+      {
+        "operation": "Plasma Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Plasma Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Plasma Cutting"
+  },
+  {
+    "raw": "Plasma Punch:Countersinking",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Countersinking",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Countersinking",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Countersinking:Countersinking//ComplexHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Countersinking",
+        "feature": null
+      },
+      {
+        "operation": "Countersinking",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Countersinking",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Countersinking:Countersinking//SimpleHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Countersinking",
+        "feature": null
+      },
+      {
+        "operation": "Countersinking",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Countersinking",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Flanging",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Flanging",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Flanging",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Flanging:Flanging//ComplexHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Flanging",
+        "feature": null
+      },
+      {
+        "operation": "Flanging",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Flanging",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Flanging:Flanging//SimpleHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Flanging",
+        "feature": null
+      },
+      {
+        "operation": "Flanging",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Flanging",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Forming",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Forming:Forming//Form",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Forming:Forming//Form:As Formed//CurvedSurface",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Forming:Forming//Form:As Formed//CurvedWall",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Forming:Forming//Form:As Formed//PlanarFace",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "PlanarFace"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "PlanarFace",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Lancing",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Lancing",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Lancing",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Lancing:Lancing//Form",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Lancing",
+        "feature": null
+      },
+      {
+        "operation": "Lancing",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Lancing",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Lancing:Lancing//Lance",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Lancing",
+        "feature": null
+      },
+      {
+        "operation": "Lancing",
+        "feature": "Lance"
+      }
+    ],
+    "leaf_operation": "Lancing",
+    "leaf_feature": "Lance",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Nibbling",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Nibbling:Nibbling//Blank",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Nibbling:Nibbling//Blank:Nibbling//Edge",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Blank"
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Nibbling:Nibbling//ComplexHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Combi Punch"
+  },
+  {
+    "raw": "Plasma Punch:Nibbling:Nibbling//ComplexHole:Nibbling//Edge",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "ComplexHole"
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Nibbling:Nibbling//SimpleHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Combi Punch"
+  },
+  {
+    "raw": "Plasma Punch:Perforating",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Perforating",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Perforating",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Perforating:Perforating//ComplexHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Perforating",
+        "feature": null
+      },
+      {
+        "operation": "Perforating",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Perforating",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Combi Perforating"
+  },
+  {
+    "raw": "Plasma Punch:Perforating:Perforating//SimpleHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Perforating",
+        "feature": null
+      },
+      {
+        "operation": "Perforating",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Perforating",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Combi Perforating"
+  },
+  {
+    "raw": "Plasma Punch:Plasma Cut",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Plasma Cut",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Plasma Cut",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Plasma Cut:Plasma Cutting//Blank",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Plasma Cut",
+        "feature": null
+      },
+      {
+        "operation": "Plasma Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Plasma Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Plasma Cut:Plasma Cutting//Blank:Plasma Cutting//Edge",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Plasma Cut",
+        "feature": null
+      },
+      {
+        "operation": "Plasma Cutting",
+        "feature": "Blank"
+      },
+      {
+        "operation": "Plasma Cutting",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Plasma Cutting",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Plasma Cut:Plasma Cutting//ComplexHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Plasma Cut",
+        "feature": null
+      },
+      {
+        "operation": "Plasma Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Plasma Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Plasma Cutting"
+  },
+  {
+    "raw": "Plasma Punch:Plasma Cut:Plasma Cutting//ComplexHole:Plasma Cutting//Edge",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Plasma Cut",
+        "feature": null
+      },
+      {
+        "operation": "Plasma Cutting",
+        "feature": "ComplexHole"
+      },
+      {
+        "operation": "Plasma Cutting",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Plasma Cutting",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Plasma Cut:Plasma Cutting//SimpleHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Plasma Cut",
+        "feature": null
+      },
+      {
+        "operation": "Plasma Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Plasma Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Plasma Cutting"
+  },
+  {
+    "raw": "Plasma Punch:Punching",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Punching:Punching//ComplexHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Combi Punch"
+  },
+  {
+    "raw": "Plasma Punch:Punching:Punching//ComplexHole:Punching//Edge",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "ComplexHole"
+      },
+      {
+        "operation": "Punching",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Punching:Punching//MultiStepHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "MultiStepHole"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "MultiStepHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Punching:Punching//SimpleHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Combi Punch"
+  },
+  {
+    "raw": "Plasma Punch:Punching:Punching//SimpleHole:Punching//Edge",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "SimpleHole"
+      },
+      {
+        "operation": "Punching",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Tapping",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Tapping",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Tapping",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Plasma Punch:Tapping:Tapping//SimpleHole",
+    "process": "Plasma Punch",
+    "levels": [
+      {
+        "operation": "Tapping",
+        "feature": null
+      },
+      {
+        "operation": "Tapping",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Tapping",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Die Station",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Addendum Trimming Post-Forming//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Addendum Trimming Post-Forming",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Addendum Trimming Post-Forming",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:As Formed//PlanarFace",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "As Formed",
+        "feature": "PlanarFace"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "PlanarFace",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Bending//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Bending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Bending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Bending//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Bending//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Blanking Piloting//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Blanking Piloting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Blanking Piloting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Blanking//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Blanking",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Blanking",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Cam Action Bending//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Cam Action Bending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Cam Action Bending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Cam Action Bending//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Cam Action Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Cam Action Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Cam Action Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Cam Action Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Cam Action Bending//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Cam Action Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Cam Action Piercing//ComplexHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Cam Action Piercing",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Cam Action Piercing",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Progressive Die Piercing"
+  },
+  {
+    "raw": "Progressive Die:Die Station:Cam Action Piercing//SimpleHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Cam Action Piercing",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Cam Action Piercing",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Progressive Die Piercing"
+  },
+  {
+    "raw": "Progressive Die:Die Station:Cam Action Trimming//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Cam Action Trimming",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Cam Action Trimming",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:CamOverBending//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "CamOverBending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "CamOverBending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:CamOverBending//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "CamOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:CamOverBending//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "CamOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Coining//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Coining",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Coining",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Coining//ComplexHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Coining",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Coining",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Coining//SimpleHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Coining",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Coining",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:CounterSinking//SimpleHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "CounterSinking",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "CounterSinking",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Cutoff//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Cutoff",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Cutoff",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Deep Drawing//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Deep Drawing",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Deep Drawing",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:DownOverBending//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "DownOverBending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "DownOverBending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:DownOverBending//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "DownOverBending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "DownOverBending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:DownOverBending//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "DownOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:DownOverBending//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "DownOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Drawing//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Drawing",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Drawing",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Edge Trimming//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Edge Trimming",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Edge Trimming",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Embossing//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Embossing",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Embossing",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Embossing//MultiBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Embossing",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Embossing",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Embossing//ShearForm",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Embossing",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Embossing",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Extruding//ComplexHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Extruding",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Extruding",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Extruding//SimpleHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Extruding",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Extruding",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Forming//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Forming//MultiBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Forming//ShearForm",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Full Blanking//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Full Blanking",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Full Blanking",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Gusset Bending//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Gusset Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Gusset Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Gusset Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Gusset Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Gusset Bending//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Gusset Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Gusset Forming//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Gusset Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Gusset Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Gusset Forming//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Gusset Forming",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Gusset Forming",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Gusset Forming//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Gusset Forming",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Gusset Forming//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Gusset Forming",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Idle//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Idle",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Idle",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Idle//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Idle",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Idle//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Idle",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Lancing/Lance",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Lancing/Lance",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Lancing/Lance",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Piercing//ComplexHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Piercing",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Piercing",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Progressive Die Piercing"
+  },
+  {
+    "raw": "Progressive Die:Die Station:Piercing//SimpleHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Piercing",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Piercing",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Progressive Die Piercing"
+  },
+  {
+    "raw": "Progressive Die:Die Station:Piloting Edge Trimming//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Piloting Edge Trimming",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Piloting Edge Trimming",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Piloting//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Piloting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Piloting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Post Form Trimming//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Post Form Trimming",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Post Form Trimming",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Re Piloting//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Re Piloting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Re Piloting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Restriking//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Restriking",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Restriking//MultiBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Restriking",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Restriking//ShearForm",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Restriking",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Restriking//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Restriking",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Restriking//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Restriking",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Restriking//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Restriking",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Scoring//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Scoring",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Scoring",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Scoring//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Scoring",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Scoring",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Scoring//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Scoring",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Scoring//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Scoring",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Setting//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Setting",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Setting",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Setting//StraightBend",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Setting",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Setting",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Setting//StraightBend:As Formed//CurvedSurface",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Setting",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Setting//StraightBend:As Formed//CurvedWall",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Setting",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Shaving//SimpleHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Shaving",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Shaving",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Side Action Forming//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Side Action Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Side Action Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Stamping//Form",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Stamping",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Stamping",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Stamping//ShearForm",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Stamping",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Stamping",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Tapping//SimpleHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Tapping",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Tapping",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Tipping Back//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Tipping Back",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Tipping Back",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Tipping//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Tipping",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Tipping",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Trimming Piloting//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Trimming Piloting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Trimming Piloting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Trimming//Blank",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Trimming",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Trimming",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Progressive Die:Die Station:Trimming//ComplexHole",
+    "process": "Progressive Die",
+    "levels": [
+      {
+        "operation": "Die Station",
+        "feature": null
+      },
+      {
+        "operation": "Trimming",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Trimming",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Shear:Shear//Blank",
+    "process": "Shear",
+    "levels": [
+      {
+        "operation": "Shear",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Shear",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Std Press:As Formed//CurvedSurface",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Std Press:As Formed//CurvedWall",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Std Press:As Formed//PlanarFace",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "PlanarFace"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "PlanarFace",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Std Press:Std Press//Blank",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "Std Press",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Std Press",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Std Press:Std Press//ComplexHole",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "Std Press",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Std Press",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Standard Press Piercing"
+  },
+  {
+    "raw": "Std Press:Std Press//Form",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "Std Press",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Std Press",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Std Press:Std Press//Lance",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "Std Press",
+        "feature": "Lance"
+      }
+    ],
+    "leaf_operation": "Std Press",
+    "leaf_feature": "Lance",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Std Press:Std Press//SimpleHole",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "Std Press",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Std Press",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Standard Press Piercing"
+  },
+  {
+    "raw": "Std Press:Std Press//StraightBend",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "Std Press",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Std Press",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Std Press:Std Press//StraightBend:As Formed//CurvedSurface",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "Std Press",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Std Press:Std Press//StraightBend:As Formed//CurvedWall",
+    "process": "Std Press",
+    "levels": [
+      {
+        "operation": "Std Press",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:As Formed//CurvedSurface",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:As Formed//CurvedWall",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:As Formed//PlanarFace",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "PlanarFace"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "PlanarFace",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Bending//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Bending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Bending//StraightBend",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Bending//StraightBend:As Formed//CurvedWall",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Blanking//Blank",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Blanking",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Blanking",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Cam Action Bending//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Cam Action Bending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Cam Action Bending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Cam Action Bending//StraightBend",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Cam Action Bending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Cam Action Bending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Cam Action Bending//StraightBend:As Formed//CurvedSurface",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Cam Action Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Cam Action Bending//StraightBend:As Formed//CurvedWall",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Cam Action Bending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:CamOverBending//StraightBend",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "CamOverBending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "CamOverBending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:CamOverBending//StraightBend:As Formed//CurvedSurface",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "CamOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:CamOverBending//StraightBend:As Formed//CurvedWall",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "CamOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Coining//Blank",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Coining",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Coining",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Coining//ComplexHole",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Coining",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Coining",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:CounterSinking//SimpleHole",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "CounterSinking",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "CounterSinking",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:DownOverBending//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "DownOverBending",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "DownOverBending",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:DownOverBending//StraightBend",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "DownOverBending",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "DownOverBending",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:DownOverBending//StraightBend:As Formed//CurvedSurface",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "DownOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:DownOverBending//StraightBend:As Formed//CurvedWall",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "DownOverBending",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Embossing//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Embossing",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Embossing",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Embossing//MultiBend",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Embossing",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Embossing",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Embossing//ShearForm",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Embossing",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Embossing",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Extruding//ComplexHole",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Extruding",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Extruding",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Extruding//SimpleHole",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Extruding",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Extruding",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Forming//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Forming//MultiBend",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Forming//ShearForm",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Lancing/Lance",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Lancing/Lance",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Lancing/Lance",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Piercing//ComplexHole",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Piercing",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Piercing",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Tandem Press Piercing"
+  },
+  {
+    "raw": "Tandem Press:Piercing//SimpleHole",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Piercing",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Piercing",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Tandem Press Piercing"
+  },
+  {
+    "raw": "Tandem Press:Restriking//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Restriking",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Restriking//MultiBend",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Restriking",
+        "feature": "MultiBend"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "MultiBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Restriking//ShearForm",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Restriking",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Restriking",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Scoring//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Scoring",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Scoring",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Scoring//StraightBend",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Scoring",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Scoring",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Scoring//StraightBend:As Formed//CurvedSurface",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Scoring",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Scoring//StraightBend:As Formed//CurvedWall",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Scoring",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Setting//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Setting",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Setting",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Setting//StraightBend",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Setting",
+        "feature": "StraightBend"
+      }
+    ],
+    "leaf_operation": "Setting",
+    "leaf_feature": "StraightBend",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Setting//StraightBend:As Formed//CurvedSurface",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Setting",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Setting//StraightBend:As Formed//CurvedWall",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Setting",
+        "feature": "StraightBend"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Side Action Forming//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Side Action Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Side Action Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Stamping//Form",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Stamping",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Stamping",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Stamping//ShearForm",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Stamping",
+        "feature": "ShearForm"
+      }
+    ],
+    "leaf_operation": "Stamping",
+    "leaf_feature": "ShearForm",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Trimming//Blank",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Trimming",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Trimming",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Tandem Press:Trimming//ComplexHole",
+    "process": "Tandem Press",
+    "levels": [
+      {
+        "operation": "Trimming",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Trimming",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:As Formed//CurvedSurface",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:As Formed//CurvedWall",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "CurvedWall"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedWall",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:As Formed//PlanarFace",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "As Formed",
+        "feature": "PlanarFace"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "PlanarFace",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Countersinking",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Countersinking",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Countersinking",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Countersinking:Countersinking//ComplexHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Countersinking",
+        "feature": null
+      },
+      {
+        "operation": "Countersinking",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Countersinking",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Countersinking:Countersinking//SimpleHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Countersinking",
+        "feature": null
+      },
+      {
+        "operation": "Countersinking",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Countersinking",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Flanging",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Flanging",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Flanging",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Flanging:Flanging//ComplexHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Flanging",
+        "feature": null
+      },
+      {
+        "operation": "Flanging",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Flanging",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Flanging:Flanging//SimpleHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Flanging",
+        "feature": null
+      },
+      {
+        "operation": "Flanging",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Flanging",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Forming",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Forming:Forming//Form",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Forming",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Forming:Forming//Form:As Formed//CurvedSurface",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "CurvedSurface"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "CurvedSurface",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Forming:Forming//Form:As Formed//PlanarFace",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Forming",
+        "feature": null
+      },
+      {
+        "operation": "Forming",
+        "feature": "Form"
+      },
+      {
+        "operation": "As Formed",
+        "feature": "PlanarFace"
+      }
+    ],
+    "leaf_operation": "As Formed",
+    "leaf_feature": "PlanarFace",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Lancing",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Lancing",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Lancing",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Lancing:Lancing//Form",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Lancing",
+        "feature": null
+      },
+      {
+        "operation": "Lancing",
+        "feature": "Form"
+      }
+    ],
+    "leaf_operation": "Lancing",
+    "leaf_feature": "Form",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Lancing:Lancing//Lance",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Lancing",
+        "feature": null
+      },
+      {
+        "operation": "Lancing",
+        "feature": "Lance"
+      }
+    ],
+    "leaf_operation": "Lancing",
+    "leaf_feature": "Lance",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Nibbling",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Nibbling:Nibbling//Blank",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Nibbling:Nibbling//Blank:Nibbling//Edge",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Blank"
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Nibbling:Nibbling//ComplexHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Nibbling:Nibbling//ComplexHole:Nibbling//Edge",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "ComplexHole"
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Nibbling:Nibbling//SimpleHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Nibbling",
+        "feature": null
+      },
+      {
+        "operation": "Nibbling",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Nibbling",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Perforating",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Perforating",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Perforating",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Perforating:Perforating//ComplexHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Perforating",
+        "feature": null
+      },
+      {
+        "operation": "Perforating",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Perforating",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Turret Perforating"
+  },
+  {
+    "raw": "Turret Press:Perforating:Perforating//SimpleHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Perforating",
+        "feature": null
+      },
+      {
+        "operation": "Perforating",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Perforating",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Turret Perforating"
+  },
+  {
+    "raw": "Turret Press:Punching",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Punching:Punching//Blank",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Punching:Punching//Blank:Punching//Edge",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "Blank"
+      },
+      {
+        "operation": "Punching",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Punching:Punching//ComplexHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Turret Punch"
+  },
+  {
+    "raw": "Turret Press:Punching:Punching//ComplexHole:Punching//Edge",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "ComplexHole"
+      },
+      {
+        "operation": "Punching",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Punching:Punching//MultiStepHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "MultiStepHole"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "MultiStepHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Punching:Punching//SimpleHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Turret Punch"
+  },
+  {
+    "raw": "Turret Press:Punching:Punching//SimpleHole:Punching//Edge",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Punching",
+        "feature": null
+      },
+      {
+        "operation": "Punching",
+        "feature": "SimpleHole"
+      },
+      {
+        "operation": "Punching",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Punching",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Tapping",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Tapping",
+        "feature": null
+      }
+    ],
+    "leaf_operation": "Tapping",
+    "leaf_feature": null,
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Turret Press:Tapping:Tapping//SimpleHole",
+    "process": "Turret Press",
+    "levels": [
+      {
+        "operation": "Tapping",
+        "feature": null
+      },
+      {
+        "operation": "Tapping",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Tapping",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Bevel Cutting//Blank",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Bevel Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Waterjet Bevel Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Bevel Cutting//ComplexHole",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Bevel Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Waterjet Bevel Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Bevel Cutting//Edge",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Bevel Cutting",
+        "feature": "Edge"
+      }
+    ],
+    "leaf_operation": "Waterjet Bevel Cutting",
+    "leaf_feature": "Edge",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Bevel Cutting//SimpleHole",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Bevel Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Waterjet Bevel Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Cut//MultiStepHole",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Cut",
+        "feature": "MultiStepHole"
+      }
+    ],
+    "leaf_operation": "Waterjet Cut",
+    "leaf_feature": "MultiStepHole",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Cutting//Blank",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Cutting",
+        "feature": "Blank"
+      }
+    ],
+    "leaf_operation": "Waterjet Cutting",
+    "leaf_feature": "Blank",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Cutting//ComplexHole",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Cutting",
+        "feature": "ComplexHole"
+      }
+    ],
+    "leaf_operation": "Waterjet Cutting",
+    "leaf_feature": "ComplexHole",
+    "canonical_operation_reference": "Waterjet Cutting"
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Cutting//FinishedPart",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Cutting",
+        "feature": "FinishedPart"
+      }
+    ],
+    "leaf_operation": "Waterjet Cutting",
+    "leaf_feature": "FinishedPart",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Cutting//PartingLine",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Cutting",
+        "feature": "PartingLine"
+      }
+    ],
+    "leaf_operation": "Waterjet Cutting",
+    "leaf_feature": "PartingLine",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Cutting//Perimeter",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Cutting",
+        "feature": "Perimeter"
+      }
+    ],
+    "leaf_operation": "Waterjet Cutting",
+    "leaf_feature": "Perimeter",
+    "canonical_operation_reference": null
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Cutting//SimpleHole",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Cutting",
+        "feature": "SimpleHole"
+      }
+    ],
+    "leaf_operation": "Waterjet Cutting",
+    "leaf_feature": "SimpleHole",
+    "canonical_operation_reference": "Waterjet Cutting"
+  },
+  {
+    "raw": "Waterjet Cut:Waterjet Cutting//Void",
+    "process": "Waterjet Cut",
+    "levels": [
+      {
+        "operation": "Waterjet Cutting",
+        "feature": "Void"
+      }
+    ],
+    "leaf_operation": "Waterjet Cutting",
+    "leaf_feature": "Void",
+    "canonical_operation_reference": null
+  }
+]

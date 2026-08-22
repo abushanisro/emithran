@@ -1,0 +1,218 @@
+[
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Cutting",
+    "operation": "2 Axis Router",
+    "machine": "Default Machine",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "unwired"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Bending/Floating /Forming",
+    "operation": "2 Roll Bending",
+    "machine": "Faccin HCU 300 X 1",
+    "route_match": "exact",
+    "live_active": true,
+    "roadmap_status": "thin"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Bending/Floating /Forming",
+    "operation": "3 Roll Bending",
+    "machine": "Faccin ASI/M 2513",
+    "route_match": "exact",
+    "live_active": true,
+    "roadmap_status": "thin"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Laser Cutting",
+    "operation": "3D Laser",
+    "machine": "Default 3D Laser",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "unwired"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Bending/Floating /Forming",
+    "operation": "4 Roll Bending",
+    "machine": "Knuth RBM 20/04 CNC",
+    "route_match": "exact",
+    "live_active": true,
+    "roadmap_status": "thin"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Bending/Floating /Forming",
+    "operation": "Bend Brake",
+    "machine": "Default Bend Brake",
+    "route_match": "exact",
+    "live_active": true,
+    "roadmap_status": "production"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": null,
+    "operation": "CTL",
+    "machine": "Default CTL",
+    "route_match": "unassigned",
+    "live_active": null,
+    "roadmap_status": "not_modeled"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Finishing",
+    "operation": "Deslag",
+    "machine": "Default Deslag",
+    "route_match": "exact",
+    "live_active": true,
+    "roadmap_status": "thin"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Laser Cutting",
+    "operation": "Fiber Laser Cut",
+    "machine": "Laser Cutter - 4kW Fiber",
+    "route_match": "exact",
+    "live_active": true,
+    "roadmap_status": "production"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Bending/Floating /Forming",
+    "operation": "Generic Press",
+    "machine": "Default Press",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "unwired"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Laser Cutting",
+    "operation": "Laser Cut",
+    "machine": "Default Laser",
+    "route_match": "exact",
+    "live_active": true,
+    "roadmap_status": "production"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Sheet Metal Fabrication",
+    "operation": "Laser Punch",
+    "machine": "Muratec Motorum Hybrid 2558 (2000W)",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "unwired"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Material Usage",
+    "operation": "Material Stock",
+    "machine": "Default Material Stock",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "non_mfg"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Material Usage",
+    "operation": "No Cost Feature",
+    "machine": "",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "non_mfg"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Cutting",
+    "operation": "OxyFuel Cut",
+    "machine": "Default Oxyfuel - 4 torch",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "unwired"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Cutting",
+    "operation": "Plasma Cut",
+    "machine": "Default Plasma",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "unwired"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Sheet Metal Fabrication",
+    "operation": "Plasma Punch",
+    "machine": "Whitney 3700 SST",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "unwired"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Bending/Floating /Forming",
+    "operation": "Progressive Die",
+    "machine": "Default Press",
+    "route_match": "exact",
+    "live_active": true,
+    "roadmap_status": "not_modeled"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Sheet Cutting",
+    "operation": "Shear",
+    "machine": "Default Shear",
+    "route_match": "alias_confident",
+    "live_active": false,
+    "roadmap_status": "not_modeled"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Bending/Floating /Forming",
+    "operation": "Std Press",
+    "machine": "Default Press",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "unwired"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Bending/Floating /Forming",
+    "operation": "Tandem Press",
+    "machine": "Default Press",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "unwired"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Bending/Floating /Forming",
+    "operation": "Turret Press",
+    "machine": "Default Turret Press",
+    "route_match": "exact",
+    "live_active": false,
+    "roadmap_status": "production"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": null,
+    "operation": "User-Defined Process",
+    "machine": "",
+    "route_match": "unassigned",
+    "live_active": null,
+    "roadmap_status": "non_mfg"
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_route": "Cutting",
+    "operation": "Waterjet Cut",
+    "machine": "OMAX 2626",
+    "route_match": "alias_confident",
+    "live_active": true,
+    "roadmap_status": "production"
+  }
+]

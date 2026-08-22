@@ -1,0 +1,328 @@
+{
+  "process_group": "Sheet Metal",
+  "source": "live Process Calculator Mappings UI export (Sheet Metal group), captured 2026-08-22",
+  "live_header_reported": "68 ops · 13 routes",
+  "transcribed_op_count": 64,
+  "transcription_note": "Transcribed count does not reconcile to the page's reported 68 — treat as best-effort, not exhaustive.",
+  "routes": {
+    "Material Usage": [
+      {
+        "operation": "Gross Usage",
+        "active": true
+      },
+      {
+        "operation": "Net Usage",
+        "active": true
+      },
+      {
+        "operation": "Material Stock",
+        "active": false
+      },
+      {
+        "operation": "No Cost Feature",
+        "active": false
+      }
+    ],
+    "Forming": [
+      {
+        "operation": "Hole Extrusion (Burring)",
+        "active": true
+      }
+    ],
+    "Drilling": [
+      {
+        "operation": "Tapping",
+        "active": true
+      }
+    ],
+    "Laser Cutting": [
+      {
+        "operation": "Laser Cut",
+        "active": true
+      },
+      {
+        "operation": "Fiber Laser Cut",
+        "active": true
+      },
+      {
+        "operation": "3D Laser",
+        "active": false
+      }
+    ],
+    "Sheet Cutting": [
+      {
+        "operation": "Shearning",
+        "active": false
+      },
+      {
+        "operation": "Fiber laser Cutting",
+        "active": false
+      },
+      {
+        "operation": "Co2 Laser Cutting",
+        "active": false
+      },
+      {
+        "operation": "Plasma Cutting",
+        "active": false
+      },
+      {
+        "operation": "Blanking",
+        "active": false
+      },
+      {
+        "operation": "3D Laser Cut",
+        "active": false
+      },
+      {
+        "operation": "Shearing",
+        "active": false
+      },
+      {
+        "operation": "Waterjet Cutting",
+        "active": false
+      }
+    ],
+    "Bending/Floating /Forming": [
+      {
+        "operation": "Bend Brake",
+        "active": true
+      },
+      {
+        "operation": "Stage Tool Bending",
+        "active": true
+      },
+      {
+        "operation": "Stage Tool Forming",
+        "active": true
+      },
+      {
+        "operation": "Roll Forming",
+        "active": true
+      },
+      {
+        "operation": "Deep Draw",
+        "active": true
+      },
+      {
+        "operation": "Laser Puch",
+        "active": false
+      },
+      {
+        "operation": "Turret Press",
+        "active": false
+      },
+      {
+        "operation": "Progressive die",
+        "active": true
+      },
+      {
+        "operation": "Offline Blank",
+        "active": true
+      },
+      {
+        "operation": "Stretch forming",
+        "active": true
+      },
+      {
+        "operation": "Hemming",
+        "active": true
+      },
+      {
+        "operation": "Flanging",
+        "active": true
+      },
+      {
+        "operation": "2 Roll Bending",
+        "active": true
+      },
+      {
+        "operation": "3 Roll Bending",
+        "active": true
+      },
+      {
+        "operation": "4 Roll Bending",
+        "active": true
+      },
+      {
+        "operation": "Generic Press",
+        "active": false
+      },
+      {
+        "operation": "Std Press",
+        "active": false
+      },
+      {
+        "operation": "Tandem Press",
+        "active": false
+      }
+    ],
+    "Press Brake": [
+      {
+        "operation": "Bend",
+        "active": true
+      },
+      {
+        "operation": "Form",
+        "active": true
+      },
+      {
+        "operation": "Press Brake Bend",
+        "active": true
+      }
+    ],
+    "Raw Material": [
+      {
+        "operation": "Sheet",
+        "active": true
+      },
+      {
+        "operation": "Flat",
+        "active": true
+      },
+      {
+        "operation": "Coil",
+        "active": true
+      },
+      {
+        "operation": "I-Beam",
+        "active": true
+      },
+      {
+        "operation": "H-Beam",
+        "active": true
+      },
+      {
+        "operation": "Angle (L-shape)",
+        "active": true
+      },
+      {
+        "operation": "Channel (C-shape / U-shape)",
+        "active": true
+      },
+      {
+        "operation": "T-Sections",
+        "active": true
+      },
+      {
+        "operation": "Z-Sections",
+        "active": true
+      }
+    ],
+    "Finishing": [
+      {
+        "operation": "Deburr",
+        "active": true
+      },
+      {
+        "operation": "Edge Finish",
+        "active": true
+      },
+      {
+        "operation": "Deslag",
+        "active": true
+      }
+    ],
+    "Inspection": [
+      {
+        "operation": "Inspect",
+        "active": true
+      },
+      {
+        "operation": "Dimensional Inspect",
+        "active": true
+      }
+    ],
+    "Surface Treatment": [
+      {
+        "operation": "Powder Coat",
+        "active": true
+      },
+      {
+        "operation": "Paint",
+        "active": true
+      },
+      {
+        "operation": "Anodize",
+        "active": true
+      }
+    ],
+    "Cutting": [
+      {
+        "operation": "Waterjet Cutting",
+        "active": true
+      },
+      {
+        "operation": "Abrasive Waterjet Cutting",
+        "active": true
+      },
+      {
+        "operation": "Pure Waterjet Cutting (for soft materials)",
+        "active": false
+      },
+      {
+        "operation": "2 Axis Router",
+        "active": false
+      },
+      {
+        "operation": "OxyFuel Cut",
+        "active": false
+      },
+      {
+        "operation": "Plasma Cut",
+        "active": false
+      }
+    ],
+    "Sheet Metal Fabrication": [
+      {
+        "operation": "Turret Punching",
+        "active": true
+      },
+      {
+        "operation": "Hole Punching",
+        "active": true
+      },
+      {
+        "operation": "Nibbling",
+        "active": true
+      }
+    ]
+  },
+  "known_duplicate_operations": [
+    {
+      "operation": "Waterjet Cutting",
+      "occurrences": [
+        "Sheet Cutting (inactive)",
+        "Cutting (active)"
+      ]
+    },
+    {
+      "operation": "Plasma Cutting / Plasma Cut",
+      "occurrences": [
+        "Sheet Cutting: \"Plasma Cutting\" (inactive)",
+        "Cutting: \"Plasma Cut\" (inactive)"
+      ]
+    },
+    {
+      "operation": "Shearing / Shearning",
+      "occurrences": [
+        "Sheet Cutting: \"Shearning\" (inactive)",
+        "Sheet Cutting: \"Shearing\" (inactive)"
+      ]
+    },
+    {
+      "operation": "3D Laser / 3D Laser Cut",
+      "occurrences": [
+        "Laser Cutting: \"3D Laser\" (inactive)",
+        "Sheet Cutting: \"3D Laser Cut\" (inactive)"
+      ]
+    },
+    {
+      "operation": "Fiber Laser Cut / Fiber laser Cutting",
+      "occurrences": [
+        "Laser Cutting: \"Fiber Laser Cut\" (active)",
+        "Sheet Cutting: \"Fiber laser Cutting\" (inactive)"
+      ]
+    }
+  ]
+}

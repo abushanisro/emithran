@@ -125,6 +125,32 @@ export const mhrFormSchema = z.object({
   usdLhrBase: z.number().min(0).optional(),
   usdLhrBurden: z.number().min(0).optional(),
   usdLhrTotal: z.number().min(0).optional(),
+  directOverheadRate: z.number().min(0).optional(),
+  indirectOverheadRate: z.number().min(0).optional(),
+
+  // Machine capability (migration 324/339) — the same real fields
+  // machine-selection/selector.ts reads for ranking, previously settable only
+  // via Excel import or a raw SQL migration, never through this dialog.
+  maxXMm: z.number().min(0).optional(),
+  maxYMm: z.number().min(0).optional(),
+  maxZMm: z.number().min(0).optional(),
+  maxDiameterMm: z.number().min(0).optional(),
+  maxLengthMm: z.number().min(0).optional(),
+  maxTonnage: z.number().min(0).optional(),
+  maxThicknessMm: z.number().min(0).optional(),
+  maxWorkpieceWeightKg: z.number().min(0).optional(),
+  powerKw: z.number().min(0).optional(),
+  maxThicknessMsMm: z.number().min(0).optional(),
+  maxThicknessSsMm: z.number().min(0).optional(),
+  maxThicknessAlMm: z.number().min(0).optional(),
+  maxThicknessCuMm: z.number().min(0).optional(),
+  cuttableMaterials: z.string().optional().or(z.literal('')),
+
+  // Additional Specifications (mhr_records.specs jsonb) — free-form catch-all
+  // for category-specific machine_library.json fields (press force, roll
+  // diameter, router RPM, etc.) with no dedicated column and no live
+  // consumer yet; edited here as raw JSON text, parsed on submit.
+  specsJson: z.string().optional().or(z.literal('')),
 }).refine(
   (data) => {
     // Validate that combined percentage costs don't exceed reasonable limits
@@ -152,6 +178,15 @@ export const mhrFormSchema = z.object({
   {
     message: 'Maintenance hours cannot exceed 30% of total working hours',
     path: ['plannedMaintenanceHoursPerYear'],
+  }
+).refine(
+  (data) => {
+    if (!data.specsJson || !data.specsJson.trim()) return true;
+    try { JSON.parse(data.specsJson); return true; } catch { return false; }
+  },
+  {
+    message: 'Additional Specifications must be valid JSON (e.g. {"press_force_kn": 300})',
+    path: ['specsJson'],
   }
 );
 

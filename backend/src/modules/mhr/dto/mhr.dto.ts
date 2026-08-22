@@ -175,6 +175,26 @@ export class CreateMHRDto {
   @ApiPropertyOptional() @IsOptional() specs?: Record<string, any>;
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() directOverheadRate?: number;
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() indirectOverheadRate?: number;
+
+  // Machine capability (physics-based selection, migration 324) — previously
+  // settable only via the Excel bulk-import path or a raw SQL migration; this
+  // lets a shop directly confirm a specific machine's real limits through the
+  // dialog. Same columns machine-selection/selector.ts's fetchMachinePool()
+  // reads for real capability-tiered ranking (see CAPABILITY_COLUMNS there).
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxXMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxYMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxZMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxDiameterMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxLengthMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxTonnage?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxWorkpieceWeightKg?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() powerKw?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessMsMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessSsMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessAlMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessCuMm?: number;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() cuttableMaterials?: string[];
 }
 
 export class UpdateMHRDto {
@@ -352,6 +372,29 @@ export class UpdateMHRDto {
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() usdLhrTotal?: number;
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() directOverheadRate?: number;
   @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() indirectOverheadRate?: number;
+
+  // specs (jsonb) was previously CREATE-only — an edited/existing record could
+  // never have this touched via the interactive API at all, only the one-way
+  // Excel-import path. Category-specific machine_library.json fields (press
+  // force, roll diameter, router RPM, etc. — no dedicated column exists or is
+  // warranted for these, see CLAUDE.md's Machine Economics entry) live here.
+  @ApiPropertyOptional() @IsOptional() specs?: Record<string, any>;
+
+  // Machine capability — see the identical block on CreateMHRDto for context.
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxXMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxYMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxZMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxDiameterMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxLengthMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxTonnage?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxWorkpieceWeightKg?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() powerKw?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessMsMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessSsMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessAlMm?: number;
+  @ApiPropertyOptional() @IsNumber() @Min(0) @IsOptional() maxThicknessCuMm?: number;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() cuttableMaterials?: string[];
 }
 
 export class QueryMHRDto {

@@ -1,0 +1,414 @@
+[
+  {
+    "process_name": "2 Axis Router",
+    "default_machine": "Default Machine",
+    "tool_shop_name": "Default Tool Shop Name",
+    "machine_entries": [
+      {
+        "tool_shop_name": "Default Tool Shop Name",
+        "machine": "Default Machine"
+      },
+      {
+        "tool_shop_name": "",
+        "machine": "2 Axis Router - 18,000 RPM"
+      }
+    ],
+    "operation_count": 3,
+    "roadmap_status": "unwired",
+    "status_note": "mapping row inactive, no cost path",
+    "process_route": "Cutting",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "2 Roll Bending",
+    "default_machine": "Faccin HCU 300 X 1",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Faccin HCU 300 X 1"
+      }
+    ],
+    "operation_count": 3,
+    "roadmap_status": "thin",
+    "status_note": "substituted through a single-row Roll Forming calculator, no material/thickness axis",
+    "process_route": "Bending/Floating /Forming",
+    "route_match": "exact",
+    "live_active": true
+  },
+  {
+    "process_name": "3 Roll Bending",
+    "default_machine": "Faccin ASI/M 2513",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Faccin ASI/M 2513"
+      }
+    ],
+    "operation_count": 5,
+    "roadmap_status": "thin",
+    "status_note": "substituted through a single-row Roll Forming calculator, no material/thickness axis",
+    "process_route": "Bending/Floating /Forming",
+    "route_match": "exact",
+    "live_active": true
+  },
+  {
+    "process_name": "3D Laser",
+    "default_machine": "Default 3D Laser",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default 3D Laser"
+      }
+    ],
+    "operation_count": 2,
+    "roadmap_status": "unwired",
+    "status_note": "mapping row inactive, no cost path",
+    "process_route": "Laser Cutting",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "4 Roll Bending",
+    "default_machine": "Knuth RBM 20/04 CNC",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Knuth RBM 20/04 CNC"
+      }
+    ],
+    "operation_count": 4,
+    "roadmap_status": "thin",
+    "status_note": "substituted through a single-row Roll Forming calculator, no material/thickness axis",
+    "process_route": "Bending/Floating /Forming",
+    "route_match": "exact",
+    "live_active": true
+  },
+  {
+    "process_name": "Bend Brake",
+    "default_machine": "Default Bend Brake",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default Bend Brake"
+      }
+    ],
+    "operation_count": 5,
+    "roadmap_status": "production",
+    "status_note": "inline cost engine (cost-engine.ts), DB-first capability selector",
+    "process_route": "Bending/Floating /Forming",
+    "route_match": "exact",
+    "live_active": true
+  },
+  {
+    "process_name": "CTL",
+    "default_machine": "Default CTL",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default CTL"
+      }
+    ],
+    "operation_count": 0,
+    "roadmap_status": "not_modeled",
+    "status_note": "absent from process_calculator_mappings entirely",
+    "process_route": null,
+    "route_match": "unassigned",
+    "live_active": null
+  },
+  {
+    "process_name": "Deslag",
+    "default_machine": "Default Deslag",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default Deslag"
+      }
+    ],
+    "operation_count": 3,
+    "roadmap_status": "thin",
+    "status_note": "folded into a generic deburring line, no real formula",
+    "process_route": "Finishing",
+    "route_match": "exact",
+    "live_active": true
+  },
+  {
+    "process_name": "Fiber Laser Cut",
+    "default_machine": "Laser Cutter - 4kW Fiber",
+    "tool_shop_name": "Default",
+    "machine_entries": [
+      {
+        "tool_shop_name": "Default",
+        "machine": "Laser Cutter - 4kW Fiber"
+      }
+    ],
+    "operation_count": 8,
+    "roadmap_status": "production",
+    "status_note": "dedicated cost engine, DB-first capability selector",
+    "process_route": "Laser Cutting",
+    "route_match": "exact",
+    "live_active": true
+  },
+  {
+    "process_name": "Generic Press",
+    "default_machine": "Default Press",
+    "tool_shop_name": "StageDiemaker1",
+    "machine_entries": [
+      {
+        "tool_shop_name": "StageDiemaker1",
+        "machine": "Default Press"
+      }
+    ],
+    "operation_count": 49,
+    "roadmap_status": "unwired",
+    "status_note": "mapping row inactive, no cost path",
+    "process_route": "Bending/Floating /Forming",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "Laser Cut",
+    "default_machine": "Default Laser",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default Laser"
+      }
+    ],
+    "operation_count": 9,
+    "roadmap_status": "production",
+    "status_note": "dedicated cost engine, DB-first capability selector",
+    "process_route": "Laser Cutting",
+    "route_match": "exact",
+    "live_active": true
+  },
+  {
+    "process_name": "Laser Punch",
+    "default_machine": "Muratec Motorum Hybrid 2558 (2000W)",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Muratec Motorum Hybrid 2558 (2000W)"
+      }
+    ],
+    "operation_count": 37,
+    "roadmap_status": "unwired",
+    "status_note": "mapping row inactive, no cost path",
+    "process_route": "Sheet Metal Fabrication",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "Material Stock",
+    "default_machine": "Default Material Stock",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default Material Stock"
+      }
+    ],
+    "operation_count": 6,
+    "roadmap_status": "non_mfg",
+    "status_note": "system marker, not a manufacturing process",
+    "process_route": "Material Usage",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "No Cost Feature",
+    "default_machine": "",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": ""
+      }
+    ],
+    "operation_count": 11,
+    "roadmap_status": "non_mfg",
+    "status_note": "system marker, not a manufacturing process",
+    "process_route": "Material Usage",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "OxyFuel Cut",
+    "default_machine": "Default Oxyfuel - 4 torch",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default Oxyfuel - 4 torch"
+      }
+    ],
+    "operation_count": 9,
+    "roadmap_status": "unwired",
+    "status_note": "mapping row inactive, no cost path",
+    "process_route": "Cutting",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "Plasma Cut",
+    "default_machine": "Default Plasma",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default Plasma"
+      }
+    ],
+    "operation_count": 9,
+    "roadmap_status": "unwired",
+    "status_note": "mapping row inactive, no cost path",
+    "process_route": "Cutting",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "Plasma Punch",
+    "default_machine": "Whitney 3700 SST",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Whitney 3700 SST"
+      }
+    ],
+    "operation_count": 37,
+    "roadmap_status": "unwired",
+    "status_note": "mapping row inactive, no cost path",
+    "process_route": "Sheet Metal Fabrication",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "Progressive Die",
+    "default_machine": "Default Press",
+    "tool_shop_name": "Default",
+    "machine_entries": [
+      {
+        "tool_shop_name": "Default",
+        "machine": "Default Press"
+      }
+    ],
+    "operation_count": 83,
+    "roadmap_status": "not_modeled",
+    "status_note": "absent + known case-duplication bug",
+    "process_route": "Bending/Floating /Forming",
+    "route_match": "exact",
+    "live_active": true
+  },
+  {
+    "process_name": "Shear",
+    "default_machine": "Default Shear",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default Shear"
+      }
+    ],
+    "operation_count": 1,
+    "roadmap_status": "not_modeled",
+    "status_note": "deactivated — no distinct shearing path exists",
+    "process_route": "Sheet Cutting",
+    "route_match": "alias_confident",
+    "live_active": false
+  },
+  {
+    "process_name": "Std Press",
+    "default_machine": "Default Press",
+    "tool_shop_name": "Diemaker1",
+    "machine_entries": [
+      {
+        "tool_shop_name": "Diemaker1",
+        "machine": "Default Press"
+      }
+    ],
+    "operation_count": 11,
+    "roadmap_status": "unwired",
+    "status_note": "mapping row inactive, no cost path",
+    "process_route": "Bending/Floating /Forming",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "Tandem Press",
+    "default_machine": "Default Press",
+    "tool_shop_name": "StageDiemaker1",
+    "machine_entries": [
+      {
+        "tool_shop_name": "StageDiemaker1",
+        "machine": "Default Press"
+      }
+    ],
+    "operation_count": 49,
+    "roadmap_status": "unwired",
+    "status_note": "mapping row inactive, no cost path",
+    "process_route": "Bending/Floating /Forming",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "Turret Press",
+    "default_machine": "Default Turret Press",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "Default Turret Press"
+      }
+    ],
+    "operation_count": 35,
+    "roadmap_status": "production",
+    "status_note": "dedicated cost engine, DB-first capability selector",
+    "process_route": "Bending/Floating /Forming",
+    "route_match": "exact",
+    "live_active": false
+  },
+  {
+    "process_name": "User-Defined Process",
+    "default_machine": "",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": ""
+      }
+    ],
+    "operation_count": 0,
+    "roadmap_status": "non_mfg",
+    "status_note": "staging-only marker",
+    "process_route": null,
+    "route_match": "unassigned",
+    "live_active": null
+  },
+  {
+    "process_name": "Waterjet Cut",
+    "default_machine": "OMAX 2626",
+    "tool_shop_name": "",
+    "machine_entries": [
+      {
+        "tool_shop_name": "",
+        "machine": "OMAX 2626"
+      }
+    ],
+    "operation_count": 12,
+    "roadmap_status": "production",
+    "status_note": "dedicated cost engine, DB-first capability selector",
+    "process_route": "Cutting",
+    "route_match": "alias_confident",
+    "live_active": true
+  }
+]
