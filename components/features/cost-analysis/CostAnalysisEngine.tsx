@@ -108,7 +108,7 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
             <FileText className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
             <p className="text-sm font-medium text-foreground mb-1">Select a BOM item</p>
             <p className="text-xs text-muted-foreground">
-              Choose an item from the left panel to view its a-priori cost estimate
+              Choose an item from the left panel to view its cost estimate
             </p>
           </CardContent>
         </Card>

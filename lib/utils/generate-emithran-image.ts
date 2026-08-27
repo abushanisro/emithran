@@ -119,7 +119,7 @@ function buildHtml(analysis: BomItemCostAnalysis, part: PartInfo): string {
     <span style="${s({ fontSize: '22px', fontWeight: '700', color: '#1a1a1a' })}">EMithran</span>
     <div style="${s({ textAlign: 'right', fontSize: '11px', color: '#777', lineHeight: '1.6' })}">
       <div>${today}</div>
-      <div>A-Priori Cost Estimate Report</div>
+      <div>Cost Estimate Report</div>
     </div>
   </div>
   <hr style="${s({ border: 'none', borderTop: '1px solid #ddd', margin: '0 0 18px' })}">

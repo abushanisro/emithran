@@ -2113,7 +2113,7 @@ export function ProcessCostDialog({
       ? (Number((savedLHRRecord as any).lhrUsdEffective) || Number((savedLHRRecord as any).lhr) || 0)
       : (typeof manualLhrRate === 'number' && manualLhrRate > 0 ? manualLhrRate : (Number(editData?.laborRate) || 0));
 
-  // Cost preview: calls the exact same aprioriTerms()-based engine that computes the
+  // Cost preview: calls the exact same eMithranTerms()-based engine that computes the
   // saved record server-side (POST /process-costs/calculate → ProcessCostCalculationEngine),
   // instead of a second, independently-maintained formula here — the preview can never
   // show a number that diverges from what actually gets charged on save. Debounced so

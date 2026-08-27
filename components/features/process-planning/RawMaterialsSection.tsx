@@ -345,7 +345,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
                     {fmtUsage(m.netUsage)} kg · {m.scrap || 0}% scrap
                   </p>
                 </div>
-                <span className="text-xs font-semibold tabular-nums shrink-0">{currencySymbol}{(computeMatCost(m) * conversionRate).toFixed(2)}</span>
+                <span className="text-xs font-semibold tabular-nums shrink-0">{currencySymbol}{fmtCurrency(computeMatCost(m) * conversionRate)}</span>
                 <div className="flex items-center gap-0.5 shrink-0">
                   <button
                     title="Cost breakdown"

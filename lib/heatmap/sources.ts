@@ -127,10 +127,7 @@ function gridCluster(
 export function buildManufacturingRiskSources(
   dfmScores: DFMScoresResponse,
   fg: FeatureGraph,
-  sheetThicknessMm: number,
 ): HeatmapSource[] {
-  const t = Math.max(sheetThicknessMm, 0.5);
-
   const holeSignals: RawSignal[] = [];
   const bendSignals: RawSignal[] = [];
 
@@ -143,39 +140,19 @@ export function buildManufacturingRiskSources(
       const v2Occ = v2.occurrences[score.occurrenceIndex];
       if (!v2Occ?.centroid) continue;
 
-      const {
-        centroid,
-        edge_clearance_mm: ec,
-        nearest_bend_distance_mm: nearBend,
-        bend_angle_deg: bendAngle,
-        bend_length_mm: bendLen,
-      } = v2Occ;
+      const { centroid, bend_length_mm: bendLen } = v2Occ;
 
-      // Fold all risk components into a single amplitude per occurrence.
-      // max() not sum(): amplitude represents the dominant hazard at this location,
-      // not a compound score. Density is expressed at the cluster level via densityBonus.
-      let amplitude = score.riskScore > 10 ? score.riskScore / 100 : 0;
-
-      if (ec != null) {
-        const ratio = ec / t;
-        const ecAmp =
-          ratio < 0.5 ? 0.95
-          : ratio < 1.0 ? 0.75
-          : ratio < 1.5 ? 0.50
-          : ratio < 2.0 ? 0.25
-          : 0;
-        if (ecAmp > amplitude) amplitude = ecAmp;
-      }
-
-      if (isHole && nearBend != null && nearBend < 3 * t) {
-        const nearAmp = Math.min(1 - nearBend / (3 * t), 0.70);
-        if (nearAmp > amplitude) amplitude = nearAmp;
-      }
-
-      if (!isHole && bendAngle != null && bendAngle > 90) {
-        const springAmp = Math.min((bendAngle - 90) / 90, 0.80);
-        if (springAmp > amplitude) amplitude = springAmp;
-      }
+      // Presentation-only: amplitude comes SOLELY from the backend's own
+      // riskScore (dfm-scoring.service.ts is the single DFM authority — see
+      // P0.3). This layer used to also re-derive its own edge-clearance/bend-
+      // proximity/springback amplitude directly from raw geometry, with
+      // different thresholds than the backend scorer -- meaning the heatmap
+      // could show risk at a location the authoritative DFM result did not
+      // flag, or vice versa. The 10-point cutoff below is a rendering
+      // decision (is this worth drawing a heat blob for), not a
+      // manufacturability judgment -- it never overrides or supplements the
+      // backend's verdict.
+      const amplitude = score.riskScore > 10 ? score.riskScore / 100 : 0;
 
       if (amplitude <= 0) continue;
 

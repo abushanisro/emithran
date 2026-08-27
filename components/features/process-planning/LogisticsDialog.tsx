@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { LogisticsType, CostBasis } from '@/lib/api/hooks/usePackagingLogisticsCosts';
+import { LogisticsType, CostBasis, useFreightRateBenchmarks } from '@/lib/api/hooks/usePackagingLogisticsCosts';
 
 interface LogisticsDialogProps {
   open: boolean;
@@ -43,6 +43,10 @@ export function LogisticsDialog({
   const [unitCost, setUnitCost] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(0);
   const [totalCost, setTotalCost] = useState<number>(0);
+
+  // Real region-pair freight reference rates — click-to-fill suggestion only,
+  // never auto-applied. See migration 389/487.
+  const { data: freightRateBenchmarks } = useFreightRateBenchmarks();
 
   // Load edit data
   useEffect(() => {
@@ -214,6 +218,26 @@ export function LogisticsDialog({
                   onChange={(e) => setUnitCost(parseFloat(e.target.value) || 0)}
                   placeholder="Enter unit cost"
                 />
+                {logisticsType === LogisticsType.OUTBOUND && costBasis === CostBasis.PER_KG && !!freightRateBenchmarks?.length && (
+                  <div className="space-y-1 pt-1">
+                    <Label className="text-xs text-muted-foreground">Reference freight rate (optional)</Label>
+                    <Select onValueChange={(rateType) => {
+                      const match = freightRateBenchmarks.find((r) => r.rateType === rateType);
+                      if (match) setUnitCost(match.rateUsdPerKg);
+                    }}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Pick the lane matching this shipment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {freightRateBenchmarks.map((r) => (
+                          <SelectItem key={r.rateType} value={r.rateType} className="text-xs">
+                            {r.rateType} — ${r.rateUsdPerKg.toFixed(2)}/kg
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

@@ -85,10 +85,32 @@ const CALCULATOR_PROPERTY_MAPPINGS: Record<string, string> = {
 // though the dialog's own preview showed a real nonzero cost. One shared
 // resolver now backs the preview AND both submit paths, so this can't
 // silently drift out of sync a second time.
+//
+// `costSummaryFx` is this item's own live cost-summary toUsdRate/
+// usdToDisplayRate (same object autoAddMaterialCost in page.tsx reads to
+// compute nativeToUsd = toUsdRate/usdToDisplayRate for the record it
+// persists) -- ONLY valid when the price being resolved is for the SAME
+// country as the active Digital Factory, since it's native-factory-currency
+// ->USD, not a generic cross-currency rate. When it's on file for that case,
+// it MUST be preferred over the Budget exchange_rates table below: this
+// item's scenario can have a pinned FX snapshot (Currency & Ask Price
+// widget, rateType 'reference'/'custom') that intentionally overrides the
+// live Budget rate for reproducibility -- see resolveDisplayCurrency's own
+// doc comment. Confirmed live: editing SECC (India, scenario pinned to a
+// 'reference' snapshot) recomputed $0.014/kg from the live Budget table here
+// while the persisted record (created via autoAddMaterialCost, which DOES
+// go through the scenario's pinned rate) held $0.012/kg -- same material,
+// same country, two different numbers depending on which code path priced
+// it. Falling back to the Budget table only when costSummaryFx isn't
+// available yet (still loading) or the priced country differs from the
+// active factory (cost-summary's rate doesn't apply cross-currency) keeps
+// this resolver from ever guessing while staying consistent with whatever
+// this item is actually priced against everywhere else.
 function resolveRegionalUnitCostUsd(
   material: RawMaterial | null | undefined,
   countryStr: string,
   rates: Record<string, number>,
+  costSummaryFx?: { toUsdRate?: number | undefined; usdToDisplayRate?: number | undefined; factoryCountry?: string | undefined } | null,
 ): number {
   if (!material) return 0;
   const cl = (countryStr || '').toLowerCase();
@@ -109,6 +131,13 @@ function resolveRegionalUnitCostUsd(
     else { localAmount = (material as any).unitCost || (material as any).cost || 0; localCurrency = (material as any).currency || 'USD'; }
   }
   if (!localAmount) return 0;
+
+  const pricedActiveFactory = !costSummaryFx?.factoryCountry
+    || costSummaryFx.factoryCountry.toLowerCase() === cl;
+  if (pricedActiveFactory && costSummaryFx?.toUsdRate && costSummaryFx?.usdToDisplayRate) {
+    return localAmount * (costSummaryFx.toUsdRate / costSummaryFx.usdToDisplayRate);
+  }
+
   // Never guess a missing FX leg (localCurrency->INR or USD->INR) as 1 —
   // that silently mispriced any material whose regional currency wasn't yet
   // loaded from the live exchange_rates table. 0 here reads the same as "no
@@ -802,7 +831,11 @@ export function RawMaterialDialog({
     // 0 (falls through to manualUnitCost below) instead of pricing against a
     // guessed rate.
     const rates = exchangeRates ?? {};
-    const unitCostUsd = resolveRegionalUnitCostUsd(selectedMaterial, country, rates);
+    const unitCostUsd = resolveRegionalUnitCostUsd(selectedMaterial, country, rates, {
+      toUsdRate: nestingCostSummary?.toUsdRate,
+      usdToDisplayRate: nestingCostSummary?.usdToDisplayRate,
+      factoryCountry: location,
+    });
 
     const finalUnitCost = unitCostUsd || manualUnitCost || 0;
     if (!finalUnitCost) return zero;
@@ -845,7 +878,7 @@ export function RawMaterialDialog({
       previewCost: totalCostVal,
       previewBreakdown: { gross, grossMaterialCost, scrapAmount, reclaimValue, netMaterialCost, scrapAdjustment: 0, subtotal: netMaterialCost, overheadCost, totalCostVal, utilRate, effPerUnit, reclaimRateInvalid: reclaimRateInvalid ? 1 : 0 },
     };
-  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, reclaimRate, editData, country, exchangeRates, nestingIsTrustworthy, isSheetMetalItem, nestingBlankSpec]);
+  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, reclaimRate, editData, country, exchangeRates, nestingIsTrustworthy, isSheetMetalItem, nestingBlankSpec, nestingCostSummary, location]);
 
   const totalCost = previewCost;
 
@@ -960,7 +993,11 @@ export function RawMaterialDialog({
         // Checking it first silently re-priced an India-scenario edit against
         // China (or whatever the catalog tag was) even though the dialog's
         // own price matrix was showing India, ₹1.14/kg, selected the whole time.
-        unitCost: resolveRegionalUnitCostUsd(selectedMaterial, country || materialInfo.country, exchangeRates ?? {})
+        unitCost: resolveRegionalUnitCostUsd(selectedMaterial, country || materialInfo.country, exchangeRates ?? {}, {
+          toUsdRate: nestingCostSummary?.toUsdRate,
+          usdToDisplayRate: nestingCostSummary?.usdToDisplayRate,
+          factoryCountry: location,
+        })
           || manualUnitCost
           || editData.unitCost
           || 0,
@@ -987,7 +1024,11 @@ export function RawMaterialDialog({
       
       // Get unit cost in USD for the selected country (mirrors getRegionalRate + INR pivot)
       const rates = exchangeRates ?? {};
-      const materialUnitCost = resolveRegionalUnitCostUsd(selectedMaterial, country, rates);
+      const materialUnitCost = resolveRegionalUnitCostUsd(selectedMaterial, country, rates, {
+        toUsdRate: nestingCostSummary?.toUsdRate,
+        usdToDisplayRate: nestingCostSummary?.usdToDisplayRate,
+        factoryCountry: location,
+      });
 
       if (!materialUnitCost && !manualUnitCost) {
         alert(

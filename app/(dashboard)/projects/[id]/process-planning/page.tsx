@@ -48,7 +48,7 @@ import { toViewerFeature, FEATURE_GROUP_META } from '@/lib/utils/feature-colors'
 import type { FeatureGroup } from '@/lib/utils/feature-colors';
 
 // ── Dimension Validation Dialog ───────────────────────────────────────────────
-// Shows the actual 3D CAD model with live-extracted measurements (aPriori-style).
+// Shows the actual 3D CAD model with live-extracted measurements (eMithran-style).
 
 function DimMetricCard({ label, value, unit, accent }: { label: string; value: string; unit?: string; accent?: string }) {
   return (
@@ -1683,7 +1683,7 @@ function ProcessPlanningPageContent() {
 
                   return (
                     <div key={targetBom.id} id="cost-analysis-full-report" className="space-y-6">
-                      {/* Cost Analysis Engine - A-Priori Report */}
+                      {/* Cost Analysis Engine - Cost Estimate Report */}
                       <CostAnalysisEngine
                         bomId={targetBom.id}
                         bomName={targetBom.name || "Assembly"}

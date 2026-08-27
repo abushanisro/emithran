@@ -72,6 +72,12 @@ export interface UpdateLHRDto extends Partial<CreateLHRDto> { }
 
 export type LHRListResponse = { records: LHREntry[]; total: number };
 
+export interface EffectiveLHRRate {
+  rateUsdPerHr: number | null;
+  source: 'shop_average' | 'benchmark' | 'none';
+  sampleSize: number;
+}
+
 export interface BenchmarkLHREntry {
   id: string;
   labourCode: string;
@@ -149,6 +155,18 @@ export const lhrApi = {
       retry: false,
     });
     return response ?? [];
+  },
+
+  // The real cost-engine-aligned Skill Rate preview for a (location,
+  // process_group) — same precedence bom-items.service.ts's resolveLHRRates()
+  // already uses for real quote costing (LHRService.getEffectiveRate).
+  getEffectiveRate: async (location: string, processGroup: string): Promise<EffectiveLHRRate> => {
+    const response = await apiClient.get<EffectiveLHRRate>('/lhr/effective-rate', {
+      params: { location, processGroup },
+      silent: true,
+      retry: false,
+    });
+    return response ?? { rateUsdPerHr: null, source: 'none', sampleSize: 0 };
   },
 
   importFromExcel: async (file: File): Promise<{ imported: number; skipped: number; errors: string[] }> => {

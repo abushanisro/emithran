@@ -65,7 +65,7 @@ export async function generateEMithranPdf(
     day: '2-digit', month: 'short', year: 'numeric',
   });
   doc.text(today, pageW - M, y, { align: 'right' });
-  doc.text('A-Priori Cost Estimate Report', pageW - M, y + 4, { align: 'right' });
+  doc.text('Cost Estimate Report', pageW - M, y + 4, { align: 'right' });
 
   y += 8;
   doc.setDrawColor(210, 210, 210);

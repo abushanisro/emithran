@@ -165,6 +165,33 @@ export function usePackagingLogisticsCost(id: string) {
   });
 }
 
+export interface FreightRateBenchmark {
+  rateType: string;
+  rateUsdPerKg: number;
+}
+
+/**
+ * Hook to get real region-pair freight reference rates (USD/kg) — used as a
+ * click-to-fill suggestion source in the "Add Logistics Item" dialog, never
+ * auto-applied to a cost record (see migration 389 for why: a previous
+ * fabricated flat freight default was removed as an anti-pattern).
+ */
+export function useFreightRateBenchmarks() {
+  return useQuery<FreightRateBenchmark[]>({
+    queryKey: ['freight-rate-benchmarks'],
+    queryFn: async () => {
+      const response = await apiClient.get<FreightRateBenchmark[]>(
+        '/packaging-logistics-costs/freight-rate-benchmarks',
+        { silent: true }
+      );
+      return response ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+}
+
 // ============================================================================
 // MUTATION HOOKS
 // ============================================================================

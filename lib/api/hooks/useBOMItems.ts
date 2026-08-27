@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
@@ -244,6 +244,21 @@ export function useCreateBOMItem() {
 /**
  * Update an existing BOM item
  */
+// P0.5: DFM scores are material/thickness-bracketed (UNDERSIZED_HOLE, CRACK_RISK
+// checks in dfm-scoring.service.ts), but a material-grade edit only ever
+// invalidated cost-summary/route-comparison — dfm-scores has staleTime: 0 with
+// no auto-refetch, so it silently kept showing the OLD material's DFM verdict
+// after a successful grade change, in the same session, until remount.
+// Extracted (not inlined) so the invalidation set — the entire behavior this
+// bug is about — is directly testable without rendering the hook.
+export function invalidateBOMItemUpdateQueries(queryClient: QueryClient, data: BOMItem): void {
+  queryClient.invalidateQueries({ queryKey: bomItemKeys.list(data.bomId) });
+  queryClient.invalidateQueries({ queryKey: bomItemKeys.detail(data.id) });
+  queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'cost-summary'] });
+  queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'route-comparison'] });
+  queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'dfm-scores'] });
+}
+
 export function useUpdateBOMItem() {
   const queryClient = useQueryClient();
 
@@ -252,15 +267,7 @@ export function useUpdateBOMItem() {
       return apiClient.put<BOMItem>(`/bom-items/${id}`, data);
     },
     onSuccess: async (data) => {
-      if (data) {
-        // Invalidate BOM item queries
-        queryClient.invalidateQueries({ queryKey: bomItemKeys.list(data.bomId) });
-        queryClient.invalidateQueries({ queryKey: bomItemKeys.detail(data.id) });
-        
-        // Invalidate the Manufacturing Intelligence cost/route queries for this item
-        queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'cost-summary'] });
-        queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'route-comparison'] });
-      }
+      if (data) invalidateBOMItemUpdateQueries(queryClient, data);
     },
     onError: (error: any) => {
       const status = error?.status || error?.response?.status;
@@ -627,6 +634,8 @@ export interface ProcessLineCost {
   commodityCode: string | null;
   /** Labour hour rate from lhr_benchmark_rates (local currency/hr). Already baked into hourlyRate. */
   labourRate?: number | null;
+  /** Which of resolveLHRRates' 4 passes resolved labourRate above — mirrors rateSource's provenance visibility, for the labor side. */
+  labourRateSource?: 'lhr_database' | 'lhr_benchmark' | 'lhr_cross_location' | 'no_lhr_rate' | null;
   machineSelection?: MachineSelectionResult;
   /** Real mhr_records id / 'bm-mhr-<id>' benchmark id for this line's resolved
    *  resource, set directly on classes (currently just Inspection) priced via
@@ -768,7 +777,7 @@ export interface CostSummaryDto {
   // inspection tables). Always derived from the live exchange_rates table
   // server-side — never a hardcoded per-country FX table on the frontend.
   inrToDisplayRate?: number;
-  // Persistent aPriori-style manual overrides already applied to the figures
+  // Persistent eMithran-style manual overrides already applied to the figures
   // above ('mat_rate' | '<process>::rate' | '<process>::cycleMin') — read-only
   // hint for the "overridden" badge + reset control, not something to re-apply.
   costOverrides?: Record<string, number>;
@@ -1140,7 +1149,7 @@ export function useMachineOverride(itemId: string | undefined, location: string)
   });
 }
 
-// aPriori-style persistent cost-field override — replaces the click-to-edit
+// eMithran-style persistent cost-field override — replaces the click-to-edit
 // material-rate / process-rate / cycle-time cells' local-only state with a
 // saved value that survives a refresh and is visible to anyone else opening
 // this BOM item. Scoped by Digital Factory location, same reason as machine

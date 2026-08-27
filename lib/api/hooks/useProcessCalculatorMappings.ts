@@ -15,6 +15,10 @@ export interface ProcessCalculatorMapping {
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
+  // Real reconciliation-export cross-reference (sm_operation_reference_map,
+  // migration 504) — present only for operations with a clean, justified
+  // name match; informational only, never a live cost input.
+  referenceHint?: { sourceProcessName: string; exampleMachine: string | null };
 }
 
 export interface ProcessHierarchy {
@@ -111,6 +115,16 @@ export function useProcessCalculatorMappings(
     queryKey: QUERY_KEYS.mappings(queryParams),
     queryFn: () => processCalculatorMappingsApi.getAll(queryParams),
     enabled: options?.enabled !== false,
+    // Same fix as useLHRBenchmark/useMHRBenchmark for the exact same bug:
+    // whichever result this exact params shape got BEFORE a transient
+    // backend outage (confirmed live — the API server can crash mid-session
+    // and stay down) permanently caches that empty/partial result for the
+    // rest of the browser tab's life otherwise. Confirmed live: this exact
+    // failure mode made MHRFormDialog's Process Route dropdown show only 1
+    // of 13 real Sheet Metal routes after the backend had restarted —
+    // nothing forced a re-fetch of the already-cached key.
+    refetchOnMount: 'always',
+    throwOnError: false,
   });
 }
 
@@ -126,6 +140,9 @@ export function useProcessHierarchy() {
   return useQuery({
     queryKey: QUERY_KEYS.hierarchy(),
     queryFn: () => processCalculatorMappingsApi.getHierarchy(),
+    // Same reasoning as useProcessCalculatorMappings above.
+    refetchOnMount: 'always',
+    throwOnError: false,
   });
 }
 

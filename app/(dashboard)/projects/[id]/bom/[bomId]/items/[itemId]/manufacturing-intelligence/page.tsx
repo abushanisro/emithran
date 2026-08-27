@@ -35,8 +35,9 @@ import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useGdtAnalysis, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, type BlankSpecDto, type ProcessLineCost, type ApplyCustomRouteStep } from '@/lib/api/hooks/useBOMItems';
 import { useMHRRecords, useMHRBenchmark } from '@/lib/api/hooks/useMHR';
-import { useFactoryCurrency, useFxRate, useRefreshFxRate, useFxRateOnDemand, type FxRateType } from '@/lib/api/hooks/useFx';
+import { useFactoryCurrency, useFactories, useCurrencies, useFxRate, useRefreshFxRate, useFxRateOnDemand, type FxRateType } from '@/lib/api/hooks/useFx';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
+import { useSmLookupTables, type ReferenceTable } from '@/lib/api/hooks/useProcesses';
 import { resolveMhrUsdRate } from '@/lib/api/mhr';
 import type { GdtSeverity, CostSummaryDto, RouteResultDto } from '@/lib/api/hooks/useBOMItems';
 import { useRawMaterials, useMaterialAliases } from '@/lib/api/hooks/useRawMaterials';
@@ -60,7 +61,8 @@ import { usePackagingLogisticsCosts } from '@/lib/api/hooks/usePackagingLogistic
 import { useProcuredPartsCosts } from '@/lib/api/hooks/useProcuredPartsCosts';
 import { useToolingCosts } from '@/lib/api/hooks/useToolingCosts';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
-import type { FeatureGraph, FeatureGraphSummary, DFMWarning, DFMSeverity, ValidationResult, ManufacturingFeature, HoleGroup, HoleGroupLocation, BendFeature, FeatureNodeV2, FaceMapEntry, FeatureCategory } from '@/lib/types/manufacturing';
+import type { FeatureGraph, FeatureGraphSummary, DFMWarning, DFMSeverity, ValidationResult, ManufacturingFeature, HoleGroup, HoleGroupLocation, BendFeature, FeatureNodeV2, FaceMapEntry, FeatureCategory, DFMScoresResponse } from '@/lib/types/manufacturing';
+import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type PanelId = 'left' | 'center' | 'right' | 'process' | 'drivers';
@@ -129,28 +131,6 @@ interface ProcessTreeNode {
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-
-const MACHINE_FOR: Record<string, string> = {
-  'Fiber Laser Cutting': 'Fiber Laser 6kW',
-  'Sheet Metal Laser Cutting': 'Fiber Laser 6kW',
-  'CNC Press Brake': 'CNC Press Brake 100T',
-  'Sheet Metal Bending': 'CNC Press Brake 100T',
-  'Injection Moulding': 'Injection Molder 1,000kN Clamp Force',
-  'Injection Molding': 'Injection Molder 1,000kN Clamp Force',
-  'Material Drying': 'Material Dryer / Hopper',
-  'Gate Trimming': 'Bench Station',
-  'Deflashing': 'Bench Station',
-  'Insert Installation': 'Bench Station',
-  'CNC Milling': 'CNC Milling Center',
-  'CNC Machining': 'CNC Milling Center',
-  'CNC Turning': 'CNC Lathe',
-  'Die Casting': 'Die Casting Machine',
-  'Deburring': 'Deburring Station',
-  'Drilling': 'CNC Drilling Machine',
-  'Inspection': 'Inspection Bench',
-  'Tapping': 'CNC Tapping Machine',
-  'Surface Treatment': 'Surface Treatment Line',
-};
 
 const SUB_OP: Record<string, string> = {
   'Fiber Laser Cutting': 'As Cut',
@@ -716,7 +696,7 @@ function resolveFeatureOpHighlight(
   return null;
 }
 
-// aPriori-style per-feature sub-operation list (cut path, pierces, bends...) —
+// eMithran-style per-feature sub-operation list (cut path, pierces, bends...) —
 // shared by both the live-engine row and the saved-process-record row, since
 // it's driven by the same geometry regardless of which is currently showing.
 // Clickable when a matching 3D feature is resolvable (see resolveFeatureOpHighlight)
@@ -1187,7 +1167,7 @@ function autoCompleteRoute(
       completed.push({ process: 'Surface Treatment' });
     }
 
-    // Inspection: always present for sheet metal (Apriori "Quality" step)
+    // Inspection: always present for sheet metal (eMithran "Quality" step)
     if (!completed.some((r) => r.process === 'Inspection')) {
       completed.push({ process: 'Inspection' });
     }
@@ -1281,11 +1261,9 @@ function buildProcessTree(
     const isMilling = !isTurning && (rec.process.includes('Milling') || rec.process.includes('Machining'));
     const isMolding = rec.process.includes('Moulding') || rec.process.includes('Molding');
 
-    // Prefer the real, DB-resolved machine from the live cost engine over the
-    // generic MACHINE_FOR placeholder table below — that table is a last-resort
-    // label for when no cost data exists yet at all (e.g. material grade not
-    // set), never a stand-in for an actual machine selection. Matched by EXACT
-    // process name against cost.processLines[].process (both machineName and
+    // Only the real, DB-resolved machine from the live cost engine is ever
+    // shown here — no fabricated placeholder. Matched by EXACT process name
+    // against cost.processLines[].process (both machineName and
     // machineClass are read straight off that same real, backend-resolved
     // line — nothing here classifies or guesses a machine class from the
     // process label). This used to hardcode a family lookup ('Cutting' ->
@@ -1294,11 +1272,13 @@ function buildProcessTree(
     // using (rec.process, itself now sourced from the applied route when one
     // exists — see appliedRouteProcessNames at the buildProcessTree call site)
     // removes the guesswork entirely instead of trading one guess for another.
+    // A machine that hasn't been resolved yet shows '—', never a plausible-
+    // looking specific spec (e.g. "Fiber Laser 6kW") that was never selected.
     const matchedCostLine = cost?.processLines?.find((l) => l.process === rec.process);
     const realMachineName = matchedCostLine?.machineName ?? null;
     const machine = rec.process === 'Inspection'
       ? (needsCmm ? 'CMM' : 'Inspection Bench')
-      : realMachineName ?? MACHINE_FOR[rec.process] ?? '—';
+      : realMachineName ?? '—';
     const subLabel = SUB_OP[rec.process] ?? 'As Processed';
     const featureNodes: ProcessTreeNode[] = [];
 
@@ -1971,7 +1951,7 @@ function PanelHeader({
 
 // ── Section ────────────────────────────────────────────────────────────────────
 
-// ── Inline-editable value cell (aPriori-style) ────────────────────────────────
+// ── Inline-editable value cell (eMithran-style) ────────────────────────────────
 
 function EditCell({
   value, prefix = '', suffix = '', decimals = 2, fieldKey, editingKey,
@@ -2028,7 +2008,7 @@ function EditCell({
   );
 }
 
-// ── CostSummaryTab — aPriori-style with inline editing ─────────────────────
+// ── CostSummaryTab — eMithran-style with inline editing ─────────────────────
 
 function CostSummaryTab({
   item, batchSize, appliedRouteId, factory = 'USA', fg, onSelectHighlight,
@@ -2081,7 +2061,7 @@ function CostSummaryTab({
     ? (comparison?.routes.find((r) => r.routeId === effectiveAppliedRouteId) ?? null)
     : null;
 
-  // aPriori-style persistent overrides — sourced from the server response
+  // eMithran-style persistent overrides — sourced from the server response
   // (bom_item_cost_overrides, scoped by BOM item + Digital Factory location),
   // not local useState. Survives refresh and is visible to anyone else who
   // opens this BOM item; previously these were pure client state that vanished
@@ -2188,7 +2168,7 @@ function CostSummaryTab({
     const batchSz = cost?.batchSize ?? 1;
     // Reverse-compute setup time from amortized setupCost — must divide by the
     // SAME combined machine+labor rate the backend used to produce setupCost
-    // (aprioriTerms: setupCost = (mhrMin + dlrMin*setupNDL) * setupTimeMin —
+    // (eMithranTerms: setupCost = (mhrMin + dlrMin*setupNDL) * setupTimeMin —
     // cost-engine.ts:365), not machine rate alone. Dividing by hourlyRate only
     // silently ignores the labor-rate term, wildly inflating the derived
     // minutes whenever labor rate dwarfs machine rate — confirmed live: Hole
@@ -2707,7 +2687,7 @@ function CostSummaryTab({
 
             {isExpanded && (
               <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
-                {/* aPriori-style feature-level sub-operations */}
+                {/* eMithran-style feature-level sub-operations */}
                 <FeatureBreakdown items={(line as any).featureBreakdown} fg={fg} onSelectHighlight={onSelectHighlight} />
                 <CalculationTracePanel line={line} />
                 {!!line.calculationTrace?.length && (
@@ -2751,8 +2731,14 @@ function CostSummaryTab({
                   {(line.labourRate ?? 0) > 0 && (
                     <div className="flex items-baseline justify-between gap-2 min-w-0">
                       <span className="text-xs text-muted-foreground truncate min-w-0">Labour Rate</span>
-                      <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+                      <span className="text-xs tabular-nums text-muted-foreground shrink-0 flex items-center gap-1">
                         {sym}{fmt(line.labourRate!, 0)}/hr
+                        {/* P0.6: labor-rate provenance, mirrors rateSource's existing MHR-side badge */}
+                        {line.labourRateSource && line.labourRateSource !== 'lhr_database' && (
+                          <span className={line.labourRateSource === 'lhr_cross_location' ? 'text-amber-500' : 'text-slate-400'}>
+                            ({line.labourRateSource === 'lhr_benchmark' ? 'benchmark' : 'cross-location'})
+                          </span>
+                        )}
                       </span>
                     </div>
                   )}
@@ -3092,7 +3078,7 @@ function CostSummaryTab({
             {/* Expanded calculation breakdown */}
             {isExpanded && (
               <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
-                {/* aPriori-style feature-level sub-operations — same as the live engine rows */}
+                {/* eMithran-style feature-level sub-operations — same as the live engine rows */}
                 <FeatureBreakdown items={matchedEngineLine?.featureBreakdown} fg={fg} onSelectHighlight={onSelectHighlight} />
                 {matchedEngineLine && <CalculationTracePanel line={matchedEngineLine} />}
                 {/* Full end-to-end calculation export — only offered when the live engine
@@ -3749,10 +3735,16 @@ function ComplexityBadge({ level }: { level: string }) {
 // ── ManufacturingFeaturesTab ───────────────────────────────────────────────────
 
 function ManufacturingFeaturesTab({
-  item, summary,
+  item, summary, dfmScores,
 }: {
   item: BOMItem;
   summary: FeatureGraphSummary | null;
+  // Real per-occurrence DFM risk from dfm-scoring.service.ts (the single DFM
+  // authority, see P0.3) — presentation-only here: this tab reads whether the
+  // backend already flagged an UNDERSIZED_HOLE/CRACK_RISK finding anywhere in
+  // the part, it never recomputes the geometry itself. Undefined while the
+  // query hasn't resolved yet.
+  dfmScores?: DFMScoresResponse | undefined;
 }) {
   if (!summary || (summary.holeCount === 0 && summary.bendCount === 0 && summary.cutLengthMm === 0)) {
     return (
@@ -3775,8 +3767,14 @@ function ManufacturingFeaturesTab({
   const largestHole = uniqueDiameters.length > 0 ? uniqueDiameters[uniqueDiameters.length - 1]! : null;
   const thickness = summary.sheetThicknessMm ?? 0;
 
+  // Real backend finding (dfm-scoring.service.ts's UNDERSIZED_HOLE, material/
+  // UTS-bracketed) — replaces a flat, independently-computed 1.5x-thickness
+  // judgment that only checked the single smallest hole in the part and
+  // could disagree with the authoritative DFM scorer (see P0.3).
+  const hasUndersizedHoleFinding = hasDfmRiskFactor(dfmScores, 'hole', 'UNDERSIZED_HOLE');
+
   const holeRisk: RiskLevel =
-    holeDensityPer1000 > 5 || (smallestHole !== null && thickness > 0 && smallestHole < 1.5 * thickness)
+    holeDensityPer1000 > 5 || hasUndersizedHoleFinding
       ? 'High'
       : uniqueDiameters.length > 10 || holeDensityPer1000 > 2
       ? 'Medium'
@@ -3793,7 +3791,12 @@ function ManufacturingFeaturesTab({
     summary.bendCount > 20 || uniqueRadii.length > 5 ? 'High' :
     summary.bendCount > 8  || uniqueRadii.length > 2 ? 'Medium' : 'Low';
 
-  const springbackRisk = minRadius !== null && thickness > 0 && minRadius < 2 * thickness;
+  // Real backend finding (dfm-scoring.service.ts's CRACK_RISK, material +
+  // thickness-bracketed via resolveBendRadiusMinFactor) — replaces a flat,
+  // material-blind 2.0x-thickness judgment that only checked the single
+  // tightest bend radius and could disagree with the authoritative DFM
+  // scorer (see P0.3).
+  const springbackRisk = hasDfmRiskFactor(dfmScores, 'bend', 'CRACK_RISK');
 
   // ── Cutting calculations ───────────────────────────────────────────────────
   const contourComplexity: RiskLevel =
@@ -3890,7 +3893,7 @@ function ManufacturingFeaturesTab({
             <ComplexityBadge level={bendComplexity} />
           </div>
           {springbackRisk && (
-            <p className="text-[9px] text-amber-600 dark:text-amber-400 py-0.5">⚠ Springback risk — min radius below 2× thickness</p>
+            <p className="text-[9px] text-amber-600 dark:text-amber-400 py-0.5">⚠ Springback risk — min radius below the material/thickness-specific minimum</p>
           )}
           {multiRadius && (
             <p className="text-[9px] text-amber-600 dark:text-amber-400 py-0.5">⚠ Multi-radius — sequential press brake setups required</p>
@@ -3963,6 +3966,11 @@ function ManufacturingFeaturesTab({
         <Row label="Tooling Requirement" value="None (laser)" />
       </Section>
 
+      {/* ── Reference Data (staged reconciliation export + live cost-engine
+           lookup tables, same data source as the Process admin page's
+           "Lookup Tables" dialog) ─────────────────────────────────────── */}
+      <ReferenceDataPanels summary={summary} />
+
       {/* ── Primary Cost Drivers ───────────────────────────────────────── */}
       {(hasCostDrivers || derivedDrivers.length > 0) && (
         <Section title="Primary Cost Drivers">
@@ -3980,6 +3988,107 @@ function ManufacturingFeaturesTab({
               ))
           }
         </Section>
+      )}
+    </div>
+  );
+}
+
+// Live, read-only bridge to the SAME data source as the Process admin page's
+// "Lookup Tables" dialog (backend's sm-lookup-bridge.config.ts /
+// GET /processes/sm-lookup-tables) — surfaces, per this part's actual detected
+// feature types, both the real sm_lookup_* cost-engine tables and the staged
+// reconciliation export relevant to them. This app has no per-item resolved
+// "which cutting process was selected" until a route is applied, so for
+// hole-bearing parts every real candidate hole-making route (Cutting/
+// Waterjet, Laser Cutting, Sheet Metal Fabrication/Turret) is shown, each
+// honestly labeled by its own route name — never guessed down to one.
+// Bending always resolves to machine_class='press_brake' in this app (see
+// sm-lookup-bridge.config.ts's own Bending/Press Brake route comments), so
+// that one is unambiguous.
+function ReferenceDataPanels({ summary }: { summary: FeatureGraphSummary | null }) {
+  const hasBend = !!summary && summary.bendCount > 0;
+  const hasHole = !!summary && summary.holeCount > 0;
+
+  const bend = useSmLookupTables('Sheet Metal', hasBend ? 'Bending/Floating /Forming' : undefined);
+  const cutting = useSmLookupTables('Sheet Metal', hasHole ? 'Cutting' : undefined);
+  const laser = useSmLookupTables('Sheet Metal', hasHole ? 'Laser Cutting' : undefined);
+  const fab = useSmLookupTables('Sheet Metal', hasHole ? 'Sheet Metal Fabrication' : undefined);
+
+  if (!hasBend && !hasHole) return null;
+
+  const groups: Array<{ route: string; tables: ReferenceTable[] | undefined }> = [
+    { route: 'Bending/Floating /Forming', tables: bend.data },
+    { route: 'Cutting (Waterjet)', tables: cutting.data },
+    { route: 'Laser Cutting', tables: laser.data },
+    { route: 'Sheet Metal Fabrication (Turret)', tables: fab.data },
+  ].filter((g) => (g.tables?.length ?? 0) > 0);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <Section title="Reference Data" defaultOpen={false}>
+      <p className="text-[9px] text-muted-foreground mb-1.5 leading-snug">
+        Live cost-engine lookup tables and staged reconciliation data for this part's detected feature types.
+        {hasHole && ' The hole-making route hasn’t been applied yet for this part, so every real candidate route is shown.'}
+      </p>
+      {groups.map((g) => (
+        <div key={g.route} className="mb-2 last:mb-0">
+          <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{g.route}</p>
+          {g.tables!.map((t) => (
+            <ReferenceTableMini key={t.id} table={t} />
+          ))}
+        </div>
+      ))}
+    </Section>
+  );
+}
+
+function ReferenceTableMini({ table }: { table: ReferenceTable }) {
+  const [expanded, setExpanded] = useState(false);
+  const rows = table.rows ?? [];
+  return (
+    <div className="border border-border/40 rounded mb-1 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full flex items-center justify-between px-2 py-1 text-left hover:bg-muted/20"
+      >
+        <span className="text-[10px] font-medium truncate pr-2">{table.tableName}</span>
+        <span className="text-[9px] text-muted-foreground shrink-0">{rows.length} row{rows.length !== 1 ? 's' : ''}</span>
+      </button>
+      {expanded && (
+        <div className="px-2 pb-1.5">
+          {table.tableDescription && (
+            <p className="text-[9px] text-muted-foreground mb-1 leading-snug">{table.tableDescription}</p>
+          )}
+          {rows.length === 0 ? (
+            <p className="text-[9px] text-muted-foreground italic">Nothing collected for this route yet.</p>
+          ) : (
+            <div className="overflow-auto max-h-40">
+              <table className="w-full text-[9px]">
+                <thead>
+                  <tr>
+                    {table.columnDefinitions.map((c) => (
+                      <th key={c.name} className="text-left font-medium text-muted-foreground pr-2 py-0.5 whitespace-nowrap">{c.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 50).map((r) => (
+                    <tr key={r.id}>
+                      {table.columnDefinitions.map((c) => (
+                        <td key={c.name} className="pr-2 py-0.5 font-mono whitespace-nowrap">{String((r.rowData as Record<string, unknown>)?.[c.name] ?? '—')}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rows.length > 50 && (
+                <p className="text-[9px] text-muted-foreground mt-1">Showing first 50 of {rows.length} rows.</p>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -5183,8 +5292,8 @@ function RouteSelectionDialog({
                       : 'border-violet-500/50 bg-violet-950/40 text-slate-100 min-w-[72px]',
                   )}>
                     <div className="text-[10px] font-medium leading-tight">{proc}</div>
-                    {(processToMachineName[proc] || MACHINE_FOR[proc]) && (
-                      <div className="text-[9px] text-muted-foreground mt-0.5 truncate">{processToMachineName[proc] || MACHINE_FOR[proc]}</div>
+                    {processToMachineName[proc] && (
+                      <div className="text-[9px] text-muted-foreground mt-0.5 truncate">{processToMachineName[proc]}</div>
                     )}
                   </div>
                   {i < flowNodes.length - 1 && (
@@ -5214,7 +5323,7 @@ function RouteSelectionDialog({
             </div>
           )}
 
-          {/* Operations table — Apriori style */}
+          {/* Operations table — eMithran style */}
           {isSheetMetal ? (
             <>
             {missingRealSteps.length > 0 && (
@@ -5827,17 +5936,6 @@ function MaterialPickerDialog({
   );
 }
 
-// Scenario currency options for the Currency & Ask Price widget — the same
-// six currencies backend/LOCATION_INFO resolves Digital Factory locations to
-// (CURRENCY_SYMBOLS in default-rates.ts), so every option here is guaranteed
-// resolvable by the FX service. Fixes the old widget's INR: '$' bug.
-const SCENARIO_CURRENCY_SYMBOLS: Record<string, string> = {
-  INR: '₹', USD: '$', EUR: '€', GBP: '£', CNY: '¥', MXN: 'MX$',
-};
-const SCENARIO_CURRENCY_LABELS: Record<string, string> = {
-  INR: 'Indian Rupee', USD: 'US Dollar', EUR: 'Euro', GBP: 'British Pound', CNY: 'Chinese Yuan', MXN: 'Mexican Peso',
-};
-
 // ── CostGuidePanel (Left) ──────────────────────────────────────────────────────
 
 function CostGuidePanel({
@@ -5846,8 +5944,14 @@ function CostGuidePanel({
   factoryDraft, setFactoryDraft, batchSizeDraft, setBatchSizeDraft,
   applyScenario,
   onManualClick, selectedManualRoute, onSelectHighlight,
+  dfmScores,
 }: {
   item: BOMItem; fg: FeatureGraph | null; summary: FeatureGraphSummary | null;
+  // Real per-occurrence DFM risk from dfm-scoring.service.ts (the single DFM
+  // authority, see P0.3) — threaded through so ManufacturingFeaturesTab can
+  // present the backend's own UNDERSIZED_HOLE/CRACK_RISK findings instead of
+  // independently recomputing them. Undefined while the query hasn't resolved.
+  dfmScores?: DFMScoresResponse | undefined;
   batchSize: number;
   productionLife: number; setProductionLife: (v: number) => void;
   processRouting: 'auto' | 'manual'; setProcessRouting: (v: 'auto' | 'manual') => void;
@@ -6044,7 +6148,7 @@ function CostGuidePanel({
         // button handlers above for why that silently loses real precision).
         const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
         // Reverse-compute setup time from amortized setupCost — must divide by
-        // the SAME combined machine+labor rate the backend used (aprioriTerms:
+        // the SAME combined machine+labor rate the backend used (eMithranTerms:
         // setupCost = (mhrMin + dlrMin*setupNDL) * setupTimeMin —
         // cost-engine.ts:365), not machine rate alone. See the identical fix
         // and its confirmed-live example on handleOpenEditProc above — this
@@ -6489,6 +6593,16 @@ function CostGuidePanel({
   // Factory currency is resolved server-side from LOCATION_INFO (the same
   // table real costing uses) via factoryDraft, never inferred/hardcoded here.
   const { data: factoryCurrencyInfo } = useFactoryCurrency(factoryDraft);
+  // Digital Factory locations + scenario currencies both come from the
+  // backend's LOCATION_INFO (via GET /api/fx/factories and /api/fx/
+  // currencies) — never a hardcoded option list here, so a new location or
+  // currency added on the backend shows up automatically.
+  const { data: factories } = useFactories();
+  const { data: currencies } = useCurrencies();
+  const scenarioCurrencySymbols = useMemo(
+    () => Object.fromEntries((currencies ?? []).map((c) => [c.code, c.symbol])),
+    [currencies],
+  );
   const savedScenarioCurrency = typeof item.scenarioOverrides?.scenarioCurrency === 'string'
     ? item.scenarioOverrides.scenarioCurrency as string : null;
   const savedFxSnapshot = item.scenarioOverrides?.fxSnapshot as {
@@ -6713,15 +6827,10 @@ function CostGuidePanel({
                 onChange={(e) => setFactoryDraft(e.target.value)}
                 className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
               >
-                <option value="India">India</option>
-                <option value="China">China</option>
-                <option value="USA">USA</option>
-                <option value="Germany">Germany</option>
-                <option value="France">France</option>
-                <option value="W. Europe">W. Europe</option>
-                <option value="E. Europe">E. Europe</option>
-                <option value="Mexico">Mexico</option>
-                <option value="Other">Other</option>
+                {!factories && <option value={factoryDraft}>{factoryDraft}</option>}
+                {(factories ?? []).map((f) => (
+                  <option key={f.location} value={f.location}>{f.location}</option>
+                ))}
               </select>
               {factoryCurrencyInfo && (
                 <p className="text-[10px] text-muted-foreground/60 leading-tight mt-1">
@@ -6739,8 +6848,9 @@ function CostGuidePanel({
                     onChange={(e) => handleScenarioCurrencyChange(e.target.value)}
                     className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
                   >
-                    {Object.keys(SCENARIO_CURRENCY_SYMBOLS).map((c) => (
-                      <option key={c} value={c}>{c} — {SCENARIO_CURRENCY_LABELS[c]}</option>
+                    {!currencies && <option value={scenarioCurrencyDraft}>{scenarioCurrencyDraft}</option>}
+                    {(currencies ?? []).map((c) => (
+                      <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
                     ))}
                   </select>
                 </div>
@@ -6843,7 +6953,7 @@ function CostGuidePanel({
                   <span className="text-xs text-muted-foreground w-20 shrink-0">Ask Price</span>
                   <div className="relative flex-1">
                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none select-none">
-                      {SCENARIO_CURRENCY_SYMBOLS[scenarioCurrencyDraft] ?? scenarioCurrencyDraft}
+                      {scenarioCurrencySymbols[scenarioCurrencyDraft] ?? scenarioCurrencyDraft}
                     </span>
                     <input
                       type="number"
@@ -6858,7 +6968,7 @@ function CostGuidePanel({
                 </div>
                 {askPriceDraft && !isNaN(parseFloat(askPriceDraft)) && (
                   <p className="text-[10px] text-amber-400/80 leading-tight">
-                    Ask {SCENARIO_CURRENCY_SYMBOLS[scenarioCurrencyDraft] ?? scenarioCurrencyDraft}{parseFloat(askPriceDraft).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — shown alongside cost for margin tracking. Saved on Apply Scenario.
+                    Ask {scenarioCurrencySymbols[scenarioCurrencyDraft] ?? scenarioCurrencyDraft}{parseFloat(askPriceDraft).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — shown alongside cost for margin tracking. Saved on Apply Scenario.
                   </p>
                 )}
               </div>
@@ -7089,7 +7199,7 @@ function CostGuidePanel({
         )}
 
         {tab === 'features' && (
-          <ManufacturingFeaturesTab item={item} summary={summary} />
+          <ManufacturingFeaturesTab item={item} summary={summary} dfmScores={dfmScores} />
         )}
 
         {tab === 'machine' && (
@@ -7167,7 +7277,7 @@ function CostGuidePanel({
                 )}
               </li>
               {askPriceDraft.trim() && !isNaN(parseFloat(askPriceDraft)) && (
-                <li>Ask Price: <span className="text-foreground font-medium">{SCENARIO_CURRENCY_SYMBOLS[scenarioCurrencyDraft] ?? scenarioCurrencyDraft}{parseFloat(askPriceDraft).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></li>
+                <li>Ask Price: <span className="text-foreground font-medium">{scenarioCurrencySymbols[scenarioCurrencyDraft] ?? scenarioCurrencyDraft}{parseFloat(askPriceDraft).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></li>
               )}
             </ul>
             <p className="text-xs">Any process whose cycle time can't be resolved will be reported below rather than saved.</p>
@@ -10308,7 +10418,7 @@ export default function ManufacturingIntelligencePage() {
     switch (heatmapLayer) {
       case 'manufacturing_risk':
         if (!dfmScores?.features?.length) return [];
-        return buildManufacturingRiskSources(dfmScores, fg, thk);
+        return buildManufacturingRiskSources(dfmScores, fg);
       case 'cost_density':
         return buildCostDensitySources(fg, thk, costHeatmapWeights);
       case 'tolerance_risk':
@@ -10602,6 +10712,14 @@ export default function ManufacturingIntelligencePage() {
       if (item.file2dPath?.toLowerCase().endsWith('.pdf')) {
         try {
           await apiClient.post(`/bom-items/${itemId}/analyze-drawing`, {}, { timeout: 60_000 });
+          // P0.6: analyze-drawing rewrites bom_items.drawing_intelligence, which
+          // gdt-analysis reads directly — without this, a re-parsed drawing's
+          // new tolerance callouts/general-tolerance block kept showing the
+          // PRE-reanalysis GD&T severity/inspection recommendation in the same
+          // session (10-min staleTime, no window-focus refetch). Same defect
+          // shape as the dfm-scores cache gap fixed in P0.5, just on this
+          // endpoint's own dependency (drawing_intelligence, not featureGraph).
+          queryClient.invalidateQueries({ queryKey: ['bom-items', itemId, 'gdt-analysis'] });
         } catch (e: unknown) {
           toast.error(`Drawing analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
         }
@@ -11039,6 +11157,7 @@ export default function ManufacturingIntelligencePage() {
     applyScenario,
     onManualClick: () => setRouteDialogOpen(true),
     selectedManualRoute, onSelectHighlight,
+    dfmScores,
   };
   const analysisProps = {
     projectId,
