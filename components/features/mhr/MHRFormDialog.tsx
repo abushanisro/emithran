@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -13,25 +13,20 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useCreateMHR, useUpdateMHR, useMHRRecord } from '@/lib/api/hooks';
+import { useCreateMHR, useUpdateMHR, useMHRRecord, useMHRReferenceDetail, useMHRCategories, useMHRLocations, useMHRManufacturerCountries } from '@/lib/api/hooks';
+import { useProcessHierarchy } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { toast } from 'sonner';
-import { useProcessHierarchy, useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { mhrFormSchema, type MHRFormData } from '@/lib/validations/mhrValidation';
 import { getCurrencyForLocation as getCurrencyInfo } from '@/lib/utils/currency-locale';
 import { useFxRate } from '@/lib/api/hooks/useFx';
+import { groupMachineLibraryDetail } from '@/lib/utils/machineLibraryDetail';
+import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
 interface MHRFormDialogProps {
   open: boolean;
@@ -39,17 +34,20 @@ interface MHRFormDialogProps {
   editingId?: string | null;
 }
 
-const MASTER_LOCATIONS = ['China', 'E. Europe', 'France', 'Germany', 'India', 'Mexico', 'Other', 'USA', 'W. Europe'] as const;
-const MACHINE_CLASS_OPTIONS = ['Heavy', 'Medium', 'Light', 'Micro'];
-const AUTOMATION_LEVEL_OPTIONS = ['Manual', 'Semi-Automatic', 'Automatic', 'CNC', 'Robotic', 'Fully Automated'];
+// Sheet-metal shop-floor labor grading (migration 577's own doc comment has
+// the full research/rationale) — a closed 3-tier classification, not a
+// DB-sourced list of arbitrary free-text values like the comboboxes below.
+const WAGE_GRADE_OPTIONS = ['Skilled', 'Semi-Skilled', 'Unskilled'] as const;
 
 // USD/USA is this app's default currency, not INR/India — see migration
 // 436_default_currency_usd_not_inr.sql's own doc comment for the full trace
-// of why INR ever became the fallback in this codebase. A user opening this
-// dialog to add a brand-new machine, before touching the location field at
-// all, should see USA/USD defaults; India is a real, correct choice like any
-// other once EXPLICITLY selected, never the unselected starting state.
-const getDefaultValues = (): MHRFormData => ({
+// of why INR ever became the fallback in this codebase. Only `location` gets
+// a real starting value here — every cost/rate/operational number starts
+// genuinely blank (not a plausible-looking fabricated figure) so Zod's
+// required-field validation forces the user to enter this machine's own
+// real numbers before the form can be submitted, never a guess that happens
+// to satisfy the schema.
+const getDefaultValues = (): Partial<MHRFormData> => ({
   location: 'USA',
   commodityCode: '',
   machineName: '',
@@ -57,96 +55,75 @@ const getDefaultValues = (): MHRFormData => ({
   manufacturer: '',
   model: '',
   specification: '',
-  // USA defaults — starting point only; no per-location fabricated
-  // substitute is applied when the location changes (removed, see the
-  // "Machine Economics" initiative in CLAUDE.md). The user enters real
-  // figures for whatever location they pick.
-  landedMachineCost: 50000,
-  machineFootprintSqm: 10.00,
-  rentPerSqmPerMonth: 15.00,
-  powerKwhPerHour: 10.00,
-  electricityCostPerKwh: 0.12,
-  shiftsPerDay: 3.00,
-  hoursPerShift: 8.00,
-  workingDaysPerYear: 260.00,
-  plannedMaintenanceHoursPerYear: 0.00,
-  capacityUtilizationRate: 85.00,
-  accessoriesCostPercentage: 8.00,
-  installationCostPercentage: 20.00,
-  paybackPeriodYears: 10.00,
-  interestRatePercentage: 5.50,
-  insuranceRatePercentage: 1.50,
-  maintenanceCostPercentage: 7.00,
-  adminOverheadPercentage: 12.00,
-  profitMarginPercentage: 15.00,
   cuttableMaterials: '',
-  specsJson: '',
 });
 
-// ── Location combobox: preset options + free-form typing ─────────────────────
-function LocationCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+// ── Generic combobox: real API-sourced presets + free-form typing ──────────
+function ComboboxWithPresets({
+  value, onChange, presets, placeholder, typePlaceholder, heading,
+}: {
+  value: string; onChange: (v: string) => void; presets: string[];
+  placeholder: string; typePlaceholder: string; heading: string;
+}) {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
-
-  // Keep local input in sync when form resets (e.g. loading existing record)
   useEffect(() => { setInputValue(value); }, [value]);
-
-  const filtered = MASTER_LOCATIONS.filter(loc =>
-    loc.toLowerCase().includes(inputValue.toLowerCase()),
-  );
-
+  const filtered = presets.filter(p => p.toLowerCase().includes(inputValue.toLowerCase()));
   const commit = (val: string) => {
     const trimmed = val.trim();
     if (trimmed) { onChange(trimmed); }
     setOpen(false);
   };
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        // Start the search box empty on every open so the full preset list
+        // shows immediately — pre-loading it with the current value (as
+        // inputValue's own sync effect does) filtered the list down to
+        // near-nothing for any field that already had a value, hiding the
+        // rest of the real options (e.g. Category showing only itself
+        // instead of all real categories on file).
+        if (o) setInputValue('');
+      }}
+    >
       <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between font-normal h-10 px-3 text-sm"
-        >
-          <span className={cn('truncate', !value && 'text-muted-foreground')}>
-            {value || 'Select or type location…'}
-          </span>
+        <Button type="button" variant="outline" role="combobox" aria-expanded={open}
+          className="w-full justify-between font-normal h-10 px-3 text-sm">
+          <span className={cn('truncate', !value && 'text-muted-foreground')}>{value || placeholder}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Select or type (e.g. India - Pune)…"
-            value={inputValue}
+          <CommandInput placeholder={typePlaceholder} value={inputValue}
             onValueChange={v => { setInputValue(v); onChange(v); }}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(inputValue); } }}
-          />
-          <CommandList>
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(inputValue); } }} />
+          <CommandList
+            // The Dialog this combobox lives in scroll-locks the page (via
+            // react-remove-scroll) while open, and that lock only recognizes
+            // elements inside the Dialog's own DOM subtree as scrollable —
+            // this list is portalled to document.body by Popover, outside
+            // that subtree, so the lock swallows the wheel event before the
+            // browser's native scroll ever runs, and the list looks stuck.
+            // Scrolling it manually here bypasses that native scroll path
+            // entirely.
+            onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
+          >
             {filtered.length === 0 && inputValue.trim() ? (
               <CommandEmpty>
-                <button
-                  type="button"
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-accent"
-                  onClick={() => commit(inputValue)}
-                >
+                <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-accent" onClick={() => commit(inputValue)}>
                   Use &ldquo;<strong>{inputValue.trim()}</strong>&rdquo;
                 </button>
               </CommandEmpty>
             ) : null}
             {filtered.length > 0 && (
-              <CommandGroup heading="Standard locations">
-                {filtered.map(loc => (
-                  <CommandItem
-                    key={loc}
-                    value={loc}
-                    onSelect={() => { setInputValue(loc); commit(loc); }}
-                  >
-                    <Check className={cn('mr-2 h-4 w-4', value === loc ? 'opacity-100' : 'opacity-0')} />
-                    {loc}
+              <CommandGroup heading={heading}>
+                {filtered.map(p => (
+                  <CommandItem key={p} value={p} onSelect={() => { setInputValue(p); commit(p); }}>
+                    <Check className={cn('mr-2 h-4 w-4', value === p ? 'opacity-100' : 'opacity-0')} />
+                    {p}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -155,17 +132,6 @@ function LocationCombobox({ value, onChange }: { value: string; onChange: (v: st
         </Command>
       </PopoverContent>
     </Popover>
-  );
-}
-
-// Small USD hint displayed next to local-currency inputs
-function UsdHint({ localVal, fxRate }: { localVal: number; fxRate: number }) {
-  if (!localVal || fxRate === 1) return null;
-  const usd = localVal / fxRate;
-  return (
-    <p className="text-xs text-muted-foreground">
-      ≈ ${usd.toLocaleString(undefined, { maximumFractionDigits: usd < 10 ? 3 : 0 })} USD
-    </p>
   );
 }
 
@@ -190,47 +156,27 @@ function EconomicsSourceNote({ source, benchmarkValue }: { source?: string | und
 
 export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogProps) {
   const { data: existingRecord } = useMHRRecord(editingId || '', { enabled: !!editingId });
+  const { data: referenceDetail } = useMHRReferenceDetail(editingId);
   const createMutation = useCreateMHR();
   const updateMutation = useUpdateMHR();
 
+  // Real distinct values from mhr_records itself — never a hardcoded list.
+  // The real process taxonomy (process_calculator_mappings, the same data
+  // the Process page itself shows) — not mhr_records.process_group, which
+  // only ever holds "Sheet Metal" and, after migration 578 made every
+  // machine_library row global (user_id NULL), returns nothing at all for
+  // getDistinctProcessGroups' per-user query.
   const { data: processHierarchy } = useProcessHierarchy();
-  const { data: allMappings } = useProcessCalculatorMappings();
+  const knownProcessGroups = processHierarchy?.processGroups ?? [];
+  const { data: knownLocations = [] } = useMHRLocations();
+  const { data: knownManufacturerCountries = [] } = useMHRManufacturerCountries();
 
   const [selectedGroup, setSelectedGroup] = useState('');
-  const [selectedRoute, setSelectedRoute] = useState('');
-  const [selectedOperation, setSelectedOperation] = useState('');
-  const [isManualMode, setIsManualMode] = useState(false);
   const [manualMHRValue, setManualMHRValue] = useState(0);
-
-  const HEADER_SKIP = new Set(['s.no', 'sno', 's no', 'sl no', 'basic info', 'location',
-    'process group', 'process route', 'operation', 'name', 'type', 'category', 'description']);
-  const isValidName = (v: string) => {
-    const t = v?.trim();
-    return (
-      t && t.length > 0 && t.length <= 100 && isNaN(Number(t)) &&
-      !t.includes('|') && !t.includes('USD→INR') && !t.includes('USD->INR') &&
-      !HEADER_SKIP.has(t.toLowerCase())
-    );
-  };
-
-  const processGroups = useMemo(() => {
-    if (!processHierarchy?.processGroups) return [];
-    return [...new Set(processHierarchy.processGroups)].filter(isValidName).map(g => ({ value: g, label: g }));
-  }, [processHierarchy?.processGroups]);
-
-  const processRoutes = useMemo(() => {
-    if (!allMappings?.mappings || !selectedGroup) return [];
-    const routes = allMappings.mappings.filter(m => m.processGroup === selectedGroup).map(m => m.processRoute);
-    return [...new Set(routes)].filter(isValidName).map(r => ({ value: r, label: r }));
-  }, [allMappings?.mappings, selectedGroup]);
-
-  const operations = useMemo(() => {
-    if (!allMappings?.mappings || !selectedGroup || !selectedRoute) return [];
-    const ops = allMappings.mappings
-      .filter(m => m.processGroup === selectedGroup && m.processRoute === selectedRoute)
-      .map(m => m.operation);
-    return [...new Set(ops)].filter(isValidName).map(o => ({ value: o, label: o }));
-  }, [allMappings?.mappings, selectedGroup, selectedRoute]);
+  // Scoped to the selected Process — without this, Category listed every
+  // domain's categories regardless of Process (281 of ~294 rows are Sheet
+  // Metal, drowning out e.g. Machining's few).
+  const { data: knownCategories = [] } = useMHRCategories(selectedGroup || undefined);
 
   const {
     register, handleSubmit, reset, setValue, control, watch,
@@ -242,14 +188,8 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   });
 
   const handleGroupChange = (group: string) => {
-    setSelectedGroup(group); setSelectedRoute(''); setSelectedOperation('');
-    setValue('commodityCode', group); setValue('specification', '');
-  };
-  const handleRouteChange = (route: string) => {
-    setSelectedRoute(route); setSelectedOperation(''); setValue('specification', '');
-  };
-  const handleOperationChange = (op: string) => {
-    setSelectedOperation(op); setValue('specification', op);
+    setSelectedGroup(group);
+    setValue('commodityCode', group);
   };
 
   useEffect(() => {
@@ -280,7 +220,13 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
         electricityCostPerKwh: existingRecord.electricityCostPerKwh,
         adminOverheadPercentage: existingRecord.adminOverheadPercentage,
         profitMarginPercentage: existingRecord.profitMarginPercentage,
-        machineClass: existingRecord.machineClass || '',
+        // Show the real, human category ("3 Roll Bender") derived the same
+        // way the Rate Table does, not the raw internal machine_class slug
+        // ("roll_forming") — that slug is a cost-engine classification code,
+        // not a display name. onSubmit below detects an untouched value and
+        // writes the original canonical machineClass back unchanged so this
+        // never corrupts machine selection.
+        machineClass: (() => { const c = mhrCategoryOf(existingRecord); return c === '-' ? '' : c; })(),
         automationLevel: existingRecord.automationLevel || '',
         wageGrade: existingRecord.wageGrade || '',
         operators: existingRecord.operators ?? undefined,
@@ -308,48 +254,40 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
         maxThicknessAlMm: existingRecord.maxThicknessAlMm ?? undefined,
         maxThicknessCuMm: existingRecord.maxThicknessCuMm ?? undefined,
         cuttableMaterials: existingRecord.cuttableMaterials?.join(', ') ?? '',
-        specsJson: existingRecord.specs && Object.keys(existingRecord.specs).length
-          ? JSON.stringify(existingRecord.specs, null, 2) : '',
       });
-      setIsManualMode(Boolean(existingRecord.isManualEntry || (existingRecord as any).is_manual_entry));
-      setManualMHRValue(Number(existingRecord.manualMHRValue || (existingRecord as any).manual_mhr_value || 0));
+      // Prefill with the calculated machine-economics MHR when there is one
+      // (only safe to use directly when the record's own currency is USD —
+      // calculatedMhrUsdHr is always USD, and converting it to a non-USD
+      // location's local currency here would need a live FX rate this effect
+      // doesn't have; those records keep the previous fallback chain
+      // unconverted rather than risk a silently wrong number). Saving without
+      // touching this field adopts the calculated value as the new
+      // manual_mhr_value — the value real quote costing reads.
+      const isUsd = (existingRecord.currency ?? 'USD') === 'USD';
+      const fallbackMhr = Number(
+        existingRecord.calculations?.totalMachineHourRate
+        || existingRecord.manualMHRValue
+        || (existingRecord as any).manual_mhr_value
+        || 0
+      );
+      const prefillMhr = (isUsd && existingRecord.calculatedMhrUsdHr != null)
+        ? existingRecord.calculatedMhrUsdHr
+        : fallbackMhr;
+      setManualMHRValue(prefillMhr);
       // Use processGroup first (set by Combined-format import); fall back to commodityCode
-      const groupFromRecord = existingRecord.processGroup || existingRecord.commodityCode || '';
-      if (existingRecord.processRoute && existingRecord.operation) {
-        // Real, persisted selection (mhr_records.process_route/operation) —
-        // use directly. Doesn't need allMappings to be loaded at all, so this
-        // hydrates immediately instead of racing the mappings fetch, and
-        // doesn't depend on `specification` (a free-text field, usually
-        // unrelated to the operation name) matching anything.
-        setSelectedGroup(groupFromRecord);
-        setSelectedRoute(existingRecord.processRoute);
-        setSelectedOperation(existingRecord.operation);
-      } else if (allMappings?.mappings) {
-        // Older record saved before processRoute/operation were persisted —
-        // fall back to re-matching by name against the specification field.
-        const match = allMappings.mappings.find(m => m.operation === existingRecord.specification);
-        if (match) {
-          setSelectedGroup(match.processGroup); setSelectedRoute(match.processRoute); setSelectedOperation(match.operation);
-        } else {
-          setSelectedGroup(groupFromRecord); setSelectedRoute(''); setSelectedOperation('');
-        }
-      } else {
-        // allMappings still loading — set group immediately so the Select isn't blank
-        setSelectedGroup(groupFromRecord);
-      }
+      setSelectedGroup(existingRecord.processGroup || existingRecord.commodityCode || '');
     } else {
       reset(getDefaultValues());
-      setIsManualMode(false); setManualMHRValue(0);
-      setSelectedGroup(''); setSelectedRoute(''); setSelectedOperation('');
+      setManualMHRValue(0);
+      setSelectedGroup('');
     }
-  }, [existingRecord, reset, allMappings]);
+  }, [existingRecord, reset]);
 
   // ── Watched values for live USD hints ─────────────────────────────────────
   const locationWatched      = watch('location');
-  const landedCostWatched    = watch('landedMachineCost') || 0;
-  const rentWatched          = watch('rentPerSqmPerMonth') || 0;
-  const electricityWatched   = watch('electricityCostPerKwh') || 0;
   const manualMHRWatched     = manualMHRValue || 0;
+  const directOhWatched      = watch('directOverheadRate');
+  const indirectOhWatched    = watch('indirectOverheadRate');
 
   // Derived currency info from selected location. fxRate is a live
   // ECB/Frankfurter reference rate (useFxRate) — never a hardcoded number.
@@ -362,65 +300,65 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
 
   const onSubmit = async (data: MHRFormData) => {
     try {
-      if (!selectedGroup) { toast.error('Please select a process group'); return; }
-      let submitData: any = { ...data };
-      if (isManualMode) {
-        if (manualMHRValue <= 0) { toast.error('Please enter a valid MHR value greater than 0'); return; }
-        submitData = {
-          machineName: data.machineName, location: data.location, commodityCode: data.commodityCode,
-          machineDescription: data.machineDescription || '', manufacturer: data.manufacturer || '',
-          model: data.model || '', specification: data.specification || '',
-          manufacturerCountry: data.manufacturerCountry || '', machineClass: data.machineClass || '',
-          automationLevel: data.automationLevel || '', wageGrade: data.wageGrade || '',
-          operators: data.operators, machinePriceUsd: data.machinePriceUsd,
-          lhrInrPerHr: data.lhrInrPerHr, usdLaborRatePerHr: data.usdLaborRatePerHr,
-          usdLhrBase: data.usdLhrBase, usdLhrBurden: data.usdLhrBurden, usdLhrTotal: data.usdLhrTotal,
-          directOverheadRate: data.directOverheadRate, indirectOverheadRate: data.indirectOverheadRate,
-          shiftsPerDay: 1, hoursPerShift: 8, workingDaysPerYear: 250,
-          plannedMaintenanceHoursPerYear: 0, capacityUtilizationRate: 85,
-          landedMachineCost: manualMHRValue, accessoriesCostPercentage: 0,
-          installationCostPercentage: 10, paybackPeriodYears: 10, interestRatePercentage: 0,
-          insuranceRatePercentage: 0, maintenanceCostPercentage: 0, machineFootprintSqm: 0,
-          rentPerSqmPerMonth: 0, powerKwhPerHour: 0, electricityCostPerKwh: 0,
-          adminOverheadPercentage: 0, profitMarginPercentage: 0, isManualEntry: true, manualMHRValue,
-          // Capability is orthogonal to manual-vs-calculated MHR mode — a
-          // manually-priced machine still has real physical limits worth
-          // recording for machine selection.
-          maxXMm: data.maxXMm, maxYMm: data.maxYMm, maxZMm: data.maxZMm,
-          maxDiameterMm: data.maxDiameterMm, maxLengthMm: data.maxLengthMm,
-          maxTonnage: data.maxTonnage, maxThicknessMm: data.maxThicknessMm,
-          maxWorkpieceWeightKg: data.maxWorkpieceWeightKg, powerKw: data.powerKw,
-          maxThicknessMsMm: data.maxThicknessMsMm, maxThicknessSsMm: data.maxThicknessSsMm,
-          maxThicknessAlMm: data.maxThicknessAlMm, maxThicknessCuMm: data.maxThicknessCuMm,
-        };
+      if (!selectedGroup) { toast.error('Please select a process'); return; }
+      // The Category field displays the derived human category (e.g. "3 Roll
+      // Bender"), never the raw canonical machineClass slug (e.g.
+      // "roll_forming") — see the reset() effect above. If the user left it
+      // showing that same derived value, write the real original slug back
+      // unchanged instead of overwriting a cost-engine classification code
+      // with a display string; an explicit edit is still respected as-is.
+      if (existingRecord && data.machineClass === mhrCategoryOf(existingRecord)) {
+        data.machineClass = existingRecord.machineClass || '';
       }
-      // cuttableMaterials/specsJson are form-only representations (comma text /
-      // raw JSON text) of the API's string[]/object shapes — convert once here
-      // for both the manual and calculated submitData paths.
+      if (manualMHRValue <= 0) { toast.error('Please enter a valid Machine Hour Rate greater than 0'); return; }
+      // Machine cost is always entered directly now (the capex/utilization
+      // calculator this used to derive totalMachineHourRate from — shifts,
+      // landed cost, financing %s, rent, power — was removed); the fixed
+      // values below are inert placeholders createManualEntryCalculation
+      // ignores once isManualEntry is true (see mhr.service.ts).
+      const submitData: any = {
+        machineName: data.machineName, location: data.location, commodityCode: data.commodityCode,
+        machineDescription: data.machineDescription || '', manufacturer: data.manufacturer || '',
+        model: data.model || '', specification: data.specification || '',
+        manufacturerCountry: data.manufacturerCountry || '', machineClass: data.machineClass || '',
+        automationLevel: data.automationLevel || '', wageGrade: data.wageGrade || '',
+        operators: data.operators, machinePriceUsd: data.machinePriceUsd,
+        lhrInrPerHr: data.lhrInrPerHr, usdLaborRatePerHr: data.usdLaborRatePerHr,
+        usdLhrBase: data.usdLhrBase, usdLhrBurden: data.usdLhrBurden, usdLhrTotal: data.usdLhrTotal,
+        directOverheadRate: data.directOverheadRate, indirectOverheadRate: data.indirectOverheadRate,
+        shiftsPerDay: 1, hoursPerShift: 8, workingDaysPerYear: 250,
+        plannedMaintenanceHoursPerYear: 0, capacityUtilizationRate: 85,
+        landedMachineCost: manualMHRValue, accessoriesCostPercentage: 0,
+        installationCostPercentage: 10, paybackPeriodYears: 10, interestRatePercentage: 0,
+        insuranceRatePercentage: 0, maintenanceCostPercentage: 0, machineFootprintSqm: 0,
+        rentPerSqmPerMonth: 0, powerKwhPerHour: 0, electricityCostPerKwh: 0,
+        adminOverheadPercentage: 0, profitMarginPercentage: 0, isManualEntry: true, manualMHRValue,
+        // Capability — the same real fields machine-selection/selector.ts
+        // reads for ranking, independent of how the machine rate is entered.
+        maxXMm: data.maxXMm, maxYMm: data.maxYMm, maxZMm: data.maxZMm,
+        maxDiameterMm: data.maxDiameterMm, maxLengthMm: data.maxLengthMm,
+        maxTonnage: data.maxTonnage, maxThicknessMm: data.maxThicknessMm,
+        maxWorkpieceWeightKg: data.maxWorkpieceWeightKg, powerKw: data.powerKw,
+        maxThicknessMsMm: data.maxThicknessMsMm, maxThicknessSsMm: data.maxThicknessSsMm,
+        maxThicknessAlMm: data.maxThicknessAlMm, maxThicknessCuMm: data.maxThicknessCuMm,
+      };
+      // cuttableMaterials is a form-only representation (comma text) of the
+      // API's string[] shape — convert once here for both the manual and
+      // calculated submitData paths.
       submitData.cuttableMaterials = data.cuttableMaterials
         ? data.cuttableMaterials.split(',').map((s) => s.trim()).filter(Boolean)
         : undefined;
-      submitData.specs = data.specsJson && data.specsJson.trim() ? JSON.parse(data.specsJson) : undefined;
-      delete submitData.specsJson;
-      // processGroup/processRoute/operation: real dedicated columns
-      // (mhr_records.process_group/process_route/operation), tracked as
-      // component state (selectedGroup/selectedRoute/selectedOperation), not
-      // registered react-hook-form fields — `data` never carries them. This
-      // form previously only ever wrote commodityCode/specification (the
-      // group/operation stand-ins used by the hierarchy pickers below), which
-      // is exactly why re-opening a saved record for Edit couldn't reliably
-      // re-select the route/operation: process_route was never persisted at
-      // all, and matching specification back to an operation name is fragile.
+      // processGroup: a real dedicated column (mhr_records.process_group),
+      // tracked as component state (selectedGroup), not a registered
+      // react-hook-form field — `data` never carries it.
       submitData.processGroup = selectedGroup;
-      submitData.processRoute = selectedRoute;
-      submitData.operation = selectedOperation;
       if (editingId) {
         await updateMutation.mutateAsync({ id: editingId, data: submitData });
       } else {
         await createMutation.mutateAsync(submitData);
       }
       onOpenChange(false);
-      reset(getDefaultValues()); setIsManualMode(false); setManualMHRValue(0);
+      reset(getDefaultValues()); setManualMHRValue(0);
     } catch {
       if (!createMutation.error && !updateMutation.error) {
         toast.error(editingId ? 'Failed to update MHR record.' : 'Failed to create MHR record.', { duration: 6000 });
@@ -429,19 +367,9 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   };
 
   const handleClose = () => {
-    onOpenChange(false); reset(getDefaultValues()); setIsManualMode(false); setManualMHRValue(0);
-    setSelectedGroup(''); setSelectedRoute(''); setSelectedOperation('');
+    onOpenChange(false); reset(getDefaultValues()); setManualMHRValue(0);
+    setSelectedGroup('');
   };
-
-  // Generic numeric field (for % fields that don't need currency)
-  const numField = (id: keyof MHRFormData, label: string, opts?: { step?: string; min?: string; max?: string }) => (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type="number" step={opts?.step ?? '0.01'} min={opts?.min ?? '0'} max={opts?.max}
-        {...register(id as any, { valueAsNumber: true })} />
-      {errors[id] && <span className="text-xs text-destructive">{(errors[id] as any)?.message}</span>}
-    </div>
-  );
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -460,13 +388,8 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="operation" disabled={isManualMode}>Operation</TabsTrigger>
-              <TabsTrigger value="costs" disabled={isManualMode}>Costs</TabsTrigger>
-              <TabsTrigger value="utilities" disabled={isManualMode}>Utilities</TabsTrigger>
-              <TabsTrigger value="margins" disabled={isManualMode}>Margins</TabsTrigger>
-              <TabsTrigger value="labour" className="text-green-700 dark:text-green-400">Labour</TabsTrigger>
               <TabsTrigger value="capability" className="text-blue-700 dark:text-blue-400">Capability</TabsTrigger>
             </TabsList>
 
@@ -484,7 +407,11 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
                     name="location"
                     control={control}
                     render={({ field }) => (
-                      <LocationCombobox value={field.value || ''} onChange={field.onChange} />
+                      <ComboboxWithPresets
+                        value={field.value || ''} onChange={field.onChange}
+                        presets={knownLocations} placeholder="Select or type location…"
+                        typePlaceholder="Select or type (e.g. India - Pune)…" heading="Locations on file"
+                      />
                     )}
                   />
                   {currCode !== 'USD' && (
@@ -494,377 +421,183 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Process Group *</Label>
-                  <Select onValueChange={handleGroupChange} value={selectedGroup}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select process group" />
-                    </SelectTrigger>
-                    <SelectContent className="max-w-[var(--radix-select-trigger-width)] max-h-60">
-                      {selectedGroup && !processGroups.find(g => g.value === selectedGroup) && (
-                        <SelectItem value={selectedGroup}><span className="block truncate">{selectedGroup}</span></SelectItem>
-                      )}
-                      {processGroups.map((g, i) => (
-                        <SelectItem key={`${g.value}-${i}`} value={g.value}><span className="block truncate">{g.label}</span></SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Process *</Label>
+                  <ComboboxWithPresets
+                    value={selectedGroup} onChange={handleGroupChange}
+                    presets={knownProcessGroups} placeholder="Select or type process…"
+                    typePlaceholder="Select or type (e.g. Sheet Metal)…" heading="Processes on file"
+                  />
                   {!selectedGroup && <span className="text-xs text-destructive">Required</span>}
                 </div>
                 <div className="space-y-2">
-                  <Label>Process Route</Label>
-                  <Select onValueChange={handleRouteChange} value={selectedRoute} disabled={!selectedGroup}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={selectedGroup ? 'Select process route' : 'Select group first'} />
-                    </SelectTrigger>
-                    <SelectContent className="max-w-[var(--radix-select-trigger-width)] max-h-60">
-                      {processRoutes.map((r, i) => (
-                        <SelectItem key={`${r.value}-${i}`} value={r.value}><span className="block truncate">{r.label}</span></SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Operation</Label>
-                  <Select onValueChange={handleOperationChange} value={selectedOperation} disabled={!selectedRoute}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={selectedRoute ? 'Select operation' : 'Select route first'} />
-                    </SelectTrigger>
-                    <SelectContent className="max-w-[var(--radix-select-trigger-width)] max-h-60">
-                      {operations.map((o, i) => (
-                        <SelectItem key={`${o.value}-${i}`} value={o.value}><span className="block truncate">{o.label}</span></SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Machine Class / Process Sequence</Label>
+                  <Label>Category</Label>
                   <Controller name="machineClass" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
-                      <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
+                    <ComboboxWithPresets
+                      value={field.value || ''} onChange={field.onChange}
+                      presets={knownCategories} placeholder="Select or type category…"
+                      typePlaceholder="Select or type (e.g. Fiber Laser Cutting Machine)…" heading="Categories on file"
+                    />
+                  )} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Wage Grade</Label>
+                  <Controller name="wageGrade" control={control} render={({ field }) => (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select wage grade…" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {field.value && !MACHINE_CLASS_OPTIONS.includes(field.value) && (
-                          <SelectItem value={field.value}>{field.value}</SelectItem>
-                        )}
-                        {MACHINE_CLASS_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        {WAGE_GRADE_OPTIONS.map((g) => (
+                          <SelectItem key={g} value={g}>{g}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Automation Level</Label>
-                  <Controller name="automationLevel" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
-                      <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
-                      <SelectContent>{AUTOMATION_LEVEL_OPTIONS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                    </Select>
-                  )} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="wageGrade">Wage Grade</Label>
-                  <Input id="wageGrade" {...register('wageGrade')} placeholder="e.g., Grade 5, WG-7" />
+                  <p className="text-xs text-muted-foreground">Reference only — real quote costing doesn't use this as a labor-rate lookup key yet.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="operators">Operators</Label>
                   <Input id="operators" type="number" step="1" min="0" {...register('operators', { valueAsNumber: true })} placeholder="e.g., 1" />
+                  <p className="text-xs text-muted-foreground">Used directly in real quote costing — this machine's operations use this operator count for setup and cycle labor, instead of a generic default. Leave blank to fall back to that default.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="manufacturer">Manufacturer</Label>
-                  <Input id="manufacturer" {...register('manufacturer')} placeholder="e.g., ABC Corp" />
+                  <Label>Manufacturer Country</Label>
+                  <Controller name="manufacturerCountry" control={control} render={({ field }) => (
+                    <ComboboxWithPresets
+                      value={field.value || ''} onChange={field.onChange}
+                      presets={knownManufacturerCountries} placeholder="Select or type country…"
+                      typePlaceholder="Select or type (e.g. Japan, Germany)…" heading="Countries on file"
+                    />
+                  )} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="manufacturerCountry">Manufacturer Country</Label>
-                  <Input id="manufacturerCountry" {...register('manufacturerCountry')} placeholder="e.g., Japan, Germany" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="model">Model</Label>
-                  <Input id="model" {...register('model')} placeholder="e.g., XR-2025" />
+                  <Label htmlFor="machinePriceUsd">Machine Price (USD)</Label>
+                  <Input id="machinePriceUsd" type="number" step="0.01" min="0"
+                    {...register('machinePriceUsd', { valueAsNumber: true })} placeholder="e.g., 50000" />
+                  <p className="text-xs text-muted-foreground">Always in USD — used for cost benchmarking</p>
                 </div>
                 <div className="col-span-2 space-y-2">
                   <Label htmlFor="machineDescription">Machine Description</Label>
                   <Input id="machineDescription" {...register('machineDescription')} placeholder="Brief description" />
                 </div>
 
-                {/* Manual Entry toggle */}
-                <div className="col-span-2 border-t pt-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Switch id="manual-mode" checked={isManualMode} onCheckedChange={setIsManualMode} />
-                    <Label htmlFor="manual-mode" className="text-sm font-medium">Manual MHR Entry (Skip automatic calculation)</Label>
-                  </div>
-                  {isManualMode && (
-                    <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
-                      <p className="text-sm text-blue-700 dark:text-blue-300">
-                        Enter the MHR value directly in local currency. Cost calculation tabs are disabled.
-                      </p>
-                      <div className="space-y-2">
-                        <Label htmlFor="manualMHR" className="text-sm font-semibold">
-                          Machine Hour Rate (MHR) — {currSym}/hour *
-                        </Label>
-                        <div className="flex items-center gap-3">
-                          <Input
-                            id="manualMHR"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={manualMHRValue === 0 ? '' : manualMHRValue}
-                            onChange={e => setManualMHRValue(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
-                            placeholder="e.g., 500.00"
-                            className="max-w-xs"
-                          />
-                          {fxRate !== 1 && manualMHRWatched > 0 && (
-                            <span className="text-sm text-muted-foreground">
-                              ≈ ${(manualMHRWatched / fxRate).toFixed(2)} USD/hr
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">This will override all automatic calculations</p>
-                      </div>
+                <div className="col-span-2 border-t pt-4 space-y-2">
+                  <Label className="text-sm font-medium">Overhead Rates (USD)</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="directOverheadRate">Direct Overhead Rate ($/hr)</Label>
+                      <Input id="directOverheadRate" type="number" step="0.01" min="0"
+                        {...register('directOverheadRate', { valueAsNumber: true })}
+                        placeholder="e.g., 19.60" />
+                      <EconomicsSourceNote source={existingRecord?.directOverheadSource} benchmarkValue={existingRecord?.benchmarkDirectOverheadRateUsdHr} />
                     </div>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* ── Operation ── */}
-            <TabsContent value="operation" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="shiftsPerDay">Shifts per Day *</Label>
-                  <Input id="shiftsPerDay" type="number" step="0.01" min="0.5" max="4" {...register('shiftsPerDay', { valueAsNumber: true })} />
-                  {errors.shiftsPerDay && <span className="text-xs text-destructive">{errors.shiftsPerDay.message}</span>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hoursPerShift">Hours per Shift *</Label>
-                  <Input id="hoursPerShift" type="number" step="0.01" min="1" max="24" {...register('hoursPerShift', { valueAsNumber: true })} />
-                  {errors.hoursPerShift && <span className="text-xs text-destructive">{errors.hoursPerShift.message}</span>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="workingDaysPerYear">Working Days per Year *</Label>
-                  <Input id="workingDaysPerYear" type="number" step="0.01" min="200" max="365" {...register('workingDaysPerYear', { valueAsNumber: true })} />
-                  {errors.workingDaysPerYear && <span className="text-xs text-destructive">{errors.workingDaysPerYear.message}</span>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="plannedMaintenanceHoursPerYear">Maintenance Hours per Year</Label>
-                  <Input id="plannedMaintenanceHoursPerYear" type="number" step="0.01" min="0" {...register('plannedMaintenanceHoursPerYear', { valueAsNumber: true })} />
-                  {errors.plannedMaintenanceHoursPerYear && <span className="text-xs text-destructive">{errors.plannedMaintenanceHoursPerYear.message}</span>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="capacityUtilizationRate">Capacity Utilization (%)*</Label>
-                  <Input id="capacityUtilizationRate" type="number" step="0.01" min="50" max="100" {...register('capacityUtilizationRate', { valueAsNumber: true })} />
-                  {errors.capacityUtilizationRate && <span className="text-xs text-destructive">{errors.capacityUtilizationRate.message}</span>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="setupTimeHr">Setup Time (hr)</Label>
-                  <Input id="setupTimeHr" type="number" step="0.01" min="0" {...register('setupTimeHr', { valueAsNumber: true })} placeholder="e.g., 0.5" />
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* ── Costs ── */}
-            <TabsContent value="costs" className="space-y-4 mt-4">
-              <div className="rounded-lg bg-muted/40 border px-4 py-2 text-xs text-muted-foreground mb-1">
-                All monetary costs are in <strong>{currSym} {currCode}</strong>.
-                {currCode !== 'USD' && <> USD equivalents shown below each field (1 USD = {fxRate} {currCode}).</>}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {/* Landed Machine Cost — local currency + USD hint */}
-                <div className="space-y-1">
-                  <Label htmlFor="landedMachineCost">Landed Machine Cost ({currSym}) *</Label>
-                  <Input id="landedMachineCost" type="number" step="0.01" min="1"
-                    {...register('landedMachineCost', { valueAsNumber: true })} />
-                  <UsdHint localVal={landedCostWatched} fxRate={fxRate} />
-                  {errors.landedMachineCost && <span className="text-xs text-destructive">{errors.landedMachineCost.message}</span>}
-                </div>
-
-                {/* Machine Price — always USD */}
-                <div className="space-y-1">
-                  <Label htmlFor="machinePriceUsd">Machine Price (USD)</Label>
-                  <Input id="machinePriceUsd" type="number" step="0.01" min="0"
-                    {...register('machinePriceUsd', { valueAsNumber: true })} placeholder="e.g., 50000" />
-                  <p className="text-xs text-muted-foreground">Always in USD — used for cost benchmarking</p>
-                </div>
-
-                {numField('accessoriesCostPercentage', 'Accessories Cost (%)')}
-
-                <div className="space-y-2">
-                  <Label htmlFor="installationCostPercentage">Installation Cost (%) *</Label>
-                  <Input id="installationCostPercentage" type="number" step="0.01" min="10" max="40"
-                    {...register('installationCostPercentage', { valueAsNumber: true })} />
-                  {errors.installationCostPercentage && <span className="text-xs text-destructive">{errors.installationCostPercentage.message}</span>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="paybackPeriodYears">Payback Period (Years) *</Label>
-                  <Input id="paybackPeriodYears" type="number" step="0.01" min="1" max="30"
-                    {...register('paybackPeriodYears', { valueAsNumber: true })} />
-                  {errors.paybackPeriodYears && <span className="text-xs text-destructive">{errors.paybackPeriodYears.message}</span>}
-                </div>
-
-                {numField('interestRatePercentage', 'Interest Rate (%)')}
-                {numField('insuranceRatePercentage', 'Insurance Rate (%)')}
-                {numField('maintenanceCostPercentage', 'Maintenance Cost (%)')}
-              </div>
-            </TabsContent>
-
-            {/* ── Utilities ── */}
-            <TabsContent value="utilities" className="space-y-4 mt-4">
-              <div className="rounded-lg bg-muted/40 border px-4 py-2 text-xs text-muted-foreground mb-1">
-                Monetary utilities in <strong>{currSym} {currCode}</strong>.
-                {currCode !== 'USD' && <> USD shown below each field.</>}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {numField('machineFootprintSqm', 'Machine Footprint (m²)')}
-
-                <div className="space-y-1">
-                  <Label htmlFor="rentPerSqmPerMonth">Rent per m²/month ({currSym})</Label>
-                  <Input id="rentPerSqmPerMonth" type="number" step="0.01" min="0"
-                    {...register('rentPerSqmPerMonth', { valueAsNumber: true })} />
-                  <UsdHint localVal={rentWatched} fxRate={fxRate} />
-                </div>
-
-                {numField('powerKwhPerHour', 'Power (kWh per Hour)')}
-
-                <div className="space-y-1">
-                  <Label htmlFor="electricityCostPerKwh">Electricity Cost ({currSym}/kWh)</Label>
-                  <Input id="electricityCostPerKwh" type="number" step="0.001" min="0"
-                    {...register('electricityCostPerKwh', { valueAsNumber: true })} />
-                  <UsdHint localVal={electricityWatched} fxRate={fxRate} />
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* ── Margins ── */}
-            <TabsContent value="margins" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                {numField('adminOverheadPercentage', 'Admin Overhead (%)')}
-                {numField('profitMarginPercentage', 'Profit Margin (%)')}
-              </div>
-            </TabsContent>
-
-            {/* ── Labour (LHR) — available in both calculator and manual mode ── */}
-            <TabsContent value="labour" className="space-y-4 mt-4">
-              <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 px-4 py-2.5 mb-1">
-                <p className="text-xs text-green-800 dark:text-green-300">
-                  All LHR values are in <strong>USD</strong>.
-                  <span className="font-semibold"> LHR Total ($/hr)</span> is the Skill-Based Labour Rate shown in the Rate Table.
-                  Leave a rate blank to have it resolved from an industry benchmark (if this machine name matches one) on save.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Overhead Rates</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="directOverheadRate">Direct Overhead Rate ($/hr)</Label>
-                    <Input id="directOverheadRate" type="number" step="0.01" min="0"
-                      {...register('directOverheadRate', { valueAsNumber: true })}
-                      placeholder="e.g., 19.60" />
-                    <EconomicsSourceNote source={existingRecord?.directOverheadSource} benchmarkValue={existingRecord?.benchmarkDirectOverheadRateUsdHr} />
+                    <div className="space-y-1">
+                      <Label htmlFor="indirectOverheadRate">Indirect Overhead Rate ($/hr)</Label>
+                      <Input id="indirectOverheadRate" type="number" step="0.01" min="0"
+                        {...register('indirectOverheadRate', { valueAsNumber: true })}
+                        placeholder="e.g., 8.40" />
+                      <EconomicsSourceNote source={existingRecord?.indirectOverheadSource} benchmarkValue={existingRecord?.benchmarkIndirectOverheadRateUsdHr} />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="indirectOverheadRate">Indirect Overhead Rate ($/hr)</Label>
-                    <Input id="indirectOverheadRate" type="number" step="0.01" min="0"
-                      {...register('indirectOverheadRate', { valueAsNumber: true })}
-                      placeholder="e.g., 8.40" />
-                    <EconomicsSourceNote source={existingRecord?.indirectOverheadSource} benchmarkValue={existingRecord?.benchmarkIndirectOverheadRateUsdHr} />
+                  <div className="flex items-center justify-between rounded-md bg-muted/40 border px-3 py-2">
+                    <span className="text-xs font-medium">Total Overhead Rate ($/hr)</span>
+                    <span className="text-sm font-semibold text-primary">
+                      {directOhWatched != null || indirectOhWatched != null
+                        ? `$${((directOhWatched || 0) + (indirectOhWatched || 0)).toFixed(2)}`
+                        : '-'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Calculated automatically — Direct OH + Indirect OH, not entered separately.</p>
+                </div>
+
+                <div className="col-span-2 border-t pt-4 space-y-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="manualMHR" className="text-sm font-medium">
+                        Machine Hour Rate — MHR ({currSym}/hr) *
+                      </Label>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          id="manualMHR"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={manualMHRValue === 0 ? '' : manualMHRValue}
+                          onChange={e => setManualMHRValue(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                          placeholder="e.g., 500.00"
+                        />
+                      </div>
+                      {fxRate !== 1 && manualMHRWatched > 0 && (
+                        <span className="text-sm text-muted-foreground">
+                          ≈ ${(manualMHRWatched / fxRate).toFixed(2)} USD/hr
+                        </span>
+                      )}
+                      {existingRecord?.calculatedMhrUsdHr != null && (
+                        <p className="text-[11px] text-muted-foreground">Prefilled from machine economics (${existingRecord.calculatedMhrUsdHr.toFixed(2)}/hr calculated) — edit and save to override.</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">This machine's real $/hr — entered directly rather than derived from a capex/utilization calculator. This is what real quote costing uses.</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="usdLhrTotal">Labor Rate — LHR ($/hr)</Label>
+                      <Input id="usdLhrTotal" type="number" step="0.01" min="0"
+                        {...register('usdLhrTotal', { valueAsNumber: true })}
+                        placeholder="e.g., 36.30" />
+                      <EconomicsSourceNote source={existingRecord?.laborRateSource} benchmarkValue={existingRecord?.benchmarkLaborRateUsdHr} />
+                      <p className="text-[11px] text-muted-foreground">Used directly in real quote costing for this machine's own operations — takes precedence over the location + process group benchmark rate when set. Leave blank to fall back to that benchmark instead.</p>
+                    </div>
                   </div>
                 </div>
               </div>
+            </TabsContent>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="lhrInrPerHr">LHR Local Rate ({currSym}/hr)</Label>
-                  <Input id="lhrInrPerHr" type="number" step="0.01" min="0"
-                    {...register('lhrInrPerHr', { valueAsNumber: true })}
-                    placeholder={currCode === 'INR' ? 'e.g., 180' : 'Local currency rate'} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="usdLaborRatePerHr">USD Labor Rate ($/hr)</Label>
-                  <Input id="usdLaborRatePerHr" type="number" step="0.01" min="0"
-                    {...register('usdLaborRatePerHr', { valueAsNumber: true })}
-                    placeholder="e.g., 2.16" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="usdLhrBase">LHR Base ($/hr)</Label>
-                  <Input id="usdLhrBase" type="number" step="0.01" min="0"
-                    {...register('usdLhrBase', { valueAsNumber: true })}
-                    placeholder="e.g., 1.50" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="usdLhrBurden">LHR Burden ($/hr)</Label>
-                  <Input id="usdLhrBurden" type="number" step="0.01" min="0"
-                    {...register('usdLhrBurden', { valueAsNumber: true })}
-                    placeholder="e.g., 0.66" />
-                </div>
-                <div className="col-span-2 space-y-2 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 p-3">
-                  <Label htmlFor="usdLhrTotal" className="text-green-800 dark:text-green-300 font-semibold text-sm">
-                    Skill-Based Labor Rate — LHR Total ($/hr) ★
-                  </Label>
-                  <Input id="usdLhrTotal" type="number" step="0.01" min="0"
-                    {...register('usdLhrTotal', { valueAsNumber: true })}
-                    placeholder="e.g., 2.16"
-                    className="border-green-300 focus:border-green-500" />
-                  <p className="text-xs text-muted-foreground">Key LHR value shown in Rate Table and used in process cost calculations</p>
-                  <EconomicsSourceNote source={existingRecord?.laborRateSource} benchmarkValue={existingRecord?.benchmarkLaborRateUsdHr} />
-                  <p className="text-[11px] text-muted-foreground/70 leading-tight">
-                    Note: this value drives the Rate Table display and exports only — real quote costing resolves labour rate independently from the LHR database by location + process group.
+            {/* ── Capability: real machine_library.json data for this exact
+                 machine, read-only (migration 324/339's editable capability
+                 number fields were removed — this lookup is now the sole
+                 content of this tab). ── */}
+            <TabsContent value="capability" className="space-y-4 mt-4">
+              {/* ── Machine & Process Lookup — real machine_library.json data for
+                   this exact machine, read-only. Replaces hand-typed JSON with
+                   the sourced values, grouped by what part of the machine/
+                   process each field describes. ── */}
+              <div className="space-y-3 border-t pt-4">
+                <div>
+                  <Label>Machine &amp; Process Lookup</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Real machine_library.json data for this machine, grouped by process — read-only.
+                    {referenceDetail?.sourceKey && (
+                      <span> Source: <span className="font-mono">{referenceDetail.sourceKey}</span></span>
+                    )}
                   </p>
                 </div>
-              </div>
-            </TabsContent>
-
-            {/* ── Capability (machine-selection/selector.ts's real capability
-                 columns, migration 324/339) — previously settable only via
-                 Excel import or a raw SQL migration; a shop can now confirm a
-                 specific machine's real physical limits directly here. ── */}
-            <TabsContent value="capability" className="space-y-4 mt-4">
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 px-4 py-2.5 mb-1">
-                <p className="text-xs text-blue-800 dark:text-blue-300">
-                  These are the real physical limits machine selection uses to decide which jobs this machine can run.
-                  Leave blank if unknown — an unset limit is never treated as a gate.
-                  {existingRecord?.capabilitySource && (
-                    <span className="block mt-1 text-[11px] opacity-80">
-                      Current source: <strong>{existingRecord.capabilitySource}</strong>
-                      {existingRecord.capabilitySource === 'seed' && ' — a model-typical estimate, not this unit’s own verified spec.'}
-                    </span>
-                  )}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {numField('maxTonnage', 'Max Tonnage (t)')}
-                {numField('powerKw', 'Power (kW)')}
-                {numField('maxXMm', 'Bed/Envelope X (mm)')}
-                {numField('maxYMm', 'Bed/Envelope Y (mm)')}
-                {numField('maxZMm', 'Envelope Z (mm)')}
-                {numField('maxDiameterMm', 'Max Diameter (mm, turning)')}
-                {numField('maxLengthMm', 'Max Length (mm, bending/turning)')}
-                {numField('maxWorkpieceWeightKg', 'Max Workpiece Weight (kg)')}
-                {numField('maxThicknessMm', 'Max Thickness — generic (mm)')}
-                {numField('maxThicknessMsMm', 'Max Thickness — Mild Steel (mm)')}
-                {numField('maxThicknessSsMm', 'Max Thickness — Stainless (mm)')}
-                {numField('maxThicknessAlMm', 'Max Thickness — Aluminum (mm)')}
-                {numField('maxThicknessCuMm', 'Max Thickness — Copper (mm)')}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cuttableMaterials">Cuttable Materials (comma-separated)</Label>
-                <Input id="cuttableMaterials" {...register('cuttableMaterials')} placeholder="e.g., SS304, AL6061, CRCA" />
-              </div>
-
-              <div className="space-y-2 border-t pt-4">
-                <Label htmlFor="specsJson">Additional Specifications (JSON)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Category-specific fields with no dedicated input yet — press force, roll diameter, RPM, etc.
-                  Stored as-is, not read by any live calculation today.
-                </p>
-                <textarea
-                  id="specsJson"
-                  {...register('specsJson')}
-                  rows={5}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
-                  placeholder={'{\n  "press_force_kn": 300,\n  "bed_length_mm": 3050\n}'}
-                />
-                {errors.specsJson && <span className="text-xs text-destructive">{errors.specsJson.message}</span>}
+                {!editingId ? (
+                  <p className="text-xs text-muted-foreground">Save the machine first — this lookup matches against the saved record.</p>
+                ) : !referenceDetail?.found ? (
+                  <p className="text-xs text-muted-foreground">No machine_library reference match found for this machine yet.</p>
+                ) : (
+                  groupMachineLibraryDetail(referenceDetail.raw, {
+                    maxXMm: existingRecord?.maxXMm, maxYMm: existingRecord?.maxYMm, maxZMm: existingRecord?.maxZMm,
+                    maxDiameterMm: existingRecord?.maxDiameterMm, maxLengthMm: existingRecord?.maxLengthMm,
+                    maxTonnage: existingRecord?.maxTonnage, maxThicknessMm: existingRecord?.maxThicknessMm,
+                    maxWorkpieceWeightKg: existingRecord?.maxWorkpieceWeightKg, powerKw: existingRecord?.powerKw,
+                    maxThicknessMsMm: existingRecord?.maxThicknessMsMm, maxThicknessSsMm: existingRecord?.maxThicknessSsMm,
+                    maxThicknessAlMm: existingRecord?.maxThicknessAlMm, maxThicknessCuMm: existingRecord?.maxThicknessCuMm,
+                  }).map((group) => (
+                    <div key={group.title} className="space-y-1">
+                      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{group.title}</div>
+                      <div className="rounded-md border bg-muted/30 p-3">
+                        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                          {group.entries.map((entry) => (
+                            <div key={entry.key} className="flex justify-between gap-2 border-b border-dashed border-muted-foreground/20 py-0.5">
+                              <dt className="text-muted-foreground truncate" title={entry.key}>{entry.label}</dt>
+                              <dd className="font-mono text-right">{entry.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </TabsContent>
           </Tabs>

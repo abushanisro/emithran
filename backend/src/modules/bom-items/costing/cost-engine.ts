@@ -16,6 +16,17 @@ import type { CostSummaryDto, ProcessLineCost, ProcessCO2, SustainabilitySummary
 import { computeSurfaceTreatmentLine } from './cost-surface-treatment';
 import type { SurfaceTreatmentDbRate } from './default-rates';
 
+// P0.6 (Machine Economics, provenance-visibility phase) — mirrors MHRRateInput's
+// own `source` tiering, but for the labor-rate side (resolveLHRRates' 4-pass
+// resolution in bom-items.service.ts), which previously collapsed to a bare
+// number with zero visibility into which pass actually won.
+// 'mhr_machine_specific' — this exact machine's own usd_lhr_total
+// (mhr_records, sourced from machine_library.json's labor_rate_usd_hr for
+// benchmarked rows) — an explicit, approved override that takes precedence
+// over the location+process_group lhr_records/lhr_benchmark_rates lookup for
+// that specific machine's operations, per user decision 2026-08-27.
+export type LhrRateSource = 'lhr_database' | 'lhr_benchmark' | 'lhr_cross_location' | 'no_lhr_rate' | 'mhr_machine_specific';
+
 export interface MHRRateInput {
   rate: number;
   source: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override';
@@ -24,6 +35,18 @@ export interface MHRRateInput {
   commodityCode: string | null;
   selection?: import('../dto/machine-selection.dto').MachineSelectionResult;
   labourRate?: number | null;
+  labourRateSource?: LhrRateSource | null;
+  // mhr_records.operators for the machine this rate resolved to (via
+  // MachineCandidate.operators) — real per-machine operator headcount, used
+  // as this operation's setupNDL/cycleNDL instead of a blanket assumption.
+  // null when no real machine (class-default fallback) or the field was
+  // never set; callers fall back to a generic default, never to 0.
+  operators?: number | null;
+  // The selected machine's own MachineCandidate.laborRateUsdHr (raw, before
+  // buildOutput applies precedence against the process-group lhrRates map) —
+  // never read directly by cost-engine.ts; buildOutput folds it into the
+  // final labourRate/labourRateSource below.
+  machineLaborRateUsdHr?: number | null;
   // Real mhr_records row id, when this rate came from the user's own imported
   // fleet (resolveCmmSpecificRate/resolveGenericInspectionRate's realCmm/
   // realBench branches) — lets a persisted process_cost_records row link back
@@ -62,8 +85,8 @@ export interface CostEngineInput {
   materialCostPerKg: number;
   materialDensityKgM3: number;
   materialSource: 'db' | 'default';
-  utsMpa?: number;                // from raw_materials (for tonnage calc)
-  shearStrengthMpa?: number;      // from raw_materials (for part allowance)
+  utsMpa?: number | null;         // from raw_materials (for tonnage calc); null when unavailable
+  shearStrengthMpa?: number | null; // from raw_materials (for part allowance); null when unavailable
   scrapPricePerKg?: number;       // from raw_materials
 
   // ── Labor rates ────────────────────────────────────────────────────────────
@@ -340,13 +363,13 @@ export function computeSustainability(
   };
 }
 
-// ── 5-term aPriori cost formula ────────────────────────────────────────────────
+// ── 5-term eMithran cost formula ────────────────────────────────────────────────
 // Returns { machineCost, setupCost, laborCost, inspCost, yieldCost, total }
 // All rates are per-hour in local currency; times are in minutes.
 // Exported so both the automated cost engine and any manual-entry preview (e.g.
 // ProcessCostDialog) compute cost from this exact same arithmetic — no second,
 // independently-maintained implementation of "cost for this line" anywhere.
-export function aprioriTerms(args: {
+export function eMithranTerms(args: {
   mhrPerHr: number;
   dlrPerHr: number;
   qairPerHr: number;
@@ -442,7 +465,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
   let grossWeightKg: number;
 
   if (nestingResult) {
-    // aPriori nesting path — use nesting-derived gross weight
+    // eMithran nesting path — use nesting-derived gross weight
     materialCost = nestingResult.netMaterialCost;
     grossWeightKg = nestingResult.grossWeightPerPartKg;
     if (nestingResult.utilisationPct < UTILIZATION_ADVISORY_THRESHOLD_PCT) {
@@ -495,12 +518,20 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     const sheetsPerLot = Math.ceil(batchSize / partsPerSheet);
     const setupTimeMin = (handlingTimeMin * sheetsPerLot) / Math.max(batchSize, 1);
 
-    const t = aprioriTerms({
+    const t = eMithranTerms({
       mhrPerHr: laserRate.rate,
-      dlrPerHr,
+      // Prefer this process's own resolved labour rate (e.g. a real
+      // 'Sheet Metal' rate for laser) over the flat blanket rate — see
+      // resolveLHRRates/buildOutput in bom-items.service.ts, which already
+      // differentiates by process group (Deburr, Turret, ...); only the
+      // flat rate was ever wired into this formula until now.
+      dlrPerHr: laserRate.labourRate ?? dlrPerHr,
       qairPerHr,
-      setupNDL: machineOperators,
-      cycleNDL: machineOperators,
+      // Prefer this machine's own real operator count (mhr_records.operators)
+      // over the blanket default — same precedence already established for
+      // dlrPerHr above.
+      setupNDL: laserRate.operators ?? machineOperators,
+      cycleNDL: laserRate.operators ?? machineOperators,
       cycleTimeMin: laserMin,
       setupTimeMin,
       inspTimeMin: inspectionTimeMin,
@@ -528,6 +559,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineName: laserRate.machineName,
       commodityCode: laserRate.commodityCode,
       labourRate: laserRate.labourRate ?? null,
+      labourRateSource: laserRate.labourRateSource ?? null,
       ...(input.laserCalculatorId ? { calculatorId: input.laserCalculatorId } : {}),
       ...(input.laserCalculatorVersion != null ? { calculatorVersion: input.laserCalculatorVersion } : {}),
       ...(input.laserPhysicsGap ? { physicsGap: input.laserPhysicsGap } : {}),
@@ -566,13 +598,16 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     } else {
       warnings.push('Hole extrusion (burring) cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
     }
+    if (opSetupMinByOp?.burring == null) {
+      warnings.push(`Hole extrusion (burring) setup time not on file — generic default applied (${BURRING_SETUP_MIN} min)`);
+    }
     const setupTimeMin = (opSetupMinByOp?.burring ?? BURRING_SETUP_MIN) / Math.max(batchSize, 1);
     const holeFormingRate = input.mhrRates?.holeForming
       ?? { rate: 0, source: 'no_db_rate' as const, machineClass: 'hole_forming', machineName: null, commodityCode: null };
 
-    const t = aprioriTerms({
-      mhrPerHr: holeFormingRate.rate, dlrPerHr, qairPerHr,
-      setupNDL: 1, cycleNDL: 1,
+    const t = eMithranTerms({
+      mhrPerHr: holeFormingRate.rate, dlrPerHr: holeFormingRate.labourRate ?? dlrPerHr, qairPerHr,
+      setupNDL: holeFormingRate.operators ?? machineOperators, cycleNDL: holeFormingRate.operators ?? machineOperators,
       cycleTimeMin: burringMin, setupTimeMin,
       inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
       netMatCost, netWeightKg, scrapPricePerKg,
@@ -595,6 +630,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineName: holeFormingRate.machineName,
       commodityCode: holeFormingRate.commodityCode,
       labourRate: holeFormingRate.labourRate ?? null,
+      labourRateSource: holeFormingRate.labourRateSource ?? null,
       ...(input.burringCalculatorId ? { calculatorId: input.burringCalculatorId } : {}),
       ...(input.burringCalculatorVersion != null ? { calculatorVersion: input.burringCalculatorVersion } : {}),
       ...(input.burringPhysicsGap ? { physicsGap: input.burringPhysicsGap } : {}),
@@ -628,12 +664,14 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     }
     const setupTimeMin = (opSetupMinByOp?.tapping ?? TAPPING_SETUP_MIN) / Math.max(batchSize, 1);
 
-    const t = aprioriTerms({
+    const t = eMithranTerms({
       mhrPerHr: tappingRate.rate,
-      dlrPerHr,
+      dlrPerHr: tappingRate.labourRate ?? dlrPerHr,
       qairPerHr,
-      setupNDL: 1, // single operator for tapping
-      cycleNDL: 1,
+      // Was hardcoded to 1 ("single operator for tapping") before real
+      // per-machine operator counts existed; now prefers the real value.
+      setupNDL: tappingRate.operators ?? machineOperators,
+      cycleNDL: tappingRate.operators ?? machineOperators,
       cycleTimeMin: tappingMin,
       setupTimeMin,
       inspTimeMin: inspectionTimeMin,
@@ -661,6 +699,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineName: tappingRate.machineName,
       commodityCode: tappingRate.commodityCode,
       labourRate: tappingRate.labourRate ?? null,
+      labourRateSource: tappingRate.labourRateSource ?? null,
       ...(input.tappingCalculatorId ? { calculatorId: input.tappingCalculatorId } : {}),
       ...(input.tappingCalculatorVersion != null ? { calculatorVersion: input.tappingCalculatorVersion } : {}),
       ...(input.tappingPhysicsGap ? { physicsGap: input.tappingPhysicsGap } : {}),
@@ -701,12 +740,12 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       ? input.pressBrakeSetupTimeMinFromCalculator
       : toolSetupBrakeMin / Math.max(batchSize, 1);
 
-    const t = aprioriTerms({
+    const t = eMithranTerms({
       mhrPerHr: pbRate.rate,
-      dlrPerHr,
+      dlrPerHr: pbRate.labourRate ?? dlrPerHr,
       qairPerHr,
-      setupNDL: machineOperators,
-      cycleNDL: machineOperators,
+      setupNDL: pbRate.operators ?? machineOperators,
+      cycleNDL: pbRate.operators ?? machineOperators,
       cycleTimeMin: pressBrakeMin,
       setupTimeMin,
       inspTimeMin: inspectionTimeMin,
@@ -734,6 +773,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineName: pbRate.machineName,
       commodityCode: pbRate.commodityCode,
       labourRate: pbRate.labourRate ?? null,
+      labourRateSource: pbRate.labourRateSource ?? null,
       ...(input.pressBrakeCalculatorId ? { calculatorId: input.pressBrakeCalculatorId } : {}),
       ...(input.pressBrakeCalculatorVersion != null ? { calculatorVersion: input.pressBrakeCalculatorVersion } : {}),
       ...(input.pressBrakePhysicsGap ? { physicsGap: input.pressBrakePhysicsGap } : {}),
@@ -762,12 +802,16 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       warnings.push('Deburring cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
     }
 
-    const t = aprioriTerms({
+    const t = eMithranTerms({
       mhrPerHr: deburrRate.rate,
-      dlrPerHr,
+      // Deburr has its own real, differentiated 'Deburr' process-group LHR
+      // rate (lhr_benchmark_rates — e.g. a BLS-cited "Manual Deburr
+      // Operator" figure), distinct from and typically lower than the
+      // generic 'Sheet Metal' rate every other process used to fall back to.
+      dlrPerHr: deburrRate.labourRate ?? dlrPerHr,
       qairPerHr,
-      setupNDL: machineOperators,
-      cycleNDL: machineOperators,
+      setupNDL: deburrRate.operators ?? machineOperators,
+      cycleNDL: deburrRate.operators ?? machineOperators,
       cycleTimeMin: deburrMin,
       setupTimeMin: 0,
       inspTimeMin: inspectionTimeMin,
@@ -795,6 +839,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineName: deburrRate.machineName,
       commodityCode: deburrRate.commodityCode,
       labourRate: deburrRate.labourRate ?? null,
+      labourRateSource: deburrRate.labourRateSource ?? null,
       ...(input.deburrCalculatorId ? { calculatorId: input.deburrCalculatorId } : {}),
       ...(input.deburrCalculatorVersion != null ? { calculatorVersion: input.deburrCalculatorVersion } : {}),
       ...(input.deburrPhysicsGap ? { physicsGap: input.deburrPhysicsGap } : {}),
@@ -826,11 +871,14 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     } else {
       warnings.push('Counterboring cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
     }
+    if (opSetupMinByOp?.counterbore == null) {
+      warnings.push(`Counterboring setup time not on file — generic default applied (${COUNTERBORE_SETUP_MIN} min)`);
+    }
     const setupTimeMin = (opSetupMinByOp?.counterbore ?? COUNTERBORE_SETUP_MIN) / Math.max(batchSize, 1);
 
-    const t = aprioriTerms({
-      mhrPerHr: drillPressRate.rate, dlrPerHr, qairPerHr,
-      setupNDL: 1, cycleNDL: 1,
+    const t = eMithranTerms({
+      mhrPerHr: drillPressRate.rate, dlrPerHr: drillPressRate.labourRate ?? dlrPerHr, qairPerHr,
+      setupNDL: drillPressRate.operators ?? machineOperators, cycleNDL: drillPressRate.operators ?? machineOperators,
       cycleTimeMin: counterboreMin, setupTimeMin,
       inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
       netMatCost, netWeightKg, scrapPricePerKg,
@@ -853,6 +901,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineName: drillPressRate.machineName,
       commodityCode: drillPressRate.commodityCode,
       labourRate: drillPressRate.labourRate ?? null,
+      labourRateSource: drillPressRate.labourRateSource ?? null,
       ...(input.counterboreCalculatorId ? { calculatorId: input.counterboreCalculatorId } : {}),
       ...(input.counterboreCalculatorVersion != null ? { calculatorVersion: input.counterboreCalculatorVersion } : {}),
       ...(input.counterborePhysicsGap ? { physicsGap: input.counterborePhysicsGap } : {}),
@@ -878,11 +927,14 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     } else {
       warnings.push('Countersinking cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
     }
+    if (opSetupMinByOp?.countersink == null) {
+      warnings.push(`Countersinking setup time not on file — generic default applied (${COUNTERSINK_SETUP_MIN} min)`);
+    }
     const setupTimeMin = (opSetupMinByOp?.countersink ?? COUNTERSINK_SETUP_MIN) / Math.max(batchSize, 1);
 
-    const t = aprioriTerms({
-      mhrPerHr: drillPressRate.rate, dlrPerHr, qairPerHr,
-      setupNDL: 1, cycleNDL: 1,
+    const t = eMithranTerms({
+      mhrPerHr: drillPressRate.rate, dlrPerHr: drillPressRate.labourRate ?? dlrPerHr, qairPerHr,
+      setupNDL: drillPressRate.operators ?? machineOperators, cycleNDL: drillPressRate.operators ?? machineOperators,
       cycleTimeMin: countersinkMin, setupTimeMin,
       inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
       netMatCost, netWeightKg, scrapPricePerKg,
@@ -905,6 +957,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineName: drillPressRate.machineName,
       commodityCode: drillPressRate.commodityCode,
       labourRate: drillPressRate.labourRate ?? null,
+      labourRateSource: drillPressRate.labourRateSource ?? null,
       ...(input.countersinkCalculatorId ? { calculatorId: input.countersinkCalculatorId } : {}),
       ...(input.countersinkCalculatorVersion != null ? { calculatorVersion: input.countersinkCalculatorVersion } : {}),
       ...(input.countersinkPhysicsGap ? { physicsGap: input.countersinkPhysicsGap } : {}),
@@ -932,13 +985,16 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     } else {
       warnings.push('PEM insertion cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
     }
+    if (opSetupMinByOp?.pem_insertion == null) {
+      warnings.push(`PEM insertion setup time not on file — generic default applied (${PEM_INSERTION_SETUP_MIN} min)`);
+    }
     const setupTimeMin = (opSetupMinByOp?.pem_insertion ?? PEM_INSERTION_SETUP_MIN) / Math.max(batchSize, 1);
     const pemRate = input.mhrRates?.pemPress
       ?? { rate: 0, source: 'no_db_rate' as const, machineClass: 'pem_press', machineName: null, commodityCode: null };
 
-    const t = aprioriTerms({
-      mhrPerHr: pemRate.rate, dlrPerHr, qairPerHr,
-      setupNDL: 1, cycleNDL: 1,
+    const t = eMithranTerms({
+      mhrPerHr: pemRate.rate, dlrPerHr: pemRate.labourRate ?? dlrPerHr, qairPerHr,
+      setupNDL: pemRate.operators ?? machineOperators, cycleNDL: pemRate.operators ?? machineOperators,
       cycleTimeMin: pemMin, setupTimeMin,
       inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
       netMatCost, netWeightKg, scrapPricePerKg,
@@ -961,6 +1017,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineName: pemRate.machineName,
       commodityCode: pemRate.commodityCode,
       labourRate: pemRate.labourRate ?? null,
+      labourRateSource: pemRate.labourRateSource ?? null,
       ...(input.pemCalculatorId ? { calculatorId: input.pemCalculatorId } : {}),
       ...(input.pemCalculatorVersion != null ? { calculatorVersion: input.pemCalculatorVersion } : {}),
       ...(input.pemPhysicsGap ? { physicsGap: input.pemPhysicsGap } : {}),
@@ -999,11 +1056,14 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     } else {
       warnings.push('Reaming cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
     }
+    if (opSetupMinByOp?.ream == null) {
+      warnings.push(`Reaming setup time not on file — generic default applied (${REAM_SETUP_MIN} min)`);
+    }
     const setupTimeMin = (opSetupMinByOp?.ream ?? REAM_SETUP_MIN) / Math.max(batchSize, 1);
 
-    const t = aprioriTerms({
-      mhrPerHr: drillPressRate.rate, dlrPerHr, qairPerHr,
-      setupNDL: 1, cycleNDL: 1,
+    const t = eMithranTerms({
+      mhrPerHr: drillPressRate.rate, dlrPerHr: drillPressRate.labourRate ?? dlrPerHr, qairPerHr,
+      setupNDL: drillPressRate.operators ?? machineOperators, cycleNDL: drillPressRate.operators ?? machineOperators,
       cycleTimeMin: reamMin, setupTimeMin,
       inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
       netMatCost, netWeightKg, scrapPricePerKg,
@@ -1027,6 +1087,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
       machineName: drillPressRate.machineName,
       commodityCode: drillPressRate.commodityCode,
       labourRate: drillPressRate.labourRate ?? null,
+      labourRateSource: drillPressRate.labourRateSource ?? null,
       ...(input.reamCalculatorId ? { calculatorId: input.reamCalculatorId } : {}),
       ...(input.reamCalculatorVersion != null ? { calculatorVersion: input.reamCalculatorVersion } : {}),
       ...(input.reamPhysicsGap ? { physicsGap: input.reamPhysicsGap } : {}),
@@ -1097,5 +1158,120 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     warnings,
     ratesSource: RATES_SOURCE_LABEL,
     sustainability,
+  };
+}
+
+// P0.2 — one authoritative applied-quote path. process_cost_records is
+// already treated as the applied-quote authority everywhere else in this
+// codebase (the Manufacturing Process section's own CRUD, Excel export Sheet
+// 1, BOM/project cost rollups, the AI assistant's cost tool) — every one of
+// them reads it back once a route has been applied, rather than trusting a
+// fresh live recompute. computeCostSummary() above is the one exception: it
+// unconditionally fabricates a Laser Cutting line for the sheet_metal
+// family's cutting operation, with no awareness that Turret Punch, Waterjet,
+// or a manually-edited Press Brake row might actually be what was applied
+// and persisted. This function is the fix: given the summary
+// computeCostSummary() just produced (the pre-apply preview) and whatever
+// active process_cost_records rows exist for this part's cutting/bending
+// operations, it overrides those specific lines with the real, persisted,
+// already-authoritative values — the same computeCost() result
+// getRouteComparison()/apply-route already wrote, read back rather than
+// recomputed a second time. No new live calculation path is introduced.
+//
+// Scoped to exactly the two operation families where a live-vs-persisted
+// divergence is possible: cutting (fiber_laser/co2_laser/turret_punch/
+// waterjet — mutually exclusive alternatives for the same operation) and
+// press_brake (independently overridable via the Edit Process Cost dialog).
+// Every other resolvePhysicsQuantity-driven line (tapping, PEM, deburr, ...)
+// already uses the identical calculator call in both computeCostSummary()
+// and getRouteComparison(), so no divergence exists there and they're left
+// untouched. When neither family has an active row (true pre-apply state,
+// nothing has ever been applied), this function is a no-op and the live
+// preview from computeCostSummary() is returned unchanged.
+export interface AppliedProcessCostRecord {
+  machine_class: string;
+  machine_name: string | null;
+  mhr_id: string | null;
+  operation: string | null;
+  process_group: string | null;
+  process_route: string | null;
+  cycle_time: number;   // seconds (process_cost_records.cycle_time convention)
+  setup_time: number;   // minutes (process_cost_records.setup_time convention)
+  direct_rate: number;
+  setup_cost_per_part: number;
+  total_cycle_cost_per_part: number;
+  total_cost_per_part: number;
+}
+
+const APPLIED_CUTTING_CLASSES = ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet'];
+const APPLIED_PROCESS_LABEL_FOR_CLASS: Record<string, string> = {
+  fiber_laser: 'Laser Cutting',
+  co2_laser: 'Laser Cutting',
+  turret_punch: 'Turret Punching',
+  waterjet: 'Waterjet Cutting',
+  press_brake: 'Press Brake',
+};
+const APPLIED_CUTTING_LABELS = ['Laser Cutting', 'Turret Punching', 'Waterjet Cutting'];
+
+function buildLineFromAppliedRecord(row: AppliedProcessCostRecord): ProcessLineCost {
+  return {
+    process: APPLIED_PROCESS_LABEL_FOR_CLASS[row.machine_class] ?? row.machine_class,
+    processGroup: row.process_group ?? undefined,
+    processRoute: row.process_route ?? undefined,
+    operation: row.operation ?? undefined,
+    setupCost: r2(Number(row.setup_cost_per_part ?? 0)),
+    runCost: r2(Number(row.total_cycle_cost_per_part ?? 0)),
+    totalCost: r2(Number(row.total_cost_per_part ?? 0)),
+    cycleTimeMin: Number(row.cycle_time ?? 0) / 60,
+    setupTimeMin: Number(row.setup_time ?? 0),
+    hourlyRate: r2(Number(row.direct_rate ?? 0)),
+    rateSource: row.mhr_id ? 'mhr_database' : 'default_rate',
+    machineClass: row.machine_class,
+    machineName: row.machine_name ?? null,
+    commodityCode: null,
+  };
+}
+
+export function applyPersistedRouteToSummary(
+  summary: CostSummaryDto,
+  appliedRows: AppliedProcessCostRecord[],
+): CostSummaryDto {
+  const cuttingRow = appliedRows.find((r) => APPLIED_CUTTING_CLASSES.includes(r.machine_class));
+  const pbRow = appliedRows.find((r) => r.machine_class === 'press_brake');
+  if (!cuttingRow && !pbRow) return summary;
+
+  const processLines = [...summary.processLines];
+  let laserMin = summary.cycleTimes.laserMin;
+  let pressBrakeMin = summary.cycleTimes.pressBrakeMin;
+  let extraCuttingMin = 0; // cycleTimes has no turret/waterjet slot — folded into totalMin only
+
+  if (cuttingRow) {
+    const appliedLine = buildLineFromAppliedRecord(cuttingRow);
+    const idx = processLines.findIndex((l) => APPLIED_CUTTING_LABELS.includes(l.process));
+    if (idx >= 0) processLines[idx] = appliedLine; else processLines.push(appliedLine);
+    const isLaser = cuttingRow.machine_class === 'fiber_laser' || cuttingRow.machine_class === 'co2_laser';
+    laserMin = isLaser ? appliedLine.cycleTimeMin : 0;
+    extraCuttingMin = isLaser ? 0 : appliedLine.cycleTimeMin;
+  }
+
+  if (pbRow) {
+    const appliedLine = buildLineFromAppliedRecord(pbRow);
+    const idx = processLines.findIndex((l) => l.process === 'Press Brake');
+    if (idx >= 0) processLines[idx] = appliedLine; else processLines.push(appliedLine);
+    pressBrakeMin = appliedLine.cycleTimeMin;
+  }
+
+  const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
+  return {
+    ...summary,
+    processLines,
+    totalProcessCost,
+    totalCost: r2(summary.materialCost + totalProcessCost),
+    cycleTimes: {
+      ...summary.cycleTimes,
+      laserMin,
+      pressBrakeMin,
+      totalMin: r2(laserMin + pressBrakeMin + summary.cycleTimes.tappingMin + summary.cycleTimes.deburrMin + extraCuttingMin),
+    },
   };
 }

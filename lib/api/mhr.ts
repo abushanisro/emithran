@@ -108,6 +108,23 @@ export type MHRRecord = {
   benchmarkDirectOverheadRateUsdHr?: number;
   benchmarkIndirectOverheadRateUsdHr?: number;
   benchmarkLaborRateUsdHr?: number;
+  // sm_reference_data.key ("<category>:<machine name>") — the part before
+  // ':' is the machine's real machine_library category, a useful fallback
+  // display for rows with no machine_class.
+  benchmarkSourceKey?: string;
+  // Migration 580 (Machine Economics, bottom-up MHR) — a genuine machine-hour
+  // rate computed from real capex/lifecycle fields, independent of Direct/
+  // Indirect OH and LHR. undefined when the machine lacks the inputs to
+  // compute it.
+  calculatedMhrUsdHr?: number;
+  // Snapshot of manualMHRValue as it stood before migration 580, for rows
+  // where that value was actually Direct+Indirect overhead (migration 564's
+  // import stopgap) — preserved for audit, never a real machine-hour rate.
+  legacyImportedMhrUsdHr?: number;
+  // 'calculated' | 'manual' | 'legacy_import' — see calculatedMhrUsdHr/
+  // legacyImportedMhrUsdHr above. Display/reference metadata only; real
+  // quote costing still reads totalMachineHourRate/manualMHRValue.
+  mhrSource?: string;
   // Real machine capability (mhr_records.max_tonnage/power_kw) — used to
   // auto-fill a calculator's "Selected Tonnage"/"Laser Machine Power" from
   // the actual selected machine, never inferred from its name string. Not
@@ -134,6 +151,19 @@ export type MHRRecord = {
   // typical model config used as a disclosed estimate — migration 459).
   // Never render maxTonnage/powerKw as "Verified" when this is 'seed'.
   capabilitySource?: string;
+  // Tier 1 universal machine_library.json economics/lifecycle fields
+  // (migration 573) — real, present across all 15 Sheet Metal categories.
+  laborTimeStandard?: number;
+  avgUtilization?: number;
+  goodPartYield?: number;
+  machineLengthMm?: number;
+  machineWidthMm?: number;
+  machineLifeYr?: number;
+  machinePowerKw?: number;
+  machineUptimePct?: number;
+  annualMaintenanceFactorPct?: number;
+  footprintAllowanceFactor?: number;
+  installationFactorPct?: number;
   calculations: MHRCalculationResult;
   createdAt: string;
   updatedAt: string;
@@ -235,6 +265,15 @@ export type MHRListResponse = {
   limit: number;
 };
 
+// Read-only join to the machine's sm_reference_data source row — full
+// machine_library.json detail for a record (press force, roll diameter,
+// RPM, tool costs, etc.) without duplicating it onto mhr_records itself.
+export type MHRReferenceDetail = {
+  found: boolean;
+  sourceKey: string | null;
+  raw: Record<string, any> | null;
+};
+
 export type MHRBenchmarkEntry = {
   id: string;
   machineName: string;
@@ -273,10 +312,14 @@ export const mhrApi = {
   },
 
   /**
-   * Get distinct process groups from MHR records
+   * Get distinct real machine categories (benchmark_source_key-derived, machine_class fallback),
+   * optionally scoped to a real process group (e.g. "Sheet Metal", "Machining").
    */
-  getProcessGroups: async (): Promise<string[]> => {
-    return (await apiClient.get<string[]>('/mhr/process-groups', { silent: true, retry: false })) ?? [];
+  getCategories: async (processGroup?: string): Promise<string[]> => {
+    return (await apiClient.get<string[]>('/mhr/categories', {
+      silent: true, retry: false,
+      ...(processGroup ? { params: { processGroup } } : {}),
+    })) ?? [];
   },
 
   /**
@@ -294,10 +337,24 @@ export const mhrApi = {
   },
 
   /**
+   * Get distinct manufacturer countries from MHR records
+   */
+  getManufacturerCountries: async (): Promise<string[]> => {
+    return (await apiClient.get<string[]>('/mhr/manufacturer-countries', { silent: true, retry: false })) ?? [];
+  },
+
+  /**
    * Get MHR record by ID
    */
   getById: async (id: string): Promise<MHRRecord> => {
     return apiClient.get<MHRRecord>(`/mhr/${id}`);
+  },
+
+  /**
+   * Get full machine_library reference detail for an MHR record (read-only)
+   */
+  getReferenceDetail: async (id: string): Promise<MHRReferenceDetail> => {
+    return (await apiClient.get<MHRReferenceDetail>(`/mhr/${id}/reference-detail`, { silent: true, retry: false })) ?? { found: false, sourceKey: null, raw: null };
   },
 
   /**

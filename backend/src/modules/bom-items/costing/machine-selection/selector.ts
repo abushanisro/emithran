@@ -50,13 +50,13 @@ const CAPABILITY_COLUMNS =
   'max_thickness_mm, max_workpiece_weight_kg, power_kw, capability_source, ' +
   'max_thickness_ms_mm, max_thickness_ss_mm, max_thickness_al_mm, max_thickness_cu_mm, ' +
   'cuttable_materials, availability_status, next_available_at, scheduled_load_pct, ' +
-  'maintenance_window_start, maintenance_window_end, capability_version, ' +
+  'maintenance_window_start, maintenance_window_end, ' +
   'tie_bar_x_mm, tie_bar_y_mm, shot_capacity_grams, min_mold_height_mm, max_mold_height_mm';
 
 const BASE_COLUMNS =
   'id, machine_name, commodity_code, process_group, machine_class, ' +
   'total_machine_hour_rate, manual_mhr_value, fully_burdened_local_per_hr, ' +
-  'capacity_utilization_rate';
+  'capacity_utilization_rate, operators, usd_lhr_total';
 
 // ── Row classification (same guards as the legacy resolveMHRRates) ────────────
 
@@ -77,6 +77,8 @@ interface RawMachineRow {
   manual_mhr_value: number | string | null;
   fully_burdened_local_per_hr: number | string | null;
   capacity_utilization_rate: number | string | null;
+  operators: number | string | null;
+  usd_lhr_total: number | string | null;
   // Capability columns — absent until migration 324 runs
   max_x_mm?: number | string | null;
   max_y_mm?: number | string | null;
@@ -98,7 +100,6 @@ interface RawMachineRow {
   scheduled_load_pct?: number | string | null;
   maintenance_window_start?: string | null;
   maintenance_window_end?: string | null;
-  capability_version?: number | null;
   // IM-specific columns — absent until migration 339 runs
   tie_bar_x_mm?: number | string | null;
   tie_bar_y_mm?: number | string | null;
@@ -116,7 +117,7 @@ function num(v: number | string | null | undefined): number | null {
 // fully_burdened_local_per_hr is machine + labour combined (mhr.service.ts's
 // calculateMHR: fullyBurdenedLocalPerHr = totalMachineHourRate + lhrPerHr) — never
 // use it here. This rate becomes MachineCandidate.hourlyRate, which feeds
-// aprioriTerms' mhrPerHr in cost-engine.ts, and that formula ALWAYS separately adds
+// eMithranTerms' mhrPerHr in cost-engine.ts, and that formula ALWAYS separately adds
 // its own direct-labour term (dlrPerHr × cycleNDL × cycleTimeMin). Preferring the
 // burdened figure double-counts labour: once inside the "machine" rate, once again
 // as its own line item. total_machine_hour_rate / manual_mhr_value are pure machine
@@ -325,7 +326,11 @@ export async function fetchMachinePool(
       commodityCode: raw.commodity_code,
       machineClass: cls,
       hourlyRate: rate,
+      // 85 here is a ranking-only placeholder, not a claimed real utilization
+      // — utilizationKnown below is what buildCandidateReasons checks before
+      // disclosing a number as if it were measured.
       utilizationPct: num(raw.capacity_utilization_rate) ?? 85,
+      utilizationKnown: num(raw.capacity_utilization_rate) != null,
       scheduledLoadPct: num(raw.scheduled_load_pct),
       availabilityStatus: (raw.availability_status as AvailabilityStatus) ?? 'available',
       nextAvailableAt: raw.next_available_at ?? null,
@@ -333,7 +338,13 @@ export async function fetchMachinePool(
       maintenanceWindowEnd: raw.maintenance_window_end ?? null,
       capability,
       capabilitySource: source,
-      capabilityVersion: raw.capability_version ?? null,
+      // mhr_records.capability_version was dropped (write-only metadata,
+      // never branched on) — always null now. Kept as a field on
+      // MachineCandidate since bom_item_machine_selection_snapshots still
+      // records it as a real audit-trail column.
+      capabilityVersion: null,
+      operators: num(raw.operators),
+      laborRateUsdHr: num(raw.usd_lhr_total),
     });
   }
 
@@ -343,7 +354,29 @@ export async function fetchMachinePool(
 
 // ── Eligibility ───────────────────────────────────────────────────────────────
 
-function laserThicknessLimit(cap: MachineCapability, req: LaserRequirement): number | null {
+// P0.6 documented data gap (not fabricated -- see CLAUDE.md's "do not guess a
+// threshold to make a check pass" rule): a `null` return here means "no limit
+// on file". P0.7 changed isCapable's laser case to treat that as NOT
+// CAPABLE (fail-closed) rather than ungated -- a machine with zero real
+// thickness data used to show as capable of any thickness, which is a worse
+// failure mode than "no capable machine" (selectMachine degrades gracefully
+// to a benchmark rate or an honest $0 with a stated reason, it never blocks
+// the quote). USA has 3 real fiber_laser mhr_records rows with NO thickness
+// data at all today ("Fiber Laser 4kW (3000×1500mm)", "Salvagnini L3-30
+// Fiber", "Salvagnini L3-40 3KW Fiber") -- these now correctly show as not
+// capable on thickness rather than falsely capable. Real spec data for the
+// two Salvagnini machines DOES exist in the already-staged reference library
+// (sm_reference_data, category 'Fiber Laser Cutting Machine', keys
+// "Salvagnini L3-30 2kW Fiber"/"Salvagnini L3-40 3kW Fiber") -- but it's
+// shaped as five generic max_thickness_1_mm..max_thickness_5_mm tiers with no
+// legend anywhere in that category mapping tier->material family (unlike
+// Turret Press's plainly-named max_thickness_steel_mm/stainless_steel_mm/
+// aluminum_mm/copper_mm columns). Guessing MS/SS/AL/CU/brass order onto tiers
+// 1-5 without a confirmed mapping risks a WRONG, confidently-labeled
+// 'imported' capability -- worse than today's honest "no data" gap. Needs the
+// real tier legend sourced before this can be backfilled; do not infer it
+// from column position alone.
+export function laserThicknessLimit(cap: MachineCapability, req: LaserRequirement): number | null {
   switch (req.materialFamily) {
     case 'MS': return cap.maxThicknessMsMm ?? cap.maxThicknessMm;
     case 'SS': return cap.maxThicknessSsMm ?? cap.maxThicknessMm;
@@ -382,8 +415,16 @@ export function isCapable(candidate: MachineCandidate, req: MachineRequirement):
       return true;
     }
     case 'laser': {
+      // Fail-closed (P0.7): a null limit means no thickness capability data
+      // exists for this machine/material at all — see laserThicknessLimit's
+      // doc comment. Treating that as "ungated" let a machine with zero real
+      // spec data show as capable of any thickness, which is a worse failure
+      // mode than surfacing "no capable machine" (selectMachine already
+      // degrades gracefully to a location benchmark rate or an honest $0 with
+      // a stated reason — see selectMachine's own comment — so rejecting here
+      // never crashes the quote, it just stops silently guessing).
       const limit = laserThicknessLimit(cap, req);
-      if (limit != null && limit < req.thicknessMm) return false;
+      if (limit == null || limit < req.thicknessMm) return false;
       if (
         cap.cuttableMaterials?.length &&
         req.materialGrade &&
@@ -391,6 +432,15 @@ export function isCapable(candidate: MachineCandidate, req: MachineRequirement):
       ) {
         return false;
       }
+      return fitsBed(cap, req.bedLengthMm, req.bedWidthMm);
+    }
+    case 'turret_punch': {
+      if (cap.maxTonnage != null && cap.maxTonnage < req.tonnage * TONNAGE_MARGIN) return false;
+      if (cap.maxThicknessMm != null && cap.maxThicknessMm < req.thicknessMm) return false;
+      return fitsBed(cap, req.bedLengthMm, req.bedWidthMm);
+    }
+    case 'waterjet': {
+      if (cap.maxThicknessMm != null && cap.maxThicknessMm < req.thicknessMm) return false;
       return fitsBed(cap, req.bedLengthMm, req.bedWidthMm);
     }
     case 'vmc': {
@@ -455,6 +505,26 @@ export function fitScore(candidate: MachineCandidate, req: MachineRequirement): 
       const x = ratio(req.bedLengthMm * BED_MARGIN, cap.maxXMm);
       const y = ratio(req.bedWidthMm * BED_MARGIN, cap.maxYMm);
       const thk = ratio(req.thicknessMm, laserThicknessLimit(cap, req));
+      if (x != null) parts.push(x);
+      if (y != null) parts.push(y);
+      if (thk != null) parts.push(thk);
+      break;
+    }
+    case 'turret_punch': {
+      const t = ratio(req.tonnage * TONNAGE_MARGIN, cap.maxTonnage);
+      const x = ratio(req.bedLengthMm * BED_MARGIN, cap.maxXMm);
+      const y = ratio(req.bedWidthMm * BED_MARGIN, cap.maxYMm);
+      const thk = ratio(req.thicknessMm, cap.maxThicknessMm);
+      if (t != null) parts.push(t);
+      if (x != null) parts.push(x);
+      if (y != null) parts.push(y);
+      if (thk != null) parts.push(thk);
+      break;
+    }
+    case 'waterjet': {
+      const x = ratio(req.bedLengthMm * BED_MARGIN, cap.maxXMm);
+      const y = ratio(req.bedWidthMm * BED_MARGIN, cap.maxYMm);
+      const thk = ratio(req.thicknessMm, cap.maxThicknessMm);
       if (x != null) parts.push(x);
       if (y != null) parts.push(y);
       if (thk != null) parts.push(thk);
@@ -540,6 +610,19 @@ function buildReasons(candidate: MachineCandidate, req: MachineRequirement): str
       }
       break;
     }
+    case 'turret_punch':
+      reasons.push(`Requires ${r0(req.tonnage * TONNAGE_MARGIN)} t (incl. 15% margin)` +
+        (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
+      if (cap.maxXMm != null && cap.maxYMm != null) {
+        reasons.push(`Part ${r0(req.bedLengthMm)}×${r0(req.bedWidthMm)} mm fits ${r0(cap.maxXMm)}×${r0(cap.maxYMm)} mm bed`);
+      }
+      break;
+    case 'waterjet':
+      if (cap.maxThicknessMm != null) reasons.push(`Thickness ${r0(req.thicknessMm)} mm ≤ ${r0(cap.maxThicknessMm)} mm machine limit`);
+      if (cap.maxXMm != null && cap.maxYMm != null) {
+        reasons.push(`Part ${r0(req.bedLengthMm)}×${r0(req.bedWidthMm)} mm fits ${r0(cap.maxXMm)}×${r0(cap.maxYMm)} mm bed`);
+      }
+      break;
     case 'vmc':
       if (cap.maxXMm != null && cap.maxYMm != null && cap.maxZMm != null) {
         reasons.push(`Part ${r0(req.xMm)}×${r0(req.yMm)}×${r0(req.zMm)} mm fits ` +
@@ -574,7 +657,11 @@ function buildReasons(candidate: MachineCandidate, req: MachineRequirement): str
       break;
   }
 
-  reasons.push(`Utilization ${r0(candidate.utilizationPct)}%`);
+  reasons.push(
+    candidate.utilizationKnown
+      ? `Utilization ${r0(candidate.utilizationPct)}%`
+      : 'Utilization not on file — ranked at a neutral default',
+  );
   if (candidate.capabilitySource === 'seed') reasons.push('Capability from model seed data — verify against machine plate');
   if (candidate.capabilitySource === 'default_class') reasons.push('No capability on file — conservative class defaults applied');
   return reasons;
@@ -594,7 +681,10 @@ function buildCapabilityCheck(candidate: MachineCandidate, req: MachineRequireme
     value: req.thicknessMm,
     limit,
     unit: 'mm',
-    supported: limit == null || limit >= req.thicknessMm,
+    // Mirrors isCapable's laser case (P0.7, fail-closed) — a null limit is
+    // "no data on file", not "supported", so this flag never disagrees with
+    // the actual eligibility gate.
+    supported: limit != null && limit >= req.thicknessMm,
   };
 }
 
@@ -642,7 +732,8 @@ function makeDefaultCandidate(_location: string, cls: MachineClass, fallbackRate
     // benchmark) — that 0 is what triggers 'no_db_rate' in the cost engine, so it
     // must stay a genuine zero rather than a value standing in for "unknown".
     hourlyRate: fallbackRate,
-    utilizationPct: 75,
+    utilizationPct: 75, // ranking-only placeholder — no real machine/data exists for this synthetic candidate
+    utilizationKnown: false,
     scheduledLoadPct: null,
     availabilityStatus: 'available',
     nextAvailableAt: null,
@@ -651,6 +742,8 @@ function makeDefaultCandidate(_location: string, cls: MachineClass, fallbackRate
     capability: { ...EMPTY_CAPABILITY, ...MACHINE_CLASS_DEFAULTS[cls] },
     capabilitySource: 'default_class',
     capabilityVersion: null,
+    operators: null, // no real machine — cost engine falls back to its own generic default
+    laborRateUsdHr: null,
   };
 }
 

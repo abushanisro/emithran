@@ -210,6 +210,24 @@ export class MHRResponseDto {
   @ApiProperty({ nullable: true }) specs?: Record<string, any>;
   @ApiProperty({ nullable: true }) directOverheadRate?: number;
   @ApiProperty({ nullable: true }) indirectOverheadRate?: number;
+  // Migration 580 (Machine Economics, bottom-up MHR) — a genuine machine-hour
+  // rate computed from real capex/lifecycle fields (price, life, salvage,
+  // maintenance, installation, supplies, uptime, utilization), independent of
+  // Direct/Indirect OH and LHR. null when the machine lacks the inputs to
+  // compute it (never a fabricated 0).
+  @ApiProperty({ nullable: true }) calculatedMhrUsdHr?: number;
+  // Snapshot of manual_mhr_value as it stood before migration 580, for the
+  // 281 rows where that value was actually direct+indirect overhead (migration
+  // 564's import stopgap) — preserved for audit even though it was never a
+  // real machine-hour rate.
+  @ApiProperty({ nullable: true }) legacyImportedMhrUsdHr?: number;
+  // Provenance of this row's authoritative MHR figure: 'calculated'
+  // (calculatedMhrUsdHr), 'manual' (a human deliberately entered/approved
+  // manualMHRValue), or 'legacy_import' (an old import artifact — not an
+  // approved value). Real quote costing still reads totalMachineHourRate/
+  // manualMHRValue regardless of this tag — migration 580 deliberately left
+  // that untouched; this is display/reference metadata only.
+  @ApiProperty({ nullable: true }) mhrSource?: string;
   // Economics provenance (Phase 1, "Machine Economics" initiative) — mirrors
   // capabilitySource below, one tier per rate field: 'shop_override'
   // (human-entered) | 'imported' (Excel bulk import) | 'benchmark'
@@ -226,6 +244,12 @@ export class MHRResponseDto {
   @ApiProperty({ nullable: true }) benchmarkDirectOverheadRateUsdHr?: number;
   @ApiProperty({ nullable: true }) benchmarkIndirectOverheadRateUsdHr?: number;
   @ApiProperty({ nullable: true }) benchmarkLaborRateUsdHr?: number;
+  // sm_reference_data.key ("<category>:<machine name>") this row was matched
+  // to (migration 537 / mhr.service.ts's lookupMachineLibraryBenchmark). The
+  // part before ':' is the machine's real machine_library category (e.g.
+  // "Fiber Laser Cutting Machine") — used by the UI as a real fallback for
+  // rows with no machine_class, instead of showing a blank/slug category.
+  @ApiProperty({ nullable: true }) benchmarkSourceKey?: string;
   // Press-brake/machine capacity — already used server-side for machine
   // selection/capability checks (machine-selection/selector.ts's maxTonnage);
   // exposed here so the interactive calculator can auto-fill "Selected
@@ -266,6 +290,20 @@ export class MHRResponseDto {
   // plate"); this just exposes it to callers outside that pipeline (this
   // dialog's own direct MHR fetch) too.
   @ApiProperty({ nullable: true }) capabilitySource?: string;
+
+  // Tier 1 universal machine_library.json economics/lifecycle fields
+  // (migration 573) — real, present across all 15 Sheet Metal categories.
+  @ApiProperty({ nullable: true }) laborTimeStandard?: number;
+  @ApiProperty({ nullable: true }) avgUtilization?: number;
+  @ApiProperty({ nullable: true }) goodPartYield?: number;
+  @ApiProperty({ nullable: true }) machineLengthMm?: number;
+  @ApiProperty({ nullable: true }) machineWidthMm?: number;
+  @ApiProperty({ nullable: true }) machineLifeYr?: number;
+  @ApiProperty({ nullable: true }) machinePowerKw?: number;
+  @ApiProperty({ nullable: true }) machineUptimePct?: number;
+  @ApiProperty({ nullable: true }) annualMaintenanceFactorPct?: number;
+  @ApiProperty({ nullable: true }) footprintAllowanceFactor?: number;
+  @ApiProperty({ nullable: true }) installationFactorPct?: number;
 
   // Calculated Results
   @ApiProperty()
@@ -355,6 +393,10 @@ export class MHRResponseDto {
       benchmarkDirectOverheadRateUsdHr: row.benchmark_direct_overhead_rate_usd_hr ? parseFloat(row.benchmark_direct_overhead_rate_usd_hr) : undefined,
       benchmarkIndirectOverheadRateUsdHr: row.benchmark_indirect_overhead_rate_usd_hr ? parseFloat(row.benchmark_indirect_overhead_rate_usd_hr) : undefined,
       benchmarkLaborRateUsdHr: row.benchmark_labor_rate_usd_hr ? parseFloat(row.benchmark_labor_rate_usd_hr) : undefined,
+      benchmarkSourceKey: row.benchmark_source_key ?? undefined,
+      calculatedMhrUsdHr: row.calculated_mhr_usd_hr != null ? parseFloat(row.calculated_mhr_usd_hr) : undefined,
+      legacyImportedMhrUsdHr: row.legacy_imported_mhr_usd_hr != null ? parseFloat(row.legacy_imported_mhr_usd_hr) : undefined,
+      mhrSource: row.mhr_source ?? undefined,
       maxTonnage: row.max_tonnage ? parseFloat(row.max_tonnage) : undefined,
       powerKw: row.power_kw ? parseFloat(row.power_kw) : undefined,
       maxXMm: row.max_x_mm ? parseFloat(row.max_x_mm) : undefined,
@@ -371,11 +413,38 @@ export class MHRResponseDto {
       cuttableMaterials: row.cuttable_materials ?? undefined,
       capabilityVersion: row.capability_version ?? undefined,
       capabilitySource: row.capability_source ?? undefined,
+      laborTimeStandard: row.labor_time_standard ? parseFloat(row.labor_time_standard) : undefined,
+      avgUtilization: row.avg_utilization ? parseFloat(row.avg_utilization) : undefined,
+      goodPartYield: row.good_part_yield ? parseFloat(row.good_part_yield) : undefined,
+      machineLengthMm: row.machine_length_mm ? parseFloat(row.machine_length_mm) : undefined,
+      machineWidthMm: row.machine_width_mm ? parseFloat(row.machine_width_mm) : undefined,
+      machineLifeYr: row.machine_life_yr ? parseFloat(row.machine_life_yr) : undefined,
+      machinePowerKw: row.machine_power_kw ? parseFloat(row.machine_power_kw) : undefined,
+      machineUptimePct: row.machine_uptime_pct ? parseFloat(row.machine_uptime_pct) : undefined,
+      annualMaintenanceFactorPct: row.annual_maintenance_factor_pct ? parseFloat(row.annual_maintenance_factor_pct) : undefined,
+      footprintAllowanceFactor: row.footprint_allowance_factor ? parseFloat(row.footprint_allowance_factor) : undefined,
+      installationFactorPct: row.installation_factor_pct ? parseFloat(row.installation_factor_pct) : undefined,
       calculations: JSON.parse(row.calculations || '{}'),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
   }
+}
+
+// Read-only lookup joining an mhr_records row to its sm_reference_data source
+// row (by benchmark_source_key, falling back to a machine-name match). Full
+// machine_library.json detail for a row stays visible (press force, roll
+// diameter, RPM, tool costs, etc.) without duplicating that data onto
+// mhr_records itself or letting a user hand-type it as free JSON.
+export class MHRReferenceDetailDto {
+  @ApiProperty()
+  found: boolean;
+
+  @ApiProperty({ nullable: true })
+  sourceKey: string | null;
+
+  @ApiProperty({ nullable: true, type: Object })
+  raw: Record<string, any> | null;
 }
 
 export class MHRListResponseDto {

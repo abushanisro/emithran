@@ -36,81 +36,103 @@ export const mhrFormSchema = z.object({
     .optional()
     .or(z.literal('')),
 
-  // Operational Parameters
+  // Operational Parameters — the detailed capex-amortization calculator these
+  // once drove (Operation/Costs/Utilities/Margins tabs) was removed in favor
+  // of Manual MHR Entry as the only machine-rate input path (see
+  // MHRFormDialog.tsx); kept optional, not deleted, only for legacy records
+  // that still carry a value from before that change.
   shiftsPerDay: z.number()
     .min(0.5, 'Shifts per day must be at least 0.5')
-    .max(4, 'Shifts per day cannot exceed 4'),
+    .max(4, 'Shifts per day cannot exceed 4')
+    .optional(),
 
   hoursPerShift: z.number()
     .min(1, 'Hours per shift must be at least 1')
-    .max(24, 'Hours per shift cannot exceed 24'),
+    .max(24, 'Hours per shift cannot exceed 24')
+    .optional(),
 
   workingDaysPerYear: z.number()
     .min(200, 'Working days must be at least 200 per year')
-    .max(365, 'Working days cannot exceed 365 per year'),
+    .max(365, 'Working days cannot exceed 365 per year')
+    .optional(),
 
   plannedMaintenanceHoursPerYear: z.number()
     .min(0, 'Maintenance hours cannot be negative')
-    .max(8760, 'Maintenance hours cannot exceed total hours in a year'),
+    .max(8760, 'Maintenance hours cannot exceed total hours in a year')
+    .optional(),
 
   capacityUtilizationRate: z.number()
     .min(50, 'Capacity utilization must be at least 50%')
-    .max(100, 'Capacity utilization cannot exceed 100%'),
+    .max(100, 'Capacity utilization cannot exceed 100%')
+    .optional(),
 
   // Capital & Financial Parameters
   landedMachineCost: z.number()
     .positive('Landed machine cost must be greater than zero')
-    .max(1000000000, 'Landed machine cost seems unreasonably high'),
+    .max(1000000000, 'Landed machine cost seems unreasonably high')
+    .optional(),
 
   accessoriesCostPercentage: z.number()
     .min(0, 'Accessories cost cannot be negative')
-    .max(50, 'Accessories cost cannot exceed 50% of machine cost'),
+    .max(50, 'Accessories cost cannot exceed 50% of machine cost')
+    .optional(),
 
   installationCostPercentage: z.number()
     .min(10, 'Installation cost must be at least 10%')
-    .max(40, 'Installation cost cannot exceed 40%'),
+    .max(40, 'Installation cost cannot exceed 40%')
+    .optional(),
 
   paybackPeriodYears: z.number()
     .min(1, 'Payback period must be at least 1 year')
-    .max(30, 'Payback period cannot exceed 30 years'),
+    .max(30, 'Payback period cannot exceed 30 years')
+    .optional(),
 
   interestRatePercentage: z.number()
     .min(0, 'Interest rate cannot be negative')
-    .max(30, 'Interest rate cannot exceed 30%'),
+    .max(30, 'Interest rate cannot exceed 30%')
+    .optional(),
 
   insuranceRatePercentage: z.number()
     .min(0, 'Insurance rate cannot be negative')
-    .max(10, 'Insurance rate cannot exceed 10%'),
+    .max(10, 'Insurance rate cannot exceed 10%')
+    .optional(),
 
   maintenanceCostPercentage: z.number()
     .min(0, 'Maintenance cost cannot be negative')
-    .max(20, 'Maintenance cost cannot exceed 20%'),
+    .max(20, 'Maintenance cost cannot exceed 20%')
+    .optional(),
 
   // Physical & Utility Parameters
   machineFootprintSqm: z.number()
     .min(0, 'Machine footprint cannot be negative')
-    .max(10000, 'Machine footprint seems unreasonably large'),
+    .max(10000, 'Machine footprint seems unreasonably large')
+    .optional(),
 
   rentPerSqmPerMonth: z.number()
     .min(0, 'Rent cannot be negative')
-    .max(100000, 'Rent per sqm seems unreasonably high'),
+    .max(100000, 'Rent per sqm seems unreasonably high')
+    .optional(),
 
   powerKwhPerHour: z.number()
     .min(0, 'Power consumption cannot be negative')
-    .max(10000, 'Power consumption seems unreasonably high'),
+    .max(10000, 'Power consumption seems unreasonably high')
+    .optional(),
 
   electricityCostPerKwh: z.number()
     .min(0, 'Electricity cost cannot be negative')
-    .max(100, 'Electricity cost seems unreasonably high'),
+    .max(100, 'Electricity cost seems unreasonably high')
+    .optional(),
 
   // Margins
   adminOverheadPercentage: z.number()
     .min(0, 'Admin overhead cannot be negative')
-    .max(50, 'Admin overhead cannot exceed 50%'),
+    .max(50, 'Admin overhead cannot exceed 50%')
+    .optional(),
 
   profitMarginPercentage: z.number()
     .min(0, 'Profit margin cannot be negative')
-    .max(100, 'Profit margin cannot exceed 100%'),
+    .max(100, 'Profit margin cannot exceed 100%')
+    .optional(),
 
   // India 2026 extended fields (all optional)
   machineClass: z.string().optional().or(z.literal('')),
@@ -145,50 +167,7 @@ export const mhrFormSchema = z.object({
   maxThicknessAlMm: z.number().min(0).optional(),
   maxThicknessCuMm: z.number().min(0).optional(),
   cuttableMaterials: z.string().optional().or(z.literal('')),
-
-  // Additional Specifications (mhr_records.specs jsonb) — free-form catch-all
-  // for category-specific machine_library.json fields (press force, roll
-  // diameter, router RPM, etc.) with no dedicated column and no live
-  // consumer yet; edited here as raw JSON text, parsed on submit.
-  specsJson: z.string().optional().or(z.literal('')),
-}).refine(
-  (data) => {
-    // Validate that combined percentage costs don't exceed reasonable limits
-    const totalPercentages =
-      data.accessoriesCostPercentage +
-      data.installationCostPercentage +
-      data.interestRatePercentage +
-      data.insuranceRatePercentage +
-      data.maintenanceCostPercentage +
-      data.adminOverheadPercentage +
-      data.profitMarginPercentage;
-
-    return totalPercentages <= 150;
-  },
-  {
-    message: 'Combined cost percentages exceed reasonable limits (>150%). Please review your percentages.',
-    path: ['installationCostPercentage'],
-  }
-).refine(
-  (data) => {
-    // Validate that maintenance hours don't exceed available hours
-    const maxAvailableHours = data.shiftsPerDay * data.hoursPerShift * data.workingDaysPerYear;
-    return data.plannedMaintenanceHoursPerYear <= maxAvailableHours * 0.3; // Max 30% maintenance
-  },
-  {
-    message: 'Maintenance hours cannot exceed 30% of total working hours',
-    path: ['plannedMaintenanceHoursPerYear'],
-  }
-).refine(
-  (data) => {
-    if (!data.specsJson || !data.specsJson.trim()) return true;
-    try { JSON.parse(data.specsJson); return true; } catch { return false; }
-  },
-  {
-    message: 'Additional Specifications must be valid JSON (e.g. {"press_force_kn": 300})',
-    path: ['specsJson'],
-  }
-);
+});
 
 export type MHRFormData = z.infer<typeof mhrFormSchema>;
 

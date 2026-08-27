@@ -3,8 +3,8 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import type { CalculationTraceStep, PhysicsGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, ValidatedInput } from './dto/cost-breakdown.dto';
-import { computeCostSummary, computeSustainability } from './costing/cost-engine';
-import type { MHRRateInput } from './costing/cost-engine';
+import { computeCostSummary, computeSustainability, applyPersistedRouteToSummary } from './costing/cost-engine';
+import type { MHRRateInput, AppliedProcessCostRecord, LhrRateSource } from './costing/cost-engine';
 import { planInspection, finalizeInspectionLine } from './costing/inspection-engine';
 import type { InspectionInput } from './costing/inspection-engine';
 import { evaluateCalculatorFormulas, normalizeFieldName } from '../calculators/calculator-formula-evaluator';
@@ -65,6 +65,7 @@ import type { GdtAnalysisDto, GdtFeatureDto } from './dto/gdt-analysis.dto';
 import {
   classifyLaserMaterial, laserRequirement, latheRequirement,
   pressBrakeRequirement, holeFormingRequirement, vmcRequirement, injectionMoldingRequirement,
+  punchingRequirement, waterjetRequirement,
   MATERIAL_MRR_CM3_MIN,
 } from './costing/machine-selection/physics';
 import type { MachineRequirement } from './costing/machine-selection/physics';
@@ -270,6 +271,7 @@ export class BOMItemsService {
     createBOMItemDto: CreateBOMItemDto,
     userId?: string,
     accessToken?: string,
+    organizationId?: string,
   ): Promise<BOMItemResponseDto> {
     this.logger.log(
       `Creating BOM item: ${createBOMItemDto.partNumber}`,
@@ -286,6 +288,7 @@ export class BOMItemsService {
       .insert({
         ...dbData,
         user_id: userId,
+        organization_id: organizationId ?? null,
       })
       .select('*')
       .limit(1);
@@ -1147,15 +1150,23 @@ export class BOMItemsService {
     // dimension as a conservative upper bound (a bend can never exceed it).
     bendLengthsMm?: number[];
     // Resolved ONCE from raw_materials by resolveMaterialForFamily (falls back
-    // to the documented mild-steel default with a warning when unverified) —
-    // the SAME number the $ cost calculation uses, so machine selection can
-    // never silently disagree with the displayed/costed tonnage.
-    utsMpa: number;
+    // to an approved per-family value with a warning when unverified, or to
+    // null — never a fabricated number — when the grade matches no known
+    // family) — the SAME number the $ cost calculation uses, so machine
+    // selection can never silently disagree with the displayed/costed
+    // tonnage. null flows through as "UTS-dependent checks skipped".
+    utsMpa: number | null;
     // Feature-driven hole extrusion (burring) — see estimateBurlDiameterMm's
     // own doc comment (default-rates.ts) for how burlDiameterMm is derived;
     // callers pass the SAME value already used for the $ cost calculation.
     extrudedFlangeCount?: number;
     burlDiameterMm?: number;
+    // P0.4: real turret-punch tonnage inputs — the SAME cutLengthMm/shear
+    // strength already resolved elsewhere on this part (capabilityGeometry's
+    // punchCutLengthMm/materialShearStrengthMpa), so machine SELECTION and the
+    // post-selection TONNAGE_EXCEEDED capability check can never disagree.
+    cutLengthMm?: number;
+    materialShearStrengthMpa?: number | null;
   }): Partial<Record<MachineClass, MachineRequirement>> {
     const requirements: Partial<Record<MachineClass, MachineRequirement>> = {};
     const matFamily = classifyLaserMaterial(input.grade);
@@ -1172,13 +1183,35 @@ export class BOMItemsService {
         bedLengthMm: flatLen,
         bedWidthMm: flatWid,
       });
-      // Same requirement object for every registered cutting engine — machine
-      // selection scores candidate machines within a class, not across cutting
-      // methods, so each class needs the identical flat-pattern/thickness fit
-      // check. Looping the registry (rather than 3 named lines) means a future
-      // registered engine is automatically included here with no extra edit.
+      // P0.4: turret punch and waterjet each get their own real physical
+      // requirement (tonnage for punching; thickness+bed only for waterjet,
+      // which has no force formula) instead of the laser's thickness+bed+
+      // material-family check — previously ALL cutting engines shared the
+      // identical LaserRequirement, so ranking never examined turret tonnage
+      // at all (see machine-selection/physics.ts's PunchingRequirement/
+      // WaterjetRequirement doc comments for the full defect). Any future
+      // cutting engine not named here falls back to the laser requirement,
+      // preserving the previous "new engine auto-included" behavior for the
+      // common case.
       for (const engine of getEnginesForFamily('sheet_metal_cutting')) {
-        requirements[engine.machineClass as MachineClass] = cutReq;
+        const cls = engine.machineClass as MachineClass;
+        if (cls === 'turret_punch') {
+          requirements[cls] = punchingRequirement({
+            cutLengthMm: input.cutLengthMm ?? 0,
+            materialShearStrengthMpa: input.materialShearStrengthMpa ?? 0,
+            thicknessMm: input.sheetThicknessMm,
+            bedLengthMm: flatLen,
+            bedWidthMm: flatWid,
+          });
+        } else if (cls === 'waterjet') {
+          requirements[cls] = waterjetRequirement({
+            thicknessMm: input.sheetThicknessMm,
+            bedLengthMm: flatLen,
+            bedWidthMm: flatWid,
+          });
+        } else {
+          requirements[cls] = cutReq;
+        }
       }
 
       if (input.bendCount > 0) {
@@ -1527,7 +1560,7 @@ export class BOMItemsService {
     return { processKey, mhrRecordId, location };
   }
 
-  // aPriori-style manual overrides: field_key = 'mat_rate' | '<process>::rate' |
+  // eMithran-style manual overrides: field_key = 'mat_rate' | '<process>::rate' |
   // '<process>::cycleMin'. Scoped by location for the same reason as machine
   // overrides — an India rate override must not silently apply after switching
   // the Digital Factory to USA.
@@ -1814,7 +1847,8 @@ export class BOMItemsService {
         commodityCode: rate.commodityCode,
         machineClass: cls,
         hourlyRate: rate.rate,
-        utilizationPct: 75,
+        utilizationPct: 75, // ranking-only placeholder for this synthesized fallback candidate
+        utilizationKnown: false,
         scheduledLoadPct: null,
         availabilityStatus: 'available',
         nextAvailableAt: null,
@@ -1823,6 +1857,8 @@ export class BOMItemsService {
         capability: { ...EMPTY_CAPABILITY, ...MACHINE_CLASS_DEFAULTS[cls] },
         capabilitySource: 'default_class',
         capabilityVersion: null,
+        operators: rate.operators ?? null,
+        laborRateUsdHr: rate.machineLaborRateUsdHr ?? null,
       };
       const reason = rate.source === 'mhr_database'
         ? 'Selected by commodity-code lookup — import the MHR database for capability-based selection'
@@ -1850,7 +1886,7 @@ export class BOMItemsService {
     ];
 
     // Await LHR data — started at the top, runs concurrently with the synchronous setup above
-    const lhrRates = await lhrRatesPromise.catch(() => new Map<string, number>());
+    const lhrRates = await lhrRatesPromise.catch(() => new Map<string, { rate: number; source: LhrRateSource }>());
 
     // ── Pass 4: mhr_benchmark_rates — DB-backed location benchmarks ─────────
     // Used as: (a) final fallback rate when mhr_records has no match, and
@@ -1911,8 +1947,18 @@ export class BOMItemsService {
       const get = (cls: MachineClass) => {
         const raw = resolved.get(cls) ?? makeDefault(cls);
         const r = ensureSelection(applyBenchmarkOverrideIfNeeded(raw, cls), cls);
-        // Attach LHR from benchmark table — surfaced for transparent machine/labour breakdown.
-        return { ...r, labourRate: lhrRates.get(cls) ?? null };
+        // This exact machine's own usd_lhr_total (machine_library.json's
+        // labor_rate_usd_hr for benchmarked rows) takes precedence over the
+        // location+process_group lhr_records/lhr_benchmark_rates lookup —
+        // explicit, approved exception (2026-08-27) to that being the sole
+        // labor-rate source; falls back to it when this machine has none.
+        const lhr = lhrRates.get(cls);
+        const perMachineLhr = r.machineLaborRateUsdHr;
+        return {
+          ...r,
+          labourRate: perMachineLhr ?? lhr?.rate ?? null,
+          labourRateSource: perMachineLhr != null ? 'mhr_machine_specific' : (lhr?.source ?? 'no_lhr_rate'),
+        };
       };
       // "Laser Cutting" is one process line regardless of which real laser
       // technology performs it — fiber and CO2 (co2_laser, e.g. AMADA
@@ -1950,8 +1996,8 @@ export class BOMItemsService {
         // Direct labor and QA inspector rates surfaced for cost-engine input.
         // fiber_laser maps to 'Sheet Metal' process group → DLR for all SM ops.
         // cmm maps to 'Quality' process group → QA inspector rate.
-        directLaborRate: lhrRates.get('fiber_laser') ?? null,
-        qaInspectorRate: lhrRates.get('cmm') ?? null,
+        directLaborRate: lhrRates.get('fiber_laser')?.rate ?? null,
+        qaInspectorRate: lhrRates.get('cmm')?.rate ?? null,
       };
     };
 
@@ -1990,6 +2036,8 @@ export class BOMItemsService {
             machineName: cand.machineName,
             commodityCode: cand.commodityCode,
             selection,
+            operators: cand.operators,
+            machineLaborRateUsdHr: cand.laborRateUsdHr,
           });
         }
         return buildOutput(resolved);
@@ -2006,7 +2054,7 @@ export class BOMItemsService {
     // Prefer fully_burdened_local_per_hr (machine + labour), fall back through
     // total_machine_hour_rate, then manual_mhr_value.
     // fully_burdened_local_per_hr is machine + labour combined — never prefer it here.
-    // This legacy resolution feeds the same aprioriTerms() path (cost-engine.ts) as the
+    // This legacy resolution feeds the same eMithranTerms() path (cost-engine.ts) as the
     // physics selector, which always separately adds its own direct-labour term; using
     // the burdened figure as "the machine rate" would double-count labour. See the
     // matching fix/comment on pickRate() in machine-selection/selector.ts.
@@ -2498,15 +2546,24 @@ export class BOMItemsService {
     fxRates: RateSnapshot,
     warnings: string[] = [],
     thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
-  ): Promise<Map<string, number>> {
+  ): Promise<Map<string, { rate: number; source: LhrRateSource }>> {
     const identities = await this.resolveProcessIdentities(accessToken, undefined, family);
     const classGroups = new Map<string, string>();
     for (const [cls, identity] of Object.entries(identities)) {
       classGroups.set(cls, identity.lhrProcessGroup ?? identity.processGroup);
     }
 
-    const result = new Map<string, number>();
+    // P0.6 (Machine Economics, provenance-visibility phase): this function's 4
+    // passes already resolve labor rate with real precedence (own-location
+    // import > benchmark > cross-location import > plausibility guard) but
+    // used to collapse to a bare number — the machine-rate side already had
+    // this exact visibility via MHRRateInput.source/rateSource (surfaced in
+    // Cost Summary as "MHR DB"/"Benchmark"/etc.); labor rate had none. Track
+    // which pass actually won per PROCESS GROUP (the resolution unit), then
+    // map to per-class source below — same shape, not a new mechanism.
+    const result = new Map<string, { rate: number; source: LhrRateSource }>();
     const pgRate = new Map<string, number>();
+    const pgSource = new Map<string, LhrRateSource>();
 
     try {
       const client = this.supabaseService.getClient(accessToken);
@@ -2532,6 +2589,7 @@ export class BOMItemsService {
         }
         for (const [pg, { sum, count }] of pgSum) {
           pgRate.set(pg, sum / count);
+          pgSource.set(pg, 'lhr_database');
         }
       }
 
@@ -2563,7 +2621,10 @@ export class BOMItemsService {
         for (const row of (benchRows ?? []) as any[]) {
           const usdRate = Number((row as any).lhr_usd_effective ?? 0);
           const pg = ((row as any).process_group as string | null)?.trim();
-          if (usdRate > 0 && pg) pgRate.set(pg, usdRate * usdToLocal);
+          if (usdRate > 0 && pg) {
+            pgRate.set(pg, usdRate * usdToLocal);
+            pgSource.set(pg, 'lhr_benchmark');
+          }
         }
       }
 
@@ -2600,10 +2661,10 @@ export class BOMItemsService {
             }
           }
           for (const [pg, { sum, count }] of p3UsdSum) {
-            if (!pgRate.has(pg)) pgRate.set(pg, sum / count);
+            if (!pgRate.has(pg)) { pgRate.set(pg, sum / count); pgSource.set(pg, 'lhr_cross_location'); }
           }
           for (const [pg, { sum, count }] of p3LocalSum) {
-            if (!pgRate.has(pg) && !p3UsdSum.has(pg)) pgRate.set(pg, sum / count);
+            if (!pgRate.has(pg) && !p3UsdSum.has(pg)) { pgRate.set(pg, sum / count); pgSource.set(pg, 'lhr_cross_location'); }
           }
         }
       }
@@ -2642,7 +2703,7 @@ export class BOMItemsService {
       // ── Map machine classes to resolved process-group rates ──────────────
       for (const [cls, pg] of classGroups) {
         const rate = pgRate.get(pg);
-        if (rate != null) result.set(cls, rate);
+        if (rate != null) result.set(cls, { rate, source: pgSource.get(pg) ?? 'lhr_database' });
       }
     } catch {
       // Non-critical — LHR display degrades gracefully; cost totals are unaffected
@@ -2663,7 +2724,7 @@ export class BOMItemsService {
   // invariant): user override > material physics > geometry classifier.
   //
   // Geometry alone cannot distinguish a machined plate from a molded cover of
-  // the identical shape — the material can. This is the aPriori routing model:
+  // the identical shape — the material can. This is the eMithran routing model:
   // geometry proposes, material routes, user override is final.
   //   1. manufacturing_family_override — explicit user intent, always wins
   //      (e.g. machined-PEEK prototype pinned to cnc_milled).
@@ -2738,9 +2799,13 @@ export class BOMItemsService {
     // UTS/shear strength — resolved from the SAME raw_materials row density/cost
     // came from (same exact-then-tokenized match), so machine selection (press-
     // brake tonnage) and $ costing can never diverge onto two different material
-    // rows or two different property sources. utsSource distinguishes a real
-    // per-part DB value from the mild-steel default so callers can warn.
-    utsMpa: number; shearStrengthMpa: number; utsSource: 'db' | 'default';
+    // rows or two different property sources. Three-tier hierarchy, no invented
+    // catch-all: verified per-part DB value ('db') -> approved material-family
+    // value from MATERIAL_UTS_MPA ('family_default') -> null ('unavailable') when
+    // the grade matches neither. Callers must treat null as "skip the UTS-
+    // dependent check" (never substitute a guessed number), and utsSource lets
+    // them warn appropriately.
+    utsMpa: number | null; shearStrengthMpa: number | null; utsSource: 'db' | 'family_default' | 'unavailable';
   }> {
     const { accessToken, grade, family, materialCol, rates, locCurrencyCode, warnings } = input;
 
@@ -2874,10 +2939,12 @@ export class BOMItemsService {
             );
           }
           const hasUts = best.utsMpa != null && best.utsMpa > 0 && best.shearStrengthMpa != null && best.shearStrengthMpa > 0;
+          const familyUts = hasUts ? null : resolveUtsMpa(grade);
           if (!hasUts) {
             warnings.push(
-              `Material "${grade}" found in raw_materials, but no verified UTS/shear strength — ` +
-              `press-brake tonnage and machine selection use a mild-steel default (410/352 MPa) until verified values are added.`,
+              familyUts != null
+                ? `Material "${grade}" found in raw_materials, but no verified UTS/shear strength — using the approved ${grade} family UTS (${familyUts} MPa) for press-brake tonnage. Shear strength has no approved-family table, so it is unavailable and turret-punch tonnage checks are skipped until verified values are added.`
+                : `Material "${grade}" found in raw_materials, but no verified UTS/shear strength, and the grade matches no approved material family either — press-brake tonnage, turret-punch tonnage, and UTS-dependent DFM checks are skipped until verified values are added.`,
             );
           }
           return {
@@ -2886,9 +2953,9 @@ export class BOMItemsService {
               : 0,
             materialDensityKgM3: best.densityKgM3 as number,
             materialSource: 'db',
-            utsMpa: hasUts ? (best.utsMpa as number) : resolveUtsMpa(grade),
-            shearStrengthMpa: hasUts ? (best.shearStrengthMpa as number) : 352,
-            utsSource: hasUts ? 'db' : 'default',
+            utsMpa: hasUts ? (best.utsMpa as number) : familyUts,
+            shearStrengthMpa: hasUts ? (best.shearStrengthMpa as number) : null,
+            utsSource: hasUts ? 'db' : (familyUts != null ? 'family_default' : 'unavailable'),
           };
         }
       } catch {
@@ -2903,18 +2970,21 @@ export class BOMItemsService {
     // ~150x error with no indication anything was wrong). materialDensityKgM3 = 0
     // correctly gates hasValidDimensions downstream to false, so weight/nesting
     // are skipped entirely rather than computed from an invented number.
+    const notFoundFamilyUts = resolveUtsMpa(grade);
     warnings.push(
-      `Material "${grade ?? 'unknown'}" not found in raw_materials database — material cost and weight are $0/0kg, ` +
-      `and press-brake tonnage/machine selection use a mild-steel default (410/352 MPa). ` +
+      `Material "${grade ?? 'unknown'}" not found in raw_materials database — material cost and weight are $0/0kg. ` +
+      (notFoundFamilyUts != null
+        ? `Press-brake tonnage uses the approved ${grade} family UTS (${notFoundFamilyUts} MPa); shear strength has no approved-family table, so it is unavailable and turret-punch tonnage checks are skipped. `
+        : `The grade also matches no approved material family, so press-brake tonnage, turret-punch tonnage, and UTS-dependent DFM checks are all skipped. `) +
       `Add the material to the raw materials table to quote accurately.`,
     );
     return {
       materialCostPerKg: 0,
       materialDensityKgM3: 0,
       materialSource: 'default',
-      utsMpa: resolveUtsMpa(grade),
-      shearStrengthMpa: 352,
-      utsSource: 'default',
+      utsMpa: notFoundFamilyUts,
+      shearStrengthMpa: null,
+      utsSource: notFoundFamilyUts != null ? 'family_default' : 'unavailable',
     };
   }
 
@@ -3093,7 +3163,7 @@ export class BOMItemsService {
     return { bendCount, bendSource, flatPatternAreaMm2, blankAreaSource, warnings };
   }
 
-  // ── aPriori-style feature-level breakdown helpers ─────────────────────────────
+  // ── eMithran-style feature-level breakdown helpers ─────────────────────────────
 
   /** Convert raw operation-sequencer output into grouped FeatureOp[] for the UI. */
   private buildCNCFeatureBreakdown(featureOps: OperationLine[]): FeatureOp[] {
@@ -3466,7 +3536,12 @@ export class BOMItemsService {
     if (!ctx.itemId) return { _gapReason: GAP_REASON };
 
     const thicknessMm = Number(inputValues['Thickness'] ?? 0);
-    const shearStrengthMpa = Number(inputValues['Shear Strength'] ?? 0);
+    // 'Shear Strength' is no longer consumed here — nesting spacing now uses
+    // a fixed laser-based default (closeout Plan Phase 3, see
+    // computePartAllowanceMm's own doc comment) instead of the old shear-
+    // strength-scaled formula. Flagged, not silently dropped: this input
+    // field is still configured on the Gross Usage calculator and now has
+    // no real consumer — see feedback_calculator_input_honesty.
     const netWeightKg = Number(inputValues['Net Weight Per Part'] ?? 0);
     const densityKgM3 = Number(inputValues['Material Density'] ?? 0);
     const edgeMarginMm = inputValues['Edge Allowance'] != null ? Number(inputValues['Edge Allowance']) : EDGE_ALLOWANCE_MM;
@@ -3478,7 +3553,7 @@ export class BOMItemsService {
     const item = await this.findOne(ctx.itemId, ctx.userId, ctx.accessToken);
     const summary = ((item.featureGraph as any)?.summary) ?? {};
 
-    const kerfMm = computePartAllowanceMm(thicknessMm, shearStrengthMpa);
+    const kerfMm = computePartAllowanceMm(thicknessMm);
     const trueShape = await this.resolveTrueShapeNestCosting(
       ctx.itemId, summary, netWeightKg, densityKgM3, thicknessMm,
       kerfMm, edgeMarginMm, ctx.userId, ctx.accessToken,
@@ -3649,6 +3724,8 @@ export class BOMItemsService {
             utsMpa,
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
+            cutLengthMm,
+            materialShearStrengthMpa: shearStrengthMpa,
           }),
           overrides: await this.fetchMachineOverrides(id, accessToken, location),
         }
@@ -3834,7 +3911,7 @@ export class BOMItemsService {
       }
       cncResult.warnings.push(...materialWarnings);
       this.attachMachineSelections(cncResult.processLines, mhrRates);
-      // Attach aPriori-style feature-level breakdown to the CNC Milling process line
+      // Attach eMithran-style feature-level breakdown to the CNC Milling process line
       if (featureOps && featureOps.length > 0) {
         const breakdown = this.buildCNCFeatureBreakdown(featureOps);
         if (breakdown.length > 0) {
@@ -4082,9 +4159,13 @@ export class BOMItemsService {
     const smBendLength = smRealBendLengths.length > 0
       ? Math.max(...smRealBendLengths)
       : (bendCount > 0 ? (((item as any).maxLength ?? 200) as number) : 200);
+    // 0, not a plausible-looking tonnage guess, when UTS is unavailable (grade
+    // matches no approved family) — resolveStrokeLookupTonnage already prefers
+    // the selected machine's real capacity over this estimate, so 0 correctly
+    // falls through to "no requirement known" rather than fabricating one.
     const smRequiredTonnage = bendCount > 0
-      ? Math.ceil(estimateBendTonnage(smUtsMpa, sheetThicknessMm, smBendLength) ?? 100)
-      : 100;
+      ? Math.ceil(estimateBendTonnage(smUtsMpa, sheetThicknessMm, smBendLength) ?? 0)
+      : 0;
     // Stroke time is a property of the MACHINE, not of this one bend's
     // minimum required force — see resolveStrokeLookupTonnage's own doc
     // comment. Uses the selected press brake's real tonnage capacity
@@ -4121,7 +4202,7 @@ export class BOMItemsService {
       ),
       this.smLookup.getToolSetupTime('brake', Math.min(smBendLength, 500)),
       bendCount > 0
-        ? this.smLookup.getManualStrokeTime(sheetThicknessMm, smStrokeTonnage, strokeComplexity)
+        ? this.smLookup.getManualStrokeTimeForPressBrake(sheetThicknessMm, smStrokeTonnage, strokeComplexity, mhrRates.pressBrake.machineName)
         : Promise.resolve({
             secondsPerBend: 0,
             dataFound: true,
@@ -4243,12 +4324,14 @@ export class BOMItemsService {
             Thickness: sheetThicknessMm,
             'Bending Line Length': smBendLength,
             'Shoulder Width': 8 * sheetThicknessMm,
-            UTS: smUtsMpa,
-            'No Of Bends': bendCount,
             // Omitted entirely (not passed as undefined) when the real stroke-
             // time lookup found no matching row — leaves the formula unable
             // to resolve this symbol, so resolvePhysicsQuantity correctly
-            // reports a real LookupGap instead of a guessed number.
+            // reports a real LookupGap instead of a guessed number. UTS is
+            // omitted the same way when the grade has no verified or approved-
+            // family value (P0.7 — no mild-steel 410 MPa fallback here anymore).
+            ...(smUtsMpa != null ? { UTS: smUtsMpa } : {}),
+            'No Of Bends': bendCount,
             ...(smStrokeResult.dataFound ? { 'Time Per Stroke': smStrokeResult.secondsPerBend } : {}),
             ...(smHandlingResult.dataFound ? { 'Sheet Loading Time': smHandlingMin } : {}),
             ...(smBrakeSetupResult.dataFound ? { 'Tool Loading Time': smBrakeSetupMin } : {}),
@@ -4258,7 +4341,7 @@ export class BOMItemsService {
             Thickness: 'BOM sheet thickness',
             'Bending Line Length': ((item as any).maxLength != null) ? 'CAD/BOM part geometry — max length' : 'Default (200mm, no CAD length available)',
             'Shoulder Width': 'Approximated as 8× sheet thickness (standard V-die shoulder rule)',
-            UTS: 'raw_materials — material grade Ultimate Tensile Strength (defaults to 410 MPa mild-steel if not verified)',
+            UTS: 'raw_materials — material grade Ultimate Tensile Strength (verified DB value, or an approved material-family default; omitted when neither is available)',
             'No Of Bends': 'CAD/drawing feature extraction — bend count',
             'Time Per Stroke': this.describeStrokeTimeProvenance(sheetThicknessMm, strokeComplexity, smStrokeResult.resolution, smStrokeResult.roundedFromTonnage),
             'Sheet Loading Time': 'sm_lookup_handling_time — part weight estimate',
@@ -4469,7 +4552,8 @@ export class BOMItemsService {
         );
       }
       const smBurlDiameterMm = estimateBurlDiameterMm(threads, summary.holeDiameters ?? []);
-      const smBurlTonnage = Math.ceil(estimateBurlTonnage(smUtsMpa, sheetThicknessMm, smBurlDiameterMm) ?? 1);
+      // 0 (not a fabricated 1t), same reasoning as smRequiredTonnage above.
+      const smBurlTonnage = Math.ceil(estimateBurlTonnage(smUtsMpa, sheetThicknessMm, smBurlDiameterMm) ?? 0);
       // See resolveStrokeLookupTonnage's own doc comment (Press Brake above) —
       // same fix applies here: stroke time belongs to the selected hole-
       // forming machine, not to this hole's own minimum required force.
@@ -4488,7 +4572,7 @@ export class BOMItemsService {
           seedScope: {
             Diameter: smBurlDiameterMmForCalc,
             Thickness: sheetThicknessMm,
-            UTS: smUtsMpa,
+            ...(smUtsMpa != null ? { UTS: smUtsMpa } : {}),
             'No Of Extrusions': smExtrudedFlangeCount,
             ...(smBurlStrokeResult.dataFound ? { 'Stroke Time': smBurlStrokeResult.secondsPerBend } : {}),
           },
@@ -4565,7 +4649,6 @@ export class BOMItemsService {
           thicknessMm: sheetThicknessMm,
           netWeightKg: smNetWeightKg,
           densityKgM3: materialDensityKgM3,
-          shearStrengthMpa: smShearStrengthMpa,
           materialPricePerKg: materialCostPerKg,
           scrapPricePerKg: smScrapPricePerKg,
           quantityRequired: batchSize,
@@ -4586,7 +4669,7 @@ export class BOMItemsService {
     let smCalculationTrace: CalculationTraceStep[] | undefined;
     let smCalculatorConfidence: ConfidenceLevel | undefined;
     if (hasValidDimensions && smNetWeightKg > 0) {
-      const partAllowanceMm = computePartAllowanceMm(sheetThicknessMm, smShearStrengthMpa);
+      const partAllowanceMm = computePartAllowanceMm(sheetThicknessMm);
       const hasQty = typeof batchSize === 'number' && batchSize > 0;
       // Gross usage resolves through the "Sheet Metal - Gross Material Usage
       // (Nesting)" calculator (physics_key='sheet_metal_gross_usage_nesting')
@@ -4611,7 +4694,7 @@ export class BOMItemsService {
         ],
         seedScope: {
           'Thickness': sheetThicknessMm,
-          'Shear Strength': smShearStrengthMpa,
+          ...(smShearStrengthMpa != null ? { 'Shear Strength': smShearStrengthMpa } : {}),
           'Net Weight Per Part': smNetWeightKg,
           'Material Density': materialDensityKgM3,
           'Edge Allowance': EDGE_ALLOWANCE_MM,
@@ -4987,7 +5070,7 @@ export class BOMItemsService {
       smResult.geometryProvenance = { bendSource: geo.bendSource, blankAreaSource: geo.blankAreaSource };
     }
     this.attachMachineSelections(smResult.processLines, mhrRates);
-    // Attach aPriori-style feature breakdowns to laser + press brake + deburr lines
+    // Attach eMithran-style feature breakdowns to laser + press brake + deburr lines
     {
       const bendRadii = (fg?.summary?.bendRadii ?? []) as number[];
       const laserLine = smResult.processLines.find((l) => l.process === 'Laser Cutting');
@@ -5019,6 +5102,53 @@ export class BOMItemsService {
       if (pemLine) {
         pemLine.featureBreakdown = this.buildPemFeatureBreakdown(smThroughHoleGroups, smPemResolved);
       }
+    }
+    // P0.2: process_cost_records is the applied-quote authority (Manufacturing
+    // Process section, Excel export, BOM/project rollups, and the AI assistant
+    // all already treat it this way -- see plan doc). Once a route has been
+    // applied for this part, Cost Summary must show THAT persisted result for
+    // its cutting/bending lines, not a fresh live recompute -- which, for
+    // cutting, only ever knows how to fabricate a Laser Cutting line, even
+    // after the user applied Turret Punch or Waterjet. Scoped to exactly the
+    // two families where a live-vs-persisted divergence was found possible:
+    // cutting (fiber_laser/co2_laser/turret_punch/waterjet -- mutually
+    // exclusive alternatives for the same operation) and press_brake
+    // (independently overridable via the Edit Process Cost dialog). Every
+    // other resolvePhysicsQuantity-driven line (tapping, PEM, deburr, ...)
+    // already uses the identical calculator call in both this method and
+    // getRouteComparison(), so no divergence risk exists there -- not touched.
+    try {
+      const client = this.supabaseService.getClient(accessToken);
+      const { data: appliedRows, error: appliedRowsError } = await client
+        .from('process_cost_records')
+        .select('machine_class, machine_name, mhr_id, operation, process_group, process_route, cycle_time, setup_time, direct_rate, setup_cost_per_part, total_cycle_cost_per_part, total_cost_per_part')
+        .eq('bom_item_id', id)
+        .eq('is_active', true)
+        .in('machine_class', ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet', 'press_brake']);
+      // P0.6: the Supabase client returns errors on the {error} field rather than
+      // throwing -- this was previously never checked, so a real DB failure (not
+      // "no applied route yet", a genuine query error) fell through indistinguishable
+      // from the honest empty-result case, silently reverting to the live
+      // pre-apply preview with no record anywhere that the applied-route read
+      // actually failed. Logged, not thrown -- the live preview is still the
+      // correct fallback behavior; only the silence was the bug.
+      if (appliedRowsError) {
+        this.logger.warn(
+          `process_cost_records lookup failed for bom_item ${id} -- falling back to live pre-apply preview: ${appliedRowsError.message}`,
+          'BOMItemsService',
+        );
+      } else if (appliedRows && appliedRows.length > 0) {
+        Object.assign(smResult, applyPersistedRouteToSummary(smResult, appliedRows as AppliedProcessCostRecord[]));
+      }
+    } catch (e: unknown) {
+      // No applied route yet (first-time costing, nothing in process_cost_records
+      // for this item) is NOT expected to reach here (an empty/no-row result is
+      // not an exception) -- this catch is for a genuine thrown error (e.g.
+      // applyPersistedRouteToSummary itself throwing on malformed data).
+      this.logger.warn(
+        `Applied-route overlay threw for bom_item ${id} -- falling back to live pre-apply preview: ${e instanceof Error ? e.message : String(e)}`,
+        'BOMItemsService',
+      );
     }
     await this.attachSavedMachineExplanations(smResult.processLines, id, accessToken, location);
     this.appendRateWarnings(smResult, location, mhrRates.benchmarkMap, rateWarnThresholds);
@@ -5270,6 +5400,9 @@ export class BOMItemsService {
       // nibbling calc already uses; null when there's nothing to punch/cut.
       punchCutLengthMm: cutLengthMm > 0 ? cutLengthMm : null,
       materialShearStrengthMpa: rcShearStrengthMpa,
+      // Real material grade — only used for laser material-family-specific
+      // thickness limits when a real per-machine capability is available.
+      materialGrade: grade,
     };
 
     const thk = sheetThicknessMm > 0 ? sheetThicknessMm : 2.0;
@@ -5290,7 +5423,7 @@ export class BOMItemsService {
     // true-shape result.
     let grossWeightKg = netWeightKg * (1 + MATERIAL_OVERHEAD_PCT / 100);
     if (family === 'sheet_metal' && netWeightKg > 0) {
-      const partAllowanceMm = computePartAllowanceMm(sheetThicknessMm, rcShearStrengthMpa);
+      const partAllowanceMm = computePartAllowanceMm(sheetThicknessMm);
       const trueShape = await this.resolveTrueShapeNestCosting(
         item.id, summary, netWeightKg, materialDensityKgM3, sheetThicknessMm,
         partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken,
@@ -5320,6 +5453,8 @@ export class BOMItemsService {
             utsMpa,
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
+            cutLengthMm,
+            materialShearStrengthMpa: rcShearStrengthMpa,
           }),
           overrides: await this.fetchMachineOverrides(id, accessToken, location),
         }
@@ -5741,7 +5876,13 @@ export class BOMItemsService {
     // route through press brake for bending) — computed once here. Each cutting
     // engine's own capability check happens inside the registry loop below,
     // merged with this shared one via mergeCuttingAndPressBrakeCapability.
-    const pbCapability = checkMachineCapability(mhrRates.pressBrake.machineClass, mhrRates.pressBrake.commodityCode, capabilityGeometry);
+    const pbCapability = checkMachineCapability(
+      mhrRates.pressBrake.machineClass,
+      mhrRates.pressBrake.commodityCode,
+      capabilityGeometry,
+      mhrRates.pressBrake.selection?.balanced?.candidate?.capability,
+      mhrRates.pressBrake.selection?.balanced?.candidate?.capabilitySource,
+    );
 
     const CONF_RANK = { high: 2, medium: 1, low: 0 } as const;
     const minConf = (a: "high" | "medium" | "low", b: "high" | "medium" | "low"): "high" | "medium" | "low" =>
@@ -5761,12 +5902,34 @@ export class BOMItemsService {
     // via comparisonWarnings when a table has no row yet (never silent).
     // See migrations 413 (deburr), 414 (turret punch), 415 (waterjet abrasive),
     // 416 (setup times).
-    const [rcOpSetupTimes, rcTurretParams, rcAbrasiveRate, rcDeburrRate] = await Promise.all([
+    const [rcOpSetupTimes, rcTurretParams, rcRealTurretParams, rcAbrasiveRate, rcRealAbrasiveRate, rcDeburrRate, rcHandlingAllowance, rcNozzleRate] = await Promise.all([
       this.smLookup.getOpSetupTimes(),
       this.smLookup.getTurretPunchParams(thk),
+      this.smLookup.getTurretPunchParamsForMachine(mhrRates.turret.machineName),
       this.smLookup.getWaterjetAbrasiveRate(),
+      this.smLookup.getWaterjetAbrasiveRateForMachine(mhrRates.waterjet.machineName),
       this.smLookup.getDeburrRate(),
+      this.smLookup.getHandlingAllowanceUsd('turret_punch', grossWeightKg),
+      this.smLookup.getWaterjetNozzleCostPerHr(),
     ]);
+    // The specific selected machine's own real abrasive rate (machine_library.json,
+    // via sm_reference_data) always wins over the generic pump-tier average when
+    // it's on file — see getWaterjetAbrasiveRateForMachine's own doc comment.
+    const effectiveAbrasiveRate = rcRealAbrasiveRate.dataFound ? rcRealAbrasiveRate : rcAbrasiveRate;
+    // Same real-machine-wins-outright rule for turret punch rate/tool-change
+    // time — see getTurretPunchParamsForMachine's own doc comment for why
+    // nibbleMmPerMin is deliberately left untouched (no direct real-data
+    // source for it). Only applied when the thickness curve itself found a
+    // row (so nibbleMmPerMin/dataFound still come from a real source) —
+    // TurretParams.dataFound is all-or-nothing, so partial real data can't
+    // safely stand in when there's no thickness-curve row at all.
+    const effectiveTurretParams = rcTurretParams.dataFound
+      ? {
+          ...rcTurretParams,
+          hitsPerMin: rcRealTurretParams.hitsPerMin ?? rcTurretParams.hitsPerMin,
+          toolChangeSec: rcRealTurretParams.toolChangeSec ?? rcTurretParams.toolChangeSec,
+        }
+      : rcTurretParams;
     const rcPbSetupMin = this.smLookup.resolveOpSetupMin(rcOpSetupTimes, 'press_brake');
     if (!rcPbSetupMin.dataFound) {
       comparisonWarnings.push("Press brake setup time from fallback — seed sm_lookup_op_setup_time for 'press_brake'");
@@ -5774,8 +5937,8 @@ export class BOMItemsService {
     if (!rcTurretParams.dataFound) {
       comparisonWarnings.push('Turret punch cycle-time params from fallback — seed sm_lookup_turret_punch for this thickness');
     }
-    if (!rcAbrasiveRate.dataFound) {
-      comparisonWarnings.push('Waterjet abrasive consumption rate from fallback — seed sm_lookup_waterjet_abrasive_rate');
+    if (!effectiveAbrasiveRate.dataFound) {
+      comparisonWarnings.push('Waterjet abrasive consumption rate from fallback — seed sm_lookup_waterjet_abrasive_rate, or add this machine to the machine library reference data');
     }
     if (!rcDeburrRate.dataFound) {
       comparisonWarnings.push('Deburr cycle-time rate from fallback — seed sm_lookup_deburr_rate');
@@ -5798,14 +5961,14 @@ export class BOMItemsService {
         (((item as any).complexity ?? fg?.summary?.complexity) === 'complex') ? 'complex' : 'simple';
       const rcBendLengthMm = capabilityGeometry.bendLengthMm ?? 200;
       const rcBendTonnage = Math.ceil(
-        estimateBendTonnage(utsMpa, thk, rcBendLengthMm) ?? 100,
+        estimateBendTonnage(utsMpa, thk, rcBendLengthMm) ?? 0,
       );
       // See resolveStrokeLookupTonnage's own doc comment — stroke time
       // belongs to the selected press brake's real tonnage capacity, not
       // this bend's own minimum required force.
       const rcBendStrokeTonnage = this.resolveStrokeLookupTonnage(rcBendTonnage, mhrRates.pressBrake);
       const [rcStrokeResult, rcHandlingResult, rcBrakeSetupResult] = await Promise.all([
-        this.smLookup.getManualStrokeTime(thk, rcBendStrokeTonnage, rcBendComplexity),
+        this.smLookup.getManualStrokeTimeForPressBrake(thk, rcBendStrokeTonnage, rcBendComplexity, mhrRates.pressBrake.machineName),
         this.smLookup.getHandlingTime(flatPatternAreaMm2 * thk / 1e9 * materialDensityKgM3 * 1.05),
         this.smLookup.getToolSetupTime('brake', Math.min(rcBendLengthMm, 500)),
       ]);
@@ -5827,7 +5990,7 @@ export class BOMItemsService {
           Thickness: thk,
           'Bending Line Length': rcBendLengthMm,
           'Shoulder Width': 8 * thk,
-          UTS: utsMpa,
+          ...(utsMpa != null ? { UTS: utsMpa } : {}),
           'No Of Bends': bendCount,
           ...(rcStrokeResult.dataFound ? { 'Time Per Stroke': rcStrokeResult.secondsPerBend } : {}),
           ...(rcHandlingResult.dataFound ? { 'Sheet Loading Time': rcHandlingResult.minutes } : {}),
@@ -6010,7 +6173,7 @@ export class BOMItemsService {
         );
       }
       const burlDiameterMm = estimateBurlDiameterMm(threads, summary.holeDiameters ?? []);
-      const rcBurlTonnage = Math.ceil(estimateBurlTonnage(utsMpa, thk, burlDiameterMm) ?? 1);
+      const rcBurlTonnage = Math.ceil(estimateBurlTonnage(utsMpa, thk, burlDiameterMm) ?? 0);
       const rcBurlComplexity: 'simple' | 'complex' =
         (((item as any).complexity ?? fg?.summary?.complexity) === 'complex') ? 'complex' : 'simple';
       // See resolveStrokeLookupTonnage's own doc comment — stroke time
@@ -6255,9 +6418,12 @@ export class BOMItemsService {
         processIdentity: identity,
         abrasivePricePerKg: waterjetAbrasivePricePerKg,
         waterjetParams: rcWaterjetParams,
-        turretParams: rcTurretParams,
-        abrasiveKgPerMin: rcAbrasiveRate.kgPerMin,
+        turretParams: effectiveTurretParams,
+        abrasiveKgPerMin: effectiveAbrasiveRate.kgPerMin,
         opSetupMin: this.smLookup.resolveOpSetupMin(rcOpSetupTimes, engine.machineClass).minutes,
+        partWeightKg: grossWeightKg,
+        ...(engine.machineClass === 'turret_punch' ? { handlingAllowance: rcHandlingAllowance } : {}),
+        ...(engine.machineClass === 'waterjet' ? { nozzleRate: rcNozzleRate } : {}),
         ...(engine.machineClass === 'fiber_laser' ? {
           cuttingSecFromCalculator: rcLaserCycleTimeSec,
           calculatorId: rcLaserCalc.calculatorId,
@@ -6267,7 +6433,12 @@ export class BOMItemsService {
         } : {}),
       });
       const routeCapability = mergeCuttingAndPressBrakeCapability(
-        engine.checkCapability(capabilityGeometry, rate.commodityCode),
+        engine.checkCapability(
+          capabilityGeometry,
+          rate.commodityCode,
+          rate.selection?.balanced?.candidate?.capability,
+          rate.selection?.balanced?.candidate?.capabilitySource,
+        ),
         pbCapability,
       );
       routes.push(assembleRoute(

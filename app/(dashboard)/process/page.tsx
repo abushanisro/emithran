@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload, Download } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload, Download, Info } from 'lucide-react';
 import {
   useProcesses,
   useReferenceTables,
@@ -47,7 +47,6 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { InlineReferenceTableEditor } from '@/components/features/calculators/builder/InlineReferenceTableEditor';
 import { useAuth } from '@/lib/providers/auth';
-import { useMHRProcessGroups } from '@/lib/api/hooks/useMHR';
 
 // Helper function to convert snake_case to camelCase
 const snakeToCamel = (str: string): string => {
@@ -153,8 +152,7 @@ export default function ProcessPage() {
     ...(showInactive ? {} : { isActive: true as const }),
     limit: 1000,
   });
-  useProcessHierarchy();
-  const { data: mhrProcessGroups } = useMHRProcessGroups();
+  const { data: processHierarchy } = useProcessHierarchy();
 
 
   // Bulk update mutation
@@ -800,11 +798,20 @@ export default function ProcessPage() {
                                         ? 'bg-muted/30 border-dashed border-border/60 opacity-60'
                                         : 'bg-secondary/40 border-border'
                                     }`}
-                                    title={op.isActive === false ? 'Inactive — not offered for costing' : undefined}
+                                    title={
+                                      op.isActive === false
+                                        ? 'Inactive — not offered for costing'
+                                        : op.referenceHint
+                                        ? `Reference cross-check: "${op.referenceHint.sourceProcessName}"${op.referenceHint.exampleMachine ? ` — example machine: ${op.referenceHint.exampleMachine}` : ''} (informational only, not a live cost input)`
+                                        : undefined
+                                    }
                                   >
                                     <span className="text-xs text-foreground">{op.operation}</span>
                                     {op.isActive === false && (
                                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">inactive</span>
+                                    )}
+                                    {op.isActive !== false && op.referenceHint && (
+                                      <Info className="h-2.5 w-2.5 text-muted-foreground/60" />
                                     )}
                                     <button
                                       className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary flex items-center justify-center"
@@ -979,8 +986,12 @@ export default function ProcessPage() {
           <div className="grid gap-4 py-4">
             {(() => {
               const allMappings = calculatorMappings?.mappings ?? [];
-              const availableGroups = (mhrProcessGroups && mhrProcessGroups.length > 0)
-                ? mhrProcessGroups
+              // The real, complete, unfiltered taxonomy — calculatorMappings
+              // itself is scoped to the page's current group/route/search
+              // filters, so deriving groups from it would wrongly narrow this
+              // dialog's own group picker to whatever's currently filtered.
+              const availableGroups = (processHierarchy?.processGroups && processHierarchy.processGroups.length > 0)
+                ? processHierarchy.processGroups
                 : [...new Set(allMappings.map(m => m.processGroup))].sort();
               const availableRoutes = [...new Set(
                 allMappings.filter(m => !mappingFormData.processGroup || m.processGroup === mappingFormData.processGroup)

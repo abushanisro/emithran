@@ -3,12 +3,15 @@ import {
   laserRequirement,
   latheRequirement,
   pressBrakeRequirement,
+  punchingRequirement,
   vmcRequirement,
+  waterjetRequirement,
 } from './physics';
 import { classifyMachineRecord, fitScore, isCapable, selectMachine } from './selector';
 import type { MachineCandidate } from '../../dto/machine-selection.dto';
 import { EMPTY_CAPABILITY, lookupSeedCapability } from './seed-registry';
 import type { MachineCapability } from './seed-registry';
+import { BOMItemsService } from '../../bom-items.service';
 
 function candidate(overrides: {
   machineId?: string;
@@ -27,6 +30,7 @@ function candidate(overrides: {
     machineClass: overrides.machineClass,
     hourlyRate: overrides.hourlyRate,
     utilizationPct: overrides.utilizationPct ?? 75,
+    utilizationKnown: overrides.utilizationPct != null,
     scheduledLoadPct: overrides.scheduledLoadPct ?? null,
     availabilityStatus: overrides.availabilityStatus ?? 'available',
     nextAvailableAt: null,
@@ -35,6 +39,8 @@ function candidate(overrides: {
     capability: { ...EMPTY_CAPABILITY, ...(overrides.capability ?? {}) },
     capabilitySource: 'imported',
     capabilityVersion: 1,
+    operators: null,
+    laborRateUsdHr: null,
   };
 }
 
@@ -102,18 +108,24 @@ describe('classifyMachineRecord', () => {
       process_group: 'Sheet metal', commodity_code: 'Sheet metal',
       total_machine_hour_rate: 11.18, manual_mhr_value: 11.18, fully_burdened_local_per_hr: 11.18,
       capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
     };
     const router3ax = {
       id: '2', machine_name: 'Multicam 7000 Series CNC Router, Model 103', machine_class: 'Router 3axis',
       process_group: 'Sheet metal', commodity_code: 'Sheet metal',
       total_machine_hour_rate: 8.14, manual_mhr_value: 8.14, fully_burdened_local_per_hr: 8.14,
       capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
     };
     const thermwood = {
       id: '3', machine_name: "Thermwood Multipurpose 67, 5' x 5'", machine_class: 'Router 5axis',
       process_group: 'Sheet metal', commodity_code: 'Sheet metal',
       total_machine_hour_rate: 11.42, manual_mhr_value: 11.42, fully_burdened_local_per_hr: 11.42,
       capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
     };
     expect(classifyMachineRecord(router5ax)).toBeNull();
     expect(classifyMachineRecord(router3ax)).toBeNull();
@@ -126,12 +138,16 @@ describe('classifyMachineRecord', () => {
       process_group: 'Machining', commodity_code: 'Machining',
       total_machine_hour_rate: 45, manual_mhr_value: 45, fully_burdened_local_per_hr: 45,
       capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
     };
     const dmgMori5ax = {
       id: '5', machine_name: 'DMG MORI DMU 105 monoBLOCK', machine_class: 'Milling_Center 5axis',
       process_group: 'Machining', commodity_code: 'Machining',
       total_machine_hour_rate: 23.26, manual_mhr_value: 23.26, fully_burdened_local_per_hr: 23.26,
       capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
     };
     expect(classifyMachineRecord(makino)).toBe('cnc_3ax_vmc');
     expect(classifyMachineRecord(dmgMori5ax)).toBe('cnc_5ax_mc');
@@ -302,5 +318,198 @@ describe('selectMachine', () => {
     const huge = candidate({ machineClass: 'cnc_3ax_vmc', hourlyRate: 2000, capability: { maxXMm: 4000, maxYMm: 3000, maxZMm: 2000, maxWorkpieceWeightKg: 9000 } });
     expect(fitScore(snug, req)).toBeGreaterThan(fitScore(huge, req));
     expect(fitScore(huge, req)).toBeGreaterThanOrEqual(0.3);
+  });
+});
+
+// P0.4 — turret punch and waterjet used to be assigned the SAME LaserRequirement
+// as fiber/CO2 laser (thickness+bed only, no tonnage dimension at all), so a
+// tonnage-incapable turret machine could rank/score identically to a capable
+// one — the failure was only ever caught post-hoc by checkMachineCapability(),
+// after a possibly-wrong machine had already been selected. These tests prove
+// the fix at the RANKING step itself, not just the post-hoc capability check.
+describe('P0.4 — turret punch / waterjet get their own real MachineRequirement kinds', () => {
+  const location = 'India';
+
+  // Shared small-part punching job used across tests A/C/E: cutLengthMm=200,
+  // shear=300 MPa, thickness=1.5mm → estimateTurretPunchTonnage gives
+  // (200*1.5*300)/9810*1.25 ≈ 11.47 t theoretical-with-margin, so a machine
+  // needs ≥ 11.47*1.15 (TONNAGE_MARGIN) ≈ 13.19 t to be capable.
+  const smallPunchJob = { cutLengthMm: 200, materialShearStrengthMpa: 300, thicknessMm: 1.5, bedLengthMm: 300, bedWidthMm: 200 };
+
+  it('A — documents the LaserRequirement blind spot, then proves punchingRequirement fixes it', () => {
+    const weakTurret = candidate({
+      machineId: 'weak-turret', machineClass: 'turret_punch', hourlyRate: 40,
+      capability: { maxTonnage: 5, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 },
+    });
+    const strongTurret = candidate({
+      machineId: 'strong-turret', machineClass: 'turret_punch', hourlyRate: 45,
+      capability: { maxTonnage: 20, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 },
+    });
+
+    // OLD behavior reproduction: both machines assigned the identical
+    // LaserRequirement (thickness+bed only) — tonnage is invisible to both
+    // isCapable and fitScore, so a 5t and a 20t turret score identically.
+    const oldReq = laserRequirement({ thicknessMm: 1.5, materialGrade: 'CRCA', bedLengthMm: 300, bedWidthMm: 200 });
+    expect(isCapable(weakTurret, oldReq)).toBe(true); // documents the defect
+    expect(isCapable(strongTurret, oldReq)).toBe(true);
+    expect(fitScore(weakTurret, oldReq)).toBe(fitScore(strongTurret, oldReq));
+
+    // NEW behavior: punchingRequirement makes tonnage visible to both.
+    const newReq = punchingRequirement(smallPunchJob);
+    expect(newReq.tonnage).toBeCloseTo(11.47, 1);
+    expect(isCapable(weakTurret, newReq)).toBe(false);  // 5t < 13.19t required
+    expect(isCapable(strongTurret, newReq)).toBe(true); // 20t ≥ 13.19t required
+
+    const result = selectMachine({ pool: [weakTurret, strongTurret], location, machineClass: 'turret_punch', requirement: newReq });
+    expect(result.balanced.candidate.machineId).toBe('strong-turret');
+  });
+
+  it('B — waterjet: thickness/bed capable vs incapable using the new WaterjetRequirement', () => {
+    const thin = candidate({ machineId: 'thin-wj', machineClass: 'waterjet', hourlyRate: 900, capability: { maxThicknessMm: 10, maxXMm: 3000, maxYMm: 1500 } });
+    const thick = candidate({ machineId: 'thick-wj', machineClass: 'waterjet', hourlyRate: 1500, capability: { maxThicknessMm: 50, maxXMm: 3000, maxYMm: 1500 } });
+    const req = waterjetRequirement({ thicknessMm: 25, bedLengthMm: 1000, bedWidthMm: 500 });
+    expect(isCapable(thin, req)).toBe(false);
+    expect(isCapable(thick, req)).toBe(true);
+    const result = selectMachine({ pool: [thin, thick], location, machineClass: 'waterjet', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('thick-wj');
+  });
+
+  it('C — among multiple capable turret machines, fitScore prefers the tighter-tonnage fit over an oversized one', () => {
+    const snug = candidate({ machineId: 'snug', machineClass: 'turret_punch', hourlyRate: 40, capability: { maxTonnage: 15, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 } });
+    const oversized = candidate({ machineId: 'oversized', machineClass: 'turret_punch', hourlyRate: 40, capability: { maxTonnage: 100, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 } });
+    const req = punchingRequirement(smallPunchJob);
+    expect(isCapable(snug, req)).toBe(true);
+    expect(isCapable(oversized, req)).toBe(true);
+    expect(fitScore(snug, req)).toBeGreaterThan(fitScore(oversized, req));
+    const result = selectMachine({ pool: [snug, oversized], location, machineClass: 'turret_punch', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('snug');
+  });
+
+  it('D — no capable turret machine in the pool still falls back to the benchmark rate, unmodified fallback path', () => {
+    const tiny = candidate({ machineId: 'tiny', machineClass: 'turret_punch', hourlyRate: 30, capability: { maxTonnage: 2, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 } });
+    const bigJob = { cutLengthMm: 2000, materialShearStrengthMpa: 400, thicknessMm: 4, bedLengthMm: 1000, bedWidthMm: 800 };
+    const req = punchingRequirement(bigJob);
+    expect(isCapable(tiny, req)).toBe(false); // sanity: this job genuinely exceeds tiny's 2t capacity
+    const arbitraryTestFallbackRate = 55;
+    const result = selectMachine({ pool: [tiny], location, machineClass: 'turret_punch', requirement: req, fallbackRate: arbitraryTestFallbackRate });
+    expect(result.balanced.candidate.machineId).toBeNull();
+    expect(result.balanced.candidate.capabilitySource).toBe('default_class');
+    expect(result.confidence).toBe(40);
+    expect(result.balanced.candidate.hourlyRate).toBe(arbitraryTestFallbackRate);
+  });
+
+  it('E — a non-seed-registry turret machine with real imported capability is judged on its own numbers, not its name', () => {
+    const req = punchingRequirement(smallPunchJob);
+    const unknownModel = candidate({
+      machineId: 'unknown-1', machineName: 'ACME XZ-9000 Prototype', machineClass: 'turret_punch', hourlyRate: 50,
+      capability: { maxTonnage: 20, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 },
+    });
+    expect(unknownModel.capabilitySource).toBe('imported');
+    expect(isCapable(unknownModel, req)).toBe(true);
+    expect(fitScore(unknownModel, req)).toBeGreaterThan(0.3);
+  });
+
+  // F — P0.1's checkMachineCapability() needs zero code changes for P0.4 (it
+  // takes no MachineRequirement at all — confirmed structurally decoupled from
+  // ranking), so its own unmodified test file is the regression check here;
+  // it is run alongside this file in every full-suite pass.
+});
+
+// P0.4 — end-to-end integration test: the real production chain
+//   CAD geometry → buildPartRequirements() → PunchingRequirement/WaterjetRequirement
+//   → selectMachine() → candidate ranking → selected machine → rate
+// buildPartRequirements() is a private BOMItemsService method, but reading its
+// body confirms it touches no injected dependency (no `this.xxxService` call
+// anywhere in it) — it is a pure geometry+material → requirements mapper, only
+// calling physics.ts builders + getEnginesForFamily/classifyLaserMaterial.
+// Object.create bypasses the constructor (so no Supabase/other DI wiring is
+// needed) while still invoking the ACTUAL production method — not a
+// hand-rebuilt PunchingRequirement/WaterjetRequirement standing in for it —
+// so this proves the real production code path, not just physics.ts/selector.ts
+// in isolation.
+describe('P0.4 — integration: buildPartRequirements() feeds selectMachine() with the new kinds', () => {
+  const location = 'India';
+
+  function callBuildPartRequirements(input: Record<string, unknown>) {
+    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (svc as any).buildPartRequirements(input);
+  }
+
+  const partGeometry = {
+    family: 'sheet_metal',
+    grade: 'CRCA',
+    sheetThicknessMm: 1.5,
+    bendCount: 0,
+    flatPatternAreaMm2: 300 * 200,
+    flatLenMm: 300,
+    flatWidMm: 200,
+    bboxXMm: 300,
+    bboxYMm: 200,
+    bboxZMm: 1.5,
+    weightKg: 0.5,
+    utsMpa: 410,
+    cutLengthMm: 200,
+    materialShearStrengthMpa: 300,
+  };
+
+  it('produces a real PunchingRequirement (not a shared LaserRequirement) for turret_punch', () => {
+    const requirements = callBuildPartRequirements(partGeometry);
+    expect(requirements.turret_punch?.kind).toBe('turret_punch');
+    expect(requirements.turret_punch?.tonnage).toBeCloseTo(11.47, 1);
+    // fiber/CO2 laser must still get the laser requirement, unmodified
+    expect(requirements.fiber_laser?.kind).toBe('laser');
+  });
+
+  it('produces a real WaterjetRequirement (not a shared LaserRequirement) for waterjet', () => {
+    const requirements = callBuildPartRequirements(partGeometry);
+    expect(requirements.waterjet?.kind).toBe('waterjet');
+    expect(requirements.waterjet?.thicknessMm).toBe(1.5);
+    expect(requirements.waterjet?.bedLengthMm).toBe(300);
+    expect(requirements.waterjet?.bedWidthMm).toBe(200);
+  });
+
+  it('the PunchingRequirement produced by the real production method correctly drives selectMachine() to reject an incapable turret and pick the capable one', () => {
+    const requirements = callBuildPartRequirements(partGeometry);
+    const weakTurret = candidate({
+      machineId: 'weak-turret', machineClass: 'turret_punch', hourlyRate: 40,
+      capability: { maxTonnage: 5, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 },
+    });
+    const strongTurret = candidate({
+      machineId: 'strong-turret', machineClass: 'turret_punch', hourlyRate: 45,
+      capability: { maxTonnage: 20, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 },
+    });
+    const result = selectMachine({
+      pool: [weakTurret, strongTurret],
+      location,
+      machineClass: 'turret_punch',
+      requirement: requirements.turret_punch,
+    });
+    expect(isCapable(weakTurret, requirements.turret_punch)).toBe(false);
+    expect(result.balanced.candidate.machineId).toBe('strong-turret');
+    expect(result.balanced.candidate.hourlyRate).toBe(45); // proves the RATE flows from the real selection, not a placeholder
+  });
+
+  it('the WaterjetRequirement produced by the real production method correctly drives selectMachine() to reject a too-thin-capacity waterjet and pick the capable one', () => {
+    const thickJob = { ...partGeometry, sheetThicknessMm: 25, flatPatternAreaMm2: 1000 * 500, flatLenMm: 1000, flatWidMm: 500 };
+    const requirements = callBuildPartRequirements(thickJob);
+    const thin = candidate({ machineId: 'thin-wj', machineClass: 'waterjet', hourlyRate: 900, capability: { maxThicknessMm: 10, maxXMm: 3000, maxYMm: 1500 } });
+    const thick = candidate({ machineId: 'thick-wj', machineClass: 'waterjet', hourlyRate: 1500, capability: { maxThicknessMm: 50, maxXMm: 3000, maxYMm: 1500 } });
+    const result = selectMachine({
+      pool: [thin, thick],
+      location,
+      machineClass: 'waterjet',
+      requirement: requirements.waterjet,
+    });
+    expect(isCapable(thin, requirements.waterjet)).toBe(false);
+    expect(result.balanced.candidate.machineId).toBe('thick-wj');
+    expect(result.balanced.candidate.hourlyRate).toBe(1500);
+  });
+
+  it('a part with zero bends still only assigns press_brake when bendCount > 0 — turret/waterjet fix does not disturb unrelated requirement assignment', () => {
+    const requirements = callBuildPartRequirements(partGeometry); // bendCount: 0
+    expect(requirements.press_brake).toBeUndefined();
+    expect(requirements.turret_punch).toBeDefined();
+    expect(requirements.waterjet).toBeDefined();
   });
 });

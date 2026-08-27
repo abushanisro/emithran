@@ -12,7 +12,8 @@ export interface MachineCandidate {
   commodityCode: string | null;
   machineClass: MachineClass;
   hourlyRate: number;
-  utilizationPct: number;        // capacity_utilization_rate 0-100
+  utilizationPct: number;        // capacity_utilization_rate 0-100 — a real value when utilizationKnown, otherwise a neutral ranking assumption
+  utilizationKnown: boolean;     // false when capacity_utilization_rate wasn't on file and utilizationPct is a ranking-only placeholder
   scheduledLoadPct: number | null;
   availabilityStatus: AvailabilityStatus;
   nextAvailableAt: string | null;
@@ -21,6 +22,19 @@ export interface MachineCandidate {
   capability: MachineCapability;
   capabilitySource: CapabilitySource;
   capabilityVersion: number | null;
+  // mhr_records.operators — real per-machine operator headcount. null for the
+  // class-default fallback candidate (no real machine) or when a real machine
+  // row has never had this field set; callers must fall back to a generic
+  // default (1) rather than treat null as zero operators.
+  operators: number | null;
+  // mhr_records.usd_lhr_total — this specific machine's own labor rate
+  // (sourced from machine_library.json's labor_rate_usd_hr for benchmarked
+  // rows). When present, takes precedence over the location+process_group
+  // lhr_records/lhr_benchmark_rates lookup for this machine's operations —
+  // an explicit, approved exception to that being the sole labor-rate source
+  // (see bom-items.service.ts's buildOutput). null when no real machine or
+  // the field was never set.
+  laborRateUsdHr: number | null;
 }
 
 // Structured version of the material/thickness-vs-capacity check — lets the

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, InternalServerErrorException, BadRequest
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
-import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult } from './dto/mhr-response.dto';
+import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult, MHRReferenceDetailDto } from './dto/mhr-response.dto';
 import { validate as isValidUUID } from 'uuid';
 import { MHRCalculationEngine } from './engines/mhr-calculation.engine';
 import { MHRInputValidator } from './validators/mhr-input.validator';
@@ -386,6 +386,58 @@ export class MHRService {
       labor: numOrNull(raw.labor_rate_usd_hr),
       sourceKey: matches[0].key ?? null,
     };
+  }
+
+  /**
+   * Read-only full machine_library.json detail for one mhr_records row —
+   * powers the HR Rates edit dialog's "Capability" tab read-only lookup
+   * (replaces a free-text "paste raw JSON yourself" field with the real,
+   * sourced data). Matches by benchmark_source_key first (exact, set at
+   * import/create time — see resolveEconomicsForCreate); falls back to an
+   * unambiguous machine-name match for older rows saved before that column
+   * existed. Never guesses: an ambiguous or missing match returns found:false
+   * rather than a wrong machine's specs.
+   */
+  async getReferenceDetail(id: string, accessToken: string): Promise<MHRReferenceDetailDto> {
+    if (!this.isValidUUID(id)) {
+      throw new BadRequestException('Invalid MHR record ID format provided.');
+    }
+    const { data: row, error: rowError } = await this.supabaseService
+      .getClient(accessToken)
+      .from('mhr_records')
+      .select('benchmark_source_key, machine_name')
+      .eq('id', id)
+      .maybeSingle();
+    if (rowError || !row) {
+      throw new NotFoundException(`MHR record with ID ${id} not found.`);
+    }
+
+    const empty: MHRReferenceDetailDto = { found: false, sourceKey: null, raw: null };
+    const client = this.supabaseService.getClient(accessToken);
+
+    if (row.benchmark_source_key) {
+      const { data } = await client
+        .from('sm_reference_data')
+        .select('key, raw')
+        .eq('category', 'machine')
+        .eq('key', row.benchmark_source_key)
+        .maybeSingle();
+      if (data) return { found: true, sourceKey: data.key, raw: data.raw ?? null };
+    }
+
+    if (row.machine_name?.trim()) {
+      const { data } = await client
+        .from('sm_reference_data')
+        .select('key, raw')
+        .eq('category', 'machine');
+      const nameLower = row.machine_name.trim().toLowerCase();
+      const matches = (data ?? []).filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+      if (matches.length === 1) {
+        return { found: true, sourceKey: matches[0].key, raw: matches[0].raw ?? null };
+      }
+    }
+
+    return empty;
   }
 
   /**
@@ -1574,21 +1626,117 @@ export class MHRService {
     };
   }
 
-  async getDistinctProcessGroups(userId: string, accessToken: string): Promise<string[]> {
+  /**
+   * Real machine_class values that unambiguously belong to one real Sheet
+   * Metal category, verified against each row's own machine_description
+   * (live-DB check, 2026-08-27) — not a generic rule for every possible use
+   * of that class. machine_class is a many-categories-to-one-class
+   * cost-engine grouping (migration 569 maps BOTH "3D Laser Cutting Machine"
+   * and "Fiber Laser Cutting Machine" to fiber_laser; BOTH "Bend Press Brake"
+   * and "Progressive Die Press" to press_brake), so resolving it to a single
+   * category is only safe once a specific row's real machine has been read
+   * and confirmed. The 13 legacy rows with no benchmark_source_key are: two
+   * "Fiber Laser {2,6}kW" (flatbed sheet cutters, not 3D/robotic — verified
+   * "Fiber Laser Cutting Machine"), one "Press Brake 160T" (bending, not
+   * progressive-die stamping — verified "Bend Press Brake"), and ten others
+   * (deburring, cmm, cnc_lathe, cnc_3ax_vmc, cnc_5ax_mc, injection_molding)
+   * from manufacturing domains this app hasn't built yet (CLAUDE.md's
+   * domain-by-domain roadmap) or a genuinely distinct process (a general
+   * deburring bench isn't the same thing as "Deslag Machine") — kept as
+   * their own real category via mhrCategoryOf, not merged into a Sheet Metal
+   * one; this mirrors the frontend's lib/utils/mhrCategoryOf.ts exactly so
+   * the suggestions list and every record's own display agree.
+   */
+  private static readonly VERIFIED_CLASS_CATEGORY: Record<string, string> = {
+    fiber_laser: 'Fiber Laser Cutting Machine',
+    press_brake: 'Bend Press Brake',
+  };
+
+  // Real process group each machine_class fallback belongs to — verified
+  // against the actual process_calculator_mappings taxonomy (2026-08-27):
+  // fiber_laser/press_brake are Sheet Metal (same domain as their verified
+  // category above); cnc_lathe/cnc_3ax_vmc/cnc_5ax_mc are Machining;
+  // injection_molding is Plastic & Rubber; cmm and deburring are Post
+  // Processing (real "Inspection"/"Deburring" routes under that group).
+  // benchmark_source_key rows need no entry here — 100% of
+  // machine_library.json is Sheet Metal (CLAUDE.md's domain-by-domain
+  // roadmap), so any row with a benchmark match is always that group.
+  private static readonly MACHINE_CLASS_PROCESS_GROUP: Record<string, string> = {
+    fiber_laser: 'Sheet Metal',
+    press_brake: 'Sheet Metal',
+    cnc_lathe: 'Machining',
+    cnc_3ax_vmc: 'Machining',
+    cnc_5ax_mc: 'Machining',
+    injection_molding: 'Plastic & Rubber',
+    cmm: 'Post Processing',
+    deburring: 'Post Processing',
+  };
+
+  private static humanizeMachineClass(machineClass: string): string {
+    return machineClass
+      .split('_')
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+
+  /**
+   * Real, computed machine categories — not a raw column. Mirrors the HR
+   * Rates table's own mhrCategoryOf(): benchmark_source_key's category
+   * (before ':') when a benchmark match exists, otherwise the row's
+   * machine_class resolved through the same verified mapping / humanizer as
+   * mhrCategoryOf.ts, instead of the raw internal slug (e.g. "fiber_laser")
+   * — which both reads badly and looks like a near-duplicate of the real
+   * category name it's a coarser version of. Not scoped to userId — most
+   * real category variety lives in the global/benchmark rows every user
+   * shares.
+   *
+   * `processGroup`, when given, scopes the result to that real process group
+   * (via MACHINE_CLASS_PROCESS_GROUP for machine_class fallback rows, or
+   * "Sheet Metal" for any benchmark_source_key row) — without this, every
+   * category from every domain was returned regardless of which Process the
+   * form's Process field had selected, so picking "Machining" still listed
+   * Sheet Metal categories (281 of ~294 rows are Sheet Metal, drowning out
+   * the rest).
+   */
+  async getDistinctCategories(accessToken: string, processGroup?: string): Promise<string[]> {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
-      .select('process_group')
-      .eq('user_id', userId)
-      .not('process_group', 'is', null)
+      .select('benchmark_source_key, machine_class')
       .limit(20000);
 
     if (error) {
-      this.logger.error(`Error fetching distinct process groups: ${error.message}`, 'MHRService');
+      this.logger.error(`Error fetching distinct categories: ${error.message}`, 'MHRService');
       return [];
     }
 
-    return [...new Set(data?.map((r: any) => r.process_group).filter(Boolean) as string[])].sort();
+    const categories = (data ?? []).map((r: any) => {
+      const fromKey = r.benchmark_source_key?.split(':')[0]?.trim();
+      const rowGroup = fromKey ? 'Sheet Metal' : (r.machine_class ? MHRService.MACHINE_CLASS_PROCESS_GROUP[r.machine_class] : undefined);
+      if (processGroup && rowGroup !== processGroup) return null;
+      if (fromKey) return fromKey;
+      if (!r.machine_class) return null;
+      return MHRService.VERIFIED_CLASS_CATEGORY[r.machine_class] ?? MHRService.humanizeMachineClass(r.machine_class);
+    }).filter(Boolean) as string[];
+
+    return [...new Set(categories)].sort();
+  }
+
+  async getDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('mhr_records')
+      .select('manufacturer_country')
+      .not('manufacturer_country', 'is', null)
+      .limit(20000);
+
+    if (error) {
+      this.logger.error(`Error fetching distinct manufacturer countries: ${error.message}`, 'MHRService');
+      return [];
+    }
+
+    return [...new Set(data?.map((r: any) => r.manufacturer_country).filter(Boolean) as string[])].sort();
   }
 
   async getDistinctCurrencies(userId: string, accessToken: string): Promise<string[]> {

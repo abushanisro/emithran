@@ -55,6 +55,9 @@ logs
 # TypeScript
 *.tsbuildinfo
 
+# External reference/inspiration scaffold — not part of the running app
+/production-ready-suite/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

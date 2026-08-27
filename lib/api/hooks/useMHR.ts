@@ -11,6 +11,7 @@ import type {
   MHRBenchmarkEntry,
   MHRListResponse,
   MHRRecord,
+  MHRReferenceDetail,
 } from '../mhr';
 import { ApiError } from '../client';
 import { toast } from 'sonner';
@@ -54,6 +55,13 @@ export function useMHRRecord(id: string, options?: { enabled?: boolean; retry?: 
     queryFn: () => mhrApi.getById(id),
     enabled: options?.enabled !== false && !!id,
     staleTime: 1000 * 60 * 5,
+    // Same fix as every other MHR distinct-value/detail hook this session:
+    // without this, reopening the Edit dialog for a machine already cached
+    // from an earlier open in this tab serves the stale cached row instead
+    // of re-fetching — invisible for fields that haven't changed, but any
+    // newly-added/changed column (e.g. calculated_mhr_usd_hr) silently
+    // doesn't show up until staleTime (5 min) elapses.
+    refetchOnMount: 'always',
     retry: (failureCount, error) => {
       if (options?.retry === false) return false;
       const apiError = error as ApiError;
@@ -65,6 +73,20 @@ export function useMHRRecord(id: string, options?: { enabled?: boolean; retry?: 
     refetchOnWindowFocus: (query) => {
       return query.state.status !== 'error';
     },
+  });
+}
+
+// Replaces the "paste raw JSON yourself" free-text field — enabled only when
+// editing an existing record (a brand-new record has no id to join against yet).
+export function useMHRReferenceDetail(id: string | undefined | null, options?: { enabled?: boolean }) {
+  return useQuery<MHRReferenceDetail>({
+    queryKey: [...mhrKeys.all, 'reference-detail', id ?? '__none__'],
+    queryFn: () => mhrApi.getReferenceDetail(id as string),
+    enabled: !!id && options?.enabled !== false,
+    staleTime: 1000 * 60 * 30,
+    retry: false,
+    refetchOnWindowFocus: false,
+    throwOnError: false,
   });
 }
 
@@ -89,12 +111,19 @@ export function useMHRBenchmark(
   };
 }
 
-export function useMHRProcessGroups() {
+// refetchOnMount: 'always' on these distinct-value lookups matches
+// useProcessCalculatorMappings' fix for the same confirmed-live bug: whichever
+// result a given query key got BEFORE a transient backend outage (the API
+// server can crash mid-session and restart) is otherwise cached for the rest
+// of the browser tab's life, silently leaving a dropdown (e.g. Category)
+// empty even once the backend is healthy again.
+export function useMHRCategories(processGroup?: string) {
   return useQuery({
-    queryKey: [...mhrKeys.all, 'process-groups'],
-    queryFn: () => mhrApi.getProcessGroups(),
+    queryKey: [...mhrKeys.all, 'categories', processGroup ?? null],
+    queryFn: () => mhrApi.getCategories(processGroup),
     staleTime: 1000 * 60 * 5,
     retry: false,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     throwOnError: false,
   });
@@ -106,9 +135,22 @@ export function useMHRLocations() {
     queryFn: () => mhrApi.getLocations(),
     staleTime: 1000 * 60 * 5,
     retry: false,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     throwOnError: false,
     select: (data) => data ?? [],
+  });
+}
+
+export function useMHRManufacturerCountries() {
+  return useQuery({
+    queryKey: [...mhrKeys.all, 'manufacturer-countries'],
+    queryFn: () => mhrApi.getManufacturerCountries(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    throwOnError: false,
   });
 }
 

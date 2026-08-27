@@ -50,7 +50,7 @@ export interface RouteResultSustainability {
 import type { CapabilityCheck, MachineSelectionResult } from './machine-selection.dto';
 import type { BlankSpecDto } from './blank-spec.dto';
 
-/** One operation in a feature-level breakdown (aPriori-style sub-operations). */
+/** One operation in a feature-level breakdown (eMithran-style sub-operations). */
 export interface FeatureOp {
   name: string;        // "Drill Ø8.0mm ×3", "Tapping M8 ×2", "Pocket Mill ×2"
   timeSec: number;     // physics-computed cycle seconds for this group
@@ -276,6 +276,12 @@ export interface ProcessLineCost {
   runCost: number;       // INR — pure cycle cost per piece
   totalCost: number;     // setupCost + runCost
   cycleTimeMin: number;  // machine cycle time in minutes (setup excluded)
+  // Raw, un-amortised setup time in minutes — distinct from setupCost (which
+  // is already divided by batchSize). Optional: not every producer populates
+  // it yet; consumers must not assume presence. Added for P0.2 so an applied
+  // process_cost_records row's setup_time can be verified end-to-end against
+  // Cost Summary, not just its already-amortised dollar cost.
+  setupTimeMin?: number;
   hourlyRate: number;    // local currency/hr — fully burdened MHR (machine + labour)
   rateSource: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override';
   machineClass: string;        // e.g. 'fiber_laser' — maps to MACHINE_REGISTRY key
@@ -284,6 +290,9 @@ export interface ProcessLineCost {
   // Labour hour rate from lhr_benchmark_rates for this location + process group.
   // Already included in hourlyRate (fully burdened) — surfaced for display transparency.
   labourRate?: number | null;
+  // Which of resolveLHRRates' 4 passes actually resolved labourRate above —
+  // mirrors rateSource's own provenance visibility, for the labor side.
+  labourRateSource?: 'lhr_database' | 'lhr_benchmark' | 'lhr_cross_location' | 'no_lhr_rate' | 'mhr_machine_specific' | null;
   // Physics-based selection result (recommendation + alternatives + profiles).
   // Attached by BOMItemsService when ENABLE_PHYSICS_MACHINE_SELECTION is on.
   machineSelection?: MachineSelectionResult;
@@ -296,7 +305,7 @@ export interface ProcessLineCost {
   // "not linked to a machine" even when a real, priced resource was used.
   mhrId?: string | null;
   benchmarkMhrId?: string | null;
-  // aPriori-style per-feature operation breakdown. Present on CNC Milling (per hole/pocket/tap),
+  // eMithran-style per-feature operation breakdown. Present on CNC Milling (per hole/pocket/tap),
   // Laser Cutting (cut path + pierces), and Press Brake (per bend group). Absent on Setup/Deburr/Inspect.
   featureBreakdown?: FeatureOp[];
   // Full end-to-end audit trail for how this line's cycle time was computed:
@@ -446,7 +455,7 @@ export interface CostSummaryDto {
   // INR number under whatever symbol the factory happened to be using.
   inrToDisplayRate?: number;
 
-  // Persistent aPriori-style manual overrides applied to this response, keyed
+  // Persistent eMithran-style manual overrides applied to this response, keyed
   // by 'mat_rate' | '<process>::rate' | '<process>::cycleMin'. materialCost /
   // processLines above already reflect these — this map is purely so the UI
   // can render the amber "overridden" state and a reset-to-computed control

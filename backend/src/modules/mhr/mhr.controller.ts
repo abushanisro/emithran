@@ -17,7 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MHRService } from './mhr.service';
 import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
-import { MHRResponseDto, MHRListResponseDto } from './dto/mhr-response.dto';
+import { MHRResponseDto, MHRListResponseDto, MHRReferenceDetailDto } from './dto/mhr-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 
@@ -42,16 +42,22 @@ export class MHRController {
     }
   }
 
-  @Get('process-groups')
-  @ApiOperation({ summary: 'Get distinct process groups from MHR records' })
-  async getProcessGroups(@CurrentUser() user: User, @AccessToken() token: string): Promise<string[]> {
-    return this.mhrService.getDistinctProcessGroups(user.id, token);
+  @Get('categories')
+  @ApiOperation({ summary: 'Get distinct real machine categories (benchmark_source_key-derived, machine_class fallback), optionally scoped to a real process group' })
+  async getCategories(@Query('processGroup') processGroup: string | undefined, @AccessToken() token: string): Promise<string[]> {
+    return this.mhrService.getDistinctCategories(token, processGroup || undefined);
   }
 
   @Get('locations')
   @ApiOperation({ summary: 'Get distinct locations from MHR records' })
   async getLocations(@CurrentUser() user: User, @AccessToken() token: string): Promise<string[]> {
     return this.mhrService.getDistinctLocations(user.id, token);
+  }
+
+  @Get('manufacturer-countries')
+  @ApiOperation({ summary: 'Get distinct manufacturer countries from MHR records' })
+  async getManufacturerCountries(@AccessToken() token: string): Promise<string[]> {
+    return this.mhrService.getDistinctManufacturerCountries(token);
   }
 
   @Get('currencies')
@@ -83,6 +89,13 @@ export class MHRController {
       this.logger.error(`Failed to fetch MHR record ${id}: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  @Get(':id/reference-detail')
+  @ApiOperation({ summary: 'Get full machine_library reference detail for an MHR record (read-only)' })
+  @ApiResponse({ status: 200, description: 'Reference detail lookup result', type: MHRReferenceDetailDto })
+  async getReferenceDetail(@Param('id') id: string, @AccessToken() token: string): Promise<MHRReferenceDetailDto> {
+    return this.mhrService.getReferenceDetail(id, token);
   }
 
   @Post()
