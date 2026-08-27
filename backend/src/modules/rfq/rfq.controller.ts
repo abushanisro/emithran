@@ -33,8 +33,10 @@ import {
 } from './dto/rfq-tracking.dto';
 import { RfqTrackingService } from './services/rfq-tracking.service';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 
 @ApiTags('RFQ (Request for Quotation)')
 @ApiBearerAuth()
@@ -55,13 +57,16 @@ export class RfqController {
     description: 'RFQ created successfully',
     type: RfqRecord
   })
+  @UseGuards(OrganizationContextGuard)
   async create(
     @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
     @Body() createRfqDto: CreateRfqDto
   ): Promise<RfqRecord> {
     try {
       this.logger.log(`Creating RFQ '${createRfqDto.rfqName}' for user ${user.id}`);
-      return await this.rfqService.create(user.id, createRfqDto);
+      return await this.rfqService.create(user.id, createRfqDto, token, organizationId);
     } catch (error) {
       this.logger.error(`Failed to create RFQ: ${error.message}`, error.stack);
       throw error;
@@ -82,11 +87,12 @@ export class RfqController {
   })
   async findAll(
     @CurrentUser() user: User,
+    @AccessToken() token: string,
     @Query('projectId') projectId?: string
   ): Promise<RfqSummary[]> {
     try {
       this.logger.log(`Fetching RFQs for user ${user.id}${projectId ? ` in project ${projectId}` : ''}`);
-      return await this.rfqService.findByUser(user.id, projectId);
+      return await this.rfqService.findByUser(user.id, projectId, token);
     } catch (error) {
       this.logger.error(`Failed to fetch RFQs: ${error.message}`, error.stack);
       throw error;
@@ -104,14 +110,16 @@ export class RfqController {
     description: 'RFQ tracking created successfully',
     type: RfqTrackingResponseDto
   })
+  @UseGuards(OrganizationContextGuard)
   async createTracking(
     @CurrentUser() user: User,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
     @Body() createTrackingDto: CreateRfqTrackingDto
   ): Promise<RfqTrackingResponseDto> {
     try {
       this.logger.log(`Creating RFQ tracking for user ${user.id}`);
-      return await this.rfqTrackingService.createTracking(user.id, token, createTrackingDto);
+      return await this.rfqTrackingService.createTracking(user.id, token, organizationId, createTrackingDto);
     } catch (error) {
       this.logger.error(`Failed to create RFQ tracking: ${error.message}`, error.stack);
       throw error;
@@ -300,11 +308,12 @@ export class RfqController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'RFQ not found' })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: User
+    @CurrentUser() user: User,
+    @AccessToken() token: string
   ): Promise<RfqRecord> {
     try {
       this.logger.log(`Fetching RFQ ${id} for user ${user.id}`);
-      return await this.rfqService.findOne(id, user.id);
+      return await this.rfqService.findOne(id, user.id, token);
     } catch (error) {
       this.logger.error(`Failed to fetch RFQ ${id}: ${error.message}`, error.stack);
       throw error;
@@ -322,14 +331,16 @@ export class RfqController {
     status: HttpStatus.BAD_REQUEST, 
     description: 'RFQ already sent or invalid status' 
   })
+  @UseGuards(OrganizationContextGuard)
   async sendRfq(
     @Param('id') id: string,
     @CurrentUser() user: User,
-    @AccessToken() token: string
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string
   ): Promise<{ message: string }> {
     try {
       this.logger.log(`Sending RFQ ${id} to vendors`);
-      await this.rfqService.sendRfq(id, user.id, token);
+      await this.rfqService.sendRfq(id, user.id, token, organizationId);
       return { message: 'RFQ sent successfully to vendors' };
     } catch (error) {
       this.logger.error(`Failed to send RFQ ${id}: ${error.message}`, error.stack);
@@ -346,11 +357,12 @@ export class RfqController {
   })
   async closeRfq(
     @Param('id') id: string,
-    @CurrentUser() user: User
+    @CurrentUser() user: User,
+    @AccessToken() token: string
   ): Promise<{ message: string }> {
     try {
       this.logger.log(`Closing RFQ ${id}`);
-      await this.rfqService.closeRfq(id, user.id);
+      await this.rfqService.closeRfq(id, user.id, token);
       return { message: 'RFQ closed successfully' };
     } catch (error) {
       this.logger.error(`Failed to close RFQ ${id}: ${error.message}`, error.stack);

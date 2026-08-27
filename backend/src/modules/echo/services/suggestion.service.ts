@@ -118,10 +118,17 @@ export class SuggestionService {
       });
     }
 
-    // R2 — DFM never run
-    const hasDfm = data.manufacturability_score != null || !!data.analysis_timestamp;
+    // R2 — DFM never run. CAD analysis no longer computes
+    // manufacturability_score as a side effect (see memory_optimizer.py's
+    // DFM-NOT-COMPUTED result), and DFM has no persistence layer of its
+    // own (CLAUDE.md documented gap — every /dfm-scores call is live,
+    // nothing is written back), so analysis_timestamp can no longer be
+    // used as a proxy for "DFM was reviewed." There is genuinely no
+    // stored signal for that anymore, so this always offers the nudge
+    // when a drawing exists rather than guessing from a now-meaningless
+    // timestamp.
     const hasDrawing = !!data.file_3d_path || !!data.file_2d_path;
-    if (!hasDfm && hasDrawing) {
+    if (hasDrawing) {
       out.push({
         id: `dyn-no-dfm-${bomItemId}`,
         title: `${partLabel}: no DFM review yet`,
@@ -131,8 +138,11 @@ export class SuggestionService {
       });
     }
 
-    // R3 — DFM exists, but score is low or warnings present
-    if (hasDfm && data.manufacturability_score != null) {
+    // R3 — DFM exists, but score is low or warnings present. Dormant since
+    // manufacturability_score is no longer populated (see R2's comment
+    // above) — kept rather than deleted so it reactivates automatically if
+    // a future persisted DFM summary is introduced.
+    if (data.manufacturability_score != null) {
       const score100 = Math.round(
         data.manufacturability_score <= 1
           ? data.manufacturability_score * 100
@@ -227,7 +237,12 @@ export class SuggestionService {
       });
     }
 
-    // R2 — items with low DFM
+    // R2 — items with low DFM. Dormant: manufacturability_score is no
+    // longer populated by CAD analysis (dfm-scoring.service.ts is the sole
+    // DFM authority and isn't persisted anywhere) — `.not(..., 'is', null)`
+    // now always excludes every row, so this returns 0 results rather than
+    // a wrong one. Reactivates automatically if a persisted DFM summary is
+    // introduced later.
     const { data: low } = await client
       .from('bom_items')
       .select('id, name, part_number, manufacturability_score, difficulty_level')

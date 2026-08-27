@@ -1,6 +1,7 @@
 import type { MHRRateInput } from './cost-engine';
 import type { ProcessLineCost, PhysicsGap, ConfidenceLevel } from '../dto/cost-breakdown.dto';
 import type { CapabilityCheck, PartGeometryForCapability } from './machine-capability';
+import type { MachineCapability } from './machine-selection/seed-registry';
 
 // Real, material+thickness-specific process params resolved by the caller
 // from a DB lookup table (sm_lookup_waterjet_cut) — never computed or
@@ -63,6 +64,21 @@ export interface CuttingProcessContext {
   // by the caller from sm_lookup_op_setup_time (migration 416), keyed by each
   // engine's own machineClass. Every engine reads this.
   opSetupMin?: number;
+  // Real part weight (kg) — only TurretPunchEngine reads this today, for the
+  // material-handling allowance (migration 530, closeout Plan Phase 2a).
+  // Gross/blank weight, not net finished-part weight — handling happens on
+  // the blank before scrap is removed.
+  partWeightKg?: number;
+  // Real handling-allowance rate resolved by the caller from
+  // sm_handling_allowance_rates (SheetMetalLookupService.getHandlingAllowanceUsd)
+  // for this engine's own machineClass. dataFound: false means no rate is
+  // seeded for this machine class — the engine must NOT charge a guessed
+  // allowance in that case.
+  handlingAllowance?: { allowanceUsd: number; dataFound: boolean };
+  // Real nozzle-wear cost/hr resolved by the caller from
+  // sm_waterjet_nozzle_rates (SheetMetalLookupService.getWaterjetNozzleCostPerHr,
+  // migration 531, closeout Plan Phase 2b). Only WaterjetEngine reads this.
+  nozzleRate?: { costPerHr: number; dataFound: boolean };
 }
 
 export interface CuttingProcessResult {
@@ -83,6 +99,16 @@ export interface CuttingProcessResult {
 export interface ManufacturingProcessEngine {
   readonly machineClass: string;
   readonly processFamily: string;
-  checkCapability(geometry: PartGeometryForCapability, commodityCode: string | null): CapabilityCheck;
+  // realCapability/capabilitySource: the real, DB-first hydrated capability
+  // (and its provenance) for the specific machine `commodityCode` resolved to
+  // (see machine-capability.ts's P0.1 doc comment) — optional so existing
+  // callers/tests that don't yet have it in scope keep compiling; engines
+  // pass both straight through unchanged.
+  checkCapability(
+    geometry: PartGeometryForCapability,
+    commodityCode: string | null,
+    realCapability?: MachineCapability | null,
+    capabilitySource?: "imported" | "seed" | "default_class",
+  ): CapabilityCheck;
   computeCost(context: CuttingProcessContext): CuttingProcessResult;
 }

@@ -158,6 +158,7 @@ export class ChildPartCostService {
     createDto: CreateChildPartCostDto,
     userId: string,
     accessToken: string,
+    organizationId?: string,
   ): Promise<ChildPartCostResponseDto> {
     this.logger.log('Creating child part cost record', 'ChildPartCostService');
 
@@ -262,7 +263,7 @@ export class ChildPartCostService {
     }
 
     // Update BOM item cost with this child part cost
-    await this.updateBomItemCostFromChildPart(createDto.bomItemId, calculationResult.totalCostPerPart, userId, accessToken);
+    await this.updateBomItemCostFromChildPart(createDto.bomItemId, calculationResult.totalCostPerPart, userId, accessToken, organizationId);
 
     return ChildPartCostResponseDto.fromDatabase(data);
   }
@@ -276,6 +277,7 @@ export class ChildPartCostService {
     updateDto: UpdateChildPartCostDto,
     userId: string,
     accessToken: string,
+    organizationId?: string,
   ): Promise<ChildPartCostResponseDto> {
     this.logger.log(`Updating child part cost: ${id}`, 'ChildPartCostService');
 
@@ -373,7 +375,7 @@ export class ChildPartCostService {
     }
 
     // Update BOM item cost
-    await this.updateBomItemCostFromChildPart(existing.bom_item_id, calculationResult.totalCostPerPart, userId, accessToken);
+    await this.updateBomItemCostFromChildPart(existing.bom_item_id, calculationResult.totalCostPerPart, userId, accessToken, organizationId);
 
     return ChildPartCostResponseDto.fromDatabase(data);
   }
@@ -381,7 +383,7 @@ export class ChildPartCostService {
   /**
    * Delete a child part cost record
    */
-  async remove(id: string, userId: string, accessToken: string): Promise<{ message: string }> {
+  async remove(id: string, userId: string, accessToken: string, organizationId?: string): Promise<{ message: string }> {
     this.logger.log(`Deleting child part cost: ${id}`, 'ChildPartCostService');
 
     // Get record to get bom_item_id
@@ -405,7 +407,7 @@ export class ChildPartCostService {
 
     // Update BOM item cost to remove this child part cost
     if (existing?.bom_item_id) {
-      await this.updateBomItemCostFromChildPart(existing.bom_item_id, 0, userId, accessToken);
+      await this.updateBomItemCostFromChildPart(existing.bom_item_id, 0, userId, accessToken, organizationId);
     }
 
     return { message: 'Child part cost deleted successfully' };
@@ -500,7 +502,8 @@ export class ChildPartCostService {
     bomItemId: string,
     childPartCost: number,
     userId: string,
-    accessToken: string
+    accessToken: string,
+    organizationId?: string,
   ): Promise<void> {
     try {
       // Update or insert bom_item_costs record
@@ -511,6 +514,7 @@ export class ChildPartCostService {
           {
             bom_item_id: bomItemId,
             user_id: userId,
+            organization_id: organizationId ?? null,
             raw_material_cost: childPartCost,
             own_cost: childPartCost,
             total_cost: childPartCost,

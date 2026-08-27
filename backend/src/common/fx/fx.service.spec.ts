@@ -119,6 +119,25 @@ describe('FxService — resolveFactoryCurrency', () => {
   });
 });
 
+describe('FxService — listFactories / listCurrencies', () => {
+  it('lists every Digital Factory location with its native currency, sourced from LOCATION_INFO', () => {
+    const svc = new FxService(makeFakeFxRateCacheService(), makeFakeExchangeRateService({}));
+    const factories = svc.listFactories();
+    expect(factories).toContainEqual({ location: 'India', code: 'INR', symbol: '₹' });
+    expect(factories).toContainEqual({ location: 'UK', code: 'GBP', symbol: '£' });
+    expect(factories).toContainEqual({ location: 'Vietnam', code: 'USD', symbol: '$' });
+  });
+
+  it('lists each distinct scenario currency exactly once, with a display name', () => {
+    const svc = new FxService(makeFakeFxRateCacheService(), makeFakeExchangeRateService({}));
+    const currencies = svc.listCurrencies();
+    const codes = currencies.map((c) => c.code);
+    expect(new Set(codes).size).toBe(codes.length); // no duplicates across the many locations sharing EUR/USD
+    expect(currencies).toContainEqual({ code: 'INR', symbol: '₹', name: 'Indian Rupee' });
+    expect(currencies).toContainEqual({ code: 'EUR', symbol: '€', name: 'Euro' });
+  });
+});
+
 describe('FxService — custom rate type', () => {
   it('requires a positive rate and a reason, never derives a value itself', async () => {
     const svc = new FxService(makeFakeFxRateCacheService(), makeFakeExchangeRateService({}));

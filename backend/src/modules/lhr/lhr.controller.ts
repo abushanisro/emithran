@@ -59,6 +59,20 @@ export class LHRController {
     return this.LHRService.getBenchmarkRates(location);
   }
 
+  @Get('effective-rate')
+  @ApiOperation({ summary: 'Preview the real cost-engine-aligned labor rate for a (location, process_group)' })
+  @ApiResponse({ status: 200, description: 'Resolved rate, or null with source "none" if nothing is on file' })
+  async getEffectiveRate(
+    @Query('location') location: string,
+    @Query('processGroup') processGroup: string,
+    @AccessToken() token: string,
+  ) {
+    if (!location || !processGroup) {
+      throw new BadRequestException('location and processGroup are required');
+    }
+    return this.LHRService.getEffectiveRate(location, processGroup, token);
+  }
+
   @Get('code/:labourCode')
   @ApiOperation({ summary: 'Get LHR record by labour code' })
   @ApiResponse({ status: 200, description: 'LHR record retrieved successfully' })

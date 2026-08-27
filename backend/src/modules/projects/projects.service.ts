@@ -126,7 +126,7 @@ export class ProjectsService {
     }
   }
 
-  async create(createProjectDto: CreateProjectDto, userId: string, accessToken?: string): Promise<ProjectResponseDto> {
+  async create(createProjectDto: CreateProjectDto, userId: string, accessToken?: string, organizationId?: string): Promise<ProjectResponseDto> {
     if (!userId) {
       throw new BadRequestException('User authentication is required to create a project.');
     }
@@ -171,7 +171,7 @@ export class ProjectsService {
         target_bom_cost_currency: createProjectDto.targetBomCostCurrency || getCurrencyByCountry(createProjectDto.country),
       };
 
-      const project = await this.projectsRepository.create(client, projectData, userId);
+      const project = await this.projectsRepository.create(client, projectData, userId, organizationId);
       return ProjectResponseDto.fromDatabase(project);
     } catch (error) {
       this.logger.error('Error creating project:', error.message);

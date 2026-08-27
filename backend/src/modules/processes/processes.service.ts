@@ -13,7 +13,7 @@ import {
   BulkUpdateTableRowsDto,
 } from './dto/processes.dto';
 import { ProcessResponseDto, ProcessListResponseDto } from './dto/process-response.dto';
-import { getSmLookupBridgeEntries, getAllSmLookupTableNames, SM_LOOKUP_READONLY_COLUMNS } from './sm-lookup-bridge.config';
+import { getSmLookupBridgeEntries, getAllSmLookupTableNames, SM_LOOKUP_READONLY_COLUMNS, SM_LOOKUP_READONLY_TABLES } from './sm-lookup-bridge.config';
 import {
   CreateProcessCalculatorMappingDto,
   UpdateProcessCalculatorMappingDto,
@@ -86,7 +86,7 @@ export class ProcessesService {
     const client = this.supabaseService.getClient(accessToken);
     const results = await Promise.all(
       entries.map((entry, idx) => this.buildLiveSmLookupTablePayload(
-        client, entry.table, entry.displayName, entry.description, idx, entry.filter, entry.orderBy,
+        client, entry.table, entry.displayName, entry.description, idx, entry.filter, entry.orderBy, entry.keyPattern,
       )),
     );
 
@@ -109,10 +109,20 @@ export class ProcessesService {
     idx: number,
     filter?: { column: string; values: string[] },
     orderBy?: string,
+    keyPattern?: string,
   ): Promise<any | null> {
     let query = client.from(table).select('*');
     if (filter) query = query.in(filter.column, filter.values);
-    if (orderBy) {
+    if (keyPattern) {
+      // Comma-separated patterns are OR'd (e.g. '%bend%,%press%') — a route's
+      // relevant staged data is rarely captured by one substring alone.
+      const patterns = keyPattern.split(',');
+      query = query.or(patterns.map((p) => `key.ilike.${p}`).join(','));
+      // sm_reference_data patterns can match hundreds of rows (e.g. laser
+      // nesting-cut-rate data) — capped so this stays a reference panel, not
+      // a full table dump; sorted so the cap drops consistently, not at random.
+      query = query.order('key', { ascending: true }).limit(300);
+    } else if (orderBy) {
       for (const col of orderBy.split(',')) query = query.order(col, { ascending: true });
     }
     const { data, error } = await query;
@@ -123,6 +133,10 @@ export class ProcessesService {
 
     const rows = data ?? [];
     const excludedCols = new Set(['id', 'created_at', 'updated_at']);
+    // sm_reference_data's `raw` column is the full original source row —
+    // already redundant with key/value/unit_type/notes on the same row, and
+    // would otherwise render as an unreadable raw-JSON column in the dialog.
+    if (table === 'sm_reference_data') excludedCols.add('raw');
     const sampleRow = rows[0] ?? {};
     const columnDefinitions = Object.keys(sampleRow)
       .filter((c) => !excludedCols.has(c))
@@ -143,8 +157,10 @@ export class ProcessesService {
       // new rows are intentionally NOT exposed for these (unlike custom
       // reference tables): this is real, live cost-engine input data, so
       // edits go through a scoped, allowlisted, per-row UPDATE, never a
-      // delete-and-reinsert of the whole table.
-      isEditable: true,
+      // delete-and-reinsert of the whole table. Staged reference-only tables
+      // (SM_LOOKUP_READONLY_TABLES) are never live cost-engine input, so they
+      // stay display-only here too.
+      isEditable: !SM_LOOKUP_READONLY_TABLES.has(table),
       createdAt: '',
       updatedAt: '',
       rows: rows.map((r: any, rowIdx: number) => ({
@@ -199,6 +215,9 @@ export class ProcessesService {
   ): Promise<any> {
     if (!getAllSmLookupTableNames().has(table)) {
       throw new BadRequestException(`"${table}" is not a recognized cost-engine lookup table`);
+    }
+    if (SM_LOOKUP_READONLY_TABLES.has(table)) {
+      throw new BadRequestException(`"${table}" is read-only staged reference data and cannot be edited here`);
     }
 
     const client = this.supabaseService.getClient(accessToken);
@@ -706,8 +725,8 @@ export class ProcessesService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let queryBuilder = this.supabaseService
-      .getClient(accessToken)
+    const client = this.supabaseService.getClient(accessToken);
+    let queryBuilder = client
       .from('process_calculator_mappings')
       .select('*', { count: 'exact' })
       .order('display_order', { ascending: true })
@@ -747,7 +766,10 @@ export class ProcessesService {
       throw new InternalServerErrorException(`Failed to fetch process calculator mappings: ${error.message}`);
     }
 
-    const mappings = (data || []).map((row) => ProcessCalculatorMappingResponseDto.fromDatabase(row));
+    const hints = await this.getOperationReferenceHints(client, data ?? []);
+    const mappings = (data || []).map((row) =>
+      ProcessCalculatorMappingResponseDto.fromDatabase(row, hints.get(row.id)),
+    );
 
     return {
       mappings,
@@ -758,13 +780,54 @@ export class ProcessesService {
   }
 
   /**
+   * Batched lookup for the reference-tool cross-reference shown alongside
+   * each operation (sm_operation_reference_map, migration 504) — one query
+   * for the whole page of mappings instead of N, since both source tables
+   * are small (a few dozen rows) and shared across every row.
+   */
+  private async getOperationReferenceHints(
+    client: ReturnType<SupabaseService['getClient']>,
+    rows: any[],
+  ): Promise<Map<string, { sourceProcessName: string; exampleMachine: string | null }>> {
+    const result = new Map<string, { sourceProcessName: string; exampleMachine: string | null }>();
+    if (rows.length === 0) return result;
+
+    const { data: mapRows, error: mapError } = await client
+      .from('sm_operation_reference_map')
+      .select('process_group, process_route, operation, source_process_name');
+    if (mapError || !mapRows || mapRows.length === 0) return result;
+
+    const sourceNames = Array.from(new Set(mapRows.map((r: any) => r.source_process_name)));
+    const machineKeys = sourceNames.map((n) => `processDefaultMachine:${n}`);
+    const { data: machineRows } = await client
+      .from('sm_reference_data')
+      .select('key, value')
+      .eq('category', 'process')
+      .in('key', machineKeys);
+    const machineByName = new Map<string, string | null>(
+      (machineRows ?? []).map((r: any) => [r.key.replace('processDefaultMachine:', ''), r.value ?? null]),
+    );
+
+    const byKey = new Map<string, string>(
+      mapRows.map((r: any) => [`${r.process_group}::${r.process_route}::${r.operation}`, r.source_process_name]),
+    );
+    for (const row of rows) {
+      const sourceProcessName = byKey.get(`${row.process_group}::${row.process_route}::${row.operation}`);
+      if (sourceProcessName) {
+        result.set(row.id, { sourceProcessName, exampleMachine: machineByName.get(sourceProcessName) ?? null });
+      }
+    }
+    return result;
+  }
+
+  /**
    * Get a specific process calculator mapping by ID
    */
   async getProcessCalculatorMapping(id: string, accessToken: string): Promise<ProcessCalculatorMappingResponseDto> {
     this.logger.log(`Fetching process calculator mapping: ${id}`, 'ProcessesService');
+    const client = this.supabaseService.getClient(accessToken);
 
-    const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+    const { data, error } = await client
       .from('process_calculator_mappings')
       .select('*')
       .eq('id', id)
@@ -775,7 +838,8 @@ export class ProcessesService {
       throw new NotFoundException(`Process calculator mapping with ID ${id} not found`);
     }
 
-    return ProcessCalculatorMappingResponseDto.fromDatabase(data);
+    const hints = await this.getOperationReferenceHints(client, [data]);
+    return ProcessCalculatorMappingResponseDto.fromDatabase(data, hints.get(data.id));
   }
 
   /**

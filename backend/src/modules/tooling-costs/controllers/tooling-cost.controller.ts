@@ -26,8 +26,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
+import { OrganizationContextGuard } from '../../../common/guards/organization-context.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../../common/decorators/current-organization.decorator';
 import { ToolingCostService } from '../services/tooling-cost.service';
 import {
   CreateToolingCostDto,
@@ -87,6 +89,7 @@ export class ToolingCostController {
    * Create new tooling cost
    */
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new tooling cost' })
   @ApiResponse({
     status: 201,
@@ -98,8 +101,9 @@ export class ToolingCostController {
     @Body() dto: CreateToolingCostDto,
     @CurrentUser('id') userId: string,
     @AccessToken() accessToken: string,
+    @CurrentOrganization() organizationId: string,
   ): Promise<ToolingCostResponseDto> {
-    return this.toolingCostService.create(dto, userId, accessToken);
+    return this.toolingCostService.create(dto, userId, accessToken, organizationId);
   }
 
   /**

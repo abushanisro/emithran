@@ -1,8 +1,30 @@
 // Pure function — no DB, no async. All inputs must be pre-resolved by the caller.
 
-// C₀ back-calculated from spec example:
-//   allowance = 0.1186 = C × 2mm × sqrt(352/10) ⟹ C ≈ 0.0593
-const PART_ALLOWANCE_CONSTANT = 0.0593;
+// Real per-process nesting part-to-part spacing (mm), by thickness — see
+// sm_reference_data category='lookup_table', key prefix 'tblPartSpacing'
+// (migration 518, closeout Plan Phase 3). Only the 3 machine classes this
+// app actually has a registered cutting engine for are covered — Oxyfuel/
+// Plasma have no cost engine here regardless of this data (see
+// manufacturing-process-registry.ts).
+//   fiber_laser: spacing == thickness, 1:1, capped at 50mm (every real data
+//     point from 0.5mm to 50mm is exactly spacing=thickness; the source's
+//     own 999mm row still reads 50mm, confirming the cap rather than
+//     linear growth beyond it).
+//   turret_punch / waterjet: FLAT spacing regardless of thickness (6.35mm /
+//     5.08mm respectively, i.e. 1/4" and 0.2" — real tool/nozzle
+//     clearances, not thickness-scaled).
+export function resolveProcessPartSpacingMm(machineClass: string, thicknessMm: number): number {
+  switch (machineClass) {
+    case 'fiber_laser':
+      return Math.min(thicknessMm, 50);
+    case 'turret_punch':
+      return 6.35;
+    case 'waterjet':
+      return 5.08;
+    default:
+      return Math.min(thicknessMm, 50); // no real data for this machine class -- laser's real curve is the closest disclosed default (see computePartAllowanceMm's own doc comment for why)
+  }
+}
 
 // Standard stock sheet sizes (width × length mm), ascending by area. Shared
 // by the rectangle-grid engine below AND true-nest-costing.engine.ts's
@@ -19,13 +41,22 @@ export const STANDARD_SHEETS: ReadonlyArray<[number, number]> = [
 
 export const EDGE_ALLOWANCE_MM = 2; // minimum clearance from sheet edge
 
-// Part-to-part allowance (punch/draw cushion, from spec formula) -- shared
-// by the rectangle-grid engine's own packing AND true-nest-costing.engine.ts
-// (as the kerf/spacing value passed to cad-engine's true-shape nest), so
-// both engines assume the same real inter-part clearance for the same part.
-export function computePartAllowanceMm(thicknessMm: number, shearStrengthMpa: number, hasImpressions = false): number {
-  const shearSafe = shearStrengthMpa > 0 ? shearStrengthMpa : 350;
-  return PART_ALLOWANCE_CONSTANT * thicknessMm * Math.sqrt(shearSafe / 10) + (hasImpressions ? 10 : 0);
+// Part-to-part nesting allowance for Gross/Net Usage -- these calculators
+// compute material utilisation BEFORE any cutting process is chosen (a part
+// could still end up laser-cut, waterjet-cut, or turret-punched), so there
+// is no real per-process identity to key spacing on here the way
+// resolveProcessPartSpacingMm above can for an already-resolved cutting
+// engine. Per an explicit product decision (2026-08-21, closeout Plan
+// Phase 3), this now assumes laser cutting -- this app's dominant/default
+// cutting method -- as a disclosed default rather than the previous
+// generic shear-strength-based formula (itself a real, back-calculated
+// "punch/draw cushion" spec value, but for a DIFFERENT physical process
+// than what nesting spacing actually needs). If Gross/Net Usage ever gains
+// a real "planned cutting process" input, this should key off
+// resolveProcessPartSpacingMm(that process, thicknessMm) instead of always
+// assuming laser.
+export function computePartAllowanceMm(thicknessMm: number, hasImpressions = false): number {
+  return resolveProcessPartSpacingMm('fiber_laser', thicknessMm) + (hasImpressions ? 10 : 0);
 }
 
 export interface TrueNestCostingCache {
@@ -75,7 +106,6 @@ export interface NestingInput {
   thicknessMm: number;
   netWeightKg: number;           // from CAD volume × density (already computed by caller)
   densityKgM3: number;
-  shearStrengthMpa: number;      // from raw_materials (used for part allowance)
   materialPricePerKg: number;
   scrapPricePerKg?: number;      // recovery value (default 0)
   edgeAllowanceMm?: number;      // default 2
@@ -171,7 +201,6 @@ export function computeNesting(input: NestingInput): NestingResult {
     thicknessMm,
     netWeightKg,
     densityKgM3,
-    shearStrengthMpa,
     materialPricePerKg,
     scrapPricePerKg = 0,
     edgeAllowanceMm = EDGE_ALLOWANCE_MM,
@@ -180,7 +209,7 @@ export function computeNesting(input: NestingInput): NestingResult {
     quantityRequired,
   } = input;
 
-  const partAllowanceMm = computePartAllowanceMm(thicknessMm, shearStrengthMpa, hasImpressions);
+  const partAllowanceMm = computePartAllowanceMm(thicknessMm, hasImpressions);
 
   const usablePartL = flatPatternLengthMm + partAllowanceMm;
   const usablePartW = flatPatternWidthMm + partAllowanceMm;

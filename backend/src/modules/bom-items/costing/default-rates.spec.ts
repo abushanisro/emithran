@@ -1,4 +1,25 @@
-import { classifyInspectionResource, benchmarkRateWarning, lhrRateWarning, DEFAULT_RATE_WARN_THRESHOLDS } from './default-rates';
+import { classifyInspectionResource, benchmarkRateWarning, lhrRateWarning, DEFAULT_RATE_WARN_THRESHOLDS, classifySurfaceTreatment } from './default-rates';
+
+describe('classifySurfaceTreatment — chemical conversion coating', () => {
+  // Migration 490 seeded a real, region-specific rate for this treatment —
+  // must route there instead of the generic '__default__' catch-all, even
+  // though "chrom" (from "chromate") would otherwise match that bucket.
+  it('routes "Chemical Conversion Coating" to its own real rate, not the generic bucket', () => {
+    expect(classifySurfaceTreatment('Chemical Conversion Coating')).toBe('chem_conversion_coating');
+  });
+
+  it('routes "Chromate Conversion per MIL-DTL-5541" to the same real rate', () => {
+    expect(classifySurfaceTreatment('Chromate Conversion per MIL-DTL-5541')).toBe('chem_conversion_coating');
+  });
+
+  it('routes the trade name "Alodine 1200S" to the same real rate', () => {
+    expect(classifySurfaceTreatment('Alodine 1200S')).toBe('chem_conversion_coating');
+  });
+
+  it('still routes an unrelated chrome-plating callout to the generic bucket (chrom alone should not over-match)', () => {
+    expect(classifySurfaceTreatment('Hard Chrome Plating')).toBe('__default__');
+  });
+});
 
 describe('classifyInspectionResource', () => {
   // 1 & 4. Explicit machine_class='cmm' wins even when the machine's own name

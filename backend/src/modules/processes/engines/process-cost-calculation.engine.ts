@@ -16,7 +16,7 @@
  */
 
 import { PROCESS_COST_CONSTANTS } from '../constants/process-cost-calculation.constants';
-import { aprioriTerms } from '../../bom-items/costing/cost-engine';
+import { eMithranTerms } from '../../bom-items/costing/cost-engine';
 
 /**
  * Input parameters for process cost calculation
@@ -153,7 +153,7 @@ export class ProcessCostCalculationEngine {
       normalized.partsPerCycle
     );
 
-    // Steps 3-5: Setup / cycle / total cost, all via the shared aprioriTerms() kernel —
+    // Steps 3-5: Setup / cycle / total cost, all via the shared eMithranTerms() kernel —
     // the same arithmetic the automated (CAD-geometry-driven) cost engine uses, so
     // setupManning, heads, and scrap% actually drive the total instead of being
     // validated-but-unused inputs.
@@ -269,9 +269,9 @@ export class ProcessCostCalculationEngine {
   }
 
   /**
-   * Setup / cycle / total cost — all via aprioriTerms(), the same kernel the
+   * Setup / cycle / total cost — all via eMithranTerms(), the same kernel the
    * automated (CAD-geometry-driven) cost engine uses. setupManning and heads are
-   * distinct, real headcounts (setup crew vs. run crew) mapped onto aprioriTerms'
+   * distinct, real headcounts (setup crew vs. run crew) mapped onto eMithranTerms'
    * setupNDL/cycleNDL; scrap% inflates the effective process cost per good part
    * (no material cost is tracked at this line level — that belongs to the BOM's
    * overall material costing) instead of being a validated-but-silent no-op.
@@ -287,7 +287,7 @@ export class ProcessCostCalculationEngine {
     const setupTimeMinPerPart = normalized.setupTime / Math.max(normalized.batchSize, 1);
     const cycleTimeMinPerPart = timeCalcs.cycleTimePerPartHours * this.time.MINUTES_PER_HOUR;
 
-    const terms = aprioriTerms({
+    const terms = eMithranTerms({
       mhrPerHr: MHR,
       dlrPerHr: LHR,
       qairPerHr: 0,

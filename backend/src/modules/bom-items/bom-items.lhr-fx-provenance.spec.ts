@@ -87,12 +87,16 @@ describe('resolveLHRRates + normalizeCostSummaryToCurrency arithmetic (mocked un
     const warnings: string[] = [];
 
     // Step 1: resolveLHRRates resolves the local-currency row as-is (Pass 1: "no FX needed").
-    const lhrRates: Map<string, number> = await (service as any).resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
-    expect(lhrRates.get('fiber_laser')).toBe(144.46);
+    const lhrRates: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
+    expect(lhrRates.get('fiber_laser')?.rate).toBe(144.46);
+    // P0.6: Pass 1 (real, same-location lhr_records) must tag 'lhr_database' —
+    // the provenance visibility the machine-rate side already had via
+    // MHRRateInput.source, now mirrored for labor.
+    expect(lhrRates.get('fiber_laser')?.source).toBe('lhr_database');
     expect(warnings).toHaveLength(0);
 
     // Step 2: that exact value flows into the cost summary DTO (mirrors cost-engine.ts's direct passthrough).
-    const dto = minimalCostSummary(lhrRates.get('fiber_laser')!);
+    const dto = minimalCostSummary(lhrRates.get('fiber_laser')!.rate);
 
     // Step 3: factory currency == scenario currency (identity) must leave labourRate untouched.
     const result = (service as any).normalizeCostSummaryToCurrency(dto, rates, 'INR', {
@@ -118,16 +122,47 @@ describe('resolveLHRRates + normalizeCostSummaryToCurrency arithmetic (mocked un
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
-    const lhrRates: Map<string, number> = await (service as any).resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
-    expect(lhrRates.get('cmm')).toBeCloseTo(1.65 * arithmeticFixtureUsdToInr, 2);
+    const lhrRates: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
+    expect(lhrRates.get('cmm')?.rate).toBeCloseTo(1.65 * arithmeticFixtureUsdToInr, 2);
+    // P0.6: Pass 2 (lhr_benchmark_rates filling a missing group) must tag 'lhr_benchmark'.
+    expect(lhrRates.get('cmm')?.source).toBe('lhr_benchmark');
     expect(warnings).toHaveLength(0); // matches its own benchmark exactly — no warning
 
-    const dto = minimalCostSummary(lhrRates.get('cmm')!);
+    const dto = minimalCostSummary(lhrRates.get('cmm')!.rate);
     const result = (service as any).normalizeCostSummaryToCurrency(dto, rates, 'INR', {
       fxSnapshot: { factoryCurrency: 'INR', scenarioCurrency: 'INR', provider: null, source: 'identity', rate: 1, rateDate: '2026-08-17', rateType: 'reference', retrievedAt: '2026-08-17T00:00:00Z' },
     });
     // Still exactly one conversion end-to-end — identity currency does not add a second one.
     expect(result.processLines[0].labourRate).toBeCloseTo(1.65 * arithmeticFixtureUsdToInr, 2);
     expect(result.processLines[0].labourRate).not.toBeCloseTo(1.65 * arithmeticFixtureUsdToInr * arithmeticFixtureUsdToInr, 2);
+  });
+
+  // P0.6: Pass 3 (cross-location lhr_records fallback) must tag 'lhr_cross_location'.
+  // NOTE — pre-existing, NOT introduced or fixed by this test/change (out of
+  // scope for a provenance-visibility-only pass): Pass 3's USD-effective branch
+  // stores the raw lhr_usd_effective average directly into the SAME "local
+  // currency" pgRate map Pass 1 uses, with NO usdToLocal conversion applied
+  // (unlike Pass 2's benchmark fallback, which does convert). For a non-USD
+  // location, this would silently treat a USD number as if it were local
+  // currency. Documented here, matched as-is by this test, not fixed — fixing
+  // it changes a real cost number, which is explicitly out of scope for this
+  // provenance-tagging pass.
+  it('Pass 3 (cross-location fallback) tags lhr_cross_location, and documents its existing no-FX-conversion behavior', async () => {
+    const supabaseService = makeSupabaseStub({
+      lhr_records: [
+        [], // Pass 1: no real row for this location/group
+        [{ process_group: 'Sheet Metal', lhr_usd_effective: 2.1 }], // Pass 3: a different location's real row
+      ],
+      lhr_benchmark_rates: [[], []], // Pass 2 (no benchmark) and Pass 4 (plausibility reference, also none)
+    });
+    const service = buildService(supabaseService, {
+      fiber_laser: { processGroup: 'Sheet Metal', processRoute: 'Laser Cutting', operation: 'Laser Cut', lhrProcessGroup: 'Sheet Metal' },
+    });
+    const rates = makeRates(arithmeticFixtureUsdToInr);
+    const warnings: string[] = [];
+
+    const lhrRates: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
+    expect(lhrRates.get('fiber_laser')?.source).toBe('lhr_cross_location');
+    expect(lhrRates.get('fiber_laser')?.rate).toBe(2.1); // raw USD figure, undocumented pre-existing behavior — see note above
   });
 });

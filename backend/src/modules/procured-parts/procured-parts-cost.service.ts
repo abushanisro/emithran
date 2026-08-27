@@ -48,7 +48,6 @@ export class ProcuredPartsCostService {
         .getClient(accessToken)
         .from('procured_parts_cost_records')
         .select('*', { count: 'exact' })
-        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -105,7 +104,6 @@ export class ProcuredPartsCostService {
       .from('procured_parts_cost_records')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
       .single();
 
     if (error || !data) {
@@ -122,6 +120,7 @@ export class ProcuredPartsCostService {
     dto: CreateProcuredPartsCostDto,
     userId: string,
     accessToken?: string,
+    organizationId?: string,
   ): Promise<ProcuredPartsCostResponseDto> {
     this.logger.log('Creating procured part cost', 'ProcuredPartsCostService');
 
@@ -129,6 +128,7 @@ export class ProcuredPartsCostService {
       const record = {
         bom_item_id: dto.bomItemId,
         user_id: userId,
+        organization_id: organizationId ?? null,
         part_name: dto.partName,
         part_number: dto.partNumber,
         supplier_name: dto.supplierName,
@@ -207,7 +207,6 @@ export class ProcuredPartsCostService {
       .from('procured_parts_cost_records')
       .update(updateData)
       .eq('id', id)
-      .eq('user_id', userId)
       .select()
       .single();
 
@@ -232,8 +231,7 @@ export class ProcuredPartsCostService {
       .getClient(accessToken)
       .from('procured_parts_cost_records')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
 
     if (error) {
       this.logger.error(`Delete error: ${error.message}`, 'ProcuredPartsCostService');

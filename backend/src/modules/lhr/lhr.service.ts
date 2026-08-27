@@ -99,6 +99,53 @@ export class LHRService {
     return this.mapDatabaseToResponse(data);
   }
 
+  /**
+   * The real, cost-engine-aligned labor rate for a (location, process_group) —
+   * same precedence bom-items.service.ts's resolveLHRRates() and
+   * bom-items.controller.ts's pickLHR() already use (shop average, then the
+   * industry benchmark), so a caller previewing a rate sees the same number
+   * quote costing will actually apply in the common case. Deliberately skips
+   * resolveLHRRates()'s cross-location fallback and plausibility-guard passes
+   * — those are bom-item-specific concerns, not needed for a preview. Never
+   * defaults to 0: a preview with nothing on file must say so, not lie.
+   */
+  async getEffectiveRate(
+    location: string,
+    processGroup: string,
+    accessToken: string,
+  ): Promise<{ rateUsdPerHr: number | null; source: 'shop_average' | 'benchmark' | 'none'; sampleSize: number }> {
+    const { data: shopRows } = await this.supabaseService
+      .getClient(accessToken)
+      .from('lhr_records')
+      .select('lhr, lhr_usd_effective')
+      .eq('location', location)
+      .eq('process_group', processGroup);
+
+    const shopRates = (shopRows ?? [])
+      .map(row => Number(row.lhr_usd_effective) || Number(row.lhr) || 0)
+      .filter(rate => rate > 0);
+
+    if (shopRates.length > 0) {
+      const average = shopRates.reduce((sum, rate) => sum + rate, 0) / shopRates.length;
+      return { rateUsdPerHr: average, source: 'shop_average', sampleSize: shopRates.length };
+    }
+
+    const { data: benchmarkRows } = await this.supabaseService
+      .getAdminClient()
+      .from('lhr_benchmark_rates')
+      .select('lhr_usd_effective')
+      .eq('location', location)
+      .eq('process_group', processGroup)
+      .limit(1);
+
+    const benchmarkRate = benchmarkRows?.[0]?.lhr_usd_effective ? Number(benchmarkRows[0].lhr_usd_effective) : null;
+    if (benchmarkRate && benchmarkRate > 0) {
+      return { rateUsdPerHr: benchmarkRate, source: 'benchmark', sampleSize: 0 };
+    }
+
+    return { rateUsdPerHr: null, source: 'none', sampleSize: 0 };
+  }
+
   async getBenchmarkRates(location?: string) {
     let query = this.supabaseService
       .getAdminClient()
@@ -317,15 +364,16 @@ export class LHRService {
   }
 
   async removeAll(userId: string, accessToken: string): Promise<{ deleted: number }> {
-    this.logger.log(`Deleting all LHR records`, 'LHRService');
+    this.logger.log(`Deleting all LHR records for user ${userId}`, 'LHRService');
 
     // Use the service-role admin client to bypass RLS — the endpoint is already protected
-    // by SupabaseAuthGuard, so only authenticated users can reach this method.
+    // by SupabaseAuthGuard, so only authenticated users can reach this method. Scoped to
+    // userId so this can't delete other users' records (was previously unscoped — bug fix).
     const { data, error } = await this.supabaseService
       .getAdminClient()
       .from('lhr_records')
       .delete()
-      .not('id', 'is', null)
+      .eq('user_id', userId)
       .select('id');
 
     if (error) {
@@ -500,7 +548,7 @@ export class LHRService {
           perks_percentage:      defaults.perks,
           lhr,
           location:              'India - Manufacturing Standard',
-          reference:             `aPriori ${gradeVal} — auto-calculated at ${WORKING_HOURS_PER_YEAR} hrs/yr`,
+          reference:             `eMithran ${gradeVal} — auto-calculated at ${WORKING_HOURS_PER_YEAR} hrs/yr`,
         });
       });
     } else {

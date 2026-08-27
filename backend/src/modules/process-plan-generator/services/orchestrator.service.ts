@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   Logger,
   MessageEvent,
@@ -28,6 +27,7 @@ interface GenerateArgs {
   bomItemId: string;
   userId: string;
   accessToken: string | null;
+  organizationId?: string;
   forceRefresh: boolean;
   notes?: string;
 }
@@ -67,7 +67,7 @@ export class OrchestratorService {
   ) {}
 
   async generate(args: GenerateArgs): Promise<GenerationResponse> {
-    const { bomItemId, userId, accessToken } = args;
+    const { bomItemId, userId, accessToken, organizationId } = args;
     const client = this.supabaseService.getClient(accessToken ?? undefined);
     const stream = this.streamKey(bomItemId, userId);
 
@@ -117,7 +117,7 @@ export class OrchestratorService {
     const idempotencyKey = sha256(`${bomItemId}::${canonicalize(brief)}`);
 
     if (!args.forceRefresh) {
-      const existing = await this.findRecentByIdempotencyKey(client, userId, idempotencyKey);
+      const existing = await this.findRecentByIdempotencyKey(client, idempotencyKey);
       if (existing) {
         this.logger.log(`Idempotent replay for ${bomItemId} → generation ${existing.id} (status=${existing.status})`);
         return existing;
@@ -126,13 +126,14 @@ export class OrchestratorService {
 
     // No reusable draft → clean up any stale row blocking the unique constraint.
     // With forceRefresh we also clear draft_ready so a new insert can proceed.
-    await this.clearStaleByIdempotencyKey(client, userId, idempotencyKey, args.forceRefresh);
+    await this.clearStaleByIdempotencyKey(client, idempotencyKey, args.forceRefresh);
 
     // ── Out-of-scope fast path ────────────────────────────────────────────
     if (!brief.scope.inScope) {
       const row = await this.insertGenerationRow(client, {
         bomItemId,
         userId,
+        organizationId,
         idempotencyKey,
         status: 'out_of_scope',
         model: REASONING_MODEL,
@@ -163,6 +164,7 @@ export class OrchestratorService {
       const reviewRow = await this.insertGenerationRow(client, {
         bomItemId,
         userId,
+        organizationId,
         idempotencyKey,
         status: 'engineering_review_required',
         model: 'deterministic',
@@ -196,6 +198,7 @@ export class OrchestratorService {
     const row = await this.insertGenerationRow(client, {
       bomItemId,
       userId,
+      organizationId,
       idempotencyKey,
       status: 'running',
       model: 'deterministic',
@@ -241,7 +244,7 @@ export class OrchestratorService {
         .eq('id', generationId);
       this.emit(stream, { type: 'failed', data: { stage: 'deterministic_planner', error: planErr.message } });
       this.closeStream(stream);
-      return this.rowToResponse(await this.loadById(client, generationId, userId));
+      return this.rowToResponse(await this.loadById(client, generationId));
     }
 
     // ── Stage 3 — resolver ────────────────────────────────────────────────
@@ -349,23 +352,23 @@ export class OrchestratorService {
     });
     this.closeStream(stream);
 
-    const final = await this.loadById(client, generationId, userId);
+    const final = await this.loadById(client, generationId);
     return this.rowToResponse(final);
   }
 
   async getGeneration(id: string, userId: string, accessToken: string | null): Promise<GenerationResponse | null> {
     const client = this.supabaseService.getClient(accessToken ?? undefined);
-    const row = await this.loadById(client, id, userId).catch(() => null);
+    const row = await this.loadById(client, id).catch(() => null);
     return row ? this.rowToResponse(row) : null;
   }
 
   async getLatestDraft(bomItemId: string, userId: string, accessToken: string | null): Promise<GenerationResponse | null> {
     const client = this.supabaseService.getClient(accessToken ?? undefined);
+    // No manual user_id filter — RLS scopes this to the caller's organization.
     const { data, error } = await client
       .from('process_plan_generations')
       .select('*')
       .eq('bom_item_id', bomItemId)
-      .eq('user_id', userId)
       .in('status', ['draft_ready', 'applied'])
       .order('started_at', { ascending: false })
       .limit(1)
@@ -376,13 +379,13 @@ export class OrchestratorService {
 
   async discard(id: string, userId: string, accessToken: string | null): Promise<void> {
     const client = this.supabaseService.getClient(accessToken ?? undefined);
+    // No manual ownership check — RLS scopes visibility to the caller's organization.
     const { data: row, error } = await client
       .from('process_plan_generations')
-      .select('id, user_id, status')
+      .select('id, status')
       .eq('id', id)
       .single();
     if (error || !row) throw new NotFoundException(`Generation ${id} not found`);
-    if (row.user_id !== userId) throw new ForbiddenException();
     if (row.status === 'applied') throw new BadRequestException('Cannot discard an already-applied generation');
 
     await client
@@ -442,13 +445,13 @@ export class OrchestratorService {
     }
   }
 
-  private async findRecentByIdempotencyKey(client: any, userId: string, key: string): Promise<GenerationResponse | null> {
+  private async findRecentByIdempotencyKey(client: any, key: string): Promise<GenerationResponse | null> {
     // draft_ready: return indefinitely — the user must apply or discard before
     // a re-generate is allowed. out_of_scope: 30-min window (brief may change).
+    // No manual org/user filter — RLS scopes this to the caller's organization.
     const { data: draft, error: draftErr } = await client
       .from('process_plan_generations')
       .select('*')
-      .eq('user_id', userId)
       .eq('idempotency_key', key)
       .eq('status', 'draft_ready')
       .order('started_at', { ascending: false })
@@ -460,7 +463,6 @@ export class OrchestratorService {
     const { data: oos, error: oosErr } = await client
       .from('process_plan_generations')
       .select('*')
-      .eq('user_id', userId)
       .eq('idempotency_key', key)
       .in('status', ['out_of_scope', 'engineering_review_required'])
       .gte('started_at', new Date(Date.now() - 30 * 60_000).toISOString())
@@ -478,13 +480,13 @@ export class OrchestratorService {
    * When forceRefresh=true, also clears 'draft_ready' and 'out_of_scope' so
    * a brand-new generation can be inserted without hitting the UNIQUE constraint.
    */
-  private async clearStaleByIdempotencyKey(client: any, userId: string, key: string, forceRefresh = false): Promise<void> {
+  private async clearStaleByIdempotencyKey(client: any, key: string, forceRefresh = false): Promise<void> {
     const statuses = ['running', 'failed', 'discarded'];
     if (forceRefresh) statuses.push('draft_ready', 'out_of_scope', 'engineering_review_required', 'applied');
+    // No manual org/user filter — RLS scopes this delete to the caller's organization.
     const { error } = await client
       .from('process_plan_generations')
       .delete()
-      .eq('user_id', userId)
       .eq('idempotency_key', key)
       .in('status', statuses);
     if (error) {
@@ -495,6 +497,7 @@ export class OrchestratorService {
   private async insertGenerationRow(client: any, args: {
     bomItemId: string;
     userId: string;
+    organizationId?: string;
     idempotencyKey: string;
     status: string;
     model: string;
@@ -516,6 +519,7 @@ export class OrchestratorService {
     const payload = {
       bom_item_id: args.bomItemId,
       user_id: args.userId,
+      organization_id: args.organizationId ?? null,
       idempotency_key: args.idempotencyKey,
       status: args.status,
       model: args.model,
@@ -545,14 +549,14 @@ export class OrchestratorService {
     return data;
   }
 
-  private async loadById(client: any, id: string, userId: string): Promise<any> {
+  private async loadById(client: any, id: string): Promise<any> {
+    // No manual ownership check — RLS scopes visibility to the caller's organization.
     const { data, error } = await client
       .from('process_plan_generations')
       .select('*')
       .eq('id', id)
       .single();
     if (error || !data) throw new NotFoundException(`Generation ${id} not found`);
-    if (data.user_id !== userId) throw new ForbiddenException();
     return data;
   }
 

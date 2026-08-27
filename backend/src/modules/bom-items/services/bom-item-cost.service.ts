@@ -39,14 +39,13 @@ export class BomItemCostService {
   /**
    * Get or create cost record for a BOM item
    */
-  async getOrCreateCost(bomItemId: string, userId: string, accessToken: string): Promise<BomItemCostDto> {
+  async getOrCreateCost(bomItemId: string, userId: string, accessToken: string, organizationId?: string): Promise<BomItemCostDto> {
     // Try to get existing record
     const { data: existing, error: fetchError } = await this.supabaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('*')
       .eq('bom_item_id', bomItemId)
-      .eq('user_id', userId)
       .single();
 
     if (!fetchError && existing) {
@@ -57,7 +56,7 @@ export class BomItemCostService {
     const { data: newRecord, error: createError } = await this.supabaseService
       .getClient(accessToken)
       .from('bom_item_costs')
-      .insert({ bom_item_id: bomItemId, user_id: userId })
+      .insert({ bom_item_id: bomItemId, user_id: userId, organization_id: organizationId ?? null })
       .select()
       .single();
 
@@ -92,7 +91,6 @@ export class BomItemCostService {
         updated_at: new Date().toISOString(),
       })
       .eq('bom_item_id', bomItemId)
-      .eq('user_id', userId)
       .select()
       .single();
 
@@ -135,8 +133,7 @@ export class BomItemCostService {
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('*')
-      .in('bom_item_id', childIds)
-      .eq('user_id', userId);
+      .in('bom_item_id', childIds);
 
     if (costsError) {
       this.logger.error(`Error fetching children costs: ${costsError.message}`, 'BomItemCostService');
@@ -149,7 +146,7 @@ export class BomItemCostService {
   /**
    * Recalculate costs for a BOM item and update the record
    */
-  async recalculateCost(bomItemId: string, userId: string, accessToken: string): Promise<BomItemCostDto> {
+  async recalculateCost(bomItemId: string, userId: string, accessToken: string, organizationId?: string): Promise<BomItemCostDto> {
     // Get item details
     const { data: item, error: itemError } = await this.supabaseService
       .getClient(accessToken)
@@ -164,7 +161,7 @@ export class BomItemCostService {
     }
 
     // Get or create cost record
-    const costRecord = await this.getOrCreateCost(bomItemId, userId, accessToken);
+    const costRecord = await this.getOrCreateCost(bomItemId, userId, accessToken, organizationId);
 
     // Get all children and their costs
     const { data: children, error: childrenError} = await this.supabaseService
@@ -182,8 +179,7 @@ export class BomItemCostService {
         .getClient(accessToken)
         .from('bom_item_costs')
         .select('bom_item_id, total_cost')
-        .in('bom_item_id', childIds)
-        .eq('user_id', userId);
+        .in('bom_item_id', childIds);
 
       if (!costsError && childCosts) {
         // Calculate children cost considering quantities
@@ -202,7 +198,6 @@ export class BomItemCostService {
       .from('packaging_logistics_cost_records')
       .select('total_cost_per_part')
       .eq('bom_item_id', bomItemId)
-      .eq('user_id', userId)
       .eq('is_active', true);
 
     const packagingLogisticsCost = packagingCosts?.reduce((sum, record) =>
@@ -214,7 +209,6 @@ export class BomItemCostService {
       .from('procured_parts_cost_records')
       .select('total_cost_per_part')
       .eq('bom_item_id', bomItemId)
-      .eq('user_id', userId)
       .eq('is_active', true);
 
     const procuredPartsCost = procuredCosts?.reduce((sum, record) =>
@@ -226,7 +220,6 @@ export class BomItemCostService {
       .from('tooling_cost_records')
       .select('total_cost')
       .eq('bom_item_id', bomItemId)
-      .eq('user_id', userId)
       .eq('is_active', true);
 
     const toolingCost = toolingCosts?.reduce((sum, record) =>
@@ -264,7 +257,6 @@ export class BomItemCostService {
         updated_at: new Date().toISOString(),
       })
       .eq('bom_item_id', bomItemId)
-      .eq('user_id', userId)
       .select()
       .single();
 
@@ -281,7 +273,7 @@ export class BomItemCostService {
   /**
    * Recursively recalculate costs for all parents up the tree
    */
-  async recalculateParentCosts(bomItemId: string, userId: string, accessToken: string): Promise<void> {
+  async recalculateParentCosts(bomItemId: string, userId: string, accessToken: string, organizationId?: string): Promise<void> {
     // Get parent item
     const { data: item, error } = await this.supabaseService
       .getClient(accessToken)
@@ -297,16 +289,16 @@ export class BomItemCostService {
     const parentItemId = item.parent_item_id;
 
     // Recalculate parent cost
-    await this.recalculateCost(parentItemId, userId, accessToken);
+    await this.recalculateCost(parentItemId, userId, accessToken, organizationId);
 
     // Recursively recalculate grandparents
-    await this.recalculateParentCosts(parentItemId, userId, accessToken);
+    await this.recalculateParentCosts(parentItemId, userId, accessToken, organizationId);
   }
 
   /**
    * Recalculate all costs for a BOM (bottom-up traversal)
    */
-  async recalculateAllCosts(bomId: string, userId: string, accessToken: string): Promise<void> {
+  async recalculateAllCosts(bomId: string, userId: string, accessToken: string, organizationId?: string): Promise<void> {
     this.logger.log(`Starting full cost recalculation for BOM ${bomId}`, 'BomItemCostService');
 
     // Get all items in the BOM
@@ -361,7 +353,7 @@ export class BomItemCostService {
 
     // Recalculate costs in bottom-up order
     for (const itemId of processOrder) {
-      await this.recalculateCost(itemId, userId, accessToken);
+      await this.recalculateCost(itemId, userId, accessToken, organizationId);
     }
 
     this.logger.log(`Completed full cost recalculation for BOM ${bomId}: ${processOrder.length} items processed`, 'BomItemCostService');
@@ -390,7 +382,6 @@ export class BomItemCostService {
       .from('bom_item_costs')
       .select('total_cost, raw_material_cost, process_cost, tooling_cost, packaging_logistics_cost, procured_parts_cost, direct_children_cost, is_stale')
       .eq('bom_item_id', bomItemId)
-      .eq('user_id', userId)
       .single();
 
     // Get children count
@@ -433,7 +424,6 @@ export class BomItemCostService {
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('*')
-      .eq('user_id', userId)
       .eq('is_stale', true);
 
     if (error) {
@@ -468,7 +458,6 @@ export class BomItemCostService {
         bom_item_id,
         bom_items!inner(id, name, item_type, parent_item_id)
       `)
-      .eq('user_id', userId)
       .eq('bom_items.parent_item_id', parentItemId);
 
     if (error || !childCosts) {
@@ -526,7 +515,6 @@ export class BomItemCostService {
         bom_item_id,
         bom_items!inner(id, name, item_type, parent_item_id, bom_id)
       `)
-      .eq('user_id', userId)
       .eq('bom_items.bom_id', bomId)
       .is('bom_items.parent_item_id', null);
 
@@ -605,8 +593,7 @@ export class BomItemCostService {
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('*')
-      .in('bom_item_id', itemIds)
-      .eq('user_id', userId);
+      .in('bom_item_id', itemIds);
 
     if (costsError) {
       this.logger.error(`Error fetching costs: ${costsError.message}`, 'BomItemCostService');

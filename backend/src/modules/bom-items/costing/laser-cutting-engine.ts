@@ -3,6 +3,7 @@ import type { MHRRateInput } from "./cost-engine";
 import type { ProcessLineCost, PhysicsGap, ConfidenceLevel } from "../dto/cost-breakdown.dto";
 import type { CapabilityCheck, PartGeometryForCapability } from "./machine-capability";
 import { checkMachineCapability } from "./machine-capability";
+import type { MachineCapability } from "./machine-selection/seed-registry";
 import type { ManufacturingProcessEngine, CuttingProcessContext, CuttingProcessResult } from "./manufacturing-process-engine";
 
 export interface LaserCuttingInput {
@@ -109,8 +110,13 @@ export class LaserCuttingEngine implements ManufacturingProcessEngine {
   readonly machineClass = 'fiber_laser';
   readonly processFamily = 'sheet_metal_cutting';
 
-  checkCapability(geometry: PartGeometryForCapability, commodityCode: string | null): CapabilityCheck {
-    return checkMachineCapability(this.machineClass, commodityCode, geometry);
+  checkCapability(
+    geometry: PartGeometryForCapability,
+    commodityCode: string | null,
+    realCapability?: MachineCapability | null,
+    capabilitySource?: "imported" | "seed" | "default_class",
+  ): CapabilityCheck {
+    return checkMachineCapability(this.machineClass, commodityCode, geometry, realCapability, capabilitySource);
   }
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
@@ -147,8 +153,13 @@ export class Co2LaserCuttingEngine implements ManufacturingProcessEngine {
   readonly machineClass = 'co2_laser';
   readonly processFamily = 'sheet_metal_cutting';
 
-  checkCapability(geometry: PartGeometryForCapability, commodityCode: string | null): CapabilityCheck {
-    return checkMachineCapability(this.machineClass, commodityCode, geometry);
+  checkCapability(
+    geometry: PartGeometryForCapability,
+    commodityCode: string | null,
+    realCapability?: MachineCapability | null,
+    capabilitySource?: "imported" | "seed" | "default_class",
+  ): CapabilityCheck {
+    return checkMachineCapability(this.machineClass, commodityCode, geometry, realCapability, capabilitySource);
   }
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {

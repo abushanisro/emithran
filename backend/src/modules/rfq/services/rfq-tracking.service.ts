@@ -47,6 +47,7 @@ export class RfqTrackingService {
   async createTracking(
     userId: string,
     accessToken: string,
+    organizationId: string | undefined,
     data: CreateRfqTrackingData
   ): Promise<RfqTrackingResponseDto> {
     // Validate project_id is provided (security requirement)
@@ -63,6 +64,7 @@ export class RfqTrackingService {
         .insert({
           rfq_id: data.rfqId,
           user_id: userId,
+          organization_id: organizationId ?? null,
           project_id: data.projectId,
           rfq_name: data.rfqName,
           rfq_number: data.rfqNumber,
@@ -81,6 +83,7 @@ export class RfqTrackingService {
       if (data.vendors.length > 0) {
         const vendorRecords = data.vendors.map(vendor => ({
           rfq_tracking_id: trackingRecord.id,
+          organization_id: organizationId ?? null,
           vendor_id: vendor.id,
           vendor_name: vendor.name,
           vendor_email: vendor.email
@@ -99,6 +102,7 @@ export class RfqTrackingService {
       if (data.parts.length > 0) {
         const partRecords = data.parts.map(part => ({
           rfq_tracking_id: trackingRecord.id,
+          organization_id: organizationId ?? null,
           bom_item_id: part.id,
           part_number: part.partNumber,
           description: part.description,
@@ -139,7 +143,6 @@ export class RfqTrackingService {
       .from('rfq_tracking_summary')
       .select('*')
       .eq('id', trackingId)
-      .eq('user_id', userId)
       .single();
 
     if (error || !data) {
@@ -167,11 +170,10 @@ export class RfqTrackingService {
 
     const client = this.supabaseService.getClient(accessToken);
 
-    // Always filter by both user_id AND project_id for security
+    // Filter by project_id — RLS already scopes visibility to the caller's org
     let query = client
       .from('rfq_tracking_summary')
       .select('*')
-      .eq('user_id', userId)
       .eq('project_id', projectId)
       .order('sent_at', { ascending: false });
 
@@ -203,12 +205,11 @@ export class RfqTrackingService {
   ): Promise<void> {
     const client = this.supabaseService.getClient(accessToken);
 
-    // Verify user owns this RFQ tracking record
+    // Verify this RFQ tracking record is accessible (RLS enforces org scope)
     const { data: tracking, error: trackingError } = await client
       .from('rfq_tracking')
       .select('id')
       .eq('id', trackingId)
-      .eq('user_id', userId)
       .single();
 
     if (trackingError || !tracking) {
@@ -268,8 +269,7 @@ export class RfqTrackingService {
     const { error } = await client
       .from('rfq_tracking')
       .update(updateData)
-      .eq('id', trackingId)
-      .eq('user_id', userId);
+      .eq('id', trackingId);
 
     if (error) {
       throw new BadRequestException(`Failed to update tracking status: ${error.message}`);
@@ -286,12 +286,11 @@ export class RfqTrackingService {
   ): Promise<void> {
     const client = this.supabaseService.getClient(accessToken);
 
-    // First verify the user owns this tracking record
+    // First verify this tracking record is accessible (RLS enforces org scope)
     const { data: tracking, error: findError } = await client
       .from('rfq_tracking')
       .select('id')
       .eq('id', trackingId)
-      .eq('user_id', userId)
       .single();
 
     if (findError || !tracking) {
@@ -302,8 +301,7 @@ export class RfqTrackingService {
     const { error: deleteError } = await client
       .from('rfq_tracking')
       .delete()
-      .eq('id', trackingId)
-      .eq('user_id', userId);
+      .eq('id', trackingId);
 
     if (deleteError) {
       throw new BadRequestException(`Failed to delete RFQ tracking: ${deleteError.message}`);
@@ -342,11 +340,10 @@ export class RfqTrackingService {
 
     const client = this.supabaseService.getClient(accessToken);
 
-    // Always filter by both user_id AND project_id
+    // Filter by project_id — RLS already scopes visibility to the caller's org
     let query = client
       .from('rfq_tracking')
       .select('status, sent_at, first_response_at')
-      .eq('user_id', userId)
       .eq('project_id', projectId);
 
     const { data, error } = await query;

@@ -10,6 +10,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { BOMsService } from './boms.service';
@@ -21,6 +22,8 @@ import { BOMResponseDto, BOMListResponseDto } from './dto/bom-response.dto';
 import { BOMItemListResponseDto } from '../bom-items/dto/bom-item-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 
 @ApiTags('BOMs')
 @ApiBearerAuth()
@@ -57,10 +60,16 @@ export class BOMsController {
   }
 
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new BOM' })
   @ApiResponse({ status: 201, description: 'BOM created successfully', type: BOMResponseDto })
-  async create(@Body() createBOMDto: CreateBOMDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMResponseDto> {
-    return this.bomsService.create(createBOMDto, user.id, token);
+  async create(
+    @Body() createBOMDto: CreateBOMDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ): Promise<BOMResponseDto> {
+    return this.bomsService.create(createBOMDto, user.id, token, organizationId);
   }
 
   @Put(':id')
@@ -79,11 +88,17 @@ export class BOMsController {
 
   // Cost-related endpoints
   @Post(':id/recalculate-all-costs')
+  @UseGuards(OrganizationContextGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Recalculate all costs for a BOM (triggered on save)' })
   @ApiResponse({ status: 200, description: 'All costs recalculated successfully' })
-  async recalculateAllCosts(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<{ message: string }> {
-    await this.bomItemCostService.recalculateAllCosts(id, user.id, token);
+  async recalculateAllCosts(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ): Promise<{ message: string }> {
+    await this.bomItemCostService.recalculateAllCosts(id, user.id, token, organizationId);
     return { message: 'All costs recalculated successfully' };
   }
 
@@ -224,10 +239,16 @@ export class BOMsController {
           failedAnalyses: limitedItems.length - analysisResults.length
         },
         summary: {
-          averageProcessingTime: analysisResults.length > 0 ? 
+          averageProcessingTime: analysisResults.length > 0 ?
             Math.round(analysisResults.reduce((sum, r) => sum + r.processingTimeMs, 0) / analysisResults.length) : 0,
-          averageManufacturabilityScore: analysisResults.length > 0 ?
-            Math.round(analysisResults.reduce((sum, r) => sum + (r.dfmAnalysis.manufacturability_score || 0), 0) / analysisResults.length * 100) / 100 : 0
+          // CAD analysis no longer computes a manufacturability score (see
+          // memory_optimizer.py's DFM-NOT-COMPUTED result) — real per-feature
+          // DFM risk is only available per item from GET
+          // /bom-items/:id/dfm-scores once its feature graph exists. `|| 0`
+          // here would silently report "0 = extremely difficult" for every
+          // batch run instead of "unknown," so this reports null instead of
+          // fabricating an average from missing data.
+          averageManufacturabilityScore: null as number | null,
         }
       };
 

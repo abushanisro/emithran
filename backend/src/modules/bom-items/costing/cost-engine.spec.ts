@@ -1,4 +1,4 @@
-import { computeCostSummary, type CostEngineInput, type MHRRateInput } from './cost-engine';
+import { computeCostSummary, applyPersistedRouteToSummary, type CostEngineInput, type MHRRateInput, type AppliedProcessCostRecord } from './cost-engine';
 import type { LookupGap, UnsupportedOperationGap } from '../dto/cost-breakdown.dto';
 import { planInspection, finalizeInspectionLine, type InspectionInput } from './inspection-engine';
 import type { NestingResult } from './sheet-metal-nesting.engine';
@@ -223,6 +223,40 @@ describe('computeCostSummary — Manufacturing Physics Calculator pipeline (Lase
     expect(deburr.calculatorId).toBe('test-deburr-calculator-id');
     expect(deburr.calculatorVersion).toBe(1);
     expect(deburr.physicsGap).toBeUndefined();
+  });
+
+  it("uses each process's own differentiated labour rate instead of one flat rate for every process", () => {
+    // Deburr has a real, differentiated 'Deburr' process-group LHR rate in
+    // production (lhr_benchmark_rates) distinct from — and typically lower
+    // than — the generic 'Sheet Metal' rate every other process falls back
+    // to. Before this fix, cost-engine.ts ignored MHRRateInput.labourRate
+    // entirely and applied the SAME flat directLaborRatePerHr to every
+    // process regardless of skill tier.
+    const flatRate = 300;
+    const deburrLabourRate = 50;
+    const result = computeCostSummary(baseInput({
+      directLaborRatePerHr: flatRate,
+      mhrRates: {
+        laser: rate(1200, 'fiber_laser'), // no labourRate override -> falls back to the flat rate
+        pressBrake: rate(800, 'press_brake'),
+        deburring: rate(300, 'deburring', { labourRate: deburrLabourRate }),
+        tapping: rate(900, 'tapping'),
+        drillPress: rate(600, 'drill_press'),
+        pemPress: rate(500, 'pem_press'),
+        inspection: rate(450, 'cmm'),
+      },
+    }));
+
+    const deburr = result.processLines.find((l) => l.process === 'Deburring')!;
+    const laser = result.processLines.find((l) => l.process === 'Laser Cutting')!;
+
+    const deburrMachineCost = (300 / 60) * (30 / 60);
+    const deburrLaborCost = (deburrLabourRate / 60) * 1 * (30 / 60);
+    expect(deburr.runCost).toBeCloseTo(deburrMachineCost + deburrLaborCost, 2);
+
+    const laserMachineCost = (1200 / 60) * (45 / 60);
+    const laserLaborCost = (flatRate / 60) * 1 * (45 / 60);
+    expect(laser.runCost).toBeCloseTo(laserMachineCost + laserLaborCost, 2);
   });
 
   it('propagates confidence through to the process line for all three states', () => {
@@ -494,5 +528,135 @@ describe('computeCostSummary — material utilisation advisory (RTP2 MAG2 FRONTF
       nestingResult: nesting({ utilisationPct: UTILIZATION_ADVISORY_THRESHOLD_PCT - 0.1 }),
     }));
     expect(justBelow.warnings.some((w) => w.includes('Material utilisation'))).toBe(true);
+  });
+});
+
+// P0.2 — process_cost_records is the applied-quote authority. Once a route
+// has been applied and persisted, Cost Summary must agree with it on the
+// full costing identity (process/operation, machine_class, machine_name,
+// cycle_time, setup_time, direct_rate, total_cost_per_part) for the cutting
+// and press-brake lines -- never fabricate or fall back to Laser Cutting.
+describe('applyPersistedRouteToSummary — P0.2 applied-route authority', () => {
+  function appliedRecord(overrides: Partial<AppliedProcessCostRecord> = {}): AppliedProcessCostRecord {
+    return {
+      machine_class: 'waterjet',
+      machine_name: 'Test Waterjet Machine',
+      mhr_id: 'mhr-wj-1',
+      operation: 'waterjet_cutting',
+      process_group: 'Sheet Metal',
+      process_route: 'Waterjet Cutting',
+      cycle_time: 600,           // seconds
+      setup_time: 25,            // minutes
+      direct_rate: 950,
+      setup_cost_per_part: 5.25,
+      total_cycle_cost_per_part: 37.5,
+      total_cost_per_part: 42.75,
+      ...overrides,
+    };
+  }
+
+  it('pre-apply path is byte-for-byte unchanged when no active process_cost_records row exists', () => {
+    const preApply = computeCostSummary(baseInput());
+    const result = applyPersistedRouteToSummary(preApply, []);
+    expect(result).toEqual(preApply);
+    expect(result.processLines.find((l) => l.process === 'Laser Cutting')).toBeDefined();
+  });
+
+  it('applied Waterjet: Cost Summary agrees with the persisted record on the full costing identity, not just the process name', () => {
+    const preApply = computeCostSummary(baseInput());
+    const record = appliedRecord({ machine_class: 'waterjet' });
+    const result = applyPersistedRouteToSummary(preApply, [record]);
+
+    // Cannot fabricate or fall back to Laser Cutting.
+    expect(result.processLines.find((l) => l.process === 'Laser Cutting')).toBeUndefined();
+
+    const line = result.processLines.find((l) => l.process === 'Waterjet Cutting')!;
+    expect(line).toBeDefined();
+    expect(line.operation).toBe(record.operation);
+    expect(line.machineClass).toBe('waterjet');
+    expect(line.machineName).toBe(record.machine_name);
+    expect(line.cycleTimeMin).toBeCloseTo(record.cycle_time / 60, 6); // cycle_time
+    expect(line.setupTimeMin).toBe(record.setup_time);                // setup_time
+    expect(line.hourlyRate).toBe(record.direct_rate);                 // direct_rate
+    expect(line.totalCost).toBe(record.total_cost_per_part);          // total_cost_per_part
+
+    // Aggregates recomputed to reflect the swap, not the discarded laser line.
+    expect(result.totalProcessCost).toBe(
+      result.processLines.reduce((s, l) => s + l.totalCost, 0),
+    );
+    expect(result.totalCost).toBe(result.materialCost + result.totalProcessCost);
+    expect(result.cycleTimes.laserMin).toBe(0);
+  });
+
+  it('applied Turret Punch: Cost Summary agrees with the persisted record on the full costing identity, not just the process name', () => {
+    const preApply = computeCostSummary(baseInput());
+    const record = appliedRecord({
+      machine_class: 'turret_punch',
+      machine_name: 'Test Turret Press',
+      operation: 'turret_punching',
+      process_route: 'Turret Punching',
+      cycle_time: 180,
+      setup_time: 45,
+      direct_rate: 620,
+      total_cost_per_part: 18.9,
+    });
+    const result = applyPersistedRouteToSummary(preApply, [record]);
+
+    expect(result.processLines.find((l) => l.process === 'Laser Cutting')).toBeUndefined();
+    expect(result.processLines.find((l) => l.process === 'Waterjet Cutting')).toBeUndefined();
+
+    const line = result.processLines.find((l) => l.process === 'Turret Punching')!;
+    expect(line).toBeDefined();
+    expect(line.operation).toBe(record.operation);
+    expect(line.machineClass).toBe('turret_punch');
+    expect(line.machineName).toBe(record.machine_name);
+    expect(line.cycleTimeMin).toBeCloseTo(record.cycle_time / 60, 6);
+    expect(line.setupTimeMin).toBe(record.setup_time);
+    expect(line.hourlyRate).toBe(record.direct_rate);
+    expect(line.totalCost).toBe(record.total_cost_per_part);
+    expect(result.cycleTimes.laserMin).toBe(0);
+  });
+
+  it('applied Press Brake: an edited/persisted bending record overrides the live recompute independently of cutting', () => {
+    const preApply = computeCostSummary(baseInput());
+    const liveLaser = preApply.processLines.find((l) => l.process === 'Laser Cutting')!;
+    const record = appliedRecord({
+      machine_class: 'press_brake',
+      machine_name: 'Test 160T Brake',
+      operation: 'press_brake_bending',
+      process_group: 'Sheet Metal',
+      process_route: 'Press Brake',
+      cycle_time: 90,
+      setup_time: 12,
+      direct_rate: 410,
+      total_cost_per_part: 9.4,
+    });
+    const result = applyPersistedRouteToSummary(preApply, [record]);
+
+    // Cutting line is untouched -- Press Brake is an independent operation,
+    // not an alternative to the cutting technology.
+    expect(result.processLines.find((l) => l.process === 'Laser Cutting')).toEqual(liveLaser);
+
+    const line = result.processLines.find((l) => l.process === 'Press Brake')!;
+    expect(line).toBeDefined();
+    expect(line.operation).toBe(record.operation);
+    expect(line.machineClass).toBe('press_brake');
+    expect(line.machineName).toBe(record.machine_name);
+    expect(line.cycleTimeMin).toBeCloseTo(record.cycle_time / 60, 6);
+    expect(line.setupTimeMin).toBe(record.setup_time);
+    expect(line.hourlyRate).toBe(record.direct_rate);
+    expect(line.totalCost).toBe(record.total_cost_per_part);
+    expect(result.cycleTimes.pressBrakeMin).toBeCloseTo(record.cycle_time / 60, 6);
+  });
+
+  it('a machine whose commodity code the static registry has never heard of is still judged on its real persisted numbers, not silently dropped', () => {
+    // Distinct from machine-capability.ts's P0.1 registry -- this proves the
+    // SAME "no fabrication" discipline holds for the applied-cost read path.
+    const preApply = computeCostSummary(baseInput());
+    const record = appliedRecord({ machine_class: 'waterjet', mhr_id: null });
+    const result = applyPersistedRouteToSummary(preApply, [record]);
+    const line = result.processLines.find((l) => l.process === 'Waterjet Cutting')!;
+    expect(line.rateSource).toBe('default_rate'); // honest, since mhr_id is absent -- never fabricated as 'mhr_database'
+    expect(line.totalCost).toBe(record.total_cost_per_part);
   });
 });

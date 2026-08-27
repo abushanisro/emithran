@@ -1,4 +1,34 @@
-import { computeNesting, resolveNestingDimensions, isTrueNestCostingCacheValid, computeMassBasedUtilizationPct } from './sheet-metal-nesting.engine';
+import { computeNesting, resolveNestingDimensions, isTrueNestCostingCacheValid, computeMassBasedUtilizationPct, resolveProcessPartSpacingMm, computePartAllowanceMm } from './sheet-metal-nesting.engine';
+
+describe('resolveProcessPartSpacingMm — real per-process nesting spacing (closeout Plan Phase 3)', () => {
+  it('matches thickness 1:1 for fiber_laser, up to the 50mm cap', () => {
+    expect(resolveProcessPartSpacingMm('fiber_laser', 5)).toBe(5);
+    expect(resolveProcessPartSpacingMm('fiber_laser', 50)).toBe(50);
+    expect(resolveProcessPartSpacingMm('fiber_laser', 999)).toBe(50);
+  });
+
+  it('is a flat spacing for turret_punch and waterjet, independent of thickness', () => {
+    expect(resolveProcessPartSpacingMm('turret_punch', 1)).toBe(6.35);
+    expect(resolveProcessPartSpacingMm('turret_punch', 10)).toBe(6.35);
+    expect(resolveProcessPartSpacingMm('waterjet', 1)).toBe(5.08);
+    expect(resolveProcessPartSpacingMm('waterjet', 10)).toBe(5.08);
+  });
+
+  it('falls back to the laser curve for any unrecognized machine class (disclosed default, not a guess)', () => {
+    expect(resolveProcessPartSpacingMm('press_brake', 5)).toBe(5);
+  });
+});
+
+describe('computePartAllowanceMm — Gross/Net Usage default (assumes laser cutting, closeout Plan Phase 3)', () => {
+  it('uses the real laser spacing curve as its base', () => {
+    expect(computePartAllowanceMm(5)).toBe(5);
+    expect(computePartAllowanceMm(75)).toBe(50);
+  });
+
+  it('adds 10mm for stamping impressions on top of the base spacing', () => {
+    expect(computePartAllowanceMm(5, true)).toBe(15);
+  });
+});
 
 describe('resolveNestingDimensions', () => {
   // A. If flat-pattern dimensions exist, nesting uses them.
@@ -58,7 +88,6 @@ describe('computeNesting — utilization formula (unchanged by the dimension-sou
       thicknessMm,
       netWeightKg,
       densityKgM3,
-      shearStrengthMpa: 138, // AL6101 real shear strength
       materialPricePerKg: 2.70,
     });
 
@@ -83,7 +112,6 @@ describe('computeNesting — utilization formula (unchanged by the dimension-sou
       thicknessMm: 0.5,
       netWeightKg: 0.001,
       densityKgM3: 2700,
-      shearStrengthMpa: 138,
       materialPricePerKg: 2.70,
     };
     const foldedResult = computeNesting({ ...common, flatPatternLengthMm: 55.0, flatPatternWidthMm: 8.0 });
@@ -110,7 +138,6 @@ describe('computeNesting — sheetsRequired / batch consumption (RTP2 MAG2 FRONT
     thicknessMm: 1.6,
     netWeightKg: 1.2335,
     densityKgM3: 7850, // SECC
-    shearStrengthMpa: 350,
     materialPricePerKg: 1.0,
   };
 

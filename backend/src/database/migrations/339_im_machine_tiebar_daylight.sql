@@ -1,4 +1,4 @@
--- Migration 339: Add IM-specific machine spec columns for aPriori-style selection.
+-- Migration 339: Add IM-specific machine spec columns for eMithran-style selection.
 -- Adds tie-bar spacing, shot capacity (grams), and mold daylight to mhr_records.
 -- All columns nullable — existing records unaffected until seeded.
 

@@ -15,7 +15,7 @@ export class RfqService {
     private readonly rfqTrackingService: RfqTrackingService
   ) { }
 
-  async create(userId: string, createRfqDto: CreateRfqDto): Promise<RfqRecord> {
+  async create(userId: string, createRfqDto: CreateRfqDto, accessToken?: string, organizationId?: string): Promise<RfqRecord> {
     const {
       rfqName,
       projectId,
@@ -32,14 +32,15 @@ export class RfqService {
     const rfqNumber = await this.generateRfqNumber();
 
     // Validate BOM items and vendors exist
-    await this.validateBomItems(bomItemIds);
-    await this.validateVendors(vendorIds);
+    await this.validateBomItems(bomItemIds, accessToken);
+    await this.validateVendors(vendorIds, accessToken);
 
 
-    const { data, error } = await this.supabaseService.client
+    const { data, error } = await this.supabaseService.getClient(accessToken)
       .from('rfq_records')
       .insert({
         user_id: userId,
+        organization_id: organizationId ?? null,
         project_id: projectId,
         rfq_name: rfqName,
         rfq_number: rfqNumber,
@@ -92,8 +93,8 @@ export class RfqService {
     return this.mapToRfqRecord(data);
   }
 
-  async findByUser(userId: string, projectId?: string): Promise<RfqSummary[]> {
-    let query = this.supabaseService.client
+  async findByUser(userId: string, projectId?: string, accessToken?: string): Promise<RfqSummary[]> {
+    let query = this.supabaseService.getClient(accessToken)
       .from('rfq_records')
       .select(`
         id,
@@ -105,7 +106,6 @@ export class RfqService {
         created_at,
         sent_at
       `)
-      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (projectId) {
@@ -128,12 +128,11 @@ export class RfqService {
     return (data || []).map((row: any) => this.mapToRfqSummary(row));
   }
 
-  async findOne(id: string, userId: string): Promise<RfqRecord> {
-    const { data, error } = await this.supabaseService.client
+  async findOne(id: string, userId: string, accessToken?: string): Promise<RfqRecord> {
+    const { data, error } = await this.supabaseService.getClient(accessToken)
       .from('rfq_records')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
       .single();
 
     if (error) {
@@ -157,11 +156,11 @@ export class RfqService {
     return this.mapToRfqRecord(data);
   }
 
-  async sendRfq(id: string, userId: string, accessToken?: string): Promise<void> {
+  async sendRfq(id: string, userId: string, accessToken?: string, organizationId?: string): Promise<void> {
     this.logger.log(`Sending RFQ ${id} for user ${userId}, accessToken provided: ${!!accessToken}`);
-    
+
     // First validate the RFQ exists and belongs to the user
-    const rfq = await this.findOne(id, userId);
+    const rfq = await this.findOne(id, userId, accessToken);
     this.logger.log(`RFQ details: ${JSON.stringify({ id: rfq.id, projectId: rfq.projectId, status: rfq.status })}`);
 
     if (rfq.status !== RfqStatus.DRAFT) {
@@ -192,7 +191,7 @@ export class RfqService {
     }
 
     // Use the database function to mark as sent
-    const { error } = await this.supabaseService.client
+    const { error } = await this.supabaseService.getClient(accessToken)
       .rpc('send_rfq', { p_rfq_id: id, p_user_id: userId });
 
     if (error) {
@@ -212,13 +211,13 @@ export class RfqService {
     this.logger.log(`RFQ ${id} marked as sent in database`);
 
     // Send RFQ emails to all vendors
-    await this.rfqEmailService.sendRfqEmails(rfq);
+    await this.rfqEmailService.sendRfqEmails(rfq, accessToken);
 
     // Create tracking record if access token provided
     if (accessToken) {
       try {
         this.logger.log(`Creating tracking record for RFQ ${rfq.id} in project ${rfq.projectId}`);
-        await this.createRfqTrackingRecord(rfq, userId, accessToken);
+        await this.createRfqTrackingRecord(rfq, userId, accessToken, organizationId);
         this.logger.log(`RFQ tracking record created successfully for RFQ ${rfq.id} in project ${rfq.projectId}`);
       } catch (error) {
         this.logger.error(`Failed to create RFQ tracking record for RFQ ${rfq.id}: ${error.message}`, error.stack);
@@ -229,11 +228,11 @@ export class RfqService {
     }
   }
 
-  async closeRfq(id: string, userId: string): Promise<void> {
+  async closeRfq(id: string, userId: string, accessToken?: string): Promise<void> {
     // Validate ownership first
-    await this.findOne(id, userId);
+    await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService.client
+    const { error } = await this.supabaseService.getClient(accessToken)
       .rpc('close_rfq', { p_rfq_id: id, p_user_id: userId });
 
     if (error) {
@@ -261,6 +260,11 @@ export class RfqService {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
 
     const prefix = `RFQ-${year}${month}`;
+    // Deliberately stays on the service-role client: rfq_number is UNIQUE
+    // across the WHOLE table (migrations/043_rfq_system.sql), not per-org —
+    // an RLS-scoped count would only see the caller's own org's rows,
+    // letting two different orgs generate the same number in the same month
+    // and collide on insert.
     const { count, error } = await this.supabaseService.client
       .from('rfq_records')
       .select('*', { count: 'exact', head: true })
@@ -275,8 +279,10 @@ export class RfqService {
     return `${prefix}-${nextNumber.toString().padStart(3, '0')}`;
   }
 
-  private async validateBomItems(bomItemIds: string[]): Promise<void> {
-    const { count, error } = await this.supabaseService.client
+  private async validateBomItems(bomItemIds: string[], accessToken?: string): Promise<void> {
+    // RLS-scoped (not admin client): also validates the caller's org actually
+    // has access to these bom_items, not merely that the ids exist somewhere.
+    const { count, error } = await this.supabaseService.getClient(accessToken)
       .from('bom_items')
       .select('*', { count: 'exact', head: true })
       .in('id', bomItemIds);
@@ -300,8 +306,8 @@ export class RfqService {
     }
   }
 
-  private async validateVendors(vendorIds: string[]): Promise<void> {
-    const { count, error } = await this.supabaseService.client
+  private async validateVendors(vendorIds: string[], accessToken?: string): Promise<void> {
+    const { count, error } = await this.supabaseService.getClient(accessToken)
       .from('vendors')
       .select('*', { count: 'exact', head: true })
       .in('id', vendorIds);
@@ -366,7 +372,7 @@ export class RfqService {
   /**
    * Create RFQ tracking record
    */
-  private async createRfqTrackingRecord(rfq: RfqRecord, userId: string, accessToken: string): Promise<void> {
+  private async createRfqTrackingRecord(rfq: RfqRecord, userId: string, accessToken: string, organizationId?: string): Promise<void> {
     // Ensure project_id is set - critical for data isolation
     if (!rfq.projectId) {
       throw new BadRequestException(
@@ -394,7 +400,7 @@ export class RfqService {
         }));
 
     // Create tracking record
-    await this.rfqTrackingService.createTracking(userId, accessToken, {
+    await this.rfqTrackingService.createTracking(userId, accessToken, organizationId, {
       rfqId: rfq.id,
       projectId: rfq.projectId,
       rfqName: rfq.rfqName,

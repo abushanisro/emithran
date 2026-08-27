@@ -233,7 +233,7 @@ export class BOMsService {
     }
   }
 
-  async create(createBOMDto: CreateBOMDto, userId: string, accessToken: string): Promise<BOMResponseDto> {
+  async create(createBOMDto: CreateBOMDto, userId: string, accessToken: string, organizationId?: string): Promise<BOMResponseDto> {
     this.logger.log('Creating BOM', 'BOMsService');
 
     const { data, error } = await this.supabaseService
@@ -245,6 +245,7 @@ export class BOMsService {
         project_id: createBOMDto.projectId,
         version: createBOMDto.version || '1.0',
         user_id: userId,
+        organization_id: organizationId ?? null,
       })
       .select()
       .single();

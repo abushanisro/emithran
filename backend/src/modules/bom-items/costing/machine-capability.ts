@@ -1,10 +1,19 @@
-// Phase-1 fallback: specs are hardcoded here by commodity code.
-// Future sprint: source MACHINE_CAPABILITY_REGISTRY from the Digital Factory
-// machine database so shop-specific limits (customer's actual 60T brake, etc.)
-// override these benchmark defaults without a code deployment.
+// P0.1 superseded this registry as the PRIMARY capability source: real,
+// provenance-tagged per-machine capability (mhr_records -> seed registry ->
+// class defaults, see checkMachineCapability's realCapability param below) now
+// takes priority whenever available, which is every real production call site
+// today (see checkMachineCapability's own doc comment). This static,
+// commodity-code-keyed registry is what remains: the last-resort fallback for
+// when realCapability is genuinely absent (ENABLE_PHYSICS_MACHINE_SELECTION=
+// false, or no candidate was ever resolved) -- kept and tested deliberately
+// (machine-capability.spec.ts's "falls back to the static registry unchanged
+// when no real capability is available"), not forgotten Phase-1 scaffolding.
 
 import type { MachineClass } from "./default-rates";
 import { estimateBendTonnage, estimateTurretPunchTonnage } from "./default-rates";
+import type { MachineCapability } from "./machine-selection/seed-registry";
+import { classifyLaserMaterial, TONNAGE_MARGIN, BED_MARGIN } from "./machine-selection/physics";
+import { laserThicknessLimit } from "./machine-selection/selector";
 
 export interface MachineCapabilitySpec {
   maxThicknessMm?: number;
@@ -55,6 +64,10 @@ export interface PartGeometryForCapability {
   // Cut (Internal & External)" input to the real TPP Manufacturing formula.
   punchCutLengthMm?: number | null;
   materialShearStrengthMpa?: number | null;
+  // Raw material grade — used only for laser material-family-specific thickness
+  // limits (classifyLaserMaterial) when realCapability is available. Optional:
+  // absence just means the generic (non-material-specific) thickness limit is used.
+  materialGrade?: string | null;
 }
 
 export type CapabilityReasonCode =
@@ -89,6 +102,30 @@ export function checkMachineCapability(
   machineClass: string,
   commodityCode: string | null,
   geometry: PartGeometryForCapability,
+  // Real, provenance-tagged per-machine capability from machine-selection/
+  // selector.ts's DB-first hydration (mhr_records -> seed registry -> class
+  // defaults). When present, this is authoritative and the static
+  // MACHINE_CAPABILITY_REGISTRY below is skipped entirely — see the P0.1 plan:
+  // the registry alone couldn't see a specific machine's real tonnage/thickness
+  // limits and silently defaulted to "capable" whenever commodityCode was null
+  // or unrecognized, even after the real selector had already proven no machine
+  // in the shop could do the job. Absent (undefined/null) only when physics
+  // selection is disabled or no candidate was ever resolved -- the registry
+  // remains the honest last-resort tier for that case, and for machine classes
+  // (waterjet, tapping, deburring) the DB-first selector doesn't yet score.
+  realCapability?: MachineCapability | null,
+  // Provenance of realCapability, straight from the SAME candidate it was read
+  // off (candidate.capability / candidate.capabilitySource are sibling fields
+  // on machine-selection/selector.ts's MachineCandidate for the one machine
+  // actually selected — see bom-items.service.ts's call sites, which read both
+  // off one local `cand`/`candidate` so they can never point at two different
+  // machines). 'imported' = real mhr_records data (high confidence); 'seed' =
+  // name-matched guess (medium); 'default_class' = conservative class-wide
+  // default, no real data on this machine at all (low) — mirrors how
+  // selector.ts itself treats these tiers (it caps its own confidence at 40
+  // for 'default_class'). Do NOT report "high" confidence for a guess just
+  // because it came from the real-capability code path.
+  capabilitySource?: "imported" | "seed" | "default_class",
 ): CapabilityCheck {
   // Bend tonnage — air-bending physics (1.42 × UTS × t² × L / V), press brake only
   const bendTonnage =
@@ -123,6 +160,77 @@ export function checkMachineCapability(
   // Class-level constraints (e.g. turret ≤ 6mm)
   const classCheck = CLASS_CONSTRAINTS[machineClass];
   if (classCheck) failures.push(...classCheck(geometry));
+
+  // Real per-machine capability takes priority over the static registry below.
+  if (realCapability) {
+    const isLaser = machineClass === "fiber_laser" || machineClass === "co2_laser";
+    const thicknessLimit = isLaser
+      ? laserThicknessLimit(realCapability, {
+          kind: "laser",
+          thicknessMm: geometry.sheetThicknessMm,
+          materialFamily: classifyLaserMaterial(geometry.materialGrade ?? null),
+          materialGrade: geometry.materialGrade ?? null,
+          bedLengthMm: geometry.flatPatternLengthMm,
+          bedWidthMm: geometry.flatPatternWidthMm,
+        })
+      : realCapability.maxThicknessMm;
+    if (thicknessLimit != null && geometry.sheetThicknessMm > thicknessLimit) {
+      failures.push({ code: "THICKNESS_EXCEEDED", message: `Thickness ${geometry.sheetThicknessMm}mm exceeds machine limit (${thicknessLimit}mm)` });
+    }
+
+    if (machineClass === "press_brake") {
+      // Real bend length (how long a single fold is), not flat-pattern length —
+      // matches machine-selection/selector.ts's own press_brake bed comparison.
+      const bendLen = geometry.bendLengthMm ?? geometry.flatPatternLengthMm;
+      if (realCapability.maxLengthMm != null && bendLen != null && bendLen * BED_MARGIN > realCapability.maxLengthMm) {
+        failures.push({ code: "BED_LENGTH_EXCEEDED", message: `Bend length ${bendLen}mm exceeds machine bed (${realCapability.maxLengthMm}mm)` });
+      }
+    } else if (
+      realCapability.maxXMm != null && realCapability.maxYMm != null &&
+      geometry.flatPatternLengthMm != null && geometry.flatPatternWidthMm != null
+    ) {
+      const l = geometry.flatPatternLengthMm * BED_MARGIN;
+      const w = geometry.flatPatternWidthMm * BED_MARGIN;
+      const fits = (realCapability.maxXMm >= l && realCapability.maxYMm >= w) ||
+                   (realCapability.maxXMm >= w && realCapability.maxYMm >= l);
+      if (!fits) {
+        failures.push({
+          code: "BED_LENGTH_EXCEEDED",
+          message: `Part ${geometry.flatPatternLengthMm}x${geometry.flatPatternWidthMm}mm exceeds machine bed (${realCapability.maxXMm}x${realCapability.maxYMm}mm)`,
+        });
+      }
+    }
+
+    if (estimatedTonnage != null && realCapability.maxTonnage != null && estimatedTonnage * TONNAGE_MARGIN > realCapability.maxTonnage) {
+      const forceLabel = machineClass === "turret_punch" ? "Estimated punch force" : "Estimated bend force";
+      failures.push({
+        code: "TONNAGE_EXCEEDED",
+        message: `${forceLabel} ${estimatedTonnage}t exceeds machine capacity (${realCapability.maxTonnage}t, incl. 15% margin)`,
+      });
+    }
+
+    // Confidence reflects how real the underlying data is — a class-wide
+    // default guess must never be reported as confidently as an imported,
+    // machine-specific spec, even though both take this same code path.
+    const confidence: "high" | "medium" | "low" =
+      capabilitySource === "seed" ? "medium" :
+      capabilitySource === "default_class" ? "low" :
+      "high"; // 'imported', or unspecified (caller vouches for the data)
+    const reasons = failures.map((f) => f.message);
+    if (capabilitySource === "seed") {
+      reasons.push("Capability from model seed data — verify against machine plate");
+    } else if (capabilitySource === "default_class") {
+      reasons.push("No capability on file for this machine — conservative class defaults applied");
+    }
+
+    return {
+      capable: failures.length === 0,
+      confidence,
+      reasonCodes: failures.map((f) => f.code),
+      reasons,
+      estimatedTonnage,
+    };
+  }
 
   // No commodity code → specific machine unknown
   if (!commodityCode) {

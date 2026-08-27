@@ -22,7 +22,22 @@ export interface SmLookupBridgeEntry {
   description: string;
   filter?: { column: string; values: string[] };
   orderBy?: string;
+  // ILIKE pattern(s) — e.g. '%laser%', or comma-separated for an OR match
+  // like '%waterjet%,%oxyfuel%,%plasma%' — applied to sm_reference_data.key
+  // only. Used exclusively by entries whose `table` is 'sm_reference_data',
+  // to surface the staged reconciliation export (migrations 479+) relevant
+  // to a route, without needing a hand-picked exact-match filter per topic.
+  // A route with no genuinely matching staged data legitimately renders an
+  // empty panel — that's an honest "nothing collected for this yet", not a
+  // bug (user confirmed this is the desired behavior 2026-08-19).
+  keyPattern?: string;
 }
+
+// sm_reference_data (migration 479) is internal staging, never a live
+// cost-engine input — see its own table comment. Bridging it read-only into
+// the Lookup Tables dialog (below) must never let it become editable through
+// this generic table-update endpoint the way real sm_lookup_* tables are.
+export const SM_LOOKUP_READONLY_TABLES = new Set(['sm_reference_data']);
 
 export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry[]>> = {
   'Sheet Metal': {
@@ -44,6 +59,12 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         description: 'Per-batch setup time (min) — migration 416',
         filter: { column: 'operation', values: ['waterjet'] },
       },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions waterjet, oxyfuel, or plasma — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%waterjet%,%oxyfuel%,%plasma%',
+      },
     ],
     'Sheet Metal Fabrication': [
       {
@@ -58,6 +79,12 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         description: 'Per-batch setup time (min) — migration 416',
         filter: { column: 'operation', values: ['turret_punch'] },
       },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions turret, punch, or nibble — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%turret%,%punch%,%nibbl%',
+      },
     ],
     'Laser Cutting': [
       {
@@ -71,6 +98,12 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         displayName: 'Laser Setup Time',
         description: 'Per-batch setup time (min) — migration 416',
         filter: { column: 'operation', values: ['fiber_laser'] },
+      },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions laser — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%laser%',
       },
     ],
     'Bending/Floating /Forming': [
@@ -115,6 +148,12 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         displayName: 'Roll Forming Line Speed / Setup Time',
         description: 'Line speed (m/min) and tooling setup time (min) — migration 442',
       },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions bend, draw, press, roll, form, or stamp — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%bend%,%draw%,%press%,%roll%,%form%,%stamp%',
+      },
     ],
     // Migration 344 also seeded a SEPARATE 'Press Brake' route (Bend/Form/
     // Press Brake Bend — distinct rows from 'Bending/Floating /Forming''s own
@@ -142,6 +181,12 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         description: 'Per-batch setup time (min) — migration 416',
         filter: { column: 'operation', values: ['press_brake'] },
       },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions bend or press — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%bend%,%press%',
+      },
     ],
     // 'Forming' / 'Hole Extrusion (Burring)' (machine_class='hole_forming',
     // migration 404) resolves its own real forming-force physics via the
@@ -155,6 +200,12 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         description: 'Manual stroke time (sec) by thickness, tonnage, and complexity — same table Press Brake uses, migration 300',
         orderBy: 'thickness_mm,tonnage',
       },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions form, extrusion, or burr — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%form%,%extrus%,%burr%',
+      },
     ],
     // 'Drilling' / 'Tapping' (machine_class='tapping') — cycle time itself is
     // real rigid-tapping physics (physics_key='tapping', migration 056), no
@@ -166,12 +217,24 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         description: 'Per-batch setup time (min) — migration 416',
         filter: { column: 'operation', values: ['tapping'] },
       },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions tap, drill, or hole — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%tap%,%drill%,%hole%',
+      },
     ],
     'Finishing': [
       {
         table: 'sm_lookup_deburr_rate',
         displayName: 'Deburr Cycle-Time Rate',
         description: 'Manual deburr time (sec) per metre of cut edge and per pierce — migration 413',
+      },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions deburr, deslag, edge, or finish — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%deburr%,%deslag%,%edge%,%finish%',
       },
     ],
     'Inspection': [
@@ -193,6 +256,12 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         description: 'Cycle time (sec) per feature type and inspection method (visual/caliper/height_gauge/cmm) — migration 423',
         orderBy: 'feature,method',
       },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions tolerance, inspection, sampling, aql, or cmm — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%tolerance%,%inspect%,%sampling%,%aql%,%cmm%',
+      },
     ],
     // Real rate table is surface_treatment_rates (migrations 362/363), not an
     // sm_lookup_* table — bridged the same way regardless of naming, since
@@ -206,6 +275,61 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         displayName: 'Surface Treatment Rates',
         description: 'Rate (USD/m²) and minimum lot charge (USD) by treatment type and location — migrations 362/363',
         orderBy: 'treatment_type,location',
+      },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions coating, plating, anodize, chromate, chem, or surface — read-only, not yet wired to a live calculator (migration 479+)',
+        keyPattern: '%coating%,%plating%,%anodiz%,%chromate%,%chem%,%surface%',
+      },
+    ],
+    // 'Gross Usage'/'Net Usage' (machine_class='sheet_metal_gross_usage_nesting'/
+    // 'sheet_metal_net_usage') both resolve their "Material Density"/"Shear
+    // Strength" calculator fields (field_type='database_lookup') from
+    // raw_materials — the real live source, same table RawMaterialDialog.tsx
+    // and the nesting engine query. raw_materials itself is NOT bridged
+    // directly (512 rows x 72 columns, a shared master table used by every
+    // process family, and every bridge payload here is unconditionally
+    // row-editable — see migration 502's comment for why that combination is
+    // unsafe for a narrow per-route admin dialog). Bridged via
+    // sm_material_usage_reference (migration 502), a narrow read-only view
+    // exposing only the two columns these calculators actually read. Route's
+    // other real dependency — STANDARD_SHEETS, the candidate sheet sizes
+    // Gross Usage evaluates — is a hardcoded TypeScript constant
+    // (sheet-metal-nesting.engine.ts), not a DB table, so it cannot be
+    // bridged here; noted for a future "make it database driven" pass, not
+    // fixed in this migration.
+    'Material Usage': [
+      {
+        table: 'sm_material_usage_reference',
+        displayName: 'Material Density & Shear Strength',
+        description: 'density_kg_m3 and shear_strength_mpa by material — the real live values Gross/Net Usage\'s "Material Density"/"Shear Strength" database-lookup fields resolve from (migration 502 view over raw_materials)',
+        orderBy: 'material',
+      },
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions material type or blank addendum — read-only, not yet wired to a live calculator (migration 479+). Deliberately narrow: broader terms like "material" or "sheet" would pull in unrelated cutting-rate data from other routes.',
+        keyPattern: '%materialType%,%blankAddendum%',
+      },
+    ],
+    // 'Raw Material' (Sheet/Flat/Coil/I-Beam/H-Beam/Angle/Channel/T-Sections/
+    // Z-Sections) — checked once already (see project memory): every one of
+    // these 9 operations has machine_class=NULL AND calculator_id=NULL in
+    // process_calculator_mappings, a fully unwired taxonomy stub. Real
+    // material costing runs through RawMaterialDialog.tsx/the nesting engine
+    // directly, never through this calculator-mapping system — so unlike
+    // Material Usage there is no real live sm_lookup_*/view dependency to
+    // bridge here. Still gets a Reference Data panel per the "every route,
+    // always show a panel" decision — this route was the one genuinely
+    // missing an entry of ANY kind (not even blank), which is why the admin
+    // UI's "Lookup Tables" link for it had nothing behind it at all.
+    'Raw Material': [
+      {
+        table: 'sm_reference_data',
+        displayName: 'Reference Data (Staged Import)',
+        description: 'Staged reconciliation export rows whose key mentions material type — read-only, not yet wired to a live calculator (migration 479+). This route has no live sm_lookup_* dependency at all (see comment above); this panel is reference-only.',
+        keyPattern: '%materialType%',
       },
     ],
   },

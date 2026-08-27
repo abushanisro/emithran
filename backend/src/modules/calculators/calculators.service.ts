@@ -512,6 +512,7 @@ export class CalculatorsServiceV2 {
    *   waterjet_cut   → params: { material, thickness_mm }
    *   sampling_plan  → params: { batch_size, complexity_level (1|2|3) }
    *   roll_forming   → params: none (single-row table, migration 442)
+   *   roll_bending   → params: { machine_name, developed_length_mm, thickness_mm, target_diameter_mm }
    */
   async resolveSheetMetalLookup(tableName: string, params: Record<string, any>) {
     const client = this.supabaseService.getAdminClient();
@@ -702,6 +703,31 @@ export class CalculatorsServiceV2 {
           value: (row as any)[pctCol],
           sampleQty: (row as any)[qtyCol],
           row,
+        };
+      }
+
+      case 'roll_bending': {
+        // Real per-machine 3/4-Roll Bender cycle time — delegates entirely to
+        // SheetMetalLookupService.getRollBendingCycleTime (see that method's
+        // own comment for the formula and its documented multi-pass gap).
+        // Unlike 'roll_forming' above (one generic shop-floor line-speed row
+        // with no per-machine or per-part axis), this resolves the SPECIFIC
+        // selected machine's own real rolling_speed_mm_s/prebend_time_s/pass
+        // limits against the actual part's developed length/thickness/target
+        // diameter — params: { machine_name, developed_length_mm,
+        // thickness_mm, target_diameter_mm }.
+        const result = await this.sheetMetalLookup.getRollBendingCycleTime(
+          String(params.machine_name || ''),
+          Number(params.developed_length_mm),
+          Number(params.thickness_mm),
+          Number(params.target_diameter_mm),
+        );
+        return {
+          value: result.secondsPerPart,
+          passMode: result.passMode,
+          capable: result.capable,
+          dataFound: result.dataFound,
+          gapReason: result.gapReason,
         };
       }
 

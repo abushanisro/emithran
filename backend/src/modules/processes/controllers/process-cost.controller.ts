@@ -28,8 +28,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
+import { OrganizationContextGuard } from '../../../common/guards/organization-context.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../../common/decorators/current-organization.decorator';
 import { ProcessCostService } from '../services/process-cost.service';
 import {
   CreateProcessCostDto,
@@ -112,6 +114,7 @@ export class ProcessCostController {
    * Create new process cost
    */
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new process cost' })
   @ApiResponse({
     status: 201,
@@ -123,10 +126,11 @@ export class ProcessCostController {
     @Body() dto: CreateProcessCostDto,
     @CurrentUser('id') userId: string,
     @AccessToken() accessToken: string,
+    @CurrentOrganization() organizationId: string,
   ): Promise<ProcessCostResponseDto> {
     try {
       this.logger.log(`Creating process cost for user ${userId}`);
-      return await this.processCostService.create(dto, userId, accessToken);
+      return await this.processCostService.create(dto, userId, accessToken, organizationId);
     } catch (error) {
       this.logger.error(`Failed to create process cost: ${error.message}`, error.stack);
       throw error;

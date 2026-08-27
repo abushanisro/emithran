@@ -48,7 +48,6 @@ let queryBuilder = this.supabaseService
         .getClient(accessToken)
         .from('packaging_logistics_cost_records')
         .select('*', { count: 'exact' })
-        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -103,7 +102,6 @@ let queryBuilder = this.supabaseService
       .from('packaging_logistics_cost_records')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
       .single();
 
     if (error || !data) {
@@ -120,6 +118,7 @@ let queryBuilder = this.supabaseService
     dto: CreatePackagingLogisticsCostDto,
     userId: string,
     accessToken?: string,
+    organizationId?: string,
   ): Promise<PackagingLogisticsCostResponseDto> {
     this.logger.log('Creating packaging/logistics cost', 'PackagingLogisticsCostService');
 
@@ -127,6 +126,7 @@ let queryBuilder = this.supabaseService
       const record = {
         bom_item_id: dto.bomItemId,
         user_id: userId,
+        organization_id: organizationId ?? null,
         cost_name: dto.costName,
         logistics_type: dto.logisticsType,
         mode_of_transport: dto.modeOfTransport,
@@ -195,7 +195,6 @@ let queryBuilder = this.supabaseService
       .from('packaging_logistics_cost_records')
       .update(updateData)
       .eq('id', id)
-      .eq('user_id', userId)
       .select()
       .single();
 
@@ -220,8 +219,7 @@ let queryBuilder = this.supabaseService
       .getClient(accessToken)
       .from('packaging_logistics_cost_records')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
 
     if (error) {
       this.logger.error(`Delete error: ${error.message}`, 'PackagingLogisticsCostService');
@@ -288,5 +286,31 @@ let queryBuilder = this.supabaseService
       totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + (row.total_cost || 0);
     }
     return totals;
+  }
+
+  /**
+   * Real region-pair freight reference rates (migration 487) — click-to-fill
+   * suggestion source for the "Add Logistics Item" dialog. Never applied
+   * automatically to a cost record; see migration 389 for why (a previous
+   * fabricated flat freight default was removed as an anti-pattern).
+   */
+  async getFreightRateBenchmarks(
+    accessToken?: string,
+  ): Promise<Array<{ rateType: string; rateUsdPerKg: number }>> {
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('freight_rate_benchmarks')
+      .select('rate_type, rate_usd_per_kg')
+      .order('rate_type');
+
+    if (error) {
+      this.logger.error(`Error fetching freight rate benchmarks: ${error.message}`, 'PackagingLogisticsCostService');
+      throw new InternalServerErrorException(`Failed to fetch freight rate benchmarks: ${error.message}`);
+    }
+
+    return (data ?? []).map((row) => ({
+      rateType: row.rate_type as string,
+      rateUsdPerKg: Number(row.rate_usd_per_kg),
+    }));
   }
 }

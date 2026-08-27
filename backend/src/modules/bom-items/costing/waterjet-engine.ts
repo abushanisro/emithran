@@ -1,11 +1,14 @@
 import {
   WATERJET_SETUP_MIN,
   WATERJET_ABRASIVE_KG_PER_MIN,
+  WATERJET_LEAD_IN_MM,
+  WATERJET_CUT_TIME_ADJUSTMENT_FACTOR,
 } from "./default-rates";
 import type { MHRRateInput } from "./cost-engine";
 import type { ProcessLineCost } from "../dto/cost-breakdown.dto";
 import type { CapabilityCheck, PartGeometryForCapability } from "./machine-capability";
 import { checkMachineCapability } from "./machine-capability";
+import type { MachineCapability } from "./machine-selection/seed-registry";
 import type { ManufacturingProcessEngine, CuttingProcessContext, CuttingProcessResult } from "./manufacturing-process-engine";
 
 export interface WaterjetInput {
@@ -48,6 +51,10 @@ export interface WaterjetInput {
   // SheetMetalLookupService.getOpSetupTime('waterjet'). Falls back to
   // WATERJET_SETUP_MIN when no row is seeded yet, with a disclosed warning.
   setupMin?: number;
+  // Real nozzle-wear cost/hr — see manufacturing-process-engine.ts's
+  // CuttingProcessContext for sourcing (migration 531, closeout Plan
+  // Phase 2b).
+  nozzleRate?: { costPerHr: number; dataFound: boolean };
 }
 
 export interface WaterjetResult {
@@ -68,7 +75,16 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
   let cuttingSec = 0;
   let pierceSec = 0;
   if (input.cuttingSpeedMmPerMin != null && input.pierceTimeSec != null) {
-    cuttingSec = input.cutLengthMm > 0 ? (input.cutLengthMm / input.cuttingSpeedMmPerMin) * 60 : 0;
+    // Each contour start (pierceCount) needs an entry ramp-up and a mirrored
+    // exit ramp-down — real travel at cutting speed, not "useful" cut length.
+    // See WATERJET_LEAD_IN_MM's own comment for the physical justification.
+    const effectiveCutLengthMm = input.cutLengthMm > 0
+      ? input.cutLengthMm + input.pierceCount * 2 * WATERJET_LEAD_IN_MM
+      : 0;
+    const rawCuttingSec = effectiveCutLengthMm > 0 ? (effectiveCutLengthMm / input.cuttingSpeedMmPerMin) * 60 : 0;
+    // Acceleration/deceleration overhead beyond the lead-in distance itself —
+    // see WATERJET_CUT_TIME_ADJUSTMENT_FACTOR's own comment.
+    cuttingSec = rawCuttingSec * WATERJET_CUT_TIME_ADJUSTMENT_FACTOR;
     pierceSec = input.pierceCount * input.pierceTimeSec;
   } else if (input.cutLengthMm > 0 || input.pierceCount > 0) {
     warnings.push("Waterjet: no sm_lookup_waterjet_cut entry for this material/thickness — cutting/pierce time is $0 until real data is added for it, not an estimate");
@@ -90,30 +106,67 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
     warnings.push("Waterjet: setup time from fallback — seed sm_lookup_op_setup_time for 'waterjet'");
   }
   const setupMin = input.setupMin ?? WATERJET_SETUP_MIN;
-  const setupCost = r2((setupMin / 60) * rate.rate / Math.max(input.batchSize, 1));
-  const runCost = r2((totalSec / 3600) * rate.rate);
+
+  // Direct labour cost — one operator, same convention as every other
+  // secondary/setup-driven process in cost-engine.ts's eMithranTerms
+  // (setupNDL/cycleNDL: 1). Uses this process's own real, differentiated
+  // labour rate (rate.labourRate, resolved by resolveLHRRates/buildOutput in
+  // bom-items.service.ts from the 'Waterjet'/'Sheet Metal' process-group
+  // benchmark) — previously resolved but never actually charged here, so
+  // this line ran at machine-rate-only cost with $0 labour. null means no
+  // differentiated rate was resolved for this location; $0 labour is
+  // disclosed, never guessed.
+  if (rate.labourRate == null) {
+    warnings.push("Waterjet: no direct labor rate resolved for this process — labor cost excluded from quote");
+  }
+  const dlrMin = (rate.labourRate ?? 0) / 60;
+  const setupCost = r2((setupMin / 60) * rate.rate / Math.max(input.batchSize, 1) + dlrMin * setupMin / Math.max(input.batchSize, 1));
+  const runCost = r2((totalSec / 3600) * rate.rate + dlrMin * cuttingMin);
+
+  const processLines: ProcessLineCost[] = [
+    {
+      process: "Waterjet Cutting",
+      ...(input.processIdentity ? {
+        processGroup: input.processIdentity.processGroup,
+        processRoute: input.processIdentity.processRoute,
+        operation: input.processIdentity.operation,
+      } : {}),
+      setupCost,
+      runCost,
+      totalCost: r2(setupCost + runCost),
+      cycleTimeMin: r2(cuttingMin),
+      hourlyRate: rate.rate,
+      rateSource: rate.source,
+      machineClass: rate.machineClass,
+      machineName: rate.machineName,
+      commodityCode: rate.commodityCode,
+      labourRate: rate.labourRate ?? null,
+    },
+  ];
+
+  // Real nozzle-wear cost, charged only for active cutting time (same basis
+  // as abrasive cost above) — see migration 531 (closeout Plan Phase 2b). A
+  // distinct, visible line item, never charged when no rate is seeded.
+  if (input.nozzleRate?.dataFound && cuttingSec > 0) {
+    const nozzleCost = r2((cuttingSec / 3600) * input.nozzleRate.costPerHr);
+    processLines.push({
+      process: "Nozzle Wear",
+      setupCost: 0,
+      runCost: nozzleCost,
+      totalCost: nozzleCost,
+      cycleTimeMin: 0,
+      hourlyRate: 0,
+      rateSource: "default_rate",
+      machineClass: rate.machineClass,
+      machineName: null,
+      commodityCode: null,
+    });
+  } else if (cuttingSec > 0) {
+    warnings.push("Waterjet: no nozzle-wear rate seeded — nozzle cost excluded from quote");
+  }
 
   return {
-    processLines: [
-      {
-        process: "Waterjet Cutting",
-        ...(input.processIdentity ? {
-          processGroup: input.processIdentity.processGroup,
-          processRoute: input.processIdentity.processRoute,
-          operation: input.processIdentity.operation,
-        } : {}),
-        setupCost,
-        runCost,
-        totalCost: r2(setupCost + runCost),
-        cycleTimeMin: r2(cuttingMin),
-        hourlyRate: rate.rate,
-        rateSource: rate.source,
-        machineClass: rate.machineClass,
-        machineName: rate.machineName,
-        commodityCode: rate.commodityCode,
-        labourRate: rate.labourRate ?? null,
-      },
-    ],
+    processLines,
     cuttingMin,
     abrasiveCost,
     warnings,
@@ -126,8 +179,13 @@ export class WaterjetEngine implements ManufacturingProcessEngine {
   readonly machineClass = 'waterjet';
   readonly processFamily = 'sheet_metal_cutting';
 
-  checkCapability(geometry: PartGeometryForCapability, commodityCode: string | null): CapabilityCheck {
-    return checkMachineCapability(this.machineClass, commodityCode, geometry);
+  checkCapability(
+    geometry: PartGeometryForCapability,
+    commodityCode: string | null,
+    realCapability?: MachineCapability | null,
+    capabilitySource?: "imported" | "seed" | "default_class",
+  ): CapabilityCheck {
+    return checkMachineCapability(this.machineClass, commodityCode, geometry, realCapability, capabilitySource);
   }
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
@@ -140,6 +198,7 @@ export class WaterjetEngine implements ManufacturingProcessEngine {
       abrasivePricePerKg: context.abrasivePricePerKg,
       abrasiveKgPerMin: context.abrasiveKgPerMin,
       setupMin: context.opSetupMin,
+      nozzleRate: context.nozzleRate,
       processIdentity: context.processIdentity,
       ...(context.waterjetParams?.dataFound ? {
         cuttingSpeedMmPerMin: context.waterjetParams.cuttingSpeedMmPerMin,

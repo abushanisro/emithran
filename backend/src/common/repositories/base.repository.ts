@@ -133,13 +133,21 @@ export abstract class BaseRepository<T> {
     client: SupabaseClient,
     data: Partial<T>,
     userId: string,
+    organizationId?: string,
   ): Promise<T> {
     const startTime = Date.now();
 
     try {
+      // organization_id only added to the payload when the caller actually
+      // resolved one — BaseRepository is generic infra, and not every future
+      // subclass is guaranteed to have this column.
       const { data: created, error } = await client
         .from(this.tableName)
-        .insert({ ...data, user_id: userId } as any)
+        .insert({
+          ...data,
+          user_id: userId,
+          ...(organizationId !== undefined ? { organization_id: organizationId } : {}),
+        } as any)
         .select()
         .single();
 

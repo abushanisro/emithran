@@ -1,6 +1,10 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
-import { LOCATION_INFO } from '../../modules/bom-items/costing/default-rates';
+import {
+  LOCATION_INFO,
+  listCurrencies as listCurrenciesFromLocationInfo,
+  listFactoryLocations,
+} from '../../modules/bom-items/costing/default-rates';
 import { FxRateCacheService } from './fx-rate-cache.service';
 
 export type FxRateType = 'reference' | 'budget' | 'custom';
@@ -38,6 +42,16 @@ export class FxService {
   resolveFactoryCurrency(location: string): { code: string; symbol: string } {
     const info = LOCATION_INFO[location] ?? LOCATION_INFO['Other'];
     return { code: info.code, symbol: info.symbol };
+  }
+
+  /** Every Digital Factory location, for the location picker — never hardcoded client-side. */
+  listFactories(): Array<{ location: string; code: string; symbol: string }> {
+    return listFactoryLocations();
+  }
+
+  /** Every distinct scenario currency, for the Currency & Ask Price picker — never hardcoded client-side. */
+  listCurrencies(): Array<{ code: string; symbol: string; name: string }> {
+    return listCurrenciesFromLocationInfo();
   }
 
   async getRate(params: {

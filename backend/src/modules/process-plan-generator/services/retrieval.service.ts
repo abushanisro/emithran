@@ -83,10 +83,11 @@ export class RetrievalService {
       throw new NotFoundException(`BOM item ${bomItemId} not found`);
     }
 
-    // Tenancy guard (defence in depth — RLS should already enforce this)
-    if (bomRow.user_id && bomRow.user_id !== userId) {
-      throw new NotFoundException(`BOM item ${bomItemId} not found`);
-    }
+    // No manual tenancy re-check here: bom_items is org-scoped by RLS
+    // (.claude/plans/delegated-gliding-swan.md) — the row could only have
+    // been fetched above if the caller's organization already matched.
+    // A user_id-based re-check here would incorrectly 404 a legitimate
+    // org-mate who didn't personally create this bom_item.
 
     // ── Resolve organization location ──────────────────────────────────────
     const orgLocation = await this.resolveOrgLocation(client, userId, bomRow);
@@ -511,7 +512,6 @@ export class RetrievalService {
     const { data: templates } = await client
       .from('tooling_cost_records')
       .select(cols)
-      .eq('user_id', userId)
       .is('bom_item_id', null)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -523,7 +523,6 @@ export class RetrievalService {
     const { data: all } = await client
       .from('tooling_cost_records')
       .select(cols)
-      .eq('user_id', userId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(80);

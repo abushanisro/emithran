@@ -59,3 +59,201 @@ describe('SheetMetalLookupService.getManualStrokeTime', () => {
     expect(result.resolution.matchedRow).toBeNull();
   });
 });
+
+// getWaterjetAbrasiveRateForMachine() — the real, selected machine's own
+// abrasive_flow_rate_kg_min from machine_library.json (staged into
+// sm_reference_data, category='machine'), which bom-items.service.ts now
+// prefers over the generic pump-tier average when the selected waterjet
+// machine happens to be one of the 281 named reference machines.
+function fakeMachineReferenceData(rows: Array<{ raw: Record<string, unknown> }>) {
+  const builder: any = {
+    from: (_table: string) => builder,
+    select: (_cols: string) => builder,
+    eq: (_col: string, _val: unknown) => builder,
+    then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data: rows, error: null }),
+  };
+  return { getAdminClient: () => builder } as any;
+}
+
+describe('SheetMetalLookupService.getWaterjetAbrasiveRateForMachine', () => {
+  it('returns the real machine-specific rate on an unambiguous exact name match', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: { name: 'OMAX 2626', abrasive_flow_rate_kg_min: 0.45 } },
+      { raw: { name: 'Some Other Waterjet', abrasive_flow_rate_kg_min: 0.6 } },
+    ]));
+    const result = await svc.getWaterjetAbrasiveRateForMachine('OMAX 2626');
+    expect(result).toEqual({ kgPerMin: 0.45, dataFound: true });
+  });
+
+  it('matches case-insensitively, same discipline as lookupMachineLibraryBenchmark', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: { name: 'OMAX 2626', abrasive_flow_rate_kg_min: 0.45 } },
+    ]));
+    const result = await svc.getWaterjetAbrasiveRateForMachine('omax 2626');
+    expect(result).toEqual({ kgPerMin: 0.45, dataFound: true });
+  });
+
+  it('returns dataFound: false when no machine name is given', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([]));
+    const result = await svc.getWaterjetAbrasiveRateForMachine(null);
+    expect(result).toEqual({ kgPerMin: 0, dataFound: false });
+  });
+
+  it('never guesses across an ambiguous (duplicate-name) match', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: { name: 'OMAX 2626', abrasive_flow_rate_kg_min: 0.45 } },
+      { raw: { name: 'OMAX 2626', abrasive_flow_rate_kg_min: 0.50 } },
+    ]));
+    const result = await svc.getWaterjetAbrasiveRateForMachine('OMAX 2626');
+    expect(result).toEqual({ kgPerMin: 0, dataFound: false });
+  });
+
+  it('returns dataFound: false when the matched machine has no real abrasive rate on file', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: { name: 'OMAX 2626', abrasive_flow_rate_kg_min: null } },
+    ]));
+    const result = await svc.getWaterjetAbrasiveRateForMachine('OMAX 2626');
+    expect(result).toEqual({ kgPerMin: 0, dataFound: false });
+  });
+});
+
+// getTurretPunchParamsForMachine() — real per-machine punch_rate_cycles_min/
+// tool_change_time_s, preferred outright over the thickness-keyed
+// sm_lookup_turret_punch curve per explicit product decision.
+describe('SheetMetalLookupService.getTurretPunchParamsForMachine', () => {
+  it('returns both real fields on an unambiguous exact name match', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: { name: 'Whitney 3700 SST', punch_rate_cycles_min: 350, tool_change_time_s: 2.5 } },
+    ]));
+    const result = await svc.getTurretPunchParamsForMachine('Whitney 3700 SST');
+    expect(result).toEqual({ hitsPerMin: 350, toolChangeSec: 2.5, dataFound: true });
+  });
+
+  it('returns dataFound: true with a partial result when only one field is real', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: { name: 'Whitney 3700 SST', punch_rate_cycles_min: 350, tool_change_time_s: null } },
+    ]));
+    const result = await svc.getTurretPunchParamsForMachine('Whitney 3700 SST');
+    expect(result).toEqual({ hitsPerMin: 350, toolChangeSec: null, dataFound: true });
+  });
+
+  it('returns dataFound: false when no machine name is given', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([]));
+    const result = await svc.getTurretPunchParamsForMachine(undefined);
+    expect(result).toEqual({ hitsPerMin: null, toolChangeSec: null, dataFound: false });
+  });
+
+  it('never guesses across an ambiguous (duplicate-name) match', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: { name: 'Whitney 3700 SST', punch_rate_cycles_min: 350, tool_change_time_s: 2.5 } },
+      { raw: { name: 'Whitney 3700 SST', punch_rate_cycles_min: 400, tool_change_time_s: 3.0 } },
+    ]));
+    const result = await svc.getTurretPunchParamsForMachine('Whitney 3700 SST');
+    expect(result).toEqual({ hitsPerMin: null, toolChangeSec: null, dataFound: false });
+  });
+});
+
+describe('SheetMetalLookupService.getBendCycleTimeForMachine', () => {
+  it('returns the real per-machine bend cycle time on an unambiguous match', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: { name: 'Default Bend Brake', bend_cycle_time_s: 4.2 } },
+    ]));
+    const result = await svc.getBendCycleTimeForMachine('Default Bend Brake');
+    expect(result).toEqual({ secondsPerBend: 4.2, dataFound: true });
+  });
+
+  it('returns dataFound: false when no machine name is given', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([]));
+    const result = await svc.getBendCycleTimeForMachine(null);
+    expect(result).toEqual({ secondsPerBend: null, dataFound: false });
+  });
+});
+
+describe('SheetMetalLookupService.getManualStrokeTimeForPressBrake', () => {
+  it('prefers the real per-machine cycle time outright over the generic curve, keeping resolution/roundedFromTonnage from the curve', async () => {
+    const svc = new SheetMetalLookupService(fakeSupabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
+    // Stub the real-machine lookup independently of the generic-curve fake DB.
+    (svc as any).getBendCycleTimeForMachine = async () => ({ secondsPerBend: 0.9, dataFound: true });
+
+    const result = await svc.getManualStrokeTimeForPressBrake(1, 80, 'simple', 'Real Machine');
+    expect(result.secondsPerBend).toBe(0.9);
+    expect(result.dataFound).toBe(true);
+    // Generic curve's own resolution trace still comes through unchanged.
+    expect(result.resolution.policy).toBe('EXACT_MATCH');
+  });
+
+  it('falls back to the generic curve untouched when no real per-machine data exists', async () => {
+    const svc = new SheetMetalLookupService(fakeSupabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
+    (svc as any).getBendCycleTimeForMachine = async () => ({ secondsPerBend: null, dataFound: false });
+
+    const result = await svc.getManualStrokeTimeForPressBrake(1, 80, 'simple', 'Unknown Machine');
+    expect(result.secondsPerBend).toBeCloseTo(1.18, 2);
+    expect(result.dataFound).toBe(true);
+  });
+});
+
+// getRollBendingCycleTime() — real per-machine 3/4-Roll Bender cycle time
+// from machine_library.json's rolling_speed_mm_s/prebend_time_s/pass limits
+// (staged into sm_reference_data, category='machine'). Single-pass parts get
+// a real computed time; multi-pass-capable parts get an honest gap (no
+// fabricated pass count); out-of-capability parts are marked not capable.
+describe('SheetMetalLookupService.getRollBendingCycleTime', () => {
+  const machine = {
+    name: 'Faccin HCU 2050 X 5',
+    rolling_speed_mm_s: 80,
+    prebend_time_s: 45,
+    max_single_pass_thickness_mm: 15,
+    min_single_pass_diameter_mm: 550,
+    max_multi_pass_thickness_mm: 20,
+    min_multi_pass_diameter_mm: 600,
+  };
+
+  it('computes real single-pass cycle time (developed length / speed + 2x prebend) when within single-pass limits', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([{ raw: machine }]));
+    // developed length 4000mm at 80mm/s = 50s rolling + 2*45s prebend = 140s
+    const result = await svc.getRollBendingCycleTime('Faccin HCU 2050 X 5', 4000, 10, 600);
+    expect(result).toEqual({ secondsPerPart: 140, passMode: 'single', capable: true, dataFound: true });
+  });
+
+  it('flags multi-pass parts as capable with an honest gap instead of a fabricated pass count', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([{ raw: machine }]));
+    // 18mm exceeds single-pass max (15mm) but is within multi-pass max (20mm)
+    const result = await svc.getRollBendingCycleTime('Faccin HCU 2050 X 5', 4000, 18, 600);
+    expect(result.capable).toBe(true);
+    expect(result.passMode).toBe('multi');
+    expect(result.secondsPerPart).toBeNull();
+    expect(result.gapReason).toMatch(/multiple rolling passes/);
+  });
+
+  it('marks a part outside both single- and multi-pass limits as not capable', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([{ raw: machine }]));
+    const result = await svc.getRollBendingCycleTime('Faccin HCU 2050 X 5', 4000, 25, 600);
+    expect(result.capable).toBe(false);
+    expect(result.secondsPerPart).toBeNull();
+    expect(result.dataFound).toBe(true);
+    expect(result.gapReason).toMatch(/Exceeds this machine's real capability/);
+  });
+
+  it('returns dataFound: false when no machine name is given', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([]));
+    const result = await svc.getRollBendingCycleTime(null, 4000, 10, 600);
+    expect(result).toEqual({ secondsPerPart: null, passMode: null, capable: false, dataFound: false });
+  });
+
+  it('never guesses across an ambiguous (duplicate-name) match', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: machine },
+      { raw: { ...machine, rolling_speed_mm_s: 60 } },
+    ]));
+    const result = await svc.getRollBendingCycleTime('Faccin HCU 2050 X 5', 4000, 10, 600);
+    expect(result).toEqual({ secondsPerPart: null, passMode: null, capable: false, dataFound: false });
+  });
+
+  it('returns dataFound: false when the matched machine has no real rolling speed on file', async () => {
+    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
+      { raw: { ...machine, rolling_speed_mm_s: null } },
+    ]));
+    const result = await svc.getRollBendingCycleTime('Faccin HCU 2050 X 5', 4000, 10, 600);
+    expect(result.dataFound).toBe(false);
+  });
+});

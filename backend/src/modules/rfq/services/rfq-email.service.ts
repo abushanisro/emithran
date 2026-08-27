@@ -72,7 +72,7 @@ export class RfqEmailService {
     }
   }
 
-  async sendRfqEmails(rfq: RfqRecord): Promise<void> {
+  async sendRfqEmails(rfq: RfqRecord, accessToken?: string): Promise<void> {
     if (!this.transporter) {
       this.logger.warn(`Skipping RFQ email send for ${rfq.rfqNumber} - Email not configured`);
       return;
@@ -82,10 +82,10 @@ export class RfqEmailService {
       this.logger.log(`Starting RFQ email send process for RFQ ${rfq.rfqNumber}`);
 
       // Fetch detailed BOM items
-      const bomItems = await this.fetchBomItemDetails(rfq.bomItemIds);
-      
+      const bomItems = await this.fetchBomItemDetails(rfq.bomItemIds, accessToken);
+
       // Fetch vendor details with email contacts
-      const vendors = await this.fetchVendorDetails(rfq.vendorIds);
+      const vendors = await this.fetchVendorDetails(rfq.vendorIds, accessToken);
       
       // Send individual emails to each vendor
       const emailPromises = vendors.map(vendor => this.sendIndividualRfqEmail(rfq, bomItems, vendor));
@@ -147,8 +147,8 @@ export class RfqEmailService {
     }
   }
 
-  private async fetchBomItemDetails(bomItemIds: string[]): Promise<BomItemDetails[]> {
-    const { data, error } = await this.supabaseService.client
+  private async fetchBomItemDetails(bomItemIds: string[], accessToken?: string): Promise<BomItemDetails[]> {
+    const { data, error } = await this.supabaseService.getClient(accessToken)
       .from('bom_items')
       .select(`
         id,
@@ -189,8 +189,8 @@ export class RfqEmailService {
     return itemsWithProcesses;
   }
 
-  private async fetchVendorDetails(vendorIds: string[]): Promise<VendorDetails[]> {
-    const { data, error } = await this.supabaseService.client
+  private async fetchVendorDetails(vendorIds: string[], accessToken?: string): Promise<VendorDetails[]> {
+    const { data, error } = await this.supabaseService.getClient(accessToken)
       .from('vendors')
       .select(`
         id,

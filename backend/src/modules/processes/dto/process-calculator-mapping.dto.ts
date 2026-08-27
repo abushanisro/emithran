@@ -126,7 +126,15 @@ export class ProcessCalculatorMappingResponseDto {
   @ApiProperty()
   updatedAt: string;
 
-  static fromDatabase(row: any): ProcessCalculatorMappingResponseDto {
+  // Real reconciliation-export cross-reference (sm_operation_reference_map,
+  // migration 504) — undefined for the majority of operations that have no
+  // clean, justified name match in the source export; never guessed. See
+  // that migration's own comments for exactly which matches were judged
+  // clean enough to include and why.
+  @ApiPropertyOptional({ description: 'Reference-tool cross-reference for this operation, if a clean name match exists (migration 504) — informational only, never a live cost input.' })
+  referenceHint?: { sourceProcessName: string; exampleMachine: string | null };
+
+  static fromDatabase(row: any, referenceHint?: { sourceProcessName: string; exampleMachine: string | null }): ProcessCalculatorMappingResponseDto {
     return {
       id: row.id,
       processGroup: row.process_group,
@@ -140,6 +148,7 @@ export class ProcessCalculatorMappingResponseDto {
       displayOrder: row.display_order,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      referenceHint,
     };
   }
 }

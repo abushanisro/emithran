@@ -22,7 +22,7 @@ describe('Echo skill router', () => {
       ['/vendors',                                 'supplier'],
       ['/raw-materials',                           'costing'],
       ['/hr-rates',                                'costing'],
-      ['/mhr-database',                            'costing'],
+      ['/hr-rates/some-id',                        'costing'],
       ['/calculators',                             'costing'],
       ['/vave',                                    'vave'],
       ['/benchmarks',                              'benchmark'],

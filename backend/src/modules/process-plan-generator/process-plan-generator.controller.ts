@@ -10,12 +10,15 @@ import {
   Post,
   Sse,
   MessageEvent,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 
 import { OrchestratorService } from './services/orchestrator.service';
 import { PersistenceService } from './services/persistence.service';
@@ -62,11 +65,13 @@ export class ProcessPlanGeneratorController {
     description: 'Runs retrieval → reasoning → resolver and persists a draft. Returns the full GenerationResponse.',
   })
   @ApiResponse({ status: 200, description: 'Draft generated (or replayed from idempotency cache)' })
+  @UseGuards(OrganizationContextGuard)
   async generate(
     @Param('bomItemId') bomItemId: string,
     @Body() body: GenerateRequestDto,
     @CurrentUser() user: AuthUser,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
   ): Promise<GenerationResponse> {
     if (!bomItemId) throw new BadRequestException('bomItemId is required');
     if (!user?.id) throw new BadRequestException('User authentication required');
@@ -76,6 +81,7 @@ export class ProcessPlanGeneratorController {
       bomItemId,
       userId: user.id,
       accessToken: token,
+      organizationId,
       forceRefresh: !!body?.forceRefresh,
       notes: body?.notes,
     });
@@ -143,6 +149,7 @@ export class ProcessPlanGeneratorController {
    * were approved). Charges credits.
    */
   @Post('generations/:id/apply')
+  @UseGuards(OrganizationContextGuard)
   @HttpCode(200)
   @ApiOperation({ summary: 'Apply a generated draft (transactional)' })
   @ApiResponse({ status: 200, description: 'Draft applied', type: ApplyResultDto })
@@ -151,9 +158,10 @@ export class ProcessPlanGeneratorController {
     @Body() body: ApplyRequestDto,
     @CurrentUser() user: AuthUser,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
   ): Promise<ApplyResultDto> {
     if (!user?.id) throw new BadRequestException('User authentication required');
-    return this.persistence.apply(id, body, user.id, token);
+    return this.persistence.apply(id, body, user.id, token, organizationId);
   }
 
   /**
@@ -203,6 +211,7 @@ export class ProcessPlanGeneratorController {
    * offline-eval dataset.
    */
   @Post('generations/:id/edits')
+  @UseGuards(OrganizationContextGuard)
   @HttpCode(201)
   @ApiOperation({ summary: 'Record a user edit on a draft line (feedback capture)' })
   async recordEdit(
@@ -210,8 +219,9 @@ export class ProcessPlanGeneratorController {
     @Body() body: CreateLineEditDto,
     @CurrentUser() user: AuthUser,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
   ): Promise<{ id: string }> {
     if (!user?.id) throw new BadRequestException('User authentication required');
-    return this.persistence.recordLineEdit(id, body, user.id, token);
+    return this.persistence.recordLineEdit(id, body, user.id, token, organizationId);
   }
 }

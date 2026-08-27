@@ -1,4 +1,4 @@
-// IM machine selection — aPriori-style 4-constraint algorithm.
+// IM machine selection — eMithran-style 4-constraint algorithm.
 // Constraints evaluated in order; failure at any constraint = reject.
 // 1. Clamp force:  requiredClamp = projectedAreaCm2 × cavityCount × materialClampFactor × 1.15
 // 2. Shot capacity: requiredShot = (partWeightG + runnerWeightG) × cavityCount × 1.10

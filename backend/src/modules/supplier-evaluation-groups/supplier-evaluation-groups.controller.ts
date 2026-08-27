@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SupplierEvaluationGroupsService } from './supplier-evaluation-groups.service';
@@ -17,6 +18,8 @@ import {
 } from './dto/supplier-evaluation-group.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 
 @ApiTags('supplier-evaluation-groups')
 @Controller('api/supplier-evaluation-groups')
@@ -32,12 +35,14 @@ export class SupplierEvaluationGroupsController {
     description: 'Evaluation group created successfully',
     type: SupplierEvaluationGroupDto,
   })
+  @UseGuards(OrganizationContextGuard)
   create(
     @CurrentUser('id') userId: string,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
     @Body() createDto: CreateSupplierEvaluationGroupDto,
   ): Promise<SupplierEvaluationGroupDto> {
-    return this.supplierEvaluationGroupsService.create(userId, createDto, token);
+    return this.supplierEvaluationGroupsService.create(userId, createDto, token, organizationId);
   }
 
   @Get()

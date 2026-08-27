@@ -476,6 +476,57 @@ export class SheetMetalLookupService {
     };
   }
 
+  // ── Real per-machine bend cycle time, for the SPECIFIC selected press
+  // brake ── machine_library.json carries a real bend_cycle_time_s for all
+  // 16 named "Bend Press Brake" machines. Same exact-name, non-ambiguous
+  // matching discipline as getWaterjetAbrasiveRateForMachine/
+  // getTurretPunchParamsForMachine.
+  async getBendCycleTimeForMachine(machineName: string | null | undefined): Promise<{ secondsPerBend: number | null; dataFound: boolean }> {
+    const empty = { secondsPerBend: null, dataFound: false };
+    if (!machineName?.trim()) return empty;
+
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine');
+    if (error || !data) return empty;
+
+    const nameLower = machineName.trim().toLowerCase();
+    const matches = data.filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+    if (matches.length !== 1) return empty;
+
+    const val = matches[0].raw?.bend_cycle_time_s;
+    if (typeof val !== 'number' || !Number.isFinite(val) || val <= 0) return empty;
+    return { secondsPerBend: val, dataFound: true };
+  }
+
+  // ── Bend stroke time, preferring the SPECIFIC selected press brake's own
+  // real cycle time over the generic thickness/tonnage/complexity curve —
+  // per explicit product decision (same "prefer it outright" rule applied to
+  // Turret Punch's rate/tool-change time). A drop-in replacement for
+  // getManualStrokeTime() at every one of its Bend Brake call sites — a
+  // single composed method rather than each call site re-implementing the
+  // same merge, so a future call site can't independently drift out of sync
+  // (this codebase has been bitten by exactly that class of bug before, with
+  // labour-rate resolution — see bom-items.service.ts's resolveLHRRates
+  // comment). `resolution`/`roundedFromTonnage` are passed through from the
+  // generic curve unchanged (still useful audit-trail context) even when the
+  // real per-machine value wins on secondsPerBend/dataFound.
+  async getManualStrokeTimeForPressBrake(
+    thicknessMm: number,
+    tonnage: number,
+    complexity: 'simple' | 'complex',
+    machineName: string | null | undefined,
+  ): ReturnType<SheetMetalLookupService['getManualStrokeTime']> {
+    const [generic, real] = await Promise.all([
+      this.getManualStrokeTime(thicknessMm, tonnage, complexity),
+      this.getBendCycleTimeForMachine(machineName),
+    ]);
+    if (!real.dataFound || real.secondsPerBend == null) return generic;
+    return { ...generic, secondsPerBend: real.secondsPerBend, dataFound: true };
+  }
+
   // ── Table 6: Sampling rate (fraction) for given lot size ──────────────────
   // Returns sample_qty_l2 / lotSize as a fraction.
   async getSamplingRate(lotSize: number): Promise<{ rate: number; dataFound: boolean }> {
@@ -594,6 +645,44 @@ export class SheetMetalLookupService {
     };
   }
 
+  // ── Turret Punch rate for the SPECIFIC selected machine, not the generic
+  // thickness curve ── machine_library.json carries real per-machine
+  // punch_rate_cycles_min/tool_change_time_s for every named turret/laser-
+  // punch machine (47 total). Unlike getWaterjetAbrasiveRateForMachine, this
+  // deliberately does NOT touch nibble speed — the real source has no
+  // matching mm/min field (only nibble_rate_cycles_min, cycles/min, which
+  // would need an inferred tool-diameter/overlap conversion formula, not a
+  // direct substitution — left for a separate, reviewed follow-up).
+  // Same exact-name, non-ambiguous matching discipline as
+  // lookupMachineLibraryBenchmark()/getWaterjetAbrasiveRateForMachine —
+  // never guesses. Per explicit product decision, the real machine's own
+  // rate is preferred outright over the generic thickness-keyed curve
+  // whenever the selected machine has real data — even though this specific
+  // real value is not itself thickness-adjusted.
+  async getTurretPunchParamsForMachine(machineName: string | null | undefined): Promise<{
+    hitsPerMin: number | null; toolChangeSec: number | null; dataFound: boolean;
+  }> {
+    const empty = { hitsPerMin: null, toolChangeSec: null, dataFound: false };
+    if (!machineName?.trim()) return empty;
+
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine');
+    if (error || !data) return empty;
+
+    const nameLower = machineName.trim().toLowerCase();
+    const matches = data.filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+    if (matches.length !== 1) return empty;
+
+    const raw = matches[0].raw ?? {};
+    const numOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
+    const hitsPerMin = numOrNull(raw.punch_rate_cycles_min);
+    const toolChangeSec = numOrNull(raw.tool_change_time_s);
+    return { hitsPerMin, toolChangeSec, dataFound: hitsPerMin != null || toolChangeSec != null };
+  }
+
   // ── Waterjet abrasive (garnet) consumption rate ────────────────────────────
   // See migration 415 — replaces WATERJET_ABRASIVE_KG_PER_MIN, which used to
   // live directly in default-rates.ts.
@@ -609,6 +698,175 @@ export class SheetMetalLookupService {
       return { kgPerMin: 0, dataFound: false };
     }
     return { kgPerMin: Number(data[0].abrasive_kg_per_min), dataFound: true };
+  }
+
+  // ── Waterjet abrasive rate for the SPECIFIC selected machine, not a generic
+  // pump tier ── machine_library.json (staged into sm_reference_data,
+  // category='machine') carries a real abrasive_flow_rate_kg_min for every
+  // named waterjet machine — this shop's actual selected machine's own real
+  // consumption rate, when it happens to be one of those 281 named units.
+  // Same exact-name, non-ambiguous matching discipline as
+  // mhr.service.ts's lookupMachineLibraryBenchmark() — never guesses, never
+  // fuzzy-matches. Preferred by the caller over the generic pump-tier row
+  // above when found (real machine data beats a generic class average);
+  // falls back to that pump-tier lookup, and ultimately to
+  // WATERJET_ABRASIVE_KG_PER_MIN, exactly as before this method existed —
+  // this only ADDS a higher-priority real source, it doesn't remove the
+  // existing fallback chain.
+  async getWaterjetAbrasiveRateForMachine(machineName: string | null | undefined): Promise<{ kgPerMin: number; dataFound: boolean }> {
+    const empty = { kgPerMin: 0, dataFound: false };
+    if (!machineName?.trim()) return empty;
+
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine');
+    if (error || !data) return empty;
+
+    const nameLower = machineName.trim().toLowerCase();
+    const matches = data.filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+    if (matches.length !== 1) return empty;
+
+    const rate = matches[0].raw?.abrasive_flow_rate_kg_min;
+    if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) return empty;
+    return { kgPerMin: rate, dataFound: true };
+  }
+
+  // ── Roll Bending (3/4-Roll) real per-machine cycle time ────────────────────
+  // machine_library.json (staged into sm_reference_data, category='machine')
+  // carries real per-machine roll-bending physics for every "3 Roll Bender"/
+  // "4 Roll Bender" machine (migration 569 links these to process_route
+  // 'Bending/Floating /Forming', machine_class 'roll_forming') — same
+  // exact-name, non-ambiguous matching discipline as
+  // getWaterjetAbrasiveRateForMachine above.
+  //
+  // Formula (single-pass only): the developed (flattened) length of the
+  // rolled shell divided by the machine's real rolling_speed_mm_s, plus TWO
+  // real prebend_time_s passes — one per sheet end. Pre-bending both leading
+  // and trailing edges before rolling is standard 3/4-roll bending practice
+  // (an un-prebent end stays flat since the roll arrangement can't curve
+  // material right at the entry/exit nip); this dataset carries a real
+  // prebend_time_s for both 3-roll AND 4-roll machines, so it's applied
+  // uniformly rather than assumed 3-roll-only from bending theory.
+  //
+  // Multi-pass is a genuine, currently-unmodeled gap: the number of passes
+  // needed depends on target curvature vs. roll diameter and springback,
+  // which isn't derivable from any field this dataset carries. Rather than
+  // guess a pass count, a part that only qualifies as multi-pass-capable
+  // returns capable:true with secondsPerPart:null and an explicit
+  // gapReason — an honest, reportable gap, not a fabricated number.
+  async getRollBendingCycleTime(
+    machineName: string | null | undefined,
+    developedLengthMm: number,
+    thicknessMm: number,
+    targetDiameterMm: number,
+  ): Promise<{
+    secondsPerPart: number | null;
+    passMode: 'single' | 'multi' | null;
+    capable: boolean;
+    dataFound: boolean;
+    gapReason?: string;
+  }> {
+    const empty = { secondsPerPart: null, passMode: null, capable: false, dataFound: false };
+    if (!machineName?.trim()) return empty;
+    if (!(developedLengthMm > 0) || !(thicknessMm > 0) || !(targetDiameterMm > 0)) return empty;
+
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine');
+    if (error || !data) return empty;
+
+    const nameLower = machineName.trim().toLowerCase();
+    const matches = data.filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+    if (matches.length !== 1) return empty;
+
+    const raw = matches[0].raw ?? {};
+    const numOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
+    const rollingSpeedMmS = numOrNull(raw.rolling_speed_mm_s);
+    const prebendTimeS = numOrNull(raw.prebend_time_s) ?? 0;
+    const maxSinglePassThicknessMm = numOrNull(raw.max_single_pass_thickness_mm);
+    const minSinglePassDiameterMm = numOrNull(raw.min_single_pass_diameter_mm);
+    const maxMultiPassThicknessMm = numOrNull(raw.max_multi_pass_thickness_mm);
+    const minMultiPassDiameterMm = numOrNull(raw.min_multi_pass_diameter_mm);
+
+    if (rollingSpeedMmS == null) return empty;
+
+    const singlePassCapable =
+      maxSinglePassThicknessMm != null && minSinglePassDiameterMm != null &&
+      thicknessMm <= maxSinglePassThicknessMm && targetDiameterMm >= minSinglePassDiameterMm;
+    const multiPassCapable =
+      maxMultiPassThicknessMm != null && minMultiPassDiameterMm != null &&
+      thicknessMm <= maxMultiPassThicknessMm && targetDiameterMm >= minMultiPassDiameterMm;
+
+    if (singlePassCapable) {
+      const rollingTimeS = developedLengthMm / rollingSpeedMmS;
+      const secondsPerPart = rollingTimeS + prebendTimeS * 2;
+      return { secondsPerPart, passMode: 'single', capable: true, dataFound: true };
+    }
+    if (multiPassCapable) {
+      return {
+        secondsPerPart: null,
+        passMode: 'multi',
+        capable: true,
+        dataFound: true,
+        gapReason: 'Part requires multiple rolling passes — real pass-count model not yet available (depends on target curvature vs. roll diameter and springback, not derivable from current data).',
+      };
+    }
+    return {
+      secondsPerPart: null,
+      passMode: null,
+      capable: false,
+      dataFound: true,
+      gapReason: `Exceeds this machine's real capability: thickness ${thicknessMm}mm / diameter ${targetDiameterMm}mm is outside both single-pass and multi-pass limits on file.`,
+    };
+  }
+
+  // ── Material handling allowance by weight (Turret Press only today) ───────
+  // See migration 530 (closeout Plan Phase 2a) -- real USD-by-weight-bracket
+  // data, currently seeded for machine_class='turret_punch' only (the other
+  // process-specific curves staged alongside it have no live consumer to
+  // wire into). Nearest-upper-bound-bracket resolution, same semantics as
+  // default-rates.ts's resolveBracket() -- kept here rather than importing
+  // that helper since this one needs an async DB round trip first to build
+  // the bracket array, unlike every other resolveBracket() caller which
+  // works off a compile-time table.
+  async getHandlingAllowanceUsd(machineClass: string, partWeightKg: number): Promise<{ allowanceUsd: number; dataFound: boolean }> {
+    const db = this.supabase.getAdminClient();
+    const { data } = await db
+      .from('sm_handling_allowance_rates')
+      .select('weight_kg_max, allowance_usd')
+      .eq('machine_class', machineClass)
+      .order('weight_kg_max', { ascending: true });
+
+    if (!data?.length) {
+      return { allowanceUsd: 0, dataFound: false };
+    }
+    const hit = data.find((r) => partWeightKg <= Number(r.weight_kg_max));
+    const row = hit ?? data[data.length - 1]!;
+    return { allowanceUsd: Number(row.allowance_usd), dataFound: true };
+  }
+
+  // ── Waterjet nozzle-wear cost per hour ─────────────────────────────────────
+  // See migration 531 (closeout Plan Phase 2b). Defaults to the 'Mid-Life
+  // Composite Carbide' grade — the middle of the 3 real seeded options —
+  // until a per-shop nozzle-grade setting exists; disclosed via dataFound,
+  // never silently substituted for a genuinely missing table.
+  async getWaterjetNozzleCostPerHr(nozzleGrade = 'Mid-Life Composite Carbide'): Promise<{ costPerHr: number; dataFound: boolean }> {
+    const db = this.supabase.getAdminClient();
+    const { data } = await db
+      .from('sm_waterjet_nozzle_rates')
+      .select('cost_usd, life_hours')
+      .eq('nozzle_grade', nozzleGrade)
+      .limit(1)
+      .maybeSingle();
+
+    if (!data || data.life_hours == null || Number(data.life_hours) <= 0) {
+      return { costPerHr: 0, dataFound: false };
+    }
+    return { costPerHr: Number(data.cost_usd) / Number(data.life_hours), dataFound: true };
   }
 
   // ── Manual deburring cycle-time rate ──────────────────────────────────────

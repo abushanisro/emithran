@@ -3,7 +3,7 @@ export const PRESS_BRAKE_SETUP_MIN = 20;
 export const TAPPING_SETUP_MIN = 10;
 export const CMM_SETUP_MIN = 15;         // per batch — program recall + fixture + datum alignment
 
-// Batch inspection sampling — three stages (aPriori-style):
+// Batch inspection sampling — three stages (eMithran-style):
 //   FAI:        first article, full measurement, once per batch
 //   in-process: 1 of every N parts, full per-piece measurement
 //   final:      1 of every N parts, short visual/gauge check before pack
@@ -107,31 +107,117 @@ export const PRESS_BRAKE_SEC_PER_BEND: Record<number, number> = {
 // Sanity: 2mm mild steel (UTS 410), 1m bend, V16 → ~15 t/m — matches brake charts.
 
 // Ultimate tensile strength (MPa) by material family/grade — bend-force lookup.
+// Approved per-family values only. There is deliberately no catch-all
+// default: an unmatched grade previously fell back to '__default__: 410'
+// (mild steel), which silently priced/gated exotic or unlisted materials as
+// if they were mild steel with no indication anything was assumed. Removed
+// per the P0.7 correctness gate — resolveUtsMpa now returns null for an
+// unmatched grade, and every caller must treat null as "not available"
+// (skip the UTS-dependent check, surface a warning) rather than invent one.
 export const MATERIAL_UTS_MPA: Record<string, number> = {
   CRCA:    370,  DC01: 370,
   IS2062:  410,  MS: 410,   E250: 410, E350: 490,
   SS304:   620,  SS316: 580, SS316L: 560,
   AL6061:  310,  AA6061: 310,   // T6 temper
   AL5052:  230,  AA5052: 230,
-  __default__: 410,              // mild steel assumption
 };
 
-export function resolveUtsMpa(grade: string | null | undefined): number {
+export function resolveUtsMpa(grade: string | null | undefined): number | null {
   const g = (grade ?? '').toUpperCase().replace(/[\s\-]/g, '');
-  const hit = Object.keys(MATERIAL_UTS_MPA).find((k) => k !== '__default__' && g.includes(k));
-  return MATERIAL_UTS_MPA[hit ?? '__default__']!;
+  const hit = Object.keys(MATERIAL_UTS_MPA).find((k) => g.includes(k));
+  return hit ? MATERIAL_UTS_MPA[hit]! : null;
 }
 
 /** Estimated press-brake force in metric tons for one air bend. */
 export function estimateBendTonnage(
-  utsMpa: number,
+  utsMpa: number | null,
   thicknessMm: number,
   bendLengthMm: number,
 ): number | null {
-  if (thicknessMm <= 0 || bendLengthMm <= 0 || utsMpa <= 0) return null;
+  if (thicknessMm <= 0 || bendLengthMm <= 0 || utsMpa == null || utsMpa <= 0) return null;
   const vOpeningMm = 8 * thicknessMm;
   const forceKn = (1.42 * utsMpa * bendLengthMm * thicknessMm * thicknessMm) / (1000 * vOpeningMm);
   return Math.round((forceKn / 9.81) * 10) / 10;
+}
+
+// ── Minimum bend radius (DFM crack-risk threshold) ────────────────────────────
+// Real, per-material, per-blank-thickness-bracket minimum bend radius factor
+// (radius / thickness) below which forming cracks the material — sourced
+// from a real USA-region manufacturing reference dataset (2026-03 snapshot;
+// see sm_reference_data category='lookup_table', key prefix
+// 'InsufficientBendRadius:'). Deliberately a SEPARATE classification from
+// classifyMaterialFamily() above: that function intentionally folds
+// galvanized/electrogalvanized codes (SECC/SGCC) into 'carbon_steel' because
+// they cut at the same laser speed as plain mild steel — but galvanized
+// steel's real minimum bend radius (3.5x) is far higher than plain steel's
+// (0.8-1.5x), so reusing that classifier here would silently under-flag
+// every galvanized part. Brackets are blank thickness upper bounds (mm);
+// thickness above the highest bracket uses that bracket's factor (disclosed
+// extrapolation, same "nearest/highest bracket" convention used elsewhere
+// in this file, e.g. resolveNearestStandardTonnageClass).
+export type BendRadiusMaterial =
+  | 'steel' | 'stainless_steel' | 'aluminum' | 'galvanized_steel'
+  | 'titanium' | 'brass' | 'copper' | 'heat_resistant_super_alloy';
+
+// Generic upper-bound-bracket resolver — brackets are [upperBoundKey, value]
+// pairs ascending by bound; a key above the highest bracket uses that
+// bracket's value (disclosed extrapolation). Every bracket-shaped lookup in
+// this file (bend radius, min hole diameter, and future ones) should call
+// this instead of re-implementing the same find/fallback logic — one tested
+// primitive instead of N near-identical hand-rolled searches.
+export function resolveBracket<T>(brackets: ReadonlyArray<readonly [number, T]>, key: number): T {
+  const hit = brackets.find(([upperBound]) => key <= upperBound);
+  return (hit ?? brackets[brackets.length - 1]!)[1];
+}
+
+// [thicknessBracketMaxMm, minRadiusFactor][], ascending by bracket.
+const BEND_RADIUS_MIN_FACTOR: Record<BendRadiusMaterial, Array<[number, number]>> = {
+  steel:                     [[6, 0.8], [12, 1.2], [25, 1.5]],
+  stainless_steel:           [[6, 2.0], [12, 2.5], [25, 3.0]],
+  aluminum:                  [[6, 1.0], [12, 1.5], [25, 2.0]],
+  galvanized_steel:          [[Infinity, 3.5]],
+  titanium:                  [[Infinity, 4.5]],
+  brass:                     [[Infinity, 0.5]],
+  copper:                    [[Infinity, 0.5]],
+  heat_resistant_super_alloy: [[1.24, 1.0], [6.35, 2.0]],
+};
+
+export function classifyBendRadiusMaterial(grade: string | null | undefined): BendRadiusMaterial {
+  const g = (grade ?? '').toUpperCase();
+  if (/SECC|SGCC|GALV/.test(g)) return 'galvanized_steel';
+  if (/ALUMIN|AA\s?\d{4}|AL\s?\d{4}|6061|6063|5052|5754|7075|2024|\bT6\b/.test(g)) return 'aluminum';
+  if (/STAINLESS|SS\s?3\d{2}|SS\s?4\d{2}|AISI\s?3\d{2}|17-4/.test(g)) return 'stainless_steel';
+  if (/TITANIUM|\bTI\b/.test(g)) return 'titanium';
+  if (/BRASS/.test(g)) return 'brass';
+  if (/COPPER|\bCU\b/.test(g)) return 'copper';
+  if (/INCONEL|HASTELLOY|SUPER\s?ALLOY|HEAT\s?RESIST/.test(g)) return 'heat_resistant_super_alloy';
+  return 'steel'; // mild/unalloyed/low-alloy carbon steel baseline — same disclosed fallback convention as classifyMaterialFamily()
+}
+
+export function resolveBendRadiusMinFactor(grade: string | null | undefined, thicknessMm: number): number {
+  const material = classifyBendRadiusMaterial(grade);
+  return resolveBracket(BEND_RADIUS_MIN_FACTOR[material], thicknessMm);
+}
+
+// ── Minimum punched-hole diameter ────────────────────────────────────────────
+// Real punch-tooling physics: a punched hole narrower than the sheet is thick
+// risks the punch snapping under lateral load, and the safe minimum scales
+// with the material's own strength — a higher-UTS material needs a
+// proportionally larger hole for the same thickness. Source: sm_reference_data
+// category='lookup_table', key prefix 'tblMinHoleDiameterRatio' (migration
+// 518) — 5 UTS brackets (MPa) -> minimum diameter-to-thickness ratio.
+// [utsMpaBracketMax, minDiameterToThicknessRatio][], ascending by bracket.
+// Source table's 655/999999999 rows both resolve to 2.0 — collapsed into the
+// single trailing Infinity bracket (resolveBracket's own highest-bracket
+// fallback already covers everything above 345 with the same value).
+const MIN_HOLE_DIAMETER_RATIO: Array<[number, number]> = [
+  [220, 1.0],
+  [345, 1.5],
+  [Infinity, 2.0],
+];
+
+export function resolveMinHoleDiameterRatio(utsMpa: number): number {
+  return resolveBracket(MIN_HOLE_DIAMETER_RATIO, utsMpa);
 }
 
 // ── Turret punch force ─────────────────────────────────────────────────────────
@@ -146,11 +232,11 @@ export function estimateBendTonnage(
 // can treat both machine classes the same way (see that function's own
 // estimatedTonnage branch).
 export function estimateTurretPunchTonnage(
-  shearStrengthMpa: number,
+  shearStrengthMpa: number | null,
   thicknessMm: number,
   cutLengthMm: number,
 ): number | null {
-  if (thicknessMm <= 0 || cutLengthMm <= 0 || shearStrengthMpa <= 0) return null;
+  if (thicknessMm <= 0 || cutLengthMm <= 0 || shearStrengthMpa == null || shearStrengthMpa <= 0) return null;
   const theoreticalForceTon = (cutLengthMm * thicknessMm * shearStrengthMpa) / 9810;
   return Math.round(theoreticalForceTon * 1.25 * 100) / 100;
 }
@@ -169,11 +255,11 @@ const HOLE_FLANGE_FORM_FACTOR = (1 / HOLE_FLANGE_PUNCH_CLEARANCE) - 0.7;
 
 /** Estimated forming force in metric tons for one round hole-extrusion (burl) hit. */
 export function estimateBurlTonnage(
-  utsMpa: number,
+  utsMpa: number | null,
   thicknessMm: number,
   holeDiameterMm: number,
 ): number | null {
-  if (thicknessMm <= 0 || holeDiameterMm <= 0 || utsMpa <= 0) return null;
+  if (thicknessMm <= 0 || holeDiameterMm <= 0 || utsMpa == null || utsMpa <= 0) return null;
   const punchPerimeterMm = HOLE_FLANGE_PUNCH_CLEARANCE * Math.PI * holeDiameterMm;
   const forceTon = (punchPerimeterMm * thicknessMm * utsMpa * HOLE_FLANGE_FORM_FACTOR) / 9810;
   return Math.round(forceTon * 100) / 100;
@@ -556,6 +642,11 @@ export function classifySurfaceTreatment(callout: string | null | undefined): st
   if (/zinc|galvani/i.test(c)) return 'zinc_plate';
   if (/powder/i.test(c)) return 'powder_coat';
   if (/passivat/i.test(c)) return 'passivate';
+  // Chromate/chemical conversion coating (e.g. MIL-DTL-5541, trade names
+  // Alodine/Iridite) — checked BEFORE the generic catch-all below, since
+  // "chrom" alone would otherwise match that bucket's broader regex and lose
+  // this treatment's own real, region-specific rate (see migration 490).
+  if (/chemical\s*conversion|chem\s*film|chromate\s*conversion|\balodine\b|\biridite\b/i.test(c)) return 'chem_conversion_coating';
   if (/plat|paint|coat|phosphat|black\s*oxide|blacken|nickel|chrom|e-?coat|trivalent/i.test(c)) return '__default__';
   return null;
 }
@@ -622,6 +713,25 @@ export const TURRET_NIBBLE_MM_PER_MIN: Record<number, number> = {
 export const WATERJET_SETUP_MIN = 30;       // per batch
 export const WATERJET_ABRASIVE_KG_PER_MIN = 0.5; // kg/min of active cutting
 
+// Every contour the head cuts needs a ramp-up run before it reaches full
+// pressure/speed and a mirrored ramp-down on exit — this distance is real
+// machine travel that isn't "useful" cut length but still consumes cutting
+// time. pierceCount already means "contour starts" (see WaterjetInput's own
+// doc comment), so each one gets 2x this amount (entry + exit) added to the
+// cut length before the speed-based time calculation. Sourced from a real
+// USA-region manufacturing reference dataset (2026-03 snapshot); see
+// sm_reference_data (category='variable', key='standardWaterjetCutLeadInAmount').
+export const WATERJET_LEAD_IN_MM = 5;
+
+// Global overhead on top of the lead-in distance above — accounts for
+// acceleration/deceleration the head does mid-path (direction changes,
+// speed ramping) that a straight length/speed calculation doesn't capture.
+// Sourced alongside WATERJET_LEAD_IN_MM from the same real reference
+// dataset (sm_reference_data key='waterjetCutTimeAdjustmentFactor') — the
+// source models both as part of one combined cut-time formula, not
+// alternatives, so both apply together here too.
+export const WATERJET_CUT_TIME_ADJUSTMENT_FACTOR = 1.4;
+
 export const RATES_SOURCE_LABEL = 'Location benchmark rates v2 (2026)';
 
 // Every costing endpoint must default to the SAME location. A summary priced in
@@ -648,8 +758,8 @@ export const MACHINE_REGISTRY = {
   // commodityCodes: DB uses 'KW' suffix (SM-LASER-2KW) not 'K' — both kept for legacy compat.
   // processGroupKeywords includes exact process_group values from process_calculator_mappings so
   // that mhr_records seeded with DB-canonical group names (e.g. 'Machining', 'Plastic & Rubber')
-  // resolve correctly alongside legacy/aPriori group names.
-  // 'Sheet metal' (lowercase m) matches the aPriori India DB rows.
+  // resolve correctly alongside legacy/eMithran group names.
+  // 'Sheet metal' (lowercase m) matches the eMithran India DB rows.
   fiber_laser:    { commodityCodes: ['SM-LASER-2K', 'SM-LASER-4K', 'SM-LASER-6K', 'SM-LASER-2KW', 'SM-LASER-4KW', 'SM-LASER-6KW'], processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'Fiber Laser', 'Laser Cutting'],                                              machineClassKeywords: ['Fiber Laser', 'Laser Cut', 'Laser Cutter', 'Laser Cutting'] },
   // A real, physically distinct laser technology from fiber_laser — CO2
   // discharge oscillator (10.6μm) vs fiber (~1.06μm), different real machines
@@ -745,6 +855,32 @@ export const LOCATION_INFO: Readonly<Record<string, LocationCurrencyInfo>> = {
 export const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = Object.fromEntries(
   Object.values(LOCATION_INFO).map((info) => [info.code, info.symbol]),
 );
+
+// ISO 4217 display names for every currency LOCATION_INFO actually resolves
+// to — this is the ONLY place a currency's full name is spelled out. The
+// frontend's Currency & Ask Price widget fetches this (via GET /api/fx/
+// currencies) instead of keeping its own hardcoded label list, so adding a
+// Digital Factory location in a new currency here is the only edit needed.
+const ISO_CURRENCY_NAMES: Readonly<Record<string, string>> = {
+  INR: 'Indian Rupee', USD: 'US Dollar', EUR: 'Euro', GBP: 'British Pound',
+  CNY: 'Chinese Yuan', MXN: 'Mexican Peso',
+};
+
+export const CURRENCY_NAMES: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.keys(CURRENCY_SYMBOLS).map((code) => [code, ISO_CURRENCY_NAMES[code] ?? code]),
+);
+
+/** Every Digital Factory location the app knows about, with its native currency — backs GET /api/fx/factories. */
+export function listFactoryLocations(): Array<{ location: string; code: string; symbol: string }> {
+  return Object.entries(LOCATION_INFO).map(([location, info]) => ({ location, code: info.code, symbol: info.symbol }));
+}
+
+/** Every distinct scenario currency a Digital Factory location resolves to — backs GET /api/fx/currencies. */
+export function listCurrencies(): Array<{ code: string; symbol: string; name: string }> {
+  return Object.keys(CURRENCY_SYMBOLS).map((code) => ({
+    code, symbol: CURRENCY_SYMBOLS[code], name: CURRENCY_NAMES[code],
+  }));
+}
 
 // ── Rate plausibility guard ────────────────────────────────────────────────────
 // A DB machine/labour rate far outside the location benchmark band almost

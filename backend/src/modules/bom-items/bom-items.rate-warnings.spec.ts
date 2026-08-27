@@ -94,13 +94,14 @@ describe('resolveLHRRates — Pass 4 plausibility guard (mocked unit tests, arbi
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
-    const result: Map<string, number> = await (service as any).resolveLHRRates(
+    const result: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates(
       'token-1', 'India', 'sheet_metal', rates, warnings, DEFAULT_RATE_WARN_THRESHOLDS,
     );
 
     // The bad Pass-1 value is still what gets applied to costing (this guard
     // discloses, never silently clamps) — but it must be flagged.
-    expect(result.get('fiber_laser')).toBe(historicalDoubleConversionLhr);
+    expect(result.get('fiber_laser')?.rate).toBe(historicalDoubleConversionLhr);
+    expect(result.get('fiber_laser')?.source).toBe('lhr_database'); // real (if corrupted) Pass-1 data — provenance is honest even when the value itself is flagged
     expect(warnings.some((w) => /over 3× the India Sheet Metal benchmark/.test(w))).toBe(true);
     expect(warnings.some((w) => w.includes(`₹${historicalDoubleConversionLhr}`))).toBe(true);
   });
@@ -114,11 +115,12 @@ describe('resolveLHRRates — Pass 4 plausibility guard (mocked unit tests, arbi
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
-    const result: Map<string, number> = await (service as any).resolveLHRRates(
+    const result: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates(
       'token-1', 'India', 'sheet_metal', rates, warnings, DEFAULT_RATE_WARN_THRESHOLDS,
     );
 
-    expect(result.get('fiber_laser')).toBeCloseTo(144.46, 2);
+    expect(result.get('fiber_laser')?.rate).toBeCloseTo(144.46, 2);
+    expect(result.get('fiber_laser')?.source).toBe('lhr_database');
     expect(warnings).toHaveLength(0);
   });
 
@@ -132,11 +134,12 @@ describe('resolveLHRRates — Pass 4 plausibility guard (mocked unit tests, arbi
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
-    const result: Map<string, number> = await (service as any).resolveLHRRates(
+    const result: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates(
       'token-1', 'India', 'sheet_metal', rates, warnings, DEFAULT_RATE_WARN_THRESHOLDS,
     );
 
-    expect(result.get('fiber_laser')).toBe(historicalDoubleConversionLhr);
+    expect(result.get('fiber_laser')?.rate).toBe(historicalDoubleConversionLhr);
+    expect(result.get('fiber_laser')?.source).toBe('lhr_database');
     expect(warnings).toHaveLength(0);
   });
 });

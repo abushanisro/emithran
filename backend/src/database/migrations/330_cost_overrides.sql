@@ -1,4 +1,4 @@
--- Migration 330: Persistent, aPriori-style manual overrides for the Cost Summary.
+-- Migration 330: Persistent, eMithran-style manual overrides for the Cost Summary.
 --
 -- Before this, "edit a cost line" (material rate/kg, per-process rate/hr, per-
 -- process cycle time) was pure React useState in CostSummaryTab — refresh the

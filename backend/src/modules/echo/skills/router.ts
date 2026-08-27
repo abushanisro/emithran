@@ -33,7 +33,7 @@ const RULES: SkillRule[] = [
   { skill: 'processDfm',  test: /^\/process(-planning)?(\/|$)/i },
   { skill: 'production',  test: /^\/production-planning(\/|$)/i },
   { skill: 'supplier',    test: /^\/(supplier-evaluation|vendors)(\/|$)/i },
-  { skill: 'costing',     test: /^\/(raw-materials|hr-rates|mhr-database|calculators)(\/|$)/i },
+  { skill: 'costing',     test: /^\/(raw-materials|hr-rates|calculators)(\/|$)/i },
   { skill: 'vave',        test: /^\/vave(\/|$)/i },
   { skill: 'benchmark',   test: /^\/benchmarks?(\/|$)/i },
 ];

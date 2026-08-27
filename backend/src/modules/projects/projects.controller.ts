@@ -10,6 +10,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
@@ -18,6 +19,8 @@ import { ProjectResponseDto, ProjectListResponseDto } from './dto/project-respon
 import { AddTeamMemberDto, UpdateTeamMemberDto, TeamMemberResponseDto, TeamMembersListResponseDto } from './dto/project-team-member.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
@@ -46,14 +49,20 @@ export class ProjectsController {
   }
 
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create new project' })
   @ApiBody({ type: CreateProjectDto })
   @ApiResponse({ status: 201, description: 'Project created successfully', type: ProjectResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid input data or project name already exists' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async create(@Body() createProjectDto: CreateProjectDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProjectResponseDto> {
-    return this.projectsService.create(createProjectDto, user.id, token);
+  async create(
+    @Body() createProjectDto: CreateProjectDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ): Promise<ProjectResponseDto> {
+    return this.projectsService.create(createProjectDto, user.id, token, organizationId);
   }
 
   @Put(':id')

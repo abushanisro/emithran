@@ -10,7 +10,7 @@
 // lathe margins per the ×1.2 rule; laser thickness limits are material-specific
 // and resolved against the machine's per-material columns by the selector.
 
-import { estimateBendTonnage, estimateBurlTonnage } from '../default-rates';
+import { estimateBendTonnage, estimateBurlTonnage, estimateTurretPunchTonnage } from '../default-rates';
 
 // ── Material factor tables ────────────────────────────────────────────────────
 // Baseline MRR (cm³/min) at 100% rigidity — used to size VMC spindle demand
@@ -102,6 +102,28 @@ export interface GenericRequirement {
   kind: 'generic';        // deburring, tapping — no dimensional gate
 }
 
+// P0.4: turret punch and waterjet used to be assigned the SAME LaserRequirement
+// as fiber/CO2 laser (they're registered in the same sheet_metal_cutting
+// engine family) — meaning ranking checked thickness+bed only, never tonnage,
+// so a tonnage-incapable turret machine could score identically to a capable
+// one. These two kinds give each its own real physical requirement instead.
+export interface PunchingRequirement {
+  kind: 'turret_punch';
+  tonnage: number;        // tons required incl. no margin (selector applies TONNAGE_MARGIN)
+  thicknessMm: number;
+  bedLengthMm: number;    // flat pattern length
+  bedWidthMm: number;     // flat pattern width
+}
+
+// Waterjet isn't force-limited the way punching is (confirmed: waterjet-
+// engine.ts has no tonnage/force formula at all) — thickness + bed only.
+export interface WaterjetRequirement {
+  kind: 'waterjet';
+  thicknessMm: number;
+  bedLengthMm: number;
+  bedWidthMm: number;
+}
+
 export interface InjectionMoldingRequirement {
   kind: 'injection_molding';
   clampTonnageRequired: number;  // selector applies TONNAGE_MARGIN
@@ -120,6 +142,8 @@ export type MachineRequirement =
   | PressBrakeRequirement
   | HoleFormingRequirement
   | LaserRequirement
+  | PunchingRequirement
+  | WaterjetRequirement
   | VmcRequirement
   | LatheRequirement
   | GenericRequirement
@@ -138,7 +162,7 @@ export type MachineRequirement =
 export function pressBrakeRequirement(input: {
   bendLengthMm: number;
   thicknessMm: number;
-  utsMpa: number;
+  utsMpa: number | null;
 }): PressBrakeRequirement {
   const { bendLengthMm, thicknessMm, utsMpa } = input;
   const t = Math.max(thicknessMm, 0);
@@ -154,7 +178,7 @@ export function pressBrakeRequirement(input: {
 export function holeFormingRequirement(input: {
   holeDiameterMm: number;
   thicknessMm: number;
-  utsMpa: number;
+  utsMpa: number | null;
 }): HoleFormingRequirement {
   const { holeDiameterMm, thicknessMm, utsMpa } = input;
   const t = Math.max(thicknessMm, 0);
@@ -173,6 +197,42 @@ export function laserRequirement(input: {
     thicknessMm: Math.max(input.thicknessMm, 0),
     materialFamily: classifyLaserMaterial(input.materialGrade),
     materialGrade: input.materialGrade,
+    bedLengthMm: Math.max(input.bedLengthMm, 0),
+    bedWidthMm: Math.max(input.bedWidthMm, 0),
+  };
+}
+
+// TPP Manufacturing punching force formula — the SAME estimateTurretPunchTonnage
+// already used by machine-capability.ts's post-selection TONNAGE_EXCEEDED check
+// (fed by the identical cutLengthMm/materialShearStrengthMpa/thicknessMm), so
+// machine SELECTION and the post-selection capability verdict can never
+// silently disagree.
+export function punchingRequirement(input: {
+  cutLengthMm: number;
+  materialShearStrengthMpa: number;
+  thicknessMm: number;
+  bedLengthMm: number;
+  bedWidthMm: number;
+}): PunchingRequirement {
+  const t = Math.max(input.thicknessMm, 0);
+  const tonnage = estimateTurretPunchTonnage(input.materialShearStrengthMpa, t, Math.max(input.cutLengthMm, 0)) ?? 0;
+  return {
+    kind: 'turret_punch',
+    tonnage,
+    thicknessMm: t,
+    bedLengthMm: Math.max(input.bedLengthMm, 0),
+    bedWidthMm: Math.max(input.bedWidthMm, 0),
+  };
+}
+
+export function waterjetRequirement(input: {
+  thicknessMm: number;
+  bedLengthMm: number;
+  bedWidthMm: number;
+}): WaterjetRequirement {
+  return {
+    kind: 'waterjet',
+    thicknessMm: Math.max(input.thicknessMm, 0),
     bedLengthMm: Math.max(input.bedLengthMm, 0),
     bedWidthMm: Math.max(input.bedWidthMm, 0),
   };
@@ -210,7 +270,7 @@ export function latheRequirement(input: {
 
 // ── Injection molding ──────────────────────────────────────────────────────────
 // Clamp tonnage = projected area × material-specific cavity pressure factor —
-// the standard shop-floor sizing rule (aPriori/industry convention). Phase 1
+// the standard shop-floor sizing rule (eMithran/industry convention). Phase 1
 // approximates projected area with the part's bbox footprint (the true
 // projected-area-in-mold-opening-direction is a Phase 2 refinement — see the
 // injection-molding plan doc). Keyed by the SAME resin-family strings already

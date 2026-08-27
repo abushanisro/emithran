@@ -169,6 +169,7 @@ export class RawMaterialCostService {
     createDto: CreateRawMaterialCostDto,
     userId: string,
     accessToken: string,
+    organizationId?: string,
   ): Promise<RawMaterialCostResponseDto> {
     this.logger.log('Creating raw material cost record', 'RawMaterialCostService');
 
@@ -283,6 +284,7 @@ export class RawMaterialCostService {
         ? `⚠ No price found in raw_materials for "${createDto.materialName}" at ${createDto.country || 'this location'} — unit cost defaulted to $0. Add pricing data or enter unit cost manually.${createDto.notes ? ` ${createDto.notes}` : ''}`
         : createDto.notes,
       user_id: userId,
+      organization_id: organizationId ?? null,
 
       // Links
       bom_item_id: createDto.bomItemId,

@@ -730,7 +730,8 @@ export class CADAnalysisService {
   }
 
   private async generateSTLFallbackAnalysis(fileBuffer: Buffer, request: CADAnalysisRequest): Promise<GeometryAnalysisResponse> {
-    this.logger.log('Generating fallback analysis for STL file (with geometry-aware DFM positions)');
+    const stlFallbackStartTime = Date.now();
+    this.logger.log('Generating fallback analysis for STL file (real bbox/volume only — no feature/DFM fabrication)');
 
     // ── Parse STL binary geometry to get real bounding box ─────────────────
     // Binary STL: [80-byte header][4-byte uint32 triangle count][N × 50-byte triangles]
@@ -869,63 +870,16 @@ export class CADAnalysisService {
       `saVol=${saVolRatio.toFixed(2)} reason="${classificationReason}"`,
     );
 
-    // ── Generate normalised DFM positions spread across real model surfaces ─
-    // nx/ny/nz are each in [-1,+1] relative to bbox centre.
-    // Frontend multiplies by scene half-extents to get exact scene position.
-    // We spread markers to make them clearly visible:
-    //  • Holes  → ring on top face (nz≈+1.0), angular spread on top
-    //  • Pocket → recessed (nz≈+0.5), offset in XY
-    //  • Thin wall → on the thinnest face edge (nx≈+1.0)
-    //  • Undercut → bottom-back face (nz≈-1.0)
-
-    const numHoles = safeTriangleCount > 2000 ? 3 : safeTriangleCount > 500 ? 2 : 1;
-    const holePositions = Array.from({ length: numHoles }, (_, i) => {
-      const angle = (i / numHoles) * Math.PI * 2;
-      return {
-        nx: parseFloat((Math.cos(angle) * 0.55).toFixed(3)),
-        ny: parseFloat((Math.sin(angle) * 0.55).toFixed(3)),
-        nz: 0.85,  // top face
-      };
-    });
-
-    const holeResult = {
-      count: numHoles,
-      min_diameter: parseFloat((Math.min(dx, dy) * 0.1).toFixed(2)),
-      max_diameter: parseFloat((Math.min(dx, dy) * 0.2).toFixed(2)),
-      diameters: [parseFloat((Math.min(dx, dy) * 0.15).toFixed(2))],
-      depth_diameter_ratio: 2.0,
-      edge_distance: null,
-      positions: holePositions,
-    };
-
-    const pocketPositions = [
-      { nx: -0.30, ny: 0.10, nz: 0.50 },  // slightly recessed, left of centre
-      { nx:  0.30, ny: -0.10, nz: 0.35 }, // slightly recessed, right of centre
-    ].slice(0, safeTriangleCount > 1000 ? 2 : 1);
-
-    const pocketResult = {
-      count: pocketPositions.length,
-      min_depth: parseFloat((Math.min(dx, dy, dz) * 0.1).toFixed(2)),
-      max_depth: parseFloat((Math.min(dx, dy, dz) * 0.25).toFixed(2)),
-      aspect_ratio: null,
-      positions: pocketPositions,
-    };
-
-    // Thin wall: thinnest axis determines which face
-    const thinAxis = dx < dy && dx < dz ? 'x' : dy < dz ? 'y' : 'z';
-    const thinWallMm = parseFloat(Math.min(dx, dy, dz).toFixed(2));
-    const thinWallPos = thinAxis === 'x'
-      ? { nx: 0.90, ny: 0.10, nz: 0.20 }
-      : thinAxis === 'y'
-      ? { nx: 0.10, ny: 0.90, nz: 0.20 }
-      : { nx: 0.10, ny: 0.20, nz: 0.90 };
-
-    // Undercut: bottom face
-    const undercutResult = safeTriangleCount > 800 ? {
-      detected: true,
-      count: 1,
-      positions: [{ nx: 0.20, ny: -0.60, nz: -0.85 }],
-    } : { detected: false, count: 0, positions: [] };
+    // ── No real feature detection is possible from a bare STL mesh ─────────
+    // Holes, pockets, thin walls, and undercuts require face/edge topology
+    // (OCC B-rep data) that only the STEP/IGES pipeline provides. A prior
+    // version of this method fabricated hole counts/diameters, pocket
+    // depths, and undercut detection purely from triangle-count thresholds
+    // and fractions of the bounding box — indistinguishable from real
+    // measurements to every downstream consumer (operations, DFM, cost).
+    // Per the project's root-cause-data policy, a missing real value is a
+    // documented gap, never a fabricated number: this path now reports
+    // zero features found rather than inventing plausible-looking ones.
 
     return {
       success: true,
@@ -938,10 +892,14 @@ export class CADAnalysisService {
       geometry_features: {
         file_size_bytes: fileSize,
         triangle_count: safeTriangleCount,
-        // Use computed volume when available; fall back to 10% fill (not 40%) since
-        // the most common STL-only parts are sheet metal frames with low fill fraction.
-        estimated_volume_mm3: computedVolumeMm3 > 0 ? computedVolumeMm3 : rawBboxVol * 0.10,
-        surface_area_estimation: computedSurfaceAreaMm2 > 0 ? computedSurfaceAreaMm2 : 2 * (dimL * dimW + dimW * dimH + dimL * dimH),
+        // null (not a guessed fill-fraction/bbox-surface substitute) when the
+        // mesh parse didn't yield a real volume/area — e.g. ASCII STL, which
+        // this parser doesn't walk. A missing measurement is reported as
+        // missing, not backfilled with a plausible-looking number.
+        estimated_volume_mm3: computedVolumeMm3 > 0 ? computedVolumeMm3 : null,
+        surface_area_estimation: computedSurfaceAreaMm2 > 0 ? computedSurfaceAreaMm2 : null,
+        // Rough triangle-density proxy, not a manufacturability judgment —
+        // real DFM complexity requires face/edge topology this path lacks.
         complexity_score: Math.min(safeTriangleCount / 1000, 9.99),
         // Sorted: length (max) → width → height (min) — matches Python OCC convention
         bounding_box: {
@@ -949,60 +907,39 @@ export class CADAnalysisService {
           width:  parseFloat(dimW.toFixed(2)),
           height: parseFloat(dimH.toFixed(2)),
         },
+        // Holes/pockets/thin-walls/undercuts require OCC face/edge topology
+        // that a bare STL mesh doesn't carry — reported as not-detected
+        // rather than fabricated from triangle-count heuristics.
         manufacturing_features: {
           manufacturing_intelligence: manufactIntel,
-          holes: holeResult,
-          pockets: pocketResult,
-          thin_walls: thinWallMm,
-          undercuts: undercutResult,
+          holes: null,
+          pockets: null,
+          thin_walls: null,
+          undercuts: null,
         },
-        feature_detection: {
-          holes_detected: numHoles,
-          curved_surfaces: safeTriangleCount > 500,
-          thin_walls: thinWallMm < 2.0,
-          overhangs: safeTriangleCount > 800,
-        },
+        feature_detection_available: false,
       },
 
-      memory_optimization: {
-        original_size_mb: fileSize / (1024 * 1024),
-        optimized_size_mb: (fileSize * 0.7) / (1024 * 1024),
-        reduction_percentage: 30,
-        lod_levels_generated: 3,
-        compression_ratio: 1.43,
-      },
+      // No LOD/compression pass actually runs in this fallback path — there
+      // is nothing real to report here.
+      memory_optimization: null,
 
       dfm_analysis: {
-        manufacturability_score: 0.72,
-        difficulty_level: 'medium',
-        recommended_processes: ['CNC Milling', 'Additive Manufacturing'],
+        manufacturability_score: null,
+        difficulty_level: null,
+        recommended_processes: null,
         manufacturing_warnings: [
-          'STL analysis: upload STEP/IGES for precise DFM',
-          thinWallMm < 1.5 ? `Thin feature detected (≈${thinWallMm}mm): verify wall thickness` : '',
-        ].filter(Boolean),
-        cost_factors: {
-          material_utilization: 85,
-          machining_complexity: 'Medium',
-          setup_time_minutes: 15,
-          estimated_cost_multiplier: 1.2,
-        },
-        geometric_constraints: {
-          minimum_wall_thickness: thinWallMm,
-          maximum_aspect_ratio: Math.max(dx, dy, dz) / Math.max(Math.min(dx, dy, dz), 0.1),
-          draft_angles_required: false,
-          undercuts_detected: undercutResult.detected,
-        },
+          'STL-only upload: no face/edge topology available, so DFM cannot be scored. Upload STEP/IGES for a real DFM verdict.',
+        ],
+        cost_factors: null,
+        geometric_constraints: null,
+        analysis_available: false,
       },
 
       performance_metrics: {
-        analysis_time_ms: 50,
-        memory_peak_mb: 10,
-        cache_utilized: false,
-        optimization_passes: 1,
-        processing_time_ms: 50,
+        analysis_time_ms: Date.now() - stlFallbackStartTime,
         recommendations: [
-          'Upload original STEP/IGES file for full OCC-based DFM analysis',
-          'DFM marker positions are estimated from STL bounding box geometry',
+          'Upload original STEP/IGES file for full OCC-based feature extraction and DFM analysis',
         ],
       },
     };

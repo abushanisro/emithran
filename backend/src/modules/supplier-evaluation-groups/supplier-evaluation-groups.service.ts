@@ -19,6 +19,7 @@ export class SupplierEvaluationGroupsService {
     userId: string,
     createDto: CreateSupplierEvaluationGroupDto,
     accessToken: string,
+    organizationId?: string,
   ): Promise<SupplierEvaluationGroupDto> {
     this.logger.log(`Creating supplier evaluation group for user ${userId}`);
 
@@ -32,6 +33,7 @@ export class SupplierEvaluationGroupsService {
         .from('supplier_evaluation_groups')
         .insert({
           user_id: userId,
+          organization_id: organizationId ?? null,
           project_id: createDto.projectId,
           name: evaluationName,
           description: createDto.description,
@@ -52,6 +54,7 @@ export class SupplierEvaluationGroupsService {
       if (createDto.bomItems?.length > 0) {
         const bomItemsData = createDto.bomItems.map(item => ({
           evaluation_group_id: groupId,
+          organization_id: organizationId ?? null,
           bom_item_id: item.id,
           bom_item_name: item.name,
           part_number: item.partNumber,
@@ -73,6 +76,7 @@ export class SupplierEvaluationGroupsService {
       if (createDto.processes?.length > 0) {
         const processesData = createDto.processes.map(process => ({
           evaluation_group_id: groupId,
+          organization_id: organizationId ?? null,
           process_id: process.id,
           process_name: process.name,
           process_group: process.processGroup,
@@ -121,7 +125,6 @@ export class SupplierEvaluationGroupsService {
           supplier_evaluation_group_bom_items(count),
           supplier_evaluation_group_processes(count)
         `)
-        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -249,8 +252,7 @@ export class SupplierEvaluationGroupsService {
           status: updateDto.status,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', groupId)
-        .eq('user_id', userId);
+        .eq('id', groupId);
 
       if (error) {
         this.logger.error('Error updating evaluation group:', error.message);
@@ -277,12 +279,11 @@ export class SupplierEvaluationGroupsService {
     try {
       const supabase = this.supabaseService.getClient(accessToken);
 
-      // Get evaluation group details
+      // Get evaluation group details (RLS scopes this to the caller's organization)
       const { data: group } = await supabase
         .from('supplier_evaluation_groups')
         .select('*')
         .eq('id', groupId)
-        .eq('user_id', userId)
         .single();
 
       if (!group) {
@@ -290,13 +291,14 @@ export class SupplierEvaluationGroupsService {
         return { canDelete: false, warnings, blockers, impactSummary };
       }
 
-      // Check for active RFQs by looking at RFQ tracking records
+      // Check for active RFQs by looking at RFQ tracking records.
+      // No manual user_id filter — rfq_tracking is org-scoped by RLS
+      // (a stale filter here would have under-counted an org-mate's RFQs).
       const { count: activeRfqCount } = await supabase
         .from('rfq_tracking')
         .select('*', { count: 'exact' })
         .eq('project_id', group.project_id)
-        .in('status', ['sent', 'responses_received'])
-        .eq('user_id', userId);
+        .in('status', ['sent', 'responses_received']);
 
       if (activeRfqCount && activeRfqCount > 0) {
         blockers.push(`${activeRfqCount} active RFQ(s) are currently sent to vendors. Cancel these RFQs first.`);
@@ -307,8 +309,7 @@ export class SupplierEvaluationGroupsService {
         .from('rfq_tracking')
         .select('*', { count: 'exact' })
         .eq('project_id', group.project_id)
-        .eq('status', 'evaluated')
-        .eq('user_id', userId);
+        .eq('status', 'evaluated');
 
       if (evaluatedCount && evaluatedCount > 0) {
         warnings.push(`${evaluatedCount} RFQ(s) are currently under evaluation and will be lost.`);
@@ -320,19 +321,23 @@ export class SupplierEvaluationGroupsService {
         .from('rfq_tracking')
         .select('*', { count: 'exact' })
         .eq('project_id', group.project_id)
-        .eq('status', 'completed')
-        .eq('user_id', userId);
+        .eq('status', 'completed');
 
       if (completedCount && completedCount > 0) {
         warnings.push('This evaluation contains completed RFQ data that may be valuable for future reference.');
         impactSummary.push({ label: 'Completed RFQs', count: completedCount });
       }
 
-      // Count related data that will be cascade deleted
+      // Count related data that will be cascade deleted.
+      // NOTE: these two queries previously filtered on .eq('group_id', groupId),
+      // but the real FK column on both tables is evaluation_group_id — 'group_id'
+      // doesn't exist, so this was silently throwing (caught by the outer
+      // try/catch) and impactSummary never actually included these counts.
+      // Fixed here as a pre-existing bug adjacent to this same function.
       const { count: bomItemsCount } = await supabase
         .from('supplier_evaluation_group_bom_items')
         .select('*', { count: 'exact' })
-        .eq('group_id', groupId);
+        .eq('evaluation_group_id', groupId);
 
       if (bomItemsCount && bomItemsCount > 0) {
         impactSummary.push({ label: 'BOM Items', count: bomItemsCount });
@@ -341,7 +346,7 @@ export class SupplierEvaluationGroupsService {
       const { count: processesCount } = await supabase
         .from('supplier_evaluation_group_processes')
         .select('*', { count: 'exact' })
-        .eq('group_id', groupId);
+        .eq('evaluation_group_id', groupId);
 
       if (processesCount && processesCount > 0) {
         impactSummary.push({ label: 'Processes', count: processesCount });
@@ -398,8 +403,7 @@ export class SupplierEvaluationGroupsService {
       const { error } = await supabase
         .from('supplier_evaluation_groups')
         .delete()
-        .eq('id', groupId)
-        .eq('user_id', userId);
+        .eq('id', groupId);
 
       if (error) {
         this.logger.error('Error removing evaluation group:', error.message);

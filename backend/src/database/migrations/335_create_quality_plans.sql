@@ -1,4 +1,4 @@
--- Migration 335: quality_plans — named inspection sampling policies (aPriori-style)
+-- Migration 335: quality_plans — named inspection sampling policies (eMithran-style)
 --
 -- Customer quality requirements (AS9100, PPAP, ...) change inspection cost via
 -- sampling, not via the measurement physics. A plan bundles the three stages:

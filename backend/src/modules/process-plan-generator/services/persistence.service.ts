@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -47,6 +46,7 @@ export class PersistenceService {
     body: ApplyRequestDto,
     userId: string,
     accessToken: string | null,
+    organizationId?: string,
   ): Promise<ApplyResultDto> {
     const client = this.supabaseService.getClient(accessToken ?? undefined);
 
@@ -60,9 +60,7 @@ export class PersistenceService {
     if (genErr || !gen) {
       throw new NotFoundException(`Generation ${generationId} not found`);
     }
-    if (gen.user_id !== userId) {
-      throw new ForbiddenException('Generation does not belong to this user');
-    }
+    // No manual ownership check — RLS scopes visibility to the caller's organization.
     if (gen.status !== 'draft_ready') {
       throw new BadRequestException(`Generation is in status '${gen.status}', cannot apply`);
     }
@@ -150,6 +148,7 @@ export class PersistenceService {
             const payload = {
               bom_item_id: bomItemId,
               user_id: userId,
+              organization_id: organizationId ?? null,
               material_name: line.data.materialName,
               material_category: line.data.materialCategory,
               material_description: line.data.materialGrade ?? (line.data as any).materialDescription ?? null,
@@ -200,6 +199,7 @@ export class PersistenceService {
             const payload = {
               bom_item_id: bomItemId,
               user_id: userId,
+              organization_id: organizationId ?? null,
               process_id: processId,
               mhr_id: line.data.mhrId,
               lhr_id: line.data.lhrId,
@@ -246,6 +246,7 @@ export class PersistenceService {
             const payload = {
               bom_item_id: bomItemId,
               user_id: userId,
+              organization_id: organizationId ?? null,
               tooling_type: line.data.toolingType,
               description: line.data.description,
               specifications: line.data.specifications,
@@ -264,6 +265,7 @@ export class PersistenceService {
             const payload = {
               bom_item_id: bomItemId,
               user_id: userId,
+              organization_id: organizationId ?? null,
               cost_name: line.data.costName,
               logistics_type: line.data.logisticsType,
               mode_of_transport: line.data.modeOfTransport,
@@ -281,6 +283,7 @@ export class PersistenceService {
             const payload = {
               bom_item_id: bomItemId,
               user_id: userId,
+              organization_id: organizationId ?? null,
               part_name: line.data.partName,
               part_number: line.data.partNumber,
               supplier_name: line.data.supplierName,
@@ -370,7 +373,7 @@ export class PersistenceService {
       .single();
 
     if (genErr || !gen) throw new NotFoundException(`Generation ${generationId} not found`);
-    if (gen.user_id !== userId) throw new ForbiddenException('Generation does not belong to this user');
+    // No manual ownership check — RLS scopes visibility to the caller's organization.
     if (gen.status !== 'draft_ready') {
       throw new BadRequestException(`Cannot select route on status '${gen.status}'`);
     }
@@ -401,22 +404,23 @@ export class PersistenceService {
     body: CreateLineEditDto,
     userId: string,
     accessToken: string | null,
+    organizationId?: string,
   ): Promise<{ id: string }> {
     const client = this.supabaseService.getClient(accessToken ?? undefined);
 
-    // Light ownership check (RLS will also enforce on insert)
+    // RLS scopes visibility to the caller's organization — no manual check needed.
     const { data: gen, error: genErr } = await client
       .from('process_plan_generations')
-      .select('id, user_id, bom_item_id')
+      .select('id, bom_item_id')
       .eq('id', generationId)
       .single();
     if (genErr || !gen) throw new NotFoundException(`Generation ${generationId} not found`);
-    if (gen.user_id !== userId) throw new ForbiddenException('Generation does not belong to this user');
 
     const payload = {
       generation_id: generationId,
       bom_item_id: gen.bom_item_id,
       user_id: userId,
+      organization_id: organizationId ?? null,
       line_kind: body.lineKind,
       line_index: body.lineIndex,
       field_path: body.fieldPath,

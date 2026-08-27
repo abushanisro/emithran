@@ -27,8 +27,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { ProcuredPartsCostService } from './procured-parts-cost.service';
 import {
   CreateProcuredPartsCostDto,
@@ -88,6 +90,7 @@ async findAll(
    * Create new procured part cost
    */
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new procured part cost' })
   @ApiResponse({
     status: 201,
@@ -98,9 +101,10 @@ async findAll(
   async create(
     @Body() dto: CreateProcuredPartsCostDto,
     @CurrentUser('id') userId: string,
-    @AccessToken() accessToken?: string,
+    @AccessToken() accessToken: string | undefined,
+    @CurrentOrganization() organizationId: string,
   ): Promise<ProcuredPartsCostResponseDto> {
-    return this.procuredPartsCostService.create(dto, userId, accessToken);
+    return this.procuredPartsCostService.create(dto, userId, accessToken, organizationId);
   }
 
   /**

@@ -1,6 +1,6 @@
 -- Migration 334: inspection_rules — DB-backed GD&T → inspection-method selection
 --
--- Layer-1 move (aPriori-style data layer): the tolerance→method matrix that
+-- Layer-1 move (eMithran-style data layer): the tolerance→method matrix that
 -- lived only in backend/src/modules/bom-items/costing/gdt-severity.ts becomes
 -- data. The code matrix stays as the fallback when this table is empty or
 -- unreachable — costing must never fail because a KB read failed.

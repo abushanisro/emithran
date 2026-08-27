@@ -15,6 +15,16 @@ export class FxController {
     return this.fxService.resolveFactoryCurrency(location);
   }
 
+  @Get('factories')
+  listFactories() {
+    return this.fxService.listFactories();
+  }
+
+  @Get('currencies')
+  listCurrencies() {
+    return this.fxService.listCurrencies();
+  }
+
   @Get('rate')
   async getRate(
     @Query('base') base: string,

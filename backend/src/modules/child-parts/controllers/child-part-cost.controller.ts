@@ -28,6 +28,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
+import { OrganizationContextGuard } from '../../../common/guards/organization-context.guard';
 import { ChildPartCostService } from '../services/child-part-cost.service';
 import {
   CreateChildPartCostDto,
@@ -134,13 +135,14 @@ export class ChildPartCostController {
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
+  @UseGuards(OrganizationContextGuard)
   async create(
     @Body() createDto: CreateChildPartCostDto,
     @Request() req: any,
   ): Promise<ChildPartCostResponseDto> {
     const userId = req.user?.id;
     const accessToken = req.headers.authorization?.replace('Bearer ', '');
-    return this.childPartCostService.create(createDto, userId, accessToken);
+    return this.childPartCostService.create(createDto, userId, accessToken, req.organizationId);
   }
 
   /**
@@ -160,6 +162,7 @@ export class ChildPartCostController {
   @ApiResponse({ status: 404, description: 'Child part cost not found' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(OrganizationContextGuard)
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateChildPartCostDto,
@@ -167,7 +170,7 @@ export class ChildPartCostController {
   ): Promise<ChildPartCostResponseDto> {
     const userId = req.user?.id;
     const accessToken = req.headers.authorization?.replace('Bearer ', '');
-    return this.childPartCostService.update(id, updateDto, userId, accessToken);
+    return this.childPartCostService.update(id, updateDto, userId, accessToken, req.organizationId);
   }
 
   /**
@@ -191,10 +194,11 @@ export class ChildPartCostController {
   })
   @ApiResponse({ status: 404, description: 'Child part cost not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(OrganizationContextGuard)
   async remove(@Param('id') id: string, @Request() req: any): Promise<{ message: string }> {
     const userId = req.user?.id;
     const accessToken = req.headers.authorization?.replace('Bearer ', '');
-    return this.childPartCostService.remove(id, userId, accessToken);
+    return this.childPartCostService.remove(id, userId, accessToken, req.organizationId);
   }
 
   /**

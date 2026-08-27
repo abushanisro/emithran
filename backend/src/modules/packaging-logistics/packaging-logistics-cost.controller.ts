@@ -27,8 +27,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { PackagingLogisticsCostService } from './packaging-logistics-cost.service';
 import {
   CreatePackagingLogisticsCostDto,
@@ -66,6 +68,20 @@ async findAll(
   }
 
   /**
+   * Real region-pair freight reference rates — click-to-fill suggestion
+   * source for the "Add Logistics Item" dialog. Declared before the ':id'
+   * route so it isn't captured by that param matcher.
+   */
+  @Get('freight-rate-benchmarks')
+  @ApiOperation({ summary: 'Get real region-pair freight reference rates (USD/kg)' })
+  @ApiResponse({ status: 200, description: 'Returns the freight rate benchmark list' })
+  async getFreightRateBenchmarks(
+    @AccessToken() accessToken?: string,
+  ): Promise<Array<{ rateType: string; rateUsdPerKg: number }>> {
+    return this.packagingLogisticsCostService.getFreightRateBenchmarks(accessToken);
+  }
+
+  /**
    * Get single packaging/logistics cost by ID
    */
   @Get(':id')
@@ -88,6 +104,7 @@ async findAll(
    * Create new packaging/logistics cost
    */
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new packaging/logistics cost' })
   @ApiResponse({
     status: 201,
@@ -98,9 +115,10 @@ async findAll(
   async create(
     @Body() dto: CreatePackagingLogisticsCostDto,
     @CurrentUser('id') userId: string,
-    @AccessToken() accessToken?: string,
+    @AccessToken() accessToken: string | undefined,
+    @CurrentOrganization() organizationId: string,
   ): Promise<PackagingLogisticsCostResponseDto> {
-    return this.packagingLogisticsCostService.create(dto, userId, accessToken);
+    return this.packagingLogisticsCostService.create(dto, userId, accessToken, organizationId);
   }
 
   /**

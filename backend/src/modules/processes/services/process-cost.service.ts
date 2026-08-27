@@ -355,6 +355,7 @@ export class ProcessCostService {
     createDto: CreateProcessCostDto,
     userId: string,
     accessToken: string,
+    organizationId?: string,
   ): Promise<ProcessCostResponseDto> {
     this.logger.log('Creating process cost record', 'ProcessCostService');
 
@@ -453,6 +454,7 @@ export class ProcessCostService {
       is_active: createDto.isActive !== false,
       notes: createDto.notes,
       user_id: userId,
+      organization_id: organizationId ?? null,
 
       // Links
       process_id: createDto.processId,

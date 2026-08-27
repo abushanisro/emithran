@@ -17,6 +17,7 @@ import {
   Patch,
   Optional,
   InternalServerErrorException,
+  UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { gunzip } from 'zlib';
@@ -38,6 +39,8 @@ import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/ex
 import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { FileStorageService } from './services/file-storage.service';
 import { StepConverterService } from './services/step-converter.service';
 import { CADAnalysisService } from './services/cad-analysis.service';
@@ -287,6 +290,28 @@ export class BOMItemsController {
     );
   }
 
+  // P0.5 audit (documented capability gap, not an oversight): DFM has NO
+  // persistence layer at all today. This endpoint always fully recomputes —
+  // reading whatever feature_graph_v2/sheetThicknessMm/materialGrade is
+  // currently on the item — and writes nothing back (no dfm_scores table
+  // exists). Consequences worth knowing before ever changing this:
+  //   - CAD/material/thickness changes can never surface a STALE backend DFM
+  //     result, because there is no snapshot to go stale — every call is
+  //     already "live." (The one real staleness bug this audit found was a
+  //     frontend React Query cache gap — useUpdateBOMItem's onSuccess wasn't
+  //     invalidating the dfm-scores query key after a material-grade edit —
+  //     fixed separately in useBOMItems.ts's invalidateBOMItemUpdateQueries.)
+  //   - There is no DFM rule-version concept (no ruleVersion/schema-version
+  //     field anywhere) — moot today since nothing is persisted, but a real
+  //     gap to close FIRST if persistence is ever introduced, or a rule
+  //     change could apply invisibly to old stored results.
+  //   - `scoredAt` below is a response timestamp only (stamped at request
+  //     time) — it does not represent "freshness of a snapshot" the way it
+  //     would if this were ever persisted.
+  // If a future requirement needs an audit trail / point-in-time DFM record
+  // (e.g. "what did DFM say when this quote was issued"), that is new
+  // capability to design deliberately (a real table + rule-version stamping +
+  // explicit save action), not something to bolt on by caching this endpoint.
   @Get(':id/dfm-scores')
   @ApiOperation({ summary: 'Compute per-occurrence DFM risk scores from stored feature_graph_v2 metrics' })
   @ApiResponse({ status: 200, description: 'DFM scores returned' })
@@ -294,24 +319,80 @@ export class BOMItemsController {
     const item = await this.bomItemsService.findOne(id, user.id, token);
     const fg = item.featureGraph as any;
     const v2features: any[] = fg?.feature_graph_v2?.features ?? [];
-    const t: number = (item as any).sheetThicknessMm ?? 1;
+    // Real value, possibly null — DFMScoringService.score() distinguishes
+    // "genuinely unknown" (null/undefined) from "0 = CNC part" and flags
+    // every affected occurrence's riskFactors rather than silently scoring
+    // against a fabricated 1mm (see that method's own doc comment).
+    const t: number | null = (item as any).sheetThicknessMm ?? null;
+    const utsMpa = await this.resolveUtsMpaForDfm(item.materialGrade, token);
     return {
       bomItemId: id,
       sheetThicknessMm: t,
-      features: this.dfmScoringService.score(v2features, t),
+      features: this.dfmScoringService.score(v2features, t, item.materialGrade, utsMpa),
       scoredAt: new Date().toISOString(),
     };
   }
 
+  /**
+   * Real UTS lookup for the min-hole-diameter DFM check (dfm-scoring.service.ts)
+   * — same precedence real cost calculation uses (uts_mpa preferred over the
+   * legacy ultimate_tensile_strength column — see bom-items.service.ts's
+   * resolveMaterialForFamily for why), but deliberately NOT the full
+   * cost-critical resolution chain (that also needs rate/currency/family
+   * context this DFM-only lookup has no reason to carry). Alias lookup first
+   * (material_aliases, migration 382/383) since many real grades only match
+   * that way, then an exact case-insensitive grade match; no fuzzy/tokenized
+   * fallback — an unresolved grade returns null and the DFM check is simply
+   * skipped for that item rather than guessing.
+   */
+  private async resolveUtsMpaForDfm(materialGrade: string | null | undefined, token: string): Promise<number | null> {
+    if (!materialGrade) return null;
+    const db = this.supabaseService.getClient(token);
+    const g = materialGrade.trim();
+    if (!g) return null;
+
+    const aliasNormalized = g.toUpperCase().replace(/[\s-]/g, '');
+    if (aliasNormalized) {
+      const { data: aliasRow } = await db
+        .from('material_aliases')
+        .select('raw_material_id')
+        .eq('alias_normalized', aliasNormalized)
+        .maybeSingle();
+      if (aliasRow?.raw_material_id) {
+        const { data } = await db
+          .from('raw_materials')
+          .select('uts_mpa, ultimate_tensile_strength')
+          .eq('id', aliasRow.raw_material_id)
+          .maybeSingle();
+        const uts = (data?.uts_mpa as number | null) ?? (data?.ultimate_tensile_strength as number | null);
+        if (uts != null) return uts;
+      }
+    }
+
+    const { data } = await db
+      .from('raw_materials')
+      .select('uts_mpa, ultimate_tensile_strength')
+      .ilike('material_grade', g)
+      .limit(1)
+      .maybeSingle();
+    return (data?.uts_mpa as number | null) ?? (data?.ultimate_tensile_strength as number | null) ?? null;
+  }
+
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new BOM item' })
   @ApiResponse({ status: 201, description: 'BOM item created successfully', type: BOMItemResponseDto })
-  async create(@Body() createBOMItemDto: CreateBOMItemDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMItemResponseDto> {
+  async create(
+    @Body() createBOMItemDto: CreateBOMItemDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ): Promise<BOMItemResponseDto> {
     try {
       if (!user?.id) {
         throw new BadRequestException('User authentication required');
       }
-      return await this.bomItemsService.create(createBOMItemDto, user.id, token);
+      return await this.bomItemsService.create(createBOMItemDto, user.id, token, organizationId);
     } catch (error) {
       this.logger.error(`Failed to create BOM item: ${error.message}`, error.stack);
       throw error;
@@ -1376,7 +1457,7 @@ export class BOMItemsController {
 
   @Post(':id/cost-override')
   @ApiOperation({
-    summary: 'aPriori-style manual override for one cost field (null/omitted value clears it)',
+    summary: 'eMithran-style manual override for one cost field (null/omitted value clears it)',
   })
   @ApiResponse({ status: 201, description: 'Override saved (or cleared) — next cost summary uses it' })
   async setCostOverride(

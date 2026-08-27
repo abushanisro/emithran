@@ -69,7 +69,7 @@ const ENTRIES: Array<{ pattern: RegExp; entry: RouteRegistryEntry }> = [
     },
   },
   {
-    pattern: /^\/(raw-materials|hr-rates|mhr-database|calculators)(\/|$)/i,
+    pattern: /^\/(raw-materials|hr-rates|calculators)(\/|$)/i,
     entry: {
       displayName: 'Costing rates',
       helpTopics: ['mhr-setup', 'lhr-setup', 'calculator-inputs'],

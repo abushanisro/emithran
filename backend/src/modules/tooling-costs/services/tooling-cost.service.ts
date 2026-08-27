@@ -71,7 +71,6 @@ export class ToolingCostService {
       let queryBuilder = client
         .from('tooling_cost_records')
         .select('*', { count: 'exact' })
-        .eq('user_id', userId)
         .range(offset, offset + limit - 1)
         .order('created_at', { ascending: false });
 
@@ -132,7 +131,6 @@ export class ToolingCostService {
         .from('tooling_cost_records')
         .select('*')
         .eq('id', id)
-        .eq('user_id', userId)
         .single();
 
       if (error || !data) {
@@ -153,6 +151,7 @@ export class ToolingCostService {
     dto: CreateToolingCostDto,
     userId: string,
     accessToken: string,
+    organizationId?: string,
   ): Promise<ToolingCostResponseDto> {
     try {
       const client = this.supabaseService.getClient(accessToken);
@@ -167,6 +166,7 @@ export class ToolingCostService {
 
       const record = {
         user_id: userId,
+        organization_id: organizationId ?? null,
         bom_item_id: dto.bomItemId,
         tooling_type: dto.toolingType,
         description: dto.description,
@@ -220,7 +220,6 @@ export class ToolingCostService {
         .from('tooling_cost_records')
         .select('*')
         .eq('id', id)
-        .eq('user_id', userId)
         .single();
 
       if (fetchError || !existing) {
@@ -277,7 +276,6 @@ export class ToolingCostService {
         .from('tooling_cost_records')
         .update(updateData)
         .eq('id', id)
-        .eq('user_id', userId)
         .select()
         .single();
 
@@ -307,8 +305,7 @@ export class ToolingCostService {
       const { error } = await client
         .from('tooling_cost_records')
         .delete()
-        .eq('id', id)
-        .eq('user_id', userId);
+        .eq('id', id);
 
       if (error) {
         this.logger.error('Error deleting tooling cost:', error);
@@ -335,7 +332,6 @@ export class ToolingCostService {
         .from('tooling_cost_records')
         .select('total_cost')
         .eq('bom_item_id', bomItemId)
-        .eq('user_id', userId)
         .eq('is_active', true);
 
       if (error) {

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DFMScoringService } from '../../bom-items/services/dfm-scoring.service';
 
 /**
  * Dispatcher: routes Claude tool_use blocks to the correct backend service
@@ -40,6 +41,11 @@ const HARD_TIMEOUT_MS = 12_000;
 @Injectable()
 export class ToolDispatcherService {
   private readonly logger = new Logger(ToolDispatcherService.name);
+  // DFMScoringService has zero constructor dependencies (pure functions
+  // only) — instantiated directly rather than via NestJS DI/module
+  // wiring, same "stay decoupled from the heavy service graph" reasoning
+  // as this file's own direct-Supabase-query pattern above.
+  private readonly dfmScoringService = new DFMScoringService();
 
   constructor(private readonly supabase: SupabaseService) {}
 
@@ -180,11 +186,16 @@ export class ToolDispatcherService {
     const bomItemId = requireString(input, 'bomItemId');
     const client = this.supabase.getClient(ctx.accessToken ?? undefined);
 
-    // DFM results are denormalised onto bom_items (migration 076).
+    // manufacturability_score/dfm_analysis on bom_items are stale/dead —
+    // CAD analysis no longer computes a manufacturability verdict (see
+    // memory_optimizer.py's DFM-NOT-COMPUTED result); dfm-scoring.service.ts
+    // is the sole DFM authority and always recomputes live from the real
+    // per-occurrence feature graph, so this tool now does the same instead
+    // of reading a column that is now permanently null.
     const { data, error } = await client
       .from('bom_items')
       .select(
-        'id, name, part_number, manufacturability_score, difficulty_level, recommended_processes, dfm_analysis, cad_analysis_warnings, geometry_analysis, analysis_timestamp, file_3d_path, file_2d_path',
+        'id, name, part_number, feature_graph, sheet_thickness_mm, material_grade, cad_analysis_warnings, geometry_analysis, analysis_timestamp, file_3d_path, file_2d_path',
       )
       .eq('id', bomItemId)
       .maybeSingle();
@@ -192,7 +203,9 @@ export class ToolDispatcherService {
     if (error) throw new Error(`bom_items: ${error.message}`);
     if (!data) return missing(`BOM item ${bomItemId} not found`);
 
-    if (data.manufacturability_score == null && !data.analysis_timestamp) {
+    const v2features: any[] = (data.feature_graph as any)?.feature_graph_v2?.features ?? [];
+
+    if (!data.analysis_timestamp && v2features.length === 0) {
       const hasFile = !!data.file_3d_path || !!data.file_2d_path;
       return {
         ok: true,
@@ -213,11 +226,24 @@ export class ToolDispatcherService {
       : 999;
     const stale = ageDays > 7;
 
-    // Score is 0..1 in the DB; rescale to 0..100 for human readability.
-    const scoreRaw = data.manufacturability_score;
-    const score100 = typeof scoreRaw === 'number'
-      ? Math.round(scoreRaw <= 1 ? scoreRaw * 100 : scoreRaw)
-      : null;
+    // UTS is deliberately not resolved here (no material-lookup service
+    // available to this file without pulling in the heavy service graph
+    // this file's constructor comment warns against) — the scorer already
+    // handles a missing UTS by skipping only the one check that needs it,
+    // never by guessing a value.
+    const scored = this.dfmScoringService.score(
+      v2features,
+      data.sheet_thickness_mm as number | null,
+      data.material_grade as string | null,
+    );
+    const occurrences = scored.flatMap((f) => f.occurrences);
+    const worstLevel = occurrences.reduce<string | null>((worst, occ) => {
+      const rank = { low: 0, medium: 1, high: 2, critical: 3 } as const;
+      if (!worst) return occ.riskLevel;
+      return rank[occ.riskLevel as keyof typeof rank] > rank[worst as keyof typeof rank] ? occ.riskLevel : worst;
+    }, null);
+    const criticalCount = occurrences.filter((o) => o.riskLevel === 'critical').length;
+    const highCount = occurrences.filter((o) => o.riskLevel === 'high').length;
 
     return {
       ok: true,
@@ -228,14 +254,16 @@ export class ToolDispatcherService {
         hasAnalysis: true,
         stale,
         ageDays: Math.round(ageDays * 10) / 10,
-        manufacturabilityScore: score100,
-        difficultyLevel: data.difficulty_level,
-        recommendedProcesses: data.recommended_processes,
-        warnings: data.cad_analysis_warnings,
-        dfm: data.dfm_analysis,
+        occurrencesScored: occurrences.length,
+        worstRiskLevel: worstLevel,
+        criticalRiskCount: criticalCount,
+        highRiskCount: highCount,
+        features: scored,
         geometry: data.geometry_analysis,
       },
-      preview: `${data.name ?? data.part_number}: score ${score100 ?? '?'}/100 (${data.difficulty_level ?? 'unknown'})${stale ? ' [stale]' : ''}`,
+      preview: occurrences.length > 0
+        ? `${data.name ?? data.part_number}: ${occurrences.length} feature occurrence(s) scored, worst risk "${worstLevel}" (${criticalCount} critical, ${highCount} high)${stale ? ' [stale geometry]' : ''}`
+        : `${data.name ?? data.part_number}: no scoreable hole/bend features in the extracted feature graph.`,
     };
   }
 
@@ -457,7 +485,7 @@ export class ToolDispatcherService {
 
     const { data, error } = await client
       .from('bom_items')
-      .select('id, name, part_number, file_2d_path, file_3d_path, drawing_extraction, geometry_analysis, manufacturability_score, dfm_analysis')
+      .select('id, name, part_number, file_2d_path, file_3d_path, drawing_extraction, geometry_analysis')
       .eq('id', bomItemId)
       .maybeSingle();
 
