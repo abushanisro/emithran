@@ -4,8 +4,11 @@ const nextConfig: NextConfig = {
   // Enable strict mode for better development experience
   reactStrictMode: true,
 
-  // Enable standalone output for Docker deployment
-  output: 'standalone',
+  // Standalone output is required for the Railway/Docker deployment (node .next/standalone/server.js).
+  // Vercel's own build pipeline does its own serverless tracing/bundling and expects the default
+  // (non-standalone) .next/ layout — forcing standalone there breaks onBuildComplete with
+  // ENOENT on .next/next-server.js.nft.json.
+  ...(process.env.VERCEL === '1' ? {} : { output: 'standalone' as const }),
 
   // Allow cross-origin requests from local network (for testing on other devices)
 
