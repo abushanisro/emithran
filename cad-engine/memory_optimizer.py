@@ -1,6 +1,6 @@
 """
 Advanced CAD Memory Management Service
-Production-quality implementation exceeding Apriori's capabilities
+Production-quality implementation exceeding industry-standard capabilities
 
 Integrates with existing OpenCascade CAD engine for enterprise-grade memory optimization,
 geometry analysis, and DFM insights
@@ -67,13 +67,21 @@ class MemoryMetrics:
 
 @dataclass
 class DFMAnalysis:
-    """Design for Manufacturing analysis"""
-    manufacturability_score: float
-    difficulty_level: str
+    """
+    Design for Manufacturing analysis result carried through this pipeline
+    step. cad-engine does NOT compute a manufacturability verdict — the
+    backend's DFMScoringService (dfm-scoring.service.ts) is the sole DFM
+    authority for this app (see CLAUDE.md). manufacturability_score/
+    difficulty_level/confidence are Optional and are always None from
+    _analyze_dfm_advanced below; a real per-feature DFM score is available
+    from GET /bom-items/:id/dfm-scores once feature extraction has run.
+    """
+    manufacturability_score: Optional[float]
+    difficulty_level: Optional[str]
     recommended_processes: List[str]
     warnings: List[Dict[str, Any]]
     cost_impact_factors: List[Dict[str, Any]]
-    confidence: float
+    confidence: Optional[float]
 
 @dataclass
 class OptimizationResult:
@@ -139,7 +147,7 @@ class AdvancedCADMemoryOptimizer:
     """
     Enterprise-grade CAD memory management system
     
-    Capabilities exceeding Apriori:
+    Capabilities exceeding industry-standard tools:
     - Real-time geometry analysis with 95%+ accuracy
     - Memory optimization with 50-80% reduction
     - Advanced DFM analysis beyond ISO standards  
@@ -940,18 +948,21 @@ class AdvancedCADMemoryOptimizer:
             'positions': pocket_positions,
         }
 
-    def _analyze_wall_thickness_real(self, shape: TopoDS_Shape, bounding_box: dict) -> float:
+    def _analyze_wall_thickness_real(self, shape: TopoDS_Shape, bounding_box: dict) -> Optional[float]:
         """
         Estimate minimum wall thickness from bounding box and surface-to-volume ratio.
         True ray-cast wall detection requires OCC.Core.BRepClass3d which is heavy;
         this heuristic is conservative and industry-appropriate for STL fallback.
+        Returns None (not a plausible-looking guess) when the bounding box itself
+        is degenerate — every dimension is <= 0, which only happens for a broken
+        or empty shape, not a real part.
         """
         dims = [bounding_box['length'], bounding_box['width'], bounding_box['height']]
         dims_sorted = sorted(d for d in dims if d > 0)
         # Thinnest dimension is the best proxy for minimum wall
         if dims_sorted:
             return round(dims_sorted[0], 3)
-        return 2.0  # Safe default
+        return None
 
     def _detect_undercuts_real(self, shape: TopoDS_Shape, bbox_minmax: dict) -> dict:
         """
@@ -1001,8 +1012,8 @@ class AdvancedCADMemoryOptimizer:
             'positions': undercut_positions,
         }  # type: ignore
 
-    def _analyze_wall_thickness(self, shape: TopoDS_Shape) -> float:
-        """Legacy shim used by DFM scoring — delegates to real implementation."""
+    def _analyze_wall_thickness(self, shape: TopoDS_Shape) -> Optional[float]:
+        """Legacy shim — delegates to real implementation."""
         bbox = Bnd_Box()
         brepbndlib.Add(shape, bbox)
         xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
@@ -1089,97 +1100,33 @@ class AdvancedCADMemoryOptimizer:
 
     def _analyze_dfm_advanced(self, shape: TopoDS_Shape, features: GeometryFeatures, file_name: str = "unknown", user_processes: Optional[List[Any]] = None) -> DFMAnalysis:
         """
-        Advanced DFM analysis with AI enhancement beyond Apriori's capabilities
+        Does NOT compute a manufacturability verdict. This method previously
+        ran four hardcoded threshold ladders (CNC/casting/sheet-metal/AM
+        "scores" derived from bbox aspect ratio and triangle-count-style
+        heuristics with no real material/thickness basis), took their max as
+        manufacturability_score, and derived a fake confidence from
+        len(recommended_processes) — a second, undocumented DFM judgment
+        that could silently contradict the app's real one. CLAUDE.md
+        designates dfm-scoring.service.ts as the sole DFM authority; this
+        method now returns an explicit "not computed here" result so no
+        consumer mistakes a cad-engine placeholder for a real verdict.
         """
-        logger.debug("Performing advanced DFM analysis with AI enhancement...")
-        
-        warnings = []
-        cost_impact_factors = []
-        
-        # Manufacturing process analysis
-        recommended_processes = []
-        
-        # CNC Machining analysis
-        cnc_score = self._analyze_cnc_manufacturability(shape, features)
-        if cnc_score > 0.6:
-            recommended_processes.append("CNC Machining")
-        
-        # Casting analysis  
-        casting_score = self._analyze_casting_manufacturability(features)
-        if casting_score > 0.7:
-            recommended_processes.append("Investment Casting")
-        
-        # Sheet Metal analysis
-        sheet_metal_score = self._analyze_sheet_metal_manufacturability(features)
-        if sheet_metal_score > 0.5:
-            recommended_processes.append("Sheet Metal Forming")
-        
-        # Additive Manufacturing analysis
-        am_score = self._analyze_am_manufacturability(features)
-        if am_score > 0.8:
-            recommended_processes.append("Additive Manufacturing")
-        
-        # Wall thickness analysis
-        min_wall_thickness = self._analyze_wall_thickness(shape)
-        if min_wall_thickness < 0.8:  # mm
-            warnings.append({
-                'type': 'critical',
-                'code': 'DFM-001',
-                'message': f'Minimum wall thickness {min_wall_thickness:.2f}mm below CNC minimum 0.8mm',
-                'cost_impact_percent': 25.0,
-                'severity': 9
-            })
-        
-        # Hole analysis (depth_diameter_ratio may be None for real geometry detector)
-        hole_analysis = self._analyze_holes(shape)
-        hole_ld = hole_analysis.get('depth_diameter_ratio')
-        if hole_ld is not None and hole_ld > 10:
-            warnings.append({
-                'type': 'warning',
-                'code': 'DFM-002',
-                'message': f'Deep holes detected (L/D ratio: {hole_ld:.1f}) — peck drilling required',
-                'cost_impact_percent': 15.0,
-                'severity': 6
-            })
-        elif hole_analysis.get('count', 0) > 0:
-            min_d = hole_analysis.get('min_diameter')
-            if min_d and min_d < 3.0:
-                warnings.append({
-                    'type': 'warning',
-                    'code': 'DFM-003',
-                    'message': f'Small diameter holes detected (min Ø{min_d}mm) — micro-drilling cost impact',
-                    'cost_impact_percent': 10.0,
-                    'severity': 5
-                })
-        
-        # Calculate overall manufacturability score
-        process_scores = [cnc_score, casting_score, sheet_metal_score, am_score]
-        manufacturability_score = max(process_scores)
-        
-        # Determine difficulty level
-        if manufacturability_score >= 0.85:
-            difficulty_level = "easy"
-        elif manufacturability_score >= 0.65:
-            difficulty_level = "medium"  
-        elif manufacturability_score >= 0.45:
-            difficulty_level = "hard"
-        else:
-            difficulty_level = "very_hard"
-        
-        # Calculate confidence based on analysis completeness
-        confidence = min(0.98, 0.7 + (len(recommended_processes) * 0.1))
-        
-        # Create traditional DFM result
-        traditional_dfm = DFMAnalysis(
-            manufacturability_score=manufacturability_score,
-            difficulty_level=difficulty_level,
-            recommended_processes=recommended_processes,
-            warnings=warnings,
-            cost_impact_factors=cost_impact_factors,
-            confidence=confidence
+        return DFMAnalysis(
+            manufacturability_score=None,
+            difficulty_level=None,
+            recommended_processes=[],
+            warnings=[{
+                'type': 'info',
+                'code': 'DFM-NOT-COMPUTED',
+                'message': (
+                    'DFM is not scored during CAD analysis. Fetch '
+                    'GET /bom-items/:id/dfm-scores after feature extraction '
+                    'for a real per-feature manufacturability verdict.'
+                ),
+            }],
+            cost_impact_factors=[],
+            confidence=None,
         )
-        
-        return traditional_dfm
 
     def get_memory_usage_report(self) -> Dict[str, Any]:
         """Get comprehensive memory usage and performance report"""
@@ -1261,9 +1208,15 @@ class AdvancedCADMemoryOptimizer:
         sv_ratio = surface_area / max(volume, 0.001)
         sv_score = min(3.0, float(sv_ratio / 10))
         
-        # Manufacturing feature complexity
-        mfg_score = min(2.0, float(len(self._analyze_manufacturing_features_simple(shape)) / 5))
-        
+        # Manufacturing feature complexity — real detected feature count, not
+        # dict key count. len(self._analyze_manufacturing_features_simple(shape))
+        # previously counted the 4 fixed dict keys (holes/pockets/undercuts/
+        # thin_walls), making mfg_score a constant 0.8 regardless of the real,
+        # expensively-computed detection results it discarded.
+        mfg = self._analyze_manufacturing_features_simple(shape)
+        real_feature_count = mfg['holes'].get('count', 0) + mfg['pockets'].get('count', 0) + mfg['undercuts']
+        mfg_score = min(2.0, float(real_feature_count) / 5)
+
         return min(10.0, float(feature_score + sv_score + mfg_score))
 
     def _analyze_manufacturing_features_simple(self, shape: TopoDS_Shape) -> Dict[str, Any]:
@@ -1274,62 +1227,6 @@ class AdvancedCADMemoryOptimizer:
             'undercuts': self._analyze_undercuts(shape),
             'thin_walls': self._analyze_wall_thickness(shape)
         }
-
-    def _analyze_cnc_manufacturability(self, shape: TopoDS_Shape, features: GeometryFeatures) -> float:
-        """Analyze CNC manufacturing feasibility"""
-        score = 0.8
-        
-        # Reduce score for complexity
-        if features.complexity_score > 7:
-            score -= 0.1
-        
-        # Reduce score for thin walls
-        min_wall = self._analyze_wall_thickness(shape)
-        if min_wall < 0.8:
-            score -= 0.3
-        elif min_wall < 1.5:
-            score -= 0.1
-        
-        return max(0.0, float(score))
-
-    def _analyze_casting_manufacturability(self, features: GeometryFeatures) -> float:
-        """Analyze casting manufacturing feasibility"""
-        score = 0.7
-        
-        # Good for medium to high volumes
-        volume = features.volume
-        if volume > 10000:  # mm³
-            score += 0.2
-        
-        return min(1.0, score)
-
-    def _analyze_sheet_metal_manufacturability(self, features: GeometryFeatures) -> float:
-        """Analyze sheet metal manufacturing feasibility"""
-        bbox = features.bounding_box
-        
-        # Check aspect ratio for sheet metal suitability
-        thickness = min(bbox['length'], bbox['width'], bbox['height'])
-        max_dimension = max(bbox['length'], bbox['width'], bbox['height'])
-        
-        aspect_ratio = max_dimension / max(thickness, 0.1)
-        
-        if aspect_ratio > 10:
-            return 0.8
-        elif aspect_ratio > 5:
-            return 0.6
-        else:
-            return 0.2
-
-    def _analyze_am_manufacturability(self, features: GeometryFeatures) -> float:
-        """Analyze additive manufacturing feasibility"""
-        score = 0.9  # AM is generally very flexible
-        
-        # Reduce for very large parts
-        volume = features.volume
-        if volume > 100000:  # mm³ 
-            score -= 0.2
-        
-        return score
 
     def _estimate_memory_usage(self, shape: TopoDS_Shape) -> int:
         """Estimate memory usage of TopoDS_Shape in bytes"""
@@ -1375,14 +1272,8 @@ class AdvancedCADMemoryOptimizer:
         elif memory.memory_reduction_percent < 30:
             recommendations.append("Consider more aggressive optimization for better memory efficiency")
         
-        if dfm.manufacturability_score < 0.6:
-            recommendations.append("Design modifications recommended to improve manufacturability")
-        
         if geometry.complexity_score > 8:
             recommendations.append("High complexity detected - consider design simplification")
-        
-        if len(dfm.warnings) > 2:
-            recommendations.append("Multiple DFM issues detected - review design for manufacturing")
         
         return recommendations
 

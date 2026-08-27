@@ -5040,13 +5040,13 @@ class InjectionMoldedFeatureExtractor:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Component Feature Analyzer — aPriori-style decomposition
+# Component Feature Analyzer — eMithran-style decomposition
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 class ComponentFeatureAnalyzer:
     """
-    aPriori-style geometry decomposition for any detected part family.
+    eMithran-style geometry decomposition for any detected part family.
 
     Produces:
       blank            — largest planar face (sheet metal blank / datum face)
@@ -5432,9 +5432,9 @@ class ComponentFeatureAnalyzer:
         setup_axes: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         """
-        Compute all 9 aPriori GCD relation types between feature instances.
+        Compute all 9 eMithran GCD relation types between feature instances.
 
-        Relation taxonomy (matches aPriori Geometric Cost Drivers panel):
+        Relation taxonomy (matches eMithran Geometric Cost Drivers panel):
           adjacent         — faces share a boundary edge (OCC topology)
           ends_on          — bend fold-line terminates on blank boundary edge
           intersects       — sphere volumes overlap, or blank contains a non-bend feature
@@ -5501,7 +5501,7 @@ class ComponentFeatureAnalyzer:
         # identity-comparison bugs (FindIndex/IsPartner/IsSame all fail for
         # faces from different traversal paths in disconnected STEP compounds).
         #
-        # Produces raw_adjacent_pairs (face-level, aPriori-style labelling)
+        # Produces raw_adjacent_pairs (face-level, eMithran-style labelling)
         # for GCD emission, plus blank_adjacent_features / feature_adjacent_pairs
         # for the downstream ends_on / intersects / lies_near derivations.
         blank_adjacent_features: set = set()
@@ -5527,7 +5527,7 @@ class ComponentFeatureAnalyzer:
                         f"blank_face_id={blank_face_id} "
                         f"(valid: {blank_face_id is not None and blank_face_id < total_faces})")
 
-            # aPriori merges co-planar OCC faces into a single "planarFace" entity before
+            # eMithran merges co-planar OCC faces into a single "planarFace" entity before
             # computing adjacency — so a blank plate represented as 8 separate OCC faces
             # becomes 1 entity, and edges between those 8 faces disappear (same entity,
             # not adjacent to itself).  Cylinders stay as individual entities.
@@ -5548,7 +5548,7 @@ class ComponentFeatureAnalyzer:
                     s = BRepAdaptor_Surface(face_ordinal_map.FindKey(fi + 1), True)
                     t = s.GetType()
                     if t == GeomAbs_Cylinder:
-                        # aPriori groups all cylinder faces of the same feature into
+                        # eMithran groups all cylinder faces of the same feature into
                         # one entity (one "simpleHole" or "straightBend" entity, not
                         # one curvedWall per OCC face). This collapses 15 curvedWall
                         # entities → 8 feature entities and reduces adjacent pairs
@@ -5627,7 +5627,7 @@ class ComponentFeatureAnalyzer:
 
             # Emit one entity-pair adjacency per unique cluster.
             # Skip clusters where all faces belong to the same entity (internal
-            # edges within a merged planar entity — aPriori ignores these).
+            # edges within a merged planar entity — eMithran ignores these).
             seen_ent_pairs: set = set()
             for cluster in edge_clusters:
                 face_ords = list(dict.fromkeys(fi for fi, _ in cluster))
@@ -5800,7 +5800,6 @@ class ComponentFeatureAnalyzer:
 
         # ── 2. ends_on ─────────────────────────────────────────────────────
         # Bends whose faces share an edge with the blank face (fold line = shared edge).
-        # Domain-rule fallback: every sheet-metal bend always ends on blank_1.
         seen_ends_on: set = set()
         for feat_id in blank_adjacent_features:
             inst_match = next((i for i in instances if i["id"] == feat_id), None)
@@ -5810,9 +5809,17 @@ class ComponentFeatureAnalyzer:
                     "type": "ends_on",
                     "source_id": feat_id,
                     "target_id": "blank_1",
+                    "provenance": "occ_adjacency",
                 })
         if not seen_ends_on:
-            # Fallback: OCC adjacency didn't resolve (face_ids absent or STEP topology variant)
+            # Domain-rule fallback for when OCC adjacency didn't resolve any
+            # bend (face_ids absent or an unusual STEP topology variant):
+            # assume every bend ends on blank_1, which is topologically true
+            # for the common single-blank case but does NOT model real
+            # bend-to-bend/bend-to-flange chains (CLAUDE.md tracks that as a
+            # separate, in-progress capability). Tagged "domain_rule_fallback"
+            # so a consumer can tell this apart from a real OCC-measured
+            # relation instead of treating it as equally precise.
             for inst in instances:
                 if inst["ftype"] == "bend":
                     seen_ends_on.add(inst["id"])
@@ -5820,6 +5827,7 @@ class ComponentFeatureAnalyzer:
                         "type": "ends_on",
                         "source_id": inst["id"],
                         "target_id": "blank_1",
+                        "provenance": "domain_rule_fallback",
                     })
 
         # ── 3. intersects ──────────────────────────────────────────────────

@@ -693,7 +693,7 @@ async def analyze_geometry_advanced(
             if cnc_features_result is not None:
                 response["cnc_features"] = cnc_features_result
 
-            # Component feature analysis (aPriori-style decomposition).
+            # Component feature analysis (eMithran-style decomposition).
             # GCD adjacency walk is the bottleneck (30–70 s for complex sheet metal).
             # Three-layer cache: in-memory → disk → fresh computation in thread pool.
             # The thread pool keeps the async event loop responsive so concurrent

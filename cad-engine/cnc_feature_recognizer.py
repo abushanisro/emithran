@@ -2,7 +2,7 @@
 CNC Feature Recognizer — Phase 1 architecture.
 
 Converts raw OCC topology into a structured manufacturing feature tree that
-resembles aPriori's feature representation rather than a flat face inventory.
+resembles eMithran's feature representation rather than a flat face inventory.
 
 Phase 1 covers cnc_turned and mill_turn parts:
   external_diameter, through_hole, blind_hole, cross_hole, pcd_hole_pattern,
