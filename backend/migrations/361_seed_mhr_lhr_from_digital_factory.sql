@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_mhr_bm_location      ON mhr_benchmark_rates(locat
 CREATE INDEX IF NOT EXISTS idx_mhr_bm_process_group ON mhr_benchmark_rates(process_group);
 
 -- ── 2. Industry benchmark seed (from migration 345) ───────────────────────────
--- aPriori-style fully-burdened MHR in USD/hr; machine costs only (no labour).
+-- eMithran-style fully-burdened MHR in USD/hr; machine costs only (no labour).
 -- OEE assumption 70 %; depreciation 8–12 yr; includes energy + tooling consumables.
 
 INSERT INTO mhr_benchmark_rates (machine_name, process_group, location, mhr_usd, machine_ref) VALUES

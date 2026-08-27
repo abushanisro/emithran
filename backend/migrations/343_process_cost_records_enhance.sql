@@ -1,6 +1,6 @@
 -- Migration 343: Enhance process_cost_records for Auto Plan + Manual Override architecture
 -- ════════════════════════════════════════════════════════════════════════════════
--- Adds three columns that support the aPriori-style "Auto is default; Override is explicit" UX:
+-- Adds three columns that support the eMithran-style "Auto is default; Override is explicit" UX:
 --
 --   location      — factory location when the route was applied (India, USA, China, etc.)
 --                   Needed because the dialog re-opens and must know which Digital Factory to

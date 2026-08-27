@@ -9,7 +9,7 @@
 -- `lhr_usd_effective` for EVERY non-USD location — e.g. India's Sheet Metal
 -- row: lhr=1.73, lhr_usd_effective=1.73 (should be ~144 INR, not 1.73).
 -- BOMItemsService.resolveLHRRates read that ₹1.73 as if it were a real local
--- rate, fed it straight into aprioriTerms() as dlrPerHr, and the FINAL
+-- rate, fed it straight into eMithranTerms() as dlrPerHr, and the FINAL
 -- normalizeCostSummaryToUsd() conversion divided it by ~83.5 a SECOND time —
 -- shrinking a real $1.73/hr labor rate down to a rounds-to-$0.00 fraction of
 -- a cent, silently excluding direct labor from every Sheet-Metal per-cycle

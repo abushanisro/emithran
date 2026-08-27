@@ -19,7 +19,7 @@
 -- formula using the same manual-stroke-time lookup table (sm_lookup_manual_stroke)
 -- the backend cost-engine (cost-engine.ts) already uses for Press Brake costing —
 -- via two new input fields:
---   - Complexity: a real, required parameter of the aPriori bending methodology
+--   - Complexity: a real, required parameter of the eMithran bending methodology
 --     (Tier/Complexity Classification) with no BOM-derivable value — the engineer
 --     must choose it, same as material grade elsewhere in this app. Not a guess.
 --   - Stroke Time Per Bend: resolved automatically by the frontend (two-pass

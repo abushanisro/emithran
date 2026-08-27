@@ -3,7 +3,7 @@
 -- lookup-table series (migration 300 seeded Tables 1-6; this was never built).
 -- ============================================================================
 -- Root cause: CostEngineInput.inspectionTimeMin had a `= 0.5` default
--- parameter in cost-engine.ts's aprioriTerms() call sites, but NO caller in
+-- parameter in cost-engine.ts's eMithranTerms() call sites, but NO caller in
 -- bom-items.service.ts ever resolved/passed a real value for it — unlike its
 -- siblings (handlingTimeMin ← Table 2, toolSetupBrakeMin ← Table 3B,
 -- samplingRate ← Table 6, all resolved via SheetMetalLookupService before

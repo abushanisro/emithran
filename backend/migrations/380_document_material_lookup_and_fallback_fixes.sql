@@ -43,7 +43,7 @@
 --    (mhr.service.ts's calculateMHR). Both machine-rate resolvers (selector.ts's
 --    pickRate, and the legacy fallback copy in bom-items.service.ts) were preferring
 --    it over the pure total_machine_hour_rate/manual_mhr_value columns, and that rate
---    feeds aprioriTerms()'s mhrPerHr — a slot that formula ALWAYS separately adds its
+--    feeds eMithranTerms()'s mhrPerHr — a slot that formula ALWAYS separately adds its
 --    own direct-labour term to. Any machine row where fully_burdened_local_per_hr was
 --    genuinely computed via the labour-inclusive formula got labour counted twice.
 --    Fixed to never read that column for this purpose (in both the backend resolvers

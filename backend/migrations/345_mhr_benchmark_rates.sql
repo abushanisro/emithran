@@ -5,7 +5,7 @@
 --   Process Cost dialog falls back to when the user has no custom MHR records for
 --   the selected location.  Mirrors the lhr_benchmark_rates pattern.
 --
--- METHODOLOGY (aPriori-style fully-burdened MHR, USD/hr, machine costs only)
+-- METHODOLOGY (eMithran-style fully-burdened MHR, USD/hr, machine costs only)
 --   MHR = (depreciation + interest + insurance + facility + maintenance
 --          + energy + tooling consumables + admin overhead) / effective_hours
 --   Effective hours = working_hours × OEE (70 % unless noted)

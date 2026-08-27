@@ -158,7 +158,7 @@ VALUES
 ON CONFLICT (process_group, process_route, operation) DO NOTHING;
 
 -- ── INJECTION MOLDING ────────────────────────────────────────────────────────
--- Process group: 'Injection Molding' (matches what aPriori and most tooling systems use)
+-- Process group: 'Injection Molding' (matches what eMithran and most tooling systems use)
 -- Also seeds 'Plastics' group used by MACHINE_TYPE_GROUP for plastics machines.
 
 INSERT INTO process_calculator_mappings (process_group, process_route, operation, is_active, display_order)

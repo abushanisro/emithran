@@ -2,7 +2,7 @@
 -- Migration 366: Fix press brake benchmark rates (2026-07-22)
 --
 -- Problem: mhr_benchmark_rates kN-tonnage rows (800kN/1500kN/2500kN) stored
--- aPriori machine-amortization-only rates ($5–26/hr). These are CAPITAL COST
+-- eMithran machine-amortization-only rates ($5–26/hr). These are CAPITAL COST
 -- only — not full-burden overhead rates. When mixed into the benchmark pool
 -- with the full-burden "Press Brake" row ($74/hr USA), the median collapsed
 -- to ~$24/hr, producing a false guard band that allowed $9/hr press brake

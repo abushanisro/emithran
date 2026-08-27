@@ -1,0 +1,27 @@
+-- ============================================================================
+-- Migration: Widen sm_reference_data.source_region
+-- Purpose: Migration 479 defined source_region as VARCHAR(10), sized for the
+--          short region codes used up to that point ('USA', 'India',
+--          'China', 'Germany', 'Mexico', 'E. Europe' -- all <=10 chars).
+--          Migrations 505-508 (Machine Library) need 'World Average' (13
+--          chars) since that export's own scope is genuinely not USA-
+--          specific like earlier categories -- inserting it failed with
+--          "value too long for type character varying(10)".
+--
+--          Widened to VARCHAR(20) rather than truncating/abbreviating
+--          'World Average' into something shorter but less clear (e.g.
+--          'World'/'Global') -- the real, human-readable region label is
+--          worth the extra column width; 20 chars covers every real region
+--          label used so far with headroom for a couple more words.
+--
+--          MUST be run BEFORE migrations 505-508 (they insert
+--          source_region='World Average', which needs this column already
+--          widened) -- numbered after them only because the need for this
+--          fix wasn't discovered until the user actually ran 505 and hit
+--          the real column-width limit live.
+-- Author: Principal Engineering Team
+-- Date: 2026-08-21
+-- Version: 1.0.0
+-- ============================================================================
+
+ALTER TABLE sm_reference_data ALTER COLUMN source_region TYPE VARCHAR(20);

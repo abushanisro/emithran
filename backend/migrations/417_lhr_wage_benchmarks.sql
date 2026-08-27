@@ -22,7 +22,7 @@
 
 CREATE TABLE IF NOT EXISTS lhr_wage_benchmarks (
     id              SERIAL PRIMARY KEY,
-    grade           VARCHAR(10) NOT NULL,          -- aPriori-style labour grade, e.g. '1','3','5','7','9','11','13'
+    grade           VARCHAR(10) NOT NULL,          -- eMithran-style labour grade, e.g. '1','3','5','7','9','11','13'
     labour_type     VARCHAR(30) NOT NULL,          -- 'Unskilled'|'Semi-Skilled'|'Skilled'|'Highly Skilled'
     wage_per_day    NUMERIC NOT NULL,
     wage_per_month  NUMERIC NOT NULL,
