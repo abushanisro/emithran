@@ -35,6 +35,17 @@ export interface MachineCandidate {
   // (see bom-items.service.ts's buildOutput). null when no real machine or
   // the field was never set.
   laborRateUsdHr: number | null;
+  // mhr_records.press_cycle_time_s / handling_time_const_s /
+  // handling_time_mass_coeff_s_per_kg — Standard Press / Tandem Press's real
+  // per-machine stroke-cycle-time and linear handling-time formula (Track B
+  // Phase 2, migration 608). Unlike every other cutting-family process,
+  // these two machine classes have no thickness/material lookup table — the
+  // cycle time genuinely IS a fixed per-machine constant. null for every
+  // other machine class, or a real press machine this data hasn't been
+  // sourced for yet (see migration 608's own documented scope).
+  pressCycleTimeS: number | null;
+  handlingConstS: number | null;
+  handlingMassCoeffSPerKg: number | null;
 }
 
 // Structured version of the material/thickness-vs-capacity check — lets the

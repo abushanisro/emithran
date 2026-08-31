@@ -6,6 +6,7 @@ import type { Currency, Country, MaterialShape, MaterialCategory } from '@/lib/c
 
 export interface MaterialFilterState {
   search: string;
+  materialGroup?: string;
   materialCategory?: MaterialCategory;
   country?: Country;
   currency?: Currency;
@@ -126,6 +127,10 @@ export const useMaterialFilters = ({
     updateFilter('search', search);
   }, [updateFilter]);
 
+  const setMaterialGroup = useCallback((materialGroup?: string) => {
+    updateFilter('materialGroup', materialGroup);
+  }, [updateFilter]);
+
   const setMaterialCategory = useCallback((category?: MaterialCategory) => {
     setFilters(prev => {
       const newFilters: MaterialFilterState = { ...prev, ...(category !== undefined ? { materialCategory: category } : {}), page: 1 };
@@ -198,6 +203,7 @@ export const useMaterialFilters = ({
   const appliedFiltersCount = useMemo(() => {
     let count = 0;
     if (filters.search) count++;
+    if (filters.materialGroup) count++;
     if (filters.materialCategory) count++;
     if (filters.country) count++;
     if (filters.currency) count++;
@@ -252,7 +258,11 @@ export const useMaterialFilters = ({
     if (filters.search) {
       summary.push(`Search: "${filters.search}"`);
     }
-    
+
+    if (filters.materialGroup) {
+      summary.push(`Group: ${filters.materialGroup}`);
+    }
+
     if (filters.materialCategory) {
       summary.push(`Category: ${filters.materialCategory}`);
     }
@@ -314,6 +324,7 @@ export const useMaterialFilters = ({
     
     // Specific field setters
     setSearch,
+    setMaterialGroup,
     setMaterialCategory,
     setCountry,
     setCurrency,

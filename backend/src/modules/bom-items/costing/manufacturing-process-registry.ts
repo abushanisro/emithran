@@ -2,6 +2,8 @@ import type { ManufacturingProcessEngine } from './manufacturing-process-engine'
 import { LaserCuttingEngine, Co2LaserCuttingEngine } from './laser-cutting-engine';
 import { TurretPunchEngine } from './turret-punch-engine';
 import { WaterjetEngine } from './waterjet-engine';
+import { RouterEngine } from './router-engine';
+import { PressStrokeEngine } from './press-stroke-engine';
 
 // The single, explicit, engineering-owned list of manufacturing processes this
 // app has a real, implemented, verified cost engine for — sheet-metal cutting
@@ -23,6 +25,9 @@ export const MANUFACTURING_PROCESS_REGISTRY: ManufacturingProcessEngine[] = [
   new Co2LaserCuttingEngine(),
   new TurretPunchEngine(),
   new WaterjetEngine(),
+  new RouterEngine(),
+  new PressStrokeEngine('standard_press', 'Standard Press'),
+  new PressStrokeEngine('tandem_press', 'Tandem Press'),
 ];
 
 export function getEnginesForFamily(processFamily: string): ManufacturingProcessEngine[] {
@@ -39,12 +44,18 @@ export const ROUTE_ID_FOR_CLASS: Record<string, string> = {
   co2_laser: 'sm-co2-laser',
   turret_punch: 'sm-turret',
   waterjet: 'sm-waterjet',
+  router_2axis: 'sm-router',
+  standard_press: 'sm-standard-press',
+  tandem_press: 'sm-tandem-press',
 };
 export const ROUTE_LABEL_FOR_CLASS: Record<string, string> = {
   fiber_laser: 'Fiber Laser + Press Brake',
   co2_laser: 'CO2 Laser + Press Brake',
   turret_punch: 'Turret Punch + Press Brake',
   waterjet: 'Waterjet + Press Brake',
+  router_2axis: '2-Axis Router + Press Brake',
+  standard_press: 'Standard Press',
+  tandem_press: 'Tandem Press',
 };
 
 export function getCuttingRouteIds(): string[] {

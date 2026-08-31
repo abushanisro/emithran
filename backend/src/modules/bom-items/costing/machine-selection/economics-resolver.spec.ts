@@ -1,7 +1,5 @@
 import {
   resolveMachineEconomics,
-  GENERIC_FALLBACK_OVERHEAD_USD_HR,
-  GENERIC_FALLBACK_LABOR_RATE_USD_HR,
   type MachineEconomicsRow,
 } from './economics-resolver';
 
@@ -51,14 +49,14 @@ describe('resolveMachineEconomics — tier priority', () => {
     expect(result.directOverheadRate.reason).toMatch(/industry benchmark/i);
   });
 
-  it('falls back to the generic constant when neither a real value nor a benchmark exists', () => {
+  it('resolves to null/no_rate — never a fabricated number — when neither a real value nor a benchmark exists', () => {
     const result = resolveMachineEconomics(row());
     expect(result.directOverheadRate).toEqual({
-      value: GENERIC_FALLBACK_OVERHEAD_USD_HR, source: 'generic_fallback', confidence: 'low',
+      value: null, source: 'no_rate', confidence: 'low',
       reason: expect.stringContaining('No direct overhead rate on file'),
     });
     expect(result.laborRateUsdHr).toEqual({
-      value: GENERIC_FALLBACK_LABOR_RATE_USD_HR, source: 'generic_fallback', confidence: 'low',
+      value: null, source: 'no_rate', confidence: 'low',
       reason: expect.stringContaining('No labor rate on file'),
     });
   });
@@ -71,6 +69,7 @@ describe('resolveMachineEconomics — tier priority', () => {
     }));
     expect(result.directOverheadRate.source).toBe('shop_override');
     expect(result.indirectOverheadRate.source).toBe('benchmark');
-    expect(result.laborRateUsdHr.source).toBe('generic_fallback');
+    expect(result.laborRateUsdHr.source).toBe('no_rate');
+    expect(result.laborRateUsdHr.value).toBeNull();
   });
 });

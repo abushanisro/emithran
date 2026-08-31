@@ -1,4 +1,4 @@
-import { SheetMetalLookupService } from './sheet-metal-lookup.service';
+import { SheetMetalLookupService, resolveNearestStandardTonnageClass } from './sheet-metal-lookup.service';
 
 // Manual-stroke rows actually seeded for tonnage=80/simple (migration 360) —
 // same three rows the live "Result Unavailable" trace showed as nearest
@@ -255,5 +255,33 @@ describe('SheetMetalLookupService.getRollBendingCycleTime', () => {
     ]));
     const result = await svc.getRollBendingCycleTime('Faccin HCU 2050 X 5', 4000, 10, 600);
     expect(result.dataFound).toBe(false);
+  });
+});
+
+// resolveNearestStandardTonnageClass — root-caused live 2026-08-31: real USA
+// press brakes whose kN-derived tonnage sits 10-11% from their clearly-
+// intended standard class (previously excluded by a 10% cutoff) now resolve
+// correctly; genuinely different-sized real machines (13%+ away) still don't.
+describe('resolveNearestStandardTonnageClass', () => {
+  it('rounds "11010 (Heller-hydraulic)" (1096kN -> 111.76t, 10.52% from 100T) to the 100T class', () => {
+    const result = resolveNearestStandardTonnageClass(1096 / 9.80665);
+    expect(result.tonnage).toBe(100);
+    expect(result.roundedFrom).toBeCloseTo(111.76, 1);
+  });
+
+  it('rounds "HG-2204 (Amada)" (2200kN -> 224.34t, 10.85% from 200T) to the 200T class', () => {
+    const result = resolveNearestStandardTonnageClass(2200 / 9.80665);
+    expect(result.tonnage).toBe(200);
+  });
+
+  it('does NOT round "HG-1303 (Amada)" (1300kN -> 132.56t, 13.15% from 150T) — genuinely a different real size', () => {
+    const result = resolveNearestStandardTonnageClass(1300 / 9.80665);
+    expect(result.tonnage).toBeCloseTo(132.56, 1);
+    expect(result.roundedFrom).toBeNull();
+  });
+
+  it('still rounds already-close real machines unchanged (e.g. "Bend Brake - 800kN Press Force", 1.93% from 80T)', () => {
+    const result = resolveNearestStandardTonnageClass(800 / 9.80665);
+    expect(result.tonnage).toBe(80);
   });
 });

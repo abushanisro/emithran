@@ -42,6 +42,13 @@ export interface MHRRateInput {
   // null when no real machine (class-default fallback) or the field was
   // never set; callers fall back to a generic default, never to 0.
   operators?: number | null;
+  // The selected machine's own mhr_records.press_cycle_time_s /
+  // handling_time_const_s / handling_time_mass_coeff_s_per_kg (via
+  // MachineCandidate — see its own doc comment). Only Standard Press/Tandem
+  // Press read these; every other machine class leaves them null.
+  pressCycleTimeS?: number | null;
+  handlingConstS?: number | null;
+  handlingMassCoeffSPerKg?: number | null;
   // The selected machine's own MachineCandidate.laborRateUsdHr (raw, before
   // buildOutput applies precedence against the process-group lhrRates map) —
   // never read directly by cost-engine.ts; buildOutput folds it into the

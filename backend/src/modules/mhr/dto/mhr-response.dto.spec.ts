@@ -46,7 +46,7 @@ describe('MHRResponseDto.fromDatabase — read-time economics resolution', () =>
   it('a blank field with no benchmark renders as undefined ("-" in the UI), not a misleading $0.00', () => {
     const dto = MHRResponseDto.fromDatabase(dbRow());
     expect(dto.usdLhrTotal).toBeUndefined();
-    expect(dto.laborRateSource).toBe('generic_fallback');
+    expect(dto.laborRateSource).toBe('no_rate');
   });
 
   it('an explicit shop_override value is never masked by a benchmark on the same row', () => {

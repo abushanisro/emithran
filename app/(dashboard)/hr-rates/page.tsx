@@ -110,7 +110,13 @@ export default function HRRatesPage() {
 
   // ─── MHR state ────────────────────────────────────────────────────────────
   const [mhrSearch, setMhrSearch] = useState('');
-  const [mhrLocation, setMhrLocation] = useState('');
+  // Defaults to USA — the reference/canonical location for this app's Sheet
+  // Metal data (see the multi-location machine-rate reconciliation this
+  // session did against it). "All Locations" combines USA/India/China/
+  // Mexico/France's now-largely-overlapping machine names into one list,
+  // making every category look duplicated (5x the real per-location count).
+  // The user still switches location manually via the Select below.
+  const [mhrLocation, setMhrLocation] = useState('USA');
   const [mhrCurrency, setMhrCurrency] = useState('');
   // Defaults to Sheet Metal — this repo's current domain focus (see
   // CLAUDE.md: Machining/Injection Molding haven't started as domains yet).
@@ -363,12 +369,11 @@ export default function HRRatesPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={mhrLocation || 'all'} onValueChange={v => setMhrLocation(v === 'all' ? '' : v)}>
+          <Select value={mhrLocation} onValueChange={setMhrLocation}>
             <SelectTrigger className="h-9 w-[140px] text-xs">
-              <SelectValue placeholder="All Locations" />
+              <SelectValue placeholder="Select location" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
               {mhrLocations.map(loc => (
                 <SelectItem key={loc} value={loc}>{loc}</SelectItem>
               ))}
@@ -461,7 +466,6 @@ export default function HRRatesPage() {
                       <TableHead className="h-9 px-2 text-xs w-[100px]">Wage Grade</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[88px] text-blue-600">Direct OH ($/hr)</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[92px] text-indigo-600">Indirect OH ($/hr)</TableHead>
-                      <TableHead className="h-9 px-2 text-xs text-right w-[86px] text-primary font-semibold">Total OH ($/hr)</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[90px] text-purple-600">MHR ($/hr)</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[100px] text-green-600">LHR (USD/hr)</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[100px]">Machine Price ($)</TableHead>
@@ -474,7 +478,7 @@ export default function HRRatesPage() {
                       return (
                         <Fragment key={category}>
                           <TableRow className="bg-muted/60 hover:bg-muted/70 cursor-pointer border-b" onClick={() => toggleCategory(category)}>
-                            <TableCell colSpan={13} className="py-1.5 px-2">
+                            <TableCell colSpan={12} className="py-1.5 px-2">
                               <div className="flex items-center gap-1.5 text-xs font-semibold">
                                 {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                                 {category}
@@ -506,22 +510,38 @@ export default function HRRatesPage() {
                                 <TableCell className="py-1.5 px-2">{record.wageGrade || '-'}</TableCell>
                                 <TableCell className="py-1.5 px-2 text-right text-blue-600">{record.directOverheadRate != null ? `$${record.directOverheadRate.toFixed(2)}` : '-'}</TableCell>
                                 <TableCell className="py-1.5 px-2 text-right text-indigo-600">{record.indirectOverheadRate != null ? `$${record.indirectOverheadRate.toFixed(2)}` : '-'}</TableCell>
-                                <TableCell className="py-1.5 px-2 text-right font-semibold text-primary">
-                                  {record.directOverheadRate != null || record.indirectOverheadRate != null
-                                    ? `$${((record.directOverheadRate || 0) + (record.indirectOverheadRate || 0)).toFixed(2)}`
-                                    : '-'}
-                                </TableCell>
                                 <TableCell className="py-1.5 px-2 text-right text-purple-600">
-                                  {record.calculatedMhrUsdHr != null ? (
-                                    <span title="Calculated from real machine economics (price, life, salvage, maintenance, installation, supplies, uptime, utilization) — independent of overhead and labor.">
-                                      ${record.calculatedMhrUsdHr.toFixed(2)}
-                                      <span className="ml-1 text-[9px] font-medium text-muted-foreground align-middle">calc</span>
-                                    </span>
-                                  ) : mhrRate.usd != null
-                                    ? <span title="Legacy value — no machine economics on file to calculate a real MHR yet">${mhrRate.usd.toFixed(2)}</span>
+                                  {/* Canonical MHR (2026-08-27) = Direct OH + Indirect OH (the standalone
+                                      "Total OH" column was removed as a duplicate of this same value),
+                                      FX-converted to this row's local currency where applicable
+                                      (mhrRate.usd/local both come from mhr_usd_per_hour, which
+                                      mhr.service.ts now derives from that same sum). calculatedMhrUsdHr
+                                      (migration 580's bottom-up machine-economics estimate) does not drive
+                                      MHR or live costing — it stays a secondary "ref" badge whenever a real
+                                      canonical value already exists.
+                                      Root-caused 2026-08-31 (live bug report): when NEITHER mhrRate.usd nor
+                                      .local exists (e.g. Plasma Punch — the real source data never had a
+                                      Direct/Indirect breakdown at all, only capex/lifecycle fields), this used
+                                      to render a bare "-" with the real, sourced calculatedMhrUsdHr value
+                                      hidden inside a hover-only tooltip on a tiny "ref" superscript — easy to
+                                      misread as "no data on file" when real, derived data actually exists.
+                                      Now shows that real number directly (muted, still tagged "ref") instead
+                                      of hiding it behind a dash. */}
+                                  {mhrRate.usd != null
+                                    ? <span>${mhrRate.usd.toFixed(2)}</span>
                                     : mhrRate.local != null
                                       ? <span title={`No confirmed USD conversion on file — showing local currency (${mhrRate.code})`}>{mhrRate.symbol}{mhrRate.local.toFixed(2)}</span>
-                                      : '-'}
+                                      : record.calculatedMhrUsdHr != null
+                                        ? <span className="text-muted-foreground" title="No Direct/Indirect overhead breakdown on file for this machine — showing the bottom-up machine-economics estimate (price, life, salvage, maintenance, installation, supplies, uptime, utilization) instead, independent of overhead and labor.">${record.calculatedMhrUsdHr.toFixed(2)}</span>
+                                        : '-'}
+                                  {record.calculatedMhrUsdHr != null && (
+                                    <span
+                                      className="ml-1 text-[9px] font-medium text-muted-foreground align-middle cursor-help"
+                                      title={`Reference only, not used for MHR: bottom-up machine-economics estimate $${record.calculatedMhrUsdHr.toFixed(2)}/hr (price, life, salvage, maintenance, installation, supplies, uptime, utilization) — independent of overhead and labor.`}
+                                    >
+                                      ref
+                                    </span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="py-1.5 px-2 text-right text-green-600">{record.usdLhrTotal != null ? `$${record.usdLhrTotal.toFixed(2)}` : '-'}</TableCell>
                                 <TableCell className="py-1.5 px-2 text-right">{record.machinePriceUsd != null ? `$${record.machinePriceUsd.toLocaleString()}` : '-'}</TableCell>

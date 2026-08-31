@@ -41,6 +41,9 @@ function candidate(overrides: {
     capabilityVersion: 1,
     operators: null,
     laborRateUsdHr: null,
+    pressCycleTimeS: null,
+    handlingConstS: null,
+    handlingMassCoeffSPerKg: null,
   };
 }
 
@@ -151,6 +154,57 @@ describe('classifyMachineRecord', () => {
     };
     expect(classifyMachineRecord(makino)).toBe('cnc_3ax_vmc');
     expect(classifyMachineRecord(dmgMori5ax)).toBe('cnc_5ax_mc');
+  });
+
+  it('never classifies a Press/Forming-family machine into press_brake (root-caused 2026-08-30 live bug: Aida UMX-600, a Progressive Die Press machine, was wrongly resolved for a Bend Brake/Shearning quote line)', () => {
+    const progressiveDiePress = {
+      id: '6', machine_name: 'Aida UMX-600', machine_class: 'Progressive Die Press',
+      process_group: 'Sheet Metal', commodity_code: 'Sheet Metal',
+      total_machine_hour_rate: 20.79, manual_mhr_value: 20.79, fully_burdened_local_per_hr: 20.79,
+      capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
+    };
+    const standardPress = {
+      id: '7', machine_name: 'Default Press', machine_class: 'Standard Press',
+      process_group: 'Sheet Metal', commodity_code: 'Sheet Metal',
+      total_machine_hour_rate: 15, manual_mhr_value: 15, fully_burdened_local_per_hr: 15,
+      capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
+    };
+    const tandemPress = {
+      id: '8', machine_name: 'Default Press', machine_class: 'Tandem Press',
+      process_group: 'Sheet Metal', commodity_code: 'Sheet Metal',
+      total_machine_hour_rate: 15, manual_mhr_value: 15, fully_burdened_local_per_hr: 15,
+      capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
+    };
+    const turretPress = {
+      id: '9', machine_name: 'Amada Vipros 255', machine_class: 'Turret Press',
+      process_group: 'Sheet Metal', commodity_code: 'Sheet Metal',
+      total_machine_hour_rate: 30, manual_mhr_value: 30, fully_burdened_local_per_hr: 30,
+      capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
+    };
+    expect(classifyMachineRecord(progressiveDiePress)).not.toBe('press_brake');
+    expect(classifyMachineRecord(standardPress)).not.toBe('press_brake');
+    expect(classifyMachineRecord(tandemPress)).not.toBe('press_brake');
+    expect(classifyMachineRecord(turretPress)).not.toBe('press_brake');
+  });
+
+  it('still classifies a real bend-brake machine correctly (e.g. machine_class "Bend Press Brake" from the real machine_library.json category name)', () => {
+    const realBendBrake = {
+      id: '10', machine_name: '11010 (Heller-hydraulic)', machine_class: 'Bend Press Brake',
+      process_group: 'Sheet Metal', commodity_code: 'Sheet Metal',
+      total_machine_hour_rate: 19.83, manual_mhr_value: 19.83, fully_burdened_local_per_hr: 19.83,
+      capacity_utilization_rate: 85,
+      operators: null,
+      usd_lhr_total: null,
+    };
+    expect(classifyMachineRecord(realBendBrake)).toBe('press_brake');
   });
 });
 
@@ -511,5 +565,34 @@ describe('P0.4 — integration: buildPartRequirements() feeds selectMachine() wi
     expect(requirements.press_brake).toBeUndefined();
     expect(requirements.turret_punch).toBeDefined();
     expect(requirements.waterjet).toBeDefined();
+  });
+
+  describe('laser thickness fail-open (root-caused 2026-08-31 — systemic class-wide data gap)', () => {
+    const req = laserRequirement({ thicknessMm: 3, materialGrade: 'CRCA', bedLengthMm: 1000, bedWidthMm: 500 });
+
+    it('rejects a machine with unknown thickness data when at least one other real machine in the class HAS real data — unchanged fail-closed behavior', () => {
+      const noData = candidate({ machineId: 'no-data', machineClass: 'fiber_laser', hourlyRate: 40 });
+      const hasData = candidate({ machineId: 'has-data', machineClass: 'fiber_laser', hourlyRate: 60, capability: { maxThicknessMsMm: 12, maxXMm: 3000, maxYMm: 1500 } });
+      expect(isCapable(noData, req)).toBe(false);
+      const result = selectMachine({ pool: [noData, hasData], location, machineClass: 'fiber_laser', requirement: req });
+      expect(result.balanced.candidate.machineId).toBe('has-data');
+    });
+
+    it('fails open (capable=true) when literally every real machine in the class has unknown thickness data', () => {
+      const noData1 = candidate({ machineId: 'laser-1', machineClass: 'fiber_laser', hourlyRate: 40 });
+      const noData2 = candidate({ machineId: 'laser-2', machineClass: 'fiber_laser', hourlyRate: 55 });
+      const result = selectMachine({ pool: [noData1, noData2], location, machineClass: 'fiber_laser', requirement: req });
+
+      // A real machine is selected — never the synthetic no-machine fallback.
+      expect(result.balanced.candidate.machineId).not.toBeNull();
+      expect(['laser-1', 'laser-2']).toContain(result.balanced.candidate.machineId);
+      expect(result.balanced.candidate.hourlyRate).toBeGreaterThan(0);
+      expect(result.balanced.reasons.some((r) => r.includes('capability assumed, not verified'))).toBe(true);
+    });
+
+    it('still fails a fail-open-eligible machine on bed size, even with unknown thickness data', () => {
+      const tooSmallBed = candidate({ machineId: 'small-bed', machineClass: 'fiber_laser', hourlyRate: 40, capability: { maxXMm: 500, maxYMm: 300 } });
+      expect(isCapable(tooSmallBed, req, { allowUnknownLaserThickness: true })).toBe(false);
+    });
   });
 });

@@ -108,6 +108,21 @@ export class RawMaterialResponseDto {
   @ApiProperty({ required: false })
   poissonRatio?: number;
 
+  @ApiProperty({ required: false, description: 'Strength coefficient K (MPa) in sigma = K * epsilon^n' })
+  strengthCoeffKMpa?: number;
+
+  @ApiProperty({ required: false, description: 'Strain-hardening exponent n in sigma = K * epsilon^n' })
+  strainHardeningExponentN?: number;
+
+  @ApiProperty({ required: false, description: 'Lankford (normal anisotropy) coefficient R' })
+  lankfordCoefficientR?: number;
+
+  @ApiProperty({ required: false, description: 'Recommended milling cutting speed (m/min), where sourced' })
+  millingSpeedMMin?: number;
+
+  @ApiProperty({ required: false, description: 'Scrap/yield-loss fraction (0-1)' })
+  scrapFactor?: number;
+
   @ApiProperty({ required: false })
   elongationPct?: number;
 
@@ -202,6 +217,11 @@ export class RawMaterialResponseDto {
       cutCode: row.cut_code ? parseFloat(row.cut_code) : undefined,
       elasticModulusGpa: row.elastic_modulus_gpa ? parseFloat(row.elastic_modulus_gpa) : undefined,
       poissonRatio: row.poisson_ratio ? parseFloat(row.poisson_ratio) : undefined,
+      strengthCoeffKMpa: row.strength_coeff_k_mpa ? parseFloat(row.strength_coeff_k_mpa) : undefined,
+      strainHardeningExponentN: row.strain_hardening_exponent_n ? parseFloat(row.strain_hardening_exponent_n) : undefined,
+      lankfordCoefficientR: row.lankford_coefficient_r ? parseFloat(row.lankford_coefficient_r) : undefined,
+      millingSpeedMMin: row.milling_speed_m_min ? parseFloat(row.milling_speed_m_min) : undefined,
+      scrapFactor: row.scrap_factor ? parseFloat(row.scrap_factor) : undefined,
       elongationPct: row.elongation_pct ? parseFloat(row.elongation_pct) : undefined,
       electricalConductivityIacsPct: row.electrical_conductivity_iacs_pct ? parseFloat(row.electrical_conductivity_iacs_pct) : undefined,
       thermalConductivityWMk: row.thermal_conductivity_w_mk ? parseFloat(row.thermal_conductivity_w_mk) : undefined,

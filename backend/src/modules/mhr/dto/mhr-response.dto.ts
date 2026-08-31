@@ -231,9 +231,12 @@ export class MHRResponseDto {
   // Economics provenance (Phase 1, "Machine Economics" initiative) — mirrors
   // capabilitySource below, one tier per rate field: 'shop_override'
   // (human-entered) | 'imported' (Excel bulk import) | 'benchmark'
-  // (machine_library.json reference data) | 'generic_fallback' (no data on
-  // file). Lets the UI show a provenance badge instead of presenting a
-  // reference-benchmark number as if it were this shop's real rate.
+  // (machine_library.json reference data) | 'no_rate' (no real value or
+  // benchmark on file — resolves to a null value, never a fabricated number)
+  // | 'generic_fallback' (legacy tag on rows saved before 2026-08-30, when
+  // this resolved to a fabricated $0 — no longer produced, but old rows can
+  // still carry it). Lets the UI show a provenance badge instead of
+  // presenting a reference-benchmark number as if it were this shop's real rate.
   @ApiProperty({ nullable: true }) directOverheadSource?: string;
   @ApiProperty({ nullable: true }) indirectOverheadSource?: string;
   @ApiProperty({ nullable: true }) laborRateSource?: string;
@@ -371,12 +374,12 @@ export class MHRResponseDto {
       usdLaborRatePerHr: row.usd_labor_rate_per_hr ? parseFloat(row.usd_labor_rate_per_hr) : undefined,
       usdLhrBase: row.usd_lhr_base ? parseFloat(row.usd_lhr_base) : undefined,
       usdLhrBurden: row.usd_lhr_burden ? parseFloat(row.usd_lhr_burden) : undefined,
-      // 'generic_fallback' maps to undefined here (renders as "-", not a
-      // misleading "$0.00") — the resolver itself always returns a concrete
-      // number for internal/persistence consistency; this is a display-only
-      // decision. 'benchmark' DOES show its real (non-zero) number, with
-      // laborRateSource below telling the UI to caveat it.
-      usdLhrTotal: resolved.laborRateUsdHr.source === 'generic_fallback' ? undefined : resolved.laborRateUsdHr.value ?? undefined,
+      // The resolver returns value: null (not a fabricated number) for
+      // 'no_rate'/legacy 'generic_fallback' — collapses to undefined here,
+      // rendering as "-" rather than a misleading "$0.00". 'benchmark' DOES
+      // show its real (non-zero) number, with laborRateSource below telling
+      // the UI to caveat it.
+      usdLhrTotal: resolved.laborRateUsdHr.value ?? undefined,
       currency: row.currency ?? undefined,
       currencySymbol: row.currency_symbol ?? undefined,
       mhrUsdPerHour: row.mhr_usd_per_hour ? parseFloat(row.mhr_usd_per_hour) : undefined,
@@ -384,8 +387,8 @@ export class MHRResponseDto {
       fullyBurdenedUsdPerHr: row.fully_burdened_usd_per_hr ? parseFloat(row.fully_burdened_usd_per_hr) : undefined,
       lhrUsdEffective: row.lhr_usd_effective ? parseFloat(row.lhr_usd_effective) : undefined,
       specs: row.specs ?? undefined,
-      directOverheadRate: resolved.directOverheadRate.source === 'generic_fallback' ? undefined : resolved.directOverheadRate.value ?? undefined,
-      indirectOverheadRate: resolved.indirectOverheadRate.source === 'generic_fallback' ? undefined : resolved.indirectOverheadRate.value ?? undefined,
+      directOverheadRate: resolved.directOverheadRate.value ?? undefined,
+      indirectOverheadRate: resolved.indirectOverheadRate.value ?? undefined,
       directOverheadSource: resolved.directOverheadRate.source,
       indirectOverheadSource: resolved.indirectOverheadRate.source,
       laborRateSource: resolved.laborRateUsdHr.source,

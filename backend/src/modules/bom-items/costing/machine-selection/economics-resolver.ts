@@ -15,14 +15,25 @@
 // lhr_records/lhr_benchmark_rates by (location, process_group) — the same
 // tables/precedence the real quote-costing engine uses (see
 // LHRService.getEffectiveRate) — never set for direct/indirect overhead.
-export type EconomicsSource = 'shop_override' | 'imported' | 'benchmark' | 'generic_fallback' | 'lhr_shop_avg' | 'lhr_benchmark';
+//
+// 'generic_fallback' is a LEGACY tag only — it may still appear on rows
+// persisted before 2026-08-30, when this resolver returned a fabricated
+// GENERIC_FALLBACK_*_USD_HR = 0 for "nothing on file". The resolver itself
+// never produces 'generic_fallback' anymore; every consumer must still
+// recognize it (alongside the new 'no_rate') for those historical rows,
+// since no data migration back-fills them. 'no_rate' is what the resolver
+// actually returns today for the same "nothing on file" case — value: null,
+// never a fabricated number (root-caused 2026-08-30, in direct response to
+// "remove all fallback, i want real without fabricated, all database driven").
+export type EconomicsSource = 'shop_override' | 'imported' | 'benchmark' | 'generic_fallback' | 'no_rate' | 'lhr_shop_avg' | 'lhr_benchmark';
 export type EconomicsConfidence = 'high' | 'medium' | 'low';
 
 export interface ResolvedRate {
+  /** null means no real value and no benchmark exist — never a fabricated number. */
   value: number | null;
   source: EconomicsSource;
   confidence: EconomicsConfidence;
-  /** Human caveat, only set for 'benchmark' / 'generic_fallback' — mirrors selector.ts's reasons(). */
+  /** Human caveat, only set for 'benchmark' / 'no_rate' — mirrors selector.ts's reasons(). */
   reason: string | null;
 }
 
@@ -44,14 +55,6 @@ export interface MachineEconomicsRow {
   benchmark_labor_rate_usd_hr: number | string | null | undefined;
 }
 
-// No real per-location/per-class labor or overhead data on file anywhere —
-// one honest "we don't know" constant, replacing MHRFormDialog.tsx's old
-// LOCATION_COST_DEFAULTS/LOCATION_LHR_DEFAULTS fabricated per-location
-// precision. Deliberately a single flat number, not a table dressed up to
-// look researched.
-export const GENERIC_FALLBACK_OVERHEAD_USD_HR = 0;
-export const GENERIC_FALLBACK_LABOR_RATE_USD_HR = 0;
-
 function num(v: number | string | null | undefined): number | null {
   if (v == null) return null;
   const n = typeof v === 'string' ? parseFloat(v) : v;
@@ -66,7 +69,6 @@ function resolveOneRate(
   realValue: number | null,
   realSource: string | null | undefined,
   benchmarkValue: number | null,
-  fallbackValue: number,
   fieldLabel: string,
 ): ResolvedRate {
   if (realValue != null) {
@@ -84,11 +86,15 @@ function resolveOneRate(
       reason: `${fieldLabel} from industry benchmark data (machine_library) — verify against this shop's actual cost`,
     };
   }
+  // Nothing real, nothing benchmarked — value stays null. Never fabricate a
+  // number here (was a hardcoded 0 through 2026-08-29); callers must treat
+  // this as a genuine data gap (block, warn, or preserve an existing value —
+  // never silently zero-fill).
   return {
-    value: fallbackValue,
-    source: 'generic_fallback',
+    value: null,
+    source: 'no_rate',
     confidence: 'low',
-    reason: `No ${fieldLabel.toLowerCase()} on file — generic fallback applied`,
+    reason: `No ${fieldLabel.toLowerCase()} on file — no real value or benchmark data exists`,
   };
 }
 
@@ -96,17 +102,17 @@ export function resolveMachineEconomics(row: MachineEconomicsRow): MachineEconom
   return {
     directOverheadRate: resolveOneRate(
       num(row.direct_overhead_rate), row.direct_overhead_source,
-      num(row.benchmark_direct_overhead_rate_usd_hr), GENERIC_FALLBACK_OVERHEAD_USD_HR,
+      num(row.benchmark_direct_overhead_rate_usd_hr),
       'Direct overhead rate',
     ),
     indirectOverheadRate: resolveOneRate(
       num(row.indirect_overhead_rate), row.indirect_overhead_source,
-      num(row.benchmark_indirect_overhead_rate_usd_hr), GENERIC_FALLBACK_OVERHEAD_USD_HR,
+      num(row.benchmark_indirect_overhead_rate_usd_hr),
       'Indirect overhead rate',
     ),
     laborRateUsdHr: resolveOneRate(
       num(row.usd_lhr_total), row.labor_rate_source,
-      num(row.benchmark_labor_rate_usd_hr), GENERIC_FALLBACK_LABOR_RATE_USD_HR,
+      num(row.benchmark_labor_rate_usd_hr),
       'Labor rate',
     ),
   };

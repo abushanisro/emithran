@@ -732,6 +732,24 @@ export const WATERJET_LEAD_IN_MM = 5;
 // alternatives, so both apply together here too.
 export const WATERJET_CUT_TIME_ADJUSTMENT_FACTOR = 1.4;
 
+// ── 2-Axis Router (Track B Phase 2) ────────────────────────────────────────────
+// Cutting speed is NOT here — it comes from the real, material-family-specific
+// sm_lookup_router_cut table (tblRouterUtilities.json) via
+// SheetMetalLookupService.getRouterParams(), resolved in bom-items.service.ts
+// and passed into computeRouterCost() (router-engine.ts). Setup time below is
+// a real, cited default: machine_library.json's "2-Axis Router" category
+// records setup_time_hr=0.5 (30min) consistently across all 10 real machines
+// in that category — used only when sm_lookup_op_setup_time has no row yet
+// for 'router_2axis' (same disclosed-fallback convention as WATERJET_SETUP_MIN).
+export const ROUTER_SETUP_MIN = 30; // per batch
+
+// Standard Press / Tandem Press (Track B Phase 2, migration 608) — used only
+// when sm_lookup_op_setup_time has no row yet for these classes. Real,
+// cited default: all 8 real Standard/Tandem Press machines' own
+// setup_time_hr (migration 585/597 staging) is 0.5hr (30min) — same
+// disclosed-fallback convention as ROUTER_SETUP_MIN above.
+export const PRESS_STROKE_SETUP_MIN = 30; // per batch
+
 export const RATES_SOURCE_LABEL = 'Location benchmark rates v2 (2026)';
 
 // Every costing endpoint must default to the SAME location. A summary priced in
@@ -774,9 +792,46 @@ export const MACHINE_REGISTRY = {
   // assumptions to a machine that doesn't use fiber-laser physics at all.
   co2_laser:      { commodityCodes: [],                                                                                              processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'CO2 Laser', 'Laser Cutting'],                                                 machineClassKeywords: ['CO2 Laser', 'CO2'] },
   // 'Bend Brake' is the DB machine_class name for India press brake records.
-  press_brake:    { commodityCodes: ['SM-BRAKE-80T', 'SM-BRAKE-160T', 'SM-BRAKE-320T'],                                             processGroupKeywords: ['Press Brake', 'Bending', 'Bend Brake', 'Sheet Metal', 'Sheet metal'],                                               machineClassKeywords: ['Press Brake', 'Bending Machine', 'Press', 'Bend Brake'] },
+  // Root-caused 2026-08-30 (live bug report): a bare 'Press' keyword here
+  // matched ANY machine whose machine_class contains the word "press" as a
+  // substring — including the entire, genuinely distinct "Press/Forming
+  // family" (Progressive Die Press, Standard Press, Tandem Press, Turret
+  // Press — CLAUDE.md's own documented "unwired placeholders", none of which
+  // bend sheet metal) — pulling machines like "Aida UMX-600" (a Progressive
+  // Die Press machine) into real, currently-active Bend Brake quotes. Same
+  // over-broad-keyword bug class already fixed once for router_2axis's own
+  // entry below — removed here too, keeping only the genuinely specific
+  // 'Press Brake'/'Bend Brake'/'Bending Machine' keywords.
+  press_brake:    { commodityCodes: ['SM-BRAKE-80T', 'SM-BRAKE-160T', 'SM-BRAKE-320T'],                                             processGroupKeywords: ['Press Brake', 'Bending', 'Bend Brake', 'Sheet Metal', 'Sheet metal'],                                               machineClassKeywords: ['Press Brake', 'Bending Machine', 'Bend Brake'] },
   turret_punch:   { commodityCodes: ['SM-PUNCH-CNC'],                                                                                processGroupKeywords: ['Turret', 'Punch', 'Sheet Metal', 'Sheet metal'],                                                                     machineClassKeywords: ['Turret Punch', 'CNC Punch', 'Punching'] },
   waterjet:       { commodityCodes: ['SM-WATERJET'],                                                                                 processGroupKeywords: ['Waterjet', 'Sheet Metal', 'Sheet metal'],                                                                            machineClassKeywords: ['Waterjet', 'Water Jet', 'Abrasive Jet'] },
+  // Track B Phase 2 (2026-08-30): real cost engine + real sm_lookup_router_cut
+  // data (tblRouterUtilities.json) now exist — no commodityCodes yet (no
+  // process_calculator_mappings commodity code assigned for this operation).
+  // machineClassKeywords are DELIBERATELY specific to "2-Axis Router"/
+  // "2 Axis Router" (machine_library.json's own category name, and the
+  // process_calculator_mappings 'operation' column's spelling) — NOT a bare
+  // 'Router' keyword. Real machining-center CNC routers (3-axis/5-axis
+  // gantry routers for wood/composite panels — e.g. "Router 5axis"/
+  // "Router 3axis" machine_class values, Thermwood/Multicam brand machines)
+  // are a completely different real machine category from this app's sheet-
+  // metal 2-axis router class, and machine-selection.spec.ts's own
+  // classifyMachineRecord test explicitly proves those must stay
+  // unclassified (this app has no real engine for CNC machining routers) —
+  // a bare 'Router' keyword here would wrongly classify them into this
+  // sheet-metal class instead, exactly the cross-category misclassification
+  // selector.ts's own isRouterRecord guard already exists to prevent
+  // elsewhere in this file.
+  router_2axis:   { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Router Cutting'],                                                                      machineClassKeywords: ['2-Axis Router', '2 Axis Router'] },
+  // Track B Phase 2 — Standard Press / Tandem Press (migration 608). Only the
+  // 8 real "Standard Press - X,000kN Press Force"/"Tandem Press - X,000kN
+  // Press Force" machines carry these classes today (already set directly on
+  // mhr_records.machine_class, so Tier 0 of classifyMachineRecord always wins
+  // — these keywords are a defensive Tier 2/3 fallback only, deliberately
+  // specific so they never match "Progressive Die Press"/"Bend Press Brake"
+  // family names, which share the bare word "Press").
+  standard_press: { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Bending', 'Forming'],                                                                   machineClassKeywords: ['Standard Press'] },
+  tandem_press:   { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Bending', 'Forming'],                                                                   machineClassKeywords: ['Tandem Press'] },
   tapping:        { commodityCodes: ['SM-TAP-CNC'],                                                                                  processGroupKeywords: ['Tapping', 'Sheet Metal', 'Sheet metal', 'Machining'],                                                               machineClassKeywords: ['Tapping', 'Tap', 'CNC Tap'] },
   // SM-DEBURR = India deburring bench code; Deslag = sheet metal slag removal op.
   // 'Post Processing' is the process DB group that contains Deburring/Finishing routes.

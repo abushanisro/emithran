@@ -1,10 +1,9 @@
 import { LASER_SETUP_MIN } from "./default-rates";
 import type { MHRRateInput } from "./cost-engine";
 import type { ProcessLineCost, PhysicsGap, ConfidenceLevel } from "../dto/cost-breakdown.dto";
-import type { CapabilityCheck, PartGeometryForCapability } from "./machine-capability";
-import { checkMachineCapability } from "./machine-capability";
-import type { MachineCapability } from "./machine-selection/seed-registry";
-import type { ManufacturingProcessEngine, CuttingProcessContext, CuttingProcessResult } from "./manufacturing-process-engine";
+import type { CuttingProcessContext, CuttingProcessResult } from "./manufacturing-process-engine";
+import { noRateFallback, computeDirectLaborCost } from "./engine-kernel";
+import { BaseCuttingEngine, buildCuttingProcessLine } from "./engine-orchestrator";
 
 export interface LaserCuttingInput {
   cutLengthMm: number;
@@ -63,61 +62,49 @@ export function computeLaserCuttingCost(input: LaserCuttingInput): LaserCuttingR
     totalLaserSec = 0;
   }
   const cuttingMin = totalLaserSec / 60;
-  const rate = input.laserRate ?? { rate: 0, source: "no_db_rate" as const, machineClass: "fiber_laser", machineName: null, commodityCode: null };
+  const rate = input.laserRate ?? noRateFallback("fiber_laser");
   if (input.setupMin == null) {
     warnings.push("Laser: setup time from fallback — seed sm_lookup_op_setup_time for 'laser'");
   }
   const setupMin = input.setupMin ?? LASER_SETUP_MIN;
-  const setupCost = r2((setupMin / 60) * rate.rate / Math.max(input.batchSize, 1));
-  const runCost   = r2((totalLaserSec / 3600) * rate.rate);
+
+  // Direct-labor cost — Track B Phase 1 bug fix: waterjet/turret both charge
+  // one operator's direct labor here (rate.labourRate × time); laser never
+  // did, an unintended divergence with no physical justification (laser
+  // needs no less operator attention than waterjet/turret) predating this
+  // redesign. Now consistent across all three via the shared kernel helper.
+  const labor = computeDirectLaborCost(rate, setupMin, cuttingMin, input.batchSize, "Laser", warnings);
+  const setupCost = (setupMin / 60) * rate.rate / Math.max(input.batchSize, 1) + labor.setupLaborCost;
+  const runCost   = (totalLaserSec / 3600) * rate.rate + labor.runLaborCost;
 
   return {
     processLines: [
-      {
+      buildCuttingProcessLine({
         process: "Laser Cutting",
-        ...(input.processIdentity ? {
-          processGroup: input.processIdentity.processGroup,
-          processRoute: input.processIdentity.processRoute,
-          operation: input.processIdentity.operation,
-        } : {}),
+        processIdentity: input.processIdentity,
         setupCost,
         runCost,
-        totalCost: r2(setupCost + runCost),
-        cycleTimeMin: r2(cuttingMin),
-        hourlyRate: rate.rate,
-        rateSource: rate.source,
-        machineClass: rate.machineClass,
-        machineName: rate.machineName,
-        commodityCode: rate.commodityCode,
-        ...(input.calculatorId ? { calculatorId: input.calculatorId } : {}),
-        ...(input.calculatorVersion != null ? { calculatorVersion: input.calculatorVersion } : {}),
-        ...(input.physicsGap ? { physicsGap: input.physicsGap } : {}),
-        ...(input.confidence ? { confidence: input.confidence } : {}),
-      },
+        cycleTimeMin: cuttingMin,
+        rate,
+        extra: {
+          labourRate: rate.labourRate ?? null,
+          ...(input.calculatorId ? { calculatorId: input.calculatorId } : {}),
+          ...(input.calculatorVersion != null ? { calculatorVersion: input.calculatorVersion } : {}),
+          ...(input.physicsGap ? { physicsGap: input.physicsGap } : {}),
+          ...(input.confidence ? { confidence: input.confidence } : {}),
+        },
+      }),
     ],
     cuttingMin,
     warnings,
   };
 }
 
-function r2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
 // Thin ManufacturingProcessEngine wrapper around the real formula above —
 // registered in manufacturing-process-registry.ts.
-export class LaserCuttingEngine implements ManufacturingProcessEngine {
+export class LaserCuttingEngine extends BaseCuttingEngine {
   readonly machineClass = 'fiber_laser';
   readonly processFamily = 'sheet_metal_cutting';
-
-  checkCapability(
-    geometry: PartGeometryForCapability,
-    commodityCode: string | null,
-    realCapability?: MachineCapability | null,
-    capabilitySource?: "imported" | "seed" | "default_class",
-  ): CapabilityCheck {
-    return checkMachineCapability(this.machineClass, commodityCode, geometry, realCapability, capabilitySource);
-  }
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     const result = computeLaserCuttingCost({
@@ -149,18 +136,9 @@ export class LaserCuttingEngine implements ManufacturingProcessEngine {
 // engine's only job is to exist as a real, registered candidate for
 // machine-selection/route-comparison to find a co2_laser-classed machine
 // through — never a second cost formula.
-export class Co2LaserCuttingEngine implements ManufacturingProcessEngine {
+export class Co2LaserCuttingEngine extends BaseCuttingEngine {
   readonly machineClass = 'co2_laser';
   readonly processFamily = 'sheet_metal_cutting';
-
-  checkCapability(
-    geometry: PartGeometryForCapability,
-    commodityCode: string | null,
-    realCapability?: MachineCapability | null,
-    capabilitySource?: "imported" | "seed" | "default_class",
-  ): CapabilityCheck {
-    return checkMachineCapability(this.machineClass, commodityCode, geometry, realCapability, capabilitySource);
-  }
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     const result = computeLaserCuttingCost({

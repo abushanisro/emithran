@@ -1770,6 +1770,9 @@ export class BOMItemsService {
     holeForming: MHRRateInput;
     turret: MHRRateInput;
     waterjet: MHRRateInput;
+    router: MHRRateInput;
+    standardPress: MHRRateInput;
+    tandemPress: MHRRateInput;
     cnc3ax: MHRRateInput;
     cnc4ax: MHRRateInput;
     cnc5ax: MHRRateInput;
@@ -1859,6 +1862,9 @@ export class BOMItemsService {
         capabilityVersion: null,
         operators: rate.operators ?? null,
         laborRateUsdHr: rate.machineLaborRateUsdHr ?? null,
+        pressCycleTimeS: rate.pressCycleTimeS ?? null,
+        handlingConstS: rate.handlingConstS ?? null,
+        handlingMassCoeffSPerKg: rate.handlingMassCoeffSPerKg ?? null,
       };
       const reason = rate.source === 'mhr_database'
         ? 'Selected by commodity-code lookup — import the MHR database for capability-based selection'
@@ -1880,7 +1886,8 @@ export class BOMItemsService {
     };
 
     const allClasses: MachineClass[] = [
-      'fiber_laser', 'co2_laser', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet',
+      'fiber_laser', 'co2_laser', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet', 'router_2axis',
+      'standard_press', 'tandem_press',
       'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn',
       'injection_molding', 'drill_press', 'pem_press', 'hole_forming',
     ];
@@ -1985,6 +1992,9 @@ export class BOMItemsService {
         holeForming:      get('hole_forming'),
         turret:           get('turret_punch'),
         waterjet:         get('waterjet'),
+        router:           get('router_2axis'),
+        standardPress:    get('standard_press'),
+        tandemPress:      get('tandem_press'),
         cnc3ax:           get('cnc_3ax_vmc'),
         cnc4ax:           get('cnc_4ax_vmc'),
         cnc5ax:           get('cnc_5ax_mc'),
@@ -2038,6 +2048,9 @@ export class BOMItemsService {
             selection,
             operators: cand.operators,
             machineLaborRateUsdHr: cand.laborRateUsdHr,
+            pressCycleTimeS: cand.pressCycleTimeS,
+            handlingConstS: cand.handlingConstS,
+            handlingMassCoeffSPerKg: cand.handlingMassCoeffSPerKg,
           });
         }
         return buildOutput(resolved);
@@ -5124,7 +5137,7 @@ export class BOMItemsService {
         .select('machine_class, machine_name, mhr_id, operation, process_group, process_route, cycle_time, setup_time, direct_rate, setup_cost_per_part, total_cycle_cost_per_part, total_cost_per_part')
         .eq('bom_item_id', id)
         .eq('is_active', true)
-        .in('machine_class', ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet', 'press_brake']);
+        .in('machine_class', ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet', 'router_2axis', 'press_brake', 'standard_press', 'tandem_press']);
       // P0.6: the Supabase client returns errors on the {error} field rather than
       // throwing -- this was previously never checked, so a real DB failure (not
       // "no applied route yet", a genuine query error) fell through indistinguishable
@@ -5560,6 +5573,10 @@ export class BOMItemsService {
     // calculator (ProcessCostDialog.tsx, wired to this same sm_lookup_waterjet_cut
     // table) computed for the identical part.
     const rcWaterjetParams = grade ? await this.smLookup.getWaterjetParams(grade, thk) : null;
+    // Same reasoning as rcWaterjetParams above — real, material-family-specific
+    // router cutting speed (Track B Phase 2, tblRouterUtilities.json), resolved
+    // ONCE here so computeRouterCost never falls back to a fabricated value.
+    const rcRouterParams = grade ? await this.smLookup.getRouterParams(grade) : null;
 
     const attachToRoutes = (dto: RouteComparisonDto): RouteComparisonDto => {
       for (const route of dto.routes) {
@@ -6062,6 +6079,9 @@ export class BOMItemsService {
       mhrRates.laser.machineClass,
       mhrRates.turret.machineClass,
       mhrRates.waterjet.machineClass,
+      mhrRates.router.machineClass,
+      mhrRates.standardPress.machineClass,
+      mhrRates.tandemPress.machineClass,
       mhrRates.holeForming.machineClass,
       mhrRates.inspection.machineClass,
     ], family);
@@ -6405,10 +6425,18 @@ export class BOMItemsService {
       [mhrRates.laser.machineClass, mhrRates.laser],
       [mhrRates.turret.machineClass, mhrRates.turret],
       [mhrRates.waterjet.machineClass, mhrRates.waterjet],
+      [mhrRates.router.machineClass, mhrRates.router],
+      [mhrRates.standardPress.machineClass, mhrRates.standardPress],
+      [mhrRates.tandemPress.machineClass, mhrRates.tandemPress],
     ]);
 
     const routes: RouteResultDto[] = [];
-    for (const engine of getEnginesForFamily('sheet_metal_cutting')) {
+    // Standard Press / Tandem Press (Track B Phase 2) are a real, registered
+    // engine family (sheet_metal_forming) but not a cutting technology —
+    // dispatched alongside the cutting engines here (the one real cost-
+    // computation call site) without joining getCuttingRouteIds()'s "Manual
+    // routing" cutting-method dropdown, which stays cutting-only on purpose.
+    for (const engine of [...getEnginesForFamily('sheet_metal_cutting'), ...getEnginesForFamily('sheet_metal_forming')]) {
       const identity = routeCompareProcessIdentities[engine.machineClass];
       const rate = mhrRatesByClass.get(engine.machineClass);
       if (!identity || !rate) continue; // no active catalog mapping, or no resolved rate — not offered, not fabricated
@@ -6419,6 +6447,7 @@ export class BOMItemsService {
         abrasivePricePerKg: waterjetAbrasivePricePerKg,
         waterjetParams: rcWaterjetParams,
         turretParams: effectiveTurretParams,
+        routerParams: rcRouterParams,
         abrasiveKgPerMin: effectiveAbrasiveRate.kgPerMin,
         opSetupMin: this.smLookup.resolveOpSetupMin(rcOpSetupTimes, engine.machineClass).minutes,
         partWeightKg: grossWeightKg,

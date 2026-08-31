@@ -148,8 +148,8 @@ function EconomicsSourceNote({ source, benchmarkValue }: { source?: string | und
       </p>
     );
   }
-  if (source === 'generic_fallback') {
-    return <p className="text-[11px] text-muted-foreground leading-tight">No rate on file — generic fallback applied.</p>;
+  if (source === 'no_rate' || source === 'generic_fallback') {
+    return <p className="text-[11px] text-muted-foreground leading-tight">No real rate or benchmark data on file for this machine — enter a value manually.</p>;
   }
   return null;
 }
@@ -172,7 +172,6 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   const { data: knownManufacturerCountries = [] } = useMHRManufacturerCountries();
 
   const [selectedGroup, setSelectedGroup] = useState('');
-  const [manualMHRValue, setManualMHRValue] = useState(0);
   // Scoped to the selected Process — without this, Category listed every
   // domain's categories regardless of Process (281 of ~294 rows are Sheet
   // Metal, drowning out e.g. Machining's few).
@@ -255,48 +254,38 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
         maxThicknessCuMm: existingRecord.maxThicknessCuMm ?? undefined,
         cuttableMaterials: existingRecord.cuttableMaterials?.join(', ') ?? '',
       });
-      // Prefill with the calculated machine-economics MHR when there is one
-      // (only safe to use directly when the record's own currency is USD —
-      // calculatedMhrUsdHr is always USD, and converting it to a non-USD
-      // location's local currency here would need a live FX rate this effect
-      // doesn't have; those records keep the previous fallback chain
-      // unconverted rather than risk a silently wrong number). Saving without
-      // touching this field adopts the calculated value as the new
-      // manual_mhr_value — the value real quote costing reads.
-      const isUsd = (existingRecord.currency ?? 'USD') === 'USD';
-      const fallbackMhr = Number(
-        existingRecord.calculations?.totalMachineHourRate
-        || existingRecord.manualMHRValue
-        || (existingRecord as any).manual_mhr_value
-        || 0
-      );
-      const prefillMhr = (isUsd && existingRecord.calculatedMhrUsdHr != null)
-        ? existingRecord.calculatedMhrUsdHr
-        : fallbackMhr;
-      setManualMHRValue(prefillMhr);
+      // MHR is no longer prefilled/edited independently — it is Direct OH +
+      // Indirect OH (both already set into the form above), always. See the
+      // read-only MHR display below.
       // Use processGroup first (set by Combined-format import); fall back to commodityCode
       setSelectedGroup(existingRecord.processGroup || existingRecord.commodityCode || '');
     } else {
       reset(getDefaultValues());
-      setManualMHRValue(0);
       setSelectedGroup('');
     }
   }, [existingRecord, reset]);
 
   // ── Watched values for live USD hints ─────────────────────────────────────
   const locationWatched      = watch('location');
-  const manualMHRWatched     = manualMHRValue || 0;
   const directOhWatched      = watch('directOverheadRate');
   const indirectOhWatched    = watch('indirectOverheadRate');
+  // Canonical MHR (2026-08-27): Direct OH + Indirect OH, USD — mirrors
+  // mhr.service.ts's create()/update() override exactly. Never independently
+  // entered; derived live as the two inputs above change.
+  const totalOhUsdWatched    = (directOhWatched || 0) + (indirectOhWatched || 0);
 
   // Derived currency info from selected location. fxRate is a live
   // ECB/Frankfurter reference rate (useFxRate) — never a hardcoded number.
   // Falls back to 1 (same sentinel already used for USD itself) while the
   // real rate is loading, which just hides the conversion hint rather than
-  // showing a wrong one; it flips to the true rate once it arrives.
+  // showing a wrong one; it flips to the true rate once it arrives. This is
+  // LOCAL-per-USD (base: USD, quote: currCode), so USD -> local multiplies
+  // by fxRate — the inverse of the (local / fxRate) -> USD conversion used
+  // elsewhere in this file.
   const { symbol: currSym, currency: currCode } = getCurrencyInfo(locationWatched || 'USA');
   const { data: liveFxForForm } = useFxRate({ base: 'USD', quote: currCode, rateType: 'reference', enabled: currCode !== 'USD' });
   const fxRate = currCode === 'USD' ? 1 : (liveFxForForm?.rate ?? 1);
+  const totalOhLocalWatched  = totalOhUsdWatched * fxRate;
 
   const onSubmit = async (data: MHRFormData) => {
     try {
@@ -310,12 +299,26 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
       if (existingRecord && data.machineClass === mhrCategoryOf(existingRecord)) {
         data.machineClass = existingRecord.machineClass || '';
       }
-      if (manualMHRValue <= 0) { toast.error('Please enter a valid Machine Hour Rate greater than 0'); return; }
+      // MHR = Direct OH + Indirect OH, always (canonical, 2026-08-27) — no
+      // longer a free-typed value. A brand-new record needs a real, nonzero
+      // breakdown; an existing record with no breakdown on file yet (a
+      // documented gap — mhr.service.ts's update() preserves its current
+      // total_machine_hour_rate rather than zeroing it) may still be saved
+      // for unrelated edits without blocking on this.
+      const hasExistingMhr = !!existingRecord
+        && Number(existingRecord.calculations?.totalMachineHourRate ?? existingRecord.manualMHRValue ?? 0) > 0;
+      if (totalOhUsdWatched <= 0 && !hasExistingMhr) {
+        toast.error('Enter Direct Overhead Rate and/or Indirect Overhead Rate — Machine Hour Rate (MHR) is their sum and must be greater than 0.');
+        return;
+      }
       // Machine cost is always entered directly now (the capex/utilization
       // calculator this used to derive totalMachineHourRate from — shifts,
       // landed cost, financing %s, rent, power — was removed); the fixed
       // values below are inert placeholders createManualEntryCalculation
-      // ignores once isManualEntry is true (see mhr.service.ts).
+      // ignores once isManualEntry is true (see mhr.service.ts). manualMHRValue
+      // itself is no longer authoritative — mhr.service.ts derives/overrides
+      // total_machine_hour_rate from directOverheadRate/indirectOverheadRate
+      // below regardless of what's submitted here.
       const submitData: any = {
         machineName: data.machineName, location: data.location, commodityCode: data.commodityCode,
         machineDescription: data.machineDescription || '', manufacturer: data.manufacturer || '',
@@ -328,11 +331,12 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
         directOverheadRate: data.directOverheadRate, indirectOverheadRate: data.indirectOverheadRate,
         shiftsPerDay: 1, hoursPerShift: 8, workingDaysPerYear: 250,
         plannedMaintenanceHoursPerYear: 0, capacityUtilizationRate: 85,
-        landedMachineCost: manualMHRValue, accessoriesCostPercentage: 0,
+        landedMachineCost: totalOhLocalWatched || 1, accessoriesCostPercentage: 0,
         installationCostPercentage: 10, paybackPeriodYears: 10, interestRatePercentage: 0,
         insuranceRatePercentage: 0, maintenanceCostPercentage: 0, machineFootprintSqm: 0,
         rentPerSqmPerMonth: 0, powerKwhPerHour: 0, electricityCostPerKwh: 0,
-        adminOverheadPercentage: 0, profitMarginPercentage: 0, isManualEntry: true, manualMHRValue,
+        adminOverheadPercentage: 0, profitMarginPercentage: 0, isManualEntry: true,
+        manualMHRValue: totalOhLocalWatched,
         // Capability — the same real fields machine-selection/selector.ts
         // reads for ranking, independent of how the machine rate is entered.
         maxXMm: data.maxXMm, maxYMm: data.maxYMm, maxZMm: data.maxZMm,
@@ -358,7 +362,7 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
         await createMutation.mutateAsync(submitData);
       }
       onOpenChange(false);
-      reset(getDefaultValues()); setManualMHRValue(0);
+      reset(getDefaultValues());
     } catch {
       if (!createMutation.error && !updateMutation.error) {
         toast.error(editingId ? 'Failed to update MHR record.' : 'Failed to create MHR record.', { duration: 6000 });
@@ -367,7 +371,7 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   };
 
   const handleClose = () => {
-    onOpenChange(false); reset(getDefaultValues()); setManualMHRValue(0);
+    onOpenChange(false); reset(getDefaultValues());
     setSelectedGroup('');
   };
 
@@ -513,29 +517,23 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
                 <div className="col-span-2 border-t pt-4 space-y-2">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="manualMHR" className="text-sm font-medium">
-                        Machine Hour Rate — MHR ({currSym}/hr) *
+                      <Label className="text-sm font-medium">
+                        Machine Hour Rate — MHR ({currSym}/hr)
                       </Label>
-                      <div className="flex items-center gap-3">
-                        <Input
-                          id="manualMHR"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={manualMHRValue === 0 ? '' : manualMHRValue}
-                          onChange={e => setManualMHRValue(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
-                          placeholder="e.g., 500.00"
-                        />
+                      <div className="flex items-center gap-3 rounded-md bg-muted/40 border px-3 py-2">
+                        <span className="text-lg font-semibold text-primary">
+                          {currSym}{totalOhLocalWatched.toFixed(2)}
+                        </span>
                       </div>
-                      {fxRate !== 1 && manualMHRWatched > 0 && (
+                      {currCode !== 'USD' && (
                         <span className="text-sm text-muted-foreground">
-                          ≈ ${(manualMHRWatched / fxRate).toFixed(2)} USD/hr
+                          = ${totalOhUsdWatched.toFixed(2)} USD overhead × {fxRate.toFixed(4)} {currCode}/USD
                         </span>
                       )}
                       {existingRecord?.calculatedMhrUsdHr != null && (
-                        <p className="text-[11px] text-muted-foreground">Prefilled from machine economics (${existingRecord.calculatedMhrUsdHr.toFixed(2)}/hr calculated) — edit and save to override.</p>
+                        <p className="text-[11px] text-muted-foreground">Reference only, not used for MHR — bottom-up machine-economics estimate: ${existingRecord.calculatedMhrUsdHr.toFixed(2)}/hr.</p>
                       )}
-                      <p className="text-xs text-muted-foreground">This machine's real $/hr — entered directly rather than derived from a capex/utilization calculator. This is what real quote costing uses.</p>
+                      <p className="text-xs text-muted-foreground">= Direct OH + Indirect OH above. Derived, not entered separately — this is what real quote costing uses.</p>
                     </div>
 
                     <div className="space-y-1">

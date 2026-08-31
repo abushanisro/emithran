@@ -403,7 +403,7 @@ export class RetrievalService {
     const { data, error } = await client
       .from('raw_materials')
       .select('id, material_group, material, material_grade, density_kg_m3, cost, currency, location, user_id, material_form, material_family')
-      .or(`material_group.ilike.%ferrous%,material_group.ilike.%non-ferrous%,material_group.ilike.%plastic%,material_group.ilike.%rubber%`)
+      .or(`material_group.ilike.%ferrous%,material_group.ilike.%non-ferrous%,material_group.ilike.%plastic%,material_group.ilike.%rubber%,material_group.ilike.%metal%`)
       .limit(120);
 
     if (error) {

@@ -1,0 +1,72 @@
+-- ============================================================================
+-- Migration 600: Deterministic alias for the ambiguous "AISI 304" grade string
+-- ============================================================================
+-- Root cause (confirmed live via direct query, not guessed): raw_materials
+-- has TWO real, independently-sourced rows for the same real alloy (austenitic
+-- 304 stainless):
+--   'SS304'   (migration 422 -- ASTM A240/A480 spec minimums, UTS 515 / YTS
+--              205 MPa, real 10-region 2026 pricing, deliberately verified)
+--   'Generic Stainless Steel, AISI 304' (migration 590 -- bulk-imported USA
+--              reference-library row, UTS 564 / YTS 210 MPa, USD-only cost)
+-- Both numbers are independently defensible (515 MPa is ASTM's guaranteed
+-- MINIMUM; 564 MPa is a plausible actual/typical mill value above that floor)
+-- -- this is NOT a data-entry error in either row, so neither is "corrected"
+-- here.
+--
+-- The actual bug: bom-items.service.ts's resolveMaterialForFamily() resolves
+-- a grade string in three tiers -- alias exact match, then material/
+-- material_grade exact match, then a TOKENIZED FUZZY fallback with no
+-- ORDER BY (ties broken only by shapeRankForFamily/cost-presence). A grade
+-- string of exactly "SS304" or exactly "Stainless Steel, AISI 304" already
+-- resolves deterministically via tier 2 (exact match) to the respective row.
+-- But "AISI 304" alone matches NEITHER row's material/material_grade column
+-- exactly, so it falls to the tokenized fallback, where token "304" matches
+-- BOTH rows and token "AISI" matches only the Generic row -- the query
+-- returns both candidates and Postgres's own unspecified row order (no
+-- ORDER BY on that query) plus the shape/cost tiebreak decides the winner
+-- non-deterministically. A part costed with grade "AISI 304" could silently
+-- get either UTS value depending on incidental row order, changing
+-- press-brake tonnage and DFM checks with no visibility that this happened.
+--
+-- Fix: alias "AISI 304" to SS304's row specifically (not the Generic row) --
+-- SS304 is the more rigorously verified row (real ASTM standard citation,
+-- real multi-region 2026 pricing across all 10 supported locations, per
+-- migration 422's own sourcing) and is what this app's costing already
+-- treats as canonical for this alloy family elsewhere. This resolves the
+-- alias lookup (tier 1, checked BEFORE the ambiguous fuzzy fallback) so
+-- "AISI 304" now always deterministically resolves to SS304, same as typing
+-- "SS304" directly. The Generic row itself is NOT deleted or altered --
+-- its own full exact name ("Generic Stainless Steel, AISI 304" or its own
+-- material_grade "Stainless Steel, AISI 304") still resolves to itself via
+-- tier 2, unaffected.
+--
+-- Scope note (NOT fixed here, explicitly out of scope): migration 422's own
+-- header already disclosed a SEPARATE, larger, pre-existing data-quality
+-- issue -- roughly 20 unrelated "Generic Stainless Steel, ..." rows (14-4PH,
+-- 15-5PH, 17-4PH, 310, 347, 416, 440, X5CrNi18-10, etc.) sharing identical
+-- copy-pasted properties (uts_mpa=620, yield=310, shear=372,
+-- elastic_modulus_gpa=193, poisson=0.27 across dozens of unrelated alloys)
+-- with internally inconsistent regional pricing. That is a distinct,
+-- larger reconciliation task, not something this migration touches.
+--
+-- Every other short-name x "Generic X" pair checked live (AA6061-T6, SAE
+-- 1018/1020/1045/4140/4340, C11000 Copper, C36000 Brass, etc.) does NOT
+-- exist as a live duplicate today -- confirmed by direct query: migration
+-- 353 (the ~50-grade short-name seed) was apparently never actually applied
+-- live, except its SS304 entry, which migration 422 re-seeded directly
+-- (422's own header independently confirms this: "Migration 353 ... was
+-- apparently never run either"). SS304 vs. the Generic AISI-304 row is the
+-- ONLY confirmed live ambiguity of this shape.
+-- ============================================================================
+
+INSERT INTO material_aliases (raw_material_id, alias)
+SELECT rm.id, 'AISI 304'
+FROM raw_materials rm
+WHERE rm.material = 'SS304'
+ON CONFLICT DO NOTHING;
+
+-- Verification:
+-- SELECT alias, alias_normalized, rm.material, rm.ultimate_tensile_strength
+--   FROM material_aliases ma JOIN raw_materials rm ON rm.id = ma.raw_material_id
+--   WHERE alias_normalized = 'AISI304';
+-- Expect exactly 1 row, rm.material = 'SS304', ultimate_tensile_strength = 515.

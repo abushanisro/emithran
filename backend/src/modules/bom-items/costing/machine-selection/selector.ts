@@ -56,7 +56,8 @@ const CAPABILITY_COLUMNS =
 const BASE_COLUMNS =
   'id, machine_name, commodity_code, process_group, machine_class, ' +
   'total_machine_hour_rate, manual_mhr_value, fully_burdened_local_per_hr, ' +
-  'capacity_utilization_rate, operators, usd_lhr_total';
+  'capacity_utilization_rate, operators, usd_lhr_total, ' +
+  'press_cycle_time_s, handling_time_const_s, handling_time_mass_coeff_s_per_kg';
 
 // ── Row classification (same guards as the legacy resolveMHRRates) ────────────
 
@@ -79,6 +80,9 @@ interface RawMachineRow {
   capacity_utilization_rate: number | string | null;
   operators: number | string | null;
   usd_lhr_total: number | string | null;
+  press_cycle_time_s?: number | string | null;
+  handling_time_const_s?: number | string | null;
+  handling_time_mass_coeff_s_per_kg?: number | string | null;
   // Capability columns — absent until migration 324 runs
   max_x_mm?: number | string | null;
   max_y_mm?: number | string | null;
@@ -345,6 +349,9 @@ export async function fetchMachinePool(
       capabilityVersion: null,
       operators: num(raw.operators),
       laborRateUsdHr: num(raw.usd_lhr_total),
+      pressCycleTimeS: num(raw.press_cycle_time_s),
+      handlingConstS: num(raw.handling_time_const_s),
+      handlingMassCoeffSPerKg: num(raw.handling_time_mass_coeff_s_per_kg),
     });
   }
 
@@ -396,7 +403,34 @@ function fitsBed(cap: MachineCapability, lengthMm: number, widthMm: number): boo
   return (x >= l && y >= w) || (x >= w && y >= l);
 }
 
-export function isCapable(candidate: MachineCandidate, req: MachineRequirement): boolean {
+// True only when NOT ONE real candidate in the class has resolvable
+// thickness data for this requirement's material family — a systemic gap,
+// not a per-machine one. See isCapable's laser case for why this
+// distinction matters.
+export function classHasRealLaserThicknessData(classPool: MachineCandidate[], req: LaserRequirement): boolean {
+  return classPool.some((c) => laserThicknessLimit(c.capability, req) != null);
+}
+
+// Root-caused live 2026-08-31: EVERY real USA fiber_laser/co2_laser machine
+// (~50 rows) has max_thickness_ms/ss/al/cu_mm completely NULL (exhaustively
+// searched memory/sheetmetal/ for a tier legend to backfill it — genuinely
+// doesn't exist anywhere). P0.7's fail-closed check (below) was written
+// assuming this was a per-machine gap (a few machines missing data among
+// many that had it) — CLAUDE.md itself still says "3 of 7". In reality it's
+// a systemic, class-wide gap: fail-closed against a 0%-covered class means
+// NO real laser machine can ever be selected, silently replacing a $40-90/hr
+// real machine with the synthetic no-machine fallback (no rate, no power) —
+// a worse outcome than the false-positive risk fail-closed was meant to
+// prevent. Fix: fail-open ONLY when literally no real machine anywhere in
+// the class has resolvable thickness data (classHasRealThicknessData below,
+// computed once per selectMachine() call from the real pool) — a genuine
+// per-machine gap among machines that mostly DO have data still fail-closes
+// exactly as before, unchanged.
+export function isCapable(
+  candidate: MachineCandidate,
+  req: MachineRequirement,
+  opts?: { allowUnknownLaserThickness?: boolean },
+): boolean {
   const cap = candidate.capability;
 
   if (candidate.availabilityStatus === 'down' || candidate.availabilityStatus === 'retired') {
@@ -422,9 +456,17 @@ export function isCapable(candidate: MachineCandidate, req: MachineRequirement):
       // mode than surfacing "no capable machine" (selectMachine already
       // degrades gracefully to a location benchmark rate or an honest $0 with
       // a stated reason — see selectMachine's own comment — so rejecting here
-      // never crashes the quote, it just stops silently guessing).
+      // never crashes the quote, it just stops silently guessing). EXCEPT:
+      // when opts.allowUnknownLaserThickness is true (the whole class has
+      // zero real data, see doc comment above), a null limit no longer
+      // rejects — real machines stay selectable, at low confidence, rather
+      // than universally replaced by the synthetic no-machine fallback.
       const limit = laserThicknessLimit(cap, req);
-      if (limit == null || limit < req.thicknessMm) return false;
+      if (limit == null) {
+        if (!opts?.allowUnknownLaserThickness) return false;
+      } else if (limit < req.thicknessMm) {
+        return false;
+      }
       if (
         cap.cuttableMaterials?.length &&
         req.materialGrade &&
@@ -586,7 +628,11 @@ function isInMaintenanceWindow(candidate: MachineCandidate, now: Date): boolean 
 
 // ── Reasons (explanation engine) ──────────────────────────────────────────────
 
-function buildReasons(candidate: MachineCandidate, req: MachineRequirement): string[] {
+function buildReasons(
+  candidate: MachineCandidate,
+  req: MachineRequirement,
+  opts?: { allowUnknownLaserThickness?: boolean },
+): string[] {
   const cap = candidate.capability;
   const reasons: string[] = [];
   const r0 = (n: number) => Math.round(n * 10) / 10;
@@ -607,6 +653,9 @@ function buildReasons(candidate: MachineCandidate, req: MachineRequirement): str
       // not repeated here as flat text.
       if (cap.maxXMm != null && cap.maxYMm != null) {
         reasons.push(`Part ${r0(req.bedLengthMm)}×${r0(req.bedWidthMm)} mm fits ${r0(cap.maxXMm)}×${r0(cap.maxYMm)} mm bed`);
+      }
+      if (opts?.allowUnknownLaserThickness && laserThicknessLimit(cap, req) == null) {
+        reasons.push('No real thickness data on file for any machine in this class — capability assumed, not verified');
       }
       break;
     }
@@ -672,7 +721,11 @@ function buildReasons(candidate: MachineCandidate, req: MachineRequirement): str
 // limit" text for the one requirement kind where a single dominant
 // material-dependent dimensional check exists. Other kinds return null —
 // extend here if the same structured view is wanted for tonnage/diameter/etc.
-function buildCapabilityCheck(candidate: MachineCandidate, req: MachineRequirement): CapabilityCheck | null {
+function buildCapabilityCheck(
+  candidate: MachineCandidate,
+  req: MachineRequirement,
+  opts?: { allowUnknownLaserThickness?: boolean },
+): CapabilityCheck | null {
   if (req.kind !== 'laser') return null;
   const limit = laserThicknessLimit(candidate.capability, req);
   return {
@@ -683,8 +736,11 @@ function buildCapabilityCheck(candidate: MachineCandidate, req: MachineRequireme
     unit: 'mm',
     // Mirrors isCapable's laser case (P0.7, fail-closed) — a null limit is
     // "no data on file", not "supported", so this flag never disagrees with
-    // the actual eligibility gate.
-    supported: limit != null && limit >= req.thicknessMm,
+    // the actual eligibility gate. EXCEPT when allowUnknownLaserThickness
+    // is true (systemic class-wide gap, not a per-machine one — see
+    // isCapable's doc comment) — supported reflects the same fail-open
+    // eligibility decision actually used to select this candidate.
+    supported: limit != null ? limit >= req.thicknessMm : !!opts?.allowUnknownLaserThickness,
   };
 }
 
@@ -704,11 +760,14 @@ export function explainCandidate(
 ): { candidate: MachineCandidate; reasons: string[]; capabilityCheck: CapabilityCheck | null } | null {
   const candidate = pool.find((c) => c.machineClass === machineClass && c.machineId === machineId);
   if (!candidate) return null;
-  const reasons = buildReasons(candidate, requirement);
-  if (!isCapable(candidate, requirement)) {
+  const opts = requirement.kind === 'laser'
+    ? { allowUnknownLaserThickness: !classHasRealLaserThicknessData(pool.filter((c) => c.machineClass === machineClass), requirement) }
+    : undefined;
+  const reasons = buildReasons(candidate, requirement, opts);
+  if (!isCapable(candidate, requirement, opts)) {
     reasons.unshift('⚠ Outside computed capability for this part — verify feasibility');
   }
-  return { candidate, reasons, capabilityCheck: buildCapabilityCheck(candidate, requirement) };
+  return { candidate, reasons, capabilityCheck: buildCapabilityCheck(candidate, requirement, opts) };
 }
 
 // ── Selection ─────────────────────────────────────────────────────────────────
@@ -744,6 +803,9 @@ function makeDefaultCandidate(_location: string, cls: MachineClass, fallbackRate
     capabilityVersion: null,
     operators: null, // no real machine — cost engine falls back to its own generic default
     laborRateUsdHr: null,
+    pressCycleTimeS: null,
+    handlingConstS: null,
+    handlingMassCoeffSPerKg: null,
   };
 }
 
@@ -766,7 +828,10 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
   const now = input.now ?? new Date();
 
   const classPool = pool.filter((c) => c.machineClass === machineClass);
-  const eligible = classPool.filter((c) => isCapable(c, requirement));
+  const laserOpts = requirement.kind === 'laser'
+    ? { allowUnknownLaserThickness: !classHasRealLaserThicknessData(classPool, requirement) }
+    : undefined;
+  const eligible = classPool.filter((c) => isCapable(c, requirement, laserOpts));
 
   // No capable machine — fall through to the location benchmark rate when one is
   // on file; otherwise the cost is genuinely $0, and the reason must say so rather
@@ -820,8 +885,8 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
   ): MachineRecommendation => ({
     candidate: s.candidate,
     score: Math.round((s.fit * weights.fit + s.util * weights.util + s.cost * weights.cost + s.avail * weights.avail) * 1000) / 1000,
-    reasons: buildReasons(s.candidate, requirement),
-    capabilityCheck: buildCapabilityCheck(s.candidate, requirement),
+    reasons: buildReasons(s.candidate, requirement, laserOpts),
+    capabilityCheck: buildCapabilityCheck(s.candidate, requirement, laserOpts),
   });
 
   // User override: force the pick, even outside the capability filter (their judgment)
@@ -848,8 +913,8 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
       balancedRec = {
         candidate: forced,
         score: Math.round(fit * 1000) / 1000,
-        reasons: ['Manually selected by cost engineer', ...buildReasons(forced, requirement)],
-        capabilityCheck: buildCapabilityCheck(forced, requirement),
+        reasons: ['Manually selected by cost engineer', ...buildReasons(forced, requirement, laserOpts)],
+        capabilityCheck: buildCapabilityCheck(forced, requirement, laserOpts),
       };
       if (forced.machineClass !== machineClass) {
         balancedRec.reasons.unshift(
@@ -857,7 +922,7 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
           `not '${machineClass}') — verify this is intentional before quoting`,
         );
       }
-      if (!isCapable(forced, requirement)) {
+      if (!isCapable(forced, requirement, laserOpts)) {
         balancedRec.reasons.unshift('⚠ Outside computed capability for this part — verify feasibility');
       }
     } else {

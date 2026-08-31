@@ -195,6 +195,11 @@ export class RawMaterialsService {
         en_standard: createRawMaterialDto.en_standard,
         jis_standard: createRawMaterialDto.jis_standard,
         shape: createRawMaterialDto.shape,
+        strength_coeff_k_mpa: createRawMaterialDto.strengthCoeffKMpa,
+        strain_hardening_exponent_n: createRawMaterialDto.strainHardeningExponentN,
+        lankford_coefficient_r: createRawMaterialDto.lankfordCoefficientR,
+        milling_speed_m_min: createRawMaterialDto.millingSpeedMMin,
+        scrap_factor: createRawMaterialDto.scrapFactor,
         user_id: userId,
       })
       .select()
@@ -261,6 +266,11 @@ export class RawMaterialsService {
       en_standard: dto.en_standard,
       jis_standard: dto.jis_standard,
       shape: dto.shape,
+      strength_coeff_k_mpa: dto.strengthCoeffKMpa,
+      strain_hardening_exponent_n: dto.strainHardeningExponentN,
+      lankford_coefficient_r: dto.lankfordCoefficientR,
+      milling_speed_m_min: dto.millingSpeedMMin,
+      scrap_factor: dto.scrapFactor,
       user_id: userId,
     }));
 
@@ -332,6 +342,11 @@ export class RawMaterialsService {
     if (updateRawMaterialDto.en_standard !== undefined) updateData.en_standard = handleStringField(updateRawMaterialDto.en_standard);
     if (updateRawMaterialDto.jis_standard !== undefined) updateData.jis_standard = handleStringField(updateRawMaterialDto.jis_standard);
     if (updateRawMaterialDto.shape !== undefined) updateData.shape = handleStringField(updateRawMaterialDto.shape);
+    if (updateRawMaterialDto.strengthCoeffKMpa !== undefined) updateData.strength_coeff_k_mpa = handleNumberField(updateRawMaterialDto.strengthCoeffKMpa);
+    if (updateRawMaterialDto.strainHardeningExponentN !== undefined) updateData.strain_hardening_exponent_n = handleNumberField(updateRawMaterialDto.strainHardeningExponentN);
+    if (updateRawMaterialDto.lankfordCoefficientR !== undefined) updateData.lankford_coefficient_r = handleNumberField(updateRawMaterialDto.lankfordCoefficientR);
+    if (updateRawMaterialDto.millingSpeedMMin !== undefined) updateData.milling_speed_m_min = handleNumberField(updateRawMaterialDto.millingSpeedMMin);
+    if (updateRawMaterialDto.scrapFactor !== undefined) updateData.scrap_factor = handleNumberField(updateRawMaterialDto.scrapFactor);
 
     this.logger.debug(`Update data to be sent to database: ${JSON.stringify(updateData, null, 2)}`, 'RawMaterialsService');
 

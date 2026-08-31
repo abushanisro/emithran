@@ -8,7 +8,7 @@ import {
   ArrowLeft, Maximize2, Minimize2, ChevronDown, ChevronRight,
   AlertCircle, GripVertical, GripHorizontal, RefreshCw,
   Calculator, ShieldCheck, Flame, Crosshair, Loader2, Edit, X, Download,
-  FileSpreadsheet,
+  FileSpreadsheet, Search, Database,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
@@ -2626,155 +2626,6 @@ function CostSummaryTab({
         </>
       )}
 
-      {/* Gate on !isLoadingProcRecords too — otherwise this live-estimate preview
-          briefly renders (and a moment later gets replaced by the saved rows
-          below) every time the stored-records query hasn't resolved yet on
-          first paint, which reads as "it worked, then reverted to the old
-          data" even though the saved rows were the correct/authoritative view
-          the whole time. */}
-      {!isLoadingProcRecords && sortedStoredProcs.length === 0 && hasStoredMat && eff?.lines?.map((line, lineIdx) => {
-        const procOv = procOverrides[line.process] ?? {};
-        const ms = line.machineSelection;
-        const rec = ms?.balanced?.candidate;
-        const isExpanded = expandedProcs.has(line.process);
-        const peers = (classPeers.get(line.machineClass) ?? []).filter((p) => p !== line.process);
-        return (
-          <div key={line.process} className="group/procrow">
-            {/* Row header — split into expand toggle + edit button so they don't nest */}
-            <div className="flex items-stretch border-b border-border/20 hover:bg-muted/10 transition-colors">
-              <button
-                type="button"
-                onClick={() => toggleProc(line.process)}
-                className="flex-1 flex items-baseline justify-between py-2 text-left pl-2 min-w-0"
-              >
-                <div className="flex-1 min-w-0 pr-2">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-[10px] tabular-nums text-muted-foreground/50 font-mono w-5 shrink-0 text-right">{(lineIdx + 1) * 10}</span>
-                    <span className="text-sm text-foreground">
-                      {isExpanded ? '▾' : '▸'} {line.process}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap pl-[26px]">
-                    <span className="truncate">
-                      {rec?.machineName ?? (
-                        line.rateSource === 'mhr_database' ? 'MHR DB'
-                        : line.rateSource === 'tier_synthetic' ? 'Benchmark'
-                        : line.rateSource === 'no_db_rate' ? 'no rate on file'
-                        : 'est.'
-                      )}
-                    </span>
-                    {peers.length > 0 && <span className="shrink-0">· same machine as {peers.join(', ')}</span>}
-                    {ms?.overridden && <span className="text-amber-500 shrink-0">· overridden</span>}
-                    {ms?.availabilityWarning && <span className="text-amber-500 shrink-0">⚠</span>}
-                    {(procOv.rate || procOv.cycleMin) && <span className="text-amber-500 shrink-0">· rate overridden</span>}
-                  </div>
-                </div>
-                <div className="shrink-0 text-right pr-2">
-                  <span className="text-sm tabular-nums text-foreground">{fmtL(line.totalCost)}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums ml-2">{eff.pct(line.totalCost).toFixed(1)}%</span>
-                </div>
-              </button>
-              {/* Edit button — visible on row hover */}
-              <button
-                type="button"
-                onClick={() => handleOpenEditProc(line, lineIdx)}
-                className="shrink-0 px-2.5 flex items-center text-muted-foreground/40 hover:text-foreground opacity-0 group-hover/procrow:opacity-100 transition-opacity"
-                title="Open in process calculator"
-              >
-                <Edit className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {isExpanded && (
-              <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
-                {/* eMithran-style feature-level sub-operations */}
-                <FeatureBreakdown items={(line as any).featureBreakdown} fg={fg} onSelectHighlight={onSelectHighlight} />
-                <CalculationTracePanel line={line} />
-                {!!line.calculationTrace?.length && (
-                  <button
-                    type="button"
-                    onClick={() => generateCalculationReportPdf({
-                      partNumber: item.partNumber ?? item.id,
-                      location: factory,
-                      currencySymbol: sym,
-                      batchSize: cost.batchSize,
-                      line,
-                      cycleTimeSec: line.cycleTimeMin * 60,
-                      laborRate: line.labourRate ?? null,
-                    })}
-                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border/40 rounded px-2 py-1 transition-colors"
-                    title="Download the full calculation (formulas + real values) as a PDF for engineering review"
-                  >
-                    <Download className="h-3 w-3" />
-                    Download calculation (PDF)
-                  </button>
-                )}
-                {/* Machine selection */}
-                {ms && (
-                  <MachineSelector
-                    itemId={item.id}
-                    processKey={line.machineClass}
-                    selection={ms}
-                    currencySymbol={sym}
-                    location={factory}
-                  />
-                )}
-                {/* Cost overrides */}
-                <div className="space-y-1.5 min-w-0">
-                  <div className="flex items-baseline justify-between gap-2 min-w-0">
-                    <span className="text-xs text-muted-foreground truncate min-w-0">Machine Rate</span>
-                    <span className="shrink-0">
-                      <EditCell value={line.rate} prefix={sym} suffix="/hr" decimals={0}
-                        fieldKey={`${line.process}::rate`} isOverridden={!!procOv.rate} {...cellProps} />
-                    </span>
-                  </div>
-                  {(line.labourRate ?? 0) > 0 && (
-                    <div className="flex items-baseline justify-between gap-2 min-w-0">
-                      <span className="text-xs text-muted-foreground truncate min-w-0">Labour Rate</span>
-                      <span className="text-xs tabular-nums text-muted-foreground shrink-0 flex items-center gap-1">
-                        {sym}{fmt(line.labourRate!, 0)}/hr
-                        {/* P0.6: labor-rate provenance, mirrors rateSource's existing MHR-side badge */}
-                        {line.labourRateSource && line.labourRateSource !== 'lhr_database' && (
-                          <span className={line.labourRateSource === 'lhr_cross_location' ? 'text-amber-500' : 'text-slate-400'}>
-                            ({line.labourRateSource === 'lhr_benchmark' ? 'benchmark' : 'cross-location'})
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-baseline justify-between gap-2 min-w-0">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <span className="text-xs text-muted-foreground truncate min-w-0">Cycle Time</span>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditProc(line, lineIdx, true)}
-                        className="text-muted-foreground/40 hover:text-violet-500 transition-colors shrink-0"
-                        title="Open cycle time in process calculator"
-                      >
-                        <Calculator className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <span className="shrink-0">
-                      <EditCell value={line.cycleMin * 60} suffix=" s" decimals={2}
-                        fieldKey={`${line.process}::cycleMin`} isOverridden={!!procOv.cycleMin} {...cellProps}
-                        onCommit={(key, secs) => cellProps.onCommit(key, secs / 60)} />
-                    </span>
-                  </div>
-                  <div className="flex items-baseline justify-between border-t border-border/20 pt-1">
-                    <span className="text-xs text-muted-foreground">Setup (÷{cost.batchSize})</span>
-                    <span className="text-xs tabular-nums text-foreground">{fmtL(line.setupCost)}</span>
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">Run</span>
-                    <span className="text-xs tabular-nums text-foreground">{fmtL(line.runCost)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-
       {/* ── All processes, merged and ordered by real manufacturing sequence —
           NOT by save status. Saved rows (Deburr, Inspect, ...) and not-yet-
           saved/gapped rows (Laser Cutting, Press Brake, ...) used to render as
@@ -2814,7 +2665,13 @@ function CostSummaryTab({
         const storedMachineClasses = new Set(
           sortedStoredProcs.map((p: any) => p.machineClass).filter(Boolean),
         );
-        const missingLines = hasStoredMat ? (eff?.lines ?? []).filter(
+        // Gated on !isLoadingProcRecords — otherwise, on first paint (before
+        // the stored-records query resolves), sortedStoredProcs is
+        // momentarily empty and every real engine line would flash as
+        // "missing"/"Result Unavailable" for an instant before correcting
+        // itself once the real stored rows arrive — reads as "it worked,
+        // then reverted to the old data" even though nothing was ever wrong.
+        const missingLines = (hasStoredMat && !isLoadingProcRecords) ? (eff?.lines ?? []).filter(
           (l) => !storedProcessNames.has(canonName(l.process.toLowerCase()))
             && !(l.machineClass && storedMachineClasses.has(l.machineClass)),
         ) : [];
@@ -2844,6 +2701,7 @@ function CostSummaryTab({
             const ms = line.machineSelection;
             const procOv = procOverrides[line.process] ?? {};
             const isExpanded = expandedProcs.has(`missing:${line.process}`);
+            const peers = (classPeers.get(line.machineClass) ?? []).filter((p) => p !== line.process);
             return (
               <div key={row.key} className="group/procrow">
                 <div className="flex items-stretch border-b border-border/20 hover:bg-muted/10 transition-colors">
@@ -2865,6 +2723,10 @@ function CostSummaryTab({
                         ) : (
                           <span className="text-xs text-amber-500">· not saved</span>
                         )}
+                        {peers.length > 0 && <span className="text-xs text-muted-foreground shrink-0">· same machine as {peers.join(', ')}</span>}
+                        {ms?.overridden && <span className="text-xs text-amber-500 shrink-0">· overridden</span>}
+                        {ms?.availabilityWarning && <span className="text-xs text-amber-500 shrink-0">⚠</span>}
+                        {(procOv.rate || procOv.cycleMin) && <span className="text-xs text-amber-500 shrink-0">· rate overridden</span>}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5 pl-[26px]">
                         {reason ?? 'Re-apply the route to save this process, or set it up manually.'}
@@ -7012,8 +6874,13 @@ function CostGuidePanel({
             </Section>
 
             <Section title="Material Grade">
-              {/* Combobox input */}
-              <div className="relative mb-2">
+              {/* Combobox input — deliberately styled to read as a live,
+                  searchable pick-from-database control (search icon, dropdown
+                  chevron, focus ring), not a static label. matDropItems is
+                  always a real-time useRawMaterials() search against the DB;
+                  nothing here is a hardcoded material list. */}
+              <div className="relative mb-1.5">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60 pointer-events-none" />
                 <input
                   type="text"
                   value={matInputValue}
@@ -7029,13 +6896,11 @@ function CostGuidePanel({
                     }
                     if (e.key === 'Escape') setMatDropOpen(false);
                   }}
-                  placeholder="Type or search material grade…"
-                  className="w-full text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 pr-24"
+                  placeholder="Search raw materials database…"
+                  title="Select a material grade from the raw materials database"
+                  className="w-full text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 pl-8 pr-24"
                 />
                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  {item.materialGrade && matInputValue === item.materialGrade && (
-                    <span className="text-[8px] font-semibold text-emerald-400 border border-emerald-500/40 rounded px-1 py-px leading-none">SET</span>
-                  )}
                   {matInputValue.trim() && matInputValue.trim() !== item.materialGrade && (
                     <button
                       onMouseDown={(e) => {
@@ -7045,21 +6910,29 @@ function CostGuidePanel({
                         void reapplyEffectiveRoute();
                         setMatDropOpen(false);
                       }}
-                      className="text-[8px] font-semibold text-violet-400 border border-violet-500/40 rounded px-1 py-px leading-none hover:bg-violet-500/10"
+                      className="text-[10px] font-semibold text-violet-500 border border-violet-500/40 rounded px-1.5 py-0.5 leading-none hover:bg-violet-500/10 transition-colors"
                     >Apply</button>
                   )}
                   <button
                     onMouseDown={(e) => { e.preventDefault(); setMatPickerOpen(true); setMatDropOpen(false); }}
-                    className="text-[8px] text-muted-foreground hover:text-foreground border border-border rounded px-1 py-px leading-none"
-                    title="Browse full database"
-                  >···</button>
+                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5 leading-none transition-colors"
+                    title="Browse the full raw materials database"
+                  >
+                    <Database className="h-3 w-3" />
+                    Browse
+                  </button>
+                  <ChevronDown
+                    className="h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none cursor-pointer"
+                    onMouseDown={(e) => { e.preventDefault(); setMatDropOpen((v) => !v); }}
+                  />
                 </div>
 
-                {/* Dropdown suggestions */}
+                {/* Dropdown suggestions — always a live DB search result, never a static/hardcoded list */}
                 {matDropOpen && matDropItems.length > 0 && (
                   <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-popover border border-border rounded shadow-lg max-h-52 overflow-y-auto">
                     {matDropItems.map((m) => {
                       const grade = materialLabel(m.material, m.materialGrade);
+                      const isCurrent = grade === item.materialGrade;
                       return (
                         <button
                           key={m.id}
@@ -7071,12 +6944,15 @@ function CostGuidePanel({
                             void reapplyEffectiveRoute();
                             setMatDropOpen(false);
                           }}
-                          className="w-full text-left px-2.5 py-1.5 hover:bg-muted/60 transition-colors border-b border-border/20 last:border-0"
+                          className={`w-full text-left px-2.5 py-1.5 hover:bg-muted/60 transition-colors border-b border-border/20 last:border-0 flex items-center justify-between gap-2 ${isCurrent ? 'bg-emerald-500/5' : ''}`}
                         >
-                          <div className="text-xs font-medium truncate">{grade}</div>
-                          {m.materialGroup && (
-                            <div className="text-[10px] text-muted-foreground truncate">{m.materialGroup}</div>
-                          )}
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium truncate">{grade}</div>
+                            {m.materialGroup && (
+                              <div className="text-[10px] text-muted-foreground truncate">{m.materialGroup}</div>
+                            )}
+                          </div>
+                          {isCurrent && <span className="text-emerald-500 text-xs shrink-0">✓</span>}
                         </button>
                       );
                     })}
@@ -7084,11 +6960,13 @@ function CostGuidePanel({
                 )}
               </div>
 
-              {/* Costed-as badge — reads from DB-persisted grade so it only appears after Apply */}
+              {/* Currently-costed confirmation — reads from DB-persisted grade so it
+                  only appears after a real Apply/selection, distinct from whatever
+                  is still being typed/searched above in matInputValue. */}
               {item.materialGrade && (
                 <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 mb-1.5 px-0.5">
                   <span>✓</span>
-                  <span>Costed as <strong>{item.materialGrade}</strong></span>
+                  <span>Currently costed as <strong>{item.materialGrade}</strong></span>
                 </div>
               )}
 

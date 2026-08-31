@@ -95,9 +95,11 @@ export type MHRRecord = {
   // Economics provenance (Phase 1, "Machine Economics" initiative, see
   // backend's economics-resolver.ts) — one tier per rate field:
   // 'shop_override' (human-entered) | 'imported' (Excel bulk import) |
-  // 'benchmark' (machine_library.json reference data) | 'generic_fallback'
-  // (no data on file). Never render a 'benchmark'/'generic_fallback' value
-  // as if it were this shop's own confirmed rate.
+  // 'benchmark' (machine_library.json reference data) | 'no_rate' (no real
+  // value or benchmark on file — value is null, never fabricated) |
+  // 'generic_fallback' (legacy tag on rows saved before 2026-08-30, when this
+  // resolved to a fabricated $0). Never render a 'benchmark'/'no_rate'/
+  // 'generic_fallback' value as if it were this shop's own confirmed rate.
   directOverheadSource?: string;
   indirectOverheadSource?: string;
   laborRateSource?: string;

@@ -214,6 +214,18 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   press_brake:    { maxTonnage: 60, maxLengthMm: 2000, maxThicknessMm: 5 },
   turret_punch:   { maxXMm: 2000, maxYMm: 1000, maxThicknessMm: 4, maxTonnage: 20 },
   waterjet:       { maxXMm: 2000, maxYMm: 1000, maxThicknessMm: 80 },
+  // No conservative envelope default — same reasoning as co2_laser above.
+  // Real "2-Axis Router" machine_library.json bed sizes span 1219mm-7700mm
+  // (Multicam 103's 2438x1219mm vs. Stratos Pro XL's 3700x2100mm and beyond),
+  // too wide a real spread to defend one class-wide floor. An unclassified
+  // router gets EMPTY_CAPABILITY only, never a fabricated number.
+  router_2axis:   {},
+  // No conservative envelope default — same reasoning as router_2axis above.
+  // Only 4 real machines exist per class (migration 608) spanning a wide
+  // real range (152.96t-713.80t tonnage, 1000mm-3250mm bed) — an
+  // unclassified Standard/Tandem Press gets EMPTY_CAPABILITY only.
+  standard_press: {},
+  tandem_press:   {},
   tapping:        {},
   deburring:      {},
   cleaning:       {},

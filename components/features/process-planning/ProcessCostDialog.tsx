@@ -761,8 +761,45 @@ export function ProcessCostDialog({
     return eligible.length > 0 ? [...ranked, ...excluded] : ranked;
   }, [operationKeywords]);
 
+  // ─── Machine-specific labour rate (root-caused 2026-08-30 from a live bug
+  // report) ────────────────────────────────────────────────────────────────
+  // bom-items.service.ts's resolveMHRRates()'s buildOutput().get() already has
+  // an approved rule (2026-08-27): the SPECIFIC selected machine's own real
+  // usd_lhr_total (mhr_records — machine_library.json's labor_rate_usd_hr, or
+  // this shop's own shop_override/imported/LHR-resolved value) takes
+  // precedence over a generic (location, process_group) wage-grade lookup.
+  // This dialog's Labour Type picker never had that rule — it always resolved
+  // purely from lhr_records/lhr_benchmark_rates, entirely independent of
+  // which machine was selected above, so e.g. "Aida UMX-600" (a real
+  // $36.30/hr-labour machine) could show an unrelated "Sheet Metal
+  // Fabricator — $46.67/hr" default. Synthesized as a real LHR-shaped
+  // pseudo-record (not a second, parallel rate concept) so it slots into the
+  // exact same dropdown/priority/rendering/effective-rate code below — always
+  // the top (highest-priority) entry when the selected machine has one.
+  const machineSpecificLHR = useMemo(() => {
+    const mhr = filteredMHR.find(r => String(r.id) === String(selectedMHRId)) as any;
+    const rate = mhr?.usdLhrTotal;
+    if (!mhr || rate == null || !(rate > 0)) return null;
+    const laborRateSource = mhr.laborRateSource as string | undefined;
+    return {
+      id: `mhr-lhr-${mhr.id}`,
+      labourType: mhr.machineName ? `Machine-Specific Rate (${mhr.machineName})` : 'Machine-Specific Rate',
+      processGroup: selectedGroup || null,
+      lhr: rate,
+      lhrUsdEffective: rate,
+      location: mhr.location ?? location,
+      // Same ★ convention as every other isBenchmark check in this file:
+      // marks "not this shop's own confirmed value" — set only when the
+      // machine's OWN rate itself came from a benchmark/reference tier
+      // (economics-resolver.ts's 'benchmark', or LHRService's 'lhr_benchmark'
+      // fallback), never for a real shop_override/imported/lhr_shop_avg value.
+      isBenchmark: laborRateSource === 'benchmark' || laborRateSource === 'lhr_benchmark',
+    };
+  }, [filteredMHR, selectedMHRId, selectedGroup, location]);
+
   // ─── filteredLHR ─────────────────────────────────────────────────────────────
-  // Priority: 1) user's own lsr_records (location+group exact match)
+  // Priority: 0) the selected machine's own real rate (machineSpecificLHR above)
+  //           1) user's own lsr_records (location+group exact match)
   //           2) user's own lsr_records (location only)
   //           3) lhr_benchmark_rates DB table — location+group
   //           4) lhr_benchmark_rates DB table — location only / all benchmark
@@ -770,6 +807,10 @@ export function ProcessCostDialog({
   //           Within each tier, rows whose `description` matches the selected
   //           operation's keywords are ranked first (see rankByOperationMatch).
   const filteredLHR = useMemo(() => {
+    const withMachineSpecific = (rows: any[]) =>
+      machineSpecificLHR
+        ? [machineSpecificLHR, ...rows.filter((r: any) => String(r.id) !== machineSpecificLHR.id)]
+        : rows;
     const records = lhrData?.records ?? [];
     const bm      = benchmarkLHR ?? [];
     const locLower = location.toLowerCase();
@@ -818,7 +859,9 @@ export function ProcessCostDialog({
       if (savedBenchmarkLHRRecord && !result.some((r: any) => String(r.id) === String((savedBenchmarkLHRRecord as any).id))) {
         result = [savedBenchmarkLHRRecord, ...result];
       }
-      return rankByOperationMatch(result);
+      // Every return path below funnels through here — machineSpecificLHR
+      // always wins the top slot when the selected machine has a real rate.
+      return withMachineSpecific(rankByOperationMatch(result));
     };
 
     // 1 & 2 — user's own records, location-scoped
@@ -843,7 +886,7 @@ export function ProcessCostDialog({
     // options (with the manual-entry escape hatch below), never silently
     // widens to every country's labour records.
     return withSaved([]);
-  }, [lhrData, benchmarkLHR, location, selectedGroup, selectedLhrGroup, selectedMachineClass, savedLHRRecord, savedBenchmarkLHRRecord, operationFullySelected]);
+  }, [lhrData, benchmarkLHR, location, selectedGroup, selectedLhrGroup, selectedMachineClass, savedLHRRecord, savedBenchmarkLHRRecord, operationFullySelected, machineSpecificLHR]);
 
   // Get selected MHR and LHR — both use String() to avoid number/string type mismatch
   const selectedMHR = useMemo(() => {

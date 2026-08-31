@@ -50,8 +50,8 @@ export class MHRController {
 
   @Get('locations')
   @ApiOperation({ summary: 'Get distinct locations from MHR records' })
-  async getLocations(@CurrentUser() user: User, @AccessToken() token: string): Promise<string[]> {
-    return this.mhrService.getDistinctLocations(user.id, token);
+  async getLocations(@AccessToken() token: string): Promise<string[]> {
+    return this.mhrService.getDistinctLocations(token);
   }
 
   @Get('manufacturer-countries')
@@ -62,8 +62,8 @@ export class MHRController {
 
   @Get('currencies')
   @ApiOperation({ summary: 'Get distinct currencies from MHR records' })
-  async getCurrencies(@CurrentUser() user: User, @AccessToken() token: string): Promise<string[]> {
-    return this.mhrService.getDistinctCurrencies(user.id, token);
+  async getCurrencies(@AccessToken() token: string): Promise<string[]> {
+    return this.mhrService.getDistinctCurrencies(token);
   }
 
   @Get('benchmark')

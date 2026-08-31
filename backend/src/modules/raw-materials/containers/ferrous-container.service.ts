@@ -79,6 +79,7 @@ export class FerrousContainerService {
       material_type: createDto.materialType,
       material_grade: createDto.materialGrade,
       material_description: createDto.materialDescription,
+      shape: createDto.shape,
       stock_form: createDto.stockForm,
       matl_state: createDto.matlState,
       application: createDto.application,

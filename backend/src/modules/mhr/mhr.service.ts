@@ -10,6 +10,7 @@ import { getCurrencyForLocation, MHR_CALCULATION_CONSTANTS } from './constants/m
 import { invalidateMachinePools } from '../bom-items/costing/machine-selection/pool-cache';
 import { resolveMachineEconomics } from '../bom-items/costing/machine-selection/economics-resolver';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { LHRService } from '../lhr/lhr.service';
 import * as ExcelJS from 'exceljs';
 
 /**
@@ -36,6 +37,7 @@ export class MHRService {
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
     private readonly exchangeRateService: ExchangeRateService,
+    private readonly lhrService: LHRService,
   ) {
     this.calculationEngine = new MHRCalculationEngine();
     this.validator = new MHRInputValidator();
@@ -446,10 +448,21 @@ export class MHRService {
    * sm_reference_data when at least one of the three fields was left blank
    * by the caller (an explicit value from the form is always 'shop_override'
    * and never needs a benchmark lookup).
+   *
+   * Labor rate specifically: completes migration 568's stated intent (never
+   * actually wired — root-caused 2026-08-30). Before falling back to the
+   * generic, non-location-aware per-machine-name catalog lookup, try the
+   * real, (location, process_group)-aware LHRService.getEffectiveRate() —
+   * the same shop-average/benchmark precedence bom-items.service.ts's
+   * resolveLHRRates() already uses for real quote costing. This is what
+   * keeps Machine Selection/Machine Economics from silently diverging from
+   * Cost Summary's labor rate for the same machine/location/process.
    */
   private async resolveEconomicsForCreate(
     accessToken: string,
     machineName: string | undefined,
+    location: string | undefined,
+    processGroup: string | undefined,
     explicit: { directOverheadRate?: number | null; indirectOverheadRate?: number | null; usdLhrTotal?: number | null },
   ) {
     const needsBenchmark = explicit.directOverheadRate == null || explicit.indirectOverheadRate == null || explicit.usdLhrTotal == null;
@@ -457,13 +470,24 @@ export class MHRService {
       ? await this.lookupMachineLibraryBenchmark(accessToken, machineName)
       : { direct: null, indirect: null, labor: null, sourceKey: null };
 
+    let laborValue: number | null = explicit.usdLhrTotal ?? null;
+    let laborSource: 'shop_override' | 'lhr_shop_avg' | 'lhr_benchmark' | null =
+      explicit.usdLhrTotal != null ? 'shop_override' : null;
+    if (laborValue == null && location && processGroup) {
+      const lhrResult = await this.lhrService.getEffectiveRate(location, processGroup, accessToken);
+      if (lhrResult.rateUsdPerHr != null) {
+        laborValue = lhrResult.rateUsdPerHr;
+        laborSource = lhrResult.source === 'shop_average' ? 'lhr_shop_avg' : 'lhr_benchmark';
+      }
+    }
+
     const resolved = resolveMachineEconomics({
       direct_overhead_rate: explicit.directOverheadRate ?? null,
       direct_overhead_source: explicit.directOverheadRate != null ? 'shop_override' : null,
       indirect_overhead_rate: explicit.indirectOverheadRate ?? null,
       indirect_overhead_source: explicit.indirectOverheadRate != null ? 'shop_override' : null,
-      usd_lhr_total: explicit.usdLhrTotal ?? null,
-      labor_rate_source: explicit.usdLhrTotal != null ? 'shop_override' : null,
+      usd_lhr_total: laborValue,
+      labor_rate_source: laborSource,
       benchmark_direct_overhead_rate_usd_hr: benchmark.direct,
       benchmark_indirect_overhead_rate_usd_hr: benchmark.indirect,
       benchmark_labor_rate_usd_hr: benchmark.labor,
@@ -504,13 +528,55 @@ export class MHRService {
       calculations = this.calculateMHR(createMHRDto);
     }
 
-    const economicsFields = await this.resolveEconomicsForCreate(accessToken, createMHRDto.machineName, {
-      directOverheadRate: createMHRDto.directOverheadRate,
-      indirectOverheadRate: createMHRDto.indirectOverheadRate,
-      usdLhrTotal: createMHRDto.usdLhrTotal,
-    });
+    const economicsFields = await this.resolveEconomicsForCreate(
+      accessToken,
+      createMHRDto.machineName,
+      createMHRDto.location,
+      createMHRDto.processGroup,
+      {
+        directOverheadRate: createMHRDto.directOverheadRate,
+        indirectOverheadRate: createMHRDto.indirectOverheadRate,
+        usdLhrTotal: createMHRDto.usdLhrTotal,
+      },
+    );
+
+    // No fabrication (2026-08-30): total_machine_hour_rate = Direct + Indirect
+    // OH, and there is no existing row to preserve on a brand-new create() —
+    // so if either component has no real value AND no benchmark data
+    // (economics-resolver.ts's 'no_rate' tier, value: null), silently
+    // treating it as 0 would persist a fabricated machine-hour rate. Refuse
+    // instead, with an actionable message, rather than writing a false number.
+    const resolvedDirectOverheadRate = economicsFields.direct_overhead_rate;
+    const resolvedIndirectOverheadRate = economicsFields.indirect_overhead_rate;
+    const missingOverhead: string[] = [];
+    if (resolvedDirectOverheadRate == null) missingOverhead.push('Direct Overhead Rate');
+    if (resolvedIndirectOverheadRate == null) missingOverhead.push('Indirect Overhead Rate');
+    if (missingOverhead.length > 0 || resolvedDirectOverheadRate == null || resolvedIndirectOverheadRate == null) {
+      throw new BadRequestException(
+        `No real value or industry benchmark data exists for: ${missingOverhead.join(' and ')}. ` +
+        `Enter the missing rate(s) manually, or use a machine name that matches real benchmark data — Machine Hour Rate cannot be created as a fabricated $0.`,
+      );
+    }
 
     const rates = await this.exchangeRateService.getSnapshot(accessToken);
+
+    // Canonical MHR (2026-08-27 decision): Machine Hour Rate = Total Overhead
+    // = Direct OH + Indirect OH, always. Direct/indirect are the sole
+    // authoritative MHR inputs — this overrides whatever the manual-entry/
+    // capex-engine branch above computed for totalMachineHourRate (their
+    // other breakdown fields — depreciation, interest, etc. — are left
+    // alone; only the headline total is canonical). Direct/indirect are
+    // USD-denominated (economics-resolver.ts) while total_machine_hour_rate
+    // is this record's LOCAL currency (computeUsdAndBurdenedRates multiplies
+    // it by usdPerLocal below), so the sum must be FX-converted here — never
+    // a raw same-number substitution, or a non-USD location's MHR would be
+    // wrong by the FX factor.
+    const { currency: createCurrency } = getCurrencyForLocation(createMHRDto.location);
+    const createUsdPerLocal = rates.convertStrict(createCurrency, 'USD');
+    // Both guaranteed non-null by the guard above — no `?? 0` fabrication.
+    const createTotalOhUsd = resolvedDirectOverheadRate + resolvedIndirectOverheadRate;
+    calculations.totalMachineHourRate = Math.round((createTotalOhUsd / createUsdPerLocal) * 100) / 100;
+
     const usdRates = this.computeUsdAndBurdenedRates(
       calculations.totalMachineHourRate,
       createMHRDto.location,
@@ -572,7 +638,11 @@ export class MHRService {
         admin_overhead_percentage: createMHRDto.adminOverheadPercentage,
         profit_margin_percentage: createMHRDto.profitMarginPercentage,
         is_manual_entry: createMHRDto.isManualEntry || false,
-        manual_mhr_value: createMHRDto.manualMHRValue || null,
+        // Kept in lockstep with total_machine_hour_rate (canonical Direct+
+        // Indirect OH) rather than whatever the caller submitted, so the two
+        // legacy fallback columns pickRate() can read never diverge from
+        // the authoritative figure.
+        manual_mhr_value: calculations.totalMachineHourRate || null,
         // India 2026 extended fields
         process_group: createMHRDto.processGroup || null,
         process_route: createMHRDto.processRoute || null,
@@ -722,7 +792,8 @@ export class MHRService {
     if (updateMHRDto.adminOverheadPercentage !== undefined) updateData.admin_overhead_percentage = updateMHRDto.adminOverheadPercentage;
     if (updateMHRDto.profitMarginPercentage !== undefined) updateData.profit_margin_percentage = updateMHRDto.profitMarginPercentage;
     if (updateMHRDto.isManualEntry !== undefined) updateData.is_manual_entry = updateMHRDto.isManualEntry;
-    if (updateMHRDto.manualMHRValue !== undefined) updateData.manual_mhr_value = updateMHRDto.manualMHRValue;
+    // manual_mhr_value is set later, unconditionally, from the canonical
+    // Direct+Indirect total — never taken directly from the DTO (see below).
     // India 2026 extended fields
     if (updateMHRDto.processGroup !== undefined) updateData.process_group = updateMHRDto.processGroup;
     if (updateMHRDto.processRoute !== undefined) updateData.process_route = updateMHRDto.processRoute;
@@ -805,6 +876,85 @@ export class MHRService {
     const effectiveLhrInr   = updateMHRDto.lhrInrPerHr ?? (existing as any).lhrInrPerHr ?? null;
     const effectiveUsdLhr   = updateMHRDto.usdLhrTotal ?? (existing as any).usdLhrTotal ?? null;
     const rates = await this.exchangeRateService.getSnapshot(accessToken);
+
+    // Canonical MHR (2026-08-27 decision): Machine Hour Rate = Total Overhead
+    // = Direct OH + Indirect OH, always — mirrors create()'s override above.
+    // `existing.directOverheadRate`/`indirectOverheadRate` are already
+    // resolved (real value OR benchmark), collapsing to `undefined` only for
+    // a true 'no_rate' (economics-resolver.ts) — so distinguishing
+    // "real/benchmark data on file" from "nothing on file at all" requires
+    // the *source* tag, not just the value. When this PATCH doesn't touch a
+    // field, the effective raw input for resolveMachineEconomics must be the
+    // ORIGINAL raw column (only equal to existing.directOverheadRate when
+    // its source was genuinely 'shop_override'/'imported' — a 'benchmark'-
+    // sourced existing value is a resolved number, not a raw one, and must
+    // be re-derived from benchmarkDirectOverheadRateUsdHr instead).
+    const isDirectRealExisting = existing.directOverheadSource === 'shop_override' || existing.directOverheadSource === 'imported';
+    const isIndirectRealExisting = existing.indirectOverheadSource === 'shop_override' || existing.indirectOverheadSource === 'imported';
+    const effectiveDirectRaw = updateMHRDto.directOverheadRate !== undefined
+      ? updateMHRDto.directOverheadRate ?? null
+      : (isDirectRealExisting ? existing.directOverheadRate ?? null : null);
+    const effectiveDirectSource = updateMHRDto.directOverheadRate !== undefined
+      ? (updateMHRDto.directOverheadRate != null ? 'shop_override' : null)
+      : (isDirectRealExisting ? existing.directOverheadSource : null);
+    const effectiveIndirectRaw = updateMHRDto.indirectOverheadRate !== undefined
+      ? updateMHRDto.indirectOverheadRate ?? null
+      : (isIndirectRealExisting ? existing.indirectOverheadRate ?? null : null);
+    const effectiveIndirectSource = updateMHRDto.indirectOverheadRate !== undefined
+      ? (updateMHRDto.indirectOverheadRate != null ? 'shop_override' : null)
+      : (isIndirectRealExisting ? existing.indirectOverheadSource : null);
+
+    const resolvedForTotal = resolveMachineEconomics({
+      direct_overhead_rate: effectiveDirectRaw,
+      direct_overhead_source: effectiveDirectSource,
+      indirect_overhead_rate: effectiveIndirectRaw,
+      indirect_overhead_source: effectiveIndirectSource,
+      usd_lhr_total: null,
+      labor_rate_source: null,
+      benchmark_direct_overhead_rate_usd_hr: (existing as any).benchmarkDirectOverheadRateUsdHr ?? null,
+      benchmark_indirect_overhead_rate_usd_hr: (existing as any).benchmarkIndirectOverheadRateUsdHr ?? null,
+      benchmark_labor_rate_usd_hr: null,
+    });
+
+    const existingTotalLocal = Number((existing as any).calculations?.totalMachineHourRate ?? 0);
+    // No fabrication (2026-08-30): EITHER component missing (economics-
+    // resolver.ts's 'no_rate' tier, value: null) means the total can't be
+    // truthfully computed — a partial zero-fill (real direct + fabricated-
+    // zero indirect) is exactly as dishonest as fabricating both.
+    const noRealOverheadDataAnywhere =
+      resolvedForTotal.directOverheadRate.value == null ||
+      resolvedForTotal.indirectOverheadRate.value == null;
+
+    if (noRealOverheadDataAnywhere && existingTotalLocal > 0) {
+      // Documented gap (e.g. the pre-2026-08-27 seed rows with a real,
+      // deliberately-entered MHR but no Direct/Indirect breakdown ever
+      // captured) — preserve the existing total rather than fabricating a
+      // breakdown or silently zeroing a real, currently-quoted rate. Real
+      // quote costing for this row is unaffected by this update.
+      calculations.totalMachineHourRate = existingTotalLocal;
+      this.logger.warn(
+        `MHR update ${id}: no Direct/Indirect overhead on file — preserving existing total_machine_hour_rate=${existingTotalLocal} instead of deriving $0`,
+        'MHRService',
+      );
+    } else if (noRealOverheadDataAnywhere) {
+      // No existing positive total to fall back on either — refuse rather
+      // than persist a fabricated $0 (this row's frontend already blocks
+      // this in the common case; this closes the gap for any other caller).
+      const missingOverhead: string[] = [];
+      if (resolvedForTotal.directOverheadRate.value == null) missingOverhead.push('Direct Overhead Rate');
+      if (resolvedForTotal.indirectOverheadRate.value == null) missingOverhead.push('Indirect Overhead Rate');
+      throw new BadRequestException(
+        `No real value or industry benchmark data exists for: ${missingOverhead.join(' and ')}. ` +
+        `Enter the missing rate(s) manually before saving — Machine Hour Rate cannot be updated to a fabricated $0.`,
+      );
+    } else {
+      const { currency: updCurrency } = getCurrencyForLocation(effectiveLocation);
+      const updUsdPerLocal = rates.convertStrict(updCurrency, 'USD');
+      // Both guaranteed non-null here (noRealOverheadDataAnywhere is false).
+      const totalOhUsd = resolvedForTotal.directOverheadRate.value! + resolvedForTotal.indirectOverheadRate.value!;
+      calculations.totalMachineHourRate = Math.round((totalOhUsd / updUsdPerLocal) * 100) / 100;
+    }
+
     const usdRates = this.computeUsdAndBurdenedRates(
       calculations.totalMachineHourRate,
       effectiveLocation,
@@ -820,6 +970,9 @@ export class MHRService {
 
     // Update calculated values
     updateData.total_machine_hour_rate = calculations.totalMachineHourRate;
+    // Kept in lockstep with total_machine_hour_rate — see create()'s
+    // identical rationale.
+    updateData.manual_mhr_value = calculations.totalMachineHourRate || null;
     updateData.total_fixed_cost_per_hour = calculations.totalFixedCostPerHour;
     updateData.total_variable_cost_per_hour = calculations.totalVariableCostPerHour;
     updateData.total_annual_cost = calculations.totalAnnualCost;
@@ -1739,12 +1892,17 @@ export class MHRService {
     return [...new Set(data?.map((r: any) => r.manufacturer_country).filter(Boolean) as string[])].sort();
   }
 
-  async getDistinctCurrencies(userId: string, accessToken: string): Promise<string[]> {
+  // Deliberately NOT scoped by user_id (matches getDistinctManufacturerCountries,
+  // and findAll's own unfiltered read) — most real mhr_records rows are global
+  // benchmark data (machine_library import) owned by a shared system identity,
+  // not the logged-in user. Scoping this to `user_id = userId` (the previous
+  // behavior) silently excluded every global location/currency from the filter
+  // dropdown, even though findAll's own table happily returns those same rows.
+  async getDistinctCurrencies(accessToken: string): Promise<string[]> {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('currency')
-      .eq('user_id', userId)
       .not('currency', 'is', null)
       .limit(20000);
 
@@ -1756,12 +1914,11 @@ export class MHRService {
     return [...new Set(data?.map((r: any) => r.currency).filter(Boolean) as string[])].sort();
   }
 
-  async getDistinctLocations(userId: string, accessToken: string): Promise<string[]> {
+  async getDistinctLocations(accessToken: string): Promise<string[]> {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('location')
-      .eq('user_id', userId)
       .not('location', 'is', null)
       .limit(20000);
 

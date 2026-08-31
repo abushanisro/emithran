@@ -6,10 +6,9 @@ import {
 } from "./default-rates";
 import type { MHRRateInput } from "./cost-engine";
 import type { ProcessLineCost } from "../dto/cost-breakdown.dto";
-import type { CapabilityCheck, PartGeometryForCapability } from "./machine-capability";
-import { checkMachineCapability } from "./machine-capability";
-import type { MachineCapability } from "./machine-selection/seed-registry";
-import type { ManufacturingProcessEngine, CuttingProcessContext, CuttingProcessResult, TurretParams } from "./manufacturing-process-engine";
+import type { CuttingProcessContext, CuttingProcessResult, TurretParams } from "./manufacturing-process-engine";
+import { r2, noRateFallback, computeDirectLaborCost } from "./engine-kernel";
+import { BaseCuttingEngine, buildCuttingProcessLine } from "./engine-orchestrator";
 
 export interface TurretPunchInput {
   sheetThicknessMm: number;
@@ -51,7 +50,7 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
   if (input.sheetThicknessMm === 0) warnings.push("Turret: thickness 0 — defaulting to 2.0 mm");
   if (thk > 6) warnings.push(`Turret: ${thk}mm exceeds typical turret punch range (≤6 mm)`);
 
-  const rate = input.turretRate ?? { rate: 0, source: "no_db_rate" as const, machineClass: "turret_punch", machineName: null, commodityCode: null };
+  const rate = input.turretRate ?? noRateFallback("turret_punch");
 
   if (!input.turretParams?.dataFound) {
     warnings.push("Turret: cycle-time params from fallback table — seed sm_lookup_turret_punch for this thickness");
@@ -78,41 +77,20 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
   }
   const setupMin = input.setupMin ?? TURRET_SETUP_MIN;
 
-  // Direct labour cost — one operator, same convention as every other
-  // secondary/setup-driven process in cost-engine.ts's eMithranTerms
-  // (setupNDL/cycleNDL: 1). Uses this process's own real, differentiated
-  // labour rate (rate.labourRate, resolved by resolveLHRRates/buildOutput in
-  // bom-items.service.ts from the 'Turret'/'Sheet Metal' process-group
-  // benchmark) — previously resolved but never actually charged here, so
-  // this line ran at machine-rate-only cost with $0 labour. null means no
-  // differentiated rate was resolved for this location; $0 labour is
-  // disclosed, never guessed.
-  if (rate.labourRate == null) {
-    warnings.push("Turret: no direct labor rate resolved for this process — labor cost excluded from quote");
-  }
-  const dlrMin = (rate.labourRate ?? 0) / 60;
-  const setupCost = r2((setupMin / 60) * rate.rate / Math.max(input.batchSize, 1) + dlrMin * setupMin / Math.max(input.batchSize, 1));
-  const runCost = r2((totalSec / 3600) * rate.rate + dlrMin * cuttingMin);
+  const labor = computeDirectLaborCost(rate, setupMin, cuttingMin, input.batchSize, "Turret", warnings);
+  const setupCost = (setupMin / 60) * rate.rate / Math.max(input.batchSize, 1) + labor.setupLaborCost;
+  const runCost = (totalSec / 3600) * rate.rate + labor.runLaborCost;
 
   const processLines: ProcessLineCost[] = [
-    {
+    buildCuttingProcessLine({
       process: "Turret Punching",
-      ...(input.processIdentity ? {
-        processGroup: input.processIdentity.processGroup,
-        processRoute: input.processIdentity.processRoute,
-        operation: input.processIdentity.operation,
-      } : {}),
+      processIdentity: input.processIdentity,
       setupCost,
       runCost,
-      totalCost: r2(setupCost + runCost),
-      cycleTimeMin: r2(cuttingMin),
-      hourlyRate: rate.rate,
-      rateSource: rate.source,
-      machineClass: rate.machineClass,
-      machineName: rate.machineName,
-      commodityCode: rate.commodityCode,
-      labourRate: rate.labourRate ?? null,
-    },
+      cycleTimeMin: cuttingMin,
+      rate,
+      extra: { labourRate: rate.labourRate ?? null },
+    }),
   ];
 
   // Real material-handling allowance by part weight — see migration 530
@@ -153,24 +131,11 @@ function nearestVal(mm: number, table: Record<number, number>): number {
   return table[best];
 }
 
-function r2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
 // Thin ManufacturingProcessEngine wrapper around the real formula above —
 // registered in manufacturing-process-registry.ts.
-export class TurretPunchEngine implements ManufacturingProcessEngine {
+export class TurretPunchEngine extends BaseCuttingEngine {
   readonly machineClass = 'turret_punch';
   readonly processFamily = 'sheet_metal_cutting';
-
-  checkCapability(
-    geometry: PartGeometryForCapability,
-    commodityCode: string | null,
-    realCapability?: MachineCapability | null,
-    capabilitySource?: "imported" | "seed" | "default_class",
-  ): CapabilityCheck {
-    return checkMachineCapability(this.machineClass, commodityCode, geometry, realCapability, capabilitySource);
-  }
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     const result = computeTurretPunchCost({

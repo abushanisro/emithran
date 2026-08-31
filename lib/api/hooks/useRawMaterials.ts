@@ -66,6 +66,11 @@ export interface RawMaterial {
   elongationPct?: number;
   electricalConductivityIacsPct?: number;
   thermalConductivityWMk?: number;
+  strengthCoeffKMpa?: number;
+  strainHardeningExponentN?: number;
+  lankfordCoefficientR?: number;
+  millingSpeedMMin?: number;
+  scrapFactor?: number;
 
   // Plastic-specific properties
   regrinding?: string;
@@ -132,6 +137,11 @@ export interface CreateRawMaterialData {
   din_standard?: string;
   en_standard?: string;
   jis_standard?: string;
+  strengthCoeffKMpa?: number;
+  strainHardeningExponentN?: number;
+  lankfordCoefficientR?: number;
+  millingSpeedMMin?: number;
+  scrapFactor?: number;
 }
 
 export interface UpdateRawMaterialData extends Partial<CreateRawMaterialData> {}

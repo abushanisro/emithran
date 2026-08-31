@@ -214,6 +214,34 @@ export class CreateRawMaterialDto {
   @Min(0)
   hardness?: number;
 
+  @ApiPropertyOptional({ example: 341.1, description: 'Strength coefficient K (MPa) in sigma = K * epsilon^n' })
+  @IsOptional()
+  @IsNumber()
+  strengthCoeffKMpa?: number;
+
+  @ApiPropertyOptional({ example: 0.21, description: 'Strain-hardening exponent n in sigma = K * epsilon^n' })
+  @IsOptional()
+  @IsNumber()
+  strainHardeningExponentN?: number;
+
+  @ApiPropertyOptional({ example: 0.71, description: 'Lankford (normal anisotropy) coefficient R' })
+  @IsOptional()
+  @IsNumber()
+  lankfordCoefficientR?: number;
+
+  @ApiPropertyOptional({ example: 12.5, description: 'Recommended milling cutting speed (m/min), where sourced' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  millingSpeedMMin?: number;
+
+  @ApiPropertyOptional({ example: 0.09, description: 'Scrap/yield-loss fraction (0-1)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  scrapFactor?: number;
+
   @ApiPropertyOptional({ example: 'Brinell', description: 'Brinell, Rockwell, Vickers, Shore' })
   @IsOptional()
   @IsString()

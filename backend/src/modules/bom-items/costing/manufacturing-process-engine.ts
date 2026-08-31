@@ -27,6 +27,16 @@ export interface TurretParams {
   dataFound: boolean;
 }
 
+// Real material-family cutting speed for 2-Axis Router, resolved by the
+// caller from sm_lookup_router_cut (Track B Phase 2, tblRouterUtilities.json)
+// via SheetMetalLookupService.getRouterParams(). Only Aluminum/Copper have
+// real data in the source — dataFound:false for anything else is a genuine,
+// disclosed gap, not a guess.
+export interface RouterParams {
+  cuttingSpeedMmPerMin: number;
+  dataFound: boolean;
+}
+
 // Shared input every registered engine's computeCost() receives. Individual
 // engines read only the fields their real formula actually needs (e.g. only
 // WaterjetEngine reads abrasivePricePerKg/waterjetParams) — unused fields are
@@ -47,6 +57,7 @@ export interface CuttingProcessContext {
   abrasivePricePerKg?: number;
   waterjetParams?: WaterjetParams | null;
   turretParams?: TurretParams | null;
+  routerParams?: RouterParams | null;
   // Manufacturing Physics Calculator architecture: pre-resolved by the caller
   // via resolvePhysicsQuantity (bom-items.service.ts) for the engine whose
   // machineClass has a registered calculator (Laser Cutting today). Engines

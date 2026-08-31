@@ -6,10 +6,9 @@ import {
 } from "./default-rates";
 import type { MHRRateInput } from "./cost-engine";
 import type { ProcessLineCost } from "../dto/cost-breakdown.dto";
-import type { CapabilityCheck, PartGeometryForCapability } from "./machine-capability";
-import { checkMachineCapability } from "./machine-capability";
-import type { MachineCapability } from "./machine-selection/seed-registry";
-import type { ManufacturingProcessEngine, CuttingProcessContext, CuttingProcessResult } from "./manufacturing-process-engine";
+import type { CuttingProcessContext, CuttingProcessResult } from "./manufacturing-process-engine";
+import { r2, noRateFallback, computeDirectLaborCost } from "./engine-kernel";
+import { BaseCuttingEngine, buildCuttingProcessLine } from "./engine-orchestrator";
 
 export interface WaterjetInput {
   sheetThicknessMm: number;
@@ -68,7 +67,7 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
   const warnings: string[] = [];
   if (input.sheetThicknessMm === 0) warnings.push("Waterjet: thickness 0 — cutting speed lookup cannot resolve without a real thickness");
 
-  const rate = input.waterjetRate ?? { rate: 0, source: "no_db_rate" as const, machineClass: "waterjet", machineName: null, commodityCode: null };
+  const rate = input.waterjetRate ?? noRateFallback("waterjet");
 
   // No hardcoded speed/pierce-time table here — see WaterjetInput's doc comment.
   // Missing real data means an honest $0/0-sec cutting line, not a guess.
@@ -107,41 +106,20 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
   }
   const setupMin = input.setupMin ?? WATERJET_SETUP_MIN;
 
-  // Direct labour cost — one operator, same convention as every other
-  // secondary/setup-driven process in cost-engine.ts's eMithranTerms
-  // (setupNDL/cycleNDL: 1). Uses this process's own real, differentiated
-  // labour rate (rate.labourRate, resolved by resolveLHRRates/buildOutput in
-  // bom-items.service.ts from the 'Waterjet'/'Sheet Metal' process-group
-  // benchmark) — previously resolved but never actually charged here, so
-  // this line ran at machine-rate-only cost with $0 labour. null means no
-  // differentiated rate was resolved for this location; $0 labour is
-  // disclosed, never guessed.
-  if (rate.labourRate == null) {
-    warnings.push("Waterjet: no direct labor rate resolved for this process — labor cost excluded from quote");
-  }
-  const dlrMin = (rate.labourRate ?? 0) / 60;
-  const setupCost = r2((setupMin / 60) * rate.rate / Math.max(input.batchSize, 1) + dlrMin * setupMin / Math.max(input.batchSize, 1));
-  const runCost = r2((totalSec / 3600) * rate.rate + dlrMin * cuttingMin);
+  const labor = computeDirectLaborCost(rate, setupMin, cuttingMin, input.batchSize, "Waterjet", warnings);
+  const setupCost = (setupMin / 60) * rate.rate / Math.max(input.batchSize, 1) + labor.setupLaborCost;
+  const runCost = (totalSec / 3600) * rate.rate + labor.runLaborCost;
 
   const processLines: ProcessLineCost[] = [
-    {
+    buildCuttingProcessLine({
       process: "Waterjet Cutting",
-      ...(input.processIdentity ? {
-        processGroup: input.processIdentity.processGroup,
-        processRoute: input.processIdentity.processRoute,
-        operation: input.processIdentity.operation,
-      } : {}),
+      processIdentity: input.processIdentity,
       setupCost,
       runCost,
-      totalCost: r2(setupCost + runCost),
-      cycleTimeMin: r2(cuttingMin),
-      hourlyRate: rate.rate,
-      rateSource: rate.source,
-      machineClass: rate.machineClass,
-      machineName: rate.machineName,
-      commodityCode: rate.commodityCode,
-      labourRate: rate.labourRate ?? null,
-    },
+      cycleTimeMin: cuttingMin,
+      rate,
+      extra: { labourRate: rate.labourRate ?? null },
+    }),
   ];
 
   // Real nozzle-wear cost, charged only for active cutting time (same basis
@@ -175,18 +153,9 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
 
 // Thin ManufacturingProcessEngine wrapper around the real formula above —
 // registered in manufacturing-process-registry.ts.
-export class WaterjetEngine implements ManufacturingProcessEngine {
+export class WaterjetEngine extends BaseCuttingEngine {
   readonly machineClass = 'waterjet';
   readonly processFamily = 'sheet_metal_cutting';
-
-  checkCapability(
-    geometry: PartGeometryForCapability,
-    commodityCode: string | null,
-    realCapability?: MachineCapability | null,
-    capabilitySource?: "imported" | "seed" | "default_class",
-  ): CapabilityCheck {
-    return checkMachineCapability(this.machineClass, commodityCode, geometry, realCapability, capabilitySource);
-  }
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     return computeWaterjetCost({
@@ -206,8 +175,4 @@ export class WaterjetEngine implements ManufacturingProcessEngine {
       } : {}),
     });
   }
-}
-
-function r2(n: number): number {
-  return Math.round(n * 100) / 100;
 }

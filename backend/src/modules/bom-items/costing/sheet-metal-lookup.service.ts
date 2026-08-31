@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import type { LookupResolution, LookupQueryParam, LookupTableRow } from '../dto/cost-breakdown.dto';
+import { classifyLaserMaterial } from './machine-selection/physics';
 
 // No fallback constants in this file. Every lookup below returns
 // `dataFound: false` (with a neutral 0/empty value that is never priced —
@@ -45,7 +46,19 @@ export function resolveNearestStandardTonnageClass(tonnage: number): { tonnage: 
     (best, c) => Math.abs(c - tonnage) < Math.abs(best - tonnage) ? c : best,
     STANDARD_PRESS_BRAKE_TONNAGE_CLASSES[0],
   );
-  const withinTolerance = Math.abs(nearestClass - tonnage) / tonnage <= 0.1;
+  // Root-caused live 2026-08-31: real USA "11010 (Heller-hydraulic)" bend
+  // brake is 1096kN -> 111.76t (SI conversion, machine_library.json's own
+  // press_force_kn), 10.52% from its clearly-intended 100T class — just over
+  // the previous 10% cutoff, so it fell through to "no data" for every real
+  // part instead of using the real 100T stroke-time curve. Checked the FULL
+  // real Bend Press Brake category (16 machines) before widening: there is a
+  // clean, evidenced gap between machines clearly meant to fit a class
+  // (≤10.85% away — e.g. this Heller unit, and "HG-2204 (Amada)" at 1843.4kN
+  // aka 224.34t/10.85% from 200T, same bug) and genuinely different-sized
+  // real machines (13.15%+ away — e.g. "HG-1303 (Amada)"/"SPH-60C (Amada)")
+  // that must NOT be force-matched to a distant class. 11% captures exactly
+  // the first group, unchanged for everything else.
+  const withinTolerance = Math.abs(nearestClass - tonnage) / tonnage <= 0.11;
   return withinTolerance && nearestClass !== tonnage
     ? { tonnage: nearestClass, roundedFrom: tonnage }
     : { tonnage, roundedFrom: null };
@@ -85,6 +98,25 @@ export interface WaterjetCutParams {
   kerfMm: number;
   dataFound: boolean;
 }
+
+export interface RouterCutParams {
+  cuttingSpeedMmPerMin: number;
+  dataFound: boolean;
+}
+
+// Real material-family -> sm_lookup_router_cut key mapping. Deliberately NOT
+// normaliseLaserMaterial() below (which speaks a different vocabulary:
+// 'Aluminium'/'Stainless Steel'/'Brass'/'Carbon Steel', with no distinct
+// Copper bucket) — the router table's real source, tblRouterUtilities.json,
+// only ever has 'Aluminum'/'Copper' rows (American spelling, no Steel/
+// Stainless data of any kind), so classifyLaserMaterial()'s AL/CU tokens map
+// onto it directly and honestly. MS/SS/OTHER get no key at all — a genuine,
+// disclosed gap in the source data, not a guess forced into a table that
+// doesn't have it.
+const ROUTER_FAMILY_KEY: Partial<Record<ReturnType<typeof classifyLaserMaterial>, string>> = {
+  AL: 'Aluminum',
+  CU: 'Copper',
+};
 
 // No fallback constants for waterjet: unlike laser (which had years of prior
 // hardcoded defaults to migrate from), there is no pre-existing waterjet
@@ -218,6 +250,35 @@ export class SheetMetalLookupService {
       cuttingSpeedMmPerMin: Number(row.cutting_speed_mm_per_min),
       pierceTimeMin: Number(row.pierce_time_sec) / 60,
       kerfMm: Number(row.kerf_mm),
+      dataFound: true,
+    };
+  }
+
+  // ── 2-Axis Router cutting params (Track B Phase 2, tblRouterUtilities.json) ──
+  // Real data covers only Aluminum/Copper — see ROUTER_FAMILY_KEY's own
+  // comment. Multiple tool_diameter_mm rows exist per material family, all
+  // sharing the same real cutting_speed_m_per_min value in the source data;
+  // ordering by tool_diameter_mm and taking the first is deterministic (never
+  // an arbitrary/unordered pick) even though the diameter itself doesn't
+  // currently change the result.
+  async getRouterParams(grade: string | null | undefined): Promise<RouterCutParams> {
+    const noData: RouterCutParams = { cuttingSpeedMmPerMin: 0, dataFound: false };
+    const familyKey = ROUTER_FAMILY_KEY[classifyLaserMaterial(grade ?? null)];
+    if (!familyKey) return noData;
+
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_lookup_router_cut')
+      .select('cutting_speed_m_per_min')
+      .eq('material_family', familyKey)
+      .order('tool_diameter_mm', { ascending: true })
+      .limit(1);
+
+    if (error || !data?.length || data[0].cutting_speed_m_per_min == null) {
+      return noData;
+    }
+    return {
+      cuttingSpeedMmPerMin: Number(data[0].cutting_speed_m_per_min) * 1000, // m/min -> mm/min
       dataFound: true,
     };
   }

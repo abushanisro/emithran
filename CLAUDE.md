@@ -6,7 +6,9 @@ eMithran is developed manufacturing-domain by manufacturing-domain, one at a tim
 
 **Current priority: Sheet Metal.**
 
-The Sheet Metal domain must reach production readiness before work begins on the next manufacturing domain (Machining, then Injection Molding, in that order).
+The Sheet Metal domain must reach production readiness before *new* work begins on the next manufacturing domain (Machining, then Injection Molding, in that order).
+
+**Correction (2026-08-29):** this "hasn't started" framing was stale. Real, tested, live-wired costing engines already exist for both later domains — `cost-cnc-engine.ts` (Machining/CNC, 43 tests) and `cost-injection-molding-engine.ts` + its `injection-molding/` subfolder (`process-tree.ts`, `routing-engine.ts`, `cycle-time.ts`, `machine-selector-im.ts` — already through its own internal "Phase 4" with real physics models: Menges cooling, flow-length fill, gate-freeze pack). Both are wired into `bom-items.service.ts` and share Sheet Metal's exact same kernel/output shape (`MHRRateInput`, `computeSustainability`, `CostSummaryDto`, `ProcessLineCost` from `cost-engine.ts`) and the same "route first, cost the route" pattern. Raw reference data for both domains is also already staged on disk (`memory/machining/`, `memory/Injection/`), ahead of this file's stated sequencing. The priority ordering above still holds for *deliberate, dedicated* domain buildout and freezing — but do not assume "Machining/Injection Molding" means empty/unbuilt when touching shared kernel code (`cost-engine.ts`, `default-rates.ts`, DTOs) — changes there affect three live domains, not one.
 
 Production readiness means the full pipeline works **dynamically** across the domain's real scenarios, not through hard-coded per-scenario paths:
 
