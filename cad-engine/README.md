@@ -22,6 +22,12 @@ Professional STEP to STL conversion service using OpenCascade Technology (OCCT).
 - ✅ Parallel mesh processing
 - ✅ Comprehensive logging
 - ✅ Automatic temp file cleanup
+- ✅ Manufacturing feature extraction (Sheet Metal, Injection Molding, CNC/Machining) —
+  see [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the domain-folder layout
+  (`sheet_metal/`, `injection_molding/`, `machining/`, `shared/`) and the
+  verified cross-domain dependency graph
+- ✅ 2D drawing/PDF title-block analysis (`drawing_analyzer.py`)
+- ✅ Real-polygon 2D nesting for the Nest View feature (`sheet_metal/nesting.py`)
 
 ## API Endpoints
 

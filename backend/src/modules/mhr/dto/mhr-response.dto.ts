@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { resolveMachineEconomics } from '../../bom-items/costing/machine-selection/economics-resolver';
+import { resolveMachineEconomics } from '../../bom-items/costing/shared/capability/machine-selection/economics-resolver';
 
 export class MHRCalculationResult {
   // Working Hours Calculations

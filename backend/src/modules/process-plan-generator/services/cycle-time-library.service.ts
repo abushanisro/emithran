@@ -4,7 +4,7 @@ import {
   LASER_SPEED_MM_PER_MIN,
   LASER_PIERCE_SEC,
   PRESS_BRAKE_SEC_PER_BEND,
-} from '../../bom-items/costing/default-rates';
+} from '../../bom-items/costing/shared/core/default-rates.constants';
 
 /**
  * Loads process cycle-time parameters from `process_cycle_time_library` once on

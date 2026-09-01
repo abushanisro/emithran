@@ -1,7 +1,7 @@
 import {
   computeTapPhysics, TAP_UNLOAD_SEC,
   computeDeburrCycleSec, DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
-} from '../bom-items/costing/default-rates';
+} from '../bom-items/costing/shared/core/default-rates.constants';
 
 /**
  * Physics-backed calculator execution — see backend/migrations/056 and

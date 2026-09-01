@@ -15,15 +15,6 @@ export class SupabaseService {
     this.supabaseAnonKey = this.configService.get<string>('SUPABASE_ANON_KEY') || '';
     this.supabaseServiceKey = this.configService.get<string>('SUPABASE_SERVICE_KEY') || '';
 
-    console.log('🔍 Supabase Configuration Check:', {
-      hasUrl: !!this.supabaseUrl,
-      hasAnonKey: !!this.supabaseAnonKey,
-      hasServiceKey: !!this.supabaseServiceKey,
-      url: this.supabaseUrl,
-      anonKeyLength: this.supabaseAnonKey.length,
-      serviceKeyLength: this.supabaseServiceKey.length
-    });
-
     if (!this.supabaseUrl || !this.supabaseAnonKey || !this.supabaseServiceKey) {
       console.error('❌ Supabase Configuration Missing - cannot create admin client');
       return;
@@ -37,7 +28,6 @@ export class SupabaseService {
           persistSession: false,
         },
       });
-      console.log('✅ Supabase admin client created successfully');
     } catch (error) {
       console.error('❌ Failed to create Supabase admin client:', error);
     }

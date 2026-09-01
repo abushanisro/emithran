@@ -18,4 +18,4 @@ export type {
   SustainabilitySummaryDto,
 } from '../modules/bom-items/dto/cost-breakdown.dto';
 
-export type { MHRRateInput, LhrRateSource } from '../modules/bom-items/costing/cost-engine';
+export type { MHRRateInput, LhrRateSource } from '../modules/bom-items/costing/shared/core/cost-engine';

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { resolveInspectionRule } from '../../bom-items/costing/gdt-severity';
-import type { InspectionMethod, InspectionRuleRow } from '../../bom-items/costing/gdt-severity';
+import { resolveInspectionRule } from '../../bom-items/costing/shared/physics/gdt-severity';
+import type { InspectionMethod, InspectionRuleRow } from '../../bom-items/costing/shared/physics/gdt-severity';
 import type { EngineeringBrief } from '../dto/engineering-brief.dto';
 import type {
   ManufacturingFeature,

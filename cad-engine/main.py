@@ -34,18 +34,18 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import uvicorn
 
-from config import AppConfig
-from services import StepReader, ShapeMesher, StlWriter, ConversionService
-from validators import FileValidator
-from memory_optimizer import AdvancedCADMemoryOptimizer
-from exceptions import (
+from shared.config import AppConfig
+from shared.services import StepReader, ShapeMesher, StlWriter, ConversionService
+from shared.validators import FileValidator
+from shared.memory_optimizer import AdvancedCADMemoryOptimizer
+from shared.exceptions import (
     CADEngineException,
     FileValidationError,
     ConversionError
 )
-import sldprt_converter
+from shared import sldprt_converter
 from copilot.router import router as copilot_router
-from drawing_analyzer import router as drawing_router
+from shared.drawing_analyzer import router as drawing_router
 
 # ============================================================================
 # CONFIGURATION & LOGGING
@@ -616,7 +616,7 @@ async def analyze_geometry_advanced(
                 )
                 detected_family = mfg_intel.get("detected_family", "")
                 if detected_family in ("cnc_turned", "mill_turn", "cnc_milled"):
-                    from cnc_feature_recognizer import CNCFeatureRecognizer  # type: ignore
+                    from machining.cnc_feature_recognizer import CNCFeatureRecognizer  # type: ignore
                     cnc_features_result = CNCFeatureRecognizer().recognize(shape, detected_family).to_dict()
                     # Embed face_map so the frontend can resolve face_ids → STL triangle ranges.
                     # For sheet_metal this lives in feature_graph_v2.metadata.face_map; for CNC we
@@ -631,7 +631,7 @@ async def analyze_geometry_advanced(
                         f"face_map_entries={len(_face_map)}"
                     )
                     try:
-                        from cnc_feature_recognizer import build_feature_graph_v2_from_cnc, _part_bounding_box  # type: ignore
+                        from machining.cnc_feature_recognizer import build_feature_graph_v2_from_cnc, _part_bounding_box  # type: ignore
                         _bbox_raw = _part_bounding_box(shape)
                         _bcx = (_bbox_raw["xmin"] + _bbox_raw["xmax"]) / 2
                         _bcy = (_bbox_raw["ymin"] + _bbox_raw["ymax"]) / 2
@@ -699,7 +699,7 @@ async def analyze_geometry_advanced(
             # The thread pool keeps the async event loop responsive so concurrent
             # requests (e.g. route-comparison, cost-summary) are not blocked.
             try:
-                from feature_extractors import ComponentFeatureAnalyzer  # type: ignore
+                from shared.component_feature_analyzer import ComponentFeatureAnalyzer  # type: ignore
                 _gh = optimization_result.geometry_hash
 
                 # Layer 1: in-memory (hot path — same process, any previous call).
@@ -799,7 +799,7 @@ async def nest_true_shape(
     parameters, not CAD-static ones -- recomputing here is cheap and never
     needs the original file.
     """
-    import nesting
+    from sheet_metal import nesting
 
     logger.info(
         f"[nest] request: outline_points={len(body.outline_points_mm)} holes={len(body.holes_mm)} "

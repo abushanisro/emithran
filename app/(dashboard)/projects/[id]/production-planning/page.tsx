@@ -15,7 +15,6 @@ import { useProductionLots, useProductionDashboard } from '@/lib/api/hooks/usePr
 import { useProject } from '@/lib/api/hooks/useProjects';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import Link from 'next/link';
-import { usePageContext } from '@/lib/echo/PageContextProvider';
 
 interface ProductionLot {
   id: string;
@@ -29,11 +28,6 @@ interface ProductionLot {
 
 export default function ProjectProductionPlanningPage() {
   const params = useParams();
-  usePageContext({
-    entityType: 'project',
-    entityId: (params?.id as string) ?? '',
-    breadcrumbs: ['Project', 'Production planning'],
-  });
   const projectId = params.id as string;
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);

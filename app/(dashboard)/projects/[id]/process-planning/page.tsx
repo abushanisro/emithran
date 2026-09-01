@@ -30,7 +30,6 @@ if (typeof window !== 'undefined') {
   }
 }
 import { BOMSelectionCard } from '@/components/features/process-planning/BOMSelectionCard';
-import { usePageContext } from '@/lib/echo/PageContextProvider';
 import { RawMaterialsSection } from '@/components/features/process-planning/RawMaterialsSection';
 import { ToolingSection } from '@/components/features/process-planning/ToolingSection';
 import { ManufacturingProcessSection } from '@/components/features/process-planning/ManufacturingProcessSection';
@@ -390,11 +389,6 @@ function ProcessPlanningPageContent() {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
 
-  usePageContext({
-    entityType: 'project',
-    entityId: projectId,
-    breadcrumbs: ['Project', 'Process planning'],
-  });
   const [selectedBomId, setSelectedBomId] = useState<string>('');
   const [selectedPartNumber, setSelectedPartNumber] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');

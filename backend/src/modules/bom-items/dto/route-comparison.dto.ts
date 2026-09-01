@@ -1,5 +1,5 @@
 import type { ProcessLineCost, RouteResultSustainability } from "./cost-breakdown.dto";
-import type { CapabilityReasonCode } from "../costing/machine-capability";
+import type { CapabilityReasonCode } from '../costing/shared/capability/machine-capability';
 
 // Was a closed string-literal union of exactly the route ids known at the
 // time (3 sheet-metal-cutting + CNC/injection-molding families). Widened to

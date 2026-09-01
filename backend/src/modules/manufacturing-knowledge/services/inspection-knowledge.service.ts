@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
-import type { InspectionRuleRow } from '../../bom-items/costing/gdt-severity';
-import type { InspectionStagePolicy } from '../../bom-items/costing/default-rates';
+import type { InspectionRuleRow } from '../../bom-items/costing/shared/physics/gdt-severity';
+import type { InspectionStagePolicy } from '../../bom-items/costing/shared/core/default-rates.constants';
 
 /**
  * Inspection knowledge — DB-backed rules and quality plans (Layer-1 data layer).

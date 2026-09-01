@@ -16,7 +16,7 @@
  */
 
 import { PROCESS_COST_CONSTANTS } from '../constants/process-cost-calculation.constants';
-import { eMithranTerms } from '../../bom-items/costing/cost-engine';
+import { eMithranTerms } from '../../bom-items/costing/shared/core/cost-engine';
 
 /**
  * Input parameters for process cost calculation

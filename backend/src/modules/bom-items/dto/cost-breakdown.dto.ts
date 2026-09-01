@@ -468,7 +468,7 @@ export interface CostSummaryDto {
   // Routed process tree (injection molding today; other families as their
   // routing engines migrate to the tree structure). Each operation carries the
   // rule that selected it — the route's audit trail, line by line.
-  processTree?: import('../costing/injection-molding/process-tree').IMProcessTree;
+  processTree?: import('../costing/injection-molding/process/process-tree').IMProcessTree;
 
   // Injection-molding-specific piece-cost breakdown (separate from tooling).
   // Present only when family === 'injection_molded'.

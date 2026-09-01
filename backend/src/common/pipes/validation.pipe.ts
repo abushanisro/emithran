@@ -17,8 +17,6 @@ export class CustomValidationPipe extends NestValidationPipe implements PipeTran
       stopAtFirstError: false,
       exceptionFactory: (errors: ValidationError[]) => {
         const formattedErrors = this.formatValidationErrors(errors);
-        console.log('🚨 Validation errors:', formattedErrors);
-        console.log('🚨 Raw validation errors:', JSON.stringify(errors, null, 2));
         return new BadRequestException({
           message: formattedErrors,
           error: 'Validation Failed',

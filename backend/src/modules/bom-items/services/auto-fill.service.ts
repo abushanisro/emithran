@@ -25,8 +25,8 @@ import {
   LASER_PIERCE_SEC,
   PRESS_BRAKE_SEC_PER_BEND,
   laserSpeedFactor,
-} from '../costing/default-rates';
-import { computeCycleTime } from '../costing/injection-molding/cycle-time';
+} from '../costing/shared/core/default-rates.constants';
+import { computeCycleTime } from '../costing/injection-molding/process/cycle-time';
 
 export interface RawGeometry {
   volume: number;

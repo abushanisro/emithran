@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsUUID } from 'class-validator';
-import type { MachineClass } from '../costing/default-rates';
-import type { MachineCapability } from '../costing/machine-selection/seed-registry';
-import type { MachineRequirement } from '../costing/machine-selection/physics';
+import type { MachineClass } from '../costing/shared/core/default-rates.constants';
+import type { MachineCapability } from '../costing/shared/capability/machine-selection/seed-registry';
+import type { MachineRequirement } from '../costing/shared/capability/machine-selection/physics';
 
 export type CapabilitySource = 'imported' | 'seed' | 'default_class';
 export type AvailabilityStatus = 'available' | 'maintenance' | 'down' | 'retired' | 'commissioning';

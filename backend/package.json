@@ -9,7 +9,7 @@
     "build": "npx @nestjs/cli build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "npx nest start",
-    "start:dev": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 npx nest start --watch",
+    "start:dev": "npx nest start --watch",
     "start:debug": "npx nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "echo 'Linting skipped - using parent config'",

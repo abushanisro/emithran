@@ -48,9 +48,13 @@ Before adopting any "modern OCC" naming advice from an external source, verify t
 symbol imports in `cad-env`/`mithran` first — the confident tone of a suggestion is not
 evidence it matches this specific binding.
 
-**Fixed in this repo:** `cad-engine/memory_optimizer.py` (imports + all 9 call sites: lines
-originally 313/321/387/790/992/1000/1008/1016 pre-fix). `cad-engine/feature_extractors.py`
-already used the correct lowercase-namespace pattern before this fix and needed no change.
+**Fixed in this repo:** `cad-engine/shared/memory_optimizer.py` (imports + all 9 call sites:
+lines originally 313/321/387/790/992/1000/1008/1016 pre-fix, before the 2026-09-01 domain
+split moved this file to `shared/` and renumbered it — see `cad-engine/ARCHITECTURE.md`).
+`SheetMetalFeatureExtractor`/`InjectionMoldedFeatureExtractor` (former `feature_extractors.py`,
+now split into `cad-engine/sheet_metal/feature_extractor.py` and
+`cad-engine/injection_molding/feature_extractor.py`) already used the correct
+lowercase-namespace pattern before this fix and needed no change.
 
 ## 2. Exception handling around untrusted STEP-derived geometry
 

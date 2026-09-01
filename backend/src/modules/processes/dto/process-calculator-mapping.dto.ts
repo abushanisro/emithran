@@ -8,17 +8,17 @@ import { IsOptionalBoolean } from '../../../common/decorators/validation.decorat
 // ============================================================================
 
 export class CreateProcessCalculatorMappingDto {
-  @ApiProperty({ example: 'Plastic & Rubber' })
+  @ApiProperty({ example: 'Injection Molding' })
   @IsString()
-  processGroup: string;
+  processGroup!: string;
 
   @ApiProperty({ example: 'Injection Molding' })
   @IsString()
-  processRoute: string;
+  processRoute!: string;
 
   @ApiProperty({ example: 'Injection Molding-Cold Runner' })
   @IsString()
-  operation: string;
+  operation!: string;
 
   @ApiPropertyOptional({ example: 'uuid-here' })
   @IsOptional()
@@ -45,7 +45,7 @@ export class CreateProcessCalculatorMappingDto {
 export class UpdateProcessCalculatorMappingDto extends PartialType(CreateProcessCalculatorMappingDto) {}
 
 export class QueryProcessCalculatorMappingsDto {
-  @ApiPropertyOptional({ example: 'Plastic & Rubber' })
+  @ApiPropertyOptional({ example: 'Injection Molding' })
   @IsOptional()
   @IsString()
   processGroup?: string;
@@ -89,18 +89,36 @@ export class QueryProcessCalculatorMappingsDto {
   limit?: number;
 }
 
+// Real cross-domain taxonomy data (process_taxonomy, migration 609) for the
+// operation this mapping row's canonical_process_id (migration 610) links
+// to — real feature-type-granular operations, aliases, and default
+// machine/tool-shop, sourced from process_operations.json/
+// process_machine_data.json (Sheet Metal), the Injection Molding
+// digital-factory file, and Machining's operations_full.json. Absent
+// (mapping.taxonomy undefined) for rows with no canonical link at all;
+// operations/aliases are empty arrays (not absent) for a linked row that
+// genuinely has none of either — an honest "no further detail available",
+// never fabricated.
+export interface ProcessTaxonomyHint {
+  defaultMachineName: string | null;
+  defaultToolShopName: string | null;
+  roadmapStatus: string;
+  aliases: string[];
+  operations: { operationCategory: string | null; featureType: string | null; raw: string }[];
+}
+
 export class ProcessCalculatorMappingResponseDto {
   @ApiProperty()
-  id: string;
+  id!: string;
 
   @ApiProperty()
-  processGroup: string;
+  processGroup!: string;
 
   @ApiProperty()
-  processRoute: string;
+  processRoute!: string;
 
   @ApiProperty()
-  operation: string;
+  operation!: string;
 
   @ApiPropertyOptional()
   machineClass?: string;
@@ -115,26 +133,31 @@ export class ProcessCalculatorMappingResponseDto {
   calculatorName?: string;
 
   @ApiProperty()
-  isActive: boolean;
+  isActive!: boolean;
 
   @ApiProperty()
-  displayOrder: number;
+  displayOrder!: number;
 
   @ApiProperty()
-  createdAt: string;
+  createdAt!: string;
 
   @ApiProperty()
-  updatedAt: string;
+  updatedAt!: string;
 
-  // Real reconciliation-export cross-reference (sm_operation_reference_map,
-  // migration 504) — undefined for the majority of operations that have no
-  // clean, justified name match in the source export; never guessed. See
-  // that migration's own comments for exactly which matches were judged
-  // clean enough to include and why.
-  @ApiPropertyOptional({ description: 'Reference-tool cross-reference for this operation, if a clean name match exists (migration 504) — informational only, never a live cost input.' })
-  referenceHint?: { sourceProcessName: string; exampleMachine: string | null };
+  @ApiPropertyOptional()
+  canonicalProcessId?: string;
 
-  static fromDatabase(row: any, referenceHint?: { sourceProcessName: string; exampleMachine: string | null }): ProcessCalculatorMappingResponseDto {
+  // Real cross-domain taxonomy data (process_taxonomy, migration 609) —
+  // undefined only for rows with no canonical link (shouldn't happen after
+  // migration 610's NOT NULL guard, kept optional defensively). Supersedes
+  // the old sm_operation_reference_map hint (migration 504, ~25 hand-picked
+  // Sheet Metal matches, one string each) with real per-operation
+  // feature-type granularity, aliases, and default machine across all 6
+  // groups.
+  @ApiPropertyOptional({ description: 'Cross-domain process taxonomy data for this operation (migration 609/610) — feature-type-granular operations, aliases, default machine/tool-shop.' })
+  taxonomy?: ProcessTaxonomyHint;
+
+  static fromDatabase(row: any, taxonomy?: ProcessTaxonomyHint): ProcessCalculatorMappingResponseDto {
     return {
       id: row.id,
       processGroup: row.process_group,
@@ -148,33 +171,34 @@ export class ProcessCalculatorMappingResponseDto {
       displayOrder: row.display_order,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      referenceHint,
+      canonicalProcessId: row.canonical_process_id ?? undefined,
+      taxonomy,
     };
   }
 }
 
 export class ProcessCalculatorMappingListResponseDto {
   @ApiProperty({ type: [ProcessCalculatorMappingResponseDto] })
-  mappings: ProcessCalculatorMappingResponseDto[];
+  mappings!: ProcessCalculatorMappingResponseDto[];
 
   @ApiProperty()
-  count: number;
+  count!: number;
 
   @ApiProperty()
-  page: number;
+  page!: number;
 
   @ApiProperty()
-  limit: number;
+  limit!: number;
 }
 
 // DTO for getting unique values for filters
 export class ProcessHierarchyDto {
   @ApiProperty({ type: [String] })
-  processGroups: string[];
+  processGroups!: string[];
 
   @ApiProperty({ type: [String] })
-  processRoutes: string[];
+  processRoutes!: string[];
 
   @ApiProperty({ type: [String] })
-  operations: string[];
+  operations!: string[];
 }

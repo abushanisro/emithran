@@ -1,0 +1,91 @@
+{
+  "_provenance": "Verbatim transcription of the live Process page (Process Calculator Mappings admin UI) as displayed to the user on 2026-09-01, pasted by the user directly. This is ground truth for process_group/process_route/operation across all 270 live rows -- it supersedes memory/sheetmetal/process/structured/processes.json wherever the two disagree, since that file was generated at an earlier point and multiple migrations (401/402/419/440/441/503/533/572/605+) have changed live process_calculator_mappings since. Spelling/casing is preserved exactly as shown (including known live typos like 'Laser Puch', 'Manal', 'Chambering', 'Cyclinderical Grinding' -- these are real live data, not corrected here).",
+  "_totals_confirmed": "270 operations across 6 groups, matching the page header exactly: Sheet Metal 59/13, Plastic & Rubber 26/11, Machining 84/12, Assembly 24/9, Post Processing 66/7, Packing & Delivery 11/2.",
+  "_addendum_inactive_rows_2026_09_01": "Migration 610's live-DB backfill guard found 9 additional Sheet Metal rows that exist in the live table but were NOT visible in the Process page's rendered pill list above (confirmed via a direct LEFT JOIN query against the live table, not a guess) -- Generic Press, Laser Punch, Material Stock, No Cost Feature, OxyFuel Cut, Plasma Punch, Progressive die, Shearing, Shearning. These match is_active=false rows documented elsewhere in this codebase (migration 605 explicitly deactivated Shearing/Shearning; structured/processes.json's live_active:false flag for Generic Press/Laser Punch/Material Stock/No Cost Feature/OxyFuel Cut/Plasma Punch corroborates the rest) -- the Process page UI apparently doesn't render inactive rows as pills, so the '59 ops' header count and this transcription both undercounted the live table by these 9. Added to the groups below with their exact live spelling (including the 'Progressive die' lowercase-d case variant and the Shearing/Shearning typo pair) so migration 610's backfill links every live row, active or not.",
+  "groups": [
+    {
+      "process_group": "Sheet Metal",
+      "routes": [
+        { "process_route": "Material Usage", "operations": ["Gross Usage", "Net Usage", "Material Stock", "No Cost Feature"] },
+        { "process_route": "Forming", "operations": ["Hole Extrusion (Burring)"] },
+        { "process_route": "Drilling", "operations": ["Tapping"] },
+        { "process_route": "Laser Cutting", "operations": ["Laser Cut", "Fiber Laser Cut", "3D Laser"] },
+        { "process_route": "Sheet Cutting", "operations": ["Fiber laser Cutting", "Co2 Laser Cutting", "Plasma Cutting", "Blanking", "3D Laser Cut", "Waterjet Cutting", "Shearing", "Shearning"] },
+        { "process_route": "Bending/Floating /Forming", "operations": ["Bend Brake", "Stage Tool Bending", "Stage Tool Forming", "Roll Forming", "Deep Draw", "Laser Puch", "Turret Press", "Offline Blank", "Stretch forming", "Hemming", "Flanging", "2 Roll Bending", "3 Roll Bending", "4 Roll Bending", "Std Press", "Tandem Press", "Generic Press", "Progressive die"] },
+        { "process_route": "Press Brake", "operations": ["Bend", "Form", "Press Brake Bend"] },
+        { "process_route": "Raw Material", "operations": ["Sheet", "Flat", "Coil", "I-Beam", "H-Beam", "Angle (L-shape)", "Channel (C-shape / U-shape)", "T-Sections", "Z-Sections"] },
+        { "process_route": "Finishing", "operations": ["Deburr", "Edge Finish", "Deslag"] },
+        { "process_route": "Inspection", "operations": ["Inspect", "Dimensional Inspect"] },
+        { "process_route": "Surface Treatment", "operations": ["Powder Coat", "Paint", "Anodize"] },
+        { "process_route": "Cutting", "operations": ["Waterjet Cutting", "Abrasive Waterjet Cutting", "Pure Waterjet Cutting (for soft materials)", "2 Axis Router", "Plasma Cut", "OxyFuel Cut"] },
+        { "process_route": "Sheet Metal Fabrication", "operations": ["Turret Punching", "Hole Punching", "Nibbling", "Forming (Louvers, Embosses)", "Countersinking (if supported by tooling)", "Laser Punch", "Plasma Punch"] }
+      ]
+    },
+    {
+      "process_group": "Plastic & Rubber",
+      "routes": [
+        { "process_route": "Compression Molding", "operations": ["Compression Molding"] },
+        { "process_route": "Injection Molding", "operations": ["Injection Molding", "Injection Molding-Hot Runner", "Injection Molding-Cold Runner", "Insert Molding", "Overmolding", "Gas-Assist Injection Molding"] },
+        { "process_route": "Structural foam molding", "operations": ["Structural foam molding"] },
+        { "process_route": "Reaction Foam Molding", "operations": ["Reaction Foam Molding"] },
+        { "process_route": "Thermoforming", "operations": ["3 Station Rotary Thermoforming", "4 Station Rotary Thermoforming", "Shuttle Station Thermoforming", "Single Station Thermoforming"] },
+        { "process_route": "Trimming / Degating", "operations": ["Manual", "Semi Automated"] },
+        { "process_route": "Blow Molding", "operations": ["Extrusion Blow Molding", "Injection Blow Molding", "Stretch Blow Molding"] },
+        { "process_route": "Raw Material", "operations": ["Granules / Pellets"] },
+        { "process_route": "Extrusion", "operations": ["Profile Extrusion", "Sheet Extrusion", "Pipe / Tube Extrusion"] },
+        { "process_route": "Rotational Molding", "operations": ["Rotational Molding"] },
+        { "process_route": "Rubber Molding", "operations": ["Rubber Compression Molding", "Rubber Injection Molding", "Rubber Transfer Molding"] }
+      ]
+    },
+    {
+      "process_group": "Machining",
+      "routes": [
+        { "process_route": "Drilling", "operations": ["Countersinking", "Drilling", "Gun Drilling", "Boring", "Reaming", "Counterboring"] },
+        { "process_route": "Turning Center", "operations": ["Saw Cut / Stock Cut", "Facing", "OD Rough Turning", "Turning", "OD Finish Turning", "Drilling", "Threading", "Chambering", "Shoulder Turning", "Flange Turning", "Taper Turning", "Step turning", "Contour turning", "Grooving", "Parting /Cut-off", "Knurling", "Eccentric / Off-Center Turning", "Boring", "Counterboring", "Countersinking", "Reaming"] },
+        { "process_route": "Cutting", "operations": ["Band Saw Cutting"] },
+        { "process_route": "Milling Center", "operations": ["Face milling", "Peripheral (Slab) Milling", "Thread Milling", "Pocket Milling", "Slot Milling", "Contour / Profile Milling", "Circular / Helical Milling", "Chamfering"] },
+        { "process_route": "Gear Cutting", "operations": ["Gear Hobbing", "Gear Shaping", "Gear Milling", "Gear Honing", "Gear Lapping"] },
+        { "process_route": "Broach", "operations": ["Broaching", "Gear Broaching"] },
+        { "process_route": "Grinding", "operations": ["Cyclinderical Grinding", "Centerless Grinding", "Surface grinding", "Gear Grinding", "Cylindrical Grinding", "Centreless Grinding", "ID Grinding", "Honing", "Lapping"] },
+        { "process_route": "EDM", "operations": ["Wire EDM", "Spark EDM"] },
+        { "process_route": "Raw Material", "operations": ["Round Bar", "Rectangular Bar", "Square Bar", "Hexagonal Bar", "Tube", "Rectangular Tube", "Square Tube", "Ingot", "Casted RM", "Billet", "Wire Rod", "Forged RM"] },
+        { "process_route": "VMC", "operations": ["Face Milling", "Peripheral Milling", "Pocket Milling", "Contour / Profile Milling", "Slot Milling", "Thread Milling", "Circular / Helical Milling", "Chamfering", "Drilling", "Counterboring", "Countersinking", "Tapping", "Reaming", "Boring"] },
+        { "process_route": "Sawing", "operations": ["Band Saw Cut", "Cold Saw Cut", "Stock Cut"] },
+        { "process_route": "Waterjet", "operations": ["Waterjet Cutting"] }
+      ]
+    },
+    {
+      "process_group": "Assembly",
+      "routes": [
+        { "process_route": "Hardware Insertion", "operations": ["PEM Insertion"] },
+        { "process_route": "Pick & Place", "operations": ["Manual Pick and Place", "Semi automated", "Fully Automated"] },
+        { "process_route": "Welding", "operations": ["Mig Welding", "Tig Welding", "Spot Weld", "Seam Weld", "Laser Weld", "Plasma Weld", "Electron Beam Weld", "Friction Stir Weld"] },
+        { "process_route": "Screwing", "operations": ["Manal", "Power gun"] },
+        { "process_route": "Bolt Nut Assy", "operations": ["Power gun", "Manal"] },
+        { "process_route": "Electrical Connection", "operations": ["Wire Harness", "Connector Crimping", "PCB Assembly"] },
+        { "process_route": "Debur", "operations": ["Manual Debur"] },
+        { "process_route": "Weld Cleaning", "operations": ["Manual", "Semi automated-Sanding"] },
+        { "process_route": "Adhesive Bonding", "operations": ["Manual Bonding", "Dispensing Robot"] }
+      ]
+    },
+    {
+      "process_group": "Post Processing",
+      "routes": [
+        { "process_route": "Surface Protection", "operations": ["Degrease", "Phosphating", "Blackning", "Plating", "Zinc Nickel plating", "Nickel Chrome Plating", "Hard Chrome plating", "Passivation", "Anodizing Type I", "Anodizing Type II", "Anodizing Type III", "Manual Paint primer", "Manual Paint finish Coat", "Manual Paint hand Cleaning", "Manual Paint hand Sanding", "Masking", "Powder Coating", "ED Coating", "Black Oxide", "Zinc Plating", "Nickel Plating", "Chrome Plating", "Electroless Nickel", "Anodising", "Hard Anodising", "Type III Hardcoat", "PVD Coating", "CVD Coating", "Tin Plating"] },
+        { "process_route": "Heat Treatment", "operations": ["Surface Harden", "Through Harden", "Anneal", "Temper", "Annealing", "Normalising", "Hardening & Tempering", "Carburising", "Carburizing", "Nitriding", "Stress Relieving", "Age Hardening", "Solution Annealing", "Induction Hardening"] },
+        { "process_route": "Inspection", "operations": ["CMM Inspection", "Manual Inspection", "Final Inspection", "Dimensional Inspection", "Visual Inspection", "First Article Inspection", "In-Process Inspection", "Go / No-Go Gauging"] },
+        { "process_route": "Testing", "operations": ["Leak test", "Ultrasonic Test", "MPT", "Dye Penetrant", "X-Ray", "Hardness Test", "Tensile Test"] },
+        { "process_route": "Cleaning", "operations": ["Ultrasonic Cleaning"] },
+        { "process_route": "Surface Treatment", "operations": ["Surface Treatment"] },
+        { "process_route": "Deburring", "operations": ["Hand Deburring", "Tumble Deburring", "Vibratory Deburring", "Robotic Deburring", "Cleaning", "Marking"] }
+      ]
+    },
+    {
+      "process_group": "Packing & Delivery",
+      "routes": [
+        { "process_route": "Packing", "operations": ["Wooden Box Packing", "Corrugated box packing", "Pallet", "Blister / Tray Packing", "Bubble Wrap", "VCI Packaging"] },
+        { "process_route": "Delivery", "operations": ["Ex", "FCA", "DDP", "FOB", "CIF"] }
+      ]
+    }
+  ]
+}

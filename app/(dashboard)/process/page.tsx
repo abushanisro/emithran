@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload, Download, Info } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload, Download, Info, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   useProcesses,
   useReferenceTables,
@@ -74,6 +74,14 @@ export default function ProcessPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
+  // Operation pill whose taxonomy detail (feature types, default machine,
+  // aliases — process_taxonomy, migration 609/610) is expanded inline.
+  // Single-select accordion — opening one closes any other, so the page
+  // never accumulates several open detail panels at once.
+  const [expandedOpId, setExpandedOpId] = useState<string | null>(null);
+  const toggleOpExpanded = (id: string) => {
+    setExpandedOpId((prev) => (prev === id ? null : id));
+  };
   const [editingTableId, setEditingTableId] = useState<string | null>(null);
   const [editedTableData, setEditedTableData] = useState<Record<string, any[]>>({});
 
@@ -96,12 +104,6 @@ export default function ProcessPage() {
   const [filterProcessGroup] = useState<string>('');
   const [filterProcessRoute] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  // Deactivated mappings (is_active=false — retired duplicates/phantom
-  // calculator refs, e.g. migration 418's Sheet Metal cleanup) are hidden by
-  // default; this list previously showed every row regardless of is_active,
-  // so deactivating a mapping never visibly cleaned anything up here.
-  const [showInactive, setShowInactive] = useState(false);
-
   // State for per-route inline lookup tables
   const [modalProcessId, setModalProcessId] = useState<string | null>(null);
   const [modalProcessName, setModalProcessName] = useState<string>('');
@@ -149,7 +151,10 @@ export default function ProcessPage() {
     ...(filterProcessGroup && filterProcessGroup !== 'all' ? { processGroup: filterProcessGroup } : {}),
     ...(filterProcessRoute && filterProcessRoute !== 'all' ? { processRoute: filterProcessRoute } : {}),
     ...(searchQuery ? { search: searchQuery } : {}),
-    ...(showInactive ? {} : { isActive: true as const }),
+    // Always fetch both active and inactive rows — an operation with no
+    // real cost engine yet stays visible (dashed/opacity + "inactive"
+    // label), an honest view of what's actually built vs. not, rather
+    // than hiding the gap behind a toggle.
     limit: 1000,
   });
   const { data: processHierarchy } = useProcessHierarchy();
@@ -703,21 +708,19 @@ export default function ProcessPage() {
                   <X className="h-4 w-4 mr-1" /> Clear
                 </Button>
               )}
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showInactive}
-                  onChange={(e) => setShowInactive(e.target.checked)}
-                  className="h-3.5 w-3.5"
-                />
-                Show inactive
-              </label>
-              {calculatorMappings && (
-                <span className="text-xs text-muted-foreground ml-auto">
-                  {calculatorMappings.mappings.length} operations ·{' '}
-                  {Object.keys(calculatorMappings.mappings.reduce((g: any, m) => { g[m.processGroup] = true; return g; }, {})).length} groups
-                </span>
-              )}
+              {calculatorMappings && (() => {
+                // Distinct (group, operation) count — matches the flat
+                // pill list below exactly, not the raw row count (which
+                // still includes cross-route duplicates of the same
+                // canonical operation).
+                const distinctOps = new Set(calculatorMappings.mappings.map(m => `${m.processGroup}\x00${m.operation?.trim()}`));
+                const distinctGroups = new Set(calculatorMappings.mappings.map(m => m.processGroup));
+                return (
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {distinctOps.size} operations · {distinctGroups.size} groups
+                  </span>
+                );
+              })()}
             </div>
             {/* GROUPED TREE VIEW */}
             {loadingMappings ? (
@@ -731,24 +734,32 @@ export default function ProcessPage() {
               const filtered = allMappings
                 .filter(m => !q || (
                   m.processGroup.toLowerCase().includes(q) ||
-                  m.processRoute.toLowerCase().includes(q) ||
                   m.operation.toLowerCase().includes(q)
                 ));
 
-              // Group with deduplication — skip entries where same operation
-              // already exists for the same (group, route) pair
-              const grouped: Record<string, Record<string, typeof allMappings>> = {};
+              // Group by process_group only — process_taxonomy (migration 609)
+              // is itself keyed by (process_group, process_name) with NO
+              // route tier, so this page now matches that shape directly:
+              // one pill per distinct operation name per group, not one per
+              // (route, operation) pair. Live rows sharing the same
+              // operation name across routes (e.g. Sheet Metal's "Waterjet
+              // Cutting" under both "Cutting" and "Sheet Cutting") are the
+              // SAME canonical process and collapse to one pill — which of
+              // the underlying route-scoped rows survives the dedup is
+              // arbitrary (first seen), so its "Lookup Tables" button below
+              // reflects that one route's tables, a known limitation until
+              // the lookup-tables bridge itself is rebuilt off
+              // process_taxonomy directly.
+              const grouped: Record<string, typeof allMappings> = {};
               const seenOps = new Set<string>();
               for (const m of filtered) {
                 const op = m.operation?.trim();
                 if (!op) continue; // skip blank operations
-                const key = `${m.processGroup}\x00${m.processRoute}\x00${op}`;
+                const key = `${m.processGroup}\x00${op}`;
                 if (seenOps.has(key)) continue;
                 seenOps.add(key);
-                if (!grouped[m.processGroup]) grouped[m.processGroup] = {};
-                const grp = grouped[m.processGroup]!;
-                if (!grp[m.processRoute]) grp[m.processRoute] = [];
-                grp[m.processRoute]!.push(m);
+                if (!grouped[m.processGroup]) grouped[m.processGroup] = [];
+                grouped[m.processGroup]!.push(m);
               }
 
               if (filtered.length === 0) {
@@ -760,39 +771,57 @@ export default function ProcessPage() {
                 );
               }
 
+              const openLookupTablesFor = async (group: string, route: string) => {
+                const processes = processesData?.processes || [];
+                let proc = processes.find(p => p.processName === route) ?? processes.find(p => p.processName.toLowerCase() === route.toLowerCase());
+                let processId = proc?.id ?? null;
+                if (!processId) {
+                  try {
+                    const newProcess = await createProcessMutation.mutateAsync({ processName: route, processCategory: group });
+                    processId = newProcess.id;
+                  } catch {
+                    toast.error('Failed to initialize process record');
+                    return;
+                  }
+                }
+                setModalProcessId(processId);
+                setModalProcessName(route);
+                setModalProcessGroup(group);
+                setExpandedTableId(null);
+                setShowAddTableEditor(false);
+                setInlineEditorTables([]);
+                setIsLookupDialogOpen(true);
+              };
+
               return (
                 <div className="space-y-2">
-                  {Object.entries(grouped).map(([group, routes]) => (
+                  {Object.entries(grouped).map(([group, ops]) => (
                     <div key={group} className="border border-border rounded-lg overflow-hidden">
                       {/* Process Group header */}
                       <div className="px-4 py-2.5 bg-secondary/50 border-b border-border flex items-center justify-between">
                         <h3 className="font-semibold text-sm text-foreground">{group}</h3>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">
-                            {Object.values(routes).flat().length} ops · {Object.keys(routes).length} routes
+                            {ops.length} ops
                           </Badge>
                           <button
                             className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors rounded hover:bg-destructive/10"
-                            onClick={() => handleDeleteGroup(group, Object.values(routes).flat())}
+                            onClick={() => handleDeleteGroup(group, ops)}
                             title={`Delete all mappings in "${group}"`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
-                      {/* Process Routes */}
-                      <div className="divide-y divide-border/40">
-                        {Object.entries(routes).map(([route, ops]) => {
-                          return (
-                          <div key={route}>
-                            {/* Route row */}
-                            <div className="px-4 py-2 flex items-start gap-4 hover:bg-secondary/10 transition-colors">
-                              <span className="text-sm font-medium w-44 shrink-0 pt-0.5 text-foreground">{route}</span>
-                              {/* Operations as pill chips */}
-                              <div className="flex flex-wrap gap-1.5 flex-1">
-                                {ops.map((op) => (
+                      {/* Operations — flat, no route tier */}
+                      <div className="p-3">
+                              <div className="flex flex-wrap gap-1.5 items-start">
+                                {ops.map((op) => {
+                                  const hasDetail = !!(op.taxonomy && (op.taxonomy.operations.length > 0 || op.taxonomy.aliases.length > 0 || op.taxonomy.defaultMachineName));
+                                  const isExpanded = expandedOpId === op.id;
+                                  return (
+                                  <Fragment key={op.id}>
                                   <div
-                                    key={op.id}
                                     className={`flex items-center gap-1 border rounded-full px-2.5 py-0.5 group ${
                                       op.isActive === false
                                         ? 'bg-muted/30 border-dashed border-border/60 opacity-60'
@@ -801,16 +830,28 @@ export default function ProcessPage() {
                                     title={
                                       op.isActive === false
                                         ? 'Inactive — not offered for costing'
-                                        : op.referenceHint
-                                        ? `Reference cross-check: "${op.referenceHint.sourceProcessName}"${op.referenceHint.exampleMachine ? ` — example machine: ${op.referenceHint.exampleMachine}` : ''} (informational only, not a live cost input)`
+                                        : hasDetail
+                                        ? 'Click the operation name to see feature types, aliases, and default machine'
                                         : undefined
                                     }
                                   >
-                                    <span className="text-xs text-foreground">{op.operation}</span>
+                                    <button
+                                      type="button"
+                                      className={`flex items-center gap-0.5 ${hasDetail ? 'cursor-pointer' : 'cursor-default'}`}
+                                      onClick={() => hasDetail && toggleOpExpanded(op.id)}
+                                      disabled={!hasDetail}
+                                    >
+                                      {hasDetail && (
+                                        isExpanded
+                                          ? <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+                                          : <ChevronRight className="h-2.5 w-2.5 text-muted-foreground/60" />
+                                      )}
+                                      <span className="text-xs text-foreground">{op.operation}</span>
+                                    </button>
                                     {op.isActive === false && (
                                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">inactive</span>
                                     )}
-                                    {op.isActive !== false && op.referenceHint && (
+                                    {op.isActive !== false && hasDetail && !isExpanded && (
                                       <Info className="h-2.5 w-2.5 text-muted-foreground/60" />
                                     )}
                                     <button
@@ -829,6 +870,13 @@ export default function ProcessPage() {
                                       </svg>
                                     </button>
                                     <button
+                                      className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary flex items-center justify-center"
+                                      onClick={() => openLookupTablesFor(op.processGroup, op.processRoute)}
+                                      title={`Lookup Tables (${op.processRoute})`}
+                                    >
+                                      <Database className="h-2.5 w-2.5" />
+                                    </button>
+                                    <button
                                       className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground flex items-center justify-center"
                                       onClick={() => handleEditMapping(op)}
                                       title="Edit"
@@ -843,41 +891,41 @@ export default function ProcessPage() {
                                       <X className="h-2.5 w-2.5" />
                                     </button>
                                   </div>
-                                ))}
+                                  {/* Taxonomy detail — feature types, default machine,
+                                      aliases (process_taxonomy, migration 609/610).
+                                      w-full forces a line break in the flex-wrap pill
+                                      row, so this renders immediately under ITS pill
+                                      rather than batched separately at the end. Only
+                                      one operation can be expanded at a time (see
+                                      expandedOpId), so at most one of these ever
+                                      renders. */}
+                                  {isExpanded && op.taxonomy && (
+                                    <div className="w-full rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs space-y-1.5">
+                                      <div className="font-medium text-foreground">{op.operation}</div>
+                                      {(op.taxonomy.defaultMachineName || op.taxonomy.defaultToolShopName) && (
+                                        <div className="text-muted-foreground">
+                                          Default machine: <span className="text-foreground">{op.taxonomy.defaultMachineName ?? '—'}</span>
+                                          {op.taxonomy.defaultToolShopName && <> · tool shop: <span className="text-foreground">{op.taxonomy.defaultToolShopName}</span></>}
+                                        </div>
+                                      )}
+                                      {op.taxonomy.aliases.length > 0 && (
+                                        <div className="text-muted-foreground">aka: {op.taxonomy.aliases.join(', ')}</div>
+                                      )}
+                                      {op.taxonomy.operations.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 pt-0.5">
+                                          {op.taxonomy.operations.map((fo, i) => (
+                                            <span key={i} className="rounded border border-border/60 bg-background px-1.5 py-0.5 text-[10px] text-foreground" title={fo.raw}>
+                                              {fo.operationCategory ?? '(bare)'}{fo.featureType ? ` // ${fo.featureType}` : ''}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  </Fragment>
+                                  );
+                                })}
                               </div>
-                              {/* Lookup Tables button — opens dialog */}
-                              <button
-                                className="flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors shrink-0 border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
-                                title="View lookup tables for this process"
-                                onClick={async () => {
-                                  const processes = processesData?.processes || [];
-                                  let proc = processes.find(p => p.processName === route) ?? processes.find(p => p.processName.toLowerCase() === route.toLowerCase());
-                                  let processId = proc?.id ?? null;
-                                  if (!processId) {
-                                    try {
-                                      const newProcess = await createProcessMutation.mutateAsync({ processName: route, processCategory: group });
-                                      processId = newProcess.id;
-                                    } catch {
-                                      toast.error('Failed to initialize process record');
-                                      return;
-                                    }
-                                  }
-                                  setModalProcessId(processId);
-                                  setModalProcessName(route);
-                                  setModalProcessGroup(group);
-                                  setExpandedTableId(null);
-                                  setShowAddTableEditor(false);
-                                  setInlineEditorTables([]);
-                                  setIsLookupDialogOpen(true);
-                                }}
-                              >
-                                <Database className="h-3 w-3" />
-                                Lookup Tables
-                              </button>
-                            </div>
-                          </div>
-                          );
-                        })}
                       </div>
                     </div>
                   ))}

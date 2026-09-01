@@ -1,4 +1,4 @@
-import type { GdtSeverity, InspectionMethod, GdtReasonCode } from "../costing/gdt-severity";
+import type { GdtSeverity, InspectionMethod, GdtReasonCode } from '../costing/shared/physics/gdt-severity';
 
 export interface GdtFeatureDto {
   type: string;

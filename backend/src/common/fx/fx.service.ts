@@ -4,7 +4,7 @@ import {
   LOCATION_INFO,
   listCurrencies as listCurrenciesFromLocationInfo,
   listFactoryLocations,
-} from '../../modules/bom-items/costing/default-rates';
+} from '../../modules/bom-items/costing/shared/core/default-rates.constants';
 import { FxRateCacheService } from './fx-rate-cache.service';
 
 export type FxRateType = 'reference' | 'budget' | 'custom';

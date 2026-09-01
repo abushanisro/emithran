@@ -12,8 +12,8 @@ import type { RouteStep } from '../../manufacturing-knowledge/dto/kb.dto';
 import {
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE, TAP_CYCLE_SEC,
   classifyMaterialFamily, INSPECTION_SAMPLING_DEFAULT,
-} from '../../bom-items/costing/default-rates';
-import { computeCycleTime } from '../../bom-items/costing/injection-molding/cycle-time';
+} from '../../bom-items/costing/shared/core/default-rates.constants';
+import { computeCycleTime } from '../../bom-items/costing/injection-molding/process/cycle-time';
 import { CycleTimeLibraryService } from './cycle-time-library.service';
 
 /**

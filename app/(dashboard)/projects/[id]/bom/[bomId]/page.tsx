@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { WorkflowNavigation } from '@/components/features/workflow/WorkflowNavigation';
 import { useProject } from '@/lib/api/hooks/useProjects';
-import { usePageContext } from '@/lib/echo/PageContextProvider';
 import { useBOM } from '@/lib/api/hooks/useBOM';
 import { useBOMItems, deleteBOMItem, createBOMItem, type CreateBOMItemDto } from '@/lib/api/hooks/useBOMItems';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -270,11 +269,6 @@ interface ImportSummary {
 
 export default function BOMDetailPage() {
   const params = useParams();
-  usePageContext({
-    entityType: 'bom',
-    entityId: (params?.bomId as string) ?? '',
-    breadcrumbs: ['Project', 'BOM'],
-  });
   const router = useRouter();
   const projectId = params.id as string;
   const bomId = params.bomId as string;
@@ -292,19 +286,6 @@ export default function BOMDetailPage() {
   const [defaultItemType, setDefaultItemType] = useState<BOMItemType | undefined>(undefined);
   const [viewingItem, setViewingItem] = useState<BOMItem | null>(null);
   const [preferredView, setPreferredView] = useState<'2d' | '3d' | 'intelligence'>('3d');
-
-  // Echo: when the user is actively viewing a BOM item, register it as the
-  // focused entity so Echo can pull DFM, cost, and supplier data for it
-  // without having to ask the user for the UUID. Stack semantics in
-  // PageContextProvider mean this overrides the parent BOM registration
-  // while viewingItem is non-null, and reverts to the BOM when null.
-  usePageContext({
-    entityType: 'bom_item',
-    entityId: viewingItem?.id ?? null,
-    ...(viewingItem && {
-      breadcrumbs: ['Project', 'BOM', viewingItem.name ?? viewingItem.partNumber ?? 'Part'],
-    }),
-  });
 
   // -------------------------------------------------------------------------
   // 3D viewer state

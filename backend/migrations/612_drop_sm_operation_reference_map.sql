@@ -1,0 +1,21 @@
+-- ============================================================================
+-- Migration 612: Drop sm_operation_reference_map (superseded by process_taxonomy)
+-- ============================================================================
+-- Migration 504 built this table to attach a single "example machine" hint
+-- to ~25 hand-picked Sheet Metal operation-name matches against a staged
+-- reconciliation export. process_taxonomy (migration 609) + the
+-- canonical_process_id link (migration 610) now cover the same need with
+-- real feature-type-granular operations, aliases, and default machine/
+-- tool-shop, across all 6 process groups, sourced from the real live data
+-- (not a one-off hand-picked list). processes.service.ts's
+-- getOperationReferenceHints() (the only reader of this table) has already
+-- been replaced by getTaxonomyForMappings() reading process_taxonomy
+-- directly -- this migration removes the now-dead table rather than
+-- leaving superseded architecture behind.
+--
+-- sm_reference_data (the much larger, generic staging table this one
+-- joined against for the 'processDefaultMachine:*' keys) is NOT touched --
+-- it's used for many other unrelated lookup purposes.
+-- ============================================================================
+
+DROP TABLE IF EXISTS sm_operation_reference_map;

@@ -3,36 +3,36 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import type { CalculationTraceStep, PhysicsGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, ValidatedInput } from './dto/cost-breakdown.dto';
-import { computeCostSummary, computeSustainability, applyPersistedRouteToSummary } from './costing/cost-engine';
-import type { MHRRateInput, AppliedProcessCostRecord, LhrRateSource } from './costing/cost-engine';
-import { planInspection, finalizeInspectionLine } from './costing/inspection-engine';
-import type { InspectionInput } from './costing/inspection-engine';
+import { computeCostSummary, computeSustainability, applyPersistedRouteToSummary } from './costing/shared/core/cost-engine';
+import type { MHRRateInput, AppliedProcessCostRecord, LhrRateSource } from './costing/shared/core/cost-engine';
+import { planInspection, finalizeInspectionLine } from './costing/shared/process/inspection-engine';
+import type { InspectionInput } from './costing/shared/process/inspection-engine';
 import { evaluateCalculatorFormulas, normalizeFieldName } from '../calculators/calculator-formula-evaluator';
 import type { CalculatorFieldRow } from '../calculators/calculator-formula-evaluator';
 import { PHYSICS_REGISTRY } from '../calculators/physics-registry';
-import { SheetMetalLookupService, roundUpToStandardTonnageClass } from './costing/sheet-metal-lookup.service';
-import type { LaserCutParams } from './costing/sheet-metal-lookup.service';
-import { computeNesting, resolveNestingDimensions, EDGE_ALLOWANCE_MM, STANDARD_SHEETS, isTrueNestCostingCacheValid, computePartAllowanceMm } from './costing/sheet-metal-nesting.engine';
-import { selectBestTrueNestCandidate } from './costing/true-nest-costing.engine';
-import { resolveNetUsagePhysics } from './costing/sheet-metal-net-usage.physics';
-import type { TrueNestCandidate, TrueNestCostingSelection } from './costing/true-nest-costing.engine';
+import { SheetMetalLookupService, roundUpToStandardTonnageClass } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
+import type { LaserCutParams } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
+import { computeNesting, resolveNestingDimensions, EDGE_ALLOWANCE_MM, STANDARD_SHEETS, isTrueNestCostingCacheValid, computePartAllowanceMm } from './costing/sheet-metal/machine/sheet-metal-nesting.engine';
+import { selectBestTrueNestCandidate } from './costing/sheet-metal/machine/true-nest-costing.engine';
+import { resolveNetUsagePhysics } from './costing/sheet-metal/raw-material/sheet-metal-net-usage.physics';
+import type { TrueNestCandidate, TrueNestCostingSelection } from './costing/sheet-metal/machine/true-nest-costing.engine';
 import {
   computeCNCMilledCostSummary, computeCNCTurnedCostSummary,
   checkCNCCapability, computeRouteComplexityScore,
   requiredMilledMachineClass, meetsRequiredMilledClass, pickRecommendedRoute,
   detectMaterialClass,
-} from './costing/cost-cnc-engine';
-import type { CNCCostInput, CNCMachineClass } from './costing/cost-cnc-engine';
-import { BlankOptimizerService } from './costing/blank-optimizer.service';
-import { buildOperationSequence, injectDrawingIntelligence } from './costing/operation-sequencer';
-import type { OperationLine } from './costing/operation-sequencer';
-import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT, recommendCavityCount } from './costing/cost-injection-molding-engine';
-import type { InjectionMoldingCostInput } from './costing/cost-injection-molding-engine';
-import { isPlasticGrade } from './costing/injection-molding/process-tree';
+} from './costing/machining/process/cost-cnc-engine';
+import type { CNCCostInput, CNCMachineClass } from './costing/machining/process/cost-cnc-engine';
+import { BlankOptimizerService } from './costing/sheet-metal/machine/blank-optimizer.service';
+import { buildOperationSequence, injectDrawingIntelligence } from './costing/machining/operation/operation-sequencer';
+import type { OperationLine } from './costing/machining/operation/operation-sequencer';
+import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT, recommendCavityCount } from './costing/injection-molding/process/cost-injection-molding-engine';
+import type { InjectionMoldingCostInput } from './costing/injection-molding/process/cost-injection-molding-engine';
+import { isPlasticGrade } from './costing/injection-molding/process/process-tree';
 import {
   selectIMmachinesByTier,
   type IMSelectionRequirements,
-} from './costing/injection-molding/machine-selector-im';
+} from './costing/injection-molding/machine/machine-selector-im';
 import {
   MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL,
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
@@ -45,21 +45,31 @@ import {
   resolveUtsMpa, isSheetFormableMaterial, estimateBendTonnage,
   estimateBurlTonnage, estimateBurlDiameterMm, BURRING_SETUP_MIN,
   type SurfaceTreatmentDbRate, classifySurfaceTreatment,
-  classifyInspectionResource,
-} from './costing/default-rates';
-import type { MachineClass } from './costing/default-rates';
-import { checkMachineCapability } from './costing/machine-capability';
-import type { CapabilityCheck as MachineCapabilityCheck, PartGeometryForCapability } from './costing/machine-capability';
-import { getEnginesForFamily, ROUTE_ID_FOR_CLASS, ROUTE_LABEL_FOR_CLASS } from './costing/manufacturing-process-registry';
-import { resolveEffectiveSheetThicknessMm, resolveScenarioFxSnapshot } from './costing/scenario-overrides';
+  classifyInspectionResource, DEFAULT_YIELD_PCT,
+} from './costing/shared/core/default-rates.constants';
+import type { MachineClass } from './costing/shared/core/default-rates.constants';
+import { checkMachineCapability } from './costing/shared/capability/machine-capability';
+import type { CapabilityCheck as MachineCapabilityCheck, PartGeometryForCapability } from './costing/shared/capability/machine-capability';
+import { getEnginesForFamily, ROUTE_ID_FOR_CLASS, ROUTE_LABEL_FOR_CLASS } from './costing/shared/core/manufacturing-process-registry';
+// Platform Architecture Remediation Phase 1 (engine registry unification,
+// Rule 8) — getRouteComparison()'s Press Brake/Deburring/Hole Extrusion/
+// Tapping lines now call the exact same registered engines
+// computeCostSummary() uses, instead of hand-rolled arithmetic that omitted
+// labor/inspection-sampling/yield-loss cost (see each engine file's own doc
+// comment for the specific divergence this closes).
+import { computePressBrakeCost } from './costing/sheet-metal/process/press-brake-engine';
+import { computeDeburringCost } from './costing/sheet-metal/operation/deburring-engine';
+import { computeHoleExtrusionCost } from './costing/sheet-metal/operation/hole-extrusion-engine';
+import { computeTappingCost } from './costing/sheet-metal/operation/tapping-engine';
+import { resolveEffectiveSheetThicknessMm, resolveScenarioFxSnapshot } from './costing/shared/physics/scenario-overrides';
 import type { CostSummaryDto, ProcessLineCost, FeatureOp, CostStatus } from './dto/cost-breakdown.dto';
 import type { BlankSpecDto } from './dto/blank-spec.dto';
 import type { TrueNestResultDto } from './dto/true-nest.dto';
 import type { CandidateRouteComparisonDto, CandidateRouteDto } from './dto/candidate-route.dto';
 import type { RouteComparisonDto, RouteResultDto, RouteId, RouteCapability } from './dto/route-comparison.dto';
-import { resolveInspectionRule, SEVERITY_RANK } from './costing/gdt-severity';
-import type { GdtSeverity, InspectionMethod, InspectionRuleRow } from './costing/gdt-severity';
-import type { InspectionStagePolicy } from './costing/default-rates';
+import { resolveInspectionRule, SEVERITY_RANK } from './costing/shared/physics/gdt-severity';
+import type { GdtSeverity, InspectionMethod, InspectionRuleRow } from './costing/shared/physics/gdt-severity';
+import type { InspectionStagePolicy } from './costing/shared/core/default-rates.constants';
 import { InspectionKnowledgeService } from '../manufacturing-knowledge/services/inspection-knowledge.service';
 import type { GdtAnalysisDto, GdtFeatureDto } from './dto/gdt-analysis.dto';
 import {
@@ -67,10 +77,10 @@ import {
   pressBrakeRequirement, holeFormingRequirement, vmcRequirement, injectionMoldingRequirement,
   punchingRequirement, waterjetRequirement,
   MATERIAL_MRR_CM3_MIN,
-} from './costing/machine-selection/physics';
-import type { MachineRequirement } from './costing/machine-selection/physics';
-import { explainCandidate, fetchMachinePool, selectMachine } from './costing/machine-selection/selector';
-import { EMPTY_CAPABILITY, MACHINE_CLASS_DEFAULTS, lookupSeedCapability } from './costing/machine-selection/seed-registry';
+} from './costing/shared/capability/machine-selection/physics';
+import type { MachineRequirement } from './costing/shared/capability/machine-selection/physics';
+import { explainCandidate, fetchMachinePool, selectMachine } from './costing/shared/capability/machine-selection/selector';
+import { EMPTY_CAPABILITY, MACHINE_CLASS_DEFAULTS, lookupSeedCapability } from './costing/shared/capability/machine-selection/seed-registry';
 import type { CapabilityCheck, MachineCandidate, MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
 import {
   shapeRankForFamily,
@@ -1771,8 +1781,12 @@ export class BOMItemsService {
     turret: MHRRateInput;
     waterjet: MHRRateInput;
     router: MHRRateInput;
+    oxyfuelCut: MHRRateInput;
+    shear: MHRRateInput;
+    laserPunch: MHRRateInput;
     standardPress: MHRRateInput;
     tandemPress: MHRRateInput;
+    progressiveDiePress: MHRRateInput;
     cnc3ax: MHRRateInput;
     cnc4ax: MHRRateInput;
     cnc5ax: MHRRateInput;
@@ -1886,8 +1900,8 @@ export class BOMItemsService {
     };
 
     const allClasses: MachineClass[] = [
-      'fiber_laser', 'co2_laser', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet', 'router_2axis',
-      'standard_press', 'tandem_press',
+      'fiber_laser', 'co2_laser', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet', 'router_2axis', 'oxyfuel_cut', 'shear', 'laser_punch',
+      'standard_press', 'tandem_press', 'progressive_die_press',
       'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn',
       'injection_molding', 'drill_press', 'pem_press', 'hole_forming',
     ];
@@ -1993,8 +2007,12 @@ export class BOMItemsService {
         turret:           get('turret_punch'),
         waterjet:         get('waterjet'),
         router:           get('router_2axis'),
+        oxyfuelCut:       get('oxyfuel_cut'),
+        shear:            get('shear'),
+        laserPunch:       get('laser_punch'),
         standardPress:    get('standard_press'),
         tandemPress:      get('tandem_press'),
+        progressiveDiePress: get('progressive_die_press'),
         cnc3ax:           get('cnc_3ax_vmc'),
         cnc4ax:           get('cnc_4ax_vmc'),
         cnc5ax:           get('cnc_5ax_mc'),
@@ -5137,7 +5155,7 @@ export class BOMItemsService {
         .select('machine_class, machine_name, mhr_id, operation, process_group, process_route, cycle_time, setup_time, direct_rate, setup_cost_per_part, total_cycle_cost_per_part, total_cost_per_part')
         .eq('bom_item_id', id)
         .eq('is_active', true)
-        .in('machine_class', ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet', 'router_2axis', 'press_brake', 'standard_press', 'tandem_press']);
+        .in('machine_class', ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet', 'router_2axis', 'oxyfuel_cut', 'shear', 'laser_punch', 'press_brake', 'standard_press', 'tandem_press', 'progressive_die_press']);
       // P0.6: the Supabase client returns errors on the {error} field rather than
       // throwing -- this was previously never checked, so a real DB failure (not
       // "no applied route yet", a genuine query error) fell through indistinguishable
@@ -5476,6 +5494,49 @@ export class BOMItemsService {
     const rateWarnThresholds = await this.loadRateWarnThresholds(accessToken, comparisonWarnings);
     const mhrRates = await this.resolveMHRRates(accessToken, location, physics, family, rates, comparisonWarnings, rateWarnThresholds);
 
+    // ── Shared eMithranTerms() context (Platform Architecture Remediation
+    // Phase 1, engine registry unification) — resolved ONCE here, identically
+    // to how getCostSummary resolves the same values for its own 9 inline
+    // blocks, so every engine invoked below (the cutting/forming loop and the
+    // 4 secondary-op engines) shares the exact same cost-composition inputs
+    // computeCostSummary uses. Closes the divergence where this comparison
+    // path used to omit inspection-sampling/yield-loss cost entirely.
+    const rcComplexityRaw = ((item as any).complexity ?? fg?.summary?.complexity ?? 'medium') as string;
+    const rcLookupComplexity: 'simple' | 'inter' | 'complex' =
+      rcComplexityRaw === 'simple' ? 'simple' : rcComplexityRaw === 'complex' ? 'complex' : 'inter';
+    const [rcSamplingForCost, rcInspectionMinResult] = await Promise.all([
+      this.smLookup.getSamplingRate(batchSize),
+      this.smLookup.getInspectionTime(rcLookupComplexity),
+    ]);
+    const rcSamplingRate = rcSamplingForCost.rate;
+    const rcInspectionTimeMin = rcInspectionMinResult.minutes;
+    // Scrap recovery credit (~30% of material price) — same standalone query
+    // as getCostSummary's smScrapPricePerKg (resolveMaterialForFamily doesn't
+    // expose cost_india).
+    let rcScrapPricePerKg = 0;
+    try {
+      const adminDb = this.supabaseService.getAdminClient();
+      const g = (grade ?? '').trim();
+      let rmRow: any[] | null = null;
+      if (g) {
+        ({ data: rmRow } = await adminDb.from('raw_materials').select('cost_india').ilike('material', g).limit(1));
+        if (!rmRow?.length) {
+          ({ data: rmRow } = await adminDb.from('raw_materials').select('cost_india').ilike('material_grade', g).limit(1));
+        }
+      }
+      if (rmRow?.[0]?.cost_india) rcScrapPricePerKg = Number(rmRow[0].cost_india) * 0.30;
+    } catch { /* non-fatal — scrap credit stays 0 */ }
+    const rcEMithranCtx = {
+      dlrPerHr: mhrRates.directLaborRate ?? 0,
+      qairPerHr: mhrRates.qaInspectorRate ?? 0,
+      inspTimeMin: rcInspectionTimeMin,
+      samplingRate: rcSamplingRate,
+      yieldPct: DEFAULT_YIELD_PCT,
+      netMatCost: materialCost,
+      netWeightKg,
+      scrapPricePerKg: rcScrapPricePerKg,
+    };
+
     // Derive laser power from machine selection (same pattern as getCostSummary
     // — real mhr_records.power_kw only, no hardcoded class-wide assumption, no
     // name-inference; see getCostSummary's own doc comment on this same field).
@@ -5577,6 +5638,18 @@ export class BOMItemsService {
     // router cutting speed (Track B Phase 2, tblRouterUtilities.json), resolved
     // ONCE here so computeRouterCost never falls back to a fabricated value.
     const rcRouterParams = grade ? await this.smLookup.getRouterParams(grade) : null;
+    // Same reasoning as rcWaterjetParams above — real, material+thickness-
+    // specific OxyFuel feed-rate/pierce-time data (sm_reference_data
+    // 'nestingCutRate:*:OxyFuelCut:*', migration 492), resolved ONCE here so
+    // computeOxyfuelCost never falls back to a fabricated value.
+    const rcOxyfuelParams = grade ? await this.smLookup.getOxyfuelParams(grade, thk) : null;
+    // Unlike rcWaterjetParams/rcOxyfuelParams/rcRouterParams above (resolved
+    // ONCE from material+thickness before machine selection), Laser Punch's
+    // real punch/nibble physics are per-SELECTED-MACHINE (sm_reference_data
+    // 'laserPunchMachine:*' rows) — resolved here by the machine mhrRates.
+    // laserPunch already picked, so computeLaserPunchCost never falls back
+    // to a fabricated value.
+    const rcLaserPunchParams = await this.smLookup.getLaserPunchMachineParams(mhrRates.laserPunch.machineName);
 
     const attachToRoutes = (dto: RouteComparisonDto): RouteComparisonDto => {
       for (const route of dto.routes) {
@@ -6037,34 +6110,28 @@ export class BOMItemsService {
 
       const pbRate = mhrRates.pressBrake;
       const rcCycleTimeSec = rcBendCalc.outputs['Cycle Time'];
-      if (typeof rcCycleTimeSec === 'number' && Number.isFinite(rcCycleTimeSec)) {
-        pressBrakeMin = rcCycleTimeSec / 60;
-      } else if (rcBendCalc.gap) {
-        const gap = rcBendCalc.gap;
-        comparisonWarnings.push(gap.gapType === 'missing_lookup'
-          ? `Press brake cycle time unavailable — ${gap.requiredAction}`
-          : `Press brake cycle time unavailable — ${gap.reason}`);
-      } else {
-        comparisonWarnings.push('Press brake cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
-      }
       const rcSetupTimeSec = rcBendCalc.outputs['Setup Time'];
-      const setupTimeMin = (typeof rcSetupTimeSec === 'number' && Number.isFinite(rcSetupTimeSec))
-        ? rcSetupTimeSec
-        : rcPbSetupMin.minutes;
-      const totalPBSec = pressBrakeMin * 60;
-      const setupCost = this.r2((setupTimeMin / 60) * pbRate.rate / Math.max(batchSize, 1));
-      const runCost   = this.r2((totalPBSec / 3600) * pbRate.rate);
-      pbLines.push({
-        process: 'Press Brake',
-        setupCost, runCost, totalCost: this.r2(setupCost + runCost),
-        cycleTimeMin: this.r2(pressBrakeMin),
-        hourlyRate: pbRate.rate, rateSource: pbRate.source,
-        machineClass: pbRate.machineClass, machineName: pbRate.machineName, commodityCode: pbRate.commodityCode,
-        ...(rcBendCalc.calculatorId ? { calculatorId: rcBendCalc.calculatorId } : {}),
-        ...(rcBendCalc.calculatorVersion != null ? { calculatorVersion: rcBendCalc.calculatorVersion } : {}),
-        ...(rcBendCalc.gap ? { physicsGap: rcBendCalc.gap } : {}),
-        ...(rcBendCalc.confidence ? { confidence: rcBendCalc.confidence } : {}),
+      // Platform Architecture Remediation Phase 1 — same registered
+      // computePressBrakeCost() engine computeCostSummary() now calls,
+      // instead of hand-rolled rate×time arithmetic that omitted labor/
+      // inspection-sampling/yield-loss cost. Cycle-time/setup-time
+      // resolution above (rcBendCalc) is unchanged — only the final cost
+      // composition is now shared.
+      const pbResult = computePressBrakeCost({
+        bendCount, batchSize,
+        rate: pbRate,
+        cycleTimeSecFromCalculator: typeof rcCycleTimeSec === 'number' ? rcCycleTimeSec : undefined,
+        setupTimeMinFromCalculator: typeof rcSetupTimeSec === 'number' ? rcSetupTimeSec : undefined,
+        fallbackSetupMin: rcPbSetupMin.minutes,
+        calculatorId: rcBendCalc.calculatorId,
+        calculatorVersion: rcBendCalc.calculatorVersion,
+        physicsGap: rcBendCalc.gap,
+        confidence: rcBendCalc.confidence,
+        ...rcEMithranCtx,
       });
+      comparisonWarnings.push(...pbResult.warnings);
+      pbLines.push(...pbResult.processLines);
+      pressBrakeMin = pbResult.cycleTimeMin;
     }
 
     const deburrLines: ProcessLineCost[] = [];
@@ -6080,8 +6147,12 @@ export class BOMItemsService {
       mhrRates.turret.machineClass,
       mhrRates.waterjet.machineClass,
       mhrRates.router.machineClass,
+      mhrRates.oxyfuelCut.machineClass,
+      mhrRates.shear.machineClass,
+      mhrRates.laserPunch.machineClass,
       mhrRates.standardPress.machineClass,
       mhrRates.tandemPress.machineClass,
+      mhrRates.progressiveDiePress.machineClass,
       mhrRates.holeForming.machineClass,
       mhrRates.inspection.machineClass,
     ], family);
@@ -6145,31 +6216,23 @@ export class BOMItemsService {
         },
       });
       const deburrSec = rcDeburrCalc.outputs['Total Time'];
-      if (typeof deburrSec === 'number' && Number.isFinite(deburrSec)) {
-        deburrMin = deburrSec / 60;
-      } else if (rcDeburrCalc.gap) {
-        const gap = rcDeburrCalc.gap;
-        comparisonWarnings.push(gap.gapType === 'missing_lookup'
-          ? `Deburring cycle time unavailable — ${gap.requiredAction}`
-          : `Deburring cycle time unavailable — ${gap.reason}`);
-      } else {
-        comparisonWarnings.push('Deburring cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
-      }
       const deburrRate = mhrRates.deburring;
-      const runCost = this.r2(((deburrSec ?? 0) / 3600) * deburrRate.rate);
-      const deburrIdentity = routeCompareProcessIdentities[deburrRate.machineClass];
-      deburrLines.push({
-        process: 'Deburring',
-        ...(deburrIdentity ? { processGroup: deburrIdentity.processGroup, processRoute: deburrIdentity.processRoute, operation: deburrIdentity.operation } : {}),
-        setupCost: 0, runCost, totalCost: runCost,
-        cycleTimeMin: this.r2(deburrMin),
-        hourlyRate: deburrRate.rate, rateSource: deburrRate.source,
-        machineClass: deburrRate.machineClass, machineName: deburrRate.machineName, commodityCode: deburrRate.commodityCode,
-        ...(rcDeburrCalc.calculatorId ? { calculatorId: rcDeburrCalc.calculatorId } : {}),
-        ...(rcDeburrCalc.calculatorVersion != null ? { calculatorVersion: rcDeburrCalc.calculatorVersion } : {}),
-        ...(rcDeburrCalc.gap ? { physicsGap: rcDeburrCalc.gap } : {}),
-        ...(rcDeburrCalc.confidence ? { confidence: rcDeburrCalc.confidence } : {}),
+      // Platform Architecture Remediation Phase 1 — same registered
+      // computeDeburringCost() engine computeCostSummary() now calls.
+      const deburrResult = computeDeburringCost({
+        cutLengthMm,
+        rate: deburrRate,
+        processIdentity: routeCompareProcessIdentities[deburrRate.machineClass],
+        cycleTimeSecFromCalculator: typeof deburrSec === 'number' ? deburrSec : undefined,
+        calculatorId: rcDeburrCalc.calculatorId,
+        calculatorVersion: rcDeburrCalc.calculatorVersion,
+        physicsGap: rcDeburrCalc.gap,
+        confidence: rcDeburrCalc.confidence,
+        ...rcEMithranCtx,
       });
+      comparisonWarnings.push(...deburrResult.warnings);
+      deburrLines.push(...deburrResult.processLines);
+      deburrMin = deburrResult.cycleTimeMin;
     }
 
     // Hole Extrusion (Burring) — identical 3-stage computation to getCostSummary
@@ -6202,19 +6265,19 @@ export class BOMItemsService {
       const rcBurlStrokeTonnage = this.resolveStrokeLookupTonnage(rcBurlTonnage, mhrRates.holeForming);
       const rcBurlStroke = await this.smLookup.getManualStrokeTime(thk, rcBurlStrokeTonnage, rcBurlComplexity);
       const totalBurlSec = rcExtrudedFlangeCount * rcBurlStroke.secondsPerBend;
-      const burringMin = totalBurlSec / 60;
       const holeFormingRate = mhrRates.holeForming;
-      const setupCost = this.r2((BURRING_SETUP_MIN / 60) * holeFormingRate.rate / Math.max(batchSize, 1));
-      const runCost   = this.r2((totalBurlSec / 3600) * holeFormingRate.rate);
-      const burringIdentity = routeCompareProcessIdentities[holeFormingRate.machineClass];
-      burringLines.push({
-        process: 'Hole Extrusion (Burring)',
-        ...(burringIdentity ? { processGroup: burringIdentity.processGroup, processRoute: burringIdentity.processRoute, operation: burringIdentity.operation } : {}),
-        setupCost, runCost, totalCost: this.r2(setupCost + runCost),
-        cycleTimeMin: this.r2(burringMin),
-        hourlyRate: holeFormingRate.rate, rateSource: holeFormingRate.source,
-        machineClass: holeFormingRate.machineClass, machineName: holeFormingRate.machineName, commodityCode: holeFormingRate.commodityCode,
+      // Platform Architecture Remediation Phase 1 — same registered
+      // computeHoleExtrusionCost() engine computeCostSummary() now calls.
+      const burringResult = computeHoleExtrusionCost({
+        extrudedFlangeCount: rcExtrudedFlangeCount, batchSize,
+        rate: holeFormingRate,
+        processIdentity: routeCompareProcessIdentities[holeFormingRate.machineClass],
+        cycleTimeSecFromCalculator: totalBurlSec,
+        fallbackSetupMin: BURRING_SETUP_MIN,
+        ...rcEMithranCtx,
       });
+      comparisonWarnings.push(...burringResult.warnings);
+      burringLines.push(...burringResult.processLines);
     }
 
     const tappingLines: ProcessLineCost[] = [];
@@ -6231,32 +6294,24 @@ export class BOMItemsService {
       const rcThreadsNoDepth = threads.map((t) => ({ ...t, depthMm: undefined }));
       const rcTappingCalc = await this.resolveTappingCycleTimeSec(accessToken, rcThreadsNoDepth, sheetThicknessMm, grade);
       const totalSec = rcTappingCalc.cycleTimeSec;
-      if (typeof totalSec === 'number' && Number.isFinite(totalSec)) {
-        tappingMin = totalSec / 60;
-      } else if (rcTappingCalc.gap) {
-        const gap = rcTappingCalc.gap;
-        comparisonWarnings.push(gap.gapType === 'missing_lookup'
-          ? `Tapping cycle time unavailable — ${gap.requiredAction}`
-          : `Tapping cycle time unavailable — ${gap.reason}`);
-      } else {
-        comparisonWarnings.push('Tapping cycle time unavailable — no calculator result and no reported gap (unexpected; check resolveTappingCycleTimeSec).');
-      }
       const tappingRate = mhrRates.tapping;
-      const setupCost = this.r2((TAPPING_SETUP_MIN / 60) * tappingRate.rate / Math.max(batchSize, 1));
-      const runCost   = this.r2(((totalSec ?? 0) / 3600) * tappingRate.rate);
-      const tappingIdentity = routeCompareProcessIdentities[tappingRate.machineClass];
-      tappingLines.push({
-        process: 'Tapping',
-        ...(tappingIdentity ? { processGroup: tappingIdentity.processGroup, processRoute: tappingIdentity.processRoute, operation: tappingIdentity.operation } : {}),
-        setupCost, runCost, totalCost: this.r2(setupCost + runCost),
-        cycleTimeMin: this.r2(tappingMin),
-        hourlyRate: tappingRate.rate, rateSource: tappingRate.source,
-        machineClass: tappingRate.machineClass, machineName: tappingRate.machineName, commodityCode: tappingRate.commodityCode,
-        ...(rcTappingCalc.calculatorId ? { calculatorId: rcTappingCalc.calculatorId } : {}),
-        ...(rcTappingCalc.calculatorVersion != null ? { calculatorVersion: rcTappingCalc.calculatorVersion } : {}),
-        ...(rcTappingCalc.gap ? { physicsGap: rcTappingCalc.gap } : {}),
-        ...(rcTappingCalc.confidence ? { confidence: rcTappingCalc.confidence } : {}),
+      // Platform Architecture Remediation Phase 1 — same registered
+      // computeTappingCost() engine computeCostSummary() now calls.
+      const tappingResult = computeTappingCost({
+        threadCount: threads.length, batchSize,
+        rate: tappingRate,
+        processIdentity: routeCompareProcessIdentities[tappingRate.machineClass],
+        cycleTimeSecFromCalculator: typeof totalSec === 'number' ? totalSec : undefined,
+        fallbackSetupMin: TAPPING_SETUP_MIN,
+        calculatorId: rcTappingCalc.calculatorId,
+        calculatorVersion: rcTappingCalc.calculatorVersion,
+        physicsGap: rcTappingCalc.gap,
+        confidence: rcTappingCalc.confidence,
+        ...rcEMithranCtx,
       });
+      comparisonWarnings.push(...tappingResult.warnings);
+      tappingLines.push(...tappingResult.processLines);
+      tappingMin = tappingResult.cycleTimeMin;
     }
 
     // Inspection (general-purpose, tiered — see costing/inspection-engine.ts).
@@ -6426,8 +6481,12 @@ export class BOMItemsService {
       [mhrRates.turret.machineClass, mhrRates.turret],
       [mhrRates.waterjet.machineClass, mhrRates.waterjet],
       [mhrRates.router.machineClass, mhrRates.router],
+      [mhrRates.oxyfuelCut.machineClass, mhrRates.oxyfuelCut],
+      [mhrRates.shear.machineClass, mhrRates.shear],
+      [mhrRates.laserPunch.machineClass, mhrRates.laserPunch],
       [mhrRates.standardPress.machineClass, mhrRates.standardPress],
       [mhrRates.tandemPress.machineClass, mhrRates.tandemPress],
+      [mhrRates.progressiveDiePress.machineClass, mhrRates.progressiveDiePress],
     ]);
 
     const routes: RouteResultDto[] = [];
@@ -6448,9 +6507,18 @@ export class BOMItemsService {
         waterjetParams: rcWaterjetParams,
         turretParams: effectiveTurretParams,
         routerParams: rcRouterParams,
+        oxyfuelParams: rcOxyfuelParams,
+        laserPunchParams: rcLaserPunchParams,
         abrasiveKgPerMin: effectiveAbrasiveRate.kgPerMin,
         opSetupMin: this.smLookup.resolveOpSetupMin(rcOpSetupTimes, engine.machineClass).minutes,
         partWeightKg: grossWeightKg,
+        // Platform Architecture Remediation Phase 1 — threading these closes
+        // the divergence where Turret/Waterjet/Router/Standard-Press/Tandem-
+        // Press routes used to omit labor/inspection-sampling/yield-loss cost
+        // entirely (only Laser Cutting's separate primary-path formula had
+        // them). Same shared context every other engine call in this method
+        // now uses.
+        ...rcEMithranCtx,
         ...(engine.machineClass === 'turret_punch' ? { handlingAllowance: rcHandlingAllowance } : {}),
         ...(engine.machineClass === 'waterjet' ? { nozzleRate: rcNozzleRate } : {}),
         ...(engine.machineClass === 'fiber_laser' ? {
@@ -6653,7 +6721,7 @@ export class BOMItemsService {
     finishedWeightKg: number;
     maxLength: number;
     maxWidth: number;
-    blankResult: import('./costing/blank-optimizer.service').BlankResult | null;
+    blankResult: import('./costing/sheet-metal/machine/blank-optimizer.service').BlankResult | null;
     materialDensityKgM3: number;
     materialCostPerKg: number;
   }): BlankSpecDto {

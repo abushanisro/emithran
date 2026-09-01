@@ -1,0 +1,62 @@
+[
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Gross Usage",
+    "suggestion": "structured/processes.json has \"Material Stock\" (now confirmed live, separately, under this same route) -- \"Gross Usage\" may be an unrelated real operation, not a renamed Material Stock. Confirm before aliasing."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Net Usage",
+    "suggestion": "Same as \"Gross Usage\" -- confirm before aliasing to anything."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Hole Extrusion (Burring)",
+    "suggestion": "A real registered engine exists (hole-extrusion-engine.ts, Phase 1) but process_operations.json has no top-level family by this name -- a genuine offline-data gap."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Fiber laser Cutting",
+    "suggestion": "Possible duplicate/legacy spelling of \"Fiber Laser Cut\" -- confirm live_active + whether this is a dead legacy row before merging operation data onto it."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Plasma Cutting",
+    "suggestion": "Possible duplicate/rename of \"Plasma Cut\" -- process_operations.json only has a \"Plasma Cut\" family. Confirm before aliasing."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "3D Laser Cut",
+    "suggestion": "Possible duplicate/rename of \"3D Laser\". Confirm before aliasing."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Shearing",
+    "suggestion": "Migration 605 documents this as reusing machine_class=press_brake with NO distinct shearing cost path (deliberately deactivated) -- NOT the same as process_operations.json's separate \"Shear\" family (also not_modeled/deactivated, \"Shear:Shear//Blank\" only). Two dead-end names, not confirmed to be the same real thing. Left unaliased."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Shearning",
+    "suggestion": "Same situation as \"Shearing\" -- migration 605's documented press_brake reuse, not confirmed identical to the \"Shear\" family. Left unaliased."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Abrasive Waterjet Cutting",
+    "suggestion": "Likely a real physical variant of Waterjet Cut (abrasive vs. pure), not just a spelling difference. Decide whether it should share Waterjet Cut's data or stay a bare row."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Pure Waterjet Cutting (for soft materials)",
+    "suggestion": "Likely a real physical variant of Waterjet Cut. Decide whether it should share Waterjet Cut's data or stay a bare row."
+  },
+  {
+    "process_group": "Sheet Metal",
+    "process_name": "Turret Punching",
+    "suggestion": "Possible rename of \"Turret Press\". Confirm before aliasing."
+  },
+  {
+    "process_group": "Plastic & Rubber",
+    "process_name": "Reaction Foam Molding",
+    "suggestion": "A real wording difference from the Injection Molding digital-factory file's \"Reaction Injection Molding\" (not just casing) -- could be the same real process under a different name, or genuinely different. Not auto-aliased."
+  }
+]

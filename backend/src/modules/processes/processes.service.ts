@@ -21,6 +21,7 @@ import {
   ProcessCalculatorMappingResponseDto,
   ProcessCalculatorMappingListResponseDto,
   ProcessHierarchyDto,
+  ProcessTaxonomyHint,
 } from './dto/process-calculator-mapping.dto';
 
 @Injectable()
@@ -766,9 +767,9 @@ export class ProcessesService {
       throw new InternalServerErrorException(`Failed to fetch process calculator mappings: ${error.message}`);
     }
 
-    const hints = await this.getOperationReferenceHints(client, data ?? []);
+    const taxonomy = await this.getTaxonomyForMappings(client, data ?? []);
     const mappings = (data || []).map((row) =>
-      ProcessCalculatorMappingResponseDto.fromDatabase(row, hints.get(row.id)),
+      ProcessCalculatorMappingResponseDto.fromDatabase(row, taxonomy.get(row.canonical_process_id)),
     );
 
     return {
@@ -780,42 +781,52 @@ export class ProcessesService {
   }
 
   /**
-   * Batched lookup for the reference-tool cross-reference shown alongside
-   * each operation (sm_operation_reference_map, migration 504) — one query
-   * for the whole page of mappings instead of N, since both source tables
-   * are small (a few dozen rows) and shared across every row.
+   * Batched taxonomy lookup for the Process page's operation pills — one
+   * pair of queries for the whole page of mappings instead of N, keyed by
+   * canonical_process_id (migration 610's FK on process_calculator_mappings,
+   * backfilled from process_taxonomy's live-snapshot-derived canonical
+   * rows). Supersedes the old sm_operation_reference_map/sm_reference_data
+   * hint (migration 504) — that only covered ~25 hand-picked Sheet Metal
+   * name matches with a single "example machine" string; this covers every
+   * linked row across all 6 groups with real feature-type-granular
+   * operations, aliases, and default machine/tool-shop, sourced from
+   * process_taxonomy (migration 609).
    */
-  private async getOperationReferenceHints(
+  private async getTaxonomyForMappings(
     client: ReturnType<SupabaseService['getClient']>,
     rows: any[],
-  ): Promise<Map<string, { sourceProcessName: string; exampleMachine: string | null }>> {
-    const result = new Map<string, { sourceProcessName: string; exampleMachine: string | null }>();
-    if (rows.length === 0) return result;
+  ): Promise<Map<string, ProcessTaxonomyHint>> {
+    const result = new Map<string, ProcessTaxonomyHint>();
+    const canonicalIds = Array.from(new Set(rows.map((r) => r.canonical_process_id).filter(Boolean)));
+    if (canonicalIds.length === 0) return result;
 
-    const { data: mapRows, error: mapError } = await client
-      .from('sm_operation_reference_map')
-      .select('process_group, process_route, operation, source_process_name');
-    if (mapError || !mapRows || mapRows.length === 0) return result;
+    const [{ data: taxonomyRows }, { data: operationRows }, { data: aliasRows }] = await Promise.all([
+      client.from('process_taxonomy').select('id, default_machine_name, default_tool_shop_name, roadmap_status').in('id', canonicalIds),
+      client.from('process_taxonomy_operations').select('canonical_process_id, operation_category, feature_type, raw_compound_string').in('canonical_process_id', canonicalIds),
+      client.from('process_taxonomy_aliases').select('canonical_process_id, alias, source').in('canonical_process_id', canonicalIds),
+    ]);
 
-    const sourceNames = Array.from(new Set(mapRows.map((r: any) => r.source_process_name)));
-    const machineKeys = sourceNames.map((n) => `processDefaultMachine:${n}`);
-    const { data: machineRows } = await client
-      .from('sm_reference_data')
-      .select('key, value')
-      .eq('category', 'process')
-      .in('key', machineKeys);
-    const machineByName = new Map<string, string | null>(
-      (machineRows ?? []).map((r: any) => [r.key.replace('processDefaultMachine:', ''), r.value ?? null]),
-    );
+    const operationsByCanonicalId = new Map<string, { operationCategory: string | null; featureType: string | null; raw: string }[]>();
+    for (const op of operationRows ?? []) {
+      const list = operationsByCanonicalId.get(op.canonical_process_id) ?? [];
+      list.push({ operationCategory: op.operation_category, featureType: op.feature_type, raw: op.raw_compound_string });
+      operationsByCanonicalId.set(op.canonical_process_id, list);
+    }
+    const aliasesByCanonicalId = new Map<string, string[]>();
+    for (const a of aliasRows ?? []) {
+      const list = aliasesByCanonicalId.get(a.canonical_process_id) ?? [];
+      list.push(a.alias);
+      aliasesByCanonicalId.set(a.canonical_process_id, list);
+    }
 
-    const byKey = new Map<string, string>(
-      mapRows.map((r: any) => [`${r.process_group}::${r.process_route}::${r.operation}`, r.source_process_name]),
-    );
-    for (const row of rows) {
-      const sourceProcessName = byKey.get(`${row.process_group}::${row.process_route}::${row.operation}`);
-      if (sourceProcessName) {
-        result.set(row.id, { sourceProcessName, exampleMachine: machineByName.get(sourceProcessName) ?? null });
-      }
+    for (const t of taxonomyRows ?? []) {
+      result.set(t.id, {
+        defaultMachineName: t.default_machine_name ?? null,
+        defaultToolShopName: t.default_tool_shop_name ?? null,
+        roadmapStatus: t.roadmap_status,
+        aliases: aliasesByCanonicalId.get(t.id) ?? [],
+        operations: operationsByCanonicalId.get(t.id) ?? [],
+      });
     }
     return result;
   }
@@ -838,8 +849,8 @@ export class ProcessesService {
       throw new NotFoundException(`Process calculator mapping with ID ${id} not found`);
     }
 
-    const hints = await this.getOperationReferenceHints(client, [data]);
-    return ProcessCalculatorMappingResponseDto.fromDatabase(data, hints.get(data.id));
+    const taxonomy = await this.getTaxonomyForMappings(client, [data]);
+    return ProcessCalculatorMappingResponseDto.fromDatabase(data, taxonomy.get(data.canonical_process_id));
   }
 
   /**

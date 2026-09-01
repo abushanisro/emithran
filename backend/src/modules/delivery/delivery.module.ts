@@ -22,6 +22,10 @@ import { InvoiceService } from './services/invoice.service';
             user: config.get('SUPABASE_DB_USER'),
             password: config.get('SUPABASE_DB_PASSWORD'),
             database: config.get('SUPABASE_DB_NAME', 'postgres'),
+            // Supabase's pooler (port 6543) requires TLS but presents a cert chain
+            // Node doesn't trust by default. Scoped here instead of disabling
+            // certificate validation process-wide via NODE_TLS_REJECT_UNAUTHORIZED.
+            ssl: { rejectUnauthorized: false },
           },
           migrations: {
             directory: './migrations'

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { resolveBendRadiusMinFactor, resolveMinHoleDiameterRatio } from '../costing/default-rates';
+import { resolveBendRadiusMinFactor, resolveMinHoleDiameterRatio } from '../costing/shared/core/default-rates.constants';
 
 // Real, sourced minimum hole-to-bend distance factor (radius/thickness) —
 // see sm_reference_data category='lookup_table',

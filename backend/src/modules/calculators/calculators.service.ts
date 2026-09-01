@@ -3,9 +3,9 @@ import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { evaluateCalculatorFormulas } from './calculator-formula-evaluator';
 import { PHYSICS_REGISTRY } from './physics-registry';
-import { SheetMetalLookupService, normaliseLaserMaterial } from '../bom-items/costing/sheet-metal-lookup.service';
+import { SheetMetalLookupService, normaliseLaserMaterial } from '../bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { BOMItemsService } from '../bom-items/bom-items.service';
-import { resolveNetUsagePhysics } from '../bom-items/costing/sheet-metal-net-usage.physics';
+import { resolveNetUsagePhysics } from '../bom-items/costing/sheet-metal/raw-material/sheet-metal-net-usage.physics';
 import {
   CreateCalculatorDto,
   UpdateCalculatorDto,

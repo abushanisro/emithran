@@ -3,7 +3,7 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
 import {
   LOCATION_INFO,
-} from '../bom-items/costing/default-rates';
+} from '../bom-items/costing/shared/core/default-rates.constants';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

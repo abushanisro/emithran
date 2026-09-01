@@ -39,7 +39,6 @@ import { ManufacturingIntelligenceModule } from './modules/manufacturing-intelli
 import { ManufacturingKnowledgeModule } from './modules/manufacturing-knowledge/manufacturing-knowledge.module';
 import { ShouldCostModule } from './modules/should-cost/should-cost.module';
 import { CostingModule } from './modules/costing/costing.module';
-import { EchoModule } from './modules/echo/echo.module';
 import { ManufacturingRulesModule } from './modules/manufacturing-rules/manufacturing-rules.module';
 import { FxModule } from './common/fx/fx.module';
 import { RequestLogInterceptor } from './modules/developer/interceptors/request-log.interceptor';
@@ -48,8 +47,6 @@ import { SupabaseService } from './common/supabase/supabase.service';
 import { SupabaseAuthGuard } from './common/guards/supabase-auth.guard';
 import { validate } from './config/env.validation';
 import { AppController } from './app.controller';
-
-console.log('🔥 DEBUG: AppController imported:', AppController.name);
 
 @Module({
   imports: [
@@ -113,7 +110,6 @@ console.log('🔥 DEBUG: AppController imported:', AppController.name);
     ManufacturingKnowledgeModule,
     ShouldCostModule,
     CostingModule,
-    EchoModule,
     ManufacturingRulesModule,
     FxModule,
   ],

@@ -34,7 +34,7 @@ import { MachineOverrideDto } from './dto/machine-selection.dto';
 import { CostOverrideDto } from './dto/cost-override.dto';
 import { ApplyRouteDto, type ApplyRouteResult, ApplyCustomRouteDto, type ApplyCustomRouteResult } from './dto/apply-route.dto';
 import type { PhysicsGap } from './dto/cost-breakdown.dto';
-import { LOCATION_INFO } from './costing/default-rates';
+import { LOCATION_INFO } from './costing/shared/core/default-rates.constants';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

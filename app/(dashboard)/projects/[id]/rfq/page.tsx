@@ -15,13 +15,11 @@ import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
 import { formatDistanceToNow, isAfter } from 'date-fns';
 import { useState } from 'react';
-import { usePageContext } from '@/lib/echo/PageContextProvider';
 
 export default function RFQPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  usePageContext({ entityType: 'project', entityId: projectId, breadcrumbs: ['Project', 'RFQ'] });
   const [selectedRfq, setSelectedRfq] = useState<string | null>(null);
   const [emailView, setEmailView] = useState<'overview' | 'compose' | 'history'>('overview');
 

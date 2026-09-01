@@ -2,6 +2,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 
 // Types
+// Real cross-domain taxonomy data (process_taxonomy, migration 609/610) —
+// feature-type-granular operations, aliases, and default machine/tool-shop
+// for the real-world process this mapping's operation resolves to.
+// operations/aliases are empty arrays (not absent) when a linked row
+// genuinely has neither — an honest "no further detail", never fabricated.
+export interface ProcessTaxonomyHint {
+  defaultMachineName: string | null;
+  defaultToolShopName: string | null;
+  roadmapStatus: string;
+  aliases: string[];
+  operations: { operationCategory: string | null; featureType: string | null; raw: string }[];
+}
+
 export interface ProcessCalculatorMapping {
   id: string;
   processGroup: string;
@@ -15,10 +28,8 @@ export interface ProcessCalculatorMapping {
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
-  // Real reconciliation-export cross-reference (sm_operation_reference_map,
-  // migration 504) — present only for operations with a clean, justified
-  // name match; informational only, never a live cost input.
-  referenceHint?: { sourceProcessName: string; exampleMachine: string | null };
+  canonicalProcessId?: string;
+  taxonomy?: ProcessTaxonomyHint;
 }
 
 export interface ProcessHierarchy {

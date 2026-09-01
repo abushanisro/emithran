@@ -1,7 +1,7 @@
 import { IsString, IsOptional, IsInt, Min, IsIn, IsArray, ArrayMinSize, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { RouteId } from './route-comparison.dto';
-import { getCuttingRouteIds } from '../costing/manufacturing-process-registry';
+import { getCuttingRouteIds } from '../costing/shared/core/manufacturing-process-registry';
 
 // Sheet-metal cutting ids come from MANUFACTURING_PROCESS_REGISTRY (via
 // getCuttingRouteIds) — the same single source of truth getRouteComparison's

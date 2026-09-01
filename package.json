@@ -4,19 +4,19 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "copy .env.development .env && next dev",
-    "dev:prod": "copy .env.production .env && next dev",
+    "dev": "shx cp .env.development .env && next dev",
+    "dev:prod": "shx cp .env.production .env && next dev",
     "build": "next build",
-    "build:dev": "copy .env.development .env && next build",
-    "build:prod": "copy .env.production .env && next build",
+    "build:dev": "shx cp .env.development .env && next build",
+    "build:prod": "shx cp .env.production .env && next build",
     "start": "node .next/standalone/server.js",
     "start:production": "NODE_ENV=production node .next/standalone/server.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "switch:dev": "copy .env.development .env && echo Switched to development environment",
-    "switch:prod": "copy .env.production .env && echo Switched to production environment"
+    "switch:dev": "shx cp .env.development .env && echo Switched to development environment",
+    "switch:prod": "shx cp .env.production .env && echo Switched to production environment"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -115,6 +115,7 @@
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^17.6.0",
     "prettier": "^3.8.3",
+    "shx": "0.4.0",
     "typescript-eslint": "^8.59.4",
     "vitest": "3.2.7"
   },
