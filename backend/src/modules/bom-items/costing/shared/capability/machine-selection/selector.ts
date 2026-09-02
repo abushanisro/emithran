@@ -57,7 +57,7 @@ const BASE_COLUMNS =
   'id, machine_name, commodity_code, process_group, machine_class, ' +
   'total_machine_hour_rate, manual_mhr_value, fully_burdened_local_per_hr, ' +
   'capacity_utilization_rate, operators, usd_lhr_total, ' +
-  'press_cycle_time_s, handling_time_const_s, handling_time_mass_coeff_s_per_kg';
+  'press_cycle_time_s, handling_time_const_s, handling_time_mass_coeff_s_per_kg, setup_time_hr';
 
 // ── Row classification (same guards as the legacy resolveMHRRates) ────────────
 
@@ -83,6 +83,7 @@ interface RawMachineRow {
   press_cycle_time_s?: number | string | null;
   handling_time_const_s?: number | string | null;
   handling_time_mass_coeff_s_per_kg?: number | string | null;
+  setup_time_hr?: number | string | null;
   // Capability columns — absent until migration 324 runs
   max_x_mm?: number | string | null;
   max_y_mm?: number | string | null;
@@ -352,6 +353,7 @@ export async function fetchMachinePool(
       pressCycleTimeS: num(raw.press_cycle_time_s),
       handlingConstS: num(raw.handling_time_const_s),
       handlingMassCoeffSPerKg: num(raw.handling_time_mass_coeff_s_per_kg),
+      setupTimeHr: num(raw.setup_time_hr),
     });
   }
 
@@ -806,6 +808,7 @@ function makeDefaultCandidate(_location: string, cls: MachineClass, fallbackRate
     pressCycleTimeS: null,
     handlingConstS: null,
     handlingMassCoeffSPerKg: null,
+    setupTimeHr: null,
   };
 }
 

@@ -80,6 +80,21 @@ export class ProcessesController {
     return this.processesService.getProcessHierarchy(token);
   }
 
+  @Get('variables')
+  @ApiOperation({ summary: 'Get domain reference-data variables (sm_reference_data / im_reference_data)' })
+  @ApiResponse({ status: 200, description: 'Domain variables retrieved successfully' })
+  async getDomainVariables(
+    @Query('domain') domain: 'sheet_metal' | 'injection_molding',
+    @AccessToken() token: string,
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+  ) {
+    if (domain !== 'sheet_metal' && domain !== 'injection_molding') {
+      throw new BadRequestException("domain must be 'sheet_metal' or 'injection_molding'");
+    }
+    return this.processesService.getDomainVariables(domain, token, search, category);
+  }
+
   @Get('calculator-mappings')
   @ApiOperation({ summary: 'Get all process calculator mappings' })
   @ApiResponse({ status: 200, description: 'Process calculator mappings retrieved successfully', type: ProcessCalculatorMappingListResponseDto })

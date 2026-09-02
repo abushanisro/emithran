@@ -38,6 +38,15 @@ export interface OxyfuelParams {
 // Real, thickness-specific turret-punch cycle-time params resolved by the
 // caller from sm_lookup_turret_punch (migration 414) — same disclosed-
 // fallback convention as WaterjetParams above.
+// DEPRECATED as of 2026-09-02 — kept only because sm_lookup_turret_punch
+// (the DB source this resolves from) still exists and may still be surfaced
+// through the Process page's "Lookup Tables" admin editor. TurretPunchEngine
+// no longer reads hitsPerMin/nibbleMmPerMin from this: that DB table's own
+// seeded values (migration 414) turned out to be IDENTICAL to what used to
+// be a hardcoded "fallback" table in code — i.e. not independently-sourced
+// real machine data at all, just the same synthetic thickness-vs-speed
+// estimate duplicated into the DB. See TurretPunchMachineParams below for
+// the real per-machine data that replaced it.
 export interface TurretParams {
   hitsPerMin: number;
   nibbleMmPerMin: number;
@@ -60,10 +69,73 @@ export interface TurretParams {
 // diameter to keep the cut edge continuous), not a fabricated speed.
 // dataFound:false (no real row for this machine) means an honest $0
 // punch/nibble line, never a guess.
+// Real, per-SELECTED-MACHINE nibble physics + tool-change time (2026-09-02),
+// resolved by the caller from sm_reference_data's staged
+// 'turretPunchMachine:<machine name>' rows (machine_library.json's "Turret
+// Press (Punch Press)" category, all 21 real machines) via
+// SheetMetalLookupService.getTurretPunchMachineParams(). Same nibbling-
+// step-per-cycle derivation as LaserPunchParams above. Deliberately has NO
+// punchRateCyclesPerMin field — no real per-machine punch/hit-rate data
+// exists anywhere in the source for this category (verified across the
+// full field-name union of all 21 real machines) — TurretPunchEngine costs
+// punching at an honest $0 with a disclosed warning, never a guess.
+export interface TurretPunchMachineParams {
+  nibbleMmPerMin: number;
+  toolChangeSec: number;
+  dataFound: boolean;
+}
+
 export interface LaserPunchParams {
   punchRateCyclesPerMin: number;
   nibbleMmPerMin: number;
   toolChangeSec: number;
+  dataFound: boolean;
+}
+
+// Real, material+thickness+POWER-specific Plasma Cut/Plasma Punch feed-rate/
+// pierce-time params (2026-09-01), resolved by the caller from
+// sm_reference_data's staged 'nestingCutRate:*:PlasmaCut:*' (1153 rows) /
+// 'nestingCutRate:*:PlasmaPunch:*' (139 rows) via
+// SheetMetalLookupService.getPlasmaCutParams()/getPlasmaPunchParams().
+// Unlike OxyfuelParams (uniform 200W across all 18 real Oxyfuel machines, so
+// no power axis needed), real Plasma Cut/Punch machines span a genuine power
+// range (100W-100,000W / 30W-400W) that materially changes the real cut
+// rate — so these resolvers first look up the SELECTED machine's own real
+// power_watts (sm_reference_data 'plasmaCutMachine:<name>'/
+// 'plasmaPunchMachine:<name>'), then nearest-power + nearest-thickness match
+// against the cut-rate table. Only feedRateLargeFeaturesMmPerMin is used —
+// same disclosed scoping choice as OxyfuelParams. dataFound:false means an
+// honest $0 cutting line, never a guess.
+export interface PlasmaCutParams {
+  feedRateLargeFeaturesMmPerMin: number;
+  pierceTimeSec: number;
+  dataFound: boolean;
+}
+export interface PlasmaPunchParams {
+  feedRateLargeFeaturesMmPerMin: number;
+  pierceTimeSec: number;
+  dataFound: boolean;
+}
+
+// Real, per-SELECTED-MACHINE roll speed/prebend time (2026-09-01), resolved
+// by the caller from sm_reference_data's staged 'rollBenderMachine:<machine
+// name>' rows (machine_library.json's "2/3/4 Roll Bender" categories) via
+// SheetMetalLookupService.getRollBendingMachineParams() — per-unit specs,
+// not a shared material/thickness table, same resolution shape as
+// LaserPunchParams. prebendTimeSec is 0 for real 2-Roll machines (no
+// prebend step in the source data) and a real per-machine value for 3/4-Roll
+// (source data confirms this real physical distinction: 3/4-roll benders
+// need a separate pre-bend pass at the sheet's leading/trailing edges;
+// 2-roll benders don't). No real "target roll radius" CAD feature exists
+// yet to determine multi-pass counts (min/max single-vs-multi-pass
+// diameter/thickness fields exist per-machine in the source but have no
+// real geometry input to compare against) — a disclosed capability gap,
+// not modeled; this engine assumes steady-state single-pass, the same kind
+// of documented simplification Progressive Die Press's steady-state
+// assumption already uses elsewhere in this codebase.
+export interface RollBendingParams {
+  rollingSpeedMmPerSec: number;
+  prebendTimeSec: number;
   dataFound: boolean;
 }
 
@@ -98,8 +170,24 @@ export interface CuttingProcessContext {
   waterjetParams?: WaterjetParams | null;
   oxyfuelParams?: OxyfuelParams | null;
   turretParams?: TurretParams | null;
+  turretPunchMachineParams?: TurretPunchMachineParams | null;
   routerParams?: RouterParams | null;
   laserPunchParams?: LaserPunchParams | null;
+  plasmaCutParams?: PlasmaCutParams | null;
+  plasmaPunchParams?: PlasmaPunchParams | null;
+  rollBendingParams?: RollBendingParams | null;
+  // Real flat-pattern bounding dimensions (item.maxLength/maxWidth, the same
+  // real values laser/waterjet/etc. already use as bedLengthMm/bedWidthMm
+  // for machine-selection capability) — only RollBendingEngine reads these,
+  // as the real feed-length driver for its cycle-time formula (the
+  // dimension fed through the rolls). Absent means no real flat-pattern
+  // extraction yet for this part; the engine stays honestly $0 rather than
+  // guessing a length.
+  flatPatternLengthMm?: number | null;
+  flatPatternWidthMm?: number | null;
+  // Progressive Die Press only — real per-SELECTED-MACHINE setup_time_hr.
+  // See PressStrokeInput's own doc comment (press-stroke-engine.ts).
+  progressiveDieSetupMinFromMachine?: number | null;
   // Manufacturing Physics Calculator architecture: pre-resolved by the caller
   // via resolvePhysicsQuantity (bom-items.service.ts) for the engine whose
   // machineClass has a registered calculator (Laser Cutting today). Engines

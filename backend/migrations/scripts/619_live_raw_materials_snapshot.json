@@ -1,0 +1,4598 @@
+{
+  "exported_at": "2026-09-02T11:13:24.993Z",
+  "count": 574,
+  "rows": [
+    {
+      "id": "c36b724f-99f9-4b11-9690-3d4c2fb0d06e",
+      "material": "Generic 0.5ozCu",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 1.05
+    },
+    {
+      "id": "bd449201-3cbb-42da-8797-05e7589eb3c5",
+      "material": "Generic 1.5ozCu",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 2.79
+    },
+    {
+      "id": "2294c73d-9984-45d3-99f6-f63487251a22",
+      "material": "Generic 10122 Colorless",
+      "material_grade": null,
+      "material_type": "WaterClear",
+      "material_description": null,
+      "cost": 120.72
+    },
+    {
+      "id": "220f6d6c-b1a3-47f0-b25f-6da4d13e35a6",
+      "material": "Generic 12120 Orange-Red",
+      "material_grade": null,
+      "material_type": "ProtoTherm",
+      "material_description": null,
+      "cost": 120.72
+    },
+    {
+      "id": "08d69384-a3de-4276-967e-55cdae0ff0a9",
+      "material": "Generic 18120 Translucent",
+      "material_grade": null,
+      "material_type": "ProtoGen",
+      "material_description": null,
+      "cost": 120.72
+    },
+    {
+      "id": "c0606655-59b7-4563-b8ef-898b60bcc054",
+      "material": "Generic 18420 White",
+      "material_grade": null,
+      "material_type": "ProtoGen",
+      "material_description": null,
+      "cost": 120.72
+    },
+    {
+      "id": "d67e9e37-e676-49b3-8ea0-a38b55207db8",
+      "material": "Generic 18920 Grey",
+      "material_grade": null,
+      "material_type": "ProtoGen",
+      "material_description": null,
+      "cost": 120.72
+    },
+    {
+      "id": "04bc4ee0-99a5-4155-a1c9-236f478a2f38",
+      "material": "Generic 1ozCu",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 1.82
+    },
+    {
+      "id": "a28f6f74-eeeb-47fb-b4f7-7bd74b599093",
+      "material": "Generic 1Ply-0.5ozCu-FR4",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 6.86
+    },
+    {
+      "id": "a95949f4-d93f-4385-838e-c63446832bd0",
+      "material": "Generic 1Ply-1.5ozCu-FR4",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 11.45
+    },
+    {
+      "id": "39db5738-6251-46c5-908a-056d088fa734",
+      "material": "Generic 1Ply-1ozCu-FR4",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 9.15
+    },
+    {
+      "id": "96303a17-28b1-48bd-883e-cf593b19c999",
+      "material": "Generic 1Ply-2ozCu-FR4",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 14.45
+    },
+    {
+      "id": "56be6122-d4d9-426f-b434-fbd49df01682",
+      "material": "Generic 2ozCu",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 3.95
+    },
+    {
+      "id": "9f613a7e-8d33-4e00-b8e0-f3a8f78c00a3",
+      "material": "Generic 2Ply-0.5ozCu-FR4",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 7.23
+    },
+    {
+      "id": "5e98cb9d-7b46-4aa8-ac0a-1284453d6d50",
+      "material": "Generic 2Ply-1.5ozCu-FR4",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 12.07
+    },
+    {
+      "id": "a841a822-370f-4738-86cc-6d68f6dba596",
+      "material": "Generic 2Ply-1ozCu-FR4",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 9.64
+    },
+    {
+      "id": "90685ace-896d-4d40-aadf-0672406c3808",
+      "material": "Generic 2Ply-2ozCu-FR4",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 15.23
+    },
+    {
+      "id": "4b6e3d97-1266-45d6-a6a2-4ec40406b4db",
+      "material": "Generic 720 Transparent",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 113.17
+    },
+    {
+      "id": "d91cb0ae-e793-44b8-b310-ef5930fe9bbd",
+      "material": "Generic 830 White",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 125.75
+    },
+    {
+      "id": "905b32a5-0df5-4035-a384-86cf944f6336",
+      "material": "Generic 840 Blue",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 125.75
+    },
+    {
+      "id": "2ebccb98-44ab-4bf8-96e2-a350c7442e84",
+      "material": "Generic 850 Grey",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 125.75
+    },
+    {
+      "id": "4f1d49b6-17b3-44fd-b4a3-609fcb0d455a",
+      "material": "Generic 870 Black",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 125.75
+    },
+    {
+      "id": "bf21f43a-b596-4a0f-b6cf-f44c33a4ef47",
+      "material": "Generic 950 Grey",
+      "material_grade": null,
+      "material_type": "Tango",
+      "material_description": null,
+      "cost": 138.32
+    },
+    {
+      "id": "44b39c1f-430d-4b42-9c79-a51fbded9b3f",
+      "material": "Generic 970 Black",
+      "material_grade": null,
+      "material_type": "Tango",
+      "material_description": null,
+      "cost": 138.32
+    },
+    {
+      "id": "d0420a3c-15f8-4e2f-9afc-50da6d1c9434",
+      "material": "Generic 980 Black Plus",
+      "material_grade": null,
+      "material_type": "Tango",
+      "material_description": null,
+      "cost": 150.9
+    },
+    {
+      "id": "7fa924f7-38fc-4afc-838b-98b2fbaceea9",
+      "material": "Generic A6 Metal",
+      "material_grade": null,
+      "material_type": "LaserForm",
+      "material_description": null,
+      "cost": 39.54
+    },
+    {
+      "id": "c17eef12-2535-4b1c-a474-7fc3d7c8f183",
+      "material": "Generic ABS",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 1.53
+    },
+    {
+      "id": "51567cb7-6654-4e51-93f8-9e4468e17a20",
+      "material": "Generic ABS, 10% Glass Filled",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 2.02
+    },
+    {
+      "id": "47091b81-1572-4914-a38f-336010c01958",
+      "material": "Generic ABS, 30% Glass Filled",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 1.96
+    },
+    {
+      "id": "f4454f09-cd14-48ab-9561-225c7f43be29",
+      "material": "Generic ABS, Blow Molding",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 1.62
+    },
+    {
+      "id": "b6979c89-199d-4c4d-abad-e8ae2f0111f6",
+      "material": "Generic ABS, Extrusion Sheet",
+      "material_grade": null,
+      "material_type": "ABS - Extrusion",
+      "material_description": null,
+      "cost": 1.36
+    },
+    {
+      "id": "91544c1d-255b-415f-a178-b0bae0cbf547",
+      "material": "Generic ABS, Fittings",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 1.48
+    },
+    {
+      "id": "30373c41-d3e0-4130-9370-0a41963d5426",
+      "material": "Generic ABS, Flame Retardant",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 1.92
+    },
+    {
+      "id": "ba3fc1a9-fd66-4beb-9bc7-0485c1eccac4",
+      "material": "Generic ABS, High Heat",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 1.58
+    },
+    {
+      "id": "7ced592d-a053-40bc-bbb0-c547e6c82d01",
+      "material": "Generic ABS, High Impact",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 1.34
+    },
+    {
+      "id": "b70b5a28-e652-4717-9f56-0c6a6eeb5dd3",
+      "material": "Generic ABS, PC-ABS",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 1.82
+    },
+    {
+      "id": "8c71c567-0610-4f37-82dc-763009bed717",
+      "material": "Generic ABS, Platable",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 2.4
+    },
+    {
+      "id": "0df21ef6-53ec-4b57-be40-e092208a7acf",
+      "material": "Generic ABS, Transparent",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 2.46
+    },
+    {
+      "id": "29edd2f3-a29c-4296-9054-0625dc2a779a",
+      "material": "Generic ABS, X-Hi Impact",
+      "material_grade": null,
+      "material_type": "ABS",
+      "material_description": null,
+      "cost": 1.89
+    },
+    {
+      "id": "3876c1b4-ea07-4a4d-a5ce-dab2ff3dc01e",
+      "material": "Generic accuGen",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 88.03
+    },
+    {
+      "id": "2813fdd2-2c9e-4276-a901-fb7aa11bec74",
+      "material": "Generic Accura 10",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 97.58
+    },
+    {
+      "id": "c9bb8466-f025-4b7c-adc8-4271b41b3bfa",
+      "material": "Generic Accura 25",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 117.7
+    },
+    {
+      "id": "09459199-10b7-4905-ab5b-e902ed7a651f",
+      "material": "Generic Accura 40",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 117.7
+    },
+    {
+      "id": "52283e5d-368e-400f-9278-43a7d1cb0dea",
+      "material": "Generic Accura 48HTR",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 120.22
+    },
+    {
+      "id": "e9b2539e-3bc5-4cdd-9da4-37c6595372a9",
+      "material": "Generic Accura 50",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 117.7
+    },
+    {
+      "id": "a0e65c68-acf4-4454-baed-bce70b2256de",
+      "material": "Generic Accura 55",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 117.7
+    },
+    {
+      "id": "625818d5-8f2e-46ef-99d9-c9a8cc849598",
+      "material": "Generic Accura 60",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 117.7
+    },
+    {
+      "id": "0b5b1c34-7f7d-403e-afa8-ae3861bcdc9c",
+      "material": "Generic Accura Bluestone",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 200.19
+    },
+    {
+      "id": "7b0586b1-0af3-402d-9020-33daf73763e5",
+      "material": "Generic Accura ClearVue",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 150.4
+    },
+    {
+      "id": "c27deb18-868a-49ea-9638-6bc69c381b2e",
+      "material": "Generic Accura Peak",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 163.47
+    },
+    {
+      "id": "679e3389-639f-4fb9-8457-3473fdeea260",
+      "material": "Generic Accura Xtreme White 200",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 157.44
+    },
+    {
+      "id": "fe8a8989-9d6c-4744-8984-d5433169bc46",
+      "material": "Generic Acetal (Thermoplastic)",
+      "material_grade": null,
+      "material_type": "Thermoplastics",
+      "material_description": null,
+      "cost": 2.16
+    },
+    {
+      "id": "a166b7a5-5dba-4949-8f8f-f19ee8b6d3ef",
+      "material": "Generic Acetal, Blow Molding",
+      "material_grade": null,
+      "material_type": "Acetal",
+      "material_description": null,
+      "cost": 1.83
+    },
+    {
+      "id": "0c97ae77-47ea-4313-b980-f99834acfd6b",
+      "material": "Generic Acetal, Copolymer",
+      "material_grade": null,
+      "material_type": "Acetal",
+      "material_description": null,
+      "cost": 1.77
+    },
+    {
+      "id": "76b32c35-51e7-4bd7-872e-752911899cec",
+      "material": "Generic Acetal, Copolymer (30% GF)",
+      "material_grade": null,
+      "material_type": "Acetal",
+      "material_description": null,
+      "cost": 2.68
+    },
+    {
+      "id": "22198d8f-df48-4aff-b3c1-38cee6178efd",
+      "material": "Generic Acetal, Homopolymer",
+      "material_grade": null,
+      "material_type": "Acetal",
+      "material_description": null,
+      "cost": 2.36
+    },
+    {
+      "id": "d0ebc71c-a025-4ecd-b3c7-0f05bcac06c5",
+      "material": "Generic Acetal, Homopolymer (30% GF)",
+      "material_grade": null,
+      "material_type": "Acetal",
+      "material_description": null,
+      "cost": 3.03
+    },
+    {
+      "id": "59906eab-2c0f-4d47-b9ec-b0b68ecbdbbf",
+      "material": "Generic Acrylic PVC, PMMA",
+      "material_grade": null,
+      "material_type": "Acrylic",
+      "material_description": null,
+      "cost": 2.58
+    },
+    {
+      "id": "59872ddd-a7a1-4877-b6eb-11b1ede9224b",
+      "material": "Generic Acrylic, Blow Molding",
+      "material_grade": null,
+      "material_type": "Acrylic",
+      "material_description": null,
+      "cost": 1.57
+    },
+    {
+      "id": "3940e0bc-ffd1-4741-89d6-397eadda8445",
+      "material": "Generic Acrylic, PMMA",
+      "material_grade": null,
+      "material_type": "Acrylic",
+      "material_description": null,
+      "cost": 0.99
+    },
+    {
+      "id": "700955ff-a766-4208-9b3d-caebd73c3b6b",
+      "material": "Generic Aluminum - Honeycomb (Expanded 1)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 35.01
+    },
+    {
+      "id": "aff409b0-8aa2-4d42-b773-29ec178c327e",
+      "material": "Generic Aluminum - Honeycomb (Expanded 2)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 27.02
+    },
+    {
+      "id": "7998a939-19dc-4cd4-88bd-2e94b1c6fb61",
+      "material": "Generic Aluminum - Honeycomb (Standard)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 375.82
+    },
+    {
+      "id": "d11807e7-4765-4dcd-96db-4911b097f55b",
+      "material": "Generic Aluminum AlSi10Mg (Alloy Casting)",
+      "material_grade": null,
+      "material_type": "Aluminum Alloy",
+      "material_description": null,
+      "cost": 47.92
+    },
+    {
+      "id": "31db5745-4f08-4e3f-8f4b-2894ca715204",
+      "material": "Generic Aluminum Bronze",
+      "material_grade": null,
+      "material_type": "Aluminum Bronze",
+      "material_description": null,
+      "cost": 7.14
+    },
+    {
+      "id": "2b318f8a-e132-40da-ae59-9b4647f3ed42",
+      "material": "Generic Aluminum, AA 1100",
+      "material_grade": "Aluminum, AA 1100",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.961
+    },
+    {
+      "id": "5b6d6eef-a6c2-42a4-968a-b21d56fec1e1",
+      "material": "Generic Aluminum, AA 2219",
+      "material_grade": "Aluminum, AA 2219",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 6.499
+    },
+    {
+      "id": "32aee152-f199-4135-b239-9793c731a14f",
+      "material": "Generic Aluminum, AA 3105",
+      "material_grade": "Aluminum, AA 3105",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.864
+    },
+    {
+      "id": "a968a18b-cf62-4bbe-b69c-3b02cc0ac938",
+      "material": "Generic Aluminum, AA 380",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.75
+    },
+    {
+      "id": "9f5b0784-6e62-4a90-a51a-8cf5ad11fa20",
+      "material": "Generic Aluminum, AA 383",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.74
+    },
+    {
+      "id": "10f2a039-b678-4689-a7e8-d889f78a0f4f",
+      "material": "Generic Aluminum, AA 383.0",
+      "material_grade": "Aluminum, AA 383.0",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.748
+    },
+    {
+      "id": "599a033f-12a8-4f68-8c90-a307af67c72b",
+      "material": "Generic Aluminum, AA 7003",
+      "material_grade": "Aluminum, AA 7003",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.726
+    },
+    {
+      "id": "a9009bb8-ac03-425e-960b-b21c3f2a6e26",
+      "material": "Generic Aluminum, ANSI 1050A",
+      "material_grade": "Aluminum, ANSI 1050A",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.955
+    },
+    {
+      "id": "637356b3-35d0-44b1-be67-9a561cfc92d6",
+      "material": "Generic Aluminum, ANSI 2007",
+      "material_grade": "Aluminum, ANSI 2007",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 6.169
+    },
+    {
+      "id": "71589ae5-0bd9-4368-b8f7-96495f8c264a",
+      "material": "Generic Aluminum, ANSI 2011",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.79
+    },
+    {
+      "id": "b4280dac-7192-4d42-97cb-9572de469abb",
+      "material": "Generic Aluminum, ANSI 2017",
+      "material_grade": "Aluminum, ANSI 2017",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 6.217
+    },
+    {
+      "id": "ca0ae78e-6782-4b7a-b54b-4698aa0839f9",
+      "material": "Generic Aluminum, ANSI 2024",
+      "material_grade": "Aluminum, ANSI 2024",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 6.235
+    },
+    {
+      "id": "4b6bb8e2-7d6c-4228-ae67-09d0ae639210",
+      "material": "Generic Aluminum, ANSI 2030",
+      "material_grade": "Aluminum, ANSI 2030",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 6.168
+    },
+    {
+      "id": "c794b701-28b6-4e03-99d5-aca0b7fc378b",
+      "material": "Generic Aluminum, ANSI 3003",
+      "material_grade": "Aluminum, ANSI 3003",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.842
+    },
+    {
+      "id": "e5443b94-75bc-473a-8688-ef0d8a68808a",
+      "material": "Generic Aluminum, ANSI 3103",
+      "material_grade": "Aluminum, ANSI 3103",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.835
+    },
+    {
+      "id": "11d799f6-a4b6-4695-afff-d13ca584bf89",
+      "material": "Generic Aluminum, ANSI 5005",
+      "material_grade": "Aluminum, ANSI 5005",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 6.063
+    },
+    {
+      "id": "de74be63-294a-4534-b1a0-8b1d0927f1b1",
+      "material": "Generic Aluminum, ANSI 5005A",
+      "material_grade": "Aluminum, ANSI 5005A",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.904
+    },
+    {
+      "id": "8cb9e31b-e343-4cb4-84c7-7b136c0bb07d",
+      "material": "Generic Aluminum, ANSI 5019",
+      "material_grade": "Aluminum, ANSI 5019",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.663
+    },
+    {
+      "id": "ab6e12d6-ddcc-470f-b5a6-de7ef49f7370",
+      "material": "Generic Aluminum, ANSI 5052",
+      "material_grade": "Aluminum, ANSI 5052",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.846
+    },
+    {
+      "id": "9f1501a1-039c-49af-b97c-df982bfa6913",
+      "material": "Generic Aluminum, ANSI 5083",
+      "material_grade": "Aluminum, ANSI 5083",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.755
+    },
+    {
+      "id": "75fe6a9a-7a69-470f-b4ef-99be57480926",
+      "material": "Generic Aluminum, ANSI 5119",
+      "material_grade": "Aluminum, ANSI 5119",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.747
+    },
+    {
+      "id": "8c9fcada-a881-481e-bc75-66cefe530377",
+      "material": "Generic Aluminum, ANSI 5251",
+      "material_grade": "Aluminum, ANSI 5251",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.844
+    },
+    {
+      "id": "2a852ef3-cc3d-491f-b383-3c67d8597433",
+      "material": "Generic Aluminum, ANSI 5454",
+      "material_grade": "Aluminum, ANSI 5454",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.816
+    },
+    {
+      "id": "25313efd-0b30-4b3f-9029-e52e11bfd96a",
+      "material": "Generic Aluminum, ANSI 5754",
+      "material_grade": "Aluminum, ANSI 5754",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.979
+    },
+    {
+      "id": "f2208edc-fd2d-44d9-bd09-651626645cfd",
+      "material": "Generic Aluminum, ANSI 6012",
+      "material_grade": "Aluminum, ANSI 6012",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.818
+    },
+    {
+      "id": "febf89a8-2ae5-42e3-a654-1c9c849f5505",
+      "material": "Generic Aluminum, ANSI 6060",
+      "material_grade": "Aluminum, ANSI 6060",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.91
+    },
+    {
+      "id": "521440ae-24bd-471a-9ea0-2a1c59827552",
+      "material": "Generic Aluminum, ANSI 6061",
+      "material_grade": "Aluminum, ANSI 6061",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.875
+    },
+    {
+      "id": "6dd0cef3-e3f1-4660-b979-be81ee44ad3e",
+      "material": "Generic Aluminum, ANSI 6061 (LD30)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.77
+    },
+    {
+      "id": "9a3fa453-a55b-4b54-a5be-941133d7c242",
+      "material": "Generic Aluminum, ANSI 6082",
+      "material_grade": "Aluminum, ANSI 6082",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.819
+    },
+    {
+      "id": "67bb777d-c3f9-4a04-9032-6a2fa02aefa4",
+      "material": "Generic Aluminum, ANSI 6101",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": null
+    },
+    {
+      "id": "05da5296-9d19-4aa2-9704-a6c55c68245d",
+      "material": "Generic Aluminum, ANSI 7020",
+      "material_grade": "Aluminum, ANSI 7020",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.785
+    },
+    {
+      "id": "c068f53b-c3b8-45f8-a21e-f2085453b0c9",
+      "material": "Generic Aluminum, ANSI 7022",
+      "material_grade": "Aluminum, ANSI 7022",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.789
+    },
+    {
+      "id": "896080c3-a713-4872-8d49-ead9549fa503",
+      "material": "Generic Aluminum, ANSI 7050",
+      "material_grade": "Aluminum, ANSI 7050",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 6.054
+    },
+    {
+      "id": "65468664-1c4b-41e1-8dcd-809a0796a295",
+      "material": "Generic Aluminum, ANSI 7075",
+      "material_grade": "Aluminum, ANSI 7075",
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 5.831
+    },
+    {
+      "id": "a39d6ded-b2a8-40e1-911d-bc8fcca5a92e",
+      "material": "Generic Aluminum, ANSI AC-AIMg (51400)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.75
+    },
+    {
+      "id": "14fa47f8-ddeb-43f2-babe-7c62175d8c60",
+      "material": "Generic Aluminum, ANSI AC-AlCu (21100)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.75
+    },
+    {
+      "id": "50e0f261-733c-4908-955a-f7635a322402",
+      "material": "Generic Aluminum, ANSI AC-AlSi1 (43000)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.58
+    },
+    {
+      "id": "8a6581c1-034c-47ef-b2ac-f53801e6a908",
+      "material": "Generic Aluminum, ANSI AC-AlSi1 (43400)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.8
+    },
+    {
+      "id": "c5ca73da-7d92-4aaf-9737-e4cff619efcc",
+      "material": "Generic Aluminum, ANSI AC-AlSi1 (47000)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.53
+    },
+    {
+      "id": "64f60717-a49d-4807-9470-4c79b0bf7d34",
+      "material": "Generic Aluminum, ANSI AC-AlSi1 (47100)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.91
+    },
+    {
+      "id": "396ba9a8-ea2f-490f-b13c-e82fa23e010b",
+      "material": "Generic Aluminum, ANSI AC-AlSi12 (44200)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.53
+    },
+    {
+      "id": "62e2b1ba-e78b-4c30-8c9b-d0101a4d54db",
+      "material": "Generic Aluminum, ANSI AC-AlSi6 (45000)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.75
+    },
+    {
+      "id": "5eaeb8d2-f357-42cd-8607-7b8c4f6bb521",
+      "material": "Generic Aluminum, ANSI AC-AlSi7 (42100)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.65
+    },
+    {
+      "id": "a84d6536-6f07-4278-ab2a-b6c26b05765e",
+      "material": "Generic Aluminum, ANSI AC-AlSi7 (42200)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.54
+    },
+    {
+      "id": "b685cb37-3643-4741-b88f-93661ab37044",
+      "material": "Generic Aluminum, ANSI AC-AlSi9 (43300)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.53
+    },
+    {
+      "id": "0f5806b5-76a5-4ef4-9aaa-a8dfb57793cc",
+      "material": "Generic Aluminum, ANSI AC-AlSi9 (46000)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.6
+    },
+    {
+      "id": "81ad3b5a-57c7-41d8-9e52-aca27a5934f3",
+      "material": "Generic Aluminum, ANSI AC-AlSi9 (46200)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.76
+    },
+    {
+      "id": "cd97ced5-d64d-4c8e-8229-f31a471492f0",
+      "material": "Generic Aluminum, ANSI AIMg1",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.8
+    },
+    {
+      "id": "a4c02df1-012e-4100-b9bf-31d18da9371d",
+      "material": "Generic Aluminum, ANSI AIMg1 (3.0506)",
+      "material_grade": null,
+      "material_type": "Aluminum",
+      "material_description": null,
+      "cost": 2.72
+    },
+    {
+      "id": "4a0a9bc2-3bf7-4a22-8020-954338f5dac0",
+      "material": "Generic Aramid - Honeycomb (15% Fiber)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 35.24
+    },
+    {
+      "id": "f551078d-c54c-479b-8967-21072758158a",
+      "material": "Generic Aramid - Honeycomb (20% Fiber)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 38.49
+    },
+    {
+      "id": "214f38fb-cdcd-4c1f-a8b4-b2c3ccb81229",
+      "material": "Generic Aramid - Honeycomb (25% Fiber)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 54.06
+    },
+    {
+      "id": "a2eba121-fc30-4e0a-9bf6-ff4e425bac12",
+      "material": "Generic ASTM A148 Grade (G32NiCrMo8)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.71
+    },
+    {
+      "id": "3c8395a0-25bc-4271-948e-c7aff1ada05e",
+      "material": "Generic ASTM A148 Grade (G34CrMo4)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.48
+    },
+    {
+      "id": "3888b52e-c365-45a8-b3cf-742d8c71bf81",
+      "material": "Generic ASTM A148 Grade (GE300)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.35
+    },
+    {
+      "id": "801fefbb-4d23-4c40-a0d1-4ef1c6a17d25",
+      "material": "Generic ASTM A217 Grade (GX8CrNi12)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 0.97
+    },
+    {
+      "id": "dea09934-f16f-4ada-90b2-acff42d5abb3",
+      "material": "Generic ASTM A27 Grade (GE200)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.35
+    },
+    {
+      "id": "3431adc8-3b1f-4615-b3ea-b41ceda2cf93",
+      "material": "Generic ASTM A27 Grade (GE240)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.35
+    },
+    {
+      "id": "13341547-b68a-4555-bdf5-4526f4cbf1e3",
+      "material": "Generic ASTM A304 1330 H",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.36
+    },
+    {
+      "id": "032306cc-49a6-4945-a173-9ad727fc277b",
+      "material": "Generic ASTM A352 Grade (G17Mn5)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.36
+    },
+    {
+      "id": "50af2d67-90e4-4a92-8da0-48c04637e5e3",
+      "material": "Generic ASTM A352 Grade (G20Mn5)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.42
+    },
+    {
+      "id": "613e5a38-7a45-4d9d-a714-88879e8bd147",
+      "material": "Generic ASTM A743 Grade (GX4CrNiMo)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.65
+    },
+    {
+      "id": "e1e4011a-1f95-4dc6-9db9-f219467b969a",
+      "material": "Generic ASTM Grade 20 GJL",
+      "material_grade": null,
+      "material_type": "Gray Iron",
+      "material_description": null,
+      "cost": 0.42
+    },
+    {
+      "id": "67a0385a-06c5-4961-accb-56ae2ab25ed7",
+      "material": "Generic ASTM Grade 25 GJL",
+      "material_grade": null,
+      "material_type": "Gray Iron",
+      "material_description": null,
+      "cost": 0.42
+    },
+    {
+      "id": "5aa42b8f-10e2-4c1b-95d0-3bc8e2c2f913",
+      "material": "Generic ASTM Grade 30 GJL",
+      "material_grade": null,
+      "material_type": "Gray Iron",
+      "material_description": null,
+      "cost": 0.36
+    },
+    {
+      "id": "c9c3ba8d-6a0d-4f2e-b571-37021a00fb20",
+      "material": "Generic ASTM Grade 35 GJL",
+      "material_grade": null,
+      "material_type": "Gray Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "0b6a83de-a03b-4fda-bbb0-acd23833592c",
+      "material": "Generic ASTM Grade 40 GJL",
+      "material_grade": null,
+      "material_type": "Gray Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "58af91eb-b2bb-4785-9af2-476d5e50213f",
+      "material": "Generic ASTM Grade 45 GJL",
+      "material_grade": null,
+      "material_type": "Gray Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "43401cf2-0aad-4356-b038-d1fd95ec6322",
+      "material": "Generic ASTM Grade 50 GJL",
+      "material_grade": null,
+      "material_type": "Gray Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "342a0422-b8f7-47ed-85e2-deccb57a83a7",
+      "material": "Generic Bluestone",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 145.37
+    },
+    {
+      "id": "f683a7f3-6744-46d0-acea-c6a2a0d28ae3",
+      "material": "Generic Brass, CW617N",
+      "material_grade": null,
+      "material_type": "Brass",
+      "material_description": null,
+      "cost": 5.27
+    },
+    {
+      "id": "09b6ead7-8ab4-40b8-b50c-ca9bb5434c80",
+      "material": "Generic Brass, Free-Cutting",
+      "material_grade": null,
+      "material_type": "Brass",
+      "material_description": null,
+      "cost": 5.39
+    },
+    {
+      "id": "38150acf-8a7f-4c1e-84d5-de52dc4b9ba8",
+      "material": "Generic Brass, UNS C36000",
+      "material_grade": "Brass, UNS C36000",
+      "material_type": "Brass",
+      "material_description": null,
+      "cost": 9.603
+    },
+    {
+      "id": "807a6a6f-313f-43b3-94d6-54ff57be0b8a",
+      "material": "Generic Brass, UNS C37700",
+      "material_grade": null,
+      "material_type": "Brass",
+      "material_description": null,
+      "cost": 5.33
+    },
+    {
+      "id": "65de2434-e2a2-4a98-a967-6b4b40a292f4",
+      "material": "Generic Brass, Yellow 270",
+      "material_grade": null,
+      "material_type": "Brass",
+      "material_description": null,
+      "cost": 5.61
+    },
+    {
+      "id": "617c147e-29d8-43ce-b21f-6af300ba365c",
+      "material": "Generic Bronze, Commercial",
+      "material_grade": null,
+      "material_type": "Bronze",
+      "material_description": null,
+      "cost": 6.72
+    },
+    {
+      "id": "a19e33e0-744c-457e-aff4-72c769777c07",
+      "material": "Generic C60",
+      "material_grade": "C60",
+      "material_type": "Carbon Steel",
+      "material_description": null,
+      "cost": 1.481
+    },
+    {
+      "id": "0b95fe88-d558-4f94-8f15-e204ef77a816",
+      "material": "Generic C60E",
+      "material_grade": "C60E",
+      "material_type": "Carbon Steel",
+      "material_description": null,
+      "cost": 1.651
+    },
+    {
+      "id": "82e4b573-4f6e-47a0-9cde-78aa911608fb",
+      "material": "Generic Carbon - NCF Prepreg",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 20.16
+    },
+    {
+      "id": "a4320642-1ce6-469a-bd50-4df5e25b6495",
+      "material": "Generic Carbon - Tow Prepreg (Type 1)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 17.87
+    },
+    {
+      "id": "b7272cb7-d99d-4eb4-a712-03833261ad78",
+      "material": "Generic Carbon - Tow Prepreg (Type 2)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 17.87
+    },
+    {
+      "id": "1599fb65-4c2e-49a4-b6a1-3080a9a6b19b",
+      "material": "Generic Carbon - Tow Prepreg (Type 3)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 17.87
+    },
+    {
+      "id": "673a29ce-b23a-4e53-a10c-e31d5b5b8510",
+      "material": "Generic Carbon - Uni Directional (Type 1)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 16.37
+    },
+    {
+      "id": "9d89aea2-f74a-4799-9958-ec748c30ec2a",
+      "material": "Generic Carbon - Uni Directional (Type 2)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 16.37
+    },
+    {
+      "id": "ad57d4fe-a98d-4766-8d03-3bdc85e79ed4",
+      "material": "Generic Carbon - Uni Directional (Type 3)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 17.15
+    },
+    {
+      "id": "20c81dd7-480f-487b-bffa-ced61f121f41",
+      "material": "Generic Carbon - Woven (Type 1)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 34.15
+    },
+    {
+      "id": "98cad1f6-6f92-4b21-9e4f-6bc01c844b24",
+      "material": "Generic Carbon - Woven (Type 2)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 23.71
+    },
+    {
+      "id": "4c7c59a9-59c0-427e-bdaa-0cde0d480d05",
+      "material": "Generic Carbon - Woven (Type 3)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 9.3
+    },
+    {
+      "id": "e12fce3f-e624-4b00-85ec-7c83d7952551",
+      "material": "Generic Castform PS",
+      "material_grade": null,
+      "material_type": "CastForm",
+      "material_description": null,
+      "cost": 66.4
+    },
+    {
+      "id": "2eacb46d-9cf3-4af1-89e9-81b7727c4153",
+      "material": "Generic CeraMax",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 118.2
+    },
+    {
+      "id": "adc22abb-ccc5-4e57-b28c-592611cbba18",
+      "material": "Generic Cobalt Alloy, Co (Type 1)",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 4.66
+    },
+    {
+      "id": "8e4a0c2e-dfa5-477a-824d-5ba4e64e52aa",
+      "material": "Generic Cobalt Alloy, Co (Type 2)",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 24.31
+    },
+    {
+      "id": "bf693bea-b73b-4aa3-9639-90eb403825b5",
+      "material": "Generic Cobalt Alloy, Co (Type 3)",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 7.06
+    },
+    {
+      "id": "60985150-fde9-4315-aebf-210a747a118c",
+      "material": "Generic Cobalt Alloy, Mar",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 17.67
+    },
+    {
+      "id": "b2e47b9f-1476-4aae-9a27-beeb6edc12e0",
+      "material": "Generic Cobalt Chrome DMP",
+      "material_grade": null,
+      "material_type": "Cobalt Chrome",
+      "material_description": null,
+      "cost": 314.38
+    },
+    {
+      "id": "a8a464fe-e2d0-4b60-b37e-dcf84191bf8a",
+      "material": "Generic Cobalt Chrome F75",
+      "material_grade": null,
+      "material_type": "Cobalt Chrome",
+      "material_description": null,
+      "cost": 165.99
+    },
+    {
+      "id": "f1a6a070-5b4b-4e8c-baaa-13a29f6d4c7c",
+      "material": "Generic Copper - Expanded",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 61.64
+    },
+    {
+      "id": "37800fa5-603a-4304-bd85-75a3c0889b01",
+      "material": "Generic Copper Panel",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 0.49
+    },
+    {
+      "id": "5cdbdd3d-cf01-49eb-8698-62af678fbc21",
+      "material": "Generic Copper, UNS C11000",
+      "material_grade": "Copper, UNS C11000",
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 11.313
+    },
+    {
+      "id": "671b7544-9662-4ab4-ac03-c98fff6b1f73",
+      "material": "Generic Copper, UNS C11000 (ETP)",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 5.6
+    },
+    {
+      "id": "5d01abbc-361e-42b0-9695-37ff8fde2480",
+      "material": "Generic Copper, UNS C18000",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 4.97
+    },
+    {
+      "id": "274eaeaf-e014-494a-947b-447e0cd6068e",
+      "material": "Generic Copper, UNS C18150",
+      "material_grade": "Copper, UNS C18150",
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 13.61
+    },
+    {
+      "id": "a0a91d51-ae80-4c63-81a1-ae676e8fef37",
+      "material": "Generic Copper, UNS C27000",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 6.74
+    },
+    {
+      "id": "eea432ed-313c-4aa6-94c1-63c6692ab521",
+      "material": "Generic Copper, UNS C27200",
+      "material_grade": "Copper, UNS C27200",
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 11.332
+    },
+    {
+      "id": "d50df5d0-2088-4f06-8787-7383c07b4385",
+      "material": "Generic Copper, UNS C28000",
+      "material_grade": "Copper, UNS C28000",
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 10.768
+    },
+    {
+      "id": "1c5791c5-5994-49be-a669-55e1ccae1f94",
+      "material": "Generic Copper, UNS C51000",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 5.33
+    },
+    {
+      "id": "0bb57db6-1a33-49cd-9802-04ade3a68df4",
+      "material": "Generic Copper, UNS C51900",
+      "material_grade": "Copper, UNS C51900",
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 17.91
+    },
+    {
+      "id": "06fe2abf-54b8-4f39-94cd-a46255547296",
+      "material": "Generic Copper, UNS C62000",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 8.87
+    },
+    {
+      "id": "9e1ceb85-2c0f-4856-a9d2-b83c96fb989c",
+      "material": "Generic Copper, UNS C62730",
+      "material_grade": "Copper, UNS C62730",
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 14.431
+    },
+    {
+      "id": "d57ffff2-d910-4b02-a394-234f208ba742",
+      "material": "Generic Core Material",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 38.49
+    },
+    {
+      "id": "78b7a6a0-8ce1-4daf-8450-7f2c196d5d09",
+      "material": "Generic CP 200",
+      "material_grade": null,
+      "material_type": "VisiJet Wax",
+      "material_description": null,
+      "cost": 173.53
+    },
+    {
+      "id": "3ff03576-3936-4768-b3e5-fbbb3e0b2f3a",
+      "material": "Generic CPX 200",
+      "material_grade": null,
+      "material_type": "VisiJet Wax",
+      "material_description": null,
+      "cost": 322.42
+    },
+    {
+      "id": "bea401ae-b146-4a83-9bf4-2bc6ecfafe93",
+      "material": "Generic CuZn39Pb3",
+      "material_grade": null,
+      "material_type": "Copper",
+      "material_description": null,
+      "cost": 7.14
+    },
+    {
+      "id": "011b21de-5495-4405-bc84-9fd102db8281",
+      "material": "Generic Default",
+      "material_grade": null,
+      "material_type": "Default",
+      "material_description": null,
+      "cost": 62.88
+    },
+    {
+      "id": "efd6dd96-1b24-46a3-990e-959ba42b0a96",
+      "material": "Generic DP 200",
+      "material_grade": null,
+      "material_type": "VisiJet Plastic",
+      "material_description": null,
+      "cost": 173.53
+    },
+    {
+      "id": "37c7e318-3b77-4b85-b726-8a0069a41009",
+      "material": "Generic Ductile Iron A536",
+      "material_grade": null,
+      "material_type": "Ductile Iron",
+      "material_description": null,
+      "cost": 0.38
+    },
+    {
+      "id": "fca092c6-828c-4749-bb3d-e250cb19afdc",
+      "material": "Generic Ductile Iron, ASTM 100-70-03",
+      "material_grade": null,
+      "material_type": "Ductile Iron",
+      "material_description": null,
+      "cost": 0.38
+    },
+    {
+      "id": "2bba64a7-7817-483f-93d1-b4f5d4356e56",
+      "material": "Generic Ductile Iron, ASTM 120-90-02",
+      "material_grade": null,
+      "material_type": "Ductile Iron",
+      "material_description": null,
+      "cost": 0.41
+    },
+    {
+      "id": "71d3dc03-35b7-4088-80c9-17c9338e260c",
+      "material": "Generic Ductile Iron, ASTM 60-40-18",
+      "material_grade": null,
+      "material_type": "Ductile Iron",
+      "material_description": null,
+      "cost": 0.36
+    },
+    {
+      "id": "2f376b7a-4b00-4eb8-bf5e-20b1fc05ab45",
+      "material": "Generic Ductile Iron, ASTM 70-50-05",
+      "material_grade": null,
+      "material_type": "Ductile Iron",
+      "material_description": null,
+      "cost": 0.41
+    },
+    {
+      "id": "4cc87d47-ac90-4588-b5ed-18d740c0ecbb",
+      "material": "Generic Ductile Iron, ASTM 80-60-03",
+      "material_grade": null,
+      "material_type": "Ductile Iron",
+      "material_description": null,
+      "cost": 0.37
+    },
+    {
+      "id": "d83d58dc-c999-4dba-8cc1-202b86ca2bae",
+      "material": "Generic Duraform EX",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 54.83
+    },
+    {
+      "id": "951e134e-180d-4312-bde4-59549f2ab5c9",
+      "material": "Generic Duraform Flex",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 44.26
+    },
+    {
+      "id": "ae1c667d-ea80-4017-9d30-c2b4789ab0f1",
+      "material": "Generic Duraform FR1200",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 54.83
+    },
+    {
+      "id": "d8aff380-53ce-40b9-8bbf-f6adace40df0",
+      "material": "Generic Duraform GF",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 54.83
+    },
+    {
+      "id": "b8dc4d3a-c22b-4424-a894-125f336b30c7",
+      "material": "Generic Duraform HST",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 54.83
+    },
+    {
+      "id": "efe535df-be51-4137-ab81-b3563887c153",
+      "material": "Generic Duraform PA",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 66.4
+    },
+    {
+      "id": "e464e1f2-92cb-4bba-bf1a-870dcb546b88",
+      "material": "Generic Duraform ProX AF",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 57.84
+    },
+    {
+      "id": "91079dc8-02c0-43ea-a348-1fa4a350620d",
+      "material": "Generic Duraform ProX EX",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 54.83
+    },
+    {
+      "id": "e0a33939-1b7e-4483-9fad-724af4737d25",
+      "material": "Generic Duraform ProX FR",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 54.83
+    },
+    {
+      "id": "f6078d86-9f6e-423a-96dc-5ebd67dfe9a2",
+      "material": "Generic Duraform ProX GF",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 38.73
+    },
+    {
+      "id": "25f1459c-af43-4b61-90e8-b0611dd1429a",
+      "material": "Generic Duraform ProX HST",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 54.83
+    },
+    {
+      "id": "256108f5-2425-4b36-bfcd-6608cbd4ad9e",
+      "material": "Generic Duraform ProX PA",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 54.83
+    },
+    {
+      "id": "2ee3d679-f0b3-4115-98c7-9a1096aa7847",
+      "material": "Generic Duraform TPU",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 54.83
+    },
+    {
+      "id": "9b85877d-4582-4bbf-8e19-6cf5f2e461b6",
+      "material": "Generic e-Stone",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 118.2
+    },
+    {
+      "id": "b54cd322-7076-4731-bbaf-ca2759b154b7",
+      "material": "Generic Epoxy - Adhesive",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 7.8
+    },
+    {
+      "id": "c570b46b-85f7-4410-8f94-a786e604797b",
+      "material": "Generic Epoxy, CF50",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 17.71
+    },
+    {
+      "id": "832425d0-2a99-4d35-adc9-9e68c60e09b8",
+      "material": "Generic Epoxy, CF60",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 21.32
+    },
+    {
+      "id": "0779342d-1289-46e9-b887-d4a78401bf82",
+      "material": "Generic EX 200",
+      "material_grade": null,
+      "material_type": "VisiJet Plastic",
+      "material_description": null,
+      "cost": 128.77
+    },
+    {
+      "id": "2b2363a8-4328-47b4-b320-903843a3614b",
+      "material": "Generic EX Plastic",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 70.92
+    },
+    {
+      "id": "c7246fdb-deb5-4f7e-80a7-20479c870bbb",
+      "material": "Generic F-0005",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.8
+    },
+    {
+      "id": "ca823a9c-8802-4e92-8ad5-0eafc42d2fa3",
+      "material": "Generic F-0005 Sponge",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.89
+    },
+    {
+      "id": "6ba1e5c4-9723-4466-b07a-4b911554692d",
+      "material": "Generic FC-0205",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.42
+    },
+    {
+      "id": "6046188b-29c1-4cd2-90c6-99b961013287",
+      "material": "Generic FD-0405",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.4
+    },
+    {
+      "id": "eab187ba-e121-4812-b220-950f279aa104",
+      "material": "Generic FLC-4605",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.1
+    },
+    {
+      "id": "a746c1b0-e1ea-45b6-a2fe-c007542ed3fe",
+      "material": "Generic Flex Plastic",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 110.16
+    },
+    {
+      "id": "3a8119f6-d4a4-4260-a4e0-79032cee5a81",
+      "material": "Generic FLN2-4405",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.62
+    },
+    {
+      "id": "542b359c-edef-4085-b315-7221fd908f71",
+      "material": "Generic FN-0205",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.35
+    },
+    {
+      "id": "f58ef13a-dc6d-41e1-b3ec-7914c8821176",
+      "material": "Generic Galv. Steel, Hot Worked (10142 HR)",
+      "material_grade": null,
+      "material_type": "Galvanized Steel",
+      "material_description": null,
+      "cost": 0.86
+    },
+    {
+      "id": "b175a79a-7fa0-4e7b-8fe7-2de36066c6f8",
+      "material": "Generic Galv. Steel, Hot Worked (1626 HR)",
+      "material_grade": null,
+      "material_type": "Galvanized Steel",
+      "material_description": null,
+      "cost": 0.87
+    },
+    {
+      "id": "e687a405-5d74-4029-878f-d1ec9e505b09",
+      "material": "Generic Galv. Steel, Hot Worked (59231 HR)",
+      "material_grade": null,
+      "material_type": "Galvanized Steel",
+      "material_description": null,
+      "cost": 0.82
+    },
+    {
+      "id": "f6201f6e-a41d-4a99-adb9-f396d4875b94",
+      "material": "Generic Galv. Steel, Hot Worked (CR)",
+      "material_grade": null,
+      "material_type": "Galvanized Steel",
+      "material_description": null,
+      "cost": 0.9
+    },
+    {
+      "id": "6886763a-427a-47c7-8781-df8da28f85b3",
+      "material": "Generic Galv. Steel, Hot Worked (HR)",
+      "material_grade": null,
+      "material_type": "Galvanized Steel",
+      "material_description": null,
+      "cost": 0.83
+    },
+    {
+      "id": "115f2350-3cd2-43b1-bd11-3e52ccccd62e",
+      "material": "Generic Galv. Steel, Hot Worked, AISI 1010",
+      "material_grade": "Galv. Steel, Hot Worked, AISI 1010",
+      "material_type": "Galv. Steel",
+      "material_description": null,
+      "cost": 1.667
+    },
+    {
+      "id": "b163e8d2-acae-4187-8c4f-ad791a86920f",
+      "material": "Generic Galv. Steel, Hot Worked, AISI 1012",
+      "material_grade": "Galv. Steel, Hot Worked, AISI 1012",
+      "material_type": "Galv. Steel",
+      "material_description": null,
+      "cost": 1.667
+    },
+    {
+      "id": "54ed5eb7-d6fa-4f62-919c-f2f7b7fa9792",
+      "material": "Generic Galv. Steel, Hot Worked, AISI 1020",
+      "material_grade": "Galv. Steel, Hot Worked, AISI 1020",
+      "material_type": "Galv. Steel",
+      "material_description": null,
+      "cost": 1.796
+    },
+    {
+      "id": "b0df6f40-7e3c-4c7c-b154-8b6b6e02819f",
+      "material": "Generic Galv. Steel, Hot Worked, DX51D",
+      "material_grade": "Galv. Steel, Hot Worked, DX51D",
+      "material_type": "Galv. Steel",
+      "material_description": null,
+      "cost": 1.836
+    },
+    {
+      "id": "23b9f7f7-1467-42bb-8696-543e221b5bb8",
+      "material": "Generic Galv. Steel, Hot Worked, DX54",
+      "material_grade": "Galv. Steel, Hot Worked, DX54",
+      "material_type": "Galv. Steel",
+      "material_description": null,
+      "cost": 1.698
+    },
+    {
+      "id": "a0aa3622-7895-4ddd-a6f1-7683d779ed13",
+      "material": "Generic Generic Material",
+      "material_grade": null,
+      "material_type": "Generic",
+      "material_description": null,
+      "cost": 0.34
+    },
+    {
+      "id": "16df5de4-792b-4da1-bee7-e3b6275ed463",
+      "material": "Generic GF Plastic",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 70.92
+    },
+    {
+      "id": "5d34c476-6409-4592-b91d-3d5b565743c0",
+      "material": "Generic Glass - Woven Prepreg (Type 1)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 17.07
+    },
+    {
+      "id": "c118d4f4-f041-49d8-bfc8-91c8d4d63edc",
+      "material": "Generic Glass - Woven Prepreg (Type 2)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 11.85
+    },
+    {
+      "id": "78f311bc-ce25-4e0e-93da-8d23daebd103",
+      "material": "Generic Glass - Woven Prepreg (Type 3)",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 4.65
+    },
+    {
+      "id": "e97baccf-cbcf-460e-97a6-51c1fec5ce1e",
+      "material": "Generic Hastelloy C-276",
+      "material_grade": "Hastelloy C-276",
+      "material_type": "Hastelloy",
+      "material_description": null,
+      "cost": 28.193
+    },
+    {
+      "id": "2913d3ed-23e2-4f79-8e27-226897f0caf3",
+      "material": "Generic Hastelloy X",
+      "material_grade": "Hastelloy X",
+      "material_type": "Hastelloy",
+      "material_description": null,
+      "cost": 22.683
+    },
+    {
+      "id": "5f213bf9-6381-431d-a198-f0d100748a8f",
+      "material": "Generic Haynes alloy 230",
+      "material_grade": "Haynes alloy 230",
+      "material_type": "Haynes Alloy",
+      "material_description": null,
+      "cost": 24.312
+    },
+    {
+      "id": "6745064b-2679-4f9d-8954-2c22c4cb59f2",
+      "material": "Generic Haynes Alloy 230",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 14.18
+    },
+    {
+      "id": "663cc306-0f44-4ddb-8edf-e19ed34ed0d2",
+      "material": "Generic HR 200",
+      "material_grade": null,
+      "material_type": "VisiJet Plastic",
+      "material_description": null,
+      "cost": 245.97
+    },
+    {
+      "id": "5dfca9b7-0a56-4d03-98b1-8b5789a264bb",
+      "material": "Generic Inconel 625",
+      "material_grade": "Inconel 625",
+      "material_type": "Inconel",
+      "material_description": null,
+      "cost": 21.243
+    },
+    {
+      "id": "1816ef6e-b641-4248-8dd2-0053f126400a",
+      "material": "Generic Inconel 718",
+      "material_grade": "Inconel 718",
+      "material_type": "Inconel",
+      "material_description": null,
+      "cost": 15.123
+    },
+    {
+      "id": "b0a281b4-9ec6-48ab-9ef8-b51bcc819a27",
+      "material": "Generic ISO JMB 300-6",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "c0c31e68-4600-45f0-82a8-7749b677dfa6",
+      "material": "Generic ISO JMB 350-10",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "ff1b4302-7029-4b42-a4f3-dedde288f492",
+      "material": "Generic ISO JMB 450-6",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "3c03cb3e-49f0-4786-80df-cc9e20641e47",
+      "material": "Generic ISO JMB 500-5",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "39e07f8c-7742-4fb6-8e4f-3c380b257b4d",
+      "material": "Generic ISO JMB 550-4",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "3b4a6abe-dbc3-47cd-bf0d-40b79a80ce0e",
+      "material": "Generic ISO JMB 600-3",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "4743efb6-788a-412a-aa25-d4e828287105",
+      "material": "Generic ISO JMB 650-2",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "375053d6-8300-4e5a-9237-d14335a0ed32",
+      "material": "Generic ISO JMB 700-2",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "2292d813-7225-4fc9-be18-c7cad02959a1",
+      "material": "Generic ISO JMB 800-1",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "e05b38d9-606e-4e28-82a1-ab2ec9ad0030",
+      "material": "Generic ISO JMW 350-4",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "e44d9f16-2120-4f3e-abce-393def77e270",
+      "material": "Generic ISO JMW 360-12",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "1b7517f1-4ae8-47a3-9e59-a14b91592d0e",
+      "material": "Generic ISO JMW 400-5",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "6f762878-9b4a-4fae-8368-1951a530d498",
+      "material": "Generic ISO JMW 450-7",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "23c47d2b-94da-44f2-ae01-4d16bcc7e277",
+      "material": "Generic ISO JMW 550-4",
+      "material_grade": null,
+      "material_type": "Malleable Cast Iron",
+      "material_description": null,
+      "cost": 0.39
+    },
+    {
+      "id": "c87840d0-24e5-4fef-b7b4-842d23f40ad5",
+      "material": "Generic ISO JS 350-22/S",
+      "material_grade": null,
+      "material_type": "Ductile Iron",
+      "material_description": null,
+      "cost": 0.42
+    },
+    {
+      "id": "13bd0c7d-1a03-4f01-a355-ec43f5b8f473",
+      "material": "Generic ISO JS 450-10/S",
+      "material_grade": null,
+      "material_type": "Ductile Iron",
+      "material_description": null,
+      "cost": 0.42
+    },
+    {
+      "id": "9d91103f-16df-4e3b-9e7c-27d3106b0a29",
+      "material": "Generic ISO JS 900-2/S",
+      "material_grade": null,
+      "material_type": "Ductile Iron",
+      "material_description": null,
+      "cost": 0.43
+    },
+    {
+      "id": "9c6c47ed-4878-4d8e-a59b-c4b6e3137217",
+      "material": "Generic Lead",
+      "material_grade": null,
+      "material_type": "Lead",
+      "material_description": null,
+      "cost": 2.12
+    },
+    {
+      "id": "12f75118-8686-4232-a09e-68fd026b351c",
+      "material": "Generic Magnesium AM60B",
+      "material_grade": null,
+      "material_type": "Magnesium",
+      "material_description": null,
+      "cost": 1.58
+    },
+    {
+      "id": "d3ee033f-8461-4674-8dd5-28ebeab53e7c",
+      "material": "Generic Magnesium AZ91D",
+      "material_grade": null,
+      "material_type": "Magnesium",
+      "material_description": null,
+      "cost": 1.52
+    },
+    {
+      "id": "90f95bce-41ea-4f70-9fb5-f6355b1774c9",
+      "material": "Generic Magnesium AZ91E",
+      "material_grade": null,
+      "material_type": "Magnesium",
+      "material_description": null,
+      "cost": 1.36
+    },
+    {
+      "id": "059ead70-6c60-490d-b911-925e63b12329",
+      "material": "Generic Manganese Bronze (Type 1)",
+      "material_grade": null,
+      "material_type": "Manganese",
+      "material_description": null,
+      "cost": 2.1
+    },
+    {
+      "id": "377a0278-a930-4048-bc0e-c872296d6906",
+      "material": "Generic Manganese Bronze (Type 2)",
+      "material_grade": null,
+      "material_type": "Manganese",
+      "material_description": null,
+      "cost": 2.1
+    },
+    {
+      "id": "ecdd7b80-221f-4015-b756-0f75adc0cfe0",
+      "material": "Generic Maraging Steel 300",
+      "material_grade": null,
+      "material_type": "Maraging Steel",
+      "material_description": null,
+      "cost": 103.62
+    },
+    {
+      "id": "686a41fc-d6ff-4293-9f06-88e7be6987f6",
+      "material": "Generic MX",
+      "material_grade": null,
+      "material_type": "VisiJet Plastic",
+      "material_description": null,
+      "cost": 125.75
+    },
+    {
+      "id": "b3e2e957-4192-42a2-98af-427c67b8977c",
+      "material": "Generic Nickel Alloy, Inconel (Type 1)",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 3.58
+    },
+    {
+      "id": "6b803066-ac27-4693-991e-6dac602684ca",
+      "material": "Generic Nickel Alloy, Inconel (Type 2)",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 7.61
+    },
+    {
+      "id": "994139d7-a4bd-406a-8768-f46f26c2a210",
+      "material": "Generic Nickel Alloy, Inconel (Type 3)",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 3.43
+    },
+    {
+      "id": "7692d72a-30f2-4f1d-872c-71de6acf8042",
+      "material": "Generic Nickel Alloy, Nickel (Type 1)",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 16.71
+    },
+    {
+      "id": "06627a14-b9d5-4a0d-8dbd-06aa6b0abdd0",
+      "material": "Generic Nickel Alloy, Nickel (Type 2)",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 10.69
+    },
+    {
+      "id": "86dbe1af-e1bb-4f54-9002-d13476688f31",
+      "material": "Generic Nickel Alloy, Nickel (Type 3)",
+      "material_grade": null,
+      "material_type": "Heat Resistant",
+      "material_description": null,
+      "cost": 11.41
+    },
+    {
+      "id": "cf5ec01c-fd49-4dee-8805-cac9ad2d3aba",
+      "material": "Generic Nylon 6/6 (Thermoplastic)",
+      "material_grade": null,
+      "material_type": "Thermoplastics",
+      "material_description": null,
+      "cost": 5.02
+    },
+    {
+      "id": "dc98d847-3aa7-4dbf-89e3-1338857e91be",
+      "material": "Generic Nylon, Blow Molding",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 2.26
+    },
+    {
+      "id": "85b4cbdb-8dd7-49f6-89eb-3245bbca7560",
+      "material": "Generic Nylon, Transparent",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 3.92
+    },
+    {
+      "id": "8d621603-0272-40bd-baca-c27f50974ab0",
+      "material": "Generic Nylon, Type 11",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 5.41
+    },
+    {
+      "id": "0505548c-f35c-4525-8b0d-1a4c96af194d",
+      "material": "Generic Nylon, Type 11 30% GF",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 5.5
+    },
+    {
+      "id": "5cfd7d47-847c-4c39-a027-48395c342809",
+      "material": "Generic Nylon, Type 11 40% GF",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 5.71
+    },
+    {
+      "id": "d8fa3e5a-593b-41fe-bb87-b3409da0c147",
+      "material": "Generic Nylon, Type 12",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 4.24
+    },
+    {
+      "id": "bcfe0d7f-ea14-46db-83fb-4f9b7a01b0cd",
+      "material": "Generic Nylon, Type 12 30% GF",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 4.36
+    },
+    {
+      "id": "cde5e608-11ad-459b-bbbd-c5e099ac57b4",
+      "material": "Generic Nylon, Type 12 50% GF",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 4.11
+    },
+    {
+      "id": "3818fa0e-2cef-4e36-ae68-42bba19e29ea",
+      "material": "Generic Nylon, Type 46",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 3.8
+    },
+    {
+      "id": "aa8e90af-e2ba-40c0-b40e-0772bccd0a26",
+      "material": "Generic Nylon, Type 6",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 2.05
+    },
+    {
+      "id": "551e588b-2bd0-41da-8291-a3fb755ebe8c",
+      "material": "Generic Nylon, Type 6 30% GF",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 2.09
+    },
+    {
+      "id": "77b1f632-01ba-4de8-8cfe-7606dafaa25a",
+      "material": "Generic Nylon, Type 6 Min Fill",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 1.81
+    },
+    {
+      "id": "4888b1fb-d2d4-4629-ae3c-077059e93e13",
+      "material": "Generic Nylon, Type 6/10",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 3.86
+    },
+    {
+      "id": "e7cbf483-d377-498a-8ff8-66f44d1a8555",
+      "material": "Generic Nylon, Type 612",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 5.16
+    },
+    {
+      "id": "b07f9c06-9340-4346-9890-22626fe30271",
+      "material": "Generic Nylon, Type 612 30% GF",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 3.99
+    },
+    {
+      "id": "b50a456a-a246-42c4-9524-aaaa7dbde253",
+      "material": "Generic Nylon, Type 612 40% GF",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 3.98
+    },
+    {
+      "id": "34428003-c6bc-413e-bb68-e907dc10d70b",
+      "material": "Generic Nylon, Type 66",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 2.17
+    },
+    {
+      "id": "2fbd59ea-42af-4a50-a164-79f4a888326c",
+      "material": "Generic Nylon, Type 66 30% GF",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 2.19
+    },
+    {
+      "id": "f2925818-17eb-4b73-81db-3e118ed8a379",
+      "material": "Generic Nylon, Type 66 Min Fill",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 2
+    },
+    {
+      "id": "dd331cfc-fd0e-478e-be8e-ef826166b5a6",
+      "material": "Generic Nylon, Type 69",
+      "material_grade": null,
+      "material_type": "Nylon",
+      "material_description": null,
+      "cost": 3.39
+    },
+    {
+      "id": "ecd168f9-0a7f-4590-a476-e520f82a963e",
+      "material": "Generic Objet Dental Bio",
+      "material_grade": null,
+      "material_type": "Dental",
+      "material_description": null,
+      "cost": 193.15
+    },
+    {
+      "id": "648dcd4c-cede-4b36-974a-0c00cd0211bc",
+      "material": "Generic Objet Durus 430",
+      "material_grade": null,
+      "material_type": "Simulated Polypropylene",
+      "material_description": null,
+      "cost": 161.97
+    },
+    {
+      "id": "b04e9bbb-835f-40e3-a041-9d079d94f1b6",
+      "material": "Generic Objet Rigid Translucent",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 113.17
+    },
+    {
+      "id": "7ccdcbbc-75fa-4cd6-99f5-57bbc7f0e908",
+      "material": "Generic Objet Rigid VeroBlack (Type 1)",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 125.75
+    },
+    {
+      "id": "a6519507-dcc1-473d-b1ff-173570f2ccde",
+      "material": "Generic Objet Rigid VeroBlack (Type 2)",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 118.71
+    },
+    {
+      "id": "000f664d-edb3-4f76-baf0-5401487ab0e0",
+      "material": "Generic Objet Rigid VeroBlack (Type 3)",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 125.75
+    },
+    {
+      "id": "60fefc72-30d3-48aa-a3ef-7ea01df24bab",
+      "material": "Generic Objet Rigid VeroClear (Type 1)",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 175.55
+    },
+    {
+      "id": "fb245415-160f-4ddc-b15f-fa66bd4bb24c",
+      "material": "Generic Objet Rigid VeroClear (Type 2)",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 118.71
+    },
+    {
+      "id": "d58dbb79-825a-4f22-9236-8dbf56cb334c",
+      "material": "Generic Objet Rigid VeroGrey",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 125.75
+    },
+    {
+      "id": "167ab284-d9e1-4dbe-bfc0-475b9585c45f",
+      "material": "Generic Objet Rigid VeroWhite (Type 1)",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 118.71
+    },
+    {
+      "id": "c8fa4dd0-2150-4323-8adb-b04a979b3b24",
+      "material": "Generic Objet Rigid VeroWhite (Type 2)",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 125.75
+    },
+    {
+      "id": "7ff44f45-9f28-46a8-894f-775a563caec3",
+      "material": "Generic Objet Rigid VeroYellow",
+      "material_grade": null,
+      "material_type": "Vero",
+      "material_description": null,
+      "cost": 118.71
+    },
+    {
+      "id": "44e41c18-5426-4639-918f-b3686a90f463",
+      "material": "Generic Objet Rigur 450",
+      "material_grade": null,
+      "material_type": "Simulated Polypropylene",
+      "material_description": null,
+      "cost": 155.93
+    },
+    {
+      "id": "c4e4a382-6b95-424b-bb39-01b715c863a5",
+      "material": "Generic Objet Rubber Tango (Type 1)",
+      "material_grade": null,
+      "material_type": "Tango",
+      "material_description": null,
+      "cost": 138.32
+    },
+    {
+      "id": "ea9a555d-1ad0-44b7-8946-6fdb70284024",
+      "material": "Generic Objet Rubber Tango (Type 2)",
+      "material_grade": null,
+      "material_type": "Tango",
+      "material_description": null,
+      "cost": 150.9
+    },
+    {
+      "id": "90b59a2b-4cb0-45a8-b187-04f99acdad0e",
+      "material": "Generic Objet Rubber Tango (Type 3)",
+      "material_grade": null,
+      "material_type": "Tango",
+      "material_description": null,
+      "cost": 138.32
+    },
+    {
+      "id": "1e6cc427-9123-43d4-ad0a-39d11568cbd9",
+      "material": "Generic PA Plastic",
+      "material_grade": null,
+      "material_type": "DuraForm",
+      "material_description": null,
+      "cost": 70.92
+    },
+    {
+      "id": "898bfc9b-13cc-48d0-872d-08256a2573ad",
+      "material": "Generic PBT 30% Glass Fiber",
+      "material_grade": null,
+      "material_type": "PBT",
+      "material_description": null,
+      "cost": 1.57
+    },
+    {
+      "id": "317bb66d-0fa7-4966-a0d0-43fd784e63ee",
+      "material": "Generic PBT 40% Glass Fiber",
+      "material_grade": null,
+      "material_type": "PBT",
+      "material_description": null,
+      "cost": 2.1
+    },
+    {
+      "id": "79bea8c0-8bc3-4880-8c2e-5809f02eae58",
+      "material": "Generic PEAK",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 118.2
+    },
+    {
+      "id": "7685321e-c5a3-4a2c-81d6-a211dc3c27bf",
+      "material": "Generic Peek HP3",
+      "material_grade": null,
+      "material_type": "Polyaryletherketone",
+      "material_description": null,
+      "cost": 264.07
+    },
+    {
+      "id": "90141ca7-5c4e-4afd-8e06-9130992c1a94",
+      "material": "Generic PET 30% Glass",
+      "material_grade": null,
+      "material_type": "PET",
+      "material_description": null,
+      "cost": 1.86
+    },
+    {
+      "id": "39fd2538-709b-4808-a550-8bcaa12d3b07",
+      "material": "Generic PET 30% Glass Flame Ret",
+      "material_grade": null,
+      "material_type": "PET",
+      "material_description": null,
+      "cost": 2.09
+    },
+    {
+      "id": "50b257bb-7415-4871-9432-90eb53312f21",
+      "material": "Generic PET 55% Glass",
+      "material_grade": null,
+      "material_type": "PET",
+      "material_description": null,
+      "cost": 2.05
+    },
+    {
+      "id": "41f3ca82-4b53-403a-a20a-a41354f11fbb",
+      "material": "Generic PET, Blow Molding",
+      "material_grade": null,
+      "material_type": "PET",
+      "material_description": null,
+      "cost": 1.42
+    },
+    {
+      "id": "6c6b35fa-29f4-420d-aebb-61357fdaad86",
+      "material": "Generic PET, Bottle (rcar)",
+      "material_grade": null,
+      "material_type": "PET",
+      "material_description": null,
+      "cost": 1.59
+    },
+    {
+      "id": "ba62d69b-d35f-4093-bc90-8210069a5b47",
+      "material": "Generic PET, CPET",
+      "material_grade": null,
+      "material_type": "PET",
+      "material_description": null,
+      "cost": 1.59
+    },
+    {
+      "id": "b35476e9-1994-439c-9aa7-33acd6a9725c",
+      "material": "Generic PET, Injection",
+      "material_grade": null,
+      "material_type": "PET",
+      "material_description": null,
+      "cost": 1.38
+    },
+    {
+      "id": "6b3fe3f2-2804-4ce6-b8ae-e87bd6f3ed2d",
+      "material": "Generic PETG Copolymer",
+      "material_grade": null,
+      "material_type": "PET",
+      "material_description": null,
+      "cost": 1.38
+    },
+    {
+      "id": "6c96357c-c779-4659-82a0-05bd5969fe96",
+      "material": "Generic Ply Material",
+      "material_grade": null,
+      "material_type": "Composites",
+      "material_description": null,
+      "cost": 34.15
+    },
+    {
+      "id": "825b985e-ef77-43f2-8ff9-5003d4876b2b",
+      "material": "Generic Polyamide 11",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 62.88
+    },
+    {
+      "id": "5e2c1c0f-c595-4d5a-a577-cd71080c892e",
+      "material": "Generic Polyamide 11 PA (Powder)",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 44.26
+    },
+    {
+      "id": "4287fcb3-2c39-4cf4-a592-2e18531509b2",
+      "material": "Generic Polyamide 12",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 48.79
+    },
+    {
+      "id": "fe335d9c-2384-4ced-87d1-633c337cdee8",
+      "material": "Generic Polyamide 12 PA (Type 1)",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 44.26
+    },
+    {
+      "id": "d643dc5b-d4d1-4dde-865e-5579081b50f8",
+      "material": "Generic Polyamide 12 PA (Type 2)",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 44.26
+    },
+    {
+      "id": "96c6041c-7f27-46f6-a9a8-373c0745f6c9",
+      "material": "Generic Polyamide 12 PA (Type 3)",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 44.26
+    },
+    {
+      "id": "093bb8b9-c018-4bc5-9c56-0458d7fd40d8",
+      "material": "Generic Polyamide 12 Primary",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 59.86
+    },
+    {
+      "id": "fa70d9e5-3871-4940-86a8-0d25d8c21d75",
+      "material": "Generic Polyamide 12, Al-",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 31.19
+    },
+    {
+      "id": "a8024ed4-0418-468c-bea4-6829efc086a3",
+      "material": "Generic Polyamide 12, Black",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 41.75
+    },
+    {
+      "id": "750d0b2d-bc8b-4b63-b22d-717146395350",
+      "material": "Generic Polyamide 12, Carbon",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 69.92
+    },
+    {
+      "id": "dc255ed5-d10f-4d64-a444-b240229b593c",
+      "material": "Generic Polyamide 12, Flame Ret",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 41.75
+    },
+    {
+      "id": "a15f1432-4d6b-44bf-a0b4-3bbb2a0fbbf8",
+      "material": "Generic Polyamide 12, Glass",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 35.21
+    },
+    {
+      "id": "4ff9224e-64bc-46ce-92da-645b8e726403",
+      "material": "Generic Polyamide 12, PA (Blend)",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 44.26
+    },
+    {
+      "id": "861f31d4-035d-4f82-bb07-42061ab381c0",
+      "material": "Generic Polyamide 12, Primary (Type 2)",
+      "material_grade": null,
+      "material_type": "Polyamide",
+      "material_description": null,
+      "cost": 55.33
+    },
+    {
+      "id": "35800826-9d3b-477a-a560-6c13da3f58a6",
+      "material": "Generic Polyamide-Imide (PAI)",
+      "material_grade": null,
+      "material_type": "Thermoplastics",
+      "material_description": null,
+      "cost": 99.73
+    },
+    {
+      "id": "3656500d-e841-4d52-910f-e03f68cd0112",
+      "material": "Generic Polybutylene Terephthalate",
+      "material_grade": null,
+      "material_type": "PBT",
+      "material_description": null,
+      "cost": 1.08
+    },
+    {
+      "id": "b25632e3-2808-4fce-8007-b95011dbe748",
+      "material": "Generic Polycarbonate",
+      "material_grade": null,
+      "material_type": "Polycarbonate",
+      "material_description": null,
+      "cost": 3.05
+    },
+    {
+      "id": "6bed7bce-a364-4a3e-ac80-7de9fea17bf7",
+      "material": "Generic Polycarbonate 20% GF",
+      "material_grade": null,
+      "material_type": "Polycarbonate",
+      "material_description": null,
+      "cost": 3.65
+    },
+    {
+      "id": "09813bfa-94ba-421e-970a-a416bd8cdb82",
+      "material": "Generic Polycarbonate 30% GF",
+      "material_grade": null,
+      "material_type": "Polycarbonate",
+      "material_description": null,
+      "cost": 2.9
+    },
+    {
+      "id": "eea66afd-4b5b-48c6-a81d-a447f856bb32",
+      "material": "Generic Polycarbonate, Blow Molding",
+      "material_grade": null,
+      "material_type": "Polycarbonate",
+      "material_description": null,
+      "cost": 3.32
+    },
+    {
+      "id": "3aa53ed4-64e3-4413-a827-1ed9b48e2aa7",
+      "material": "Generic Polycarbonate, CD",
+      "material_grade": null,
+      "material_type": "Polycarbonate",
+      "material_description": null,
+      "cost": 2.81
+    },
+    {
+      "id": "cd9a08c4-e77b-481c-afd5-d8c9a452c4f1",
+      "material": "Generic Polycarbonate, Extrusion",
+      "material_grade": null,
+      "material_type": "Polycarbonate",
+      "material_description": null,
+      "cost": 1.64
+    },
+    {
+      "id": "c7e2b9e6-a0a8-4595-9960-3731733fa067",
+      "material": "Generic Polycarbonate, FR",
+      "material_grade": null,
+      "material_type": "Polycarbonate",
+      "material_description": null,
+      "cost": 3.8
+    },
+    {
+      "id": "aaf42777-bb27-43e4-82e5-e626825858ab",
+      "material": "Generic Polyether Sulphone",
+      "material_grade": null,
+      "material_type": "PES",
+      "material_description": null,
+      "cost": 6.42
+    },
+    {
+      "id": "7df60e12-056e-4ad3-9d28-04fecdd8f637",
+      "material": "Generic Polyetheretherketone (PEEK)",
+      "material_grade": null,
+      "material_type": "Thermoplastics",
+      "material_description": null,
+      "cost": 52.53
+    },
+    {
+      "id": "330115ac-31be-4495-b0f8-8cf60d4c02bf",
+      "material": "Generic Polyetherimide (PEI)",
+      "material_grade": null,
+      "material_type": "Thermoplastics",
+      "material_description": null,
+      "cost": 13.39
+    },
+    {
+      "id": "1a086103-aa4e-471d-b08f-7ba2b80b28f2",
+      "material": "Generic Polyetherimide, PEI",
+      "material_grade": null,
+      "material_type": "PEI",
+      "material_description": null,
+      "cost": 9.34
+    },
+    {
+      "id": "0e2092b8-88c8-4215-8584-4cf14b281e67",
+      "material": "Generic Polyethylene, HDPE Extrusion",
+      "material_grade": null,
+      "material_type": "HDPE - Extrusion",
+      "material_description": null,
+      "cost": 0.76
+    },
+    {
+      "id": "a55990ad-290e-4ba6-8811-d37d14042435",
+      "material": "Generic Polyethylene, High Density (HDPE)",
+      "material_grade": null,
+      "material_type": "Polyethylene",
+      "material_description": null,
+      "cost": 1.13
+    },
+    {
+      "id": "bfa69f75-392a-453b-a965-0ac5a5a4aabe",
+      "material": "Generic Polyethylene, Low Density (LDPE)",
+      "material_grade": null,
+      "material_type": "Polyethylene",
+      "material_description": null,
+      "cost": 1.02
+    },
+    {
+      "id": "36664d6a-04a3-4390-a8a8-a27c522fd99c",
+      "material": "Generic Polyimide",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 8.4
+    },
+    {
+      "id": "196a476e-8ed8-40a4-8fa1-95f4517d5f61",
+      "material": "Generic Polyphenylene Oxide, Blow Molding",
+      "material_grade": null,
+      "material_type": "PPO",
+      "material_description": null,
+      "cost": 1.81
+    },
+    {
+      "id": "1200a6f4-9ab5-4eb5-b713-8c92d96cb923",
+      "material": "Generic Polyphenylene Sulphide",
+      "material_grade": null,
+      "material_type": "PPS",
+      "material_description": null,
+      "cost": 1.76
+    },
+    {
+      "id": "50783eb2-9347-41d2-a576-bf80c0a38448",
+      "material": "Generic Polyphenylene Sulphide, Blow Molding",
+      "material_grade": null,
+      "material_type": "PPS",
+      "material_description": null,
+      "cost": 4.49
+    },
+    {
+      "id": "a6194ef7-5d82-428f-9f03-6c8b2b81ec56",
+      "material": "Generic Polypropylene Copolymer",
+      "material_grade": null,
+      "material_type": "Polypropylene",
+      "material_description": null,
+      "cost": 0.68
+    },
+    {
+      "id": "9f45620d-fdab-48bf-bfd0-41d0bf54e3c3",
+      "material": "Generic Polypropylene Ext. Fiber",
+      "material_grade": null,
+      "material_type": "Polypropylene",
+      "material_description": null,
+      "cost": 0.5
+    },
+    {
+      "id": "328705c2-17d3-4578-9448-425ae38bf51d",
+      "material": "Generic Polypropylene G-P H",
+      "material_grade": null,
+      "material_type": "Polypropylene",
+      "material_description": null,
+      "cost": 0.57
+    },
+    {
+      "id": "60fdc092-2ad1-4d4c-b513-82c9b5c90c5c",
+      "material": "Generic Polypropylene Hi Impact",
+      "material_grade": null,
+      "material_type": "Polypropylene",
+      "material_description": null,
+      "cost": 0.76
+    },
+    {
+      "id": "3a9c74e9-fb03-484e-8e46-d778efd962cb",
+      "material": "Generic Polypropylene Med Impact",
+      "material_grade": null,
+      "material_type": "Polypropylene",
+      "material_description": null,
+      "cost": 0.62
+    },
+    {
+      "id": "a932034c-5896-4fc7-bedc-c74439e12dea",
+      "material": "Generic Polypropylene Profiles",
+      "material_grade": null,
+      "material_type": "Polypropylene",
+      "material_description": null,
+      "cost": 0.63
+    },
+    {
+      "id": "07da50e9-8924-473c-a20e-87b08d9627a7",
+      "material": "Generic Polypropylene, Blow Molding",
+      "material_grade": null,
+      "material_type": "Polypropylene",
+      "material_description": null,
+      "cost": 1.48
+    },
+    {
+      "id": "0832332b-0de3-44bc-ab22-11cb0edb3a1b",
+      "material": "Generic Polypropylene, Extrusion",
+      "material_grade": null,
+      "material_type": "PP - Extrusion",
+      "material_description": null,
+      "cost": 0.55
+    },
+    {
+      "id": "bf36ae47-582e-4e7d-bb35-411f90af4b7f",
+      "material": "Generic Polypropylene, Impact Copolymer",
+      "material_grade": null,
+      "material_type": "Impact Copolymer",
+      "material_description": null,
+      "cost": 0.91
+    },
+    {
+      "id": "1d19d87e-c654-456b-a4e6-83554d5bb702",
+      "material": "Generic Polystyrene",
+      "material_grade": null,
+      "material_type": "Polystyrene",
+      "material_description": null,
+      "cost": 1.5
+    },
+    {
+      "id": "0734a9f5-77ff-4f94-bbf0-eb0c7b679599",
+      "material": "Generic Polystyrene FR",
+      "material_grade": null,
+      "material_type": "Polystyrene",
+      "material_description": null,
+      "cost": 1.93
+    },
+    {
+      "id": "c66c2ef2-f3a7-40fc-a42f-d0d5b357daa7",
+      "material": "Generic Polystyrene G-P Crystal",
+      "material_grade": null,
+      "material_type": "Polystyrene",
+      "material_description": null,
+      "cost": 1.25
+    },
+    {
+      "id": "08aaea26-1d08-4c17-a40a-64f9d54f82e0",
+      "material": "Generic Polystyrene Hi Heat",
+      "material_grade": null,
+      "material_type": "Polystyrene",
+      "material_description": null,
+      "cost": 1.33
+    },
+    {
+      "id": "c34ce135-f031-4be4-a202-86ba246164ef",
+      "material": "Generic Polystyrene HIPS",
+      "material_grade": null,
+      "material_type": "Polystyrene",
+      "material_description": null,
+      "cost": 1.44
+    },
+    {
+      "id": "154c9e7f-ec1c-4329-b907-7b4ccfb57f27",
+      "material": "Generic Polystyrene HIPS, Extrusion",
+      "material_grade": null,
+      "material_type": "PS - High Impact",
+      "material_description": null,
+      "cost": 1.05
+    },
+    {
+      "id": "e259436a-def6-4cd8-b304-9caccd202896",
+      "material": "Generic Polystyrene Prime Part",
+      "material_grade": null,
+      "material_type": "Polystyrene",
+      "material_description": null,
+      "cost": 47.78
+    },
+    {
+      "id": "9a572277-e1e9-4078-8bdc-766aa29b58ad",
+      "material": "Generic Polystyrene Super Hi Impact",
+      "material_grade": null,
+      "material_type": "Polystyrene",
+      "material_description": null,
+      "cost": 1.39
+    },
+    {
+      "id": "38e71ec1-7607-4e76-ad8c-7b191075eddf",
+      "material": "Generic Polystyrene, G-P Crystal",
+      "material_grade": null,
+      "material_type": "PS - Crystal",
+      "material_description": null,
+      "cost": 0.9
+    },
+    {
+      "id": "9b3b0d13-4645-4b35-8cbc-68efd493a921",
+      "material": "Generic Polyurethane, 80/20 TDI",
+      "material_grade": null,
+      "material_type": "Polyurethane",
+      "material_description": null,
+      "cost": 1.4
+    },
+    {
+      "id": "7f2af95d-70ec-4776-8eb9-dea6725d48da",
+      "material": "Generic Polyurethane, Polymer",
+      "material_grade": null,
+      "material_type": "Polyurethane",
+      "material_description": null,
+      "cost": 1.34
+    },
+    {
+      "id": "bb8c95ab-6253-4f2b-8f8e-7844b8797cec",
+      "material": "Generic Polyvinyl Chloride, Blow Molding",
+      "material_grade": null,
+      "material_type": "PVC",
+      "material_description": null,
+      "cost": 1.51
+    },
+    {
+      "id": "ecb8d45b-ed4a-4f80-90ec-9c7b760d7abe",
+      "material": "Generic PPS 30% Glass Fiber",
+      "material_grade": null,
+      "material_type": "PPS",
+      "material_description": null,
+      "cost": 2.01
+    },
+    {
+      "id": "d24e11a2-ef0b-4c67-8c40-37cb5e2d475b",
+      "material": "Generic PPS 40% Glass Fiber",
+      "material_grade": null,
+      "material_type": "PPS",
+      "material_description": null,
+      "cost": 3.27
+    },
+    {
+      "id": "b64e3aa6-9ba6-41aa-8067-518e70f980ab",
+      "material": "Generic PS Plastic",
+      "material_grade": null,
+      "material_type": "CastForm",
+      "material_description": null,
+      "cost": 65.89
+    },
+    {
+      "id": "07bde9f4-8819-433b-b082-2981529bda51",
+      "material": "Generic S355J2",
+      "material_grade": null,
+      "material_type": "Unalloyed Steel",
+      "material_description": null,
+      "cost": 0.79
+    },
+    {
+      "id": "26ce5d44-2ff9-4acd-9f5d-202e6171ede8",
+      "material": "Generic S355J2G3",
+      "material_grade": null,
+      "material_type": "Low-Alloy Steel",
+      "material_description": null,
+      "cost": 0.43
+    },
+    {
+      "id": "d1bc6093-a23b-438e-b9d0-a78a7542c5d7",
+      "material": "Generic S690QL",
+      "material_grade": null,
+      "material_type": "Low-Alloy Steel",
+      "material_description": null,
+      "cost": 0.98
+    },
+    {
+      "id": "774f7293-199d-4783-95cb-97c1f6e82398",
+      "material": "Generic SAE 4118",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.48
+    },
+    {
+      "id": "fb844a78-f9c3-4def-bc5e-e46f7e897584",
+      "material": "Generic Silicon Brass 879",
+      "material_grade": null,
+      "material_type": "Silicon Brass",
+      "material_description": null,
+      "cost": 2.72
+    },
+    {
+      "id": "7d8cb81c-0961-40a1-8ac9-ac0aad478bce",
+      "material": "Generic SR 200",
+      "material_grade": null,
+      "material_type": "VisiJet Plastic",
+      "material_description": null,
+      "cost": 122.23
+    },
+    {
+      "id": "41c6b3f0-1bfb-46ff-977b-6b1c029fc5bf",
+      "material": "Generic Stainless Steel GP1",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 53.34
+    },
+    {
+      "id": "e3b1622c-e588-48d7-af90-b4d3544b5ead",
+      "material": "Generic Stainless Steel Hardened",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 161.55
+    },
+    {
+      "id": "4f697faf-dbb1-44f3-9b44-6083a6b9a0f5",
+      "material": "Generic Stainless Steel, 14-4PH",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 2.78
+    },
+    {
+      "id": "57dd46ad-cb5b-490d-9d10-0b828f9ee147",
+      "material": "Generic Stainless Steel, 15-5PH",
+      "material_grade": "Stainless Steel, 15-5PH",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.42
+    },
+    {
+      "id": "41317ce8-bb09-49d2-a108-b08ee3583cae",
+      "material": "Generic Stainless Steel, 17-4PH",
+      "material_grade": "Stainless Steel, 17-4PH",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 7.185
+    },
+    {
+      "id": "5644b826-3dd8-4bb4-8524-30f6f93f8088",
+      "material": "Generic Stainless Steel, 310",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.03
+    },
+    {
+      "id": "d7ab4ff9-caac-4561-a4ae-4c3c6d8c5688",
+      "material": "Generic Stainless Steel, 347",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.67
+    },
+    {
+      "id": "ff1a9282-f12d-4bfe-a12f-3857c6d0db82",
+      "material": "Generic Stainless Steel, 416",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.38
+    },
+    {
+      "id": "bc32a3a4-22d6-4b9b-a73e-8484a9dc4add",
+      "material": "Generic Stainless Steel, 440 (Type 2)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.54
+    },
+    {
+      "id": "c652bc79-eaad-4553-9687-1e0e2d76031f",
+      "material": "Generic Stainless Steel, 440B",
+      "material_grade": "Stainless Steel, 440B",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.318
+    },
+    {
+      "id": "ae865426-6f95-4931-93a1-45691397761f",
+      "material": "Generic Stainless Steel, 440B (X90CrMoV18)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.69
+    },
+    {
+      "id": "39a2d8d5-4f60-4dcc-883f-ca72ec92578d",
+      "material": "Generic Stainless Steel, A2 (Stainless Ste)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.2
+    },
+    {
+      "id": "ca9c4476-67fe-46b2-aa79-083c4769d971",
+      "material": "Generic Stainless Steel, A240",
+      "material_grade": "Stainless Steel, A240",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 2.385
+    },
+    {
+      "id": "90d11533-3b73-48ac-8e94-e5efb121088e",
+      "material": "Generic Stainless Steel, A3 (GX5CrNi19-10)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.6
+    },
+    {
+      "id": "fe01dbda-a634-4309-9927-73e12441204e",
+      "material": "Generic Stainless Steel, A351 CF8",
+      "material_grade": "Stainless Steel, A351 CF8",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.157
+    },
+    {
+      "id": "4edff6c6-5002-40fd-b8a2-71c4471ea33d",
+      "material": "Generic Stainless Steel, AISI 301",
+      "material_grade": "Stainless Steel, AISI 301",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.642
+    },
+    {
+      "id": "ac86f047-3ad9-465b-ae60-011d4c35f66e",
+      "material": "Generic Stainless Steel, AISI 303",
+      "material_grade": "Stainless Steel, AISI 303",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.796
+    },
+    {
+      "id": "cc2d67c6-af70-4c71-b01c-6e7cdc7cfb5d",
+      "material": "Generic Stainless Steel, AISI 304",
+      "material_grade": "Stainless Steel, AISI 304",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.848
+    },
+    {
+      "id": "fa43a570-85de-4d94-bfa6-2bd56ddaafee",
+      "material": "Generic Stainless Steel, AISI 304L",
+      "material_grade": "Stainless Steel, AISI 304L",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 4.003
+    },
+    {
+      "id": "9b34223a-12bc-42df-a327-d8367dd8a7f1",
+      "material": "Generic Stainless Steel, AISI 316",
+      "material_grade": "Stainless Steel, AISI 316",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 6.394
+    },
+    {
+      "id": "2dfc8749-03a3-4a5a-8e67-1d0fec529c79",
+      "material": "Generic Stainless Steel, AISI 316L",
+      "material_grade": "Stainless Steel, AISI 316L",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 6.394
+    },
+    {
+      "id": "99da6e58-445b-4676-9c08-e64a9e4cdc31",
+      "material": "Generic Stainless Steel, AISI 316Ti",
+      "material_grade": "Stainless Steel, AISI 316Ti",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 6.121
+    },
+    {
+      "id": "5167557f-5202-4aec-afa8-26ef695aa73d",
+      "material": "Generic Stainless Steel, AISI 321",
+      "material_grade": "Stainless Steel, AISI 321",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 6.128
+    },
+    {
+      "id": "d8f69738-eb86-4721-853a-39ab9bca3dd1",
+      "material": "Generic Stainless Steel, AISI 441",
+      "material_grade": "Stainless Steel, AISI 441",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 2.677
+    },
+    {
+      "id": "480b727d-a1aa-4930-8de4-a4fbb36ed6af",
+      "material": "Generic Stainless Steel, Alloy (EN 1.4307)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 2.03
+    },
+    {
+      "id": "545d715b-9931-48ab-9dd7-7fd11006827f",
+      "material": "Generic Stainless Steel, Alloy (EN 1.4401)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.25
+    },
+    {
+      "id": "c6c6579a-2596-49bc-ac1b-d2d29a66053e",
+      "material": "Generic Stainless Steel, Alloy (X10Cr13)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.16
+    },
+    {
+      "id": "eb132495-d70d-4f05-b928-190c07a05253",
+      "material": "Generic Stainless Steel, Alloy (X10CrNi18-8)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.85
+    },
+    {
+      "id": "9586e019-4b31-40a0-848c-82701f2ea065",
+      "material": "Generic Stainless Steel, Alloy (X2CrNiMo17)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.25
+    },
+    {
+      "id": "a86d75a8-d95d-4b84-9da3-ad4b6e91af4f",
+      "material": "Generic Stainless Steel, Alloy (X5CrNi18-10)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.96
+    },
+    {
+      "id": "b7247767-eaf5-4f9d-8d41-3c111ec0a45b",
+      "material": "Generic Stainless Steel, Alloy (X5CrNiMo17)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 3.25
+    },
+    {
+      "id": "b1af6093-8e6c-4024-a3ce-cf1e2baa629d",
+      "material": "Generic Stainless Steel, Alloy (X6Cr17)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.36
+    },
+    {
+      "id": "8bfd869a-2da2-4f54-8b4b-cb0ba7d78d2a",
+      "material": "Generic Stainless Steel, Alloy (X6CrNiMoTi)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 4.13
+    },
+    {
+      "id": "e22d26a1-3bfa-4ca9-9f8c-a73ca9e09ef8",
+      "material": "Generic Stainless Steel, Alloy (X6CrNiTi18-10)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.05
+    },
+    {
+      "id": "cd917eaa-ee9d-46a9-9fc0-0d4ff3db9a39",
+      "material": "Generic Stainless Steel, Alloy (X8CrNiS18-9)",
+      "material_grade": null,
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 1.93
+    },
+    {
+      "id": "30e19914-a994-437f-b9e9-49b19fccc5be",
+      "material": "Generic Steel, AISI 1035",
+      "material_grade": "Steel, AISI 1035",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.479
+    },
+    {
+      "id": "c612b64a-bf06-46d4-ac0e-61cc82d68f8b",
+      "material": "Generic Steel, AISI 1045, Machined",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.36
+    },
+    {
+      "id": "bf268a04-6415-4099-b07b-278f8e187462",
+      "material": "Generic Steel, AISI 4140, Machined",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.36
+    },
+    {
+      "id": "e0f00f5b-6e79-4753-84f4-ea26436b5fac",
+      "material": "Generic Steel, AISI 4140, Medium-Carbon",
+      "material_grade": "Steel, AISI 4140, Medium-Carbon",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.968
+    },
+    {
+      "id": "b52f7632-145a-4b10-8e4b-af7e9f3fd594",
+      "material": "Generic Steel, AISI 4820",
+      "material_grade": null,
+      "material_type": "Low-Alloy Steel",
+      "material_description": null,
+      "cost": 0.76
+    },
+    {
+      "id": "9839d08f-87d5-4058-a1ff-ee87fa3b48f4",
+      "material": "Generic Steel, ASTM A27 (GP 280 GH)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "0a4d2646-b9ae-4ff5-86ae-27ae84380385",
+      "material": "Generic Steel, ASTM A915 (GP 240 GH)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.83
+    },
+    {
+      "id": "bcca6e25-26d4-4dd0-93bd-ec244e96e8b7",
+      "material": "Generic Steel, Cold Rolled Electrogalvanized (SECC)",
+      "material_grade": "SECC",
+      "material_type": "Galvanized Steel",
+      "material_description": null,
+      "cost": null
+    },
+    {
+      "id": "74e59045-0b42-44f7-87a8-1ea1dbff8652",
+      "material": "Generic Steel, Cold Worked (Grade 1018)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1
+    },
+    {
+      "id": "98b85c97-a483-45a7-9788-4713d362ce9a",
+      "material": "Generic Steel, Cold Worked (Grade 1050)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.87
+    },
+    {
+      "id": "aaca9174-69b8-4d52-8478-d1c5d8442f2c",
+      "material": "Generic Steel, Cold Worked (Grade 4130)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "a345df5a-d7ae-4acf-aed3-26e37cbd0d7a",
+      "material": "Generic Steel, Cold Worked (Grade 5210)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "7e2b4da4-1c04-42d5-972f-931b9b1539fd",
+      "material": "Generic Steel, Cold Worked (Grade 8620)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "294bf184-d60c-470e-8d07-acfdb58ba012",
+      "material": "Generic Steel, Cold Worked (Type 1)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.83
+    },
+    {
+      "id": "cdb84024-8906-4e7b-8d33-1ed2b660af6e",
+      "material": "Generic Steel, Cold Worked 34CrNiMo6",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "19e10fab-7675-407f-b884-fbfecbbc9c5d",
+      "material": "Generic Steel, Cold Worked C22 CR",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.77
+    },
+    {
+      "id": "a2e23fa7-2c3c-41cc-9943-2dfb32f31dd1",
+      "material": "Generic Steel, Cold Worked DC01 CR",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.88
+    },
+    {
+      "id": "8e5d633b-e564-478c-8dc9-deb9a6c2fa10",
+      "material": "Generic Steel, Cold Worked DC04",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.83
+    },
+    {
+      "id": "39496bd6-a521-4563-bede-653cc37d469d",
+      "material": "Generic Steel, Cold Worked EN 10130",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "7cb77b84-3809-4df3-948f-29ad1f18894c",
+      "material": "Generic Steel, Cold Worked S245G CR",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.83
+    },
+    {
+      "id": "f306b748-eef3-4746-8545-0d28516b7070",
+      "material": "Generic Steel, Cold Worked, AISI 1005",
+      "material_grade": "Steel, Cold Worked, AISI 1005",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.473
+    },
+    {
+      "id": "3b514ebe-b7eb-45d7-b424-4faa6ffb7e8b",
+      "material": "Generic Steel, Cold Worked, AISI 1008",
+      "material_grade": "Steel, Cold Worked, AISI 1008",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.88
+    },
+    {
+      "id": "cf04659a-fb8e-407b-9d89-d0a0e54d775f",
+      "material": "Generic Steel, Cold Worked, AISI 1010",
+      "material_grade": "Steel, Cold Worked, AISI 1010",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.681
+    },
+    {
+      "id": "8c96a60c-e5bd-49c7-bb98-0fe9ce43547d",
+      "material": "Generic Steel, Cold Worked, AISI 1012",
+      "material_grade": "Steel, Cold Worked, AISI 1012",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.681
+    },
+    {
+      "id": "dd7b9529-f332-4760-96bc-202fdab82648",
+      "material": "Generic Steel, Cold Worked, AISI 1018",
+      "material_grade": "Steel, Cold Worked, AISI 1018",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.781
+    },
+    {
+      "id": "48e71a73-8d75-40e5-a112-002bdfeec414",
+      "material": "Generic Steel, Cold Worked, AISI 1020",
+      "material_grade": "Steel, Cold Worked, AISI 1020",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.688
+    },
+    {
+      "id": "ab009fae-a81c-4315-9602-fa32eae89066",
+      "material": "Generic Steel, Cold Worked, AISI 1050",
+      "material_grade": "Steel, Cold Worked, AISI 1050",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.688
+    },
+    {
+      "id": "bae4fb93-8f06-46bd-8444-e4b89661324e",
+      "material": "Generic Steel, Cold Worked, AISI 4130",
+      "material_grade": "Steel, Cold Worked, AISI 4130",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.594
+    },
+    {
+      "id": "28b521c8-875e-4335-8229-c92f9774125d",
+      "material": "Generic Steel, Cold Worked, AISI 4340",
+      "material_grade": "Steel, Cold Worked, AISI 4340",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 2.026
+    },
+    {
+      "id": "a9a9804e-82f8-4182-bd3d-7cdd7aeef4e4",
+      "material": "Generic Steel, Cold Worked, AISI 5210",
+      "material_grade": "Steel, Cold Worked, AISI 5210",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.542
+    },
+    {
+      "id": "7f9b7b5a-de75-492c-8941-92d93fcf850d",
+      "material": "Generic Steel, Cold Worked, AISI 8620",
+      "material_grade": "Steel, Cold Worked, AISI 8620",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.767
+    },
+    {
+      "id": "ec0cbd49-a4e3-406f-aa27-1c18b781e509",
+      "material": "Generic Steel, Cold Worked, DC06",
+      "material_grade": "Steel, Cold Worked, DC06",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.495
+    },
+    {
+      "id": "03ade22d-6455-48fc-bbdd-edef63086048",
+      "material": "Generic Steel, Hot Worked (11 SMn 30 / EN 1.0715)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.79
+    },
+    {
+      "id": "89348ecb-7bc5-4c36-bdda-faf93a122367",
+      "material": "Generic Steel, Hot Worked (11 SMnPb 30 / EN 1.0718)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "4b5be1a4-d858-46ea-bfc5-413d2290dfbe",
+      "material": "Generic Steel, Hot Worked (16 MnCr 5 / EN 1.7131)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.75
+    },
+    {
+      "id": "047770b6-c29f-422d-b939-c11db4599a86",
+      "material": "Generic Steel, Hot Worked (17100 / Generic 10210-1)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.8
+    },
+    {
+      "id": "f7fa0af1-10e5-4545-ad0f-530c2280460a",
+      "material": "Generic Steel, Hot Worked (42 CrMo 4 / EN 1.7225)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.78
+    },
+    {
+      "id": "6b83f72e-4396-42a1-a9f1-6a6446866400",
+      "material": "Generic Steel, Hot Worked (42 CrMoS 4 / EN 1.7227)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.79
+    },
+    {
+      "id": "48f6fb78-94de-49f7-9d4f-252f7cdb2b66",
+      "material": "Generic Steel, Hot Worked (51 CrV 4 / EN 1.8159)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.39
+    },
+    {
+      "id": "aa280498-2d72-42cc-82d3-da3d03ae88c1",
+      "material": "Generic Steel, Hot Worked (C 100 S / EN 1.1274)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.76
+    },
+    {
+      "id": "a6cf6ebb-c7e9-4e7e-90bc-a0af862bff28",
+      "material": "Generic Steel, Hot Worked (C 45 / EN 1.0503)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.74
+    },
+    {
+      "id": "8fa72b0e-65cf-4491-81c0-089eeb260408",
+      "material": "Generic Steel, Hot Worked (C 45 E / EN 1.1191)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.74
+    },
+    {
+      "id": "59995872-59d2-4338-a93a-dd8c506c76a5",
+      "material": "Generic Steel, Hot Worked (C 45 R / EN 1.1201)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.74
+    },
+    {
+      "id": "e099bc48-8d34-47d8-97b8-bc18d2c77439",
+      "material": "Generic Steel, Hot Worked (C 75 S / EN 1.1248)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.85
+    },
+    {
+      "id": "ba8709b0-0135-430f-b36f-503ccf8be7a0",
+      "material": "Generic Steel, Hot Worked (C22 HR / EN 1.0402 HR)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.81
+    },
+    {
+      "id": "4bf5571c-5c60-4c37-9b08-704512320634",
+      "material": "Generic Steel, Hot Worked (E235 / EN 1.0308)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.74
+    },
+    {
+      "id": "fa7ba78e-80cc-48ac-a8f3-79921730bbda",
+      "material": "Generic Steel, Hot Worked (EN 1.0038)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.79
+    },
+    {
+      "id": "0601a9cc-8597-4b55-a4ea-28d9f2210178",
+      "material": "Generic Steel, Hot Worked (Generic Steel, Hot W... Type 2)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.85
+    },
+    {
+      "id": "c9304234-bc14-4258-a4df-61a3099aa18c",
+      "material": "Generic Steel, Hot Worked (Generic Steel, Hot Worked Type 3)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.12
+    },
+    {
+      "id": "e38c6af7-e41a-4bce-a082-1c4699b75e9a",
+      "material": "Generic Steel, Hot Worked (Generic Steel, Hot Worked Type 4)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.79
+    },
+    {
+      "id": "7b315202-fefd-47b3-a154-43b7bcad27d0",
+      "material": "Generic Steel, Hot Worked (Generic Steel, Hot Worked)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.81
+    },
+    {
+      "id": "219fce5d-f7f7-4641-b4e1-20733bbcebd1",
+      "material": "Generic Steel, Hot Worked (S12C HR / EN 1.0144 HR)",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "84385a33-9186-4e4b-a3ea-a9fddaa1b289",
+      "material": "Generic Steel, Hot Worked Ck 10 HR",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "7bd4647e-39ad-4fdd-83c4-97f67d60b78c",
+      "material": "Generic Steel, Hot Worked DD11",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.73
+    },
+    {
+      "id": "ae9c4dd2-0718-49ce-96a1-bbb548f49363",
+      "material": "Generic Steel, Hot Worked DD13",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.78
+    },
+    {
+      "id": "124804b8-fab2-4ef6-a98c-8daa862052de",
+      "material": "Generic Steel, Hot Worked S245G HR",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.81
+    },
+    {
+      "id": "b00e5590-4c2b-40bd-9b6d-4630eb02dcf9",
+      "material": "Generic Steel, Hot Worked, AISI 1006",
+      "material_grade": "Steel, Hot Worked, AISI 1006",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.473
+    },
+    {
+      "id": "e83cac96-66ab-434f-b7f5-004b13705ce7",
+      "material": "Generic Steel, Hot Worked, AISI 1008",
+      "material_grade": "Steel, Hot Worked, AISI 1008",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.474
+    },
+    {
+      "id": "bc8be0e1-b0b4-4209-925f-be2763f926d3",
+      "material": "Generic Steel, Hot Worked, AISI 1010",
+      "material_grade": "Steel, Hot Worked, AISI 1010",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.49
+    },
+    {
+      "id": "a6d11dca-feba-4607-9611-d53a79cd3003",
+      "material": "Generic Steel, Hot Worked, AISI 1012",
+      "material_grade": "Steel, Hot Worked, AISI 1012",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.568
+    },
+    {
+      "id": "691b05fd-e4aa-42a1-9cf7-cc4c944d6ce0",
+      "material": "Generic Steel, Hot Worked, AISI 1018",
+      "material_grade": "Steel, Hot Worked, AISI 1018",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.479
+    },
+    {
+      "id": "a40a3377-25a5-4e1d-8ebe-74053975506f",
+      "material": "Generic Steel, Hot Worked, AISI 1020",
+      "material_grade": "Steel, Hot Worked, AISI 1020",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.481
+    },
+    {
+      "id": "72762063-4144-48a1-a611-fddd17f43652",
+      "material": "Generic Steel, Hot Worked, AISI 1042",
+      "material_grade": "Steel, Hot Worked, AISI 1042",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.651
+    },
+    {
+      "id": "e1032103-1af6-48d7-bbbb-ed52ab3e4992",
+      "material": "Generic Steel, Hot Worked, AISI 1045",
+      "material_grade": "Steel, Hot Worked, AISI 1045",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.645
+    },
+    {
+      "id": "9e24a22e-286f-418f-980b-469cc1f66a74",
+      "material": "Generic Steel, Hot Worked, AISI 1049",
+      "material_grade": "Steel, Hot Worked, AISI 1049",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.481
+    },
+    {
+      "id": "686aaf2b-2dd8-4955-a983-325ffde6bbc8",
+      "material": "Generic Steel, Hot Worked, AISI 1050",
+      "material_grade": "Steel, Hot Worked, AISI 1050",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.488
+    },
+    {
+      "id": "9f2f720f-52e2-480f-b472-0963b994bbe6",
+      "material": "Generic Steel, Hot Worked, AISI 1075",
+      "material_grade": "Steel, Hot Worked, AISI 1075",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.494
+    },
+    {
+      "id": "af46749a-7dc5-41db-ae48-fd2c980a363c",
+      "material": "Generic Steel, Hot Worked, AISI 1095",
+      "material_grade": "Steel, Hot Worked, AISI 1095",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.491
+    },
+    {
+      "id": "6aa5e321-b0bf-442d-bcea-2c0c331fe6ef",
+      "material": "Generic Steel, Hot Worked, AISI 1213",
+      "material_grade": "Steel, Hot Worked, AISI 1213",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.726
+    },
+    {
+      "id": "048fee33-e6ee-4035-b382-a3371bf7c3e6",
+      "material": "Generic Steel, Hot Worked, AISI 12L13",
+      "material_grade": "Steel, Hot Worked, AISI 12L13",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.726
+    },
+    {
+      "id": "d4c63b01-8934-4ca0-a10f-e72f86919f9b",
+      "material": "Generic Steel, Hot Worked, AISI 1513",
+      "material_grade": "Steel, Hot Worked, AISI 1513",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.534
+    },
+    {
+      "id": "ddec250a-6482-433e-92b3-28ab4c37b6cc",
+      "material": "Generic Steel, Hot Worked, AISI 4140",
+      "material_grade": "Steel, Hot Worked, AISI 4140",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.586
+    },
+    {
+      "id": "d595d1a1-4bd6-4eb7-8358-98272570fee9",
+      "material": "Generic Steel, Hot Worked, AISI 4140H",
+      "material_grade": "Steel, Hot Worked, AISI 4140H",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.477
+    },
+    {
+      "id": "3131868e-86a3-4ad7-8960-943c0779acd7",
+      "material": "Generic Steel, Hot Worked, AISI 5115",
+      "material_grade": "Steel, Hot Worked, AISI 5115",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.491
+    },
+    {
+      "id": "5354bd93-8b52-4d8f-8356-a4912e695ad8",
+      "material": "Generic Steel, Hot Worked, AISI 6150",
+      "material_grade": "Steel, Hot Worked, AISI 6150",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.578
+    },
+    {
+      "id": "207ad07b-7174-4458-95d7-59845d937d37",
+      "material": "Generic Steel, Hot Worked, ASTM A36",
+      "material_grade": "Steel, Hot Worked, ASTM A36",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.597
+    },
+    {
+      "id": "bf9bf5e4-ccb3-41aa-8e4a-1730833568f0",
+      "material": "Generic Steel, Hot Worked, ASTM A572 Grade 50",
+      "material_grade": "Steel, Hot Worked, ASTM A572 Grade 50",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.491
+    },
+    {
+      "id": "8661cbd6-fa6b-4d76-b838-b09d8da8bf8b",
+      "material": "Generic Steel, Hot Worked, Grade S235JR",
+      "material_grade": "Steel, Hot Worked, Grade S235JR",
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.578
+    },
+    {
+      "id": "7e4bdd8a-b013-4b0d-91a5-309983a6671f",
+      "material": "Generic Steel, SAE 1580",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 0.75
+    },
+    {
+      "id": "1f9849c5-a404-4793-b746-9636311811dd",
+      "material": "Generic Styrene Acrylonitrile, Blow Molding",
+      "material_grade": null,
+      "material_type": "SAN",
+      "material_description": null,
+      "cost": 1.54
+    },
+    {
+      "id": "be48af98-ce72-4212-b87d-59b49fbcbee7",
+      "material": "Generic Titanium TI64ELI (Low Interstitial)",
+      "material_grade": null,
+      "material_type": "Titanium Alloy",
+      "material_description": null,
+      "cost": 290.11
+    },
+    {
+      "id": "23756bb2-9e04-4d8f-ade3-0a1026762c11",
+      "material": "Generic Titanium, Ti-5Al-2.5Sn (TiAl5Sn2.5)",
+      "material_grade": null,
+      "material_type": "Titanium",
+      "material_description": null,
+      "cost": 12.62
+    },
+    {
+      "id": "a02529aa-eeb2-48ce-8f1a-2876591dd3eb",
+      "material": "Generic Titanium, Ti-6Al-4V (G-TiAl6V4)",
+      "material_grade": null,
+      "material_type": "Titanium",
+      "material_description": null,
+      "cost": 12.44
+    },
+    {
+      "id": "144e937f-a4ae-4e3b-8db4-47a1d3347c05",
+      "material": "Generic Titanium, Titanium (Grade)",
+      "material_grade": null,
+      "material_type": "Titanium",
+      "material_description": null,
+      "cost": 17.05
+    },
+    {
+      "id": "e036c0db-bfa8-421c-8b0b-2e44df64add2",
+      "material": "Generic Tool Steel, A-2",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.39
+    },
+    {
+      "id": "e7915797-6c0c-4769-afdc-8bcdbfe521ac",
+      "material": "Generic Tool Steel, D-2",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.8
+    },
+    {
+      "id": "eea2d98b-a6ba-482d-b8ed-5b477f8a0e73",
+      "material": "Generic Tool Steel, O-1",
+      "material_grade": null,
+      "material_type": "Steel",
+      "material_description": null,
+      "cost": 1.12
+    },
+    {
+      "id": "bac04894-e85f-471d-95f6-16a75d6ebd69",
+      "material": "Generic TPA (Thermoplastic Polyamide)",
+      "material_grade": null,
+      "material_type": "TPA",
+      "material_description": null,
+      "cost": 7.59
+    },
+    {
+      "id": "ba2a1eb7-5e63-4002-922b-fe16edd40d76",
+      "material": "Generic TPE (Thermoplastic Copolymer)",
+      "material_grade": null,
+      "material_type": "TPE",
+      "material_description": null,
+      "cost": 4.48
+    },
+    {
+      "id": "ad4aaa59-c444-4b5e-8251-c5afe17e3b51",
+      "material": "Generic TPE Prime Part",
+      "material_grade": null,
+      "material_type": "Polyetheramide",
+      "material_description": null,
+      "cost": 51.81
+    },
+    {
+      "id": "47296a12-85ba-4105-84bd-eaba562ed876",
+      "material": "Generic TPO (Thermoplastic Polyolefin)",
+      "material_grade": null,
+      "material_type": "TPO",
+      "material_description": null,
+      "cost": 1.66
+    },
+    {
+      "id": "476f3abe-1a6a-4cb9-8739-79fa7c750797",
+      "material": "Generic TPS (Styrenic Block Copolymer)",
+      "material_grade": null,
+      "material_type": "TPS",
+      "material_description": null,
+      "cost": 2.07
+    },
+    {
+      "id": "1f7bec7d-6f2b-4232-b3cd-e25ab962b701",
+      "material": "Generic TPU (Thermoplastic Polyurethane)",
+      "material_grade": null,
+      "material_type": "TPU",
+      "material_description": null,
+      "cost": 4.83
+    },
+    {
+      "id": "a1abeb4f-84e1-4618-9863-3415cc00933c",
+      "material": "Generic TPV (Thermoplastic Vulcanizate)",
+      "material_grade": null,
+      "material_type": "TPV",
+      "material_description": null,
+      "cost": 2.94
+    },
+    {
+      "id": "84e02520-db27-414e-bb01-ae0a7f32a0d1",
+      "material": "Generic Unsaturated Polyester (UP-CF50)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 13.82
+    },
+    {
+      "id": "4c4f1fa5-bf25-4907-be76-67b59d78e17b",
+      "material": "Generic Unsaturated Polyester (UP-CF53)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 14.49
+    },
+    {
+      "id": "c88a0972-78f3-42c3-a9bd-e653fc40ed24",
+      "material": "Generic Unsaturated Polyester (UP-CF55)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 14.94
+    },
+    {
+      "id": "fe9e7db4-add6-4e70-95cf-d6d2f832f564",
+      "material": "Generic Unsaturated Polyester (UP-GF10-FR)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.03
+    },
+    {
+      "id": "163623cf-c1b6-4ae9-bdcb-0d65add7a7bc",
+      "material": "Generic Unsaturated Polyester (UP-GF10-FRLS)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.96
+    },
+    {
+      "id": "1905cd45-285c-41a5-8d27-6ba84adcec7e",
+      "material": "Generic Unsaturated Polyester (UP-GF12-FR)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.99
+    },
+    {
+      "id": "97ecd9bb-b0f9-4340-ae48-651a687750e7",
+      "material": "Generic Unsaturated Polyester (UP-GF15-FR)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.88
+    },
+    {
+      "id": "dc8bc4e7-7c35-41b1-b005-382dce361cd1",
+      "material": "Generic Unsaturated Polyester (UP-GF15-FRLS)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.25
+    },
+    {
+      "id": "12fed754-dfa0-457d-979b-5d6d1da3a22d",
+      "material": "Generic Unsaturated Polyester (UP-GF15-LS)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.97
+    },
+    {
+      "id": "9ded8b93-f251-40eb-a4c0-c1093b3d33aa",
+      "material": "Generic Unsaturated Polyester (UP-GF15-SR)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.95
+    },
+    {
+      "id": "6db8799b-37a2-4048-8ed9-e0893876bc6c",
+      "material": "Generic Unsaturated Polyester (UP-GF18-FR)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.02
+    },
+    {
+      "id": "c8bd5021-c0af-452a-a6c5-371fb8d7591f",
+      "material": "Generic Unsaturated Polyester (UP-GF20-FR)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.97
+    },
+    {
+      "id": "a40acd2d-64d1-4e09-923b-9957e05c09a0",
+      "material": "Generic Unsaturated Polyester (UP-GF20-FRLS)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.9
+    },
+    {
+      "id": "4b8675f0-a192-41bb-8e00-12ffb27f35df",
+      "material": "Generic Unsaturated Polyester (UP-GF20-LS)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.84
+    },
+    {
+      "id": "2f79bf70-2e84-4391-852a-1cf97c80ca32",
+      "material": "Generic Unsaturated Polyester (UP-GF22-FR)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.97
+    },
+    {
+      "id": "11d13e21-6a85-40f2-9686-f9a964fbc487",
+      "material": "Generic Unsaturated Polyester (UP-GF24-GP)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.91
+    },
+    {
+      "id": "c7370bfd-57f4-4530-90f8-b6117197c385",
+      "material": "Generic Unsaturated Polyester (UP-GF25-FR)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.12
+    },
+    {
+      "id": "1bcb8d53-068b-4c2e-9c04-07ba24fdb33e",
+      "material": "Generic Unsaturated Polyester (UP-GF25-GA)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.9
+    },
+    {
+      "id": "fcbb546d-6ded-48ef-9c8b-8db79dd2d57b",
+      "material": "Generic Unsaturated Polyester (UP-GF25-LP)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.19
+    },
+    {
+      "id": "db097316-14a5-4664-9275-bb36bbf48f1f",
+      "material": "Generic Unsaturated Polyester (UP-GF25-LS)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.13
+    },
+    {
+      "id": "f918e928-4e44-412e-86c1-f0fc1da74cd6",
+      "material": "Generic Unsaturated Polyester (UP-GF27-LPA)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.48
+    },
+    {
+      "id": "79543325-d57a-41b6-879e-fbd847eef72d",
+      "material": "Generic Unsaturated Polyester (UP-GF28-GP)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.94
+    },
+    {
+      "id": "71315f02-6478-4e43-8ce4-0e90c3d1fe1e",
+      "material": "Generic Unsaturated Polyester (UP-GF28-LD)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.22
+    },
+    {
+      "id": "a071fddd-211f-4885-927c-694a15010023",
+      "material": "Generic Unsaturated Polyester (UP-GF30-LD)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.23
+    },
+    {
+      "id": "c6baf4e0-69a1-4558-9696-fc46a38c8d09",
+      "material": "Generic Unsaturated Polyester (UP-GF30-LP)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.19
+    },
+    {
+      "id": "5fe44ecb-63e8-4b05-b67c-746e840e6a49",
+      "material": "Generic Unsaturated Polyester (UP-GF30-LPA)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.48
+    },
+    {
+      "id": "0e67cf39-06de-4c16-852c-c8cecc590ba3",
+      "material": "Generic Unsaturated Polyester (UP-GF30-LS)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.13
+    },
+    {
+      "id": "a1001f43-dba0-46b2-9483-83f615ca22b8",
+      "material": "Generic Unsaturated Polyester (UP-GF33-GP)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.96
+    },
+    {
+      "id": "054d4208-4b13-4c1a-ae19-b5713a14f459",
+      "material": "Generic Unsaturated Polyester (UP-GF38-LPA)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.51
+    },
+    {
+      "id": "53ddf048-1ac3-4333-9ac4-7f95d0c48e2c",
+      "material": "Generic Unsaturated Polyester (UP-GF45-GP)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.36
+    },
+    {
+      "id": "1636b982-d481-4e13-960e-14fbfcce847b",
+      "material": "Generic Unsaturated Polyester (UP-GF63-GP)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 1.41
+    },
+    {
+      "id": "b4a57fb1-ee60-4ec8-b516-f5e7df30579d",
+      "material": "Generic Unsaturated Polyester (UP-GF8-CA)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 0.98
+    },
+    {
+      "id": "6f128f24-bff1-4e7b-af4a-4aa281ad355d",
+      "material": "Generic Unsaturated Polyester (UP-GFCF55)",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 7.75
+    },
+    {
+      "id": "f373cae2-871d-4202-ac1d-e295fff66725",
+      "material": "Generic V-Flash",
+      "material_grade": null,
+      "material_type": "V-Flash",
+      "material_description": null,
+      "cost": 237.42
+    },
+    {
+      "id": "55959c53-6516-4a2e-b949-c182bfc5c232",
+      "material": "Generic Vinyl Ester, CF50",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 15.99
+    },
+    {
+      "id": "6de162d3-28a8-49db-be9b-84dad727b157",
+      "material": "Generic Vinyl Ester, CF60",
+      "material_grade": null,
+      "material_type": "Thermoset",
+      "material_description": null,
+      "cost": 18.3
+    },
+    {
+      "id": "906fe293-4608-49a0-8dc8-6bf62621f879",
+      "material": "Generic Visijet CE-BK",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 138.32
+    },
+    {
+      "id": "04dc5d7d-9573-46db-a0dc-64bca8a14e5c",
+      "material": "Generic Visijet CE-NT",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 138.32
+    },
+    {
+      "id": "6fe3d9ca-6887-4649-bce2-0f3df14e5aed",
+      "material": "Generic Visijet CR-BK",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 158.44
+    },
+    {
+      "id": "6dc85a22-b630-4add-be53-b326b241ff49",
+      "material": "Generic Visijet CR-CL 200",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 158.44
+    },
+    {
+      "id": "27521e7f-fd1e-4951-88de-489b526dfe78",
+      "material": "Generic Visijet CR-WT 200",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 158.44
+    },
+    {
+      "id": "31d568cb-c105-41a5-b551-02c5ad3b1c7d",
+      "material": "Generic Visijet M2 EBK",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 139.33
+    },
+    {
+      "id": "1389a53f-96be-44e7-ab88-3e66a7f94e23",
+      "material": "Generic Visijet M2 ENT",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 139.33
+    },
+    {
+      "id": "f55a9345-40fe-4747-b298-5343bf94c91c",
+      "material": "Generic Visijet M2R-BK",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 153.92
+    },
+    {
+      "id": "0137e7d4-50c7-43e2-b356-a39cc093453a",
+      "material": "Generic Visijet M2R-CL",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 153.92
+    },
+    {
+      "id": "aacc8b14-b5bd-42f9-9b2a-7615108e5d3e",
+      "material": "Generic Visijet M2R-GRY",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 161.97
+    },
+    {
+      "id": "68f6d4c9-b474-47e4-96dc-06703fc0782f",
+      "material": "Generic Visijet M2R-WT",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 153.92
+    },
+    {
+      "id": "4636b8d6-b1fa-434a-a7b6-a084d6642cd0",
+      "material": "Generic Visijet M3 Black",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 167.5
+    },
+    {
+      "id": "91b20e9d-422d-44d6-8a7f-d534f53fe21d",
+      "material": "Generic Visijet M3 Crystal",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 150.9
+    },
+    {
+      "id": "8234a53b-3e14-4f1f-9672-d22c9b7ecb93",
+      "material": "Generic Visijet M3 Proplast",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 158.95
+    },
+    {
+      "id": "9186a4a0-ce53-4a54-97f1-7e534c27a2ec",
+      "material": "Generic Visijet M3 Techplast",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 158.95
+    },
+    {
+      "id": "517a3272-3234-4cad-9ab2-f2f930024246",
+      "material": "Generic Visijet M3-X",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 167.5
+    },
+    {
+      "id": "17b4d5f0-3615-45c9-a881-7874f30f327e",
+      "material": "Generic Visijet SL Black",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 193.15
+    },
+    {
+      "id": "dee59239-6726-4ce2-8ef0-0c0a6b9a4808",
+      "material": "Generic Visijet SL Clear",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 183.59
+    },
+    {
+      "id": "9fc0000f-58fc-4113-a7ab-b1b5e3ea5d09",
+      "material": "Generic Visijet SL Flex",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 210.25
+    },
+    {
+      "id": "45bafe80-33e8-43a6-ba8a-629f247b3f82",
+      "material": "Generic Visijet SL Hi-Temp",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 210.25
+    },
+    {
+      "id": "8f600a33-7cd1-4178-9dd2-a3aa41733af5",
+      "material": "Generic Visijt M3 Navy",
+      "material_grade": null,
+      "material_type": "Visijet",
+      "material_description": null,
+      "cost": 158.95
+    },
+    {
+      "id": "f18d42ca-260e-4045-8309-a69528a70601",
+      "material": "Generic Xtreme",
+      "material_grade": null,
+      "material_type": "Accura",
+      "material_description": null,
+      "cost": 117.7
+    },
+    {
+      "id": "42115cd5-99e8-4334-9bdc-e2fc73d833c5",
+      "material": "Generic Zinc - Zamak (1743-2 Z430)",
+      "material_grade": null,
+      "material_type": "Zinc",
+      "material_description": null,
+      "cost": 2.15
+    },
+    {
+      "id": "1f96e77a-e1f2-4192-a26d-3339226e82ce",
+      "material": "Generic Zinc - Zamak 5 (1743-2 Z410)",
+      "material_grade": null,
+      "material_type": "Zinc",
+      "material_description": null,
+      "cost": 2.03
+    },
+    {
+      "id": "fbfe4b32-ce6d-4288-b340-9d873f83d758",
+      "material": "Generic Zinc-Aluminum Z110 (1743-2 Z110)",
+      "material_grade": null,
+      "material_type": "Zinc-Aluminum",
+      "material_description": null,
+      "cost": 2.1
+    },
+    {
+      "id": "1722b2cc-14b8-4805-8361-14279f082206",
+      "material": "Generic Zinc-Aluminum Z2720 (1743-2 Z2720)",
+      "material_grade": null,
+      "material_type": "Zinc-Aluminum",
+      "material_description": null,
+      "cost": 2.36
+    },
+    {
+      "id": "e026602f-819e-48c7-a265-e85e9d3d411e",
+      "material": "Generic Zinc-Aluminum Z810 (1743-2 Z810)",
+      "material_grade": null,
+      "material_type": "Zinc-Aluminum",
+      "material_description": null,
+      "cost": 2.09
+    },
+    {
+      "id": "a1881dc0-66fe-4cb3-9397-e9e8d6198941",
+      "material": "SS304",
+      "material_grade": "304",
+      "material_type": "Stainless Steel",
+      "material_description": null,
+      "cost": 190
+    }
+  ]
+}

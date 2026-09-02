@@ -27,6 +27,8 @@ import { BlankOptimizerService } from './costing/sheet-metal/machine/blank-optim
 import { buildOperationSequence, injectDrawingIntelligence } from './costing/machining/operation/operation-sequencer';
 import type { OperationLine } from './costing/machining/operation/operation-sequencer';
 import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT, recommendCavityCount } from './costing/injection-molding/process/cost-injection-molding-engine';
+import { computeCompressionMoldingCost } from './costing/injection-molding/process/cost-compression-molding-engine';
+import { computeReactionInjectionMoldingCost } from './costing/injection-molding/process/cost-reaction-injection-molding-engine';
 import type { InjectionMoldingCostInput } from './costing/injection-molding/process/cost-injection-molding-engine';
 import { isPlasticGrade } from './costing/injection-molding/process/process-tree';
 import {
@@ -1138,6 +1140,23 @@ export class BOMItemsService {
     return process.env.ENABLE_PHYSICS_MACHINE_SELECTION !== 'false';
   }
 
+  // Cached per-process, not per-request: migration 619 adds raw_materials.
+  // cure_time_min, but this code must keep working correctly (not crash,
+  // not silently misreport "material not found") against a database that
+  // hasn't had that migration applied yet. Probed once and cached, mirroring
+  // selector.ts's fetchMachinePool's own "retry without the new columns on
+  // a schema-cache error" resilience for the exact same reason (see that
+  // file's own comment). Real per-grade thermal columns (melting_temp_c
+  // etc.) are NOT probed here — they've been live in raw_materials since
+  // before this session, unlike cure_time_min.
+  private materialCureTimeColumnAvailable: boolean | null = null;
+  private async checkMaterialCureTimeColumnAvailable(client: ReturnType<SupabaseService['getClient']>): Promise<boolean> {
+    if (this.materialCureTimeColumnAvailable != null) return this.materialCureTimeColumnAvailable;
+    const { error } = await client.from('raw_materials').select('cure_time_min').limit(1);
+    this.materialCureTimeColumnAvailable = !(error && /column|schema cache/i.test(error.message));
+    return this.materialCureTimeColumnAvailable;
+  }
+
   // Compute the physical requirement each machine class must meet for this part.
   // Classes absent from the map are gated as 'generic' (no dimensional constraint).
   private buildPartRequirements(input: {
@@ -1784,9 +1803,14 @@ export class BOMItemsService {
     oxyfuelCut: MHRRateInput;
     shear: MHRRateInput;
     laserPunch: MHRRateInput;
+    plasmaCut: MHRRateInput;
+    plasmaPunch: MHRRateInput;
     standardPress: MHRRateInput;
     tandemPress: MHRRateInput;
     progressiveDiePress: MHRRateInput;
+    rollBending2: MHRRateInput;
+    rollBending3: MHRRateInput;
+    rollBending4: MHRRateInput;
     cnc3ax: MHRRateInput;
     cnc4ax: MHRRateInput;
     cnc5ax: MHRRateInput;
@@ -1794,6 +1818,9 @@ export class BOMItemsService {
     cncLatheLive: MHRRateInput;
     cncMillTurn: MHRRateInput;
     injectionMolding: MHRRateInput;
+    compressionMolding: MHRRateInput;
+    structuralFoamMolding: MHRRateInput;
+    reactionInjectionMolding: MHRRateInput;
     benchmarkMap: Map<MachineClass, number>;
     directLaborRate: number | null;   // Sheet Metal DLR (lhr_records / lhr_benchmark_rates)
     qaInspectorRate: number | null;   // Quality inspector rate (Quality process group)
@@ -1879,6 +1906,7 @@ export class BOMItemsService {
         pressCycleTimeS: rate.pressCycleTimeS ?? null,
         handlingConstS: rate.handlingConstS ?? null,
         handlingMassCoeffSPerKg: rate.handlingMassCoeffSPerKg ?? null,
+        setupTimeHr: rate.setupTimeHr ?? null,
       };
       const reason = rate.source === 'mhr_database'
         ? 'Selected by commodity-code lookup — import the MHR database for capability-based selection'
@@ -1900,10 +1928,10 @@ export class BOMItemsService {
     };
 
     const allClasses: MachineClass[] = [
-      'fiber_laser', 'co2_laser', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet', 'router_2axis', 'oxyfuel_cut', 'shear', 'laser_punch',
-      'standard_press', 'tandem_press', 'progressive_die_press',
+      'fiber_laser', 'co2_laser', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet', 'router_2axis', 'oxyfuel_cut', 'shear', 'laser_punch', 'plasma_cut', 'plasma_punch',
+      'standard_press', 'tandem_press', 'progressive_die_press', 'roll_bending_2', 'roll_bending_3', 'roll_bending_4',
       'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn',
-      'injection_molding', 'drill_press', 'pem_press', 'hole_forming',
+      'injection_molding', 'compression_molding', 'structural_foam_molding', 'reaction_injection_molding', 'drill_press', 'pem_press', 'hole_forming',
     ];
 
     // Await LHR data — started at the top, runs concurrently with the synchronous setup above
@@ -2010,9 +2038,14 @@ export class BOMItemsService {
         oxyfuelCut:       get('oxyfuel_cut'),
         shear:            get('shear'),
         laserPunch:       get('laser_punch'),
+        plasmaCut:        get('plasma_cut'),
+        plasmaPunch:      get('plasma_punch'),
         standardPress:    get('standard_press'),
         tandemPress:      get('tandem_press'),
         progressiveDiePress: get('progressive_die_press'),
+        rollBending2:     get('roll_bending_2'),
+        rollBending3:     get('roll_bending_3'),
+        rollBending4:     get('roll_bending_4'),
         cnc3ax:           get('cnc_3ax_vmc'),
         cnc4ax:           get('cnc_4ax_vmc'),
         cnc5ax:           get('cnc_5ax_mc'),
@@ -2020,6 +2053,9 @@ export class BOMItemsService {
         cncLatheLive:     get('cnc_lathe_live'),
         cncMillTurn:      get('cnc_mill_turn'),
         injectionMolding: get('injection_molding'),
+        compressionMolding: get('compression_molding'),
+        structuralFoamMolding: get('structural_foam_molding'),
+        reactionInjectionMolding: get('reaction_injection_molding'),
         benchmarkMap, // exposed for appendRateWarnings benchmark guard
         // Direct labor and QA inspector rates surfaced for cost-engine input.
         // fiber_laser maps to 'Sheet Metal' process group → DLR for all SM ops.
@@ -2069,6 +2105,7 @@ export class BOMItemsService {
             pressCycleTimeS: cand.pressCycleTimeS,
             handlingConstS: cand.handlingConstS,
             handlingMassCoeffSPerKg: cand.handlingMassCoeffSPerKg,
+            setupTimeHr: cand.setupTimeHr,
           });
         }
         return buildOutput(resolved);
@@ -2837,14 +2874,44 @@ export class BOMItemsService {
     // dependent check" (never substitute a guessed number), and utsSource lets
     // them warn appropriately.
     utsMpa: number | null; shearStrengthMpa: number | null; utsSource: 'db' | 'family_default' | 'unavailable';
+    // Real per-grade Injection Molding thermal/process properties (Phase 1
+    // materials-data foundation, 2026-09-02) — resolved from the SAME
+    // raw_materials row every other field on this return came from (same
+    // exact-then-tokenized match), never a second, independently-resolved
+    // material. null (never a fabricated default) when this specific grade
+    // has no real value on file — see thermalSource/cureTimeSource for why.
+    meltingTempC: number | null; moldTempC: number | null; ejectionTempC: number | null;
+    specificHeatMeltJgC: number | null; thermalConductivityMeltWMK: number | null;
+    thermalSource: 'db' | 'unavailable';
+    cureTimeMinFromMaterial: number | null;
+    cureTimeSource: 'db' | 'unavailable' | 'column_not_migrated';
   }> {
     const { accessToken, grade, family, materialCol, rates, locCurrencyCode, warnings } = input;
 
     if (grade) {
       try {
         const client = this.supabaseService.getClient(accessToken);
+        const cureTimeColumnAvailable = await this.checkMaterialCureTimeColumnAvailable(client);
         const g = grade.trim();
-        const selectCols = `${materialCol}, cost_india, cost, density, density_kg_m3, shape, material_grade, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa`;
+        // melting_temp_c/mold_temp_c/specific_heat_melt/thermal_conductivity_melt:
+        // real, per-grade Injection Molding thermal properties, already
+        // populated for 511/574 raw_materials rows (imported at some earlier
+        // point from the same aPriori source as
+        // memory/Injection/materials_final.json). Selected unconditionally
+        // (not gated by family) since they're NULL-safe for every non-plastic
+        // material and this is the SAME single material-resolution call
+        // every family already shares — a second, family-gated query would
+        // be a second source of truth.
+        //
+        // cure_time_min: migration 619's new column (compression-molding-
+        // relevant thermoset grades only, see
+        // gen_619_seed_material_cure_time.js) — only requested when
+        // checkMaterialCureTimeColumnAvailable() has confirmed it exists, so
+        // this resolver keeps working correctly against a database that
+        // hasn't had migration 619 applied yet (never a crash, never a
+        // false "material not found").
+        const selectCols = `${materialCol}, cost_india, cost, density, density_kg_m3, shape, material_grade, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c` +
+          (cureTimeColumnAvailable ? `, cure_time_min` : '');
 
         // Alias lookup first — e.g. "AL6101" has no substring in common with its
         // real row ("Generic Aluminum, ANSI 6101"), so none of the ilike attempts
@@ -2939,7 +3006,16 @@ export class BOMItemsService {
           // migration 395) numerically identical to today's behavior.
           const shearStrengthMpa = (row.shear_strength_mpa as number | null) ?? (row.shearing_strength as number | null);
           const utsMpa = (row.uts_mpa as number | null) ?? (row.ultimate_tensile_strength as number | null);
-          return { shape: (row.shape as string | null) ?? null, locCost, indiaCost, densityKgM3, shearStrengthMpa, utsMpa };
+          const meltingTempC = (row.melting_temp_c as number | null) ?? null;
+          const moldTempC = (row.mold_temp_c as number | null) ?? null;
+          const ejectDeflectionTempC = (row.eject_deflection_temp_c as number | null) ?? null;
+          const specificHeatMeltJgC = (row.specific_heat_melt as number | null) ?? null;
+          const thermalConductivityMeltWMK = (row.thermal_conductivity_melt as number | null) ?? null;
+          const cureTimeMinFromMaterial = (row.cure_time_min as number | null) ?? null;
+          return {
+            shape: (row.shape as string | null) ?? null, locCost, indiaCost, densityKgM3, shearStrengthMpa, utsMpa,
+            meltingTempC, moldTempC, ejectDeflectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, cureTimeMinFromMaterial,
+          };
         });
 
         // Density and cost are independent facts about a material row — a
@@ -2978,6 +3054,7 @@ export class BOMItemsService {
                 : `Material "${grade}" found in raw_materials, but no verified UTS/shear strength, and the grade matches no approved material family either — press-brake tonnage, turret-punch tonnage, and UTS-dependent DFM checks are skipped until verified values are added.`,
             );
           }
+          const hasThermal = best.meltingTempC != null && best.moldTempC != null;
           return {
             materialCostPerKg: hasCost
               ? (best.locCost != null && best.locCost > 0 ? best.locCost : (best.indiaCost as number) * rates.convertStrict('INR', locCurrencyCode))
@@ -2987,6 +3064,13 @@ export class BOMItemsService {
             utsMpa: hasUts ? (best.utsMpa as number) : familyUts,
             shearStrengthMpa: hasUts ? (best.shearStrengthMpa as number) : null,
             utsSource: hasUts ? 'db' : (familyUts != null ? 'family_default' : 'unavailable'),
+            meltingTempC: best.meltingTempC, moldTempC: best.moldTempC, ejectionTempC: best.ejectDeflectionTempC,
+            specificHeatMeltJgC: best.specificHeatMeltJgC, thermalConductivityMeltWMK: best.thermalConductivityMeltWMK,
+            thermalSource: hasThermal ? 'db' : 'unavailable',
+            cureTimeMinFromMaterial: best.cureTimeMinFromMaterial,
+            cureTimeSource: best.cureTimeMinFromMaterial != null
+              ? 'db'
+              : (cureTimeColumnAvailable ? 'unavailable' : 'column_not_migrated'),
           };
         }
       } catch {
@@ -3016,6 +3100,10 @@ export class BOMItemsService {
       utsMpa: notFoundFamilyUts,
       shearStrengthMpa: null,
       utsSource: notFoundFamilyUts != null ? 'family_default' : 'unavailable',
+      meltingTempC: null, moldTempC: null, ejectionTempC: null, specificHeatMeltJgC: null, thermalConductivityMeltWMK: null,
+      thermalSource: 'unavailable',
+      cureTimeMinFromMaterial: null,
+      cureTimeSource: 'unavailable',
     };
   }
 
@@ -3724,8 +3812,16 @@ export class BOMItemsService {
 
     const materialWarnings: string[] = [];
     if (familyResolution.warning) materialWarnings.push(familyResolution.warning);
-    const { materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa } =
-      await this.resolveMaterialForFamily({
+    const {
+      materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa,
+      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK,
+      // cureTimeMinFromMaterial deliberately NOT destructured here: this
+      // primary quote path has no per-item Compression Molding / RIM process
+      // dispatch yet (only getRouteComparison() exposes those as alternate
+      // routes today — a known, disclosed architecture gap, out of Phase 1
+      // scope). Destructuring an unused field here would misleadingly imply
+      // it's wired when it isn't.
+    } = await this.resolveMaterialForFamily({
         accessToken,
         grade,
         family,
@@ -3734,6 +3830,14 @@ export class BOMItemsService {
         locCurrencyCode: locInfo.code,
         warnings: materialWarnings,
       });
+    // Real per-grade Injection Molding thermal properties (Phase 1
+    // materials-data foundation, 2026-09-02) — same resolved material row as
+    // materialCostPerKg/materialDensityKgM3 above, never a second lookup.
+    // Harmless (unused) for every non-Injection-Molding-family quote.
+    const realResinInputs = {
+      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK,
+      densityKgM3: materialDensityKgM3 > 0 ? materialDensityKgM3 : null,
+    };
 
     const costOverrides = await this.fetchCostOverrides(id, accessToken, location);
 
@@ -4028,6 +4132,7 @@ export class BOMItemsService {
         // imBbox is sorted descending, so [0]=longest, [1]=mid, [2]=shortest.
         bboxMaxMm: imBbox[0],
         bboxMidMm: imBbox[1],
+        realResinInputs,
         signals: {
           projectedAreaMm2: imBbox[0] * imBbox[1] > 0 ? imBbox[0] * imBbox[1] : null,
           wallThicknessMinMm: (summary.wallThicknessMinMm as number) > 0 ? (summary.wallThicknessMinMm as number) : null,
@@ -5155,7 +5260,7 @@ export class BOMItemsService {
         .select('machine_class, machine_name, mhr_id, operation, process_group, process_route, cycle_time, setup_time, direct_rate, setup_cost_per_part, total_cycle_cost_per_part, total_cost_per_part')
         .eq('bom_item_id', id)
         .eq('is_active', true)
-        .in('machine_class', ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet', 'router_2axis', 'oxyfuel_cut', 'shear', 'laser_punch', 'press_brake', 'standard_press', 'tandem_press', 'progressive_die_press']);
+        .in('machine_class', ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet', 'router_2axis', 'oxyfuel_cut', 'shear', 'laser_punch', 'plasma_cut', 'plasma_punch', 'press_brake', 'standard_press', 'tandem_press', 'progressive_die_press', 'roll_bending_2', 'roll_bending_3', 'roll_bending_4']);
       // P0.6: the Supabase client returns errors on the {error} field rather than
       // throwing -- this was previously never checked, so a real DB failure (not
       // "no applied route yet", a genuine query error) fell through indistinguishable
@@ -5401,8 +5506,12 @@ export class BOMItemsService {
     // called resolveUtsMpa(grade) (the hardcoded fallback table) directly,
     // independently of this resolver's real raw_materials lookup, and could
     // silently disagree with it.
-    const { materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa: rcShearStrengthMpa } =
-      await this.resolveMaterialForFamily({
+    const {
+      materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa: rcShearStrengthMpa,
+      meltingTempC: rcMeltingTempC, moldTempC: rcMoldTempC, ejectionTempC: rcEjectionTempC,
+      specificHeatMeltJgC: rcSpecificHeatMeltJgC, thermalConductivityMeltWMK: rcThermalConductivityMeltWMK,
+      cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
+    } = await this.resolveMaterialForFamily({
         accessToken,
         grade,
         family,
@@ -5411,6 +5520,13 @@ export class BOMItemsService {
         locCurrencyCode: locInfo.code,
         warnings: comparisonWarnings,
       });
+    // Real per-grade Injection Molding thermal/cure-time properties — same
+    // resolved material row as materialCostPerKg/materialDensityKgM3 above.
+    const rcRealResinInputs = {
+      meltingTempC: rcMeltingTempC, moldTempC: rcMoldTempC, ejectionTempC: rcEjectionTempC,
+      specificHeatMeltJgC: rcSpecificHeatMeltJgC, thermalConductivityMeltWMK: rcThermalConductivityMeltWMK,
+      densityKgM3: materialDensityKgM3 > 0 ? materialDensityKgM3 : null,
+    };
 
     const realMaxBendLengthMm = ((fg?.summary?.bendLengths ?? []) as number[]).length > 0
       ? Math.max(...(fg.summary.bendLengths as number[]))
@@ -5650,6 +5766,29 @@ export class BOMItemsService {
     // laserPunch already picked, so computeLaserPunchCost never falls back
     // to a fabricated value.
     const rcLaserPunchParams = await this.smLookup.getLaserPunchMachineParams(mhrRates.laserPunch.machineName);
+    // Turret Punch (2026-09-02): real per-selected-machine nibble/tool-change
+    // data — replaces sm_lookup_turret_punch's fabricated hits/nibble table
+    // for the parts of the formula that have a real substitute. See
+    // TurretPunchMachineParams' own doc comment.
+    const rcTurretPunchMachineParams = await this.smLookup.getTurretPunchMachineParams(mhrRates.turret.machineName);
+    // Plasma Cut/Punch: same per-selected-machine resolution shape as Laser
+    // Punch above, but keyed by the machine's real power_watts (varies
+    // 100W-100,000W / 30W-400W) rather than a fixed per-unit spec — see
+    // getPlasmaCutParams/getPlasmaPunchParams' own doc comments.
+    const rcPlasmaCutParams = await this.smLookup.getPlasmaCutParams(mhrRates.plasmaCut.machineName, grade, thk);
+    const rcPlasmaPunchParams = await this.smLookup.getPlasmaPunchParams(mhrRates.plasmaPunch.machineName, grade, thk);
+    // Roll Bending: same per-selected-machine resolution shape as Laser
+    // Punch — 3 distinct real machine pools (2/3/4 Roll Bender), each
+    // resolved independently since they can select different real machines.
+    const rcRollBending2Params = await this.smLookup.getRollBendingMachineParams(mhrRates.rollBending2.machineName);
+    const rcRollBending3Params = await this.smLookup.getRollBendingMachineParams(mhrRates.rollBending3.machineName);
+    const rcRollBending4Params = await this.smLookup.getRollBendingMachineParams(mhrRates.rollBending4.machineName);
+    // Progressive Die Press (2026-09-02, hardcoded-fallback audit finding):
+    // real per-selected-machine setup time — see
+    // getProgressiveDieMachineSetupMin's own doc comment for why this class
+    // specifically needs per-machine resolution instead of one shared
+    // constant.
+    const rcProgressiveDieSetupMin = await this.smLookup.getProgressiveDieMachineSetupMin(mhrRates.progressiveDiePress.machineName);
 
     const attachToRoutes = (dto: RouteComparisonDto): RouteComparisonDto => {
       for (const route of dto.routes) {
@@ -5867,6 +6006,7 @@ export class BOMItemsService {
           annualVolume, productionLifeYears: 5,
           bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
           currencySymbol: locInfo.symbol,
+          realResinInputs: rcRealResinInputs,
         };
         const cost = computeInjectionMoldedCostSummary(imInput);
         cost.warnings.push(...comparisonWarnings);
@@ -5907,6 +6047,128 @@ export class BOMItemsService {
           } : undefined,
         } satisfies RouteResultDto;
       });
+
+      // Real, distinct manufacturing PROCESSES (not IMM size tiers) — added
+      // as additional candidate routes so a real user can see and compare
+      // them, closing the process-duplicate-audit finding (2026-09-02) that
+      // these two previously had no route through which a real quote could
+      // ever reflect their own real machine class. Deliberately NOT folded
+      // into the tier-comparison scoring above (bestQuality's clamp-
+      // utilization sweet-spot logic is injection-molding-specific and
+      // meaningless for a compression press) — only pushed into the flat
+      // route list so lowestCost/fastest badges (computed generically below
+      // over the whole array) correctly consider them too.
+      const netWeightKgRC = Math.round((Math.max(partVolumeMm3, 0) / 1e9) * materialDensityKgM3 * 1000) / 1000;
+      const compressionMaterialCost = this.r2(netWeightKgRC * materialCostPerKg);
+      const compressionResult = computeCompressionMoldingCost({
+        batchSize,
+        partWeightKg: netWeightKgRC > 0 ? netWeightKgRC : undefined,
+        rate: mhrRates.compressionMolding,
+        // Real per-grade cure_time_min — same resolved material row as
+        // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
+        cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
+      });
+      const compressionCapable = mhrRates.compressionMolding.source === 'mhr_database';
+      imRoutes.push({
+        routeId: 'im-compression-molding',
+        routeLabel: mhrRates.compressionMolding.machineName
+          ? `Compression Molding — ${mhrRates.compressionMolding.machineName}`
+          : 'Compression Molding',
+        processLines: compressionResult.processLines, materialCost: compressionMaterialCost, abrasiveCost: 0,
+        totalProcessCost: this.r2(compressionResult.processLines.reduce((s, l) => s + l.totalCost, 0)),
+        isFeasible: compressionCapable,
+        totalCost: compressionCapable ? this.r2(compressionMaterialCost + compressionResult.processLines.reduce((s, l) => s + l.totalCost, 0)) : null,
+        cycleTimes: {
+          cuttingMin: 0, pressBrakeMin: this.r2(compressionResult.cuttingMin), tappingMin: 0, deburrMin: 0,
+          totalMin: this.r2(compressionResult.cuttingMin),
+        },
+        badges: { lowestCost: false, fastest: false, bestQuality: false },
+        capability: {
+          cuttingCapable: compressionCapable, pressBrakeCapable: compressionCapable, overallCapable: compressionCapable,
+          confidence: compressionCapable ? 'medium' : 'low',
+          estimatedTonnage: null,
+          reasonCodes: compressionCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
+          warnings: compressionCapable ? [] : ['No real compression_molding machine rate resolved for this location'],
+        },
+        warnings: [...compressionResult.warnings, ...comparisonWarnings], ratesSource: RATES_SOURCE_LABEL,
+      } satisfies RouteResultDto);
+
+      const rimResult = computeReactionInjectionMoldingCost({
+        batchSize,
+        partWeightKg: netWeightKgRC > 0 ? netWeightKgRC : undefined,
+        rate: mhrRates.reactionInjectionMolding,
+        // Real per-grade cure/reaction time — same resolved material row as
+        // materialCostPerKg above (rcCureTimeMinFromMaterial, Phase 1).
+        cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
+      });
+      const rimCapable = mhrRates.reactionInjectionMolding.source === 'mhr_database';
+      imRoutes.push({
+        routeId: 'im-reaction-injection-molding',
+        routeLabel: mhrRates.reactionInjectionMolding.machineName
+          ? `Reaction Injection Molding — ${mhrRates.reactionInjectionMolding.machineName}`
+          : 'Reaction Injection Molding',
+        processLines: rimResult.processLines, materialCost: compressionMaterialCost, abrasiveCost: 0,
+        totalProcessCost: this.r2(rimResult.processLines.reduce((s, l) => s + l.totalCost, 0)),
+        isFeasible: rimCapable,
+        totalCost: rimCapable ? this.r2(compressionMaterialCost + rimResult.processLines.reduce((s, l) => s + l.totalCost, 0)) : null,
+        cycleTimes: {
+          cuttingMin: 0, pressBrakeMin: this.r2(rimResult.cuttingMin), tappingMin: 0, deburrMin: 0,
+          totalMin: this.r2(rimResult.cuttingMin),
+        },
+        badges: { lowestCost: false, fastest: false, bestQuality: false },
+        capability: {
+          cuttingCapable: rimCapable, pressBrakeCapable: rimCapable, overallCapable: rimCapable,
+          confidence: rimCapable ? 'medium' : 'low',
+          estimatedTonnage: null,
+          reasonCodes: rimCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
+          warnings: rimCapable ? [] : ['No real reaction_injection_molding machine rate resolved for this location'],
+        },
+        warnings: [...rimResult.warnings, ...comparisonWarnings], ratesSource: RATES_SOURCE_LABEL,
+      } satisfies RouteResultDto);
+
+      const structuralFoamInput: InjectionMoldingCostInput = {
+        volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
+        wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
+        materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
+        mhrRate: mhrRates.structuralFoamMolding, deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
+        annualVolume, productionLifeYears: 5,
+        bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
+        currencySymbol: locInfo.symbol,
+        realResinInputs: rcRealResinInputs,
+      };
+      const structuralFoamCost = computeInjectionMoldedCostSummary(structuralFoamInput);
+      structuralFoamCost.warnings.push(...comparisonWarnings);
+      const structuralFoamCapable = mhrRates.structuralFoamMolding.source === 'mhr_database';
+      imRoutes.push({
+        routeId: 'im-structural-foam-molding',
+        routeLabel: mhrRates.structuralFoamMolding.machineName
+          ? `Structural Foam Molding — ${mhrRates.structuralFoamMolding.machineName}`
+          : 'Structural Foam Molding',
+        processLines: structuralFoamCost.processLines, materialCost: structuralFoamCost.materialCost, abrasiveCost: 0,
+        totalProcessCost: structuralFoamCost.totalProcessCost,
+        isFeasible: structuralFoamCapable,
+        totalCost: structuralFoamCapable ? structuralFoamCost.totalCost : null,
+        cycleTimes: {
+          cuttingMin: structuralFoamCost.cycleTimes.laserMin, pressBrakeMin: structuralFoamCost.cycleTimes.pressBrakeMin,
+          tappingMin: structuralFoamCost.cycleTimes.tappingMin, deburrMin: structuralFoamCost.cycleTimes.deburrMin,
+          totalMin: structuralFoamCost.cycleTimes.totalMin,
+        },
+        badges: { lowestCost: false, fastest: false, bestQuality: false },
+        capability: {
+          cuttingCapable: structuralFoamCapable, pressBrakeCapable: structuralFoamCapable, overallCapable: structuralFoamCapable,
+          confidence: structuralFoamCapable ? 'medium' : 'low',
+          estimatedTonnage: null,
+          reasonCodes: structuralFoamCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
+          warnings: structuralFoamCapable ? [] : ['No real structural_foam_molding machine rate resolved for this location'],
+        },
+        warnings: structuralFoamCost.warnings, ratesSource: structuralFoamCost.ratesSource,
+        sustainability: structuralFoamCost.sustainability ? {
+          totalCo2Kg: structuralFoamCost.sustainability.totalCo2Kg,
+          totalProcessEnergyKwh: structuralFoamCost.sustainability.totalProcessEnergyKwh,
+          wasteCostInr: structuralFoamCost.sustainability.wasteCostInr,
+          sustainabilityScore: structuralFoamCost.sustainability.sustainabilityScore,
+        } : undefined,
+      } satisfies RouteResultDto);
 
       const capableRoutes = imRoutes.filter((r) => r.capability.overallCapable);
       if (capableRoutes.length > 0) {
@@ -6150,9 +6412,14 @@ export class BOMItemsService {
       mhrRates.oxyfuelCut.machineClass,
       mhrRates.shear.machineClass,
       mhrRates.laserPunch.machineClass,
+      mhrRates.plasmaCut.machineClass,
+      mhrRates.plasmaPunch.machineClass,
       mhrRates.standardPress.machineClass,
       mhrRates.tandemPress.machineClass,
       mhrRates.progressiveDiePress.machineClass,
+      mhrRates.rollBending2.machineClass,
+      mhrRates.rollBending3.machineClass,
+      mhrRates.rollBending4.machineClass,
       mhrRates.holeForming.machineClass,
       mhrRates.inspection.machineClass,
     ], family);
@@ -6484,9 +6751,14 @@ export class BOMItemsService {
       [mhrRates.oxyfuelCut.machineClass, mhrRates.oxyfuelCut],
       [mhrRates.shear.machineClass, mhrRates.shear],
       [mhrRates.laserPunch.machineClass, mhrRates.laserPunch],
+      [mhrRates.plasmaCut.machineClass, mhrRates.plasmaCut],
+      [mhrRates.plasmaPunch.machineClass, mhrRates.plasmaPunch],
       [mhrRates.standardPress.machineClass, mhrRates.standardPress],
       [mhrRates.tandemPress.machineClass, mhrRates.tandemPress],
       [mhrRates.progressiveDiePress.machineClass, mhrRates.progressiveDiePress],
+      [mhrRates.rollBending2.machineClass, mhrRates.rollBending2],
+      [mhrRates.rollBending3.machineClass, mhrRates.rollBending3],
+      [mhrRates.rollBending4.machineClass, mhrRates.rollBending4],
     ]);
 
     const routes: RouteResultDto[] = [];
@@ -6509,6 +6781,15 @@ export class BOMItemsService {
         routerParams: rcRouterParams,
         oxyfuelParams: rcOxyfuelParams,
         laserPunchParams: rcLaserPunchParams,
+        turretPunchMachineParams: rcTurretPunchMachineParams,
+        plasmaCutParams: rcPlasmaCutParams,
+        plasmaPunchParams: rcPlasmaPunchParams,
+        flatPatternLengthMm,
+        flatPatternWidthMm,
+        ...(engine.machineClass === 'roll_bending_2' ? { rollBendingParams: rcRollBending2Params } : {}),
+        ...(engine.machineClass === 'roll_bending_3' ? { rollBendingParams: rcRollBending3Params } : {}),
+        ...(engine.machineClass === 'roll_bending_4' ? { rollBendingParams: rcRollBending4Params } : {}),
+        ...(engine.machineClass === 'progressive_die_press' ? { progressiveDieSetupMinFromMachine: rcProgressiveDieSetupMin } : {}),
         abrasiveKgPerMin: effectiveAbrasiveRate.kgPerMin,
         opSetupMin: this.smLookup.resolveOpSetupMin(rcOpSetupTimes, engine.machineClass).minutes,
         partWeightKg: grossWeightKg,

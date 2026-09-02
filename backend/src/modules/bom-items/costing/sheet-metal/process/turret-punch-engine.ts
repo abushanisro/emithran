@@ -1,13 +1,11 @@
 import {
   TURRET_SETUP_MIN,
   TURRET_TOOL_CHANGE_SEC,
-  TURRET_HITS_PER_MIN,
-  TURRET_NIBBLE_MM_PER_MIN,
   DEFAULT_YIELD_PCT,
 } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
-import type { CuttingProcessContext, CuttingProcessResult, TurretParams } from '../../shared/core/manufacturing-process.types';
+import type { CuttingProcessContext, CuttingProcessResult, TurretPunchMachineParams } from '../../shared/core/manufacturing-process.types';
 import { r2, noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
@@ -23,13 +21,14 @@ export interface TurretPunchInput {
   // hardcoded here. Absent means the caller couldn't resolve one; consumers must
   // not fabricate processGroup/processRoute/operation in that case.
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
-  // Real, thickness-specific hits/min, nibble speed, and tool-change time from
-  // sm_lookup_turret_punch (migration 414), resolved by the caller via
-  // SheetMetalLookupService.getTurretPunchParams() — same disclosed-fallback
-  // pattern as laser's/waterjet's own params. Falls back to the module-level
-  // TURRET_HITS_PER_MIN/TURRET_NIBBLE_MM_PER_MIN/TURRET_TOOL_CHANGE_SEC tables
-  // when the caller has no real DB data (dataFound: false), with a warning.
-  turretParams?: TurretParams | null;
+  // Real per-SELECTED-MACHINE nibble speed + tool-change time (2026-09-02),
+  // resolved by the caller via
+  // SheetMetalLookupService.getTurretPunchMachineParams() — see that
+  // method's own doc comment. No real punch/hit-rate data exists for this
+  // class (verified against the full field-name union of all 21 real
+  // machines); punching costs an honest $0 with a disclosed warning when
+  // pierceCount > 0, never a guess.
+  turretMachineParams?: TurretPunchMachineParams | null;
   // Per-batch setup time (min) — resolved by the caller from
   // sm_lookup_op_setup_time (migration 416) via getOpSetupTime('turret_punch').
   setupMin?: number;
@@ -63,23 +62,33 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
 
   const rate = input.turretRate ?? noRateFallback("turret_punch");
 
-  if (!input.turretParams?.dataFound) {
-    warnings.push("Turret: cycle-time params from fallback table — seed sm_lookup_turret_punch for this thickness");
+  // Punching: no real per-machine punch/hit-rate data exists anywhere in the
+  // source for this class (verified against the full field-name union of
+  // all 21 real Turret Press machines) — an honest $0, never a guess.
+  const punchingSec = 0;
+  if (input.pierceCount > 0) {
+    warnings.push("Turret: no real punch/hit-rate data exists for this machine class — punching time is $0 until real data is sourced, not an estimate");
   }
-  const hitsPerMin = input.turretParams?.dataFound ? input.turretParams.hitsPerMin : nearestVal(thk, TURRET_HITS_PER_MIN);
-  const nibbleSpeed = input.turretParams?.dataFound ? input.turretParams.nibbleMmPerMin : nearestVal(thk, TURRET_NIBBLE_MM_PER_MIN);
-  const toolChangeSecPerHole = input.turretParams?.dataFound ? input.turretParams.toolChangeSec : TURRET_TOOL_CHANGE_SEC;
 
-  // Punching hits
-  const punchingSec = input.pierceCount > 0 ? (input.pierceCount / hitsPerMin) * 60 : 0;
-
+  const toolChangeSecPerHole = input.turretMachineParams?.dataFound ? input.turretMachineParams.toolChangeSec : TURRET_TOOL_CHANGE_SEC;
+  if (!input.turretMachineParams?.dataFound && input.holeCount > 0) {
+    warnings.push("Turret: tool-change time from fallback — seed sm_reference_data 'turretPunchMachine:<name>' for the selected machine");
+  }
   // Tool change penalty — amortised over batchSize
   const toolChangeSec = (input.holeCount * toolChangeSecPerHole) / Math.max(input.batchSize, 1);
 
-  // Nibbling for contour cuts
-  const nibblingSec = input.cutLengthMm > 0 ? (input.cutLengthMm / nibbleSpeed) * 60 : 0;
-  if (input.cutLengthMm > 0)
-    warnings.push("Turret: contour assumed nibbled — actual method depends on tooling setup");
+  // Nibbling for contour cuts — real per-machine nibble speed (derived from
+  // nibble_rate_cycles_min × step-per-cycle geometry), same resolution shape
+  // as Laser Punch. Honest $0 when no real row resolves for this machine.
+  let nibblingSec = 0;
+  if (input.turretMachineParams?.dataFound) {
+    nibblingSec = input.cutLengthMm > 0 ? (input.cutLengthMm / input.turretMachineParams.nibbleMmPerMin) * 60 : 0;
+    if (input.cutLengthMm > 0) {
+      warnings.push("Turret: contour assumed nibbled — actual method depends on tooling setup");
+    }
+  } else if (input.cutLengthMm > 0) {
+    warnings.push("Turret: no real nibble-rate data on file for this machine — nibbling time is $0 until real data is sourced, not an estimate");
+  }
 
   const totalSec = punchingSec + toolChangeSec + nibblingSec;
   const cuttingMin = totalSec / 60;
@@ -146,15 +155,6 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
   };
 }
 
-function nearestVal(mm: number, table: Record<number, number>): number {
-  const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
-  let best = keys[0];
-  for (const k of keys) {
-    if (Math.abs(k - mm) < Math.abs(best - mm)) best = k;
-  }
-  return table[best];
-}
-
 // Thin ManufacturingProcessEngine wrapper around the real formula above —
 // registered in manufacturing-process-registry.ts.
 export class TurretPunchEngine extends BaseCuttingEngine {
@@ -170,7 +170,7 @@ export class TurretPunchEngine extends BaseCuttingEngine {
       batchSize: context.batchSize,
       turretRate: context.rate,
       processIdentity: context.processIdentity,
-      turretParams: context.turretParams,
+      turretMachineParams: context.turretPunchMachineParams,
       setupMin: context.opSetupMin,
       partWeightKg: context.partWeightKg,
       handlingAllowance: context.handlingAllowance,

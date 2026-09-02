@@ -117,6 +117,30 @@ export interface LaserPunchMachineParams {
   dataFound: boolean;
 }
 
+export interface TurretPunchMachineParams {
+  nibbleMmPerMin: number;
+  toolChangeSec: number;
+  dataFound: boolean;
+}
+
+export interface PlasmaCutParams {
+  feedRateLargeFeaturesMmPerMin: number;
+  pierceTimeSec: number;
+  dataFound: boolean;
+}
+
+export interface PlasmaPunchParams {
+  feedRateLargeFeaturesMmPerMin: number;
+  pierceTimeSec: number;
+  dataFound: boolean;
+}
+
+export interface RollBendingMachineParams {
+  rollingSpeedMmPerSec: number;
+  prebendTimeSec: number;
+  dataFound: boolean;
+}
+
 // Real material-family -> sm_lookup_router_cut key mapping. Deliberately NOT
 // normaliseLaserMaterial() below (which speaks a different vocabulary:
 // 'Aluminium'/'Stainless Steel'/'Brass'/'Carbon Steel', with no distinct
@@ -360,6 +384,182 @@ export class SheetMetalLookupService {
       toolChangeSec,
       dataFound: true,
     };
+  }
+
+  // ── Turret Punch per-machine physics (2026-09-02, sm_reference_data
+  // 'turretPunchMachine:<machine name>' rows staged from machine_library.json's
+  // "Turret Press (Punch Press)" category, all 21 real machines). Replaces
+  // sm_lookup_turret_punch's fabricated thickness-vs-speed table for the
+  // nibbling/tool-change half of the formula — see TurretPunchMachineParams'
+  // own doc comment for why there's no punchRateCyclesPerMin here (no real
+  // per-machine punch/hit-rate data exists anywhere in the source).
+  async getTurretPunchMachineParams(machineName: string | null | undefined): Promise<TurretPunchMachineParams> {
+    const noData: TurretPunchMachineParams = { nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false };
+    if (!machineName) return noData;
+
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine')
+      .eq('key', `turretPunchMachine:${machineName}`)
+      .maybeSingle();
+    if (error || !data?.raw) return noData;
+
+    const nibbleRate = data.raw.nibble_rate_cycles_min;
+    const nibbleDia = data.raw.nibble_tool_diameter_mm;
+    const nibbleOverlap = data.raw.nibble_tool_overlap_mm;
+    const toolChangeSec = data.raw.tool_change_time_s;
+    if (
+      typeof nibbleRate !== 'number' || nibbleRate <= 0 ||
+      typeof nibbleDia !== 'number' || typeof nibbleOverlap !== 'number' ||
+      typeof toolChangeSec !== 'number'
+    ) {
+      return noData;
+    }
+    const nibbleStepMm = nibbleDia - nibbleOverlap;
+    if (nibbleStepMm <= 0) return noData;
+
+    return {
+      nibbleMmPerMin: nibbleRate * nibbleStepMm,
+      toolChangeSec,
+      dataFound: true,
+    };
+  }
+
+  // ── Plasma Cut / Plasma Punch (2026-09-01) ────────────────────────────────
+  // Unlike OxyFuel (uniform 200W across all real machines, so no power axis
+  // needed), real Plasma Cut (100W-100,000W across 13 machines) and Plasma
+  // Punch (30W-400W across 12 machines) span a genuine power range that
+  // materially changes the real feed rate — so both resolvers first look up
+  // the SELECTED machine's own real power_watts (staged per-machine, same
+  // pattern as getLaserPunchMachineParams), then nearest-power + nearest-
+  // thickness match against the shared nestingCutRate table. Material vocab
+  // ('Steel'/'Cast Iron'/'Stainless Steel') is the same non-laser vocabulary
+  // OxyFuel uses — same remap, not normaliseLaserMaterial's output directly.
+  private async getPlasmaMachinePowerWatts(sourceKeyPrefix: 'plasmaCutMachine' | 'plasmaPunchMachine', machineName: string | null | undefined): Promise<number | null> {
+    if (!machineName) return null;
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine')
+      .eq('key', `${sourceKeyPrefix}:${machineName}`)
+      .maybeSingle();
+    if (error || !data?.raw) return null;
+    const powerWatts = data.raw.power_watts;
+    return typeof powerWatts === 'number' && powerWatts > 0 ? powerWatts : null;
+  }
+
+  private async getPlasmaCutRateParams(
+    machineTypeKeyFragment: 'PlasmaCut' | 'PlasmaPunch',
+    powerWatts: number,
+    grade: string | null | undefined,
+    thicknessMm: number,
+  ): Promise<{ feedRateLargeFeaturesMmPerMin: number; pierceTimeSec: number; dataFound: boolean }> {
+    const noData = { feedRateLargeFeaturesMmPerMin: 0, pierceTimeSec: 0, dataFound: false };
+    const material = normaliseLaserMaterial(grade);
+    const plasmaMaterial = material === 'Stainless Steel' ? 'Stainless Steel' : 'Steel';
+
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'lookup_table')
+      .like('key', `nestingCutRate:%:${machineTypeKeyFragment}:%`);
+    if (error || !data?.length) return noData;
+
+    const rowsForMaterial = data.filter((r: any) => r.raw?.materialTypeName === plasmaMaterial);
+    if (!rowsForMaterial.length) return noData;
+
+    const powers = [...new Set(rowsForMaterial.map((r: any) => Number(r.raw?.powerWatts)))].sort((a, b) => a - b);
+    const nearestPwr = nearestKey(powerWatts, powers);
+    const rowsAtPower = rowsForMaterial.filter((r: any) => Number(r.raw?.powerWatts) === nearestPwr);
+    if (!rowsAtPower.length) return noData;
+
+    const thicknesses = [...new Set(rowsAtPower.map((r: any) => Number(r.raw?.thicknessMm)))].sort((a, b) => a - b);
+    const nearestThick = nearestKey(thicknessMm, thicknesses);
+    const row = rowsAtPower.find((r: any) => Number(r.raw?.thicknessMm) === nearestThick);
+    const feedRate = row?.raw?.feedRateLargeFeaturesMmPerMin;
+    const pierceTimeS = row?.raw?.pierceTimeS;
+    if (typeof feedRate !== 'number' || !Number.isFinite(feedRate) || feedRate <= 0 || typeof pierceTimeS !== 'number') {
+      return noData;
+    }
+    return { feedRateLargeFeaturesMmPerMin: feedRate, pierceTimeSec: pierceTimeS, dataFound: true };
+  }
+
+  async getPlasmaCutParams(
+    machineName: string | null | undefined,
+    grade: string | null | undefined,
+    thicknessMm: number,
+  ): Promise<PlasmaCutParams> {
+    const powerWatts = await this.getPlasmaMachinePowerWatts('plasmaCutMachine', machineName);
+    if (powerWatts == null) return { feedRateLargeFeaturesMmPerMin: 0, pierceTimeSec: 0, dataFound: false };
+    return this.getPlasmaCutRateParams('PlasmaCut', powerWatts, grade, thicknessMm);
+  }
+
+  async getPlasmaPunchParams(
+    machineName: string | null | undefined,
+    grade: string | null | undefined,
+    thicknessMm: number,
+  ): Promise<PlasmaPunchParams> {
+    const powerWatts = await this.getPlasmaMachinePowerWatts('plasmaPunchMachine', machineName);
+    if (powerWatts == null) return { feedRateLargeFeaturesMmPerMin: 0, pierceTimeSec: 0, dataFound: false };
+    return this.getPlasmaCutRateParams('PlasmaPunch', powerWatts, grade, thicknessMm);
+  }
+
+  // ── 2/3/4 Roll Bending per-machine physics (2026-09-01, sm_reference_data
+  // 'rollBenderMachine:<machine name>' rows staged from machine_library.json's
+  // "2/3/4 Roll Bender" categories — real machine names confirmed non-
+  // overlapping across all 3 categories, so no category prefix is needed in
+  // the key). prebendTimeSec is real per-machine data for 3/4-Roll machines
+  // and genuinely absent (0) for 2-Roll machines — a real physical
+  // distinction in the source data, not a gap.
+  async getRollBendingMachineParams(machineName: string | null | undefined): Promise<RollBendingMachineParams> {
+    const noData: RollBendingMachineParams = { rollingSpeedMmPerSec: 0, prebendTimeSec: 0, dataFound: false };
+    if (!machineName) return noData;
+
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine')
+      .eq('key', `rollBenderMachine:${machineName}`)
+      .maybeSingle();
+    if (error || !data?.raw) return noData;
+
+    const rollingSpeed = data.raw.rolling_speed_mm_s;
+    const prebendTime = data.raw.prebend_time_s;
+    if (typeof rollingSpeed !== 'number' || rollingSpeed <= 0) return noData;
+
+    return {
+      rollingSpeedMmPerSec: rollingSpeed,
+      prebendTimeSec: typeof prebendTime === 'number' ? prebendTime : 0,
+      dataFound: true,
+    };
+  }
+
+  // ── Progressive Die Press per-machine setup time (2026-09-02, hardcoded-
+  // fallback audit finding). Standard/Tandem Press's real setup_time_hr IS
+  // genuinely uniform (0.5hr/30min, matches PRESS_STROKE_SETUP_MIN) — but
+  // Progressive Die's varies 0.47-0.72hr (28.2-43.2min) across the 14 safe
+  // (non-contaminated) real machines, correlating with press-force tier.
+  // Staged from machine_library.json's "Progressive Die Press" category,
+  // real per-machine setup_time_hr only for the 14 safe machines (the 12
+  // cross-category-contaminated ones are never staged here — same
+  // exclusion as their press_cycle_time_s backfill, migration 608/2026-09-01).
+  async getProgressiveDieMachineSetupMin(machineName: string | null | undefined): Promise<number | null> {
+    if (!machineName) return null;
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine')
+      .eq('key', `progressiveDieMachine:${machineName}`)
+      .maybeSingle();
+    if (error || !data?.raw) return null;
+    const setupTimeHr = data.raw.setup_time_hr;
+    return typeof setupTimeHr === 'number' && setupTimeHr > 0 ? setupTimeHr * 60 : null;
   }
 
   // ── 2-Axis Router cutting params (Track B Phase 2, tblRouterUtilities.json) ──

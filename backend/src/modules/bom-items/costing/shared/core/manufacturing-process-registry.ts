@@ -5,8 +5,11 @@ import { WaterjetEngine } from '../../sheet-metal/process/waterjet-engine';
 import { OxyfuelCuttingEngine } from '../../sheet-metal/process/oxyfuel-cutting-engine';
 import { ShearingEngine } from '../../sheet-metal/process/shearing-engine';
 import { LaserPunchEngine } from '../../sheet-metal/process/laser-punch-engine';
+import { PlasmaCuttingEngine } from '../../sheet-metal/process/plasma-cutting-engine';
+import { PlasmaPunchEngine } from '../../sheet-metal/process/plasma-punch-engine';
 import { RouterEngine } from '../../sheet-metal/process/router-engine';
 import { PressStrokeEngine } from '../../sheet-metal/process/press-stroke-engine';
+import { RollBendingEngine } from '../../sheet-metal/process/roll-bending-engine';
 import { PressBrakeEngine } from '../../sheet-metal/process/press-brake-engine';
 import { DeburringEngine } from '../../sheet-metal/operation/deburring-engine';
 import { TappingEngine } from '../../sheet-metal/operation/tapping-engine';
@@ -66,10 +69,15 @@ export const MANUFACTURING_PROCESS_REGISTRY: ManufacturingProcessEngine<any, any
   new OxyfuelCuttingEngine(),
   new ShearingEngine(),
   new LaserPunchEngine(),
+  new PlasmaCuttingEngine(),
+  new PlasmaPunchEngine(),
   new RouterEngine(),
   new PressStrokeEngine('standard_press', 'Standard Press'),
   new PressStrokeEngine('tandem_press', 'Tandem Press'),
   new PressStrokeEngine('progressive_die_press', 'Progressive Die'),
+  new RollBendingEngine('roll_bending_2', '2 Roll Bending'),
+  new RollBendingEngine('roll_bending_3', '3 Roll Bending'),
+  new RollBendingEngine('roll_bending_4', '4 Roll Bending'),
   new PressBrakeEngine(),
   new DeburringEngine(),
   new TappingEngine(),
@@ -107,6 +115,8 @@ export const ROUTE_ID_FOR_CLASS: Record<string, string> = {
   oxyfuel_cut: 'sm-oxyfuel',
   shear: 'sm-shear',
   laser_punch: 'sm-laser-punch',
+  plasma_cut: 'sm-plasma',
+  plasma_punch: 'sm-plasma-punch',
   standard_press: 'sm-standard-press',
   tandem_press: 'sm-tandem-press',
 };
@@ -119,6 +129,8 @@ export const ROUTE_LABEL_FOR_CLASS: Record<string, string> = {
   oxyfuel_cut: 'OxyFuel Cut + Press Brake',
   shear: 'Shearing + Press Brake',
   laser_punch: 'Laser Punch + Press Brake',
+  plasma_cut: 'Plasma Cut + Press Brake',
+  plasma_punch: 'Plasma Punch + Press Brake',
   standard_press: 'Standard Press',
   tandem_press: 'Tandem Press',
 };

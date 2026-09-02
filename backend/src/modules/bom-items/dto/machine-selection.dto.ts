@@ -46,6 +46,12 @@ export interface MachineCandidate {
   pressCycleTimeS: number | null;
   handlingConstS: number | null;
   handlingMassCoeffSPerKg: number | null;
+  // mhr_records.setup_time_hr — real per-machine setup time, generically
+  // available for any class (2026-09-02, added for Compression Molding /
+  // Reaction Injection Molding, which have no per-operation lookup table
+  // the way Sheet Metal classes do — real setup_time_hr genuinely IS a
+  // fixed per-machine value for these). null when not set for this machine.
+  setupTimeHr: number | null;
 }
 
 // Structured version of the material/thickness-vs-capacity check — lets the

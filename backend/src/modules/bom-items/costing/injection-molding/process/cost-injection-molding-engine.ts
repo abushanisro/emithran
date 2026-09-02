@@ -33,6 +33,7 @@ import {
   computeCycleTime,
   lookupResinProps,
   type GateType,
+  type RealResinInputs,
 } from './cycle-time';
 
 function r2(n: number): number { return Math.round(n * 100) / 100; }
@@ -239,6 +240,14 @@ export interface InjectionMoldingCostInput {
   moldingSubtype?: MoldingSubtype;
   // Local currency symbol (₹, $, €, …) for warning messages; defaults to '$'.
   currencySymbol?: string;
+  // Real per-grade thermal properties (Phase 1 materials-data foundation,
+  // 2026-09-02), resolved by the caller from raw_materials via
+  // resolveMaterialForFamily — the SAME real row materialCostPerKg/
+  // materialDensityKgM3 above came from. Optional; the Menges cooling
+  // formula falls back to the cited generic resin-family table
+  // (RESIN_THERMAL_TABLE) field-by-field when a specific property isn't on
+  // file for this grade — never fabricated, never all-or-nothing.
+  realResinInputs?: RealResinInputs | null;
 }
 
 // Auto-derive molding subtype from material grade + signals.
@@ -327,7 +336,14 @@ export function computeInjectionMoldedCostSummary(
     grade: materialGrade,
     gateTypeOverride: callerGateType,
     isLsr,
+    realResinInputs: input.realResinInputs,
   });
+  if (input.realResinInputs?.meltingTempC != null || input.realResinInputs?.moldTempC != null) {
+    warnings.push(
+      `Cooling-time inputs: using real per-grade thermal properties on file for "${materialGrade ?? 'this material'}" ` +
+      `(raw_materials) where available; generic resin-family literature defaults fill any remaining field.`,
+    );
+  }
 
   // Surfacing the gate recommendation as a routing signal and (when changed from
   // any caller-supplied value) as an explicit audit note in warnings.
@@ -345,7 +361,10 @@ export function computeInjectionMoldedCostSummary(
   // factor. The machine selector already uses this for IMM selection; surface it
   // here so the user sees the constraint in the cost breakdown warnings.
   if ((input.signals?.projectedAreaMm2 ?? 0) > 0) {
-    const resinProps = lookupResinProps(materialGrade);
+    // Same real-or-fallback resolution as the cooling model above — a
+    // material's Tm can never disagree with itself between the two uses in
+    // this function.
+    const resinProps = lookupResinProps(materialGrade, input.realResinInputs);
     // Reuse physics.ts classifyResinFamily via pressure factor approximation.
     // Phase 5 will import clampTonnageRequired directly from the machine selector.
     const projAreaCm2 = (input.signals!.projectedAreaMm2 as number) / 100;

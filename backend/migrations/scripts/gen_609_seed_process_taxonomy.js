@@ -178,6 +178,12 @@ const NEAR_MISS_SUGGESTIONS = {
   'Plastic & Rubber||Reaction Foam Molding': 'A real wording difference from the Injection Molding digital-factory file\'s "Reaction Injection Molding" (not just casing) -- could be the same real process under a different name, or genuinely different. Not auto-aliased.',
 };
 
+// Live rows indexed by (group, name) -- used below to detect when a row's
+// resolved family name is ITSELF a separate live row's own process_name
+// (the Laser Punch/Laser Puch shape: two distinctly-spelled live operations
+// that are really the same manufacturing process).
+const liveRowByKey = new Map(liveCanonicalRows.map(r => [`${r.process_group}||${r.process_name}`, r]));
+
 for (const row of liveCanonicalRows) {
   const resolver = row.process_group === 'Sheet Metal' ? resolveSheetMetal
     : row.process_group === 'Plastic & Rubber' ? resolvePlasticRubber
@@ -191,6 +197,38 @@ for (const row of liveCanonicalRows) {
   }
 
   const { offlineProc, familyName, aliasSource } = resolved;
+
+  // Cross-name family consolidation (fixes the Laser Punch/Laser Puch
+  // duplication class of bug). Both resolution paths above (the explicit
+  // FAMILY_ALIAS table, and an exact post-normalization match against the
+  // trusted offline reference data) are deterministic, already-sourced
+  // identity resolutions -- not a new string-similarity guess, per the
+  // "use the explicit family/alias mapping as the source of truth, never
+  // fuzzy-match" requirement. When this row's real family name is ITSELF a
+  // DIFFERENT live row's own process_name, this row is a pure alias of
+  // that other, already-canonical row: it must NOT become an independent
+  // process_taxonomy row (previously caused two canonical rows, e.g.
+  // cfa72275 "Laser Punch" and 5baaf77c "Laser Puch", each independently
+  // getting a full copy of the SAME 37 operations) and must NOT own the
+  // alias record in the wrong direction (previously the ALIASED row --
+  // whichever one happened to trigger FAMILY_ALIAS -- became "canonical"
+  // for alias purposes regardless of which spelling was actually correct).
+  //
+  // When familyName differs from this row's own name but NO separate live
+  // row exists under familyName (e.g. a pure case/whitespace variant with
+  // only one live representative), this row IS the sole real live
+  // instance of that family: unchanged behavior, it keeps its own
+  // canonical row and records an alias pointing at itself.
+  const trueRowKey = `${row.process_group}||${familyName}`;
+  const isAliasOnly = !!aliasSource && familyName !== row.process_name && liveRowByKey.has(trueRowKey);
+
+  if (isAliasOnly) {
+    row._isAliasOnly = true;
+    row._aliasOfFamilyName = familyName;
+    row._aliasSource = aliasSource;
+    continue; // no canonical row, no operations copy -- see the alias pass below
+  }
+
   row._roadmapStatus = ROADMAP_OVERRIDE[`${row.process_group}||${row.process_name}`]
     || offlineProc.roadmap_status
     || 'not_modeled';
@@ -209,6 +247,26 @@ for (const row of liveCanonicalRows) {
     }
   }
 }
+
+// Second pass: for every alias-only row found above, record the
+// CORRECTLY-DIRECTED alias -- canonical = the real live row under
+// familyName (used as the JOIN key when this SQL runs), alias text = this
+// row's own (non-canonical) name. This is the exact fix for the reversed
+// direction the generator used to produce: previously the aliased row's
+// OWN name was used as the JOIN key (making the typo "canonical" for
+// alias purposes) with the correct spelling stored as its alias.
+for (const row of liveCanonicalRows) {
+  if (!row._isAliasOnly) continue;
+  aliasRows.push({
+    process_group: row.process_group,
+    process_name: row._aliasOfFamilyName,
+    alias: row.process_name,
+    source: row._aliasSource,
+  });
+}
+
+const aliasOnlyCount = liveCanonicalRows.filter(r => r._isAliasOnly).length;
+const liveCanonicalRowsFinal = liveCanonicalRows.filter(r => !r._isAliasOnly);
 
 // Machining live rows that happen to be an exact name match to one of the
 // 43 offline station/process names (confirmed: only "Wire EDM") still get
@@ -229,7 +287,7 @@ for (const row of liveCanonicalRows) {
 // (liveCanonicalRows, Machining group) by exact name only -- confirmed
 // live only "Wire EDM" is a genuine overlap; everything else is additive.
 const machiningRoadmapStatus = 'not_modeled'; // no live cost-engine linkage claim made for these -- real gap, not guessed
-const liveMachiningNames = new Set(liveCanonicalRows.filter(r => r.process_group === 'Machining').map(r => r.process_name));
+const liveMachiningNames = new Set(liveCanonicalRowsFinal.filter(r => r.process_group === 'Machining').map(r => r.process_name));
 const machiningStationRows = [];
 for (const proc of machOfflineProcesses) {
   if (liveMachiningNames.has(proc.processName)) continue; // exact overlap (Wire EDM) -- already a canonical row via the live set
@@ -247,7 +305,7 @@ for (const raw of machOfflineOperationsRaw) {
   operationRows.push({ process_group: 'Machining', process_name: targetName, operation_category: operationCategory, feature_type: featureType, raw: raw.processName });
 }
 
-const canonicalRows = [...liveCanonicalRows, ...machiningStationRows];
+const canonicalRows = [...liveCanonicalRowsFinal, ...machiningStationRows];
 
 function taxonomyValueRow(r) {
   return `(${sqlStr(r.process_group)}, ${sqlStr(r.process_name)}, NULL, ${sqlStr(r._roadmapStatus || 'not_modeled')}, ${sqlStr(r._defaultMachine)}, ${sqlStr(r._defaultToolShop)})`;
@@ -260,9 +318,13 @@ const sql = `-- ================================================================
 -- Generated by gen_609_seed_process_taxonomy.js -- DO NOT hand-edit, re-run
 -- the generator and diff instead.
 --
--- ${canonicalRows.length} canonical rows total: ${liveCanonicalRows.length} from the live
+-- ${canonicalRows.length} canonical rows total: ${liveCanonicalRowsFinal.length} from the live
 -- process_calculator_mappings snapshot (deduped across cross-route
--- duplicates) plus ${machiningStationRows.length} Machining station/process-type rows
+-- duplicates, then ${aliasOnlyCount} more absorbed as pure aliases of an
+-- already-canonical row of the same real family -- e.g. "Laser Puch" onto
+-- "Laser Punch" -- rather than becoming independent canonical rows; see
+-- the cross-name family consolidation comment inline above) plus
+-- ${machiningStationRows.length} Machining station/process-type rows
 -- from memory/machining/processes.json (a different, additive axis from
 -- live Machining operations -- see the generator's header for why these
 -- are NOT merged into the live operation rows except where a name is a
@@ -316,6 +378,6 @@ COMMIT;
 fs.writeFileSync(path.join(SCRIPTS_DIR, '..', '609_seed_process_taxonomy.sql'), sql, 'utf8');
 fs.writeFileSync(path.join(SCRIPTS_DIR, '609_unresolved_candidates.json'), JSON.stringify(unresolvedCandidates, null, 2), 'utf8');
 
-console.log('Wrote 609_seed_process_taxonomy.sql --', canonicalRows.length, 'canonical rows (', liveCanonicalRows.length, 'live +', machiningStationRows.length, 'Machining stations),', operationRows.length, 'operation children,', aliasRows.length, 'aliases.');
+console.log('Wrote 609_seed_process_taxonomy.sql --', canonicalRows.length, 'canonical rows (', liveCanonicalRowsFinal.length, 'live +', machiningStationRows.length, 'Machining stations;', aliasOnlyCount, 'live rows absorbed as aliases instead of independent canonical rows),', operationRows.length, 'operation children,', aliasRows.length, 'aliases.');
 console.log('Wrote 609_unresolved_candidates.json --', unresolvedCandidates.length, 'near-miss names needing human review.');
 console.log('Enriched canonical rows:', enrichedCount, 'of', canonicalRows.length);

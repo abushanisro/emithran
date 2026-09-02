@@ -989,6 +989,62 @@ export class ProcessesService {
   }
 
   // ============================================================================
+  // DOMAIN REFERENCE VARIABLES (sm_reference_data / im_reference_data)
+  // ============================================================================
+
+  /**
+   * Reference-data variables for one manufacturing domain — the same
+   * lossless staging tables the Process page's per-route Lookup Tables
+   * dialog already reads from (sm_reference_data, migration 479;
+   * im_reference_data, migration 636), surfaced here as a flat,
+   * domain-wide, searchable list rather than scoped to one route.
+   */
+  async getDomainVariables(
+    domain: 'sheet_metal' | 'injection_molding',
+    accessToken: string,
+    search?: string,
+    category?: string,
+  ): Promise<{ domain: string; total: number; categories: string[]; variables: any[] }> {
+    const table = domain === 'sheet_metal' ? 'sm_reference_data' : 'im_reference_data';
+    const client = this.supabaseService.getClient(accessToken);
+
+    let query = client
+      .from(table)
+      .select('id, category, source_region, source_version, key, value, unit_type, notes', { count: 'exact' })
+      .order('category', { ascending: true })
+      .order('key', { ascending: true });
+
+    if (category) query = query.eq('category', category);
+    if (search) query = query.or(`key.ilike.%${search}%,notes.ilike.%${search}%`);
+
+    const { data, error, count } = await query.limit(2000);
+
+    if (error) {
+      this.logger.error(`Error fetching ${table}: ${error.message}`, 'ProcessesService');
+      throw new InternalServerErrorException(`Failed to fetch ${domain} variables: ${error.message}`);
+    }
+
+    const { data: categoryRows } = await client.from(table).select('category');
+    const categories = [...new Set((categoryRows ?? []).map((r: any) => r.category))].sort();
+
+    return {
+      domain,
+      total: count ?? 0,
+      categories,
+      variables: (data ?? []).map((r: any) => ({
+        id: r.id,
+        category: r.category,
+        sourceRegion: r.source_region,
+        sourceVersion: r.source_version,
+        key: r.key,
+        value: r.value,
+        unitType: r.unit_type,
+        notes: r.notes,
+      })),
+    };
+  }
+
+  // ============================================================================
   // VENDOR PROCESS CAPABILITIES
   // ============================================================================
 

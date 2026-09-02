@@ -78,13 +78,63 @@ export const RESIN_THERMAL_TABLE: Record<string, ResinThermalProps> = {
   __default__: { alpha: 0.090, Tm: 240, Tw: 60,  Te: 95,  vFront: 150 },
 };
 
-export function lookupResinProps(grade: string | null): ResinThermalProps {
-  if (!grade) return RESIN_THERMAL_TABLE.__default__;
-  const tokens = tokenizeGrade(grade);
-  for (const token of tokens) {
-    if (token in RESIN_THERMAL_TABLE) return RESIN_THERMAL_TABLE[token];
+// Real, per-grade properties from raw_materials (Phase 1 materials-data
+// foundation, 2026-09-02) — resolveMaterialForFamily's own return shape.
+// Each field is independently optional: a grade may have real Tm but not
+// real specific heat, and a partial real value is still strictly better
+// than the generic resin-family default for that ONE field, so fields are
+// overridden individually, never all-or-nothing.
+export interface RealResinInputs {
+  meltingTempC: number | null;
+  moldTempC: number | null;
+  ejectionTempC: number | null;
+  specificHeatMeltJgC: number | null;
+  thermalConductivityMeltWMK: number | null;
+  densityKgM3: number | null; // needed only to derive alpha; not itself a ResinThermalProps field
+}
+
+// vFront (melt-front fill velocity) is deliberately NEVER overridden by real
+// per-grade data here — Phase 1's authorized scope is thermal/cooling
+// properties only (melting/mold/eject temperature, specific heat, thermal
+// conductivity); flowLengthRatio-based fill velocity is a separate,
+// not-yet-authorized piece of work (would touch the fill-time model, not
+// the cooling model this phase covers).
+export function lookupResinProps(grade: string | null, real?: RealResinInputs | null): ResinThermalProps {
+  const base = (() => {
+    if (!grade) return RESIN_THERMAL_TABLE.__default__;
+    const tokens = tokenizeGrade(grade);
+    for (const token of tokens) {
+      if (token in RESIN_THERMAL_TABLE) return RESIN_THERMAL_TABLE[token];
+    }
+    return RESIN_THERMAL_TABLE.__default__;
+  })();
+
+  if (!real) return base;
+
+  // alpha (thermal diffusivity, mm²/s) = k / (ρ·cp) — a real, standard
+  // physics identity, not a new formula: k = thermal_conductivity_melt
+  // (W/m·K), ρ = density (kg/m³), cp = specific_heat_melt (J/g·K, converted
+  // to J/kg·K). Only derived when all three real inputs are present; keeps
+  // the cited fallback table's alpha otherwise (never a partial/guessed
+  // derivation).
+  let alpha = base.alpha;
+  if (
+    real.thermalConductivityMeltWMK != null && real.thermalConductivityMeltWMK > 0 &&
+    real.densityKgM3 != null && real.densityKgM3 > 0 &&
+    real.specificHeatMeltJgC != null && real.specificHeatMeltJgC > 0
+  ) {
+    const cpJKgK = real.specificHeatMeltJgC * 1000; // J/(g·K) -> J/(kg·K)
+    const alphaM2S = real.thermalConductivityMeltWMK / (real.densityKgM3 * cpJKgK);
+    alpha = alphaM2S * 1e6; // m²/s -> mm²/s
   }
-  return RESIN_THERMAL_TABLE.__default__;
+
+  return {
+    alpha,
+    Tm: real.meltingTempC ?? base.Tm,
+    Tw: real.moldTempC ?? base.Tw,
+    Te: real.ejectionTempC ?? base.Te,
+    vFront: base.vFront,
+  };
 }
 
 // ── Menges cooling-time formula ────────────────────────────────────────────────
@@ -314,11 +364,15 @@ export function computeCycleTime(input: {
   grade: string | null;
   gateTypeOverride?: GateType | null; // caller-supplied gate type bypasses recommendation
   isLsr?: boolean;                    // when true: Arrhenius cure, not Menges cooling
+  // Real per-grade thermal properties (Phase 1 materials-data foundation,
+  // 2026-09-02) — see lookupResinProps' own doc comment. Optional; falls
+  // back to the cited generic resin-family table field-by-field when absent.
+  realResinInputs?: RealResinInputs | null;
 }): CycleTimeResult {
   const { wallMm, longestBboxMm, bboxMidMm, volumeMm3, projectedAreaMm2, grade } = input;
   const isLsr = input.isLsr ?? isSiliconeGrade(grade);
 
-  const props = lookupResinProps(grade);
+  const props = lookupResinProps(grade, input.realResinInputs);
   const wall = Math.max(wallMm, 0.5); // physical floor: 0.5 mm (thinnest practical injection wall)
 
   // LSR self-degates — cold-deck manifolds produce minimal vestige; default to sub gate.

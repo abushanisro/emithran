@@ -156,6 +156,55 @@ describe('computePressStrokeCost — Progressive Die Press (real strokes_per_min
   });
 });
 
+// Real hardcoded-fallback audit finding (2026-09-02): Progressive Die's real
+// setup_time_hr varies 0.47-0.72hr (28.2-43.2min) across the 14 safe
+// machines, correlating with press-force tier — unlike Standard/Tandem
+// Press, where the real value genuinely is uniform (0.5hr/30min). Collapsing
+// it to one shared PRESS_STROKE_SETUP_MIN=30 constant was wrong.
+describe('computePressStrokeCost — Progressive Die Press real per-machine setup time', () => {
+  it('uses the real per-machine setup time when no op-level setupMin is resolved', () => {
+    // "Progressive Die Press - 5,000kN Press Force" real setup_time_hr=0.53 -> 31.8min
+    const result = computePressStrokeCost('Progressive Die', 'progressive_die_press', {
+      numberOfStrokes: 1,
+      batchSize: 500,
+      pressRate: realProgressiveDieRate(),
+      progressiveDieSetupMinFromMachine: 31.8,
+    });
+    expect(result.warnings.some((w) => w.includes('setup time from generic fallback'))).toBe(false);
+  });
+
+  it('prefers the op-level setupMin over the real per-machine value when both are present', () => {
+    const result = computePressStrokeCost('Progressive Die', 'progressive_die_press', {
+      numberOfStrokes: 1,
+      batchSize: 500,
+      pressRate: realProgressiveDieRate(),
+      setupMin: 40,
+      progressiveDieSetupMinFromMachine: 31.8,
+    });
+    expect(result.warnings.some((w) => w.includes('setup time from generic fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(false);
+  });
+
+  it('falls back to the generic 30min constant, with a disclosed warning citing the real range, when neither resolves', () => {
+    const result = computePressStrokeCost('Progressive Die', 'progressive_die_press', {
+      numberOfStrokes: 1,
+      batchSize: 500,
+      pressRate: realProgressiveDieRate(),
+    });
+    expect(result.warnings.some((w) => w.includes('setup time from generic fallback (30min)') && w.includes('28.2-43.2min'))).toBe(true);
+  });
+
+  it('does not apply the Progressive-Die-specific fallback message to Standard/Tandem Press (their uniform value is correct as-is)', () => {
+    const result = computePressStrokeCost('Standard Press', 'standard_press', {
+      numberOfStrokes: 1,
+      batchSize: 250,
+      pressRate: realRate(),
+    });
+    expect(result.warnings.some((w) => w.includes('setup time from generic fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w === 'Standard Press: setup time from fallback — seed a real per-machine setup time')).toBe(true);
+  });
+});
+
 describe('PressStrokeEngine — ManufacturingProcessEngine wrapper', () => {
   it('reports the correct machineClass/processFamily/process label per instance', () => {
     const standard = new PressStrokeEngine('standard_press', 'Standard Press');

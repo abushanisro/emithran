@@ -44,6 +44,7 @@ function candidate(overrides: {
     pressCycleTimeS: null,
     handlingConstS: null,
     handlingMassCoeffSPerKg: null,
+    setupTimeHr: null,
   };
 }
 

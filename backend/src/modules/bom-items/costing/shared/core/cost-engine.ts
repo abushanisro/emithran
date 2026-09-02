@@ -65,6 +65,12 @@ export interface MHRRateInput {
   pressCycleTimeS?: number | null;
   handlingConstS?: number | null;
   handlingMassCoeffSPerKg?: number | null;
+  // The selected machine's own mhr_records.setup_time_hr (via
+  // MachineCandidate — see its own doc comment). Generic across any class;
+  // Compression Molding / Reaction Injection Molding are the first real
+  // consumers (2026-09-02) since they have no per-operation setup-time
+  // lookup table the way Sheet Metal classes do.
+  setupTimeHr?: number | null;
   // The selected machine's own MachineCandidate.laborRateUsdHr (raw, before
   // buildOutput applies precedence against the process-group lhrRates map) —
   // never read directly by cost-engine.ts; buildOutput folds it into the

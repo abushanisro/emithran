@@ -244,6 +244,24 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   // machines (2026-09-01) span 200-4000W / 220-300kN press force / a wide
   // sheet-size range, too wide a real spread for one class-wide floor.
   laser_punch:    {},
+  // No conservative envelope default — 13 real Plasma Cutting Machine
+  // machines (2026-09-01) span 100W-100,000W power, too wide a real spread
+  // for one class-wide floor.
+  plasma_cut:     {},
+  // No conservative envelope default — 12 real Plasma Punch machines
+  // (2026-09-01) span 30-400W power, too wide a real spread for one
+  // class-wide floor.
+  plasma_punch:   {},
+  // No conservative envelope default and no MachineRequirement built for
+  // these classes at all (same as standard_press/tandem_press/
+  // progressive_die_press — see bom-items.service.ts's requirements-building
+  // block) — real per-category capability (roll_working_length_mm,
+  // steel_thickness_mm / single-vs-multi-pass thickness) isn't modeled as a
+  // MachineRequirement yet, same deliberate simplification already accepted
+  // for the Press family.
+  roll_bending_2: {},
+  roll_bending_3: {},
+  roll_bending_4: {},
   tapping:        {},
   deburring:      {},
   cleaning:       {},
@@ -267,6 +285,20 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   // 30-80T Arburg Allrounder class) — an unknown injection molding machine
   // should only win small parts, not silently claim a 500T part.
   injection_molding: { maxTonnage: 80, tieBarXMm: 430, tieBarYMm: 380, shotCapacityGrams: 180, minMoldHeightMm: 220, maxMoldHeightMm: 480 },
+  // No generic class-default capability here (same as co2_laser/surface_treatment) —
+  // real per-machine capability comes from mhr_records (max_tonnage, staged
+  // 2026-09-02 from structural_foam_molding_machines.json's real
+  // clampingForceKn) via MachineCandidate, not this seed fallback.
+  structural_foam_molding: {},
+  // Compression molding has no clamp-tonnage-style capability concept this
+  // registry models (see cost-compression-molding-engine.ts) — real per-
+  // machine press force/kinematics are staged directly onto mhr_records'
+  // press_cycle_time_s, not read through this seed-capability path.
+  compression_molding: {},
+  // No generic class-default capability here — real per-machine clamp
+  // force/shot data (memory/Injection/machine/reaction_injection_molding_machines.json)
+  // is staged directly onto mhr_records (max_tonnage, shot_capacity_grams).
+  reaction_injection_molding: {},
   // No envelope/tonnage concept applies — surface treatment is a
   // subcontracted-style area treatment (cost-surface-treatment.ts), never
   // resolved through this machine-instance capability path. Empty, same

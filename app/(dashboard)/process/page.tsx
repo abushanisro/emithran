@@ -23,6 +23,7 @@ import {
   useUpdateSmLookupRow,
   useBulkUpdateTableRows,
   useCreateProcess,
+  useDomainVariables,
   type ReferenceTable,
 } from '@/lib/api/hooks/useProcesses';
 import {
@@ -116,6 +117,21 @@ export default function ProcessPage() {
   const [isLookupDialogOpen, setIsLookupDialogOpen] = useState(false);
   const [expandedTableId, setExpandedTableId] = useState<string | null>(null);
   const [showAddTableEditor, setShowAddTableEditor] = useState(false);
+
+  // Domain reference-data Variables section (sm_reference_data /
+  // im_reference_data — backend migrations 479 and 636). Collapsed by
+  // default: this is supplementary reference data (515-row-plus lists),
+  // not the page's primary purpose, but shown "on top" per the request —
+  // above Process Calculator Mappings — with a visible count so it's
+  // discoverable without pushing the primary content down by default.
+  const [isVariablesExpanded, setIsVariablesExpanded] = useState(false);
+  const [variablesDomain, setVariablesDomain] = useState<'sheet_metal' | 'injection_molding'>('sheet_metal');
+  const [variablesSearch, setVariablesSearch] = useState('');
+  const [variablesCategory, setVariablesCategory] = useState<string>('');
+  const { data: variablesData, isLoading: variablesLoading } = useDomainVariables(
+    variablesDomain,
+    { search: variablesSearch || undefined, category: variablesCategory || undefined },
+  );
 
   // Fetch processes from database
   const { data: processesData, isLoading: processesLoading, error: processesError } = useProcesses();
@@ -629,6 +645,122 @@ export default function ProcessPage() {
       </div>
 
       <div className="space-y-6">
+        {/* DOMAIN REFERENCE VARIABLES — sm_reference_data / im_reference_data */}
+        <Card>
+          <CardHeader>
+            <button
+              type="button"
+              className="flex items-center justify-between w-full text-left"
+              onClick={() => setIsVariablesExpanded((prev) => !prev)}
+            >
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  {isVariablesExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                  <Database className="h-5 w-5" />
+                  Variables
+                  {variablesData && (
+                    <Badge variant="secondary" className="ml-1">{variablesData.total}</Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Licensed Digital Factory reference constants, rate-profile settings, and tool-material properties — Sheet Metal and Injection Molding
+                </CardDescription>
+              </div>
+            </button>
+          </CardHeader>
+          {isVariablesExpanded && (
+            <CardContent>
+              <div className="flex items-center gap-2 mb-4">
+                <Button
+                  variant={variablesDomain === 'sheet_metal' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => { setVariablesDomain('sheet_metal'); setVariablesCategory(''); }}
+                >
+                  Sheet Metal
+                </Button>
+                <Button
+                  variant={variablesDomain === 'injection_molding' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => { setVariablesDomain('injection_molding'); setVariablesCategory(''); }}
+                >
+                  Injection Molding
+                </Button>
+              </div>
+
+              {variablesData && variablesData.categories.length > 1 && (
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
+                  <Button
+                    variant={variablesCategory === '' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setVariablesCategory('')}
+                  >
+                    All
+                  </Button>
+                  {variablesData.categories.map((cat) => (
+                    <Button
+                      key={cat}
+                      variant={variablesCategory === cat ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setVariablesCategory(cat)}
+                    >
+                      {cat.replace(/_/g, ' ')}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search variable name or description..."
+                  value={variablesSearch}
+                  onChange={(e) => setVariablesSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {variablesLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Loading variables...
+                </div>
+              ) : !variablesData || variablesData.variables.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No variables found{variablesSearch ? ` for "${variablesSearch}"` : ''}.
+                </div>
+              ) : (
+                <div className="border rounded-md max-h-[420px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Value</TableHead>
+                        <TableHead>Unit</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {variablesData.variables.map((v) => (
+                        <TableRow key={v.id}>
+                          <TableCell className="font-mono text-xs whitespace-nowrap">{v.key}</TableCell>
+                          <TableCell className="font-mono text-xs">{v.value ?? '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{v.unitType || '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{v.notes || '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {variablesData && variablesData.variables.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Showing {variablesData.variables.length} of {variablesData.total} variables.
+                </p>
+              )}
+            </CardContent>
+          )}
+        </Card>
+
         {/* CALCULATOR MAPPINGS */}
         <Card>
           <CardHeader>
@@ -709,11 +841,15 @@ export default function ProcessPage() {
                 </Button>
               )}
               {calculatorMappings && (() => {
-                // Distinct (group, operation) count — matches the flat
-                // pill list below exactly, not the raw row count (which
-                // still includes cross-route duplicates of the same
-                // canonical operation).
-                const distinctOps = new Set(calculatorMappings.mappings.map(m => `${m.processGroup}\x00${m.operation?.trim()}`));
+                // Distinct real-process count — matches the flat pill list
+                // below exactly. Keyed by canonical_process_id (migration
+                // 609/610) when present, since that's the real "is this the
+                // same manufacturing process" signal (collapses same-name
+                // cross-route rows like Waterjet Cutting AND resolved
+                // spelling/typo duplicates like Laser Puch/Laser Punch onto
+                // one count) — falls back to (group, operation) only for a
+                // row with no canonical link.
+                const distinctOps = new Set(calculatorMappings.mappings.map(m => m.canonicalProcessId ? `cpid:${m.canonicalProcessId}` : `${m.processGroup}\x00${m.operation?.trim()}`));
                 const distinctGroups = new Set(calculatorMappings.mappings.map(m => m.processGroup));
                 return (
                   <span className="text-xs text-muted-foreground ml-auto">
@@ -740,24 +876,37 @@ export default function ProcessPage() {
               // Group by process_group only — process_taxonomy (migration 609)
               // is itself keyed by (process_group, process_name) with NO
               // route tier, so this page now matches that shape directly:
-              // one pill per distinct operation name per group, not one per
-              // (route, operation) pair. Live rows sharing the same
-              // operation name across routes (e.g. Sheet Metal's "Waterjet
-              // Cutting" under both "Cutting" and "Sheet Cutting") are the
-              // SAME canonical process and collapse to one pill — which of
-              // the underlying route-scoped rows survives the dedup is
-              // arbitrary (first seen), so its "Lookup Tables" button below
-              // reflects that one route's tables, a known limitation until
-              // the lookup-tables bridge itself is rebuilt off
-              // process_taxonomy directly.
+              // one pill per distinct REAL PROCESS per group, not one per
+              // raw row. Consolidation key is canonical_process_id
+              // (migration 609/610) when present — the real "is this the
+              // same manufacturing process" signal, covering BOTH same-name
+              // cross-route duplicates (e.g. Sheet Metal's "Waterjet
+              // Cutting" under both "Cutting" and "Sheet Cutting") AND
+              // resolved spelling/typo duplicates that consolidate onto one
+              // canonical row but keep different operation text (e.g.
+              // "Laser Puch" now shares "Laser Punch"'s canonical_process_id
+              // — see the process-duplicate-audit fix). Falls back to
+              // (group, operation name) only for a row with no canonical
+              // link at all.
+              //
+              // When two rows share a key, the ACTIVE one always wins as
+              // the representative pill, regardless of array/display order
+              // — an inactive duplicate must never hide its active
+              // counterpart (or vice versa: an inactive duplicate must
+              // never itself become the only visible pill for a real,
+              // active process).
               const grouped: Record<string, typeof allMappings> = {};
-              const seenOps = new Set<string>();
+              const byConsolidationKey = new Map<string, typeof allMappings[number]>();
               for (const m of filtered) {
                 const op = m.operation?.trim();
                 if (!op) continue; // skip blank operations
-                const key = `${m.processGroup}\x00${op}`;
-                if (seenOps.has(key)) continue;
-                seenOps.add(key);
+                const key = m.canonicalProcessId ? `cpid:${m.canonicalProcessId}` : `${m.processGroup}\x00${op}`;
+                const existing = byConsolidationKey.get(key);
+                if (!existing || (existing.isActive === false && m.isActive !== false)) {
+                  byConsolidationKey.set(key, m);
+                }
+              }
+              for (const m of byConsolidationKey.values()) {
                 if (!grouped[m.processGroup]) grouped[m.processGroup] = [];
                 grouped[m.processGroup]!.push(m);
               }
@@ -817,7 +966,17 @@ export default function ProcessPage() {
                       <div className="p-3">
                               <div className="flex flex-wrap gap-1.5 items-start">
                                 {ops.map((op) => {
-                                  const hasDetail = !!(op.taxonomy && (op.taxonomy.operations.length > 0 || op.taxonomy.aliases.length > 0 || op.taxonomy.defaultMachineName));
+                                  // Inactive rows must never show taxonomy detail, even when they
+                                  // share a canonical_process_id with an active row (the correct,
+                                  // intended shape once duplicates are consolidated onto one real
+                                  // canonical row -- e.g. Laser Puch now correctly shares Laser
+                                  // Punch's canonical row, same as Waterjet Cutting's two routes
+                                  // always have). Without this gate, an inactive duplicate would
+                                  // inherit and display its active counterpart's full detail,
+                                  // including an alias list that reads as self-referential on the
+                                  // duplicate's own pill.
+                                  const hasDetail = op.isActive !== false
+                                    && !!(op.taxonomy && (op.taxonomy.operations.length > 0 || op.taxonomy.aliases.length > 0 || op.taxonomy.defaultMachineName));
                                   const isExpanded = expandedOpId === op.id;
                                   return (
                                   <Fragment key={op.id}>
@@ -832,14 +991,13 @@ export default function ProcessPage() {
                                         ? 'Inactive — not offered for costing'
                                         : hasDetail
                                         ? 'Click the operation name to see feature types, aliases, and default machine'
-                                        : undefined
+                                        : 'No feature-type/alias/default-machine detail on file for this operation yet'
                                     }
                                   >
                                     <button
                                       type="button"
-                                      className={`flex items-center gap-0.5 ${hasDetail ? 'cursor-pointer' : 'cursor-default'}`}
-                                      onClick={() => hasDetail && toggleOpExpanded(op.id)}
-                                      disabled={!hasDetail}
+                                      className="flex items-center gap-0.5 cursor-pointer"
+                                      onClick={() => toggleOpExpanded(op.id)}
                                     >
                                       {hasDetail && (
                                         isExpanded

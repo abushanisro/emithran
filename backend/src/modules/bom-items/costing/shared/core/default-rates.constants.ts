@@ -696,19 +696,31 @@ export function classifyInspectionResource(
   return 'OTHER';
 }
 
-// ── Turret Punch ──────────────────────────────────────────────────────────────
-export const TURRET_SETUP_MIN = 45;        // per batch (programming + tool load)
-export const TURRET_TOOL_CHANGE_SEC = 30;  // penalty per unique hole diameter
+// ── Turret Punch (corrected 2026-09-02 — see audit notes below) ───────────────
+// TURRET_SETUP_MIN and TURRET_TOOL_CHANGE_SEC below were previously 45min/30s
+// with no citation — both were simply wrong: all 21 real machine_library.json
+// "Turret Press (Punch Press)" machines report setup_time_hr=0.5 (30min) and
+// tool_change_time_s=1.5s uniformly (the fallback was 20x the real tool-change
+// value). Corrected to the real, cited values — used only as the fallback of
+// last resort behind SheetMetalLookupService.getTurretPunchMachineParams()'s
+// real per-machine resolution (see that method's own doc comment).
+export const TURRET_SETUP_MIN = 30;         // per batch — real, cited above
+export const TURRET_TOOL_CHANGE_SEC = 1.5;  // per unique hole diameter — real, cited above
 
-// Punching speed (hits/min) by sheet thickness
-export const TURRET_HITS_PER_MIN: Record<number, number> = {
-  1: 250, 2: 200, 3: 150, 4: 100, 5: 80, 6: 60,
-};
-
-// Nibbling speed (mm/min) for contour cuts by sheet thickness
-export const TURRET_NIBBLE_MM_PER_MIN: Record<number, number> = {
-  1: 1200, 2: 800, 3: 600, 4: 400,
-};
+// REMOVED (2026-09-02): TURRET_HITS_PER_MIN and TURRET_NIBBLE_MM_PER_MIN used
+// to live here as "fallback" tables for when sm_lookup_turret_punch had no
+// row — but sm_lookup_turret_punch's own seeded values (migration 414) are
+// IDENTICAL to these tables. That DB table is not independently-sourced real
+// machine data; it's the same synthetic thickness-vs-speed estimate, just
+// duplicated into the DB and then this file. No real per-machine punch/hit-
+// rate field exists anywhere in machine_library.json's Turret Press category
+// (verified: full field-name union across all 21 real machines checked) — a
+// genuine, disclosed capability gap, not fabricated. Real per-machine nibble
+// data DOES exist (nibble_rate_cycles_min + nibble_tool_diameter_mm/
+// nibble_tool_overlap_mm — same shape as Laser Punch's real data) and is now
+// resolved via getTurretPunchMachineParams() instead. Punching (hits/min)
+// has no real substitute and now costs an honest $0 with a disclosed warning
+// — see computeTurretPunchCost's own comment.
 
 // ── Waterjet ──────────────────────────────────────────────────────────────────
 // Abrasive prices come from the `consumable_prices` DB table (migration 362).
@@ -718,7 +730,17 @@ export const TURRET_NIBBLE_MM_PER_MIN: Record<number, number> = {
 // and passed into computeWaterjetCost() (waterjet-engine.ts). A hardcoded,
 // material-blind speed/pierce-time table used to live here and silently
 // diverged from that real data — removed rather than kept as a "fallback".
-export const WATERJET_SETUP_MIN = 30;       // per batch
+// Corrected 2026-09-02: was 30 with no citation. All 27 real
+// machine_library.json "Waterjet Cutting Machine" rows report
+// setup_time_hr=0.08 (4.8min) uniformly — used only as the fallback of last
+// resort behind sm_lookup_op_setup_time's real per-op setup time.
+export const WATERJET_SETUP_MIN = 4.8;       // per batch — real, cited above
+// Generic fallback of last resort, behind getWaterjetAbrasiveRateForMachine's
+// real per-machine abrasive_flow_rate_kg_min (0.34-0.46 across the 27 real
+// machines) — this constant is only reached when no per-machine row
+// resolves; not independently re-verified against real data since it's
+// already correctly gated behind the real resolver, unlike the constants
+// above.
 export const WATERJET_ABRASIVE_KG_PER_MIN = 0.5; // kg/min of active cutting
 
 // OxyFuel Cut (2026-09-01). Feed rate / pierce time are NOT here — real,
@@ -774,6 +796,22 @@ export const PRESS_STROKE_SETUP_MIN = 30; // per batch
 // same disclosed-fallback convention as PRESS_STROKE_SETUP_MIN above.
 export const SHEARING_SETUP_MIN = 22.8; // per batch
 
+// Compression Molding (2026-09-02, Injection Molding domain) — used only
+// when a compression_molding rate has no per-machine setup_time_hr staged
+// (should not happen today: all 23 real machines in
+// memory/Injection/machine/compression_molding_machines.json carry a real
+// setupTimeHr, median 1.0hr/60min). Real, cited median default, kept as a
+// disclosed fallback for defensive completeness only.
+export const COMPRESSION_MOLDING_SETUP_MIN = 60; // per batch
+
+// Reaction Injection Molding (2026-09-02, Injection Molding domain) — used
+// only when a reaction_injection_molding rate has no per-machine
+// setup_time_hr staged (should not happen today: both real machines in
+// memory/Injection/machine/reaction_injection_molding_machines.json carry
+// the identical real setupTimeHr=2hr/120min). Real, cited value, kept as a
+// disclosed fallback for defensive completeness only.
+export const REACTION_INJECTION_MOLDING_SETUP_MIN = 120; // per batch
+
 // A guillotine/power shear cuts one full straight line per stroke — it
 // cannot follow a contour. "Shear:Shear//Blank" is the ONLY feature type
 // this process appears under in process_operations.json (391 raw compound
@@ -796,6 +834,27 @@ export const SHEARING_CUTS_PER_BLANK = 2;
 // rows carry the identical setup_time_hr=0.5 (30min) — same disclosed-
 // fallback convention as TURRET_SETUP_MIN/ROUTER_SETUP_MIN above.
 export const LASER_PUNCH_SETUP_MIN = 30; // per batch
+
+// Plasma Cut (2026-09-01) — used only when sm_reference_data has no real
+// 'nestingCutRate:*:PlasmaCut:*' row for this machine/material/thickness yet.
+// Real, cited default: all 13 real machine_library.json "Plasma Cutting
+// Machine" rows carry the identical setup_time_hr=0.08 (4.8min) — same
+// disclosed-fallback convention as OXYFUEL_SETUP_MIN above.
+export const PLASMA_CUT_SETUP_MIN = 4.8; // per batch
+
+// Plasma Punch (2026-09-01) — used only when sm_reference_data has no real
+// 'nestingCutRate:*:PlasmaPunch:*' row yet. Real, cited default: 11 of 12
+// real machine_library.json "Plasma Punch" rows carry setup_time_hr=0.5
+// (30min); one outlier (0.3hr) does not change the dominant value used here
+// — same disclosed-fallback convention as every other setup-min constant.
+export const PLASMA_PUNCH_SETUP_MIN = 30; // per batch
+
+// 2/3/4 Roll Bending (2026-09-01) — used only when sm_reference_data has no
+// real 'rollBenderMachine:<name>' row for the selected machine yet. Real,
+// cited default: all 48 real machine_library.json "2/3/4 Roll Bender" rows
+// carry the identical setup_time_hr=0.5 (30min) — same disclosed-fallback
+// convention as every other setup-min constant.
+export const ROLL_BENDING_SETUP_MIN = 30; // per batch
 
 export const RATES_SOURCE_LABEL = 'Location benchmark rates v2 (2026)';
 
@@ -894,6 +953,41 @@ export const MACHINE_REGISTRY = {
   // real class as part of this change, not a fresh contamination. Deliberately
   // specific keywords so 'Turret Punch'/'CNC Punch' never match here.
   laser_punch:    { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Bending/Floating /Forming', 'Cutting'],                                              machineClassKeywords: ['Laser Punch'] },
+  // Plasma Cut (2026-09-01) — real cost engine + real per-machine power
+  // (sm_reference_data 'plasmaCutMachine:*' rows) feeding real material+
+  // thickness+power cut-rate data (sm_reference_data 'nestingCutRate:*:
+  // PlasmaCut:*', 1153 rows) for all 13 real machines in machine_library.json's
+  // "Plasma Cutting Machine" category. Was already carrying a phantom
+  // machine_class='plasma' (not a real registered class) on all 65 live
+  // mhr_records rows — reclassified to this real class as part of this
+  // change. Deliberately specific keywords so 'Plasma Punch' (different real
+  // class below) never matches here.
+  plasma_cut:     { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Cutting'],                                                                             machineClassKeywords: ['Plasma Cut', 'Plasma Cutting'] },
+  // Plasma Punch (2026-09-01) — real cost engine. Despite the "Punch" name,
+  // the only real data available (sm_reference_data 'nestingCutRate:*:
+  // PlasmaPunch:*', 139 rows) is a feed-rate/pierce-time cutting model keyed
+  // by material+thickness+power, identical in shape to Plasma Cut/OxyFuel —
+  // these are plasma torches mounted on punch-press-style machines, not
+  // discrete-cycle punches like Laser Punch's real punch_rate_cycles_min
+  // data. No punch-cycle data exists for this class, so this engine is NOT
+  // modeled like LaserPunchEngine — the real data available determines the
+  // model, not the taxonomy name.
+  plasma_punch:   { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Sheet Metal Fabrication'],                                                              machineClassKeywords: ['Plasma Punch'] },
+  // 2/3/4 Roll Bending (2026-09-01) — real cost engine (shared formula,
+  // reuses the PressStrokeEngine-style "one class, constructor-parameterized"
+  // pattern) + real per-machine rolling speed/prebend time (sm_reference_data
+  // 'rollBenderMachine:*' rows) for 4/25/19 real machines. Fixes a real,
+  // pre-existing data bug: all 236 live mhr_records rows for these 3
+  // PHYSICALLY DIFFERENT machine categories (2-Roll has no prebend step;
+  // 3/4-Roll do) were sharing one undifferentiated 'roll_forming'
+  // machine_class with zero registered engine behind it — an active,
+  // phantom-calculator route in the live catalog before this change (same
+  // class of bug as the Laser Punch/turret_punch contamination fixed
+  // earlier). Distinct real classes per category, no name overlap between
+  // the 3 real machine pools (verified before this split).
+  roll_bending_2: { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Bending/Floating /Forming'],                                                            machineClassKeywords: ['2 Roll Bender', '2-Roll Bender'] },
+  roll_bending_3: { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Bending/Floating /Forming'],                                                            machineClassKeywords: ['3 Roll Bender', '3-Roll Bender'] },
+  roll_bending_4: { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Bending/Floating /Forming'],                                                            machineClassKeywords: ['4 Roll Bender', '4-Roll Bender'] },
   // Track B Phase 2 — Standard Press / Tandem Press (migration 608). Only the
   // 8 real "Standard Press - X,000kN Press Force"/"Tandem Press - X,000kN
   // Press Force" machines carry these classes today (already set directly on
@@ -955,6 +1049,36 @@ export const MACHINE_REGISTRY = {
   // SM-IM-* = India injection molder commodity codes (100T / 200T / 500T).
   // 'Plastic & Rubber' is the exact process_group in process_calculator_mappings.
   injection_molding: { commodityCodes: ['IM-SMALL', 'IM-MED', 'IM-LARGE', 'SM-IM-100T', 'SM-IM-200T', 'SM-IM-500T'],             processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Injection Mold', 'Plastics', 'Plastic & Rubber'],                            machineClassKeywords: ['Injection Molding', 'Injection Molder', 'IMM', 'Injection Mold'] },
+  // Real, distinct machine class (2026-09-02 process-duplicate-audit fix) —
+  // previously "Structural foam molding" shared machine_class='compression_molding'
+  // with the real Compression Molding process (a live data bug: both real,
+  // different manufacturing processes silently costed as the same class).
+  // Real machine pool: memory/Injection/machine/structural_foam_molding_machines.json
+  // (21 machines, e.g. "Milacron LP500M-423", machineStyle='FOAM'). This IS
+  // genuinely injection-style physics (fill/pack/cool/eject via a nozzle,
+  // low-pressure with a blowing agent) — reuses computeInjectionMoldedCostSummary
+  // unchanged, only the machine pool/rate differs from injection_molding.
+  structural_foam_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Plastic & Rubber'], machineClassKeywords: ['Structural Foam', 'Foam Molder', 'Foam Molding'] },
+  // Real, distinct machine class (2026-09-02). Real machine pool:
+  // memory/Injection/machine/compression_molding_machines.json (23 machines,
+  // e.g. "Accurl Hydraulic Press HBP-40"). Compression molding is NOT
+  // injection-style physics (no fill/gate/runner/pack — a preheated charge
+  // is placed in an open mold, the press closes under real force/time, the
+  // material cures/consolidates, the press opens) — costed by its own
+  // computeCompressionMoldingCost(), not the injection-molding engine. See
+  // that file's own header for the real-data-only, no-fabricated-cure-time
+  // discipline this class's costing follows.
+  compression_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Plastic & Rubber'], machineClassKeywords: ['Compression Molding', 'Compression Press'] },
+  // Real, distinct machine class (2026-09-02). Real machine pool:
+  // memory/Injection/machine/reaction_injection_molding_machines.json (2
+  // machines, e.g. "Gusmer-Decker Reactor IP-40"). RIM genuinely injects
+  // (real injectionRateMm3PerS data exists, unlike compression molding) but
+  // cures via a chemical reaction between two mixed liquid components, not
+  // thermal cooling — Menges cooling physics (computeInjectionMoldedCostSummary)
+  // does not apply. Costed by its own computeReactionInjectionMoldingCost(),
+  // real fill time from injectionRateMm3PerS, honest disclosed gap for the
+  // chemical cure/reaction time (no real cure-kinetics data exists).
+  reaction_injection_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Plastic & Rubber'], machineClassKeywords: ['Reaction Injection', 'RIM', 'Reactor'] },
   // Real, DB-backed class (Platform Architecture Remediation Phase 1) —
   // computeSurfaceTreatmentLine() (cost-surface-treatment.ts) already used
   // this exact literal for every ProcessLineCost it emits; it was never

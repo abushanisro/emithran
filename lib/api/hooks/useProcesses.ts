@@ -265,6 +265,50 @@ export function useUpdateSmLookupRow() {
   });
 }
 
+// Domain reference-data variables (sm_reference_data / im_reference_data —
+// backend migrations 479 and 636) — the licensed Digital Factory reference
+// dataset's named engineering constants, rate-profile settings, and tool-
+// material properties, surfaced as one flat, searchable, domain-wide list.
+export interface DomainVariable {
+  id: number;
+  category: string;
+  sourceRegion: string;
+  sourceVersion: string;
+  key: string;
+  value: string | null;
+  unitType: string | null;
+  notes: string | null;
+}
+
+export interface DomainVariablesResponse {
+  domain: string;
+  total: number;
+  categories: string[];
+  variables: DomainVariable[];
+}
+
+export function useDomainVariables(
+  domain: 'sheet_metal' | 'injection_molding',
+  options?: { search?: string | undefined; category?: string | undefined },
+) {
+  const { user, loading: authLoading } = useAuth();
+
+  return useQuery({
+    queryKey: ['processes', 'variables', domain, options?.search, options?.category],
+    queryFn: async () => {
+      const params = new URLSearchParams({ domain });
+      if (options?.search) params.set('search', options.search);
+      if (options?.category) params.set('category', options.category);
+      const response = await apiClient.get<DomainVariablesResponse>(
+        `/processes/variables?${params.toString()}`,
+      );
+      return response;
+    },
+    enabled: !authLoading && !!user,
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
 export function useReferenceTable(tableId: string | undefined) {
   const { user, loading: authLoading } = useAuth();
 
