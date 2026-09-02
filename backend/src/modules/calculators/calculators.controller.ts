@@ -5,6 +5,8 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { CalculatorsServiceV2 } from './calculators.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import {
   CreateCalculatorDto,
   UpdateCalculatorDto,
@@ -51,14 +53,16 @@ export class CalculatorsController {
   }
 
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new calculator' })
   @ApiResponse({ status: 201, description: 'Calculator created successfully' })
   async create(
     @Body() dto: CreateCalculatorDto,
     @CurrentUser() user: User,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
   ) {
-    return this.calculatorsService.create(dto, user.id, token);
+    return this.calculatorsService.create(dto, user.id, token, organizationId);
   }
 
   @Put(':id')

@@ -39,7 +39,7 @@ export class CalculatorsServiceV2 {
   /**
    * GET ALL CALCULATORS
    * Returns calculators with their fields and formulas in one atomic read
-   * SECURITY: Enforces tenant isolation via user_id filter
+   * SECURITY: Enforces org-scoped isolation via RLS (migration 622)
    */
   async findAll(query: QueryCalculatorDto, userId: string, accessToken: string) {
     this.logger.log(`Fetching calculators for user: ${userId}`, 'CalculatorsServiceV2');
@@ -51,7 +51,12 @@ export class CalculatorsServiceV2 {
 
     const client = this.supabaseService.getClient(accessToken);
 
-    // Build query: user's own calculators + all global/library calculators
+    // Org-scoped via RLS (migrations 622/627) — returns every calculator
+    // visible to the caller: global rows (organization_id IS NULL — the
+    // seeded platform costing-engine calculators), any calculator marked
+    // is_public, and the caller's own organization's calculators. No manual
+    // filter here; duplicating RLS's condition client-side would be a
+    // second, driftable source of truth for the same rule.
     let queryBuilder = client
       .from('calculators')
       .select(
@@ -62,12 +67,6 @@ export class CalculatorsServiceV2 {
       `,
         { count: 'exact' },
       )
-      // Fixed pre-existing bug: `is_global` is not a real column on
-      // calculators (only `is_public`, plus now `user_id IS NULL` for
-      // global calculators seeded by migration 470) -- this `.or()` used to
-      // reference a nonexistent column, so the "show me public/global
-      // calculators too" fallback was silently broken.
-      .or(`user_id.eq.${userId},is_public.eq.true,user_id.is.null`)
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -110,7 +109,7 @@ export class CalculatorsServiceV2 {
   /**
    * GET SINGLE CALCULATOR
    * Returns complete calculator with all fields and formulas
-   * SECURITY: Enforces ownership verification via user_id
+   * SECURITY: Enforces org-scoped isolation via RLS (migration 622)
    */
   async findOne(id: string, userId: string, accessToken: string) {
     this.logger.log(`Fetching calculator: ${id} for user: ${userId}`, 'CalculatorsServiceV2');
@@ -127,12 +126,7 @@ export class CalculatorsServiceV2 {
       `,
       )
       .eq('id', id)
-      // Fixed pre-existing bug: `is_global` is not a real column on
-      // calculators (only `is_public`, plus now `user_id IS NULL` for
-      // global calculators seeded by migration 470) -- this `.or()` used to
-      // reference a nonexistent column, so the "show me public/global
-      // calculators too" fallback was silently broken.
-      .or(`user_id.eq.${userId},is_public.eq.true,user_id.is.null`)
+      // Org-scoped via RLS (migration 622) — no manual filter needed.
       .single();
 
     if (error || !data) {
@@ -155,7 +149,7 @@ export class CalculatorsServiceV2 {
    * CREATE CALCULATOR (ATOMIC)
    * Creates calculator + fields + formulas in a single transaction
    */
-  async create(dto: CreateCalculatorDto, userId: string, accessToken: string) {
+  async create(dto: CreateCalculatorDto, userId: string, accessToken: string, organizationId: string) {
     this.logger.log(`Creating calculator: ${dto.name}`, 'CalculatorsServiceV2');
 
     const client = this.supabaseService.getClient(accessToken);
@@ -165,6 +159,7 @@ export class CalculatorsServiceV2 {
       .from('calculators')
       .insert({
         user_id: userId,
+        organization_id: organizationId,
         name: dto.name,
         description: dto.description,
         calc_category: dto.calcCategory,
