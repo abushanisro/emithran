@@ -67,7 +67,8 @@ export class PlasticRubberContainerService {
   async createPlasticRubberMaterial(
     createDto: CreateRawMaterialDto,
     userId: string,
-    accessToken: string
+    accessToken: string,
+    organizationId: string
   ): Promise<RawMaterialResponseDto> {
     this.logger.log('Creating plastic & rubber material', 'PlasticRubberContainerService');
 
@@ -108,6 +109,7 @@ export class PlasticRubberContainerService {
       hardness_system: createDto.hardnessSystem,
       cut_code: createDto.cutCode,
       user_id: userId,
+      organization_id: organizationId,
     };
 
     const { data, error } = await this.supabaseService

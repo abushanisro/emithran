@@ -27,14 +27,15 @@ export class VendorsService {
   // ============================================================================
 
   async findAll(query: QueryVendorsDto, userId: string, accessToken: string) {
-    this.logger.log('Fetching all vendors from shared database', 'VendorsService');
+    this.logger.log('Fetching vendors for the caller\'s organization', 'VendorsService');
 
     const page = query.page || 1;
     const limit = Math.min(query.limit || 20, 100); // Cap at 100 for performance
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    // Shared database - all authenticated users see all vendors
+    // Org-scoped via RLS (migration 620) — every authenticated user in the
+    // caller's organization sees the same vendor list; no manual filter here.
     let queryBuilder = this.supabaseService
       .getClient(accessToken)
       .from('vendor_summary')
@@ -176,7 +177,7 @@ export class VendorsService {
   }
 
   async findOne(id: string, userId: string, accessToken: string) {
-    this.logger.log(`Fetching vendor: ${id} from shared database`, 'VendorsService');
+    this.logger.log(`Fetching vendor: ${id}`, 'VendorsService');
 
     // Validate UUID format
     if (!this.isValidUUID(id)) {
@@ -212,7 +213,7 @@ export class VendorsService {
     }
   }
 
-  async create(createVendorDto: CreateVendorDto, userId: string, accessToken: string) {
+  async create(createVendorDto: CreateVendorDto, userId: string, accessToken: string, organizationId: string) {
     this.logger.log('Creating vendor', 'VendorsService');
 
     // Convert camelCase to snake_case for database
@@ -224,6 +225,7 @@ export class VendorsService {
       .insert({
         ...vendorData,
         user_id: userId,
+        organization_id: organizationId,
       })
       .select()
       .single();
@@ -244,9 +246,9 @@ export class VendorsService {
   }
 
   async update(id: string, updateVendorDto: UpdateVendorDto, userId: string, accessToken: string) {
-    this.logger.log(`Updating vendor: ${id} in shared database`, 'VendorsService');
+    this.logger.log(`Updating vendor: ${id}`, 'VendorsService');
 
-    // Verify vendor exists (shared database - no user check)
+    // Verify vendor exists and is visible to the caller (org-scoped via RLS)
     await this.findOne(id, userId, accessToken);
 
     // Convert camelCase to snake_case for database
@@ -276,9 +278,9 @@ export class VendorsService {
   }
 
   async remove(id: string, userId: string, accessToken: string) {
-    this.logger.log(`Deleting vendor: ${id} from shared database`, 'VendorsService');
+    this.logger.log(`Deleting vendor: ${id}`, 'VendorsService');
 
-    // Verify vendor exists (shared database - no user check)
+    // Verify vendor exists and is visible to the caller (org-scoped via RLS)
     await this.findOne(id, userId, accessToken);
 
     const { error } = await this.supabaseService
@@ -299,30 +301,32 @@ export class VendorsService {
     return { message: 'Vendor deleted successfully' };
   }
 
-  async removeAll(userId: string, accessToken: string) {
-    this.logger.log('Deleting all vendors from shared database (WARNING: affects all users)', 'VendorsService');
+  async removeAll(userId: string, accessToken: string, organizationId: string) {
+    this.logger.log(`Deleting all vendors in organization ${organizationId}`, 'VendorsService');
 
-    // First get count of all vendors
+    // Count only this organization's vendors — RLS would already scope the
+    // delete below to the same set, but the explicit filter makes the
+    // blast radius of this bulk operation legible in the query itself
+    // rather than relying solely on the policy to save it from itself.
     const { count } = await this.supabaseService
       .getClient(accessToken)
       .from('vendors')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('organization_id', organizationId);
 
-    // Delete ALL vendors from shared database
-    // WARNING: This affects all users in multi-tenant setup
     const { error } = await this.supabaseService
       .getClient(accessToken)
       .from('vendors')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all (dummy condition)
+      .eq('organization_id', organizationId);
 
     if (error) {
-      this.logger.error(`Error deleting all vendors: ${error.message}`, 'VendorsService');
-      throw new InternalServerErrorException(`Failed to delete all vendors: ${error.message}`);
+      this.logger.error(`Error deleting vendors: ${error.message}`, 'VendorsService');
+      throw new InternalServerErrorException(`Failed to delete vendors: ${error.message}`);
     }
 
     return {
-      message: 'All vendors deleted successfully from shared database',
+      message: 'Vendors deleted successfully',
       deleted: count || 0
     };
   }
@@ -332,9 +336,9 @@ export class VendorsService {
   // ============================================================================
 
   async findEquipment(vendorId: string, userId: string, accessToken: string) {
-    this.logger.log(`Fetching equipment for vendor: ${vendorId} (shared database)`, 'VendorsService');
+    this.logger.log(`Fetching equipment for vendor: ${vendorId}`, 'VendorsService');
 
-    // Verify vendor exists (shared database - no user check)
+    // Verify vendor exists and is visible to the caller (org-scoped via RLS)
     await this.findOne(vendorId, userId, accessToken);
 
     const { data, error } = await this.supabaseService
@@ -353,17 +357,18 @@ export class VendorsService {
   }
 
   async createEquipment(createEquipmentDto: CreateVendorEquipmentDto, userId: string, accessToken: string) {
-    this.logger.log(`Creating equipment for vendor: ${createEquipmentDto.vendorId} (shared database)`, 'VendorsService');
+    this.logger.log(`Creating equipment for vendor: ${createEquipmentDto.vendorId}`, 'VendorsService');
 
-    // Verify vendor exists (shared database - no user check)
-    await this.findOne(createEquipmentDto.vendorId, userId, accessToken);
+    // Verify vendor exists and is visible to the caller (org-scoped via RLS);
+    // also gives us the parent's organization_id to stamp onto the new row.
+    const vendor = await this.findOne(createEquipmentDto.vendorId, userId, accessToken);
 
     const equipmentData = this.convertToSnakeCase(createEquipmentDto);
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_equipment')
-      .insert(equipmentData)
+      .insert({ ...equipmentData, organization_id: vendor.organizationId })
       .select()
       .single();
 
@@ -376,9 +381,9 @@ export class VendorsService {
   }
 
   async updateEquipment(id: string, updateEquipmentDto: UpdateVendorEquipmentDto, userId: string, accessToken: string) {
-    this.logger.log(`Updating equipment: ${id} (shared database)`, 'VendorsService');
+    this.logger.log(`Updating equipment: ${id}`, 'VendorsService');
 
-    // Verify equipment exists (shared database - no user check)
+    // Existence check only (org-scoped via RLS on the SELECT below)
     const { data: equipment, error: getError } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_equipment')
@@ -409,9 +414,9 @@ export class VendorsService {
   }
 
   async removeEquipment(id: string, userId: string, accessToken: string) {
-    this.logger.log(`Deleting equipment: ${id} (shared database)`, 'VendorsService');
+    this.logger.log(`Deleting equipment: ${id}`, 'VendorsService');
 
-    // Verify equipment exists (shared database - no user check)
+    // Existence check only (org-scoped via RLS on the SELECT below)
     const { data: equipment, error: getError } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_equipment')
@@ -442,9 +447,9 @@ export class VendorsService {
   // ============================================================================
 
   async findServices(vendorId: string, userId: string, accessToken: string) {
-    this.logger.log(`Fetching services for vendor: ${vendorId} (shared database)`, 'VendorsService');
+    this.logger.log(`Fetching services for vendor: ${vendorId}`, 'VendorsService');
 
-    // Verify vendor exists (shared database - no user check)
+    // Verify vendor exists and is visible to the caller (org-scoped via RLS)
     await this.findOne(vendorId, userId, accessToken);
 
     const { data, error } = await this.supabaseService
@@ -463,17 +468,18 @@ export class VendorsService {
   }
 
   async createService(createServiceDto: CreateVendorServiceDto, userId: string, accessToken: string) {
-    this.logger.log(`Creating service for vendor: ${createServiceDto.vendorId} (shared database)`, 'VendorsService');
+    this.logger.log(`Creating service for vendor: ${createServiceDto.vendorId}`, 'VendorsService');
 
-    // Verify vendor exists (shared database - no user check)
-    await this.findOne(createServiceDto.vendorId, userId, accessToken);
+    // Verify vendor exists and is visible to the caller (org-scoped via RLS);
+    // also gives us the parent's organization_id to stamp onto the new row.
+    const vendor = await this.findOne(createServiceDto.vendorId, userId, accessToken);
 
     const serviceData = this.convertToSnakeCase(createServiceDto);
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_services')
-      .insert(serviceData)
+      .insert({ ...serviceData, organization_id: vendor.organizationId })
       .select()
       .single();
 
@@ -486,9 +492,9 @@ export class VendorsService {
   }
 
   async updateService(id: string, updateServiceDto: UpdateVendorServiceDto, userId: string, accessToken: string) {
-    this.logger.log(`Updating service: ${id} (shared database)`, 'VendorsService');
+    this.logger.log(`Updating service: ${id}`, 'VendorsService');
 
-    // Verify service exists (shared database - no user check)
+    // Existence check only (org-scoped via RLS on the SELECT below)
     const { data: service, error: getError } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_services')
@@ -519,9 +525,9 @@ export class VendorsService {
   }
 
   async removeService(id: string, userId: string, accessToken: string) {
-    this.logger.log(`Deleting service: ${id} (shared database)`, 'VendorsService');
+    this.logger.log(`Deleting service: ${id}`, 'VendorsService');
 
-    // Verify service exists (shared database - no user check)
+    // Existence check only (org-scoped via RLS on the SELECT below)
     const { data: service, error: getError } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_services')
@@ -552,9 +558,9 @@ export class VendorsService {
   // ============================================================================
 
   async findContacts(vendorId: string, userId: string, accessToken: string) {
-    this.logger.log(`Fetching contacts for vendor: ${vendorId} (shared database)`, 'VendorsService');
+    this.logger.log(`Fetching contacts for vendor: ${vendorId}`, 'VendorsService');
 
-    // Verify vendor exists (shared database - no user check)
+    // Verify vendor exists and is visible to the caller (org-scoped via RLS)
     await this.findOne(vendorId, userId, accessToken);
 
     const { data, error } = await this.supabaseService
@@ -574,17 +580,18 @@ export class VendorsService {
   }
 
   async createContact(createContactDto: CreateVendorContactDto, userId: string, accessToken: string) {
-    this.logger.log(`Creating contact for vendor: ${createContactDto.vendorId} (shared database)`, 'VendorsService');
+    this.logger.log(`Creating contact for vendor: ${createContactDto.vendorId}`, 'VendorsService');
 
-    // Verify vendor exists (shared database - no user check)
-    await this.findOne(createContactDto.vendorId, userId, accessToken);
+    // Verify vendor exists and is visible to the caller (org-scoped via RLS);
+    // also gives us the parent's organization_id to stamp onto the new row.
+    const vendor = await this.findOne(createContactDto.vendorId, userId, accessToken);
 
     const contactData = this.convertToSnakeCase(createContactDto);
 
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_contacts')
-      .insert(contactData)
+      .insert({ ...contactData, organization_id: vendor.organizationId })
       .select()
       .single();
 
@@ -597,9 +604,9 @@ export class VendorsService {
   }
 
   async updateContact(id: string, updateContactDto: UpdateVendorContactDto, userId: string, accessToken: string) {
-    this.logger.log(`Updating contact: ${id} (shared database)`, 'VendorsService');
+    this.logger.log(`Updating contact: ${id}`, 'VendorsService');
 
-    // Verify contact exists (shared database - no user check)
+    // Existence check only (org-scoped via RLS on the SELECT below)
     const { data: contact, error: getError } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_contacts')
@@ -630,9 +637,9 @@ export class VendorsService {
   }
 
   async removeContact(id: string, userId: string, accessToken: string) {
-    this.logger.log(`Deleting contact: ${id} (shared database)`, 'VendorsService');
+    this.logger.log(`Deleting contact: ${id}`, 'VendorsService');
 
-    // Verify contact exists (shared database - no user check)
+    // Existence check only (org-scoped via RLS on the SELECT below)
     const { data: contact, error: getError } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_contacts')
@@ -665,12 +672,13 @@ export class VendorsService {
   async getEquipmentTypes(userId: string, accessToken: string) {
     this.logger.log('Fetching all unique equipment types', 'VendorsService');
 
-    // Get all vendor IDs for this user
+    // Org-scoped via RLS (migration 620) — no manual filter needed; this
+    // returns every vendor visible to the caller's organization, not just
+    // ones the caller personally created.
     const { data: vendors, error: vendorsError } = await this.supabaseService
       .getClient(accessToken)
       .from('vendors')
-      .select('id')
-      .eq('user_id', userId);
+      .select('id');
 
     if (vendorsError || !vendors || vendors.length === 0) {
       return [];
@@ -678,7 +686,7 @@ export class VendorsService {
 
     const vendorIds = vendors.map(v => v.id);
 
-    // Get distinct equipment types for user's vendors
+    // Get distinct equipment types for those vendors
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('vendor_equipment')
@@ -711,8 +719,8 @@ export class VendorsService {
   // 31:Contact 2  32:Title 2  33:Email 2  34:Phone 2
   // 35:Company Profile  36:Machine List  37:LinkedIn URL (ignored)
 
-  async importFromCsv(file: Express.Multer.File, userId: string, accessToken: string) {
-    this.logger.log('Importing vendors from file (Shared Database Mode)', 'VendorsService');
+  async importFromCsv(file: Express.Multer.File, userId: string, accessToken: string, organizationId: string) {
+    this.logger.log('Importing vendors from file', 'VendorsService');
 
     if (!file) {
       throw new InternalServerErrorException('No file provided');
@@ -810,6 +818,7 @@ export class VendorsService {
             state: this.extractState(address || ''),
             country: this.extractCountry(address || ''),
             user_id: userId,
+            organization_id: organizationId,
             status: 'active',
             vendor_type: 'supplier',
           };
@@ -835,6 +844,7 @@ export class VendorsService {
           if (c1Name && vendor?.id) {
             await this.supabaseService.getClient(accessToken).from('vendor_contacts').insert({
               vendor_id: vendor.id,
+              organization_id: organizationId,
               name: c1Name,
               designation: row[28]?.trim() || null,
               email: row[29]?.trim() || null,
@@ -848,6 +858,7 @@ export class VendorsService {
           if (c2Name && vendor?.id) {
             await this.supabaseService.getClient(accessToken).from('vendor_contacts').insert({
               vendor_id: vendor.id,
+              organization_id: organizationId,
               name: c2Name,
               designation: row[32]?.trim() || null,
               email: row[33]?.trim() || null,

@@ -9,6 +9,7 @@ import {
   Param,
   Query,
   UseInterceptors,
+  UseGuards,
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
@@ -36,6 +37,8 @@ import {
 } from './dto/process-calculator-mapping.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 
 @ApiTags('Processes')
 @ApiBearerAuth()
@@ -49,6 +52,7 @@ export class ProcessesController {
   // ============================================================================
 
   @Post('calculator-mappings/import-excel')
+  @UseGuards(OrganizationContextGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Import process calculator mappings from Excel file' })
   @ApiResponse({ status: 201, description: 'Mappings imported successfully' })
@@ -57,6 +61,7 @@ export class ProcessesController {
     @Body('replaceExisting') replaceExisting: string,
     @CurrentUser() user: User,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
   ) {
     if (!file) throw new BadRequestException('No file uploaded');
     return this.processesService.importCalculatorMappingsFromExcel(
@@ -64,6 +69,7 @@ export class ProcessesController {
       replaceExisting === 'true',
       user.id,
       token,
+      organizationId,
     );
   }
 
@@ -96,13 +102,15 @@ export class ProcessesController {
   }
 
   @Post('calculator-mappings')
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new process calculator mapping' })
   @ApiResponse({ status: 201, description: 'Process calculator mapping created successfully', type: ProcessCalculatorMappingResponseDto })
   async createProcessCalculatorMapping(
     @Body() createDto: CreateProcessCalculatorMappingDto,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
   ): Promise<ProcessCalculatorMappingResponseDto> {
-    return this.processesService.createProcessCalculatorMapping(createDto, token);
+    return this.processesService.createProcessCalculatorMapping(createDto, token, organizationId);
   }
 
   @Put('calculator-mappings/:id')

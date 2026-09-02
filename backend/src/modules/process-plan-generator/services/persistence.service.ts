@@ -114,6 +114,7 @@ export class PersistenceService {
         if (pm.kind === 'raw_material') {
           const insertPayload = {
             user_id: userId,
+            organization_id: organizationId,
             material_group: (pm.data as any).materialGroup,
             material: (pm.data as any).material,
             material_grade: (pm.data as any).grade,
@@ -132,6 +133,7 @@ export class PersistenceService {
             process_route: (pm.data as any).processRoute,
             operation: (pm.data as any).operation,
             is_active: true,
+            organization_id: organizationId,
           };
           const { data, error } = await client.from('process_calculator_mappings').insert(insertPayload).select('id').single();
           if (error) throw new Error(`process_calculator_mappings insert failed: ${error.message}`);

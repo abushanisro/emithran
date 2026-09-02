@@ -67,7 +67,8 @@ export class FerrousContainerService {
   async createFerrousMaterial(
     createDto: CreateRawMaterialDto,
     userId: string,
-    accessToken: string
+    accessToken: string,
+    organizationId: string
   ): Promise<RawMaterialResponseDto> {
     this.logger.log('Creating ferrous material', 'FerrousContainerService');
 
@@ -110,6 +111,7 @@ export class FerrousContainerService {
       en_standard: createDto.en_standard,
       jis_standard: createDto.jis_standard,
       user_id: userId,
+      organization_id: organizationId,
     };
 
     const { data, error } = await this.supabaseService
@@ -216,7 +218,8 @@ export class FerrousContainerService {
   async importFerrousDataFromExcel(
     excelData: CreateRawMaterialDto[],
     userId: string,
-    accessToken: string
+    accessToken: string,
+    organizationId: string
   ): Promise<{ imported: number; errors: string[] }> {
     this.logger.log(`Importing ${excelData.length} ferrous materials from Excel`, 'FerrousContainerService');
 
@@ -225,7 +228,7 @@ export class FerrousContainerService {
 
     for (const dto of excelData) {
       try {
-        await this.createFerrousMaterial(dto, userId, accessToken);
+        await this.createFerrousMaterial(dto, userId, accessToken, organizationId);
         imported++;
       } catch (error) {
         errors.push(`Row ${imported + errors.length + 1}: ${error.message}`);

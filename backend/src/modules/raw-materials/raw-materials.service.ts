@@ -151,7 +151,7 @@ export class RawMaterialsService {
     return RawMaterialResponseDto.fromDatabase(data);
   }
 
-  async create(createRawMaterialDto: CreateRawMaterialDto, userId: string, accessToken: string): Promise<RawMaterialResponseDto> {
+  async create(createRawMaterialDto: CreateRawMaterialDto, userId: string, accessToken: string, organizationId: string): Promise<RawMaterialResponseDto> {
     this.logger.log('Creating raw material', 'RawMaterialsService');
 
     const { data, error } = await this.supabaseService
@@ -201,6 +201,7 @@ export class RawMaterialsService {
         milling_speed_m_min: createRawMaterialDto.millingSpeedMMin,
         scrap_factor: createRawMaterialDto.scrapFactor,
         user_id: userId,
+        organization_id: organizationId,
       })
       .select()
       .single();
@@ -222,7 +223,7 @@ export class RawMaterialsService {
     return RawMaterialResponseDto.fromDatabase(data);
   }
 
-  async createBatch(materials: CreateRawMaterialDto[], userId: string, accessToken: string): Promise<number> {
+  async createBatch(materials: CreateRawMaterialDto[], userId: string, accessToken: string, organizationId: string): Promise<number> {
     this.logger.log(`Batch creating ${materials.length} raw materials`, 'RawMaterialsService');
 
     const records = materials.map(dto => ({
@@ -272,6 +273,7 @@ export class RawMaterialsService {
       milling_speed_m_min: dto.millingSpeedMMin,
       scrap_factor: dto.scrapFactor,
       user_id: userId,
+      organization_id: organizationId,
     }));
 
     const { data, error } = await this.supabaseService
@@ -386,9 +388,12 @@ export class RawMaterialsService {
   }
 
   async removeAll(userId: string, accessToken: string) {
-    this.logger.log(`Deleting all raw materials`, 'RawMaterialsService');
+    this.logger.log(`Deleting raw materials owned by the caller's organization`, 'RawMaterialsService');
 
-    // Get count of all materials to be deleted
+    // Org-scoped via RLS (migration 621) — the global catalog (organization_id
+    // IS NULL) is never matched by the UPDATE/DELETE policy, so this can only
+    // ever delete rows the caller's own organization created, never the
+    // shared reference catalog or another org's rows.
     const { count } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
@@ -399,7 +404,6 @@ export class RawMaterialsService {
       return { message: 'No materials to delete', deleted: 0 };
     }
 
-    // Delete all materials globally
     const { error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
@@ -407,11 +411,11 @@ export class RawMaterialsService {
       .not('id', 'is', null);
 
     if (error) {
-      this.logger.error(`Error deleting all raw materials: ${error.message}`, 'RawMaterialsService');
-      throw new InternalServerErrorException(`Failed to delete all raw materials: ${error.message}`);
+      this.logger.error(`Error deleting raw materials: ${error.message}`, 'RawMaterialsService');
+      throw new InternalServerErrorException(`Failed to delete raw materials: ${error.message}`);
     }
 
-    this.logger.log(`Successfully deleted ${count} raw materials (global)`, 'RawMaterialsService');
+    this.logger.log(`Successfully deleted ${count} raw materials`, 'RawMaterialsService');
     return { message: `Successfully deleted ${count} raw material(s)`, deleted: count };
   }
 
@@ -482,17 +486,19 @@ export class RawMaterialsService {
   async createPlasticRubberMaterial(
     createDto: CreateRawMaterialDto,
     userId: string,
-    accessToken: string
+    accessToken: string,
+    organizationId: string
   ): Promise<RawMaterialResponseDto> {
-    return this.plasticRubberContainer.createPlasticRubberMaterial(createDto, userId, accessToken);
+    return this.plasticRubberContainer.createPlasticRubberMaterial(createDto, userId, accessToken, organizationId);
   }
 
   async createFerrousMaterial(
     createDto: CreateRawMaterialDto,
     userId: string,
-    accessToken: string
+    accessToken: string,
+    organizationId: string
   ): Promise<RawMaterialResponseDto> {
-    return this.ferrousContainer.createFerrousMaterial(createDto, userId, accessToken);
+    return this.ferrousContainer.createFerrousMaterial(createDto, userId, accessToken, organizationId);
   }
 
   async updatePlasticRubberMaterial(
@@ -544,10 +550,11 @@ export class RawMaterialsService {
   async importFerrousDataFromExcel(
     excelData: CreateRawMaterialDto[],
     userId: string,
-    accessToken: string
+    accessToken: string,
+    organizationId: string
   ): Promise<{ imported: number; errors: string[] }> {
     this.logger.log('Importing ferrous materials from Excel', 'RawMaterialsService');
-    return this.ferrousContainer.importFerrousDataFromExcel(excelData, userId, accessToken);
+    return this.ferrousContainer.importFerrousDataFromExcel(excelData, userId, accessToken, organizationId);
   }
 
   async getMaterialCategories(): Promise<{ categories: typeof MATERIAL_CATEGORY_LABELS }> {

@@ -10,6 +10,7 @@ import {
   Query,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
   ParseUUIDPipe,
   HttpCode,
 } from '@nestjs/common';
@@ -30,6 +31,8 @@ import {
 import { MatchVendorsDto } from './dto/match-vendors.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 
 @ApiTags('Vendors')
 @ApiBearerAuth()
@@ -53,6 +56,7 @@ export class VendorsController {
   // ============================================================================
 
   @Post('upload-csv')
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Upload vendors from CSV file' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 201, description: 'Vendors imported successfully' })
@@ -61,8 +65,9 @@ export class VendorsController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: User,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
   ) {
-    return this.vendorsService.importFromCsv(file, user.id, token);
+    return this.vendorsService.importFromCsv(file, user.id, token, organizationId);
   }
 
   @Get('equipment-types')
@@ -93,10 +98,16 @@ export class VendorsController {
   }
 
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new vendor' })
   @ApiResponse({ status: 201, description: 'Vendor created successfully' })
-  async create(@Body() createVendorDto: CreateVendorDto, @CurrentUser() user: User, @AccessToken() token: string) {
-    return this.vendorsService.create(createVendorDto, user.id, token);
+  async create(
+    @Body() createVendorDto: CreateVendorDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ) {
+    return this.vendorsService.create(createVendorDto, user.id, token, organizationId);
   }
 
   @Put(':id')
@@ -116,10 +127,15 @@ export class VendorsController {
   }
 
   @Delete()
-  @ApiOperation({ summary: 'Delete all vendors' })
-  @ApiResponse({ status: 200, description: 'All vendors deleted successfully' })
-  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
-    return this.vendorsService.removeAll(user.id, token);
+  @UseGuards(OrganizationContextGuard)
+  @ApiOperation({ summary: "Delete all vendors in the caller's organization" })
+  @ApiResponse({ status: 200, description: 'Vendors deleted successfully' })
+  async removeAll(
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ) {
+    return this.vendorsService.removeAll(user.id, token, organizationId);
   }
 
   // ============================================================================

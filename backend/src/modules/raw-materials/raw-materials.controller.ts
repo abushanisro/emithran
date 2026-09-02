@@ -10,6 +10,7 @@ import {
   Query,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
   BadRequestException,
   Logger,
 } from '@nestjs/common';
@@ -21,6 +22,8 @@ import { MaterialShape } from './constants/material-categories.constants';
 import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-material-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
+import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import * as ExcelJS from 'exceljs';
 
 @ApiTags('Raw Materials')
@@ -124,20 +127,33 @@ export class RawMaterialsController {
   }
 
   @Post('plastic-rubber')
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create a new plastic or rubber material' })
   @ApiResponse({ status: 201, description: 'Plastic/rubber material created successfully', type: RawMaterialResponseDto })
-  async createPlasticRubberMaterial(@Body() createDto: CreateRawMaterialDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
-    return this.rawMaterialsService.createPlasticRubberMaterial(createDto, user.id, token);
+  async createPlasticRubberMaterial(
+    @Body() createDto: CreateRawMaterialDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ): Promise<RawMaterialResponseDto> {
+    return this.rawMaterialsService.createPlasticRubberMaterial(createDto, user.id, token, organizationId);
   }
 
   @Post('ferrous')
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create a new ferrous material' })
   @ApiResponse({ status: 201, description: 'Ferrous material created successfully', type: RawMaterialResponseDto })
-  async createFerrousMaterial(@Body() createDto: CreateRawMaterialDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
-    return this.rawMaterialsService.createFerrousMaterial(createDto, user.id, token);
+  async createFerrousMaterial(
+    @Body() createDto: CreateRawMaterialDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ): Promise<RawMaterialResponseDto> {
+    return this.rawMaterialsService.createFerrousMaterial(createDto, user.id, token, organizationId);
   }
 
   @Post('ferrous/import')
+  @UseGuards(OrganizationContextGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Import ferrous materials from Excel file' })
@@ -145,7 +161,8 @@ export class RawMaterialsController {
   async importFerrousFromExcel(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: User,
-    @AccessToken() token: string
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
   ) {
     if (!file) {
       throw new BadRequestException('Excel file is required');
@@ -181,7 +198,7 @@ export class RawMaterialsController {
       }
     });
 
-    return this.rawMaterialsService.importFerrousDataFromExcel(data, user.id, token);
+    return this.rawMaterialsService.importFerrousDataFromExcel(data, user.id, token, organizationId);
   }
 
   @Get('grouped')
@@ -200,10 +217,16 @@ export class RawMaterialsController {
   }
 
   @Post()
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new raw material' })
   @ApiResponse({ status: 201, description: 'Raw material created successfully', type: RawMaterialResponseDto })
-  async create(@Body() createRawMaterialDto: CreateRawMaterialDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialResponseDto> {
-    return this.rawMaterialsService.create(createRawMaterialDto, user.id, token);
+  async create(
+    @Body() createRawMaterialDto: CreateRawMaterialDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
+  ): Promise<RawMaterialResponseDto> {
+    return this.rawMaterialsService.create(createRawMaterialDto, user.id, token, organizationId);
   }
 
   @Put(':id')
@@ -228,6 +251,7 @@ export class RawMaterialsController {
   }
 
   @Post('upload-excel')
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Upload Excel file to bulk import raw materials' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Excel file processed successfully' })
@@ -237,6 +261,7 @@ export class RawMaterialsController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: User,
     @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string,
   ): Promise<{ message: string; created: number; failed: number; errors?: any[]; dataWarnings?: string[] }> {
     this.logger.log(`Upload request received: ${file?.originalname || 'No file'}`, 'RawMaterialsController');
 
@@ -596,7 +621,7 @@ export class RawMaterialsController {
       if (validMaterials.length > 0) {
         this.logger.log(`Starting batch insert of ${validMaterials.length} materials...`, 'RawMaterialsController');
         try {
-          created = await this.rawMaterialsService.createBatch(validMaterials, user.id, token);
+          created = await this.rawMaterialsService.createBatch(validMaterials, user.id, token, organizationId);
           this.logger.log(`Batch insert complete: ${created} materials created`, 'RawMaterialsController');
         } catch (error) {
           this.logger.error(`Batch insert failed: ${error.message}`, 'RawMaterialsController');

@@ -325,7 +325,6 @@ export class AutoFillService {
       mhrRate,
       lhrRate,
       materialResult?.unitCost ?? null,
-      userId,
       accessToken,
     );
 
@@ -1626,17 +1625,19 @@ export class AutoFillService {
     mhrRate: number | null,
     lhrRate: number | null,
     materialCostPerKg: number | null,
-    userId: string,
     accessToken: string,
   ): Promise<{ calculatorId: string | null; estimatedUnitCost: number | null }> {
     try {
       const client = this.supabaseService.getClient(accessToken);
       const keyword = processType.toLowerCase();
 
+      // Org-scoped via RLS (migration 622) — matches the caller's own
+      // organization's calculators, system/global calculators, and any
+      // is_public one. Previously manually filtered to .eq('user_id', userId),
+      // which missed both a teammate's calculators and global/public ones.
       const { data, error } = await client
         .from('calculators')
         .select('id, name, calc_category, fields:calculator_fields(*), formulas:calculator_formulas(*)')
-        .eq('user_id', userId)
         .or(`name.ilike.%${keyword}%,calc_category.ilike.%${keyword}%`)
         .order('created_at', { ascending: false })
         .limit(5);

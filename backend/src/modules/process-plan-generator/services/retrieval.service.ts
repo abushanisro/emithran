@@ -532,24 +532,25 @@ export class RetrievalService {
 
   private async queryCalculators(client: any, userId: string) {
     const selectExpr = `
-      id, name, calc_category, description, user_id, is_global,
+      id, name, calc_category, description, user_id,
       fields:calculator_fields(field_name, data_source, source_field, default_value),
       formulas:calculator_formulas(formula_name, formula_expression, execution_order, is_primary_result)
     `;
-    // Return user-owned calculators + global/shared calculators in one query.
+    // Org-scoped via RLS (migrations 622/627) — returns the caller's own
+    // organization's calculators plus global (organization_id IS NULL) and
+    // any is_public calculator, no manual filter needed. Previously
+    // referenced a nonexistent `is_global` column, which made both this
+    // query AND its own fallback below error out on every call — this
+    // method always silently returned [] until now.
     const { data, error } = await client
       .from('calculators')
       .select(selectExpr)
-      .or(`user_id.eq.${userId},is_global.eq.true`)
       .limit(40);
-    if (error || !data || data.length === 0) {
-      const { data: fallback } = await client
-        .from('calculators')
-        .select(selectExpr)
-        .limit(40);
-      return fallback ?? [];
+    if (error) {
+      this.logger.warn(`queryCalculators failed: ${error.message}`);
+      return [];
     }
-    return data;
+    return data ?? [];
   }
 
   // ── Process reference table enrichment ───────────────────────────────────

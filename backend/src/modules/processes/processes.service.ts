@@ -859,6 +859,7 @@ export class ProcessesService {
   async createProcessCalculatorMapping(
     dto: CreateProcessCalculatorMappingDto,
     accessToken: string,
+    organizationId: string,
   ): Promise<ProcessCalculatorMappingResponseDto> {
     this.logger.log('Creating process calculator mapping', 'ProcessesService');
 
@@ -873,6 +874,7 @@ export class ProcessesService {
         calculator_name: dto.calculatorName || null,
         is_active: dto.isActive !== undefined ? dto.isActive : true,
         display_order: dto.displayOrder || 0,
+        organization_id: organizationId,
       })
       .select()
       .single();
@@ -1043,6 +1045,7 @@ export class ProcessesService {
     replaceExisting: boolean,
     userId: string,
     accessToken: string,
+    organizationId: string,
   ): Promise<{ imported: number; skipped: number }> {
     const workbook = new ExcelJS.Workbook();
     const arrayBuffer = fileBuffer.buffer.slice(
@@ -1137,6 +1140,7 @@ export class ProcessesService {
       operation:     r.operation,
       is_active:     true,
       display_order: i,
+      organization_id: organizationId,
     }));
 
     let imported = 0;
