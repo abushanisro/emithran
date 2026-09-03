@@ -44,6 +44,10 @@ Do not optimize for passing predefined scenarios through hard-coded logic. The s
 - [x] bend extraction
 - [x] hole extraction
 - [x] slot/other real features (cut_profile, extruded_flange, thin_web)
+- [x] perforation pattern detection (repeated-hole regions, distinguished from incidental same-diameter holes via real `sm_reference_data` thresholds `defaultNumIdentHolesPerforating`/`defaultNumNearbyIdentHolesPerforating`) — `sheet_metal/features/perforation.py`, wired into `extract()`/`feature_graph_v2`, 12 real tests incl. one real-OCC end-to-end (2026-09-02)
+- [ ] formed-feature detection (embosses/dimples/louvers/beads) — investigated (2026-09-02), NOT shippable: a genuine formed dimple is a paired offset-wall structure with no existing detector; the one reachable sub-case (a shallow same-layer blind cavity) is geometrically indistinguishable from an ordinary shallow blind hole. Feasibility spike only (`sheet_metal/features/forming_spike.py`, 11 tests), deliberately NOT wired into `extract()` — every candidate is `recognition_status='ambiguous'`, never a confident detection. See its module docstring before attempting again.
+- [ ] lance detection (partial cut, material remains attached, displaced flap) — investigated (2026-09-02), NOT shippable: a lance's hinge is topologically a short bend, reusing `_is_bend_cylinder` + `bend_relationships.py`'s adjacency, but a short-bend-with-small-flange signature is indistinguishable from an ordinary small separate bent tab. Feasibility spike only (`sheet_metal/features/lancing_spike.py`, 10 tests, synthetic-dict verification only — no real-B-Rep fixture attempted, that verification remains open), deliberately NOT wired into `extract()`.
+- [x] "Flanging" (Laser Punch/Plasma Punch/Turret Press routes) confirmed to need NO new CAD work — cross-checked `process_operations.json`'s `Flanging//ComplexHole|SimpleHole` taxonomy against live `sm_reference_data` (`enableCoiningFlangedHoles`, `CheckIfFlanged`) and the existing `extrudedFlangeCount` doc comment: it's hole-flanging, already fully covered by the existing `extruded_flange_count` detector + `HoleExtrusionEngine`/"Hole Extrusion (Burring)" cost engine (real, tested, live). Only remaining gap is a naming/alias link, already scoped under the Phase 2a process-taxonomy plan — not CAD work.
 - [ ] bend-to-bend / bend-to-flange relationships (signed fold direction) — in progress
 - [x] flat-pattern information (outline, area, K-factor/bend allowance)
 - [ ] stable topology provenance (current face/edge identity is runtime-ordinal / geometric-match only, not stable across STEP regeneration)
@@ -51,13 +55,17 @@ Do not optimize for passing predefined scenarios through hard-coded logic. The s
 
 **Process** (existence ≠ production readiness — each needs real operations, constraints, machine capabilities, and costing behavior, not just a taxonomy row)
 - [x] Fiber Laser, Laser
-- [ ] Plasma, Oxyfuel (no cost engine yet)
 - [x] Waterjet
 - [x] Turret Punching / Nibbling
 - [x] Bend Brake
-- [ ] 2/3/4 Roll Bending (taxonomy exists, no cost engine)
-- [ ] Press/Forming family (Generic/Std/Tandem Press — taxonomy exists, unwired placeholders)
-- [ ] Progressive Die
+- [x] OxyFuel Cut — real cost engine (`oxyfuel-cutting-engine.ts`), 18 real machines, real `sm_reference_data` feed-rate/pierce-time data (2026-09-01)
+- [x] Shearing — real cost engine, reuses `computePressStrokeCost` (2-cut-per-blank Euclidean model), 10 real machines (2026-09-01)
+- [x] Laser Punch — real cost engine, real per-machine punch/nibble physics, 26 real machines (2026-09-01). Fixed a real, pre-existing bug in the same pass: 127 of these machines were mislabeled `machine_class='turret_punch'`, silently contaminating the Turret Punch quote pool.
+- [x] Plasma Cut — real cost engine (feed-rate/pierce-time model, not punch-cycle — the real data available determines the model), 13 real machines spanning 100W-100,000W, real per-machine power resolved before the nearest-power/nearest-thickness table lookup (2026-09-01)
+- [x] Plasma Punch — same model as Plasma Cut (real data has no punch-cycle fields for this class despite the name), 12 real machines spanning 30W-400W (2026-09-01)
+- [x] Standard Press, Tandem Press, Progressive Die — real cost engine (`press-stroke-engine.ts`, one shared "one stroke = one part" formula, 3 registered classes); Progressive Die uses 14 of 26 real machines (12 excluded — confirmed cross-category press-force contamination, same discipline as migration 608's Standard/Tandem split)
+- [ ] 2/3/4 Roll Bending (taxonomy exists — 25/19/4 real machines in `machine_library.json` — no cost engine yet)
+- [ ] Generic Press — confirmed genuinely absent from all real data sources (no machine category exists anywhere); deleted from the catalog entirely, not a gap to fill
 
 **Operations** — each process should resolve to its own real sub-operations dynamically (e.g. Fiber Laser → Profile Cut / Hole / Complex Hole / Bevel; Bend Brake → Straight Bend / Multi Bend / Form / Flange), not a flat undifferentiated cost per process.
 

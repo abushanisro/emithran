@@ -130,7 +130,7 @@ export function ComplexityTab({ bomMetrics }: Props) {
         // Infer process from material
         const mat = item.material.toLowerCase();
         if (mat.includes("steel") || mat.includes("aluminum")) processes.add("CNC Machining");
-        if (mat.includes("plastic")) processes.add("Injection Molding");
+        if (mat.includes("plastic")) processes.add("Plastic Molding");
         if (mat.includes("sheet")) processes.add("Sheet Metal");
         if (mat.includes("cast")) processes.add("Casting");
       }

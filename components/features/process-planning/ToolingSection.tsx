@@ -27,7 +27,7 @@ const MANUFACTURING_PROCESSES = {
     subProcesses: ['turning', 'milling', 'drilling', 'grinding', 'boring', 'threading']
   },
   injection_molding: {
-    label: 'Injection Molding',
+    label: 'Plastic Molding',
     subProcesses: ['mold_making', 'injection', 'cooling', 'ejection']
   },
   sheet_metal: {

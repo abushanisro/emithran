@@ -125,7 +125,7 @@ export default function ProcessPage() {
   // above Process Calculator Mappings — with a visible count so it's
   // discoverable without pushing the primary content down by default.
   const [isVariablesExpanded, setIsVariablesExpanded] = useState(false);
-  const [variablesDomain, setVariablesDomain] = useState<'sheet_metal' | 'injection_molding'>('sheet_metal');
+  const [variablesDomain, setVariablesDomain] = useState<'sheet_metal' | 'injection_molding' | 'machining'>('sheet_metal');
   const [variablesSearch, setVariablesSearch] = useState('');
   const [variablesCategory, setVariablesCategory] = useState<string>('');
   const { data: variablesData, isLoading: variablesLoading } = useDomainVariables(
@@ -663,7 +663,7 @@ export default function ProcessPage() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Licensed Digital Factory reference constants, rate-profile settings, and tool-material properties — Sheet Metal and Injection Molding
+                  Licensed Digital Factory reference constants, rate-profile settings, and tool-material properties — Sheet Metal, Plastic Molding, and Machining
                 </CardDescription>
               </div>
             </button>
@@ -683,7 +683,14 @@ export default function ProcessPage() {
                   size="sm"
                   onClick={() => { setVariablesDomain('injection_molding'); setVariablesCategory(''); }}
                 >
-                  Injection Molding
+                  Plastic Molding
+                </Button>
+                <Button
+                  variant={variablesDomain === 'machining' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => { setVariablesDomain('machining'); setVariablesCategory(''); }}
+                >
+                  Machining
                 </Button>
               </div>
 

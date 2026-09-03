@@ -66,7 +66,7 @@ const MANUFACTURING_PROCESSES: Record<string, ProcessDefinition> = {
     }
   },
   injection_molding: {
-    label: 'Injection Molding',
+    label: 'Plastic Molding',
     subProcesses: {
       mold_making: { label: 'Mold Making', toolTypes: ['die', 'cutting_tool', 'measuring_tool'] },
       injection: { label: 'Injection Process', toolTypes: ['die', 'fixture', 'test_equipment'] },

@@ -487,7 +487,7 @@ function MaterialsContent({ filteredBomMetrics }: { filteredBomMetrics: Resolved
     const mat = (item.material ?? "").toLowerCase();
     if (mat.includes("steel") || mat.includes("stainless")) return "Machining";
     if (mat.includes("aluminum") || mat.includes("alloy")) return "Machining";
-    if (mat.includes("plastic") || mat.includes("polymer")) return "Injection Molding";
+    if (mat.includes("plastic") || mat.includes("polymer")) return "Plastic Molding";
     if (mat.includes("rubber") || mat.includes("silicone")) return "Molding";
     if (mat.includes("composite") || mat.includes("fiber")) return "Composite Fabrication";
     if (mat.includes("cast") || mat.includes("iron")) return "Casting";

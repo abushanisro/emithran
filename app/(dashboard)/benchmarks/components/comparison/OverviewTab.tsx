@@ -184,7 +184,7 @@ export function OverviewTab({ bomMetrics, processes, vendors }: Props) {
                     "CNC Machining",
                     "Sheet Metal",
                     "Casting",
-                    "Injection Molding",
+                    "Plastic Molding",
                     "3D Printing",
                   ];
                   const display =

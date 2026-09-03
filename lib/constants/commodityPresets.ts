@@ -406,7 +406,7 @@ export const MANUFACTURING_PROCESSES: ManufacturingProcessOption[] = [
   },
   {
     value: 'injection-molding',
-    label: 'Injection Molding',
+    label: 'Plastic Molding',
     description: 'Plastic injection molding machines, mold making equipment',
   },
   {

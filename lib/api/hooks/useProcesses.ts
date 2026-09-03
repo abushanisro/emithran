@@ -265,10 +265,11 @@ export function useUpdateSmLookupRow() {
   });
 }
 
-// Domain reference-data variables (sm_reference_data / im_reference_data —
-// backend migrations 479 and 636) — the licensed Digital Factory reference
-// dataset's named engineering constants, rate-profile settings, and tool-
-// material properties, surfaced as one flat, searchable, domain-wide list.
+// Domain reference-data variables (sm_reference_data / im_reference_data /
+// machining_reference_data — backend migrations 479, 636, and 638) — the
+// licensed Digital Factory reference dataset's named engineering constants,
+// rate-profile settings, and tool-material properties, surfaced as one
+// flat, searchable, domain-wide list.
 export interface DomainVariable {
   id: number;
   category: string;
@@ -288,7 +289,7 @@ export interface DomainVariablesResponse {
 }
 
 export function useDomainVariables(
-  domain: 'sheet_metal' | 'injection_molding',
+  domain: 'sheet_metal' | 'injection_molding' | 'machining',
   options?: { search?: string | undefined; category?: string | undefined },
 ) {
   const { user, loading: authLoading } = useAuth();

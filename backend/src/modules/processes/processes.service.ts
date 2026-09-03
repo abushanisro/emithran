@@ -996,16 +996,22 @@ export class ProcessesService {
    * Reference-data variables for one manufacturing domain — the same
    * lossless staging tables the Process page's per-route Lookup Tables
    * dialog already reads from (sm_reference_data, migration 479;
-   * im_reference_data, migration 636), surfaced here as a flat,
-   * domain-wide, searchable list rather than scoped to one route.
+   * im_reference_data, migration 636; machining_reference_data,
+   * migration 638), surfaced here as a flat, domain-wide, searchable list
+   * rather than scoped to one route.
    */
   async getDomainVariables(
-    domain: 'sheet_metal' | 'injection_molding',
+    domain: 'sheet_metal' | 'injection_molding' | 'machining',
     accessToken: string,
     search?: string,
     category?: string,
   ): Promise<{ domain: string; total: number; categories: string[]; variables: any[] }> {
-    const table = domain === 'sheet_metal' ? 'sm_reference_data' : 'im_reference_data';
+    const table =
+      domain === 'sheet_metal'
+        ? 'sm_reference_data'
+        : domain === 'injection_molding'
+          ? 'im_reference_data'
+          : 'machining_reference_data';
     const client = this.supabaseService.getClient(accessToken);
 
     let query = client
@@ -1017,7 +1023,7 @@ export class ProcessesService {
     if (category) query = query.eq('category', category);
     if (search) query = query.or(`key.ilike.%${search}%,notes.ilike.%${search}%`);
 
-    const { data, error, count } = await query.limit(2000);
+    const { data, error } = await query.limit(2000);
 
     if (error) {
       this.logger.error(`Error fetching ${table}: ${error.message}`, 'ProcessesService');
@@ -1027,11 +1033,31 @@ export class ProcessesService {
     const { data: categoryRows } = await client.from(table).select('category');
     const categories = [...new Set((categoryRows ?? []).map((r: any) => r.category))].sort();
 
+    // When the same (category, key) was sourced more than once at different
+    // times (e.g. a corrected screenshot re-capture superseding an older
+    // snapshot — sm_reference_data's 'wage_grade' category has both a
+    // 2026-03 batch from migration 482 and a corrected 2026-09 batch from
+    // migration 641 for the same process names), keep only the row with the
+    // newest source_version so the corrected value is what's shown. Older
+    // snapshots stay in the table (lossless staging), just not surfaced
+    // here when a newer one for the same key exists.
+    const latestByKey = new Map<string, any>();
+    for (const r of data ?? []) {
+      const dedupeKey = `${r.category}::${r.key}`;
+      const existing = latestByKey.get(dedupeKey);
+      if (!existing || String(r.source_version) > String(existing.source_version)) {
+        latestByKey.set(dedupeKey, r);
+      }
+    }
+    const deduped = [...latestByKey.values()].sort((a, b) =>
+      a.category === b.category ? String(a.key).localeCompare(String(b.key)) : String(a.category).localeCompare(String(b.category)),
+    );
+
     return {
       domain,
-      total: count ?? 0,
+      total: deduped.length,
       categories,
-      variables: (data ?? []).map((r: any) => ({
+      variables: deduped.map((r: any) => ({
         id: r.id,
         category: r.category,
         sourceRegion: r.source_region,

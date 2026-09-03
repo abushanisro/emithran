@@ -15,7 +15,7 @@ export const EQUIPMENT_CATEGORIES = {
   GRINDING: 'Grinding',
   HEAT_TREATMENT: 'Heat Treatment',
   HEATING_FURNACE: 'Heating Furnace',
-  INJECTION_MOLDING: 'Injection Molding',
+  INJECTION_MOLDING: 'Plastic Molding',
   MATERIAL_HANDLING: 'Material Handling',
   MELTING_FURNACE: 'Melting Furnace',
   RAW_MATERIAL: 'Raw Material',

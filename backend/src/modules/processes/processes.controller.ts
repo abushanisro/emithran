@@ -81,16 +81,16 @@ export class ProcessesController {
   }
 
   @Get('variables')
-  @ApiOperation({ summary: 'Get domain reference-data variables (sm_reference_data / im_reference_data)' })
+  @ApiOperation({ summary: 'Get domain reference-data variables (sm_reference_data / im_reference_data / machining_reference_data)' })
   @ApiResponse({ status: 200, description: 'Domain variables retrieved successfully' })
   async getDomainVariables(
-    @Query('domain') domain: 'sheet_metal' | 'injection_molding',
+    @Query('domain') domain: 'sheet_metal' | 'injection_molding' | 'machining',
     @AccessToken() token: string,
     @Query('search') search?: string,
     @Query('category') category?: string,
   ) {
-    if (domain !== 'sheet_metal' && domain !== 'injection_molding') {
-      throw new BadRequestException("domain must be 'sheet_metal' or 'injection_molding'");
+    if (domain !== 'sheet_metal' && domain !== 'injection_molding' && domain !== 'machining') {
+      throw new BadRequestException("domain must be 'sheet_metal', 'injection_molding', or 'machining'");
     }
     return this.processesService.getDomainVariables(domain, token, search, category);
   }

@@ -15,6 +15,8 @@ import math
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
 
+from sheet_metal.features.perforation import detect_perforation_patterns
+
 logger = logging.getLogger(__name__)
 
 
@@ -253,6 +255,25 @@ class SheetMetalFeatureExtractor:
                 if isinstance(d, (int, float)) and d > 0 and d < 2.0 * sheet_thickness
             )
 
+        # Perforating: a genuine repeated-pattern hole region (e.g. a
+        # ventilation grille), distinguished from incidental same-diameter
+        # holes scattered around the part -- see
+        # sheet_metal/features/perforation.py's module docstring for the
+        # real sourced thresholds this classification uses. Pure
+        # computational geometry over the SAME real hole set `holes` above
+        # already validated -- no new OCC access, honestly empty (never
+        # fabricated) when no diameter group reaches the real 20-hole
+        # threshold. Unavailable on the STL mesh-inference fallback (no
+        # hole_entries_raw there), same gate as counterbore/countersink.
+        perforation_groups: List[Dict[str, Any]] = []
+        try:
+            hole_entries_raw = holes.get("hole_entries_raw", [])
+            if hole_entries_raw:
+                perforation_groups = detect_perforation_patterns(hole_entries_raw)
+        except Exception as e:
+            logger.warning(f"[SheetMetal] perforation detection failed: {e}")
+        perforation_count = len(perforation_groups)
+
         slots: Dict[str, Any] = {"count": 0}
         try:
             slots = self._detect_slots_v2(
@@ -395,6 +416,24 @@ class SheetMetalFeatureExtractor:
                         "feature_type": "thin_web",
                         "occurrences": thin_web_occurrences,
                     })
+                # One v2 feature entry per qualifying perforated region — same
+                # absolute-mm occurrence-centroid convention as
+                # extruded_flange/thin_web above (this data is produced at the
+                # same _count_holes_with_location layer, before the
+                # Three.js-centering _build_feature_occurrences applies to
+                # holes/bends). Real per-hole face_ids, not derived/guessed.
+                for idx, region in enumerate(perforation_groups):
+                    v2_features.append({
+                        "id": f"perforation_{idx}_d{region['diameter_mm']}",
+                        "feature_type": "perforation",
+                        "diameter_mm": region["diameter_mm"],
+                        "pitch_x_mm": region["pitch_x_mm"],
+                        "pitch_y_mm": region["pitch_y_mm"],
+                        "pattern_rows": region["pattern_rows"],
+                        "pattern_cols": region["pattern_cols"],
+                        "region_bbox_mm": region["region_bbox_mm"],
+                        "occurrences": region["occurrences"],
+                    })
                 feature_graph_v2 = {
                     "metadata": {
                         "face_map": face_map or [],
@@ -432,7 +471,7 @@ class SheetMetalFeatureExtractor:
             f"internal={cut_length_breakdown['internal_profiles_mm']:.0f}) "
             f"longest_cut={longest_continuous_cut_mm:.0f}mm "
             f"corners(sharp={sharp_corner_count},acute={acute_corner_count}) bends={bends['count']} "
-            f"holes={holes['count']}(small={small_hole_count},flanges={extruded_flange_count},webs={thin_web_count}) "
+            f"holes={holes['count']}(small={small_hole_count},flanges={extruded_flange_count},webs={thin_web_count},perforations={perforation_count}) "
             f"internal_profiles={internal_profile_count} slots={slots['count']} "
             f"pierces={pierce_count} rapid_traverse={rapid_traverse_sec}s "
             f"area={flat_pattern_area_mm2:.0f}mm² "
@@ -465,6 +504,13 @@ class SheetMetalFeatureExtractor:
             "hole_groups": holes.get("hole_groups", []),
             "small_hole_count": small_hole_count,
             "hole_confidence": 0.90,
+            # Real repeated-pattern hole regions -- see
+            # sheet_metal/features/perforation.py for the sourced thresholds
+            # and honest-None grid-resolution rules. Additive to hole_count
+            # (every perforation hole is still a real hole, still costed via
+            # normal pierce time) -- never a replacement for it.
+            "perforation_count": perforation_count,
+            "perforation_groups": perforation_groups,
             "counterbore_count": counterbores["count"],
             "counterbore_groups": counterbores["groups"],
             "countersink_count": countersinks["count"],
@@ -1709,6 +1755,7 @@ class SheetMetalFeatureExtractor:
                 "count": 0, "diameters": [], "all_diameters": [], "hole_groups": [], "centroids": [],
                 "centroids_mm": [],
                 "extruded_flange_count": 0, "thin_web_count": 0,
+                "hole_entries_raw": [],
             }
 
         # Group by diameter rounded to 0.1 mm
@@ -1794,6 +1841,12 @@ class SheetMetalFeatureExtractor:
             "thin_web_count": thin_web_count,
             "extruded_flange_occurrences": extruded_flange_occurrences,
             "thin_web_occurrences": thin_web_occurrences,
+            # Deduped, coaxial-clustered per-hole tuples (same list this
+            # method itself groups by diameter above) — exposed so extract()
+            # can run perforation-pattern detection over the SAME real hole
+            # set this method already validated, instead of re-deriving its
+            # own (and risking drift from this method's filtering rules).
+            "hole_entries_raw": hole_entries,
         }
 
     def _detect_counterbore_countersink(
