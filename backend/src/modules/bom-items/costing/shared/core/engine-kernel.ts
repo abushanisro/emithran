@@ -26,6 +26,25 @@ export function noRateFallback(machineClass: string): MHRRateInput {
   return { rate: 0, source: 'no_db_rate', machineClass, machineName: null, commodityCode: null };
 }
 
+// Root-caused 2026-09-04: getRouteComparison() used to append a separate
+// real Press Brake process line to EVERY route with real bends — cutting
+// routes (Laser/Turret/Waterjet/etc., none of which can bend) AND forming
+// routes (Standard Press/Tandem Press/Progressive Die Press/Roll Bending
+// 2/3/4) alike — double-charging bending for the forming-family routes,
+// since their own real registered catalog taxonomy
+// (process_calculator_mappings, e.g. "Std Press:Std Press//StraightBend",
+// "Tandem Press:Bending//StraightBend", "Progressive Die:Die Station:
+// Bending//StraightBend", "2/3/4 Roll Bending:...//StraightBend" — verified
+// directly against memory/sheetmetal/process/process_operations.json)
+// confirms all 6 of these classes perform bending as part of their own
+// process, not as a downstream operation. A 'cutting' route still needs the
+// separate Press Brake line — none of those machines can bend. Pure boolean
+// so it's directly unit-testable without mocking the Supabase-backed
+// getRouteComparison() call site that consumes it.
+export function shouldAddSeparatePressBrakeLine(processFamily: 'cutting' | 'forming'): boolean {
+  return processFamily !== 'forming';
+}
+
 export interface EMithranTermsArgs {
   mhrPerHr: number;
   dlrPerHr: number;

@@ -1,15 +1,17 @@
 import { IsString, IsOptional, IsInt, Min, IsIn, IsArray, ArrayMinSize, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { RouteId } from './route-comparison.dto';
-import { getCuttingRouteIds } from '../costing/shared/core/manufacturing-process-registry';
+import { getCuttingRouteIds, getFormingRouteIds } from '../costing/shared/core/manufacturing-process-registry';
 
-// Sheet-metal cutting ids come from MANUFACTURING_PROCESS_REGISTRY (via
-// getCuttingRouteIds) — the same single source of truth getRouteComparison's
-// route loop uses — so a registered engine is valid here with no separate
-// edit. CNC/injection-molding ids are unrelated route families with their own
-// fixed, real machine/tonnage tiers — not part of this registry.
+// Sheet-metal cutting/forming ids come from MANUFACTURING_PROCESS_REGISTRY
+// (via getCuttingRouteIds/getFormingRouteIds) — the same single source of
+// truth getRouteComparison's route loop uses — so a registered engine is
+// valid here with no separate edit. CNC/injection-molding ids are unrelated
+// route families with their own fixed, real machine/tonnage tiers — not part
+// of this registry.
 const VALID_ROUTE_IDS: RouteId[] = [
   ...getCuttingRouteIds(),
+  ...getFormingRouteIds(),
   'cnc-3ax', 'cnc-4ax', 'cnc-5ax',
   'cnc-lathe', 'cnc-lathe-lt', 'cnc-mill-turn',
   'injection-molding', 'im-small-50t', 'im-standard-200t', 'im-large-500t',

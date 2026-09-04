@@ -80,6 +80,7 @@ import {
   punchingRequirement, waterjetRequirement,
   MATERIAL_MRR_CM3_MIN,
 } from './costing/shared/capability/machine-selection/physics';
+import { shouldAddSeparatePressBrakeLine } from './costing/shared/core/engine-kernel';
 import type { MachineRequirement } from './costing/shared/capability/machine-selection/physics';
 import { explainCandidate, fetchMachinePool, selectMachine } from './costing/shared/capability/machine-selection/selector';
 import { EMPTY_CAPABILITY, MACHINE_CLASS_DEFAULTS, lookupSeedCapability } from './costing/shared/capability/machine-selection/seed-registry';
@@ -5489,6 +5490,11 @@ export class BOMItemsService {
     const flatPatternLengthMm = ((item as any).maxLength ?? (item as any).max_length ?? null) as number | null;
     const flatPatternWidthMm  = ((item as any).maxWidth  ?? (item as any).max_width  ?? null) as number | null;
 
+    // Real, already-resolved part input — reused below (sheet-metal forming
+    // tooling-economics note) and separately by the injection-molding tier
+    // block further down this method (its own local `annualVolume` there).
+    const annualVolumeRC = ((item as any).annualVolume as number | null | undefined) ?? null;
+
     // ── Shared warnings ────────────────────────────────────────────────────────
     const comparisonWarnings: string[] = [];
     if (!grade) comparisonWarnings.push('Material grade not set — default mild steel rates applied');
@@ -5790,6 +5796,30 @@ export class BOMItemsService {
     // constant.
     const rcProgressiveDieSetupMin = await this.smLookup.getProgressiveDieMachineSetupMin(mhrRates.progressiveDiePress.machineName);
 
+    // Real tooling-economics thresholds (progressive_die_press / tandem_press
+    // only — see getToolingAnnualVolumeThresholds' own doc comment).
+    const rcToolingVolumeThresholds = await this.smLookup.getToolingAnnualVolumeThresholds();
+
+    // Real, database-driven "is this route's hard tooling economical at this
+    // part's real annual volume" note — the only 2 sheet-metal forming
+    // classes with a sourced threshold. Compares annualVolumeRC (this part's
+    // real, already-resolved input) against the real threshold and states
+    // the actual relationship; returns null (no note, not a fabricated one)
+    // whenever either input required to make the real comparison is missing.
+    const buildToolingVolumeNote = (machineClass: string): string | null => {
+      const thresholdByClass: Record<string, { limit: number | null; label: string }> = {
+        progressive_die_press: { limit: rcToolingVolumeThresholds.progressiveDie, label: 'progressive die tooling' },
+        tandem_press: { limit: rcToolingVolumeThresholds.stageTooling, label: 'stage tooling' },
+      };
+      const entry = thresholdByClass[machineClass];
+      if (!entry || entry.limit === null || annualVolumeRC === null) return null;
+      const vol = annualVolumeRC.toLocaleString();
+      const limit = entry.limit.toLocaleString();
+      return annualVolumeRC >= entry.limit
+        ? `Economical at this volume — ${vol}/yr meets the ${limit}/yr minimum for ${entry.label} to pay off.`
+        : `Below the ${limit}/yr minimum annual volume for ${entry.label} to be economical — this part's annual volume is ${vol}/yr.`;
+    };
+
     const attachToRoutes = (dto: RouteComparisonDto): RouteComparisonDto => {
       for (const route of dto.routes) {
         this.attachMachineSelections(route.processLines, mhrRates);
@@ -5860,6 +5890,8 @@ export class BOMItemsService {
         routes: [{
           routeId: 'cnc-3ax' as const,
           routeLabel: 'Upload 3D Model for Routing',
+          processFamily: 'cutting' as const,
+          toolingVolumeNote: null,
           processLines: [],
           materialCost: 0,
           abrasiveCost: 0,
@@ -6021,6 +6053,8 @@ export class BOMItemsService {
         return {
           routeId: TIER_ROUTE_IDS[tier.tierId]!,
           routeLabel,
+          processFamily: 'cutting',
+          toolingVolumeNote: null,
           processLines: cost.processLines, materialCost: cost.materialCost, abrasiveCost: 0,
           totalProcessCost: cost.totalProcessCost,
           isFeasible: capable,
@@ -6074,6 +6108,8 @@ export class BOMItemsService {
         routeLabel: mhrRates.compressionMolding.machineName
           ? `Compression Molding — ${mhrRates.compressionMolding.machineName}`
           : 'Compression Molding',
+        processFamily: 'cutting',
+        toolingVolumeNote: null,
         processLines: compressionResult.processLines, materialCost: compressionMaterialCost, abrasiveCost: 0,
         totalProcessCost: this.r2(compressionResult.processLines.reduce((s, l) => s + l.totalCost, 0)),
         isFeasible: compressionCapable,
@@ -6107,6 +6143,8 @@ export class BOMItemsService {
         routeLabel: mhrRates.reactionInjectionMolding.machineName
           ? `Reaction Injection Molding — ${mhrRates.reactionInjectionMolding.machineName}`
           : 'Reaction Injection Molding',
+        processFamily: 'cutting',
+        toolingVolumeNote: null,
         processLines: rimResult.processLines, materialCost: compressionMaterialCost, abrasiveCost: 0,
         totalProcessCost: this.r2(rimResult.processLines.reduce((s, l) => s + l.totalCost, 0)),
         isFeasible: rimCapable,
@@ -6144,6 +6182,8 @@ export class BOMItemsService {
         routeLabel: mhrRates.structuralFoamMolding.machineName
           ? `Structural Foam Molding — ${mhrRates.structuralFoamMolding.machineName}`
           : 'Structural Foam Molding',
+        processFamily: 'cutting',
+        toolingVolumeNote: null,
         processLines: structuralFoamCost.processLines, materialCost: structuralFoamCost.materialCost, abrasiveCost: 0,
         totalProcessCost: structuralFoamCost.totalProcessCost,
         isFeasible: structuralFoamCapable,
@@ -6239,14 +6279,22 @@ export class BOMItemsService {
     const CONF_RANK = { high: 2, medium: 1, low: 0 } as const;
     const minConf = (a: "high" | "medium" | "low", b: "high" | "medium" | "low"): "high" | "medium" | "low" =>
       CONF_RANK[a] <= CONF_RANK[b] ? a : b;
-    const mergeCuttingAndPressBrakeCapability = (cutting: MachineCapabilityCheck, pb: MachineCapabilityCheck): RouteCapability => ({
+    // pb is null for a 'forming' route (Standard/Tandem Press, Progressive Die,
+    // Roll Bending 2/3/4) — those machines bend as part of their own process
+    // (see shouldAddSeparatePressBrakeLine's doc comment) and never get a
+    // separate Press Brake step, so their feasibility must not depend on
+    // whether a Press Brake machine can also handle this part. When pb is
+    // null, `cutting` already holds that engine's OWN real capability check
+    // (including its own real estimatedTonnage, e.g. press/die force) — used
+    // as-is rather than discarded.
+    const mergeCuttingAndPressBrakeCapability = (cutting: MachineCapabilityCheck, pb: MachineCapabilityCheck | null): RouteCapability => ({
       cuttingCapable:    cutting.capable,
-      pressBrakeCapable: pb.capable,
-      overallCapable:    cutting.capable && pb.capable,
-      confidence:        minConf(cutting.confidence, pb.confidence),
-      estimatedTonnage:  pb.estimatedTonnage,
-      reasonCodes:       [...cutting.reasonCodes, ...pb.reasonCodes],
-      warnings:          [...cutting.reasons, ...pb.reasons],
+      pressBrakeCapable: pb ? pb.capable : true,
+      overallCapable:    pb ? (cutting.capable && pb.capable) : cutting.capable,
+      confidence:        pb ? minConf(cutting.confidence, pb.confidence) : cutting.confidence,
+      estimatedTonnage:  pb ? pb.estimatedTonnage : cutting.estimatedTonnage,
+      reasonCodes:       pb ? [...cutting.reasonCodes, ...pb.reasonCodes] : cutting.reasonCodes,
+      warnings:          pb ? [...cutting.reasons, ...pb.reasons] : cutting.reasons,
     });
 
     // Real cycle-time/setup-time lookups shared by the cutting-route loop below
@@ -6684,6 +6732,8 @@ export class BOMItemsService {
       abrasiveCost: number,
       routeWarnings: string[],
       capability: RouteCapability,
+      processFamily: 'cutting' | 'forming',
+      machineClass: string,
     ): RouteResultDto => {
       // Burring + Tapping run BEFORE Press Brake + Deburr: the M3 threads sit
       // in the extruded collar (burl), so the collar must be formed and
@@ -6693,27 +6743,55 @@ export class BOMItemsService {
       // deburr instead of a flat blank. Real geometry-driven ordering call,
       // not an arbitrary reshuffle — see REAL_PROCESS_ORDER (page.tsx) for
       // the matching frontend sequencing.
-      const allLines = [...cuttingLines, ...burringLines, ...tappingLines, ...pbLines, ...deburrLines, ...inspectionLines];
+      //
+      // Root-caused 2026-09-04: a 'forming' route (Standard Press/Tandem
+      // Press/Progressive Die/Roll Bending 2/3/4) used to ALWAYS get pbLines
+      // appended too, double-charging bending — once via the press/roll's
+      // own real process line, again via a separate Press Brake operation —
+      // even though these are exactly the machine classes whose own real
+      // registered catalog taxonomy (process_calculator_mappings, e.g.
+      // "Std Press:Std Press//StraightBend", "Tandem Press:Bending//
+      // StraightBend", "Progressive Die:Die Station:Bending//StraightBend",
+      // "2/3/4 Roll Bending:...//StraightBend") confirms they perform
+      // bending as part of their own process, not a downstream operation. A
+      // 'cutting' route (Laser/Turret/Waterjet/etc.) still gets pbLines —
+      // none of those machines can bend, a separate Press Brake step there
+      // is real and correct. This does not change what a forming route's
+      // own line costs (still the real press-stroke/roll-bending formula,
+      // unchanged) — it only stops adding a second, redundant bending charge
+      // on top for the 6 classes whose own real taxonomy already covers it.
+      const includePressBrake = shouldAddSeparatePressBrakeLine(processFamily);
+      const allLines = [
+        ...cuttingLines, ...burringLines, ...tappingLines,
+        ...(includePressBrake ? pbLines : []),
+        ...deburrLines, ...inspectionLines,
+      ];
       const totalProcessCost = this.r2(allLines.reduce((s, l) => s + l.totalCost, 0) + abrasiveCost);
       const totalCost = this.r2(materialCost + totalProcessCost);
       const { totalCo2Kg, totalProcessEnergyKwh, wasteCostInr, sustainabilityScore } =
         computeSustainability(grade, materialCostPerKg, netWeightKg, grossWeightKg, batchSize, allLines);
+      const effectivePressBrakeMin = includePressBrake ? pressBrakeMin : 0;
       return {
         routeId, routeLabel,
+        processFamily,
+        toolingVolumeNote: buildToolingVolumeNote(machineClass),
         processLines: allLines,
         materialCost, abrasiveCost, totalProcessCost,
         isFeasible: capability.overallCapable,
         totalCost,
         cycleTimes: {
           cuttingMin: this.r2(cuttingMin),
-          pressBrakeMin: this.r2(pressBrakeMin),
+          pressBrakeMin: this.r2(effectivePressBrakeMin),
           tappingMin: this.r2(tappingMin),
           deburrMin: this.r2(deburrMin),
-          totalMin: this.r2(cuttingMin + pressBrakeMin + deburrMin + tappingMin),
+          totalMin: this.r2(cuttingMin + effectivePressBrakeMin + deburrMin + tappingMin),
         },
         badges: { lowestCost: false, fastest: false, bestQuality: false },
         capability,
-        warnings: routeWarnings,
+        warnings: (!includePressBrake && bendCount > 0) ? [
+          ...routeWarnings,
+          'Bending performed in-process by this press/roll (real registered catalog capability) — no separate Press Brake operation added.',
+        ] : routeWarnings,
         ratesSource: RATES_SOURCE_LABEL,
         sustainability: { totalCo2Kg, totalProcessEnergyKwh, wasteCostInr, sustainabilityScore },
       };
@@ -6762,11 +6840,18 @@ export class BOMItemsService {
     ]);
 
     const routes: RouteResultDto[] = [];
-    // Standard Press / Tandem Press (Track B Phase 2) are a real, registered
-    // engine family (sheet_metal_forming) but not a cutting technology —
-    // dispatched alongside the cutting engines here (the one real cost-
-    // computation call site) without joining getCuttingRouteIds()'s "Manual
-    // routing" cutting-method dropdown, which stays cutting-only on purpose.
+    // Standard Press / Tandem Press / Progressive Die / Roll Bending are a
+    // real, registered engine family (sheet_metal_forming) but not a
+    // cutting technology — dispatched alongside the cutting engines here
+    // (the one real cost-computation call site) so route-comparison summary
+    // consumers see them, but each route's real processFamily (below) is
+    // set from which of these two real getEnginesForFamily buckets actually
+    // produced it — never guessed — so a mutually-exclusive "pick one
+    // cutting method" consumer (the Workflow Builder) can filter to
+    // processFamily==='cutting' and never show a forming route as if it
+    // were a cutting alternative (it structurally isn't: no separate Press
+    // Brake/Deburr step of its own).
+    const formingMachineClasses = new Set(getEnginesForFamily('sheet_metal_forming').map((e) => e.machineClass));
     for (const engine of [...getEnginesForFamily('sheet_metal_cutting'), ...getEnginesForFamily('sheet_metal_forming')]) {
       const identity = routeCompareProcessIdentities[engine.machineClass];
       const rate = mhrRatesByClass.get(engine.machineClass);
@@ -6810,6 +6895,7 @@ export class BOMItemsService {
           confidence: rcLaserCalc.confidence,
         } : {}),
       });
+      const isFormingRoute = formingMachineClasses.has(engine.machineClass);
       const routeCapability = mergeCuttingAndPressBrakeCapability(
         engine.checkCapability(
           capabilityGeometry,
@@ -6817,12 +6903,14 @@ export class BOMItemsService {
           rate.selection?.balanced?.candidate?.capability,
           rate.selection?.balanced?.candidate?.capabilitySource,
         ),
-        pbCapability,
+        isFormingRoute ? null : pbCapability,
       );
       routes.push(assembleRoute(
         (ROUTE_ID_FOR_CLASS[engine.machineClass] ?? engine.machineClass) as RouteId,
         ROUTE_LABEL_FOR_CLASS[engine.machineClass] ?? engine.machineClass,
         cutResult.processLines, cutResult.cuttingMin, cutResult.abrasiveCost, cutResult.warnings, routeCapability,
+        isFormingRoute ? 'forming' : 'cutting',
+        engine.machineClass,
       ));
     }
 
@@ -7460,6 +7548,8 @@ export class BOMItemsService {
       return {
         routeId: milledRouteIds[i],
         routeLabel: milledRouteLabels[i],
+        processFamily: 'cutting',
+        toolingVolumeNote: null,
         processLines: cost.processLines,
         materialCost: cost.materialCost,
         abrasiveCost: 0,
@@ -7609,6 +7699,8 @@ export class BOMItemsService {
       return {
         routeId: routeIds[i],
         routeLabel: routeLabels[i],
+        processFamily: 'cutting',
+        toolingVolumeNote: null,
         processLines: cost.processLines,
         materialCost: cost.materialCost,
         abrasiveCost: 0,
