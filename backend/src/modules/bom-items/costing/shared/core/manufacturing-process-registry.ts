@@ -119,6 +119,10 @@ export const ROUTE_ID_FOR_CLASS: Record<string, string> = {
   plasma_punch: 'sm-plasma-punch',
   standard_press: 'sm-standard-press',
   tandem_press: 'sm-tandem-press',
+  progressive_die_press: 'sm-progressive-die',
+  roll_bending_2: 'sm-roll-bending-2',
+  roll_bending_3: 'sm-roll-bending-3',
+  roll_bending_4: 'sm-roll-bending-4',
 };
 export const ROUTE_LABEL_FOR_CLASS: Record<string, string> = {
   fiber_laser: 'Fiber Laser + Press Brake',
@@ -133,8 +137,23 @@ export const ROUTE_LABEL_FOR_CLASS: Record<string, string> = {
   plasma_punch: 'Plasma Punch + Press Brake',
   standard_press: 'Standard Press',
   tandem_press: 'Tandem Press',
+  // Real operation names from the catalog (process_calculator_mappings /
+  // Process > Process Calculator Mappings admin page's "Sheet Metal" group)
+  // — "Progressive die"/"2 Roll Bending"/"3 Roll Bending"/"4 Roll Bending",
+  // not invented display strings. Missing here before this fix, so these 4
+  // real classes fell back to their raw machine_class string as the label
+  // (e.g. "progressive_die_press", "roll_bending_2") in the Workflow
+  // Builder route picker.
+  progressive_die_press: 'Progressive die',
+  roll_bending_2: '2 Roll Bending',
+  roll_bending_3: '3 Roll Bending',
+  roll_bending_4: '4 Roll Bending',
 };
 
 export function getCuttingRouteIds(): string[] {
   return getEnginesForFamily('sheet_metal_cutting').map((e) => ROUTE_ID_FOR_CLASS[e.machineClass] ?? e.machineClass);
+}
+
+export function getFormingRouteIds(): string[] {
+  return getEnginesForFamily('sheet_metal_forming').map((e) => ROUTE_ID_FOR_CLASS[e.machineClass] ?? e.machineClass);
 }

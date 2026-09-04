@@ -24,6 +24,31 @@ export interface RouteCapability {
 export interface RouteResultDto {
   routeId: RouteId;
   routeLabel: string;
+  // Which real registered-engine family produced this route
+  // (manufacturing-process-registry.ts's getEnginesForFamily bucket) —
+  // 'cutting' routes (Laser/Turret/Waterjet/Shear/Plasma/OxyFuel/Router) are
+  // mutually-exclusive alternatives for the SAME cut+bend+deburr+inspect
+  // chain; 'forming' routes (Standard/Tandem/Progressive-Die Press, Roll
+  // Bending) are complete, structurally different single-process
+  // alternatives with no separate Press Brake/Deburr step of their own.
+  // Consumers that pick ONE cutting method (the Workflow Builder's cutting
+  // row) must filter to 'cutting' — mixing both families into one
+  // mutually-exclusive picker previously showed forming routes as if they
+  // were cutting alternatives, which they structurally are not.
+  processFamily: 'cutting' | 'forming';
+  // Real, database-driven tooling-economics signal — set ONLY for the 2
+  // forming classes that have a real, sourced annual-volume threshold in
+  // sm_reference_data (category='variable', migration 479):
+  // progressive_die_press (key='progDieAnnualVolumeLimit') and tandem_press
+  // (key='stageToolingAnnualVolumeLimit' — "stage tooling" is the real
+  // reference-data term for Tandem Press's hard tooling, confirmed via
+  // migration 500/609's processDefaultMachine:Tandem Press -> tool_shop_name
+  // 'StageDiemaker1'). null for every other route — standard_press/roll_
+  // bending/all cutting classes have no such sourced threshold, and none is
+  // fabricated for them. Compares the part's real, already-resolved
+  // annualVolume against the real threshold and states the real relationship
+  // in each direction; never hides or reorders the route based on this.
+  toolingVolumeNote: string | null;
   processLines: ProcessLineCost[];
   materialCost: number;
   abrasiveCost: number;
