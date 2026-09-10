@@ -34,9 +34,21 @@ describe('recommendMoldClass — real SPI lifeShotRating values (migration 682)'
   });
 });
 
-describe('computeMoldCost — baseCostUsd table unaffected by the lifeShotRating fix', () => {
-  it('single-cavity cost equals the class base cost, unchanged by this fix (only lifeShotRating changed, not baseCostUsd)', () => {
-    expect(computeMoldCost('Class101', 1)).toBe(50_000);
-    expect(computeMoldCost('Class105', 1)).toBe(1_500);
+// computeMoldCost's per-class flat baseCostUsd table was removed 2026-09-10
+// (no DB/migration/literature citation existed for those 5 dollar figures —
+// unlike lifeShotRating above, which migration 682/tblSpiType.json backs).
+// Mold cost is now the real, itemized purchased-component BOM subtotal from
+// mold-tooling-engine.ts's computeMoldToolingCost(), scaled by the same
+// (disclosed, non-real) +35%-per-additional-cavity heuristic this file
+// already had — computeMoldCost itself is now class-agnostic, taking that
+// real BOM subtotal directly rather than deriving one from moldClass.
+describe('computeMoldCost — real BOM-subtotal scaling, class-agnostic', () => {
+  it('single-cavity cost equals the supplied base cost unchanged', () => {
+    expect(computeMoldCost(1_500, 1)).toBe(1_500);
+    expect(computeMoldCost(50_000, 1)).toBe(50_000);
+  });
+
+  it('each additional cavity adds 35% of the base cost', () => {
+    expect(computeMoldCost(1_000, 3)).toBe(1_000 + 2 * 1_000 * 0.35);
   });
 });

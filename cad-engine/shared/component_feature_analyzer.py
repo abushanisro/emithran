@@ -86,13 +86,38 @@ def detect_part_family(
     elongation = dims[2] / max(dims[1], 1.0)   # max / mid  — high = rod-like
     circularity = dims[1] / max(dims[2], 1.0)  # mid / max  — high = circular cross-section
 
-    if flatness < 0.15:
-        confidence = min(0.95, 0.60 + (0.15 - flatness) * 2.0)
-        return "sheet_metal", round(confidence, 3), [
-            f"Very flat cross-section (flatness={flatness:.2f} < 0.15)",
-        ]
+    # ── Scored comparison, not sequential gate-and-stop ─────────────────────
+    #
+    # Root-caused 2026-09-10 (a real reported part: a 6mm-thick, 96.5x150mm
+    # injection-molded cover, flatness=0.04): the previous version of this
+    # function returned on the FIRST gate that fired, in a fixed order —
+    # flatness < 0.15 always won before any injection-molded signal (draft
+    # angle, wall-thickness uniformity) was even computed. A part that is
+    # both very flat AND carries strong, unambiguous IM evidence had no way
+    # to be classified correctly; sheet-metal's single flatness signal always
+    # pre-empted every other family's real evidence.
+    #
+    # Every real threshold/formula below is UNCHANGED from the original
+    # gates — each one still exists because of a specific cited real part
+    # (ZDR90 enclosure, a Motor Bracket regression, a 300x300x140mm sheet
+    # metal box; see the per-signal comments preserved throughout). What
+    # changed is control flow only: every family's score is computed
+    # independently over the SAME real signals, then the highest-scoring
+    # family wins — so flatness alone can no longer out-vote real IM
+    # evidence just because it happens to be checked first.
+    candidates: List[Tuple[str, float, List[str]]] = []
 
     hole_density = hole_count / max(total_face_count, 1)
+
+    # Gate 0 — very flat cross-section is strong sheet-metal evidence on its
+    # own, but no longer an immediate return: a part this flat that ALSO
+    # carries strong injection-molded evidence (below) must be allowed to
+    # win on the stronger real signal instead of being pre-empted here.
+    if flatness < 0.15:
+        confidence = min(0.95, 0.60 + (0.15 - flatness) * 2.0)
+        candidates.append(("sheet_metal", round(confidence, 3), [
+            f"Very flat cross-section (flatness={flatness:.2f} < 0.15)",
+        ]))
 
     # Pre-veto gate: cylindrical-face-dominated topology with non-rotational alignment.
     # Sheet metal enclosures (boxes, frames, channels) have many small cylindrical faces
@@ -107,11 +132,11 @@ def detect_part_family(
             and cyl_axis_alignment < 0.50
             and large_cyl_count == 0):
         confidence = min(0.88, 0.72 + min(hole_density, 0.80) * 0.18)
-        return "sheet_metal", round(confidence, 3), [
+        candidates.append(("sheet_metal", round(confidence, 3), [
             f"Cylindrical-face-dominated topology ({hole_density:.0%} of faces) "
             f"with flat-ish bbox (flatness={flatness:.2f}) and non-rotational alignment "
             f"(cyl_alignment={cyl_axis_alignment:.2f}) — bend-rich or perforated sheet metal",
-        ]
+        ]))
 
     # Hard veto: parts with multiple large-radius cylinders (external OD surfaces) cannot
     # be sheet metal. A lens holder / flange / shaft has external diameters >> hole radii;
@@ -160,19 +185,19 @@ def detect_part_family(
     # NOT applied when external OD cylinders are detected (sheet_metal_veto).
     if not sheet_metal_veto and hole_count > 20 and flatness < 0.60:
         confidence = min(0.85, 0.70 + min(hole_count, 200) / 2000)
-        return "sheet_metal", round(confidence, 3), [
+        candidates.append(("sheet_metal", round(confidence, 3), [
             f"High absolute hole count ({hole_count}) with flat-ish bbox "
             f"(flatness={flatness:.2f}) — perforated sheet metal",
-        ]
+        ]))
 
     # Gate 1b — hole density + moderately flat bbox (catches cases below 20-hole threshold).
     if not sheet_metal_veto and hole_density > 0.20 and flatness < 0.60:
         confidence = min(0.88, 0.68 + max(0, 0.60 - flatness) * 0.3)
-        return "sheet_metal", round(confidence, 3), [
+        candidates.append(("sheet_metal", round(confidence, 3), [
             f"High hole density ({hole_count}/{total_face_count} faces = {hole_density:.0%}) "
             f"with flat-ish bbox (flatness={flatness:.2f})",
             "Perforated sheet metal — hole-dominated topology",
-        ]
+        ]))
 
     # Gate 1c — planar-dominant surface topology + moderately flat bbox.
     # Sheet metal is almost entirely planar faces (top, bottom, flanges, webs).
@@ -182,11 +207,11 @@ def detect_part_family(
     # clearly sheet metal — the original 0.35 cutoff was too tight for formed enclosures.
     if not sheet_metal_veto and planar_face_fraction > 0.70 and flatness < 0.48:
         confidence = min(0.82, 0.62 + (0.48 - flatness) * 0.4 + planar_face_fraction * 0.1)
-        return "sheet_metal", round(confidence, 3), [
+        candidates.append(("sheet_metal", round(confidence, 3), [
             f"Predominantly planar surfaces ({planar_face_fraction:.0%}) "
             f"with flat-ish bbox (flatness={flatness:.2f})",
             "Surface topology consistent with sheet metal",
-        ]
+        ]))
 
     # Gate 1d — fill ratio gate (formed sheet metal bracket / enclosure).
     # If the part occupies < 10% of its bounding box volume AND its faces are majority
@@ -205,11 +230,11 @@ def detect_part_family(
                 and not (cyl_axis_alignment > 0.65 and rotational_face_ratio > 0.35)
                 and dims[0] / dims[2] < 0.80):
             _conf = round(min(0.85, 0.65 + (0.10 - _fill_ratio) * 5.0), 3)
-            return "sheet_metal", _conf, [
+            candidates.append(("sheet_metal", _conf, [
                 f"Very low fill ratio ({_fill_ratio:.3f} < 0.10): part occupies "
                 f"{_fill_ratio:.1%} of bounding box — formed sheet metal bracket/enclosure",
                 f"Majority planar faces ({planar_face_fraction:.0%}) confirm non-solid topology",
-            ]
+            ]))
 
     # Disc / flange / ring (lens holders, pulleys, bearing races):
     # rotational_face_ratio > 0.30 guards against round milled housings / pipe manifolds
@@ -226,8 +251,9 @@ def detect_part_family(
             reasons.append(
                 f"Secondary machining features detected (count={secondary_features_count})"
             )
-            return "mill_turn", 0.75, reasons
-        return "cnc_turned", 0.80, reasons
+            candidates.append(("mill_turn", 0.75, reasons))
+        else:
+            candidates.append(("cnc_turned", 0.80, reasons))
 
     if elongation > 2.5 and flatness > 0.20:
         reasons = [
@@ -238,8 +264,9 @@ def detect_part_family(
             reasons.append(
                 f"Secondary machining features detected (count={secondary_features_count})"
             )
-            return "mill_turn", 0.72, reasons
-        return "cnc_turned", 0.75, reasons
+            candidates.append(("mill_turn", 0.72, reasons))
+        else:
+            candidates.append(("cnc_turned", 0.75, reasons))
 
     # Injection-molded shell: not flat enough for the sheet-metal gates above, not
     # rotationally dominant enough for the disc/turned gates above — a thin shell
@@ -264,7 +291,19 @@ def detect_part_family(
             and cyl_axis_alignment < 0.50
             and circularity < 0.80
             and (draft_face_ratio > 0.30 or pocket_count >= 3)):
-        confidence = min(0.72, 0.60 + thin_wall_ratio * 0.15 + draft_face_ratio * 0.20)
+        # Confidence ceiling widened from the original gate's 0.72 cap
+        # (2026-09-10, scored-comparison rewrite): that cap was calibrated
+        # only against this function's own catch-all fallback (cnc_milled,
+        # 0.65) — the sole competitor whenever this gate fired under the old
+        # sequential design. In a scored comparison this same evidence must
+        # also be able to outweigh a genuinely flat part's sheet-metal score
+        # (gate 0 / 1b) when the IM evidence is real and strong — draft_face_
+        # ratio is weighted higher than thin_wall_ratio because a drafted
+        # wall is direct, unambiguous mold-pull evidence (sheet metal and
+        # milled walls are never intentionally drafted), while thin_wall_
+        # ratio is corroborating (multiple close gauge bins) rather than
+        # conclusive on its own.
+        confidence = min(0.90, 0.58 + thin_wall_ratio * 0.20 + draft_face_ratio * 0.40)
         reasons = [
             f"Thin-wall shell with multiple close-but-distinct gauge bins "
             f"(thin_wall_ratio={thin_wall_ratio:.2f} > 0.35) — not one dominant sheet gauge",
@@ -275,15 +314,22 @@ def detect_part_family(
             reasons.append(f"Drafted walls detected (draft_face_ratio={draft_face_ratio:.2f} > 0.30)")
         else:
             reasons.append(f"Elevated pocket count ({pocket_count}) consistent with ribs/bosses")
-        return "injection_molded", round(confidence, 3), reasons
+        candidates.append(("injection_molded", round(confidence, 3), reasons))
 
-    return "cnc_milled", 0.65, [
+    candidates.append(("cnc_milled", 0.65, [
         f"No strong rotational or sheet-metal signal "
         f"(flatness={flatness:.2f}, elongation={elongation:.2f}, "
         f"circularity={circularity:.2f}, "
         f"cyl_alignment={cyl_axis_alignment:.2f}, "
         f"rot_ratio={rotational_face_ratio:.2f})",
-    ]
+    ]))
+
+    # ── Highest-scoring family wins ─────────────────────────────────────────
+    # cnc_milled's catch-all above always contributes a candidate, so this
+    # list is never empty. Ties resolve to whichever real signal was
+    # evaluated first (stable, deterministic — same part always classifies
+    # the same way), never to a fabricated tiebreaker.
+    return max(candidates, key=lambda c: c[1])
 
 
 class ComponentFeatureAnalyzer:

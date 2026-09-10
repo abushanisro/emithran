@@ -551,6 +551,15 @@ export interface ToolingCostDto {
   moldCostPerPartUsd: number;
   annualVolume: number;
   productionLifeYears: number;
+  /** Real, itemized purchased-component BOM subtotal moldCostUsd is derived from (mold-tooling-engine.ts). */
+  moldBomSubtotalUsd?: number;
+  /** Real components this mold needs but with no fixable cost/qty on file (e.g. Ejector Pin). */
+  moldMissingComponents?: string[];
+  /** Real design/machining/assembly hours needed to build this mold — disclosed, never priced (no toolroom rate on file). */
+  moldEstimatedDesignHrs?: number;
+  moldEstimatedMachiningHrs?: number;
+  moldEstimatedAssemblyHrs?: number;
+  moldEstimatedAssemblyOperators?: number;
 }
 
 /**

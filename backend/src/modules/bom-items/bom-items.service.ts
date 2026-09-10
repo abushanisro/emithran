@@ -73,6 +73,7 @@ import type { BlankSpecDto } from './dto/blank-spec.dto';
 import type { TrueNestResultDto } from './dto/true-nest.dto';
 import type { CandidateRouteComparisonDto, CandidateRouteDto } from './dto/candidate-route.dto';
 import type { RouteComparisonDto, RouteComparisonResponseDto, RouteResultDto, RouteId, RouteCapability } from './dto/route-comparison.dto';
+import { VALID_ROUTE_IDS } from './dto/apply-route.dto';
 import { resolveInspectionRule, SEVERITY_RANK } from './costing/shared/physics/gdt-severity';
 import type { GdtSeverity, InspectionMethod, InspectionRuleRow } from './costing/shared/physics/gdt-severity';
 import type { InspectionStagePolicy } from './costing/shared/core/default-rates.constants';
@@ -6454,7 +6455,24 @@ export class BOMItemsService {
         // never the automatic pick. A no-op for CNC/injection-molding routes,
         // which are always tagged 'cutting' already (they have no forming
         // concept), so this touches sheet-metal recommendation only.
-        recommendedRouteId: selectRecommendedRoute(normalized.routes.filter((r) => r.processFamily === 'cutting'))?.routeId ?? null,
+        //
+        // ALSO restricted to VALID_ROUTE_IDS (apply-route.dto.ts) — the same
+        // real source of truth ApplyRouteDto validates against. Root-caused
+        // live: the Injection Molding branch pushes 3 real process
+        // alternatives (im-compression-molding/im-reaction-injection-molding/
+        // im-structural-foam-molding) into this same array, tagged 'cutting',
+        // *only* so the lowestCost/fastest badges consider them (see that
+        // branch's own comment) — never meant to be auto-applied, since none
+        // of the 3 ids are registered apply targets. Without this filter,
+        // whichever of them was cheapest could become recommendedRouteId,
+        // Auto routing would send it straight to ApplyRouteDto, and it would
+        // fail outright with "ID must be one of the following values...".
+        // Gating on VALID_ROUTE_IDS closes this for good: a route can never
+        // be recommended unless it is also genuinely applyable, for any
+        // current or future route id, not just these 3.
+        recommendedRouteId: selectRecommendedRoute(
+          normalized.routes.filter((r) => r.processFamily === 'cutting' && VALID_ROUTE_IDS.includes(r.routeId)),
+        )?.routeId ?? null,
         resolvedInputs: costingInputs,
       };
     };
@@ -6645,8 +6663,12 @@ export class BOMItemsService {
           : { rate: Math.round(baseMhrRate * mult), source: 'tier_synthetic',
               machineClass: 'injection_molding', machineName: null, commodityCode: null };
 
+        // maxTonnage is metric tonnes-force (derived from the real clampingForceKn
+        // via / 9.80665 at import time — migration 633 / selector.ts:307's same real
+        // SI conversion) — reverse it with the same constant, not a rounded "×10"
+        // (that introduced a ~2% round-trip error vs. the real per-machine kN value).
         const clampKN = cand?.capability.maxTonnage != null
-          ? cand.capability.maxTonnage * 10
+          ? cand.capability.maxTonnage * 9.80665
           : spec.clampKN;
         const shotCm3 = cand?.capability.shotCapacityGrams != null
           ? cand.capability.shotCapacityGrams / (materialDensityKgM3 / 1000)

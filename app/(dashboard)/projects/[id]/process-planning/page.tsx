@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
@@ -748,7 +749,15 @@ function ProcessPlanningPageContent() {
 
       // Save manufacturing specifications to database via Process Planning API
       await apiClient.post('/process-planning/specifications/upsert', manufacturingSpecs);
-      
+
+      // manufacturingFamilyOverride lives on the BOM item itself (resolveEffectiveFamily,
+      // bom-items.service.ts), not the process-planning specs table above — saved via
+      // the real BOM item update endpoint. Sent as null (not '') when cleared, matching
+      // the DTO's manufacturingFamilyOverride?: string | null.
+      await apiClient.put(`/bom-items/${selectedItem.id}`, {
+        manufacturingFamilyOverride: editablePartData.manufacturingFamilyOverride || null,
+      });
+
       setIsEditingPartDetails(false);
       
       // Show success message
@@ -1423,6 +1432,32 @@ function ProcessPlanningPageContent() {
                               />
                             ) : (
                               <p className="text-xs font-medium">{editablePartData.hardness || '—'}</p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Manufacturing Family</label>
+                            {isEditingPartDetails ? (
+                              <Select
+                                value={editablePartData.manufacturingFamilyOverride || 'auto'}
+                                onValueChange={(v) => setEditablePartData(prev => ({ ...prev, manufacturingFamilyOverride: v === 'auto' ? '' : v }))}
+                              >
+                                <SelectTrigger className="h-7 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="auto">Auto-detect (material + geometry)</SelectItem>
+                                  <SelectItem value="sheet_metal">Sheet Metal</SelectItem>
+                                  <SelectItem value="injection_molded">Injection Molding</SelectItem>
+                                  <SelectItem value="cnc_milled">CNC Milled</SelectItem>
+                                  <SelectItem value="cnc_turned">CNC Turned</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <p className="text-xs font-medium">
+                                {editablePartData.manufacturingFamilyOverride
+                                  ? editablePartData.manufacturingFamilyOverride.replace(/_/g, ' ')
+                                  : 'Auto-detect'}
+                              </p>
                             )}
                           </div>
                         </div>
