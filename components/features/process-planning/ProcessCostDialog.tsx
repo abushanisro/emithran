@@ -293,10 +293,10 @@ export function ProcessCostDialog({
   // Prevents the full pickers from flashing empty before the load effect fires in edit mode.
   // false = load effect hasn't run yet for this open; true = fields are populated from editData.
   const [editDataApplied, setEditDataApplied] = useState(false);
-  // When true, show the catalog pickers instead of a read-only "Saved process" panel (after Re-select click)
-  // reSelectMode was here: the flag that swapped the read-only "Saved process"
-  // panel for the real pickers. The pickers are always shown now, so there is
-  // no second mode to be in.
+  // Inline validation error shown above the form actions on submit (replaces
+  // a blocking browser alert() — every other validation in this form is an
+  // inline message, this is the one place that wasn't).
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Preserve facilityId and facilityRateId from editData for updates
   const [facilityId, setFacilityId] = useState<string | undefined>(undefined);
@@ -847,6 +847,21 @@ export function ProcessCostDialog({
     return null;
   }, [calculatorsData]);
 
+  // Real calculator ids resolved BY NAME, never hardcoded — a hardcoded UUID
+  // silently stops matching the moment either calculator is ever recreated/
+  // reseeded (this exact class of reseed already happened this session for
+  // other catalogs, e.g. migrations 052/045 for these two calculators
+  // themselves). Used below to gate the Tapping- and Bending-specific
+  // auto-fill blocks by real identity instead of a literal id.
+  const tappingCalculatorId = useMemo(
+    () => calculatorsData?.calculators?.find((c: any) => c.name === 'Machining - Tapping')?.id ?? null,
+    [calculatorsData],
+  );
+  const bendingCalculatorId = useMemo(
+    () => calculatorsData?.calculators?.find((c: any) => c.name === 'Sheet Metal - Bending Manufacturing')?.id ?? null,
+    [calculatorsData],
+  );
+
   // Auto-selected ONLY when the machine class maps to exactly one catalog row,
   // which is the only case where the answer is a fact rather than a preference.
   //
@@ -1150,7 +1165,7 @@ export function ProcessCostDialog({
       // engagement depth (its own formula: Machining Time = f(Length + 4mm
       // lead-in)) -- excluded here and set correctly (to sheet thickness)
       // in the Tapping-specific block below instead.
-      ...(selectedCalculatorId !== 'fe42139c-5675-4a82-94d5-7f2d440ae9bf'
+      ...(selectedCalculatorId !== tappingCalculatorId
         ? { 'Length': bomItemData.length || bomItemData.maxLength }
         : {}),
       'Max Length': bomItemData.maxLength || bomItemData.length,
@@ -1690,7 +1705,7 @@ export function ProcessCostDialog({
     //   Tap Diameter — the thread's nominal major diameter (M3 -> 3mm).
     //   Feed per Rev — for rigid tapping, feed/rev IS the thread pitch by
     //     definition (0.5mm for M3x0.5).
-    if (selectedCalculatorId === 'fe42139c-5675-4a82-94d5-7f2d440ae9bf') {
+    if (selectedCalculatorId === tappingCalculatorId) {
       const thread = ((bomItemData.drawingIntelligence as any)?.threads as Array<{ size: string; pitch: number; count?: number }> | undefined)?.[0];
       const nominalDia = thread?.size ? parseFloat(thread.size.replace(/[^0-9.]/g, '')) : null;
 
@@ -1780,7 +1795,7 @@ export function ProcessCostDialog({
     const toolLoadingField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Tool Loading Time');
     if (
       toolLoadingField && isBlank(newInputs['Tool Loading Time']) && bomItemData.bendCount > 0 &&
-      selectedCalculatorId === '102772ff-5422-45c1-b391-6d2d4a96ab1b'
+      selectedCalculatorId === bendingCalculatorId
     ) {
       const bendLengthMm = Math.max(bomItemData.maxLength || 0, bomItemData.maxWidth || 0);
       if (bendLengthMm > 0) {
@@ -2046,7 +2061,7 @@ export function ProcessCostDialog({
   // loading — that's what withSaved()/withSavedMachines() below already do,
   // independently of this gate — so waiting here served no purpose.
   useEffect(() => {
-    if (!open) { setEditDataApplied(false); return; }
+    if (!open) { setEditDataApplied(false); setSubmitError(null); return; }
 
     if (editData && open && !editDataApplied) {
       setEditDataApplied(true);
@@ -2251,16 +2266,21 @@ export function ProcessCostDialog({
 
     const cycleTimeNum = parseFloat(cycleTime as string) || 0;
     const batchSizeNum = parseFloat(batchSize as string) || 0;
+    const partsPerCycleNum = parseFloat(partsPerCycle as string) || 0;
 
     if (cycleTimeNum <= 0) {
-      alert('Please enter a valid Cycle Time (greater than 0)');
+      setSubmitError('Please enter a valid Cycle Time (greater than 0)');
       return;
     }
     if (batchSizeNum <= 0) {
-      alert('Please enter a valid Batch Size (greater than 0)');
+      setSubmitError('Please enter a valid Batch Size (greater than 0)');
       return;
     }
-
+    if (partsPerCycleNum <= 0) {
+      setSubmitError('Please enter a valid Parts/Cycle (greater than 0)');
+      return;
+    }
+    setSubmitError(null);
 
     onSubmit({
       id: editData?.id,
@@ -2553,36 +2573,6 @@ export function ProcessCostDialog({
                         </p>
                       </div>
 
-                      {/* Machine Hour Rate override */}
-                      <div className="space-y-2">
-                        <Label>Machine Hour Rate (MHR)</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={machineValue}
-                            onChange={(e) => {
-                              setMachineValue(e.target.value);
-                            }}
-                            placeholder="Enter machine value"
-                            className="flex-1"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => {
-                              setCalculatorTarget('machineValue');
-                              setCalculatorOpen(true);
-                            }}
-                            title="Use Calculator"
-                          >
-                            <CalculatorIcon className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
                       {/* Machine (MHR) Selection */}
                       <div className="space-y-2">
                         <Label>Machine</Label>
@@ -2666,6 +2656,50 @@ export function ProcessCostDialog({
                             )}
                           </div>
                         )}
+                      </div>
+
+                      {/* Real, distinct field (process_cost_records.machine_value) — the
+                          machine/equipment's own capital value, for investment/depreciation
+                          reporting (see the Invest tab). NOT the hourly cost rate — that
+                          comes from the Machine selection above and is what actually drives
+                          this line's cost. A real, confirmed live bug (2026-09-10): this used
+                          to be labelled "Machine Hour Rate (MHR)" and placed ABOVE the Machine
+                          selector, reading exactly like the applied rate — it never was; the
+                          cost engine reads effectiveMachineRate (from the Machine selection),
+                          never this field. Relabelled and moved below Machine to match the
+                          natural "pick machine → see its rate → optionally note its capital
+                          value" flow. */}
+                      <div className="space-y-2">
+                        <Label>Machine / Equipment Value (optional)</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={machineValue}
+                            onChange={(e) => {
+                              setMachineValue(e.target.value);
+                            }}
+                            placeholder="Enter machine/equipment capital value"
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setCalculatorTarget('machineValue');
+                              setCalculatorOpen(true);
+                            }}
+                            title="Use Calculator"
+                          >
+                            <CalculatorIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          This machine&apos;s capital/purchase value, for investment reporting only — it does not
+                          affect this line&apos;s cost. The applied hourly rate is the Machine selection above.
+                        </p>
                       </div>
 
                       {/* Labour rate — derived, not chosen. It is the selected machine's
@@ -2889,13 +2923,16 @@ export function ProcessCostDialog({
               </Card>
             </div>
 
+              {submitError && (
+                <p className="text-xs text-destructive mt-2">⚠ {submitError}</p>
+              )}
               <DialogFooter className="mt-6">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  disabled={Number(cycleTime) <= 0 || Number(batchSize) <= 0}
+                  disabled={Number(cycleTime) <= 0 || Number(batchSize) <= 0 || Number(partsPerCycle) <= 0}
                 >
                   {editData ? 'Update Process' : 'Add Process'}
                 </Button>
