@@ -117,3 +117,51 @@ export function resolveScenarioAskPrice(
   if (typeof s.amount !== 'number' || !(s.amount >= 0) || typeof s.currency !== 'string') return null;
   return { amount: s.amount, currency: s.currency };
 }
+
+// ── Scenario costing inputs (batch size / location / production life) ─────────
+//
+// Named readers for the three costing-input keys the Cost Guide persists into
+// this same bag via merge_scenario_overrides. Same contract as
+// resolveEffectiveSheetThicknessMm above: validate the shape, never guess,
+// return null when the key is absent or malformed so the caller's own priority
+// chain decides what happens next.
+//
+// These are deliberately readers ONLY — they hold no defaults. The single place
+// a costing-input default is written is COSTING_INPUT_DEFAULTS in
+// costing-inputs.ts, which composes these with the request and the bom_items
+// row. Putting a `?? 1` here would recreate exactly the per-consumer-default
+// problem that work exists to remove.
+
+/** Persisted scenario batch size (parts per order). null when unset or not a positive integer. */
+export function resolveScenarioBatchSize(
+  scenarioOverrides: Record<string, unknown> | null | undefined,
+): number | null {
+  const raw = scenarioOverrides?.['batchSize'];
+  return typeof raw === 'number' && Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : null;
+}
+
+/** Persisted scenario digital-factory location. null when unset or not a non-empty string. */
+export function resolveScenarioLocation(
+  scenarioOverrides: Record<string, unknown> | null | undefined,
+): string | null {
+  const raw = scenarioOverrides?.['location'];
+  return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null;
+}
+
+/**
+ * Persisted scenario production life in years — how long this part is quoted to
+ * stay in production, used to amortise tooling. null when unset or not a
+ * positive number.
+ *
+ * This key has no bom_items column by design: the JSONB bag already carries
+ * every other scenario input (thickness, batch size, location, currency, ask
+ * price), and merge_scenario_overrides has no key whitelist, so a new column
+ * would add a second home for the same value and a second place its default
+ * could drift.
+ */
+export function resolveScenarioProductionLifeYears(
+  scenarioOverrides: Record<string, unknown> | null | undefined,
+): number | null {
+  const raw = scenarioOverrides?.['productionLifeYears'];
+  return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
+}

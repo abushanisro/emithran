@@ -1,3 +1,15 @@
+import type { LhrRateSource } from '../costing/shared/core/cost-engine';
+import type { CostingInputs } from '../costing/shared/physics/costing-inputs';
+
+/**
+ * The costing inputs this response was actually computed at, together with where
+ * each one came from. Echoed rather than left implicit so the UI seeds its own
+ * state from the values the engine used, instead of keeping a second copy with
+ * its own default that can silently disagree — see costing-inputs.ts for why
+ * that was the root cause worth removing.
+ */
+export type ResolvedCostingInputsDto = CostingInputs;
+
 export interface ProcessCO2 {
   process: string;       // "Laser Cutting"
   machineClass: string;  // "fiber_laser"
@@ -282,17 +294,56 @@ export interface ProcessLineCost {
   // process_cost_records row's setup_time can be verified end-to-end against
   // Cost Summary, not just its already-amortised dollar cost.
   setupTimeMin?: number;
-  hourlyRate: number;    // local currency/hr — fully burdened MHR (machine + labour)
-  rateSource: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override';
+  /**
+   * Which real source `setupTimeMin` came from — 'calculator' is a real DB
+   * calculator that modelled THIS part, 'machine' is this machine's own
+   * mhr_records.setup_time_hr, 'operation_lookup' the per-operation
+   * sm_lookup_op_setup_time row, 'class_default' the cited per-class constant.
+   * Disclosed rather than inferred so the UI never presents a class default as
+   * if it were the selected machine's real setup time. See resolveSetupMinutes().
+   */
+  setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'class_default';
+  /**
+   * Real per-machine operator headcount (mhr_records.operators, via the selected
+   * MachineCandidate) that this line was costed with. Surfaced so apply-route can
+   * persist the real crew size instead of the literal 1 it wrote for every
+   * machine, and so the UI can show what the setup cost was actually manned at.
+   */
+  operators?: number | null;
+  // local currency/hr — the MACHINE hour rate, and only that.
+  //
+  // This said "fully burdened MHR (machine + labour)", which is not what any
+  // producer puts here: eMithranTerms takes mhrPerHr and dlrPerHr as two
+  // separate arguments (machineCost = mhrPerHr/60 * cycleTimeMin, laborCost =
+  // dlrPerHr/60 * cycleNDL * cycleTimeMin), and every registered engine sets
+  // this from MHRRateInput.rate, which is the machine rate, with labourRate
+  // carried separately below.
+  //
+  // The comment mattered: it is the assumption buildLineFromAppliedRecord was
+  // reading direct_rate (machine + labour) under, so an applied line reported
+  // 62.52/hr for an operation the engine had costed at 15.85/hr. See migration
+  // 718 and line_hourly_rate.
+  hourlyRate: number;
+  // 'tooling_amortization': not a machine-rate line at all — hourlyRate is 0
+  // and the line's whole cost is a real, itemized hard-tooling investment
+  // (see progressive-die-tooling-engine.ts) amortised over annualVolume ×
+  // productionLifeYears. Kept distinct from 'no_db_rate' (a genuine $0 gap)
+  // so appendRateWarnings never reports a real, non-zero tooling cost as
+  // "no rate on file".
+  rateSource: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override' | 'tooling_amortization';
   machineClass: string;        // e.g. 'fiber_laser' — maps to MACHINE_REGISTRY key
   machineName: string | null;  // DB machine_name; null when source is 'default_rate'
   commodityCode: string | null; // DB commodity_code; null when source is 'default_rate'
   // Labour hour rate from lhr_benchmark_rates for this location + process group.
-  // Already included in hourlyRate (fully burdened) — surfaced for display transparency.
+  //
+  // NOT included in hourlyRate — the two are separate terms in eMithranTerms and
+  // are charged separately. The previous comment here claimed the opposite
+  // ("already included in hourlyRate (fully burdened)"), which is what made
+  // adding it to hourlyRate look like disclosure rather than double counting.
   labourRate?: number | null;
   // Which of resolveLHRRates' 4 passes actually resolved labourRate above —
   // mirrors rateSource's own provenance visibility, for the labor side.
-  labourRateSource?: 'lhr_database' | 'lhr_benchmark' | 'lhr_cross_location' | 'no_lhr_rate' | 'mhr_machine_specific' | null;
+  labourRateSource?: LhrRateSource | null;
   // Physics-based selection result (recommendation + alternatives + profiles).
   // Attached by BOMItemsService when ENABLE_PHYSICS_MACHINE_SELECTION is on.
   machineSelection?: MachineSelectionResult;
@@ -370,7 +421,7 @@ export interface CostSummaryDto {
   // See CostStatus's own doc comment. Optional on the same convention as
   // currency/toUsdRate below — the per-family engines (cost-engine.ts,
   // cost-cnc-engine.ts, cost-injection-molding-engine.ts) build this DTO
-  // before normalizeCostSummaryToUsd fills it in; always present by the time
+  // before normalizeCostSummaryToCurrency fills it in; always present by the time
   // a getCostSummary response reaches a caller.
   costStatus?: CostStatus;
   // Process names with an unresolved physicsGap, when costStatus is
@@ -500,4 +551,19 @@ export interface ToolingCostDto {
   moldCostPerPartUsd: number;
   annualVolume: number;
   productionLifeYears: number;
+}
+
+/**
+ * What the cost-summary endpoint returns: an engine result plus the costing
+ * inputs it was computed at.
+ *
+ * Deliberately a separate type rather than a field on CostSummaryDto. The
+ * engines (cost-engine, cost-cnc-engine, cost-injection-molding-engine) build a
+ * CostSummaryDto from parameters they are handed; they never perform input
+ * resolution and have nothing truthful to put in this field. Only the service
+ * entry point that called resolveCostingInputs does, so only it can widen an
+ * engine result into a response — which is exactly what the type says.
+ */
+export interface CostSummaryResponseDto extends CostSummaryDto {
+  resolvedInputs: ResolvedCostingInputsDto;
 }

@@ -6,7 +6,7 @@ import {
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult, TurretPunchMachineParams } from '../../shared/core/manufacturing-process.types';
-import { r2, noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
+import { r2, noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
 export interface TurretPunchInput {
@@ -92,10 +92,18 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
 
   const totalSec = punchingSec + toolChangeSec + nibblingSec;
   const cuttingMin = totalSec / 60;
-  if (input.setupMin == null) {
-    warnings.push("Turret: setup time from fallback — seed sm_lookup_op_setup_time for 'turret_punch'");
-  }
-  const setupMin = input.setupMin ?? TURRET_SETUP_MIN;
+  // Real setup time, most-specific real source first: this machine's own
+  // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
+  // row, then the cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: "Turret Punching",
+    machineSetupTimeHr: rate.setupTimeHr,
+    operationSetupMin: input.setupMin,
+    classDefaultMin: TURRET_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  const setupMin = setup.setupMin;
+  if (setup.warning) warnings.push(setup.warning);
 
   const t = eMithranTerms({
     mhrPerHr: rate.rate,
@@ -117,6 +125,8 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
     buildCuttingProcessLine({
       process: "Turret Punching",
       processIdentity: input.processIdentity,
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: t.setupCost,
       runCost: t.machineCost + t.laborCost,
       totalCost: t.total,
@@ -160,6 +170,7 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
 export class TurretPunchEngine extends BaseCuttingEngine {
   readonly machineClass = 'turret_punch';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Turret Punching';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     const result = computeTurretPunchCost({

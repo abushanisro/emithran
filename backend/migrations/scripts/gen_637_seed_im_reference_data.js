@@ -50,6 +50,26 @@ function sqlJsonb(obj) {
   return `$jsonb$${JSON.stringify(obj)}$jsonb$::jsonb`;
 }
 
+// The real source JSON carries its original tool's name inside a handful of
+// free-text fields/values it never touches functionally (variable
+// descriptions, one named strategy value) — per this project's standing
+// rule (never name the licensed third-party reference-data source in code,
+// comments, migrations, or DB values), every string is sanitized to a
+// neutral "eMithran" label before staging. Does NOT touch the source
+// file's own top-level JSON key names below (digitalFactory_aPrioriUSA) —
+// those must stay as-is to correctly read the real file; only the
+// generated `notes` text mentioning that key name is reworded.
+function sanitize(v) {
+  if (typeof v === 'string') return v.replace(/aPriori/g, 'eMithran');
+  if (Array.isArray(v)) return v.map(sanitize);
+  if (v && typeof v === 'object') {
+    const out = {};
+    for (const [k, val] of Object.entries(v)) out[k] = sanitize(val);
+    return out;
+  }
+  return v;
+}
+
 const rows = [];
 
 // ── category = 'variable' ────────────────────────────────────────────────
@@ -58,10 +78,10 @@ for (const v of varsData.digitalFactoryVariables) {
   rows.push({
     category: 'variable',
     key: v.variableName,
-    value: v.stringValue,
+    value: sanitize(v.stringValue),
     unit_type: v.unitTypeName || null,
-    notes: v.notes || null,
-    raw: v,
+    notes: sanitize(v.notes || null),
+    raw: sanitize(v),
   });
 }
 
@@ -75,8 +95,8 @@ for (const [field, val] of Object.entries(settings)) {
     key: field,
     value: String(val),
     unit_type: null,
-    notes: `From the "${settings.name}" rate profile (digitalFactory_aPrioriUSA.settings).`,
-    raw: { profileName: settings.name, field, value: val },
+    notes: `From the "${settings.name}" rate profile (eMithran USA settings).`,
+    raw: sanitize({ profileName: settings.name, field, value: val }),
   });
 }
 
@@ -89,7 +109,7 @@ for (const m of toolMaterials) {
     value: m.materialCostUsdPerKg != null ? String(m.materialCostUsdPerKg) : null,
     unit_type: 'Currency/kg',
     notes: `${m.materialTypeName} tool/mold material — hardness ${m.hardness}, machinability index ${m.machinabilityIndex}.`,
-    raw: m,
+    raw: sanitize(m),
   });
 }
 

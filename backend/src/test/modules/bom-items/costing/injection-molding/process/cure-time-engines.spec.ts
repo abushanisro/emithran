@@ -26,13 +26,34 @@ const realMachineRate = (machineClass: string): MHRRateInput => ({
   setupTimeHr: 1.0,    // real per-machine setup, hours
 });
 
-const noDataMachineRate = (machineClass: string): MHRRateInput => ({
+// A REAL, selected machine that simply has no press_cycle_time_s on file.
+// This is a genuine case: migration 608 records 19 real press-family machines
+// (Aida x7, Bliss B-35, Niagara E511B, the Progressive Die placeholders) with
+// no press_cycle_time_s anywhere in the staged data.
+//
+// machineName is deliberately a real name. The previous version of this fixture
+// set machineName:null AND pressCycleTimeS:null together, which conflated two
+// different failures -- "a machine was selected but its cycle time is unknown"
+// and "no machine was selected at all". press-stroke-engine.ts now reports
+// those separately (the second cannot be a missing-press_cycle_time_s problem,
+// because there is no machine to be missing it), so the fixture has to pick one.
+const noCycleTimeMachineRate = (machineClass: string): MHRRateInput => ({
+  rate: 1200,
+  source: 'mhr_database',
+  machineClass,
+  machineName: 'Real Test Machine',
+  commodityCode: null,
+  pressCycleTimeS: null, // no real cycle-time data on file for this machine
+});
+
+// Nothing passed the capability check, so selection returned no machine.
+const noMachineSelectedRate = (machineClass: string): MHRRateInput => ({
   rate: 1200,
   source: 'default_rate',
   machineClass,
   machineName: null,
   commodityCode: null,
-  pressCycleTimeS: null, // no real cycle-time data on file for this machine
+  pressCycleTimeS: null,
 });
 
 describe('computeCompressionMoldingCost — real cure-time folding', () => {
@@ -70,7 +91,7 @@ describe('computeCompressionMoldingCost — real cure-time folding', () => {
     const result = computeCompressionMoldingCost({
       batchSize: 100,
       partWeightKg: 0.5,
-      rate: noDataMachineRate('compression_molding'),
+      rate: noCycleTimeMachineRate('compression_molding'),
       cureTimeMinFromMaterial: 4,
     });
     expect(result.cuttingMin).toBe(0);
@@ -78,6 +99,23 @@ describe('computeCompressionMoldingCost — real cure-time folding', () => {
     // This engine's own cure-time disclosure is gated on pressCycleTimeS != null —
     // it must not add a second, confusing warning when the base $0 warning already covers it.
     expect(result.warnings.some((w) => w.toLowerCase().includes('cure time') || w.toLowerCase().includes('cure-time'))).toBe(false);
+  });
+
+  it('no machine selected at all -> reports the capability gap, not a missing press_cycle_time_s', () => {
+    // The distinction this asserts is the whole point of the split above: when
+    // selection returns nothing, blaming absent press_cycle_time_s sends the
+    // reader to the wrong table. Observed for real on tandem_press, where all
+    // four USA rows DID carry a real press_cycle_time_s and the actual cause was
+    // a zero thickness capability rejecting every candidate (migration 713).
+    const result = computeCompressionMoldingCost({
+      batchSize: 100,
+      partWeightKg: 0.5,
+      rate: noMachineSelectedRate('compression_molding'),
+      cureTimeMinFromMaterial: 4,
+    });
+    expect(result.cuttingMin).toBe(0);
+    expect(result.warnings.some((w) => w.includes('no capable machine on file for this part'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('no real press_cycle_time_s on file'))).toBe(false);
   });
 });
 

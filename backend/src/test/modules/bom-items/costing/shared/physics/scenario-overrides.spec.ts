@@ -1,6 +1,7 @@
 import {
   resolveEffective, resolveEffectiveSheetThicknessMm,
   resolveScenarioCurrency, resolveScenarioFxSnapshot, resolveScenarioAskPrice,
+  resolveScenarioBatchSize, resolveScenarioLocation, resolveScenarioProductionLifeYears,
 } from '../../../../../../modules/bom-items/costing/shared/physics/scenario-overrides';
 
 describe('resolveEffective', () => {
@@ -99,5 +100,54 @@ describe('resolveScenarioAskPrice', () => {
   it('allows a zero ask price (not yet quoted) without treating it as absent', () => {
     expect(resolveScenarioAskPrice({ askPrice: { amount: 0, currency: 'USD' } }))
       .toEqual({ amount: 0, currency: 'USD' });
+  });
+});
+
+// ── Costing-input readers ─────────────────────────────────────────────────────
+// Readers only: they hold NO defaults. Every one returns null for an absent or
+// malformed key so the canonical resolver (costing-inputs.ts) owns the chain.
+
+describe('resolveScenarioBatchSize', () => {
+  it('reads a persisted batch size', () => {
+    expect(resolveScenarioBatchSize({ batchSize: 100000 })).toBe(100000);
+  });
+  it('returns null when unset, so the resolver decides — never a built-in fallback', () => {
+    expect(resolveScenarioBatchSize({})).toBeNull();
+    expect(resolveScenarioBatchSize(undefined)).toBeNull();
+    expect(resolveScenarioBatchSize(null)).toBeNull();
+  });
+  it('ignores a non-numeric or sub-1 value rather than costing on garbage', () => {
+    expect(resolveScenarioBatchSize({ batchSize: 'lots' as any })).toBeNull();
+    expect(resolveScenarioBatchSize({ batchSize: 0 })).toBeNull();
+    expect(resolveScenarioBatchSize({ batchSize: -10 })).toBeNull();
+  });
+  it('floors a fractional batch — parts are whole', () => {
+    expect(resolveScenarioBatchSize({ batchSize: 250.7 })).toBe(250);
+  });
+});
+
+describe('resolveScenarioLocation', () => {
+  it('reads and trims a persisted location', () => {
+    expect(resolveScenarioLocation({ location: ' India ' })).toBe('India');
+  });
+  it('returns null for absent or blank rather than defaulting to a country', () => {
+    expect(resolveScenarioLocation({})).toBeNull();
+    expect(resolveScenarioLocation({ location: '   ' })).toBeNull();
+    expect(resolveScenarioLocation({ location: 42 as any })).toBeNull();
+  });
+});
+
+describe('resolveScenarioProductionLifeYears', () => {
+  it('reads a persisted production life', () => {
+    expect(resolveScenarioProductionLifeYears({ productionLifeYears: 10 })).toBe(10);
+  });
+  it('returns null when unset, leaving the canonical default to the resolver', () => {
+    expect(resolveScenarioProductionLifeYears({})).toBeNull();
+    expect(resolveScenarioProductionLifeYears(null)).toBeNull();
+  });
+  it('ignores a non-positive or non-numeric value', () => {
+    expect(resolveScenarioProductionLifeYears({ productionLifeYears: 0 })).toBeNull();
+    expect(resolveScenarioProductionLifeYears({ productionLifeYears: -3 })).toBeNull();
+    expect(resolveScenarioProductionLifeYears({ productionLifeYears: 'five' as any })).toBeNull();
   });
 });

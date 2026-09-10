@@ -41,7 +41,14 @@ function humanizeMachineClass(machineClass: string): string {
 // Machining/Injection Molding legacy rows) — and even then, resolves it to a
 // verified real category or at least a properly-cased name rather than the
 // raw internal slug.
-export function mhrCategoryOf(record: { machineClass?: string; benchmarkSourceKey?: string }): string {
+// Params accept `| undefined` explicitly (not just optional) so a row typed
+// from an API response — where every nullable column is `string | undefined` —
+// can be passed straight in under exactOptionalPropertyTypes, instead of each
+// caller having to re-shape the row first.
+export function mhrCategoryOf(record: {
+  machineClass?: string | undefined;
+  benchmarkSourceKey?: string | undefined;
+}): string {
   const fromBenchmarkKey = record.benchmarkSourceKey?.split(':')[0]?.trim();
   if (fromBenchmarkKey) return fromBenchmarkKey;
   if (!record.machineClass) return '-';

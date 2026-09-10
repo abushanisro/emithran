@@ -100,7 +100,7 @@ describe('computePlasmaCutCost — direct labour cost', () => {
     const line = result.processLines[0]!;
 
     expect(line.labourRate).toBeNull();
-    expect(line.runCost).toBeCloseTo(Math.round((result.cuttingMin / 60) * 60 * 100) / 100, 5);
+    expect(line.runCost).toBeCloseTo((result.cuttingMin / 60) * 60, 5);
   });
 });
 

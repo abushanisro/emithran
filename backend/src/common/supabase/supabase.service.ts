@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class SupabaseService {
+  private readonly logger = new Logger(SupabaseService.name);
   private supabaseUrl: string;
   private supabaseAnonKey: string;
   private supabaseServiceKey: string;
@@ -16,7 +17,7 @@ export class SupabaseService {
     this.supabaseServiceKey = this.configService.get<string>('SUPABASE_SERVICE_KEY') || '';
 
     if (!this.supabaseUrl || !this.supabaseAnonKey || !this.supabaseServiceKey) {
-      console.error('❌ Supabase Configuration Missing - cannot create admin client');
+      this.logger.error('❌ Supabase Configuration Missing - cannot create admin client');
       return;
     }
 
@@ -29,7 +30,7 @@ export class SupabaseService {
         },
       });
     } catch (error) {
-      console.error('❌ Failed to create Supabase admin client:', error);
+      this.logger.error('❌ Failed to create Supabase admin client:', error);
     }
   }
 
@@ -104,7 +105,7 @@ export class SupabaseService {
             error.message?.includes('fetch failed') ||
             error.message?.includes('network error');
             
-          console.warn(`Supabase fetch attempt ${attempt} failed:`, {
+          this.logger.warn(`Supabase fetch attempt ${attempt} failed:`, {
             error: error.message,
             code: error.code,
             retryable: isRetryableError
@@ -150,22 +151,61 @@ export class SupabaseService {
   }
 
   /**
-   * Get admin user ID by email for development
+   * The user id the development auth bypass acts as, looked up by email.
+   *
+   * The email was hardcoded to 'emuski@mithran.com', which matches no account
+   * in this project — so this always returned null, the guard substituted the
+   * literal string 'admin-fallback' as the user id, and every write carrying it
+   * into a uuid column failed. Confirmed live: an apply-route call failed with
+   * `invalid input syntax for type uuid: "admin-fallback"`.
+   *
+   * Now configurable via ADMIN_FALLBACK_EMAIL, defaulting to the previous
+   * literal so behaviour is unchanged where that account does exist. When the
+   * address matches nothing the failure is logged explicitly, because the
+   * consequence — an id that cannot be persisted — is not obvious from the
+   * symptom it produces further downstream.
    */
+  /**
+   * The account the development auth bypass acts as, from ADMIN_FALLBACK_EMAIL.
+   *
+   * No default: the address that used to be hardcoded here matched no account in
+   * this project, so the lookup silently failed on every call. Deliberately not
+   * replaced with one of the real accounts either — which identity a bypass
+   * assumes is deployment configuration, not something source should decide.
+   */
+  getAdminFallbackEmail(): string | null {
+    return this.configService.get<string>('ADMIN_FALLBACK_EMAIL')?.trim() || null;
+  }
+
   async getAdminUserId(): Promise<string | null> {
+    const adminEmail = this.getAdminFallbackEmail();
+    if (!adminEmail) {
+      this.logger.warn(
+        'ADMIN_FALLBACK_EMAIL is not set — the development auth bypass has no account to act as. ' +
+        'Requests without a bearer token will be rejected.',
+      );
+      return null;
+    }
     try {
       const { data: users, error } = await this.adminClient.auth.admin.listUsers();
-      
+
       if (error) {
-        console.warn('Failed to get admin user ID:', error.message);
+        this.logger.warn('Failed to get admin user ID:', error.message);
         return null;
       }
 
-      const adminUser = users?.users?.find(user => user.email === 'emuski@mithran.com');
+      const adminUser = users?.users?.find(user => user.email === adminEmail);
+      if (!adminUser) {
+        this.logger.warn(
+          `No account matches ADMIN_FALLBACK_EMAIL '${adminEmail}' — the development auth bypass ` +
+          `has no real user id to act as, so any write that persists a user id will be rejected. ` +
+          `Set ADMIN_FALLBACK_EMAIL to a real account, or send a bearer token.`,
+        );
+      }
       return adminUser?.id || null;
     } catch (error: any) {
       const msg = error?.cause?.code ?? error?.message ?? 'unknown';
-      console.warn('Failed to get admin user ID:', msg);
+      this.logger.warn('Failed to get admin user ID:', msg);
       return null;
     }
   }
@@ -190,7 +230,7 @@ export class SupabaseService {
    */
   async reloadSchemaCache(): Promise<boolean> {
     if (!this.supabaseUrl || !this.supabaseServiceKey) {
-      console.warn('Supabase not configured - cannot reload schema cache');
+      this.logger.warn('Supabase not configured - cannot reload schema cache');
       return false;
     }
     
@@ -216,15 +256,16 @@ export class SupabaseService {
       const { error } = await this.adminClient.rpc('pgrst_reload_config');
       
       if (error && !error.message.includes('function "pgrst_reload_config" does not exist')) {
-        console.error('Failed to reload schema cache:', error);
+        this.logger.error('Failed to reload schema cache:', error);
         return false;
       }
 
-      console.log('Schema cache reload triggered successfully');
+      this.logger.log('Schema cache reload triggered successfully');
       return true;
     } catch (error) {
-      console.error('Error reloading schema cache:', error);
+      this.logger.error('Error reloading schema cache:', error);
       return false;
     }
   }
 }
+

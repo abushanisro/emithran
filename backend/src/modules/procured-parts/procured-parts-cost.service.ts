@@ -13,6 +13,7 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { declareCostRecordCurrency } from '../bom-items/costing/shared/core/persisted-currency-contract';
 import {
   CreateProcuredPartsCostDto,
   UpdateProcuredPartsCostDto,
@@ -142,7 +143,18 @@ export class ProcuredPartsCostService {
         duty_cost: dto.dutyCost || 0,
         moq: dto.moq,
         lead_time_days: dto.leadTimeDays,
-        currency: dto.currency || 'USD',
+        // Currency provenance (migration 708, P1b-i). This is the one producer
+        // whose caller can actually state a currency, so a supplied
+        // dto.currency is a real declaration and the row is marked accordingly.
+        // When it is absent the stored value stays 'USD' exactly as before --
+        // behaviour unchanged -- but the row is marked unverified, because
+        // `dto.currency || 'USD'` makes a stored USD indistinguishable from a
+        // defaulted one after the fact. Live data shows why that matters: both
+        // existing rows are INR.
+        ...declareCostRecordCurrency({
+          declaredCurrency: dto.currency,
+          storedCurrencyFallback: 'USD',
+        }),
         cost_breakdown: dto.costBreakdown || {},
         notes: dto.notes,
         is_active: dto.isActive !== undefined ? dto.isActive : true,
@@ -197,7 +209,17 @@ export class ProcuredPartsCostService {
     if (dto.dutyCost !== undefined) updateData.duty_cost = dto.dutyCost;
     if (dto.moq !== undefined) updateData.moq = dto.moq;
     if (dto.leadTimeDays !== undefined) updateData.lead_time_days = dto.leadTimeDays;
-    if (dto.currency !== undefined) updateData.currency = dto.currency;
+    // Re-declare provenance whenever the currency changes, never the currency
+    // alone. ck_ppcr_currency_traceable requires a 'local' row to have
+    // currency = cost_currency_local, so updating one without the other would
+    // either violate the constraint or silently leave a row claiming it holds
+    // a currency it no longer holds.
+    if (dto.currency !== undefined) {
+      Object.assign(updateData, declareCostRecordCurrency({
+        declaredCurrency: dto.currency,
+        storedCurrencyFallback: dto.currency,
+      }));
+    }
     if (dto.costBreakdown !== undefined) updateData.cost_breakdown = dto.costBreakdown;
     if (dto.notes !== undefined) updateData.notes = dto.notes;
     if (dto.isActive !== undefined) updateData.is_active = dto.isActive;

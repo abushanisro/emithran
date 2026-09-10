@@ -2,7 +2,7 @@ import { LASER_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/default-ra
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost, PhysicsGap, ConfidenceLevel } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
-import { noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
+import { noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
 export interface LaserCuttingInput {
@@ -75,10 +75,18 @@ export function computeLaserCuttingCost(input: LaserCuttingInput): LaserCuttingR
   }
   const cuttingMin = totalLaserSec / 60;
   const rate = input.laserRate ?? noRateFallback("fiber_laser");
-  if (input.setupMin == null) {
-    warnings.push("Laser: setup time from fallback — seed sm_lookup_op_setup_time for 'laser'");
-  }
-  const setupMin = input.setupMin ?? LASER_SETUP_MIN;
+  // Real setup time, most-specific real source first: this machine's own
+  // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
+  // row, then the cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: "Laser Cutting",
+    machineSetupTimeHr: rate.setupTimeHr,
+    operationSetupMin: input.setupMin,
+    classDefaultMin: LASER_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  const setupMin = setup.setupMin;
+  if (setup.warning) warnings.push(setup.warning);
 
   // eMithranTerms() — the platform's one real cost-composition core (Phase 1,
   // engine registry unification). Same formula, same call shape as every
@@ -106,6 +114,8 @@ export function computeLaserCuttingCost(input: LaserCuttingInput): LaserCuttingR
       buildCuttingProcessLine({
         process: "Laser Cutting",
         processIdentity: input.processIdentity,
+        setupTimeMin: setup.setupMin,
+        setupTimeSource: setup.source,
         setupCost: t.setupCost,
         runCost: t.machineCost + t.laborCost,
         totalCost: t.total,
@@ -130,6 +140,7 @@ export function computeLaserCuttingCost(input: LaserCuttingInput): LaserCuttingR
 export class LaserCuttingEngine extends BaseCuttingEngine {
   readonly machineClass = 'fiber_laser';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Laser Cutting';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     const result = computeLaserCuttingCost({
@@ -172,6 +183,7 @@ export class LaserCuttingEngine extends BaseCuttingEngine {
 export class Co2LaserCuttingEngine extends BaseCuttingEngine {
   readonly machineClass = 'co2_laser';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Laser Cutting';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     const result = computeLaserCuttingCost({
@@ -200,3 +212,89 @@ export class Co2LaserCuttingEngine extends BaseCuttingEngine {
     return { ...result, abrasiveCost: 0 };
   }
 }
+
+// Root-caused 2026-09-10, confirmed directly by the user: "Fiber Laser
+// Cutting Machine" (26), "Laser Cutting Machine" (24) and "3D Laser Cutting
+// Machine" (15) are three real, separately-specced Digital Factory machine
+// pools, but only two registered engines existed (fiber_laser, co2_laser),
+// so the other two real pools had no distinct route of their own — see
+// default-rates.constants.ts's laser_cut/laser_3d MACHINE_REGISTRY entries
+// for the full history, including why this does not conflict with migration
+// 715's "Laser Cut" operation-name dedup (a calculator/formula choice, not a
+// machine-pool claim).
+//
+// Same real cost formula as every other laser-technology engine above —
+// computeLaserCuttingCost has no technology-specific assumption baked in, so
+// this engine's only job is to exist as a real, registered candidate for
+// machine-selection/route-comparison to find a laser_cut-classed machine
+// through, never a second cost formula.
+export class LaserCutEngine extends BaseCuttingEngine {
+  readonly machineClass = 'laser_cut';
+  readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Laser Cutting';
+
+  computeCost(context: CuttingProcessContext): CuttingProcessResult {
+    const result = computeLaserCuttingCost({
+      cutLengthMm: context.cutLengthMm,
+      pierceCount: context.pierceCount,
+      batchSize: context.batchSize,
+      grade: context.grade,
+      laserRate: context.rate,
+      sheetThicknessMm: context.sheetThicknessMm,
+      cuttingSecFromCalculator: context.cuttingSecFromCalculator,
+      calculatorId: context.calculatorId,
+      calculatorVersion: context.calculatorVersion,
+      physicsGap: context.physicsGap,
+      confidence: context.confidence,
+      processIdentity: context.processIdentity,
+      setupMin: context.opSetupMin,
+      dlrPerHr: context.dlrPerHr,
+      qairPerHr: context.qairPerHr,
+      inspTimeMin: context.inspTimeMin,
+      samplingRate: context.samplingRate,
+      yieldPct: context.yieldPct,
+      netMatCost: context.netMatCost,
+      netWeightKg: context.netWeightKg,
+      scrapPricePerKg: context.scrapPricePerKg,
+    });
+    return { ...result, abrasiveCost: 0 };
+  }
+}
+
+// 3D/tube/5-axis laser cutting — see default-rates.constants.ts's laser_3d
+// entry for why this is a genuinely separate real class, not a keyword
+// variant of fiber_laser. Same real cost formula; see LaserCutEngine's own
+// comment above for why that is correct, not a shortcut.
+export class ThreeDLaserCuttingEngine extends BaseCuttingEngine {
+  readonly machineClass = 'laser_3d';
+  readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Laser Cutting';
+
+  computeCost(context: CuttingProcessContext): CuttingProcessResult {
+    const result = computeLaserCuttingCost({
+      cutLengthMm: context.cutLengthMm,
+      pierceCount: context.pierceCount,
+      batchSize: context.batchSize,
+      grade: context.grade,
+      laserRate: context.rate,
+      sheetThicknessMm: context.sheetThicknessMm,
+      cuttingSecFromCalculator: context.cuttingSecFromCalculator,
+      calculatorId: context.calculatorId,
+      calculatorVersion: context.calculatorVersion,
+      physicsGap: context.physicsGap,
+      confidence: context.confidence,
+      processIdentity: context.processIdentity,
+      setupMin: context.opSetupMin,
+      dlrPerHr: context.dlrPerHr,
+      qairPerHr: context.qairPerHr,
+      inspTimeMin: context.inspTimeMin,
+      samplingRate: context.samplingRate,
+      yieldPct: context.yieldPct,
+      netMatCost: context.netMatCost,
+      netWeightKg: context.netWeightKg,
+      scrapPricePerKg: context.scrapPricePerKg,
+    });
+    return { ...result, abrasiveCost: 0 };
+  }
+}
+

@@ -207,8 +207,10 @@ export class ProcessCostCalculationEngine {
       throw new Error(`Heads must be between ${validation.HEADS.MIN} and ${validation.HEADS.MAX}`);
     }
 
-    if (input.cycleTime < validation.CYCLE_TIME.MIN || input.cycleTime > validation.CYCLE_TIME.MAX) {
-      throw new Error(`Cycle Time must be between ${validation.CYCLE_TIME.MIN} and ${validation.CYCLE_TIME.MAX} seconds`);
+    if (input.cycleTime <= validation.CYCLE_TIME.EXCLUSIVE_MIN || input.cycleTime > validation.CYCLE_TIME.MAX) {
+      throw new Error(
+        `Cycle Time must be greater than ${validation.CYCLE_TIME.EXCLUSIVE_MIN} and at most ${validation.CYCLE_TIME.MAX} seconds (received ${input.cycleTime})`,
+      );
     }
 
     if (input.partsPerCycle < validation.PARTS_PER_CYCLE.MIN || input.partsPerCycle > validation.PARTS_PER_CYCLE.MAX) {

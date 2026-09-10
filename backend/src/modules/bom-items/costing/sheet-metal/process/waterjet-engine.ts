@@ -8,7 +8,7 @@ import {
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
-import { r2, noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
+import { r2, noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
 export interface WaterjetInput {
@@ -112,10 +112,18 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
     (cuttingSec / 60) * abrasiveKgPerMin * abrasivePricePerKg,
   );
 
-  if (input.setupMin == null) {
-    warnings.push("Waterjet: setup time from fallback — seed sm_lookup_op_setup_time for 'waterjet'");
-  }
-  const setupMin = input.setupMin ?? WATERJET_SETUP_MIN;
+  // Real setup time, most-specific real source first: this machine's own
+  // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
+  // row, then the cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: "Waterjet Cutting",
+    machineSetupTimeHr: rate.setupTimeHr,
+    operationSetupMin: input.setupMin,
+    classDefaultMin: WATERJET_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  const setupMin = setup.setupMin;
+  if (setup.warning) warnings.push(setup.warning);
 
   const t = eMithranTerms({
     mhrPerHr: rate.rate,
@@ -137,6 +145,8 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
     buildCuttingProcessLine({
       process: "Waterjet Cutting",
       processIdentity: input.processIdentity,
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: t.setupCost,
       runCost: t.machineCost + t.laborCost,
       totalCost: t.total,
@@ -180,6 +190,7 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
 export class WaterjetEngine extends BaseCuttingEngine {
   readonly machineClass = 'waterjet';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Waterjet Cutting';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     return computeWaterjetCost({

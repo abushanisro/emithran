@@ -1,4 +1,4 @@
-import { computeNesting, resolveNestingDimensions, isTrueNestCostingCacheValid, computeMassBasedUtilizationPct, resolveProcessPartSpacingMm, computePartAllowanceMm } from '../../../../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
+import { computeNesting, resolveNestingDimensions, isTrueNestCostingCacheValid, trueNestInputFingerprint, computeMassBasedUtilizationPct, resolveProcessPartSpacingMm, computePartAllowanceMm } from '../../../../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
 
 describe('resolveProcessPartSpacingMm — real per-process nesting spacing (closeout Plan Phase 3)', () => {
   it('matches thickness 1:1 for fiber_laser, up to the 50mm cap', () => {
@@ -256,5 +256,89 @@ describe('computeMassBasedUtilizationPct — regression for the true-nest costin
     expect(computeMassBasedUtilizationPct(5, 1)).toBe(100);
     expect(computeMassBasedUtilizationPct(0, 10)).toBe(0);
     expect(computeMassBasedUtilizationPct(10, 0)).toBe(0);
+  });
+});
+
+// ── trueNestInputFingerprint ─────────────────────────────────────────────────
+//
+// Root-caused 2026-09-09 from a live hang: route-comparison and cost-summary
+// both resolve the true-shape nest, and an uncached resolve walks all 5
+// STANDARD_SHEETS sequentially against cad-engine's single-threaded /nest at
+// 13-30s per sheet. The cache that avoids this lived in featureGraph.summary,
+// which Reanalyze rebuilds from scratch — so every Reanalyze threw away a
+// perfectly valid result and the next page load hung until the client gave up.
+//
+// The cache can only be carried across a Reanalyze if validity is tied to the
+// geometry rather than to the accident of the summary being rewritten. This
+// fingerprint is that tie.
+describe('trueNestInputFingerprint — ties a cached nest to the geometry it came from', () => {
+  const base = {
+    outlinePointsMm: [[0, 0], [100, 0], [100, 50], [0, 50]],
+    holesMm: [{ x: 20, y: 20, d: 4.2 }],
+    thicknessMm: 1.5,
+    densityKgM3: 7850,
+    netWeightKg: 0.0239,
+  };
+
+  it('is stable for identical geometry — a no-op Reanalyze keeps its cache', () => {
+    expect(trueNestInputFingerprint(base)).toBe(trueNestInputFingerprint({ ...base }));
+  });
+
+  it('ignores floating-point noise below 0.01mm from an identical re-extraction', () => {
+    const noisy = { ...base, outlinePointsMm: [[0, 0], [100.000000003, 0], [100, 50], [0, 50]] };
+    expect(trueNestInputFingerprint(noisy)).toBe(trueNestInputFingerprint(base));
+  });
+
+  it('changes when the outline really changes', () => {
+    const bigger = { ...base, outlinePointsMm: [[0, 0], [120, 0], [120, 50], [0, 50]] };
+    expect(trueNestInputFingerprint(bigger)).not.toBe(trueNestInputFingerprint(base));
+  });
+
+  it('changes when holes, thickness, density or net weight change', () => {
+    for (const changed of [
+      { ...base, holesMm: [{ x: 20, y: 20, d: 8.0 }] },
+      { ...base, thicknessMm: 2.0 },
+      { ...base, densityKgM3: 2700 },
+      { ...base, netWeightKg: 0.0400 },
+    ]) {
+      expect(trueNestInputFingerprint(changed)).not.toBe(trueNestInputFingerprint(base));
+    }
+  });
+
+  it('does not depend on key order, which re-extraction does not guarantee', () => {
+    const reordered = { ...base, holesMm: [{ d: 4.2, y: 20, x: 20 }] };
+    expect(trueNestInputFingerprint(reordered)).toBe(trueNestInputFingerprint(base));
+  });
+});
+
+describe('isTrueNestCostingCacheValid — fingerprint gate', () => {
+  const cache = {
+    sheetWidthMm: 1250, sheetLengthMm: 2500, kerfMm: 0.56, edgeMarginMm: 2,
+    partsPerSheet: 1079, utilizationPct: 73.8, sheetWeightKg: 36.8,
+    grossWeightPerPartKg: 0.0341, inputFingerprint: 'abc123-4f',
+  };
+
+  it('reuses a cache written from the same geometry', () => {
+    expect(isTrueNestCostingCacheValid(cache, 0.56, 2, 'abc123-4f')).toBe(true);
+  });
+
+  it('refuses a cache written from different geometry', () => {
+    expect(isTrueNestCostingCacheValid(cache, 0.56, 2, 'different-99')).toBe(false);
+  });
+
+  // Carrying the cache across Reanalyze is only safe if a pre-fingerprint entry
+  // is refused rather than trusted — it could have been written from any geometry.
+  it('refuses a cache written before fingerprinting existed', () => {
+    const { inputFingerprint, ...legacy } = cache;
+    expect(isTrueNestCostingCacheValid(legacy, 0.56, 2, 'abc123-4f')).toBe(false);
+  });
+
+  it('still honours kerf and edge margin alongside the fingerprint', () => {
+    expect(isTrueNestCostingCacheValid(cache, 1.0, 2, 'abc123-4f')).toBe(false);
+    expect(isTrueNestCostingCacheValid(cache, 0.56, 3, 'abc123-4f')).toBe(false);
+  });
+
+  it('leaves existing callers that pass no fingerprint unchanged', () => {
+    expect(isTrueNestCostingCacheValid(cache, 0.56, 2)).toBe(true);
   });
 });

@@ -325,6 +325,16 @@ export const mhrApi = {
   },
 
   /**
+   * Get distinct real process_group values on file in MHR records — the
+   * direct column, not process_calculator_mappings' is_active-gated list
+   * (those are different concepts: whether a calculator is wired vs.
+   * whether real HR Rates machines exist for that group).
+   */
+  getProcessGroups: async (): Promise<string[]> => {
+    return (await apiClient.get<string[]>('/mhr/process-groups', { silent: true, retry: false })) ?? [];
+  },
+
+  /**
    * Get distinct locations from MHR records
    */
   getLocations: async (): Promise<string[]> => {
@@ -343,6 +353,13 @@ export const mhrApi = {
    */
   getManufacturerCountries: async (): Promise<string[]> => {
     return (await apiClient.get<string[]>('/mhr/manufacturer-countries', { silent: true, retry: false })) ?? [];
+  },
+
+  /**
+   * Get distinct real wage grades from MHR records
+   */
+  getWageGrades: async (): Promise<string[]> => {
+    return (await apiClient.get<string[]>('/mhr/wage-grades', { silent: true, retry: false })) ?? [];
   },
 
   /**

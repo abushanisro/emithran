@@ -52,9 +52,39 @@ export function classifyLaserMaterial(grade: string | null): LaserMaterialFamily
 
   if (has('SS', 'STAINLESS', 'INOX', '304', '316', '321', '410', '430')) return 'SS';
   if (has('AL', 'ALU', 'ALUMINIUM', 'ALUMINUM', '6061', '6063', '5052', '7075', '2024')) return 'AL';
-  if (has('CU', 'COPPER', 'BRASS', 'BRONZE') || /C\s?(110|260)/.test(grade.toUpperCase())) return 'CU';
-  if (has('MS', 'CRCA', 'HRC', 'HR', 'CR', 'SPCC', 'MILD', 'STEEL', '2062', '513') ||
-      /IS\s?(2062|513)|EN\s?(8|1A)|Q\s?235|S\s?(235|355)/.test(grade.toUpperCase())) return 'MS';
+  // CUZN/CW are the EN designations for brass (e.g. CuZn39Pb3 = CW614N, free-
+  // cutting brass). Found by the same audit as the JIS steel gap below: the
+  // sibling classifier normaliseLaserMaterial already matches /BRASS|CUZ|CW/,
+  // so one live BOM grade ("Generic CuZn39Pb3") was Brass for the cut-speed
+  // lookup and OTHER for capability gating at the same time. The letter/digit
+  // tokenizer above splits "CuZn39Pb3" into CUZN / 39 / PB / 3, which is why a
+  // bare 'CU' token never matched it.
+  if (has('CU', 'CUZN', 'COPPER', 'BRASS', 'BRONZE')
+      || /C\s?(110|260)|CU\s?ZN|CW\s?\d{3}/.test(grade.toUpperCase())) return 'CU';
+  // JIS carbon-steel sheet family. SPCC (G3141) was already here; its own
+  // sibling and galvanized grades were not, so real mild steel fell through to
+  // OTHER. Found live: SECC is the most common grade in this deployment (9 of
+  // the 22 BOM items carry it) and classified as OTHER, while CRCA and SPCC --
+  // the same material class -- classified as MS.
+  //
+  //   G3141 cold-rolled:            SPCC, SPCD, SPCE
+  //   G3313 electro-galvanized:     SECC, SECD, SECE   (the zinc-coated G3141 grades)
+  //   G3302 hot-dip galvanized:     SGCC, SGCD
+  //
+  // Sourced, not inferred: the coating does not change the base steel, and the
+  // live raw_materials row for SECC carries uts_mpa 270 / shearing_strength 216
+  // -- mild-steel values, not stainless or aluminium.
+  //
+  // Impact is explainability plus a latent mis-gate, NOT a live cost error:
+  // materialFamily is consumed only through materialThicknessLimit, whose OTHER
+  // branch reads max_thickness_mm before max_thickness_ms_mm (MS reads them the
+  // other way round). No USA machine row currently has both columns set to
+  // different values -- verified, 10 rows have both, 0 disagree -- so the two
+  // paths resolve to the same number today. What the user actually saw was a
+  // capability reason reading "Thickness 1.5 mm (OTHER)" for a mild-steel part.
+  if (has('MS', 'CRCA', 'HRC', 'HR', 'CR', 'MILD', 'STEEL', '2062', '513',
+          'SPCC', 'SPCD', 'SPCE', 'SECC', 'SECD', 'SECE', 'SGCC', 'SGCD') ||
+      /IS\s?(2062|513)|EN\s?(8|1A)|Q\s?235|S\s?(235|355)|DC\s?0[1-6]|E\s?(250|350)/.test(grade.toUpperCase())) return 'MS';
   return 'OTHER';
 }
 
@@ -102,6 +132,58 @@ export interface GenericRequirement {
   kind: 'generic';        // deburring, tapping — no dimensional gate
 }
 
+// Real machine_library.json "Shearing Machine" data is per-material thickness
+// (max_thickness_steel_mm/_stainless_steel_mm/_aluminum_mm/_copper_mm) plus a
+// shear/bed length (shear_length_mm) — no tonnage field at all (unlike
+// press_brake/turret_punch/hole_forming, a shear's rated capacity IS its
+// per-material thickness limit, not a separately-derived force). Same
+// material-family shape as LaserRequirement, reusing classifyLaserMaterial —
+// one classification scheme, not a second one invented for this class.
+export interface ShearRequirement {
+  kind: 'shear';
+  thicknessMm: number;
+  materialFamily: LaserMaterialFamily;
+  materialGrade: string | null;   // raw grade, kept for reasons/diagnostics
+  cutLengthMm: number;            // longest cut (shear operates in straight strokes across the blank)
+}
+
+// Real machine_library.json "Plasma Cutting Machine" data has NO thickness
+// field at all (unlike shear/laser) — only power_watts (100W-100,000W
+// across 13 real machines) and bed_length_mm/bed_width_mm. Thickness
+// feasibility for a given power is already handled, more precisely, by the
+// real per-part nestingCutRate table (sheet-metal-lookup.service.ts's
+// getPlasmaCutParams — nearest-power + nearest-thickness match against real
+// data, honest $0/no-data when nothing matches) at COST time — inventing a
+// second, cruder power→thickness formula here risks disagreeing with that
+// real table. Gate on bed size only (real, sourced); thickness stays
+// informational, not a pass/fail dimension, until a real synchronous
+// power→thickness capability table is sourced.
+export interface PlasmaCutRequirement {
+  kind: 'plasma_cut';
+  bedLengthMm: number;
+  bedWidthMm: number;
+}
+
+// Real machine_library.json "Laser Punch / Punch Press" data is the richest
+// of this backlog: real press_force_kn (a genuine punching-force capacity,
+// unused by laser-punch-engine.ts's own real cost formula — a real,
+// sourced, previously-unused capability gap, not a duplicate of an existing
+// formula), real per-material thickness (max_thickness_steel_mm/
+// _aluminum_mm/_stainless_steel_mm/_copper_mm — same MS/SS/AL/CU shape as
+// shear), and real bed size (max_sheet_length_mm/max_sheet_width_mm).
+// Required tonnage reuses estimateTurretPunchTonnage — the same real
+// shearing-force-through-sheet-metal physics this codebase already
+// validated for turret punching, not a new formula invented for this class.
+export interface LaserPunchRequirement {
+  kind: 'laser_punch';
+  tonnage: number;        // required, incl. no margin (selector applies TONNAGE_MARGIN)
+  thicknessMm: number;
+  materialFamily: LaserMaterialFamily;
+  materialGrade: string | null;
+  bedLengthMm: number;
+  bedWidthMm: number;
+}
+
 // P0.4: turret punch and waterjet used to be assigned the SAME LaserRequirement
 // as fiber/CO2 laser (they're registered in the same sheet_metal_cutting
 // engine family) — meaning ranking checked thickness+bed only, never tonnage,
@@ -138,6 +220,54 @@ export interface InjectionMoldingRequirement {
   partWidthMm: number;           // second bbox dim
 }
 
+// Real machine_library.json "Standard Press"/"Tandem Press"/"Progressive Die
+// Press" data (staged sm_reference_data, migrations 508/585): real
+// press_force_kn, real bed size (max_part_length_mm/_width_mm for Standard/
+// Tandem; press_table_length_mm/_width_mm for Progressive Die — same real
+// quantity, different real field name per source table), and real per-
+// material thickness (all 5 materials for Standard/Tandem; aluminum ONLY for
+// Progressive Die — the source migration's own note discloses the other 4
+// were illegible in the source photos and were never fabricated to fill the
+// gap; this requirement's thickness gate is therefore only meaningfully
+// checked for AL parts on Progressive Die machines, same non-fail-closed
+// ungated-on-null policy as every other class with partial real data).
+// Required tonnage reuses estimateTurretPunchTonnage (the same real
+// shearing-force formula already validated for Turret Punch/Laser Punch)
+// against the part's real blanking perimeter — blanking is the dominant,
+// worst-case tonnage driver for a stamping die. This does NOT separately
+// account for a combined bend+blank hit's true tonnage, or differentiate
+// in-die bending capability from blank-only — no real per-machine die-
+// station/bending-capability data exists anywhere in the sourced reference
+// data to build that distinction from (see CLAUDE.md's Cost checklist,
+// "Press-family... double-charge bending" entry — a separate, disclosed,
+// NOT-fixed gap this requirement does not touch).
+export interface PressRequirement {
+  kind: 'press_forming';
+  tonnage: number;        // required, incl. no margin (selector applies TONNAGE_MARGIN)
+  thicknessMm: number;
+  materialFamily: LaserMaterialFamily;
+  materialGrade: string | null;
+  bedLengthMm: number;
+  bedWidthMm: number;
+}
+
+// Real machine_library.json "2/3/4 Roll Bender" data (staged sm_reference_data,
+// migration 505): real roll_working_length_mm (the roll's real feed-length
+// capacity) and real steel_thickness_mm (mild-steel ONLY — no other real
+// material breakdown exists for this class anywhere in the sourced reference
+// data; a few individual machines additionally carry real min/max_single/
+// multi_pass_diameter_mm fields, inconsistently present across the fleet —
+// not consumed here since a MachineCapability-wide single-pass/multi-pass
+// distinction doesn't exist as a mhr_records column yet, real gap, not
+// fabricated). Thickness gate is therefore only meaningfully checked against
+// mild/carbon steel parts; ungated (non-fail-closed) for anything else or
+// for a machine with no real thickness data on file, same policy as Shear.
+export interface RollBendingRequirement {
+  kind: 'roll_bending';
+  thicknessMm: number;
+  rollLengthMm: number;
+}
+
 export type MachineRequirement =
   | PressBrakeRequirement
   | HoleFormingRequirement
@@ -147,7 +277,12 @@ export type MachineRequirement =
   | VmcRequirement
   | LatheRequirement
   | GenericRequirement
-  | InjectionMoldingRequirement;
+  | InjectionMoldingRequirement
+  | ShearRequirement
+  | PlasmaCutRequirement
+  | LaserPunchRequirement
+  | PressRequirement
+  | RollBendingRequirement;
 
 // ── Requirement builders ──────────────────────────────────────────────────────
 
@@ -235,6 +370,84 @@ export function waterjetRequirement(input: {
     thicknessMm: Math.max(input.thicknessMm, 0),
     bedLengthMm: Math.max(input.bedLengthMm, 0),
     bedWidthMm: Math.max(input.bedWidthMm, 0),
+  };
+}
+
+export function shearRequirement(input: {
+  thicknessMm: number;
+  materialGrade: string | null;
+  cutLengthMm: number;
+}): ShearRequirement {
+  return {
+    kind: 'shear',
+    thicknessMm: Math.max(input.thicknessMm, 0),
+    materialFamily: classifyLaserMaterial(input.materialGrade),
+    materialGrade: input.materialGrade,
+    cutLengthMm: Math.max(input.cutLengthMm, 0),
+  };
+}
+
+export function laserPunchRequirement(input: {
+  cutLengthMm: number;
+  materialShearStrengthMpa: number;
+  thicknessMm: number;
+  materialGrade: string | null;
+  bedLengthMm: number;
+  bedWidthMm: number;
+}): LaserPunchRequirement {
+  const t = Math.max(input.thicknessMm, 0);
+  const tonnage = estimateTurretPunchTonnage(input.materialShearStrengthMpa, t, Math.max(input.cutLengthMm, 0)) ?? 0;
+  return {
+    kind: 'laser_punch',
+    tonnage,
+    thicknessMm: t,
+    materialFamily: classifyLaserMaterial(input.materialGrade),
+    materialGrade: input.materialGrade,
+    bedLengthMm: Math.max(input.bedLengthMm, 0),
+    bedWidthMm: Math.max(input.bedWidthMm, 0),
+  };
+}
+
+export function plasmaCutRequirement(input: {
+  bedLengthMm: number;
+  bedWidthMm: number;
+}): PlasmaCutRequirement {
+  return {
+    kind: 'plasma_cut',
+    bedLengthMm: Math.max(input.bedLengthMm, 0),
+    bedWidthMm: Math.max(input.bedWidthMm, 0),
+  };
+}
+
+export function pressFormingRequirement(input: {
+  cutLengthMm: number;
+  materialShearStrengthMpa: number;
+  thicknessMm: number;
+  materialGrade: string | null;
+  bedLengthMm: number;
+  bedWidthMm: number;
+}): PressRequirement {
+  const t = Math.max(input.thicknessMm, 0);
+  const tonnage = estimateTurretPunchTonnage(input.materialShearStrengthMpa, t, Math.max(input.cutLengthMm, 0)) ?? 0;
+  return {
+    kind: 'press_forming',
+    tonnage,
+    thicknessMm: t,
+    materialFamily: classifyLaserMaterial(input.materialGrade),
+    materialGrade: input.materialGrade,
+    bedLengthMm: Math.max(input.bedLengthMm, 0),
+    bedWidthMm: Math.max(input.bedWidthMm, 0),
+  };
+}
+
+export function rollBendingRequirement(input: {
+  thicknessMm: number;
+  rollLengthMm: number;
+}): RollBendingRequirement {
+  return {
+    kind: 'roll_bending',
+    thicknessMm: Math.max(input.thicknessMm, 0),
+    rollLengthMm: Math.max(input.rollLengthMm, 0),
   };
 }
 

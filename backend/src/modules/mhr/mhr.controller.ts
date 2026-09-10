@@ -48,6 +48,12 @@ export class MHRController {
     return this.mhrService.getDistinctCategories(token, processGroup || undefined);
   }
 
+  @Get('process-groups')
+  @ApiOperation({ summary: 'Get distinct real process_group values on file in MHR records' })
+  async getProcessGroups(@AccessToken() token: string): Promise<string[]> {
+    return this.mhrService.getDistinctProcessGroups(token);
+  }
+
   @Get('locations')
   @ApiOperation({ summary: 'Get distinct locations from MHR records' })
   async getLocations(@AccessToken() token: string): Promise<string[]> {
@@ -58,6 +64,12 @@ export class MHRController {
   @ApiOperation({ summary: 'Get distinct manufacturer countries from MHR records' })
   async getManufacturerCountries(@AccessToken() token: string): Promise<string[]> {
     return this.mhrService.getDistinctManufacturerCountries(token);
+  }
+
+  @Get('wage-grades')
+  @ApiOperation({ summary: 'Get distinct real wage grades from MHR records' })
+  async getWageGrades(@AccessToken() token: string): Promise<string[]> {
+    return this.mhrService.getDistinctWageGrades(token);
   }
 
   @Get('currencies')

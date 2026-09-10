@@ -20,7 +20,7 @@ export class ProcessRouteResponseDto {
   @ApiPropertyOptional({ example: 'Standard Plastic Molding Template' })
   templateName?: string;
 
-  @ApiProperty({ example: 'Plastic & Rubber' })
+  @ApiProperty({ example: 'Plastic Molding' })
   processGroup: string;
 
   @ApiPropertyOptional({ example: 'Injection Molding' })

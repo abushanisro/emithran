@@ -2,6 +2,12 @@ import { IsString, IsOptional, IsInt, Min, IsIn, IsArray, ArrayMinSize, Validate
 import { Type } from 'class-transformer';
 import type { RouteId } from './route-comparison.dto';
 import { getCuttingRouteIds, getFormingRouteIds } from '../costing/shared/core/manufacturing-process-registry';
+import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
+
+// The locations this system holds real rate and material-cost data for, taken
+// from LOCATION_INFO itself so the validator can never drift from the table
+// that actually resolves currency and the raw_materials cost column.
+const SUPPORTED_LOCATIONS = Object.keys(LOCATION_INFO);
 
 // Sheet-metal cutting/forming ids come from MANUFACTURING_PROCESS_REGISTRY
 // (via getCuttingRouteIds/getFormingRouteIds) — the same single source of
@@ -28,9 +34,21 @@ export class ApplyRouteDto {
   @Type(() => Number)
   batchSize?: number;
 
-  @IsOptional()
+  /**
+   * Required, and restricted to a location this system actually has rates for.
+   *
+   * Applying a route WRITES a costing commitment: machine rates, labour rates
+   * and the raw_materials cost column are all resolved per location, and the
+   * resolved figures are persisted. This was `@IsOptional()`, and the handler
+   * read `dto.location ?? 'USA'` — so an apply that stated no location was
+   * priced against USA rates in USD and saved that way, with nobody having
+   * chosen USA. `@IsIn` closes the second half of the same hole: an
+   * unrecognised string fell through LOCATION_INFO's own `?? LOCATION_INFO.USA`
+   * to the cost_usa column just the same.
+   */
   @IsString()
-  location?: string;
+  @IsIn(SUPPORTED_LOCATIONS)
+  location!: string;
 }
 
 export interface ApplyRouteResult {
@@ -88,9 +106,10 @@ export class ApplyCustomRouteDto {
   @Type(() => Number)
   batchSize?: number;
 
-  @IsOptional()
+  /** Required and validated — see ApplyRouteDto.location. */
   @IsString()
-  location?: string;
+  @IsIn(SUPPORTED_LOCATIONS)
+  location!: string;
 }
 
 export interface ApplyCustomRouteResult {

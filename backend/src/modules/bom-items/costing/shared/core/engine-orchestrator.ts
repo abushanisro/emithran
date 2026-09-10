@@ -57,14 +57,37 @@ export interface CuttingProcessLineInput {
   // pre-Phase-1 caller) preserves the documented setupCost+runCost contract
   // exactly as before.
   totalCost?: number;
+  /**
+   * Real, un-amortised setup minutes for one batch — the value resolveSetupMinutes()
+   * returned, BEFORE division by batch size. Distinct from setupCost, which is
+   * already amortised. Carried onto the line so apply-route can persist the real
+   * setup time instead of the literal 15 it used to write for every process on
+   * every machine, and so the UI can show what the engine actually charged.
+   */
+  setupTimeMin?: number;
+  /** Which tier resolveSetupMinutes() used — disclosed, never inferred downstream. */
+  setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'class_default';
   /** Extra fields specific to the calling engine (physicsGap, calculatorId, etc.) — merged in as-is. */
   extra?: Partial<ProcessLineCost>;
 }
 
 /** Assembles the field set every cutting-engine ProcessLineCost shares, already r2()-rounded. */
 export function buildCuttingProcessLine(input: CuttingProcessLineInput): ProcessLineCost {
-  const setupCost = r2(input.setupCost);
-  const runCost = r2(input.runCost);
+  // Per-PART money is NOT rounded to 2 decimals here.
+  //
+  // At production volume these are legitimately sub-cent: a real 30-minute
+  // press setup amortised over a batch of 125,000 is $0.000356 a part, and r2
+  // turns that into $0.00. That is what made a Standard Press line report
+  // "Setup (0.0 min) $0.00" on screen while the machine carried a real
+  // setup_time_hr of 0.5 on file -- the setup was resolved, charged, and then
+  // rounded away before anyone could see it. Run cost survived only because it
+  // happened to exceed half a cent.
+  //
+  // Rounding money for display is the UI currency contract's job, and it
+  // already does it. cycleTimeMin below keeps its r2: minutes are a different
+  // quantity with their own documented rounding contract.
+  const setupCost = input.setupCost;
+  const runCost = input.runCost;
   return {
     process: input.process,
     ...(input.processIdentity ? {
@@ -74,8 +97,14 @@ export function buildCuttingProcessLine(input: CuttingProcessLineInput): Process
     } : {}),
     setupCost,
     runCost,
-    totalCost: r2(input.totalCost ?? (setupCost + runCost)),
+    totalCost: input.totalCost ?? (setupCost + runCost),
     cycleTimeMin: r2(input.cycleTimeMin),
+    ...(input.setupTimeMin !== undefined ? { setupTimeMin: r2(input.setupTimeMin) } : {}),
+    ...(input.setupTimeSource ? { setupTimeSource: input.setupTimeSource } : {}),
+    // Real crew size this line was costed with — the same rate.operators
+    // eMithranTerms() used for setupNDL/cycleNDL, carried through so the
+    // persisted record and the UI can show it instead of assuming 1.
+    ...(input.rate.operators != null ? { operators: input.rate.operators } : {}),
     hourlyRate: input.rate.rate,
     rateSource: input.rate.source,
     machineClass: input.rate.machineClass,

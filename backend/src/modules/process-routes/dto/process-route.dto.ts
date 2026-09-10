@@ -54,7 +54,7 @@ export class CreateProcessRouteDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: 'Plastic & Rubber' })
+  @ApiPropertyOptional({ example: 'Plastic Molding' })
   @IsOptional()
   @IsString()
   processGroup?: string;

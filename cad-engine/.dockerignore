@@ -32,6 +32,7 @@ temp/
 
 # Docs and dev-only files (reduce image size)
 README.md
+RUNNING.md
 DEPLOYMENT.md
 ADVANCED_FEATURES.md
 memory.md

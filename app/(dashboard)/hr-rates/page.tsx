@@ -4,6 +4,10 @@ import { useState, useRef, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { addAoaSheet, createWorkbook, downloadWorkbook } from '@/lib/utils/excel-browser';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
+import {
+  effectiveProcessGroupOf,
+  processGroupOptionsFrom,
+} from '@/lib/processCatalog/hr-rates-process-selection';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
@@ -147,9 +151,6 @@ export default function HRRatesPage() {
   const { data: mhrCurrencies = [] } = useMHRCurrencies();
   const { data: mhrLocations = [] } = useMHRLocations();
 
-  const effectiveProcessGroupOf = (r: { processGroup?: string; commodityCode: string }) =>
-    r.processGroup || r.commodityCode || '-';
-
   const filteredMhrRecords = useMemo(() => {
     const records = mhrData?.records ?? [];
     if (!mhrProcessGroupFilter) return records;
@@ -157,12 +158,14 @@ export default function HRRatesPage() {
   }, [mhrData?.records, mhrProcessGroupFilter]);
 
   // Real distinct process groups AS ACTUALLY DISPLAYED (processGroup ??
-  // commodityCode) — not useMHRProcessGroups(), which only queries the real
-  // process_group column and would miss every commodityCode-only group.
-  const mhrProcessGroupOptions = useMemo(() => {
-    const groups = (mhrData?.records ?? []).map(effectiveProcessGroupOf).filter(g => g !== '-');
-    return [...new Set(groups)].sort();
-  }, [mhrData?.records]);
+  // commodityCode) — not the /mhr/process-groups endpoint, which only queries
+  // the real process_group column and would miss every commodityCode-only
+  // group. Shared with Edit Process Cost, which derives its Process picker from
+  // the identical rule over the identical query.
+  const mhrProcessGroupOptions = useMemo(
+    () => processGroupOptionsFrom(mhrData?.records ?? []),
+    [mhrData?.records],
+  );
 
   // Live ECB/Frankfurter reference rates for every distinct currency the
   // currently-loaded rows actually need — never a hardcoded rate table.
@@ -224,7 +227,7 @@ export default function HRRatesPage() {
         ? (r.calculations.totalAnnualCost > 0 ? r.calculations.totalAnnualCost * fxRate : usdMhr * effHrs * fxRate)
         : null;
       return [
-        r.machineName, r.processGroup || r.commodityCode || '-', mhrCategoryOf(r),
+        r.machineName, effectiveProcessGroupOf(r), mhrCategoryOf(r),
         r.wageGrade || '-', r.location, `${symbol} ${code}`, r.manufacturer || '-',
         r.manufacturerCountry || '-', r.machinePriceUsd != null ? `$${r.machinePriceUsd.toLocaleString()}` : '-',
         r.automationLevel || '-',

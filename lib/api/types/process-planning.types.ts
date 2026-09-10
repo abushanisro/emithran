@@ -242,7 +242,7 @@ export const PROCESS_CATEGORIES: CategoryConfig[] = [
   },
   {
     id: 'plastic_rubber',
-    label: 'Plastic & Rubber',
+    label: 'Plastic Molding',
     description: 'Injection Molding, Extrusion',
     processes: ['Injection Molding', 'Extrusion', 'Blow Molding', 'Thermoforming'],
   },

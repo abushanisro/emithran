@@ -85,6 +85,16 @@ const SELF_DEGATE_TYPES: ReadonlySet<GateType> = new Set(['hot_tip', 'sub']);
 // ── SPI mold classification ────────────────────────────────────────────────────
 // Source: SPI (Society of the Plastics Industry) mold classification standard.
 // Class 101 = highest precision/life, Class 105 = prototype only.
+//
+// lifeShotRating values confirmed against the real source table (migration
+// 682, tblSpiType.json / "Num Annual Mold Cycles") — Class101 and Class105
+// were wrong before this fix (Class101 was capped at 1,000,000 instead of
+// the real ~unlimited production-tooling rating; Class105 was 10x too low
+// at 500 instead of 5,000). Class102-104 already matched and are unchanged.
+// The real table also carries a "Use Insert" flag per class (true for
+// 101/102, false for 103-105) — whether the mold uses a replaceable
+// hardened cavity insert — a real signal not modeled anywhere in this
+// engine yet; disclosed here as a follow-up, not added in this pass.
 
 export type MoldClass = 'Class101' | 'Class102' | 'Class103' | 'Class104' | 'Class105';
 
@@ -94,11 +104,11 @@ interface MoldClassSpec {
 }
 
 const SPI_MOLD_CLASSES: Record<MoldClass, MoldClassSpec> = {
-  Class101: { lifeShotRating: 1_000_000, baseCostUsd: 50_000 },
-  Class102: { lifeShotRating: 1_000_000, baseCostUsd: 25_000 },
-  Class103: { lifeShotRating:   500_000, baseCostUsd: 12_000 },
-  Class104: { lifeShotRating:   100_000, baseCostUsd:  5_000 },
-  Class105: { lifeShotRating:       500, baseCostUsd:  1_500 },
+  Class101: { lifeShotRating: 9_999_999_999, baseCostUsd: 50_000 },
+  Class102: { lifeShotRating:     1_000_000, baseCostUsd: 25_000 },
+  Class103: { lifeShotRating:       500_000, baseCostUsd: 12_000 },
+  Class104: { lifeShotRating:       100_000, baseCostUsd:  5_000 },
+  Class105: { lifeShotRating:         5_000, baseCostUsd:  1_500 },
 };
 
 // Ordered from cheapest to most expensive — pick first class whose rated life
@@ -319,6 +329,35 @@ export function computeInjectionMoldedCostSummary(
     );
   }
 
+  // ── Cavity count: 3-constraint recommendation ─────────────────────────────
+  // Machine defaults: 80T class (conservative) when no machine data supplied.
+  // 1 ton ≈ 10 kN; shot capacity ≈ 0.9 × tonnage (industry rule of thumb).
+  // Computed BEFORE cycle time (moved ahead of its original position, migration
+  // 663 wiring) — recommendCavityCount() has no dependency on the cycle-time
+  // result (its gateType input is the caller/default value, not the
+  // cycle-time-recommended gate), and cycleTime.fillSec needs the real
+  // cavityCount to apply the real cavities-per-mold adjustment factor below.
+  const DEFAULT_CLAMP_KN = 800;    // 80T default class
+  const DEFAULT_SHOT_CM3 = 72;     // 80T × 0.9
+  const clampKN = input.clampTonnageKN ?? DEFAULT_CLAMP_KN;
+  const shotCm3 = input.shotCapacityCm3 ?? DEFAULT_SHOT_CM3;
+
+  const { count: cavityCount, constrainedBy: cavityConstrainedBy } = recommendCavityCount({
+    projectedAreaMm2: input.signals?.projectedAreaMm2 ?? null,
+    annualVolume: input.annualVolume ?? batch,
+    clampTonnageKN: clampKN,
+    shotCapacityCm3: shotCm3,
+    partVolumeMm3: volume,
+    gateType: (input.signals?.gateType ?? 'edge') as GateType,
+  });
+
+  if (cavityCount > 1) {
+    warnings.push(`Cavity count: ${cavityCount} (constrained by ${cavityConstrainedBy}) — confirm with toolmaker`);
+  }
+  if (!input.clampTonnageKN) {
+    warnings.push('Machine clamp tonnage not supplied — cavity count estimated from 80T default class');
+  }
+
   // ── Phase 4: compute cycle time via thermal + rheology models ─────────────
   const wall = wallThicknessNominalMm > 0 ? wallThicknessNominalMm : IM_DEFAULT_WALL_MM;
   // When bbox not provided, estimate from volume (cube root × 2 approximates longest dim).
@@ -337,11 +376,20 @@ export function computeInjectionMoldedCostSummary(
     gateTypeOverride: callerGateType,
     isLsr,
     realResinInputs: input.realResinInputs,
+    // Real fill-time adjustment factors (migration 663). No per-part
+    // gate-count signal exists yet, so gatesPerCavity keeps its default
+    // (1) — surfaced explicitly in warnings below rather than left silent.
+    cavityCount,
   });
   if (input.realResinInputs?.meltingTempC != null || input.realResinInputs?.moldTempC != null) {
     warnings.push(
       `Cooling-time inputs: using real per-grade thermal properties on file for "${materialGrade ?? 'this material'}" ` +
       `(raw_materials) where available; generic resin-family literature defaults fill any remaining field.`,
+    );
+  }
+  if (cavityCount > 1) {
+    warnings.push(
+      `Fill time uses real cavity-count/gate-count adjustment factors (migration 663): ${cavityCount} cavities × 1 gate/cavity assumed (no gate-count signal on file).`,
     );
   }
 
@@ -372,30 +420,6 @@ export function computeInjectionMoldedCostSummary(
     const pressureFactor = resinProps.Tm > 300 ? 1.0 : resinProps.Tm > 240 ? 0.75 : 0.65;
     const clampTon = Math.ceil(projAreaCm2 * pressureFactor);
     warnings.push(`Estimated clamp force: ~${clampTon}T (${projAreaCm2.toFixed(0)} cm² × ${pressureFactor} tons/cm²)`);
-  }
-
-  // ── Cavity count: 3-constraint recommendation ─────────────────────────────
-  // Machine defaults: 80T class (conservative) when no machine data supplied.
-  // 1 ton ≈ 10 kN; shot capacity ≈ 0.9 × tonnage (industry rule of thumb).
-  const DEFAULT_CLAMP_KN = 800;    // 80T default class
-  const DEFAULT_SHOT_CM3 = 72;     // 80T × 0.9
-  const clampKN = input.clampTonnageKN ?? DEFAULT_CLAMP_KN;
-  const shotCm3 = input.shotCapacityCm3 ?? DEFAULT_SHOT_CM3;
-
-  const { count: cavityCount, constrainedBy: cavityConstrainedBy } = recommendCavityCount({
-    projectedAreaMm2: input.signals?.projectedAreaMm2 ?? null,
-    annualVolume: input.annualVolume ?? batch,
-    clampTonnageKN: clampKN,
-    shotCapacityCm3: shotCm3,
-    partVolumeMm3: volume,
-    gateType: (input.signals?.gateType ?? 'edge') as GateType,
-  });
-
-  if (cavityCount > 1) {
-    warnings.push(`Cavity count: ${cavityCount} (constrained by ${cavityConstrainedBy}) — confirm with toolmaker`);
-  }
-  if (!input.clampTonnageKN) {
-    warnings.push('Machine clamp tonnage not supplied — cavity count estimated from 80T default class');
   }
 
   // ── Route the part — gate type from Phase 4 feeds into routing ─────────────

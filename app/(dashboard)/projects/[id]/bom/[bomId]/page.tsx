@@ -285,7 +285,7 @@ export default function BOMDetailPage() {
   const [parentItemId, setParentItemId] = useState<string | null>(null);
   const [defaultItemType, setDefaultItemType] = useState<BOMItemType | undefined>(undefined);
   const [viewingItem, setViewingItem] = useState<BOMItem | null>(null);
-  const [preferredView, setPreferredView] = useState<'2d' | '3d' | 'intelligence'>('3d');
+  const [preferredView, setPreferredView] = useState<'2d' | '3d'>('3d');
 
   // -------------------------------------------------------------------------
   // 3D viewer state
@@ -1372,8 +1372,6 @@ export default function BOMDetailPage() {
         onClose={() => setViewingItem(null)}
         onUpdate={refetchBOMItems}
         preferredView={preferredView}
-        projectId={projectId}
-        bomId={bomId}
       />
 
       {/* Import summary dialog */}

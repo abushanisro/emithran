@@ -92,7 +92,7 @@ describe('computePressStrokeCost — direct labour cost', () => {
     const line = result.processLines[0]!;
 
     expect(line.labourRate).toBeNull();
-    expect(line.runCost).toBeCloseTo(Math.round((result.cuttingMin / 60) * 32.27 * 100) / 100, 5);
+    expect(line.runCost).toBeCloseTo((result.cuttingMin / 60) * 32.27, 5);
   });
 
   it('falls back to a no_db_rate machine rate (not a guessed number) when no rate is resolved at all', () => {
@@ -201,7 +201,15 @@ describe('computePressStrokeCost — Progressive Die Press real per-machine setu
       pressRate: realRate(),
     });
     expect(result.warnings.some((w) => w.includes('setup time from generic fallback'))).toBe(false);
-    expect(result.warnings.some((w) => w === 'Standard Press: setup time from fallback — seed a real per-machine setup time')).toBe(true);
+    // Asserts the intent, not the exact sentence: this engine now emits the
+    // SHARED resolveSetupMinutes disclosure (as the other sixteen do), which
+    // keeps the established "setup time from fallback" marker and additionally
+    // names both real sources that were missing. Pinning the old wording here
+    // would pin a string that no longer lives in this engine.
+    expect(result.warnings.some((w) =>
+      w.startsWith('Standard Press: setup time from fallback')
+      && w.includes('setup_time_hr')
+      && w.includes('sm_lookup_op_setup_time'))).toBe(true);
   });
 });
 

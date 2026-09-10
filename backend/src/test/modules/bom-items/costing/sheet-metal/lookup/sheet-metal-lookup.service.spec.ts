@@ -258,6 +258,49 @@ describe('SheetMetalLookupService.getRollBendingCycleTime', () => {
   });
 });
 
+// getToolingAnnualVolumeThresholds() — real sm_reference_data 'variable' rows
+// (migration 479): progDieAnnualVolumeLimit / stageToolingAnnualVolumeLimit,
+// the sourced annual-volume thresholds gating whether Progressive Die /
+// Tandem Press hard tooling is economical for a given part.
+function fakeVariableRows(rows: Array<{ key: string; value: string }>) {
+  const builder: any = {
+    from: (_table: string) => builder,
+    select: (_cols: string) => builder,
+    eq: (_col: string, _val: unknown) => builder,
+    in: (_col: string, _vals: unknown[]) => builder,
+    then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data: rows, error: null }),
+  };
+  return { getAdminClient: () => builder } as any;
+}
+
+describe('SheetMetalLookupService.getToolingAnnualVolumeThresholds', () => {
+  it('returns both real thresholds unchanged when both rows are present', async () => {
+    const svc = new SheetMetalLookupService(fakeVariableRows([
+      { key: 'progDieAnnualVolumeLimit', value: '15000' },
+      { key: 'stageToolingAnnualVolumeLimit', value: '10000' },
+    ]));
+    const result = await svc.getToolingAnnualVolumeThresholds();
+    expect(result.progressiveDie).toBe(15000);
+    expect(result.stageTooling).toBe(10000);
+  });
+
+  it('reports a real null for a threshold whose row is missing, never a fabricated default', async () => {
+    const svc = new SheetMetalLookupService(fakeVariableRows([
+      { key: 'progDieAnnualVolumeLimit', value: '15000' },
+    ]));
+    const result = await svc.getToolingAnnualVolumeThresholds();
+    expect(result.progressiveDie).toBe(15000);
+    expect(result.stageTooling).toBeNull();
+  });
+
+  it('returns both null when the query finds no rows at all', async () => {
+    const svc = new SheetMetalLookupService(fakeVariableRows([]));
+    const result = await svc.getToolingAnnualVolumeThresholds();
+    expect(result.progressiveDie).toBeNull();
+    expect(result.stageTooling).toBeNull();
+  });
+});
+
 // resolveNearestStandardTonnageClass — root-caused live 2026-08-31: real USA
 // press brakes whose kN-derived tonnage sits 10-11% from their clearly-
 // intended standard class (previously excluded by a 10% cutoff) now resolve
@@ -283,5 +326,122 @@ describe('resolveNearestStandardTonnageClass', () => {
   it('still rounds already-close real machines unchanged (e.g. "Bend Brake - 800kN Press Force", 1.93% from 80T)', () => {
     const result = resolveNearestStandardTonnageClass(800 / 9.80665);
     expect(result.tonnage).toBe(80);
+  });
+});
+
+// getProgressiveDieToolingVariables() — real sm_reference_data 'variable' rows
+// (migration 479) progressive-die-tooling-engine.ts needs to price the real
+// BOM subtotal and estimate real, unpriced toolmaker build hours.
+describe('SheetMetalLookupService.getProgressiveDieToolingVariables', () => {
+  it('normalises whole-number percentages and leaves already-fractional ones alone', async () => {
+    const svc = new SheetMetalLookupService(fakeVariableRows([
+      { key: 'orMarkupPercent', value: '10' },
+      { key: 'percentSGandA', value: '.1' },
+      { key: 'percentProfit', value: '.1' },
+      { key: 'orDesignPercent', value: '32.8' },
+      { key: 'orAssemblyPercent', value: '35.6' },
+      { key: 'orDebugPercent', value: '4.1' },
+      { key: 'orReworkPercent', value: '2' },
+      { key: 'assyHrsCompProgDie', value: '1.1' },
+    ]));
+    const result = await svc.getProgressiveDieToolingVariables();
+    expect(result.toolingMarkupPct).toBeCloseTo(0.10, 5);
+    expect(result.sgAndAPct).toBeCloseTo(0.10, 5);
+    expect(result.profitPct).toBeCloseTo(0.10, 5);
+    expect(result.designHoursPct).toBeCloseTo(0.328, 5);
+    expect(result.assemblyHoursPct).toBeCloseTo(0.356, 5);
+    expect(result.debugHoursPct).toBeCloseTo(0.041, 5);
+    expect(result.reworkHoursPct).toBeCloseTo(0.02, 5);
+    // Not a percentage at all — a direct multiplier dial, left as-is.
+    expect(result.progDieAssemblyDial).toBe(1.1);
+  });
+
+  it('passes real per-die-block hour figures through unchanged', async () => {
+    const svc = new SheetMetalLookupService(fakeVariableRows([
+      { key: 'dbCncSetupHrs', value: '0.75' },
+      { key: 'dbMillingHrs', value: '1.5' },
+      { key: 'dbCncHrsPerPocket', value: '0.5' },
+      { key: 'dbMilledPocketsPerDieBlock', value: '5' },
+      { key: 'dbGrindingHrsPerDieBlock', value: '3' },
+      { key: 'dbDrillingHrsPerDieBlock', value: '0' },
+      { key: 'dbWireEdmSetupHrs', value: '1' },
+    ]));
+    const result = await svc.getProgressiveDieToolingVariables();
+    expect(result.dbCncSetupHrs).toBe(0.75);
+    expect(result.dbMillingHrs).toBe(1.5);
+    expect(result.dbCncHrsPerPocket).toBe(0.5);
+    expect(result.dbMilledPocketsPerDieBlock).toBe(5);
+    expect(result.dbGrindingHrsPerDieBlock).toBe(3);
+    expect(result.dbDrillingHrsPerDieBlock).toBe(0);
+    expect(result.dbWireEdmSetupHrs).toBe(1);
+  });
+
+  it('reports a real null for every field when no rows are on file, never a fabricated default', async () => {
+    const svc = new SheetMetalLookupService(fakeVariableRows([]));
+    const result = await svc.getProgressiveDieToolingVariables();
+    for (const v of Object.values(result)) expect(v).toBeNull();
+  });
+
+  it('reports a real null for one specific missing field while the rest resolve', async () => {
+    const svc = new SheetMetalLookupService(fakeVariableRows([
+      { key: 'dbGrindingHrsPerDieBlock', value: '3' },
+    ]));
+    const result = await svc.getProgressiveDieToolingVariables();
+    expect(result.dbGrindingHrsPerDieBlock).toBe(3);
+    expect(result.dbMillingHrs).toBeNull();
+  });
+});
+
+// getToolingComponentCosts() — real progressive-die/stage-tooling BOM costs
+// (migration 720, sm_lookup_tooling_component_costs).
+describe('SheetMetalLookupService.getToolingComponentCosts', () => {
+  function fakeComponentCostRows(rows: Array<Record<string, unknown>>) {
+    const builder: any = {
+      from: (_table: string) => builder,
+      select: (_cols: string) => builder,
+      then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data: rows, error: null }),
+    };
+    return { getAdminClient: () => builder } as any;
+  }
+
+  it('maps real rows through, including the null model of a single-variant component', async () => {
+    const svc = new SheetMetalLookupService(fakeComponentCostRows([
+      { component_name: 'dieButton', model: null, size_mm: null, cost_usd: '125', weight_kg: '0.5' },
+      { component_name: 'guidePinAssy', model: 'small', size_mm: '50.8', cost_usd: '360', weight_kg: '10' },
+    ]));
+    const rows = await svc.getToolingComponentCosts();
+    expect(rows).toEqual([
+      { componentName: 'dieButton', model: null, sizeMm: null, costUsd: 125, weightKg: 0.5 },
+      { componentName: 'guidePinAssy', model: 'small', sizeMm: 50.8, costUsd: 360, weightKg: 10 },
+    ]);
+  });
+
+  it('returns an empty array, never fabricated rows, when the table has none on file', async () => {
+    const svc = new SheetMetalLookupService(fakeComponentCostRows([]));
+    expect(await svc.getToolingComponentCosts()).toEqual([]);
+  });
+});
+
+// getToolingCoatingCostPerKg() — real per-kg coating cost (migration 721,
+// sm_lookup_tooling_coating_cost).
+describe('SheetMetalLookupService.getToolingCoatingCostPerKg', () => {
+  function fakeCoatingRow(row: Record<string, unknown> | null) {
+    const builder: any = {
+      from: (_table: string) => builder,
+      select: (_cols: string) => builder,
+      eq: (_col: string, _val: unknown) => builder,
+      maybeSingle: () => Promise.resolve({ data: row, error: null }),
+    };
+    return { getAdminClient: () => builder } as any;
+  }
+
+  it('resolves the real rate for an exact (toolMaterial, coatingType) pair', async () => {
+    const svc = new SheetMetalLookupService(fakeCoatingRow({ coating_cost_usd_per_kg: '3.4' }));
+    expect(await svc.getToolingCoatingCostPerKg('D2', 'CVD')).toBe(3.4);
+  });
+
+  it('returns null, never substituting a different pair\'s rate, when this exact pair has none on file', async () => {
+    const svc = new SheetMetalLookupService(fakeCoatingRow(null));
+    expect(await svc.getToolingCoatingCostPerKg('S7', 'CVD')).toBeNull();
   });
 });

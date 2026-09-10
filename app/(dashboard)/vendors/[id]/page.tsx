@@ -32,14 +32,11 @@ import {
   Users,
   Award,
   FileText,
-  Settings,
-  MessageSquare,
-  Wrench,
 } from 'lucide-react';
 import type { VendorEquipment } from '@/lib/api/vendors';
 import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES, getAllCategories, getEquipmentTypesByCategory, getFieldsForCategory, type FieldConfig, type EquipmentCategory } from '@/lib/constants/equipment-types';
 
-type TabType = 'basic' | 'services' | 'equipment' | 'facility' | 'shared-rfqs' | 'qms' | 'users' | 'cnc-machining' | 'docs';
+type TabType = 'basic' | 'equipment' | 'facility' | 'qms' | 'users' | 'docs';
 
 export default function VendorDetailPage() {
   const params = useParams();
@@ -78,16 +75,16 @@ export default function VendorDetailPage() {
   const deleteEquipmentMutation = useDeleteVendorEquipment();
   const updateVendorMutation = useUpdateVendor();
 
+  // Services, Shared RFQs and CNC Machining removed: none of the three had a
+  // content panel, so every one of them rendered an empty page. CNC Machining
+  // was also a process-specific tab hardcoded into a generic vendor screen.
   const tabs = [
     { id: 'basic', label: 'Basic', icon: Building2 },
-    { id: 'services', label: 'Services', icon: Wrench },
-    { id: 'equipment', label: 'Equipment', icon: Factory },
     { id: 'facility', label: 'Facility', icon: Building2 },
-    { id: 'shared-rfqs', label: 'Shared RFQs', icon: MessageSquare },
     { id: 'qms', label: 'QMS', icon: Award },
     { id: 'users', label: 'Users', icon: Users },
-    { id: 'cnc-machining', label: 'CNC Machining', icon: Settings },
     { id: 'docs', label: 'Docs', icon: FileText },
+    { id: 'equipment', label: 'Equipment', icon: Factory },
   ];
 
   const handleAddEquipment = () => {

@@ -244,6 +244,56 @@ interface BOMItemDialogProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/**
+ * Production runs per year, mirroring the backend BATCHES_PER_YEAR in
+ * costing/shared/physics/costing-inputs.ts. This dialog only uses it to offer
+ * the Batch Production field as a convenience view of the same number; the
+ * batch size that costing actually uses is resolved server-side by
+ * resolveCostingInputs, never from this field.
+ *
+ * Provenance: a stated planning policy (quarterly releases), not measured
+ * manufacturing data and not sourced reference data. It is a scheduling
+ * assumption, and it applies only when a real annual volume exists.
+ */
+const BATCHES_PER_YEAR = 4;
+
+
+// Which upstream source filled a field, rendered as a small tag beside its
+// label. Module scope on purpose: a component declared inside another gets a
+// fresh identity every render, and React remounts rather than updates it.
+const AutoBadgeFor = React.memo(function AutoBadgeFor({
+  field,
+  autoFilledFields,
+  fieldLineage,
+}: {
+  field: string;
+  autoFilledFields: Set<string>;
+  fieldLineage: Record<string, { source: string }>;
+}) {
+  if (!autoFilledFields.has(field)) return null;
+  const lineage = fieldLineage[field];
+  if (!lineage) return null;
+  if (lineage.source === 'derived') {
+    return (
+      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-purple-400 border-purple-400/40 ml-1">
+        DERIVED
+      </Badge>
+    );
+  }
+  if (lineage.source === 'drawing') {
+    return (
+      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-blue-500 border-blue-400/40 ml-1">
+        DRAWING
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-cyan-500 border-cyan-400/40 ml-1">
+      CAD
+    </Badge>
+  );
+});
+
 export function BOMItemDialog({
   bomId,
   item,
@@ -336,9 +386,35 @@ export function BOMItemDialog({
       .sort();
   }, [rawMaterialsData]);
 
+  // What the dropdown actually renders: narrowed against what has been typed
+  // RIGHT NOW, and capped.
+  //
+  // It used to render every name the query returned -- limit: 1000 -- with
+  // Command's own filtering switched off (shouldFilter={false}), so the only
+  // thing that ever narrowed the list was the 500ms-debounced server
+  // round-trip. Each keystroke therefore re-rendered up to a thousand mounted
+  // rows and held them for at least half a second before a narrower result
+  // arrived. That is what made the field lag and feel like it was dropping
+  // characters.
+  //
+  // The debounced query still does the real search across the whole table --
+  // this does not replace it, and a match past the cap is still reachable by
+  // typing more of it. This only stops the UI mounting rows the engineer has
+  // already typed past.
+  const MATERIAL_OPTIONS_RENDER_CAP = 100;
+  const materialOptionMatches = useMemo((): string[] => {
+    const q = materialSearch.trim().toLowerCase();
+    if (!q) return materialNameOptions;
+    return materialNameOptions.filter((n) => n.toLowerCase().includes(q));
+  }, [materialNameOptions, materialSearch]);
+
+  const visibleMaterialOptions = useMemo(
+    () => materialOptionMatches.slice(0, MATERIAL_OPTIONS_RENDER_CAP),
+    [materialOptionMatches],
+  );
+
   const [loading, setLoading] = useState(false);
   const [autoParentId, setAutoParentId] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState<{ file2d?: number; file3d?: number }>({});
   const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
   // ── Multi-file / auto-fill state ──────────────────────────────────────────
@@ -359,7 +435,7 @@ export function BOMItemDialog({
     description: '',
     itemType: defaultItemType || ('' as BOMItemType),
     quantity: 1,
-    annualVolume: 1000,
+    annualVolume: null as number | null,
     unit: 'pcs',
     material: '',
     materialGrade: '',
@@ -444,7 +520,9 @@ export function BOMItemDialog({
       errors.quantity = 'Quantity seems unusually high. Please verify.';
     }
 
-    if (formData.annualVolume <= 0) {
+    if (formData.annualVolume == null) {
+      errors.annualVolume = 'Annual volume is required — it sets batch size and route economics';
+    } else if (formData.annualVolume <= 0) {
       errors.annualVolume = 'Annual volume must be greater than 0';
     } else if (formData.annualVolume > 10000000) {
       errors.annualVolume = 'Annual volume seems extremely high. Please verify.';
@@ -483,6 +561,20 @@ export function BOMItemDialog({
     };
   }, [formData]);
 
+  // Read straight off the memo, NOT mirrored into state.
+  //
+  // This used to be a useState fed by an effect on [validationStatus.errors].
+  // validationStatus is a useMemo returning a fresh object literal, so
+  // `.errors` had a new identity on every keystroke, the effect's reference
+  // comparison always saw a change, and it called setValidationErrors with a
+  // value that was already derivable -- committing a SECOND full render of
+  // this ~2000-line dialog for every character typed in any field.
+  //
+  // Nothing else ever wrote it, so it was pure duplication of state that
+  // already exists. Declared here (rather than replacing all its call sites)
+  // so the ~12 reads below stay exactly as they were.
+  const validationErrors = validationStatus.errors;
+
 
   // ── Auto-fill helpers ─────────────────────────────────────────────────────
 
@@ -509,17 +601,26 @@ export function BOMItemDialog({
       if (!prev.partNumber) { patch.partNumber = r.suggestions.partNumber; filled.add('partNumber'); }
       // Geometry fields: only fill when CAD engine was online and returned real data
       if (geometryAvailable && !prev.volume) { patch.volume = r.geometry.volume; filled.add('volume'); }
-      if (geometryAvailable && !prev.weight) { patch.weight = r.geometry.weight; filled.add('weight'); }
+      // Only a real, positive weight. The backend sends 0 for "not known",
+      // because weight needs a density and density needs a material the
+      // engineer has not chosen yet.
+      if (geometryAvailable && !prev.weight && r.geometry.weight > 0) { patch.weight = r.geometry.weight; filled.add('weight'); }
       if (geometryAvailable && !prev.surfaceArea) { patch.surfaceArea = r.geometry.surfaceArea; filled.add('surfaceArea'); }
       if (geometryAvailable && !prev.maxLength) { patch.maxLength = r.geometry.boundingBox.length; filled.add('maxLength'); }
       if (geometryAvailable && !prev.maxWidth) { patch.maxWidth = r.geometry.boundingBox.width; filled.add('maxWidth'); }
       if (geometryAvailable && !prev.maxHeight) { patch.maxHeight = r.geometry.boundingBox.height; filled.add('maxHeight'); }
-      if (geometryAvailable && !prev.materialGrade && r.suggestions.materialGrade) {
-        patch.materialGrade = r.suggestions.materialGrade;
-        patch.materialSource = 'cad';
-        patch.materialConfidence = 0.6;
-        filled.add('materialGrade');
-      }
+      // Material grade is NOT auto-filled, and is no longer suggested at all.
+      //
+      // The backend used to run suggestMaterial(), which never read the CAD file:
+      // it queried raw_materials for anything ferrous, took the first 10 by
+      // density, and returned the MEDIAN row. That is where "Generic CuZn39Pb3"
+      // — a brass — came from on 1.5mm sheet-steel parts whose own drawing title
+      // block reads SECC at 0.92 confidence. Not an extraction, a guess.
+      //
+      // It is gone at the source (auto-fill.service.ts step 3), so there is no
+      // grade to fill and no badge to show. The engineer picks the material,
+      // which is also what makes Weight meaningful: weight = volume x density,
+      // and density is a property of the material, not of the solid.
       // makeBuy and itemType are safe defaults — fill always
       if (!prev.makeBuy || prev.makeBuy === 'make') {
         patch.makeBuy = r.suggestions.makeBuy;
@@ -685,10 +786,6 @@ export function BOMItemDialog({
   });
 
   useEffect(() => {
-    setValidationErrors(validationStatus.errors);
-  }, [validationStatus.errors]);
-
-  useEffect(() => {
     if (!item && getAutoParent) {
       setAutoParentId(getAutoParent(formData.itemType));
     }
@@ -714,7 +811,7 @@ export function BOMItemDialog({
         description: item.description || '',
         itemType: item.itemType || BOMItemType.ASSEMBLY,
         quantity: item.quantity || 1,
-        annualVolume: item.annualVolume || 1000,
+        annualVolume: item.annualVolume ?? null,
         unit: item.unit || 'pcs',
         material: item.material || '',
         materialGrade: item.materialGrade || '',
@@ -754,7 +851,7 @@ export function BOMItemDialog({
         description: '',
         itemType: defaultItemType || ('' as BOMItemType),
         quantity: 1,
-        annualVolume: 1000,
+        annualVolume: null,
         unit: 'pcs',
         material: '',
         materialGrade: '',
@@ -1048,7 +1145,7 @@ export function BOMItemDialog({
         itemType: formData.itemType,
         parentItemId: finalParentId || undefined,
         quantity: formData.quantity,
-        annualVolume: formData.annualVolume,
+        annualVolume: formData.annualVolume ?? undefined,
         unit: formData.unit,
         material: formData.material || undefined,
         materialGrade: formData.materialGrade || undefined,
@@ -1228,9 +1325,15 @@ export function BOMItemDialog({
           itemType: (r.suggestions.itemType as BOMItemType) || BOMItemType.CHILD_PART,
           parentItemId: finalParentId || undefined,
           quantity: 1,
-          annualVolume: 1000,
+          // No annualVolume. A bulk import has nobody to ask, and 1000 was not
+          // an answer — it was the schema default echoed back, then used to
+          // derive batch size and to take the low-volume branches of route
+          // scoring. Imported parts arrive with the volume unresolved and the
+          // Cost Guide says so.
           unit: 'pcs',
-          materialGrade: r.suggestions.materialGrade || undefined,
+          // Deliberately absent — see the single-file path above. The CAD
+          // file's embedded material is a placeholder, not a specification,
+          // and must not arrive as the item's costing grade.
           makeBuy: r.suggestions.makeBuy || 'make',
           weight: r.geometry.weight || undefined,
           maxLength: r.geometry.boundingBox.length || undefined,
@@ -1265,31 +1368,17 @@ export function BOMItemDialog({
   };
 
   // ── Auto badge ──────────────────────────────────────────────────────────────
-
-  const AutoBadge = ({ field }: { field: string }) => {
-    if (!autoFilledFields.has(field)) return null;
-    const lineage = fieldLineage[field];
-    if (!lineage) return null;
-    if (lineage.source === 'derived') {
-      return (
-        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-purple-400 border-purple-400/40 ml-1">
-          DERIVED
-        </Badge>
-      );
-    }
-    if (lineage.source === 'drawing') {
-      return (
-        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-blue-500 border-blue-400/40 ml-1">
-          DRAWING
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-cyan-500 border-cyan-400/40 ml-1">
-        CAD
-      </Badge>
-    );
-  };
+  // AutoBadgeFor is module-scope (see the bottom of this file). It used to be
+  // declared here, inside the component body, which gave it a new function
+  // identity on every render -- React then treats it as a DIFFERENT component
+  // type and unmounts/remounts every badge instead of updating it, on every
+  // keystroke. This binds the two lineage maps once per render instead.
+  const AutoBadge = useCallback(
+    ({ field }: { field: string }) => (
+      <AutoBadgeFor field={field} autoFilledFields={autoFilledFields} fieldLineage={fieldLineage} />
+    ),
+    [autoFilledFields, fieldLineage],
+  );
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
@@ -1399,14 +1488,10 @@ export function BOMItemDialog({
                         {/\.(dxf|dwg)$/i.test(pf.file.name) ? (
                           <Badge variant="outline" className="text-xs shrink-0">DXF Drawing</Badge>
                         ) : pf.result ? (
-                          <>
-                            <Badge variant="secondary" className="text-xs shrink-0">{pf.result.suggestions.processType}</Badge>
-                            {pf.result.suggestions.materialGrade && (
-                              <Badge variant="outline" className="text-xs shrink-0 max-w-[80px] truncate">
-                                {pf.result.suggestions.materialGrade}
-                              </Badge>
-                            )}
-                          </>
+                          /* Process family only. No material badge: nothing in the CAD
+                             file states a grade, so there is nothing here to show
+                             until the engineer picks one. */
+                          <Badge variant="secondary" className="text-xs shrink-0">{pf.result.suggestions.processType}</Badge>
                         ) : null}
                         {pf.status === 'error' && (
                           <span className="text-xs text-red-500 shrink-0 max-w-[100px] truncate" title={pf.error}>
@@ -1556,7 +1641,7 @@ export function BOMItemDialog({
                       <CommandList className="max-h-[280px] overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
                         <CommandGroup>
                           {/* Custom value row */}
-                          {materialSearch && !materialNameOptions.some(n => n.toLowerCase() === materialSearch.toLowerCase()) && (
+                          {materialSearch && !materialOptionMatches.some(n => n.toLowerCase() === materialSearch.toLowerCase()) && (
                             <div
                               onClick={() => {
                                 setFormData({ ...formData, material: materialSearch, materialGrade: '' });
@@ -1569,7 +1654,7 @@ export function BOMItemDialog({
                             </div>
                           )}
                           {/* DB material names */}
-                          {materialNameOptions.map((name: string) => (
+                          {visibleMaterialOptions.map((name: string) => (
                             <div
                               key={name}
                               onClick={() => {
@@ -1586,7 +1671,13 @@ export function BOMItemDialog({
                               <span className="font-medium">{name}</span>
                             </div>
                           ))}
-                          {!isLoadingMaterials && materialNameOptions.length === 0 && materialSearch && (
+                          {/* Honest about the cap rather than silently truncating. */}
+                          {materialOptionMatches.length > visibleMaterialOptions.length && (
+                            <div className="px-3 py-2 text-xs text-muted-foreground text-center border-t border-border">
+                              +{materialOptionMatches.length - visibleMaterialOptions.length} more — keep typing to narrow
+                            </div>
+                          )}
+                          {!isLoadingMaterials && materialOptionMatches.length === 0 && materialSearch && (
                             <div className="px-3 py-4 text-sm text-muted-foreground text-center">
                               No matches in database — custom value will be saved.
                             </div>
@@ -1749,9 +1840,9 @@ export function BOMItemDialog({
                   id="annualVolume"
                   type="number"
                   min="1"
-                  value={formData.annualVolume || ''}
+                  value={formData.annualVolume ?? ''}
                   onFocus={(e) => e.target.select()}
-                  onChange={(e) => setFormData({ ...formData, annualVolume: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData({ ...formData, annualVolume: e.target.value === '' ? null : (parseInt(e.target.value) || null) })}
                   className={validationErrors.annualVolume ? 'border-red-500 focus:border-red-500' : ''}
                   required
                 />
@@ -1783,11 +1874,11 @@ export function BOMItemDialog({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={parseFloat((formData.annualVolume / 4).toFixed(2)) || ''}
+                  value={formData.annualVolume == null ? '' : parseFloat((formData.annualVolume / BATCHES_PER_YEAR).toFixed(2))}
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => {
                     const batch = parseFloat(e.target.value) || 0;
-                    setFormData({ ...formData, annualVolume: Math.round(batch * 4) });
+                    setFormData({ ...formData, annualVolume: batch > 0 ? Math.round(batch * BATCHES_PER_YEAR) : null });
                   }}
                 />
                 <p className="text-xs text-muted-foreground">Quarterly batch size</p>

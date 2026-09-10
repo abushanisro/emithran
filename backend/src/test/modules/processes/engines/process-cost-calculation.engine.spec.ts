@@ -19,6 +19,34 @@ describe('ProcessCostCalculationEngine', () => {
   // as inputs but never actually applied in the cost formula — changing them
   // had zero effect on totalCostPerPart.
 
+  // Regression coverage for a fabricated validation floor. CYCLE_TIME.MIN was 1
+  // second, which rejected the routing engines' own output: roll bending derives
+  // cycleSec as rollFeedLengthMm / rollingSpeedMmPerSec + prebendTimeSec, a
+  // continuous quantity that is routinely sub-second, and a real live 3 Roll
+  // Bending line persisted at 0.6 s. Every cost preview for it threw, and the UI
+  // rendered the failure as a confident "$0.00".
+  describe('sub-second cycle times', () => {
+    it('costs a real 0.6s cycle instead of rejecting it', () => {
+      const result = engine.calculate({ ...baseInput, cycleTime: 0.6 });
+      expect(result.totalCostPerPart).toBeGreaterThan(0);
+    });
+
+    it('scales with cycle time across the old 1-second boundary', () => {
+      const fast = engine.calculate({ ...baseInput, cycleTime: 0.5 });
+      const slow = engine.calculate({ ...baseInput, cycleTime: 1.5 });
+      expect(slow.totalCycleCostPerPart).toBeGreaterThan(fast.totalCycleCostPerPart);
+    });
+
+    it('still refuses a zero or negative cycle time, which is not a quantity', () => {
+      expect(() => engine.calculate({ ...baseInput, cycleTime: 0 })).toThrow(/Cycle Time must be greater than/);
+      expect(() => engine.calculate({ ...baseInput, cycleTime: -1 })).toThrow(/Cycle Time must be greater than/);
+    });
+
+    it('still refuses a cycle time past the real upper bound', () => {
+      expect(() => engine.calculate({ ...baseInput, cycleTime: 1000001 })).toThrow(/Cycle Time must be greater than/);
+    });
+  });
+
   it('increasing setupManning increases the total (previously had zero effect)', () => {
     const base = engine.calculate(baseInput);
     const withMoreSetupCrew = engine.calculate({ ...baseInput, setupManning: 3 });

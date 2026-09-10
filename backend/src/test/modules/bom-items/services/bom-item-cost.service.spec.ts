@@ -5,6 +5,7 @@
 // by user_id any more (that would silently exclude an org-mate's packaging/
 // procured/tooling cost records from a BOM total), and new rows must carry
 // organization_id so RLS can actually enforce the org boundary.
+import { ExchangeRateService } from '../../../../common/exchange-rate/exchange-rate.service';
 import { BomItemCostService } from '../../../../modules/bom-items/services/bom-item-cost.service';
 import { type Logger } from '../../../../common/logger/logger.service';
 import { type SupabaseService } from '../../../../common/supabase/supabase.service';
@@ -34,7 +35,13 @@ describe('BomItemCostService.getOrCreateCost', () => {
       getClient: jest.fn().mockReturnValue({ from: fromMock }),
     } as unknown as SupabaseService;
 
-    const service = new BomItemCostService(supabaseService, { error: jest.fn() } as unknown as Logger);
+    const service = new BomItemCostService(
+      supabaseService,
+      { error: jest.fn() } as unknown as Logger,
+      // Third constructor arg since P1b-iii. getOrCreateCost never resolves an
+      // FX snapshot, so these tests never reach it.
+      {} as unknown as ExchangeRateService,
+    );
     await service.getOrCreateCost('item-1', 'user-456', 'token', 'org-789');
 
     expect(insertChain.insert).toHaveBeenCalledWith(
@@ -67,7 +74,16 @@ describe('BomItemCostService recalculateCost sibling-table lookups', () => {
       getClient: jest.fn().mockReturnValue({ from: fromMock }),
     } as unknown as SupabaseService;
 
-    const service = new BomItemCostService(supabaseService, { error: jest.fn(), log: jest.fn() } as unknown as Logger);
+    const service = new BomItemCostService(
+      supabaseService,
+      { error: jest.fn(), log: jest.fn(), warn: jest.fn() } as unknown as Logger,
+      // Third constructor arg since P1b-iii: recalculateCost resolves exactly
+      // one FX snapshot per rollup. convertOptional is the only member the
+      // rollup calls on it.
+      {
+        getSnapshot: jest.fn().mockResolvedValue({ convertOptional: () => 1 }),
+      } as unknown as ExchangeRateService,
+    );
 
     try {
       await service.recalculateCost('item-1', 'user-456', 'token', 'org-789');

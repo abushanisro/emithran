@@ -13,6 +13,7 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { declareCostRecordCurrency } from '../bom-items/costing/shared/core/persisted-currency-contract';
 import {
   CreatePackagingLogisticsCostDto,
   UpdatePackagingLogisticsCostDto,
@@ -139,6 +140,17 @@ let queryBuilder = this.supabaseService
         cost_breakdown: dto.costBreakdown || {},
         notes: dto.notes,
         is_active: dto.isActive !== undefined ? dto.isActive : true,
+
+        // Currency provenance (migration 708, P1b-i). This table had no
+        // currency column at all until 708, and this service still contains no
+        // FX handling of any kind, so a stored amount is in whatever currency
+        // the person entering it had in mind. That is recorded as undeclared
+        // rather than assumed: these values are summed into
+        // bom_item_costs.packaging_logistics_cost beside USD raw material, and
+        // one live aggregate already carries 273 of unlabelled money this way.
+        // Declaring a currency here requires a DTO and form field -- a
+        // follow-up, not a value to invent.
+        ...declareCostRecordCurrency({}),
       };
 
       const { data, error } = await this.supabaseService

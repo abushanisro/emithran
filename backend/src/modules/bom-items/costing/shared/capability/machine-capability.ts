@@ -13,7 +13,7 @@ import type { MachineClass } from '../core/default-rates.constants';
 import { estimateBendTonnage, estimateTurretPunchTonnage } from '../core/default-rates.constants';
 import type { MachineCapability } from './machine-selection/seed-registry';
 import { classifyLaserMaterial, TONNAGE_MARGIN, BED_MARGIN } from './machine-selection/physics';
-import { laserThicknessLimit } from './machine-selection/selector';
+import { laserThicknessLimit, materialThicknessLimit } from './machine-selection/selector';
 
 export interface MachineCapabilitySpec {
   maxThicknessMm?: number;
@@ -164,6 +164,7 @@ export function checkMachineCapability(
   // Real per-machine capability takes priority over the static registry below.
   if (realCapability) {
     const isLaser = machineClass === "fiber_laser" || machineClass === "co2_laser";
+    const isShear = machineClass === "shear";
     const thicknessLimit = isLaser
       ? laserThicknessLimit(realCapability, {
           kind: "laser",
@@ -173,6 +174,8 @@ export function checkMachineCapability(
           bedLengthMm: geometry.flatPatternLengthMm,
           bedWidthMm: geometry.flatPatternWidthMm,
         })
+      : isShear
+      ? materialThicknessLimit(realCapability, classifyLaserMaterial(geometry.materialGrade ?? null))
       : realCapability.maxThicknessMm;
     if (thicknessLimit != null && geometry.sheetThicknessMm > thicknessLimit) {
       failures.push({ code: "THICKNESS_EXCEEDED", message: `Thickness ${geometry.sheetThicknessMm}mm exceeds machine limit (${thicknessLimit}mm)` });
@@ -184,6 +187,18 @@ export function checkMachineCapability(
       const bendLen = geometry.bendLengthMm ?? geometry.flatPatternLengthMm;
       if (realCapability.maxLengthMm != null && bendLen != null && bendLen * BED_MARGIN > realCapability.maxLengthMm) {
         failures.push({ code: "BED_LENGTH_EXCEEDED", message: `Bend length ${bendLen}mm exceeds machine bed (${realCapability.maxLengthMm}mm)` });
+      }
+    } else if (isShear) {
+      // Real shear bed/blade length (machine_library.json's shear_length_mm →
+      // MachineCapability.maxLengthMm) vs. the longest edge of the flat
+      // pattern — the longest flat-pattern edge is a conservative proxy for
+      // the actual cut length, same convention as press_brake's bendLengthMm
+      // fallback above.
+      const cutLen = geometry.flatPatternLengthMm != null && geometry.flatPatternWidthMm != null
+        ? Math.max(geometry.flatPatternLengthMm, geometry.flatPatternWidthMm)
+        : geometry.flatPatternLengthMm;
+      if (realCapability.maxLengthMm != null && cutLen != null && cutLen * BED_MARGIN > realCapability.maxLengthMm) {
+        failures.push({ code: "BED_LENGTH_EXCEEDED", message: `Cut length ${cutLen}mm exceeds machine shear bed (${realCapability.maxLengthMm}mm)` });
       }
     } else if (
       realCapability.maxXMm != null && realCapability.maxYMm != null &&

@@ -13,14 +13,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { ChevronsUpDown, Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useCreateMHR, useUpdateMHR, useMHRRecord, useMHRReferenceDetail, useMHRCategories, useMHRLocations, useMHRManufacturerCountries } from '@/lib/api/hooks';
-import { useProcessHierarchy } from '@/lib/api/hooks/useProcessCalculatorMappings';
+import { ComboboxWithPresets } from '@/components/ui/combobox-with-presets';
+import { useCreateMHR, useUpdateMHR, useMHRRecord, useMHRReferenceDetail, useMHRCategories, useMHRProcessGroups, useMHRLocations, useMHRManufacturerCountries, useMHRWageGrades } from '@/lib/api/hooks';
 import { toast } from 'sonner';
 import { mhrFormSchema, type MHRFormData } from '@/lib/validations/mhrValidation';
 import { getCurrencyForLocation as getCurrencyInfo } from '@/lib/utils/currency-locale';
@@ -34,10 +29,6 @@ interface MHRFormDialogProps {
   editingId?: string | null;
 }
 
-// Sheet-metal shop-floor labor grading (migration 577's own doc comment has
-// the full research/rationale) — a closed 3-tier classification, not a
-// DB-sourced list of arbitrary free-text values like the comboboxes below.
-const WAGE_GRADE_OPTIONS = ['Skilled', 'Semi-Skilled', 'Unskilled'] as const;
 
 // USD/USA is this app's default currency, not INR/India — see migration
 // 436_default_currency_usd_not_inr.sql's own doc comment for the full trace
@@ -57,83 +48,6 @@ const getDefaultValues = (): Partial<MHRFormData> => ({
   specification: '',
   cuttableMaterials: '',
 });
-
-// ── Generic combobox: real API-sourced presets + free-form typing ──────────
-function ComboboxWithPresets({
-  value, onChange, presets, placeholder, typePlaceholder, heading,
-}: {
-  value: string; onChange: (v: string) => void; presets: string[];
-  placeholder: string; typePlaceholder: string; heading: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value);
-  useEffect(() => { setInputValue(value); }, [value]);
-  const filtered = presets.filter(p => p.toLowerCase().includes(inputValue.toLowerCase()));
-  const commit = (val: string) => {
-    const trimmed = val.trim();
-    if (trimmed) { onChange(trimmed); }
-    setOpen(false);
-  };
-  return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        // Start the search box empty on every open so the full preset list
-        // shows immediately — pre-loading it with the current value (as
-        // inputValue's own sync effect does) filtered the list down to
-        // near-nothing for any field that already had a value, hiding the
-        // rest of the real options (e.g. Category showing only itself
-        // instead of all real categories on file).
-        if (o) setInputValue('');
-      }}
-    >
-      <PopoverTrigger asChild>
-        <Button type="button" variant="outline" role="combobox" aria-expanded={open}
-          className="w-full justify-between font-normal h-10 px-3 text-sm">
-          <span className={cn('truncate', !value && 'text-muted-foreground')}>{value || placeholder}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput placeholder={typePlaceholder} value={inputValue}
-            onValueChange={v => { setInputValue(v); onChange(v); }}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(inputValue); } }} />
-          <CommandList
-            // The Dialog this combobox lives in scroll-locks the page (via
-            // react-remove-scroll) while open, and that lock only recognizes
-            // elements inside the Dialog's own DOM subtree as scrollable —
-            // this list is portalled to document.body by Popover, outside
-            // that subtree, so the lock swallows the wheel event before the
-            // browser's native scroll ever runs, and the list looks stuck.
-            // Scrolling it manually here bypasses that native scroll path
-            // entirely.
-            onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
-          >
-            {filtered.length === 0 && inputValue.trim() ? (
-              <CommandEmpty>
-                <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-accent" onClick={() => commit(inputValue)}>
-                  Use &ldquo;<strong>{inputValue.trim()}</strong>&rdquo;
-                </button>
-              </CommandEmpty>
-            ) : null}
-            {filtered.length > 0 && (
-              <CommandGroup heading={heading}>
-                {filtered.map(p => (
-                  <CommandItem key={p} value={p} onSelect={() => { setInputValue(p); commit(p); }}>
-                    <Check className={cn('mr-2 h-4 w-4', value === p ? 'opacity-100' : 'opacity-0')} />
-                    {p}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 // Economics provenance caveat (Phase 1, "Machine Economics" initiative) —
 // only surfaces a note for the two non-authoritative tiers, mirroring
@@ -161,15 +75,16 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   const updateMutation = useUpdateMHR();
 
   // Real distinct values from mhr_records itself — never a hardcoded list.
-  // The real process taxonomy (process_calculator_mappings, the same data
-  // the Process page itself shows) — not mhr_records.process_group, which
-  // only ever holds "Sheet Metal" and, after migration 578 made every
-  // machine_library row global (user_id NULL), returns nothing at all for
-  // getDistinctProcessGroups' per-user query.
-  const { data: processHierarchy } = useProcessHierarchy();
-  const knownProcessGroups = processHierarchy?.processGroups ?? [];
+  // mhr_records.process_group directly (migration 646/647/694 backfilled
+  // it reliably across every domain) — NOT the process_calculator_mappings
+  // catalog tree, whose is_active flag would hide "Machining" here entirely:
+  // migration 691 left every Machining process_calculator_mappings row
+  // inactive (no machine_class registered yet), an unrelated concept from
+  // "does this process group have real HR Rates machines on file".
+  const { data: knownProcessGroups = [] } = useMHRProcessGroups();
   const { data: knownLocations = [] } = useMHRLocations();
   const { data: knownManufacturerCountries = [] } = useMHRManufacturerCountries();
+  const { data: knownWageGrades = [] } = useMHRWageGrades();
 
   const [selectedGroup, setSelectedGroup] = useState('');
   // Scoped to the selected Process — without this, Category listed every
@@ -446,16 +361,11 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
                 <div className="space-y-2">
                   <Label>Wage Grade</Label>
                   <Controller name="wageGrade" control={control} render={({ field }) => (
-                    <Select value={field.value || ''} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select wage grade…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WAGE_GRADE_OPTIONS.map((g) => (
-                          <SelectItem key={g} value={g}>{g}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <ComboboxWithPresets
+                      value={field.value || ''} onChange={field.onChange}
+                      presets={knownWageGrades} placeholder="Select or type wage grade…"
+                      typePlaceholder="Select or type (e.g. 3 - Metal)…" heading="Wage grades on file"
+                    />
                   )} />
                   <p className="text-xs text-muted-foreground">Reference only — real quote costing doesn't use this as a labor-rate lookup key yet.</p>
                 </div>

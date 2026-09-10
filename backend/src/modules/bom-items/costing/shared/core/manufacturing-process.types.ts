@@ -289,6 +289,16 @@ export interface ManufacturingProcessEngine<
 > {
   readonly machineClass: MachineClass;
   readonly processFamily: string;
+  /**
+   * The name this engine puts on the line it produces — the same string, so a
+   * consumer can name the process without running the engine.
+   *
+   * Optional only because the non-sheet-metal conformance wrappers (CNC,
+   * injection molding, inspection, surface treatment) compute whole quotes
+   * rather than one named line. Consumers must handle its absence rather than
+   * assume every registered engine declares one.
+   */
+  readonly processLabel?: string;
   // realCapability/capabilitySource: the real, DB-first hydrated capability
   // (and its provenance) for the specific machine `commodityCode` resolved to
   // (see machine-capability.ts's P0.1 doc comment) — optional so existing

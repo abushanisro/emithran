@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -30,6 +30,7 @@ interface UploadedFile {
  */
 @Injectable()
 export class FileStorageService {
+  private readonly logger = new Logger(FileStorageService.name);
   private supabase: SupabaseClient;
   private readonly BUCKET_NAME = 'bom-files';
   private readonly MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
@@ -57,7 +58,7 @@ export class FileStorageService {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
     const supabaseKey = this.configService.get<string>('SUPABASE_SERVICE_KEY');
 
-    console.log(`Initializing Supabase client with URL: ${supabaseUrl ? 'SET' : 'MISSING'}, Key: ${supabaseKey ? 'SET' : 'MISSING'}`);
+    this.logger.log(`Initializing Supabase client with URL: ${supabaseUrl ? 'SET' : 'MISSING'}, Key: ${supabaseKey ? 'SET' : 'MISSING'}`);
 
     if (!supabaseUrl || !supabaseKey) {
       throw new InternalServerErrorException(
@@ -66,7 +67,7 @@ export class FileStorageService {
     }
 
     this.supabase = createClient(supabaseUrl, supabaseKey);
-    console.log(`Supabase client initialized successfully for bucket: ${this.BUCKET_NAME}`);
+    this.logger.log(`Supabase client initialized successfully for bucket: ${this.BUCKET_NAME}`);
   }
 
   /**
@@ -224,30 +225,30 @@ export class FileStorageService {
     expiresIn: number = 3600, // 1 hour in seconds
   ): Promise<string> {
     try {
-      console.log(`Attempting to generate signed URL for path: ${storagePath} in bucket: ${this.BUCKET_NAME}`);
+      this.logger.log(`Attempting to generate signed URL for path: ${storagePath} in bucket: ${this.BUCKET_NAME}`);
       
       const { data, error } = await this.supabase.storage
         .from(this.BUCKET_NAME)
         .createSignedUrl(storagePath, expiresIn);
 
       if (error) {
-        console.error(`Supabase storage error:`, error);
+        this.logger.error(`Supabase storage error:`, error);
         throw new InternalServerErrorException(
           `Failed to generate signed URL - Supabase error: ${error.message}`,
         );
       }
 
       if (!data || !data.signedUrl) {
-        console.error(`No data returned from Supabase storage for path: ${storagePath}`);
+        this.logger.error(`No data returned from Supabase storage for path: ${storagePath}`);
         throw new InternalServerErrorException(
           `Failed to generate signed URL - No data returned for path: ${storagePath}`,
         );
       }
 
-      console.log(`Successfully generated signed URL for path: ${storagePath}`);
+      this.logger.log(`Successfully generated signed URL for path: ${storagePath}`);
       return data.signedUrl;
     } catch (error) {
-      console.error(`Exception in getSignedUrl for path ${storagePath}:`, error);
+      this.logger.error(`Exception in getSignedUrl for path ${storagePath}:`, error);
       throw new InternalServerErrorException(
         `Failed to generate signed URL: ${error.message}`,
       );
@@ -259,18 +260,18 @@ export class FileStorageService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      console.log(`Testing connection to bucket: ${this.BUCKET_NAME}`);
+      this.logger.log(`Testing connection to bucket: ${this.BUCKET_NAME}`);
       const { data, error } = await this.supabase.storage.listBuckets();
       
       if (error) {
-        console.error('Failed to list buckets:', error);
+        this.logger.error('Failed to list buckets:', error);
         return false;
       }
       
-      console.log('Available buckets:', data?.map(b => b.name));
+      this.logger.log('Available buckets:', data?.map(b => b.name));
       return data?.some(bucket => bucket.name === this.BUCKET_NAME) || false;
     } catch (error) {
-      console.error('Exception testing connection:', error);
+      this.logger.error('Exception testing connection:', error);
       return false;
     }
   }
@@ -280,22 +281,22 @@ export class FileStorageService {
    */
   async listFiles(directoryPath: string): Promise<string[]> {
     try {
-      console.log(`Listing files in directory: ${directoryPath}`);
+      this.logger.log(`Listing files in directory: ${directoryPath}`);
       
       const { data, error } = await this.supabase.storage
         .from(this.BUCKET_NAME)
         .list(directoryPath, { limit: 100 });
       
       if (error) {
-        console.error(`Error listing files in ${directoryPath}:`, error);
+        this.logger.error(`Error listing files in ${directoryPath}:`, error);
         return [];
       }
       
       const fileNames = data?.map(item => item.name) || [];
-      console.log(`Found ${fileNames.length} files in ${directoryPath}:`, fileNames);
+      this.logger.log(`Found ${fileNames.length} files in ${directoryPath}:`, fileNames);
       return fileNames;
     } catch (error) {
-      console.error(`Exception listing files in ${directoryPath}:`, error);
+      this.logger.error(`Exception listing files in ${directoryPath}:`, error);
       return [];
     }
   }
@@ -318,9 +319,9 @@ export class FileStorageService {
         
         const exists = !!(data && data.length > 0);
         results.push({ bucket: bucketName, exists });
-        console.log(`File ${filePath} in bucket '${bucketName}': ${exists ? 'EXISTS' : 'NOT FOUND'}`);
+        this.logger.log(`File ${filePath} in bucket '${bucketName}': ${exists ? 'EXISTS' : 'NOT FOUND'}`);
       } catch (error) {
-        console.error(`Error checking ${filePath} in bucket ${bucketName}:`, error);
+        this.logger.error(`Error checking ${filePath} in bucket ${bucketName}:`, error);
         results.push({ bucket: bucketName, exists: false });
       }
     }
@@ -341,13 +342,13 @@ export class FileStorageService {
         });
       
       if (error) {
-        console.error(`Error checking file existence:`, error);
+        this.logger.error(`Error checking file existence:`, error);
         return false;
       }
       
       return data && data.length > 0;
     } catch (error) {
-      console.error(`Exception checking file existence:`, error);
+      this.logger.error(`Exception checking file existence:`, error);
       return false;
     }
   }

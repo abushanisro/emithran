@@ -4,7 +4,7 @@ import type { CapabilityCheck, PartGeometryForCapability } from '../../shared/ca
 import { checkMachineCapability } from '../../shared/capability/machine-capability';
 import type { MachineCapability } from '../../shared/capability/machine-selection/seed-registry';
 import type { ManufacturingProcessEngine } from '../../shared/core/manufacturing-process.types';
-import { eMithranTerms } from '../../shared/core/engine-kernel';
+import { eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 
 // Extracted verbatim from cost-engine.ts's inline Press Brake block (Platform
 // Architecture Remediation Phase 1 — engine registry unification, Rule 8).
@@ -23,6 +23,8 @@ export interface PressBrakeInput {
   cycleTimeSecFromCalculator?: number;
   setupTimeMinFromCalculator?: number;
   fallbackSetupMin: number; // toolSetupBrakeMin, per-batch — used only when setupTimeMinFromCalculator is absent
+  /** Real sm_lookup_op_setup_time minutes for bending, when a row exists. */
+  operationSetupMin?: number | null;
   calculatorId?: string | null;
   calculatorVersion?: number | null;
   physicsGap?: PhysicsGap | null;
@@ -59,9 +61,26 @@ export function computePressBrakeCost(input: PressBrakeInput): PressBrakeResult 
     warnings.push('Press brake cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
   }
 
-  const setupTimeMin = (typeof input.setupTimeMinFromCalculator === 'number' && Number.isFinite(input.setupTimeMinFromCalculator))
-    ? input.setupTimeMinFromCalculator
-    : input.fallbackSetupMin / Math.max(input.batchSize, 1);
+  // The bending calculator's own "Setup Time" output is already PER PIECE —
+  // its real stored formula is "Tool Loading Time / Lot Size" and its label is
+  // "Setup Time (min/piece)" (calculators/009). So it is the only tier here
+  // that must NOT be divided again, and multiplying it back out by the batch
+  // recovers the real un-amortised Tool Loading Time for the line/record.
+  const batch = Math.max(input.batchSize, 1);
+  const calculatorSetupMinPerPiece =
+    (typeof input.setupTimeMinFromCalculator === 'number' && Number.isFinite(input.setupTimeMinFromCalculator))
+      ? input.setupTimeMinFromCalculator
+      : null;
+  const setup = resolveSetupMinutes({
+    process: 'Press Brake',
+    calculatorSetupMin: calculatorSetupMinPerPiece === null ? null : calculatorSetupMinPerPiece * batch,
+    machineSetupTimeHr: input.rate.setupTimeHr,
+    operationSetupMin: input.operationSetupMin,
+    classDefaultMin: input.fallbackSetupMin,
+    machineName: input.rate.machineName,
+  });
+  if (setup.warning) warnings.push(setup.warning);
+  const setupTimeMin = setup.setupMin / batch;
 
   const t = eMithranTerms({
     mhrPerHr: input.rate.rate,
@@ -91,6 +110,8 @@ export function computePressBrakeCost(input: PressBrakeInput): PressBrakeResult 
         processRoute: input.processIdentity.processRoute,
         operation: input.processIdentity.operation,
       } : {}),
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: Math.round(t.setupCost * 100) / 100,
       runCost: Math.round((t.machineCost + t.laborCost) * 100) / 100,
       totalCost: Math.round(t.total * 100) / 100,
@@ -117,6 +138,7 @@ export interface PressBrakeContext extends PressBrakeInput {}
 export class PressBrakeEngine implements ManufacturingProcessEngine<PressBrakeContext, PressBrakeResult> {
   readonly machineClass = 'press_brake' as const;
   readonly processFamily = 'sheet_metal_secondary_ops';
+  readonly processLabel = 'Press Brake';
 
   checkCapability(
     geometry: PartGeometryForCapability,

@@ -211,6 +211,24 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   // behind it. An unclassified/unverified CO2 laser gets EMPTY_CAPABILITY
   // only — a real, honest "no capability on file" state, not a number.
   co2_laser:      {},
+  // laser_cut (added 2026-09-10, user-confirmed distinct real Digital
+  // Factory pool, memory/sheetmetal/machine/machine_library.json's "Laser
+  // Cutting Machine" category, 24 real machines e.g. "Cincinnati CL 850").
+  // Real minimum bed X/Y across all 24 real machines on file (1250x1150mm) —
+  // same conservative-floor convention fiber_laser above uses, sourced from
+  // real data, not guessed. No per-material max-thickness fields: unlike
+  // Fiber Laser Cutting Machine's schema (max_thickness_1..5_mm), this
+  // category's real records carry no per-material thickness data at all, so
+  // none is fabricated here.
+  laser_cut:      { maxXMm: 1250, maxYMm: 1150 },
+  // 3D Laser (added 2026-09-10, user-confirmed distinct real pool,
+  // "3D Laser Cutting Machine" category, 15 real machines e.g. "3D Laser -
+  // 3300 Watts"). Real minimum bed X/Y/Z across all 15 real machines
+  // (1300x1300x600mm) — this is the only laser class whose real schema even
+  // has a bed_height_mm (Z) field at all, confirming it is genuinely not a
+  // flat-sheet machine. Same conservative-floor convention, no per-material
+  // thickness fields (none exist in the real data for this category either).
+  laser_3d:       { maxXMm: 1300, maxYMm: 1300, maxZMm: 600 },
   press_brake:    { maxTonnage: 60, maxLengthMm: 2000, maxThicknessMm: 5 },
   turret_punch:   { maxXMm: 2000, maxYMm: 1000, maxThicknessMm: 4, maxTonnage: 20 },
   waterjet:       { maxXMm: 2000, maxYMm: 1000, maxThicknessMm: 80 },
@@ -228,37 +246,55 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   // No conservative envelope default — same reasoning as router_2axis above.
   // Only 4 real machines exist per class (migration 608) spanning a wide
   // real range (152.96t-713.80t tonnage, 1000mm-3250mm bed) — an
-  // unclassified Standard/Tandem Press gets EMPTY_CAPABILITY only.
+  // unclassified Standard/Tandem Press gets EMPTY_CAPABILITY only. Real
+  // per-machine capability (press_force_kn, max_part_length/width_mm, all 5
+  // real per-material thickness fields) is backfilled directly into
+  // mhr_records via migration 701, the same migration-JOIN pattern as
+  // shear/laser_punch below — not hardcoded here.
   standard_press: {},
   tandem_press:   {},
   // Same reasoning — 14 real, category-exclusive Progressive Die Press
   // machines (2026-09-01) span 588kN-9964kN press force / 950mm-5000mm
-  // table length, too wide a real spread for one class-wide floor.
+  // table length, too wide a real spread for one class-wide floor. Real
+  // per-machine capability backfilled via migration 701 too, but only
+  // press_force_kn/press_table_length_width_mm/max_thickness_aluminum_mm —
+  // the source data has no other 4 real materials' thickness for this
+  // class (disclosed gap in the staging migration itself), never fabricated.
   progressive_die_press: {},
-  // No conservative envelope default — 10 real Shearing Machine machines
+  // No conservative envelope default — the 10 real Shearing Machine machines
   // (2026-09-01) span shear_speed 11-35 strokes/min and per-material
-  // thickness limits from 1.7mm (SS) to 20mm (AL) — too wide a real spread
-  // for one class-wide floor, same reasoning as router_2axis/oxyfuel_cut.
+  // thickness limits from 1.7mm (SS) to 20mm (AL), too wide a real spread
+  // for one class-wide floor. Real per-machine capability is backfilled
+  // directly into mhr_records (Machine Economics backlog, Part 1 — a
+  // migration 570-style JOIN against sm_reference_data's already-staged
+  // "Shearing Machine:*" rows, real DB data taking priority in
+  // hydrateCapability() over this code-level seed layer), not hardcoded
+  // here — this empty default is only the last-resort tier for a shear
+  // row the migration hasn't reached (e.g. added after the migration ran).
   shear:          {},
   // No conservative envelope default — 26 real Laser Punch / Punch Press
   // machines (2026-09-01) span 200-4000W / 220-300kN press force / a wide
   // sheet-size range, too wide a real spread for one class-wide floor.
   laser_punch:    {},
-  // No conservative envelope default — 13 real Plasma Cutting Machine
-  // machines (2026-09-01) span 100W-100,000W power, too wide a real spread
-  // for one class-wide floor.
+  // No conservative envelope default — the 13 real Plasma Cutting Machine
+  // machines (2026-09-01) span 100W-100,000W power and 2438-27000mm bed
+  // length, too wide a real spread for one class-wide floor. Real
+  // per-machine bed size is backfilled directly into mhr_records (Machine
+  // Economics backlog, Part 1 — see the shear entry above for the same
+  // migration-driven pattern), not hardcoded here.
   plasma_cut:     {},
   // No conservative envelope default — 12 real Plasma Punch machines
   // (2026-09-01) span 30-400W power, too wide a real spread for one
   // class-wide floor.
   plasma_punch:   {},
-  // No conservative envelope default and no MachineRequirement built for
-  // these classes at all (same as standard_press/tandem_press/
-  // progressive_die_press — see bom-items.service.ts's requirements-building
-  // block) — real per-category capability (roll_working_length_mm,
-  // steel_thickness_mm / single-vs-multi-pass thickness) isn't modeled as a
-  // MachineRequirement yet, same deliberate simplification already accepted
-  // for the Press family.
+  // No conservative envelope default — real per-machine roll_working_length_mm
+  // and mild-steel-only steel_thickness_mm span too wide a real range for one
+  // class-wide floor (a few machines additionally carry real single-vs-
+  // multi-pass diameter/thickness fields, inconsistently present across the
+  // fleet — not modeled as a MachineRequirement dimension yet, a real,
+  // disclosed gap, not fabricated). Real per-machine capability (roll length,
+  // mild-steel thickness) backfilled directly into mhr_records via migration
+  // 701, the same migration-JOIN pattern as shear/laser_punch above.
   roll_bending_2: {},
   roll_bending_3: {},
   roll_bending_4: {},

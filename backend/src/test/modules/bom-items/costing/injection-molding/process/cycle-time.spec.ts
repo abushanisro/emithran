@@ -14,6 +14,7 @@
 import {
   lookupResinProps,
   computeCycleTime,
+  computeFillTimeSec,
   RESIN_THERMAL_TABLE,
   type RealResinInputs,
 } from '../../../../../../modules/bom-items/costing/injection-molding/process/cycle-time';
@@ -137,5 +138,54 @@ describe('computeCycleTime — real data threaded end to end, formula untouched'
     expect(withReal.resinProps.Tm).toBe(260);
     // Fill time model is untouched by Phase 1 (vFront never overridden).
     expect(withReal.fillSec).toBe(fallback.fillSec);
+  });
+});
+
+// Real cavity-count/gate-count fill-time adjustment factors (migration 663,
+// injectionTimeAdjustmentFactors.json). Values below are the real source
+// table's own numbers, not invented test fixtures.
+describe('computeFillTimeSec — real cavity-count/gate-count adjustment factors (migration 663)', () => {
+  const props = RESIN_THERMAL_TABLE.ABS;
+  // Large enough that the base (pre-adjustment) fill time clears
+  // IM_FILL_MIN_SEC (0.5 s) even after the smallest real adjustment factor
+  // (0.25) is applied — otherwise the floor would mask the factors being tested.
+  const bboxMm = 1000;
+  const rawFillSec = () => {
+    // Reproduce the pre-factor base model directly (flow-length / vFront)
+    // to compute the expected pre-adjustment baseline independently of the
+    // function under test.
+    const lFlow = bboxMm * 0.60;
+    const tFill = lFlow / Math.max(props.vFront, 10);
+    return Math.max(0.5, Math.round(tFill * 10) / 10);
+  };
+
+  it('defaults (no cavityCount/gatesPerCavity args) apply cavityFactor=1.00 (≤3) and gateFactor=0.60 (1 gate)', () => {
+    const base = rawFillSec();
+    const result = computeFillTimeSec(bboxMm, props);
+    expect(result).toBeCloseTo(Math.max(0.5, Math.round(base * 1.00 * 0.60 * 10) / 10), 5);
+  });
+
+  it('8 cavities lands in the ≤8 bucket (factor 1.05), scaling fill time up vs. 1 cavity', () => {
+    const base = rawFillSec();
+    const oneCavity = computeFillTimeSec(bboxMm, props, 1, 1);
+    const eightCavities = computeFillTimeSec(bboxMm, props, 8, 1);
+    expect(oneCavity).toBeCloseTo(Math.round(base * 1.00 * 0.60 * 10) / 10, 5);
+    expect(eightCavities).toBeCloseTo(Math.round(base * 1.05 * 0.60 * 10) / 10, 5);
+    expect(eightCavities).toBeGreaterThan(oneCavity);
+  });
+
+  it('4 gates per cavity lands in the ≤4 bucket (factor 0.25), scaling fill time down vs. 1 gate', () => {
+    const base = rawFillSec();
+    const oneGate = computeFillTimeSec(bboxMm, props, 1, 1);
+    const fourGates = computeFillTimeSec(bboxMm, props, 1, 4);
+    expect(oneGate).toBeCloseTo(Math.round(base * 1.00 * 0.60 * 10) / 10, 5);
+    expect(fourGates).toBeCloseTo(Math.round(base * 1.00 * 0.25 * 10) / 10, 5);
+    expect(fourGates).toBeLessThan(oneGate);
+  });
+
+  it('cavity counts beyond the last real breakpoint (999,999) use the ceiling bucket (factor 1.10), not a guessed extrapolation', () => {
+    const atCeiling = computeFillTimeSec(bboxMm, props, 50, 1);
+    const wayBeyond = computeFillTimeSec(bboxMm, props, 10_000, 1);
+    expect(wayBeyond).toBe(atCeiling);
   });
 });

@@ -17,6 +17,7 @@ import { BaseCuttingEngine } from '../../shared/core/engine-orchestrator';
 export class ShearingEngine extends BaseCuttingEngine {
   readonly machineClass = 'shear';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Shearing';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     return computePressStrokeCost('Shearing', 'shear', {

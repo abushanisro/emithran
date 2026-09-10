@@ -1,5 +1,5 @@
 import type { ManufacturingProcessEngine } from './manufacturing-process.types';
-import { LaserCuttingEngine, Co2LaserCuttingEngine } from '../../sheet-metal/process/laser-cutting-engine';
+import { LaserCuttingEngine, Co2LaserCuttingEngine, LaserCutEngine, ThreeDLaserCuttingEngine } from '../../sheet-metal/process/laser-cutting-engine';
 import { TurretPunchEngine } from '../../sheet-metal/process/turret-punch-engine';
 import { WaterjetEngine } from '../../sheet-metal/process/waterjet-engine';
 import { OxyfuelCuttingEngine } from '../../sheet-metal/process/oxyfuel-cutting-engine';
@@ -64,6 +64,8 @@ import { SurfaceTreatmentEngine } from '../process/surface-treatment-registry-en
 export const MANUFACTURING_PROCESS_REGISTRY: ManufacturingProcessEngine<any, any, any, any>[] = [
   new LaserCuttingEngine(),
   new Co2LaserCuttingEngine(),
+  new LaserCutEngine(),
+  new ThreeDLaserCuttingEngine(),
   new TurretPunchEngine(),
   new WaterjetEngine(),
   new OxyfuelCuttingEngine(),
@@ -109,6 +111,8 @@ export function getEnginesForFamily(processFamily: string): ManufacturingProcess
 export const ROUTE_ID_FOR_CLASS: Record<string, string> = {
   fiber_laser: 'sm-laser',
   co2_laser: 'sm-co2-laser',
+  laser_cut: 'sm-laser-cut',
+  laser_3d: 'sm-laser-3d',
   turret_punch: 'sm-turret',
   waterjet: 'sm-waterjet',
   router_2axis: 'sm-router',
@@ -127,6 +131,8 @@ export const ROUTE_ID_FOR_CLASS: Record<string, string> = {
 export const ROUTE_LABEL_FOR_CLASS: Record<string, string> = {
   fiber_laser: 'Fiber Laser + Press Brake',
   co2_laser: 'CO2 Laser + Press Brake',
+  laser_cut: 'Laser Cut + Press Brake',
+  laser_3d: '3D Laser + Press Brake',
   turret_punch: 'Turret Punch + Press Brake',
   waterjet: 'Waterjet + Press Brake',
   router_2axis: '2-Axis Router + Press Brake',
@@ -156,4 +162,61 @@ export function getCuttingRouteIds(): string[] {
 
 export function getFormingRouteIds(): string[] {
   return getEnginesForFamily('sheet_metal_forming').map((e) => ROUTE_ID_FOR_CLASS[e.machineClass] ?? e.machineClass);
+}
+
+
+/**
+ * The process label each registered engine puts on its own line, keyed by
+ * machine class — derived from the engines, never maintained as a list.
+ *
+ * Replaces a hardcoded four-entry map in cost-engine.ts that named only
+ * fiber_laser / co2_laser / turret_punch / waterjet, so every other applied
+ * route had no name available and fell back to whatever catalog field happened
+ * to be on the persisted row (for the press family, the route GROUP
+ * "Bending/Floating /Forming" rather than a process name).
+ */
+export function getProcessLabelForClass(): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const engine of MANUFACTURING_PROCESS_REGISTRY) {
+    if (engine.processLabel) map[engine.machineClass] = engine.processLabel;
+  }
+  return map;
+}
+
+/**
+ * Every machine class that can be the CORE process of an applied sheet-metal
+ * route: each registered cutting or forming engine, plus press_brake.
+ *
+ * Derived from the registry, in one place, because it is read twice on the
+ * same code path and the two reads must not be allowed to disagree.
+ * getCostSummary() loads the applied route with
+ * `.in('machine_class', ...)` and then hands the SAME concept to
+ * applyPersistedRouteToSummary() as its coreProcessClasses argument. Those
+ * were two independent lists — a 17-entry string literal for the query and a
+ * getEnginesForFamily() derivation for the overlay. They happened to agree
+ * exactly, which is what made it dangerous rather than obviously broken:
+ * registering a new cutting engine grows the derivation and not the literal,
+ * so the applied row is filtered out of the query, `appliedRows` comes back
+ * empty, the overlay never runs, and the Cost Guide silently shows the live
+ * pre-apply preview instead — which for cutting only ever composes a Laser
+ * Cutting line. A user who applied that new route would see a laser quote.
+ *
+ * press_brake is a member because it is independently overridable through the
+ * Edit Process Cost dialog, so a persisted press-brake row must load and
+ * overlay even when the route's core cutting row is unchanged. It is a
+ * secondary-ops engine, hence named here rather than coming from a family.
+ */
+export function getRouteCoreProcessClasses(): ReadonlySet<string> {
+  return new Set<string>([
+    ...getEnginesForFamily('sheet_metal_cutting').map((e) => e.machineClass as string),
+    ...getEnginesForFamily('sheet_metal_forming').map((e) => e.machineClass as string),
+    'press_brake',
+  ]);
+}
+
+/** The registered classes that bend in-process, so their route needs no press brake. */
+export function getFormingProcessClasses(): ReadonlySet<string> {
+  return new Set<string>(
+    getEnginesForFamily('sheet_metal_forming').map((e) => e.machineClass as string),
+  );
 }

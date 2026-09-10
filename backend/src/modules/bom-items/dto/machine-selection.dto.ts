@@ -52,6 +52,17 @@ export interface MachineCandidate {
   // the way Sheet Metal classes do — real setup_time_hr genuinely IS a
   // fixed per-machine value for these). null when not set for this machine.
   setupTimeHr: number | null;
+  /**
+   * The two components the canonical Machine Hour Rate is DEFINED as
+   * (migration 581: MHR = Direct Overhead Rate + Indirect Overhead Rate,
+   * derived by mhr.service.ts on every write and authoritative for live quote
+   * costing). Carried so applyBenchmarkOverrideIfNeeded() can distinguish a
+   * real machine rate that IS that canonical sum from a mis-scaled import,
+   * instead of judging both by their ratio to a generic class benchmark.
+   * null when the row has no overhead breakdown on file.
+   */
+  directOverheadRate: number | null;
+  indirectOverheadRate: number | null;
 }
 
 // Structured version of the material/thickness-vs-capacity check — lets the

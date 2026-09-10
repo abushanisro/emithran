@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { SupabaseService } from '@/common/supabase/supabase.service';
 import { 
   CreateRemarkDto, 
@@ -14,6 +14,8 @@ import {
 
 @Injectable()
 export class RemarkService {
+  private readonly logger = new Logger(RemarkService.name);
+
   constructor(private readonly supabaseService: SupabaseService) {}
 
   async createRemark(createDto: CreateRemarkDto, createdBy: string): Promise<RemarkResponseDto> {
@@ -53,7 +55,7 @@ export class RemarkService {
         .single();
 
       if (error) {
-        console.error('Database error creating remark:', error);
+        this.logger.error('Database error creating remark:', error);
         throw new BadRequestException('Failed to create remark');
       }
 
@@ -62,7 +64,7 @@ export class RemarkService {
       if (error instanceof BadRequestException || error instanceof ConflictException) {
         throw error;
       }
-      console.error('Error creating remark:', error);
+      this.logger.error('Error creating remark:', error);
       throw new BadRequestException('Failed to create remark');
     }
   }
@@ -121,7 +123,7 @@ export class RemarkService {
       .single();
 
     if (error) {
-      console.error('Database error updating remark:', error);
+      this.logger.error('Database error updating remark:', error);
       throw new BadRequestException('Failed to update remark');
     }
 
@@ -153,7 +155,7 @@ export class RemarkService {
       .eq('id', id);
 
     if (error) {
-      console.error('Database error deleting remark:', error);
+      this.logger.error('Database error deleting remark:', error);
       throw new BadRequestException('Failed to delete remark');
     }
   }
@@ -227,7 +229,7 @@ export class RemarkService {
     const { data, error, count } = await query;
 
     if (error) {
-      console.error('Database error fetching remarks:', error);
+      this.logger.error('Database error fetching remarks:', error);
       throw new BadRequestException('Failed to fetch remarks');
     }
 
@@ -269,7 +271,7 @@ export class RemarkService {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Database error fetching remarks by lot:', error);
+      this.logger.error('Database error fetching remarks by lot:', error);
       throw new BadRequestException('Failed to fetch remarks for lot');
     }
 
@@ -323,7 +325,7 @@ export class RemarkService {
       .single();
 
     if (error) {
-      console.error('Database error creating comment:', error);
+      this.logger.error('Database error creating comment:', error);
       throw new BadRequestException('Failed to create comment');
     }
 
@@ -356,7 +358,7 @@ export class RemarkService {
       .single();
 
     if (error) {
-      console.error('Database error updating comment:', error);
+      this.logger.error('Database error updating comment:', error);
       throw new BadRequestException('Failed to update comment');
     }
 
@@ -387,7 +389,7 @@ export class RemarkService {
       .eq('id', id);
 
     if (error) {
-      console.error('Database error deleting comment:', error);
+      this.logger.error('Database error deleting comment:', error);
       throw new BadRequestException('Failed to delete comment');
     }
   }
@@ -402,7 +404,7 @@ export class RemarkService {
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('Database error fetching comments:', error);
+      this.logger.error('Database error fetching comments:', error);
       throw new BadRequestException('Failed to fetch comments');
     }
 
@@ -424,7 +426,7 @@ export class RemarkService {
       .eq('lot_id', lotId);
 
     if (error) {
-      console.error('Database error fetching remark stats:', error);
+      this.logger.error('Database error fetching remark stats:', error);
       throw new BadRequestException('Failed to fetch remark statistics');
     }
 

@@ -312,6 +312,12 @@ const DEFAULT_THREAD_PITCH_MM: Record<number, number> = {
   3: 0.5, 4: 0.7, 5: 0.8, 6: 1.0, 8: 1.25, 10: 1.5, 12: 1.75, 16: 2.0, 20: 2.5, 24: 3.0,
 };
 
+// The two values used when even the standard series cannot answer. Named, so
+// they read as assumptions at every use site instead of as bare literals, and
+// so resolveTapPhysicsInputs can flag when it fell back to them.
+const ASSUMED_TAP_DIAMETER_MM = 4;
+const ASSUMED_THREAD_PITCH_MM = 1.0;
+
 // Real HSS (M2 grade) tapping surface speed by material family — cross-verified
 // from two independent published tap-vendor references:
 //   - Viking Drill & Tool / Norseman Drill & Tool "Recommended Feeds and
@@ -382,6 +388,7 @@ export interface TapCycleBreakdown {
   totalSec: number;     // toolChangeSec + perHoleSec * count
   pitchMm: number;
   depthMm: number;
+  pitchIsAssumed: boolean; // true when neither a real pitch nor an ISO coarse-series entry existed
   depthIsAssumed: boolean; // true when no real depth was available and fallbackDepthMm was used
   surfaceSpeedMMin: number;   // real material-specific speed actually used (see TAP_SURFACE_SPEED_M_MIN_BY_MATERIAL)
   materialFamily: string;     // classifyMaterialFamily() result that picked surfaceSpeedMMin
@@ -403,7 +410,11 @@ export interface TapCycleBreakdown {
  */
 export interface TapPhysicsInputs {
   diameterMm: number;
+  /** true when sizeStr carried no parseable M-diameter and the assumption was used. */
+  diameterIsAssumed: boolean;
   pitchMm: number;
+  /** true when neither a real pitch nor an ISO coarse-series entry was available. */
+  pitchIsAssumed: boolean;
   depthMm: number;
   depthIsAssumed: boolean;
   surfaceSpeedMMin: number;
@@ -427,13 +438,25 @@ export function resolveTapPhysicsInputs(
   materialGrade?: string | null,
 ): TapPhysicsInputs {
   const diaMatch = sizeStr.match(/M\s*(\d+(?:\.\d+)?)/i);
-  const diameterMm = diaMatch ? parseFloat(diaMatch[1]) : 4;
-  const pitchMm = pitchMmIn ?? DEFAULT_THREAD_PITCH_MM[Math.round(diameterMm)] ?? 1.0;
+  // An unparseable size string used to silently become M4 — a real tap
+  // diameter, fed straight into the RPM term of the cycle-time physics, while
+  // the calculator's own provenance line still read 'Parsed from thread size'.
+  // The number was fabricated and the label said it was measured. Both are
+  // reported now: the assumption is flagged so every consumer can disclose it.
+  const diameterIsAssumed = !diaMatch;
+  const diameterMm = diaMatch ? parseFloat(diaMatch[1]) : ASSUMED_TAP_DIAMETER_MM;
+  // The ISO 261 coarse-pitch series below is real reference data — M4 really is
+  // 0.7. The `?? 1.0` tail was not: an off-series nominal (M7, M14, M18, M22, or
+  // a diameter that came from the assumption above) got a 1.0mm pitch that
+  // scales feed = RPM x pitch, and so scales tapping cycle time and cost.
+  const tablePitch = DEFAULT_THREAD_PITCH_MM[Math.round(diameterMm)];
+  const pitchIsAssumed = pitchMmIn == null && tablePitch == null;
+  const pitchMm = pitchMmIn ?? tablePitch ?? ASSUMED_THREAD_PITCH_MM;
   const depthIsAssumed = depthMmIn == null || depthMmIn <= 0;
   const depthMm = depthIsAssumed ? Math.max(fallbackDepthMm, 0.1) : depthMmIn!;
   const materialFamily = classifyMaterialFamily(materialGrade);
   const surfaceSpeedMMin = TAP_SURFACE_SPEED_M_MIN_BY_MATERIAL[materialFamily] ?? TAP_SURFACE_SPEED_M_MIN_BY_MATERIAL['__default__']!;
-  return { diameterMm, pitchMm, depthMm, depthIsAssumed, surfaceSpeedMMin, materialFamily };
+  return { diameterMm, diameterIsAssumed, pitchMm, pitchIsAssumed, depthMm, depthIsAssumed, surfaceSpeedMMin, materialFamily };
 }
 
 export function computeTapCycleSec(
@@ -444,7 +467,7 @@ export function computeTapCycleSec(
   fallbackDepthMm: number,
   materialGrade?: string | null,
 ): TapCycleBreakdown {
-  const { diameterMm, pitchMm, depthMm, depthIsAssumed, surfaceSpeedMMin, materialFamily } =
+  const { diameterMm, pitchMm, pitchIsAssumed, depthMm, depthIsAssumed, surfaceSpeedMMin, materialFamily } =
     resolveTapPhysicsInputs(sizeStr, pitchMmIn, depthMmIn, fallbackDepthMm, materialGrade);
 
   const physics = computeTapPhysics(diameterMm, count, pitchMm, depthMm, surfaceSpeedMMin);
@@ -455,6 +478,7 @@ export function computeTapCycleSec(
     tapSec: Math.round(physics.machiningTimeSec * 100) / 100,
     totalSec: physics.totalSecWithoutUnload,
     pitchMm,
+    pitchIsAssumed,
     depthMm: Math.round(depthMm * 100) / 100,
     depthIsAssumed,
     surfaceSpeedMMin,
@@ -881,10 +905,26 @@ export interface MachineRegistryEntry {
 export const MACHINE_REGISTRY = {
   // commodityCodes: DB uses 'KW' suffix (SM-LASER-2KW) not 'K' — both kept for legacy compat.
   // processGroupKeywords includes exact process_group values from process_calculator_mappings so
-  // that mhr_records seeded with DB-canonical group names (e.g. 'Machining', 'Plastic & Rubber')
+  // that mhr_records seeded with DB-canonical group names (e.g. 'Machining', 'Plastic Molding')
   // resolve correctly alongside legacy/eMithran group names.
   // 'Sheet metal' (lowercase m) matches the eMithran India DB rows.
-  fiber_laser:    { commodityCodes: ['SM-LASER-2K', 'SM-LASER-4K', 'SM-LASER-6K', 'SM-LASER-2KW', 'SM-LASER-4KW', 'SM-LASER-6KW'], processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'Fiber Laser', 'Laser Cutting'],                                              machineClassKeywords: ['Fiber Laser', 'Laser Cut', 'Laser Cutter', 'Laser Cutting'] },
+  // 'Laser Cut', 'Laser Cutter', 'Laser Cutting' removed from this class's own
+  // machineClassKeywords (root-caused 2026-09-10, confirmed by the user
+  // directly: Fiber Laser Cutting Machine (26), Laser Cutting Machine (24)
+  // and 3D Laser Cutting Machine (15) are three real, separately-specced
+  // Digital Factory machine pools). This is a DIFFERENT concern from
+  // migration 715 (2026-09-09), which deactivated a duplicate OPERATION
+  // NAME ("Fiber Laser Cut", byte-identical to "Laser Cut" in route/
+  // machine_class/calculator) — that migration never claimed the three real
+  // machine POOLS should share one machine_class, only that the "Laser Cut"
+  // operation correctly uses the real, verified fiber-laser-shaped
+  // cutting-speed calculator (migration 457/f8537846) — a calculator choice
+  // that is independent of which machine pool prices against it. Generic
+  // laser keywords here would keep sweeping "Laser Cutting Machine"'s and
+  // "3D Laser Cutting Machine"'s real, distinctly-specced machines into
+  // fiber_laser's pool, exactly the same shape of bug already fixed once for
+  // CO2 ("Quattro") below — so 'Fiber Laser' is the only keyword left.
+  fiber_laser:    { commodityCodes: ['SM-LASER-2K', 'SM-LASER-4K', 'SM-LASER-6K', 'SM-LASER-2KW', 'SM-LASER-4KW', 'SM-LASER-6KW'], processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'Fiber Laser', 'Laser Cutting'],                                              machineClassKeywords: ['Fiber Laser'] },
   // A real, physically distinct laser technology from fiber_laser — CO2
   // discharge oscillator (10.6μm) vs fiber (~1.06μm), different real machines
   // (e.g. AMADA Quattro AF1000i-C/AF2000i-C — confirmed via AMADA's own
@@ -897,6 +937,19 @@ export const MACHINE_REGISTRY = {
   // in mhr_records, which then silently applied fiber-laser cutting-speed
   // assumptions to a machine that doesn't use fiber-laser physics at all.
   co2_laser:      { commodityCodes: [],                                                                                              processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'CO2 Laser', 'Laser Cutting'],                                                 machineClassKeywords: ['CO2 Laser', 'CO2'] },
+  // The real "Laser Cutting Machine" Digital Factory pool (24 machines,
+  // user-confirmed distinct specs from Fiber Laser Cutting Machine). Reuses
+  // the SAME real "Laser Cut" operation and the SAME verified fiber-laser-
+  // shaped cutting-speed calculator (migration 715/457 — a calculator/
+  // formula choice, not a machine-pool claim) but resolves its rate/
+  // capability from THIS class's own real machine pool, not fiber_laser's.
+  laser_cut:      { commodityCodes: [],                                                                                              processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'Laser Cutting'],                                                              machineClassKeywords: ['Laser Cut', 'Laser Cutter', 'Laser Cutting Machine'] },
+  // The real "3D Laser Cutting Machine" Digital Factory pool (15 machines,
+  // user-confirmed distinct specs) — 3D/tube/5-axis laser cutting, a
+  // genuinely different capability from flat-sheet cutting (real taxonomy
+  // operations are ComplexHole/SimpleHole only, no //Blank — it does not
+  // blank its own stock, see routeProducesBlank).
+  laser_3d:       { commodityCodes: [],                                                                                              processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'Laser Cutting', '3D Laser'],                                                    machineClassKeywords: ['3D Laser'] },
   // 'Bend Brake' is the DB machine_class name for India press brake records.
   // Root-caused 2026-08-30 (live bug report): a bare 'Press' keyword here
   // matched ANY machine whose machine_class contains the word "press" as a
@@ -1047,8 +1100,9 @@ export const MACHINE_REGISTRY = {
   cnc_lathe_live: { commodityCodes: ['CNC-LATHE-LT'],                                                                                processGroupKeywords: ['Turning', 'Lathe', 'Machining'],                                                                                    machineClassKeywords: ['Live Tool', 'Sub-Spindle', 'Live Tooling'] },
   cnc_mill_turn:  { commodityCodes: ['CNC-MILLTURN'],                                                                                processGroupKeywords: ['Mill-Turn', 'Turn-Mill', 'Machining'],                                                                               machineClassKeywords: ['Mill-Turn', 'MillTurn', 'Turn Mill', 'Mill Turn'] },
   // SM-IM-* = India injection molder commodity codes (100T / 200T / 500T).
-  // 'Plastic & Rubber' is the exact process_group in process_calculator_mappings.
-  injection_molding: { commodityCodes: ['IM-SMALL', 'IM-MED', 'IM-LARGE', 'SM-IM-100T', 'SM-IM-200T', 'SM-IM-500T'],             processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Injection Mold', 'Plastics', 'Plastic & Rubber'],                            machineClassKeywords: ['Injection Molding', 'Injection Molder', 'IMM', 'Injection Mold'] },
+  // 'Plastic Molding' is the exact process_group in process_calculator_mappings
+  // and process_taxonomy (migration 647 — renamed from 'Plastic & Rubber').
+  injection_molding: { commodityCodes: ['IM-SMALL', 'IM-MED', 'IM-LARGE', 'SM-IM-100T', 'SM-IM-200T', 'SM-IM-500T'],             processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Injection Mold', 'Plastics'],                            machineClassKeywords: ['Injection Molding', 'Injection Molder', 'IMM', 'Injection Mold'] },
   // Real, distinct machine class (2026-09-02 process-duplicate-audit fix) —
   // previously "Structural foam molding" shared machine_class='compression_molding'
   // with the real Compression Molding process (a live data bug: both real,
@@ -1058,7 +1112,7 @@ export const MACHINE_REGISTRY = {
   // genuinely injection-style physics (fill/pack/cool/eject via a nozzle,
   // low-pressure with a blowing agent) — reuses computeInjectionMoldedCostSummary
   // unchanged, only the machine pool/rate differs from injection_molding.
-  structural_foam_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Plastic & Rubber'], machineClassKeywords: ['Structural Foam', 'Foam Molder', 'Foam Molding'] },
+  structural_foam_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding'], machineClassKeywords: ['Structural Foam', 'Foam Molder', 'Foam Molding'] },
   // Real, distinct machine class (2026-09-02). Real machine pool:
   // memory/Injection/machine/compression_molding_machines.json (23 machines,
   // e.g. "Accurl Hydraulic Press HBP-40"). Compression molding is NOT
@@ -1068,7 +1122,7 @@ export const MACHINE_REGISTRY = {
   // computeCompressionMoldingCost(), not the injection-molding engine. See
   // that file's own header for the real-data-only, no-fabricated-cure-time
   // discipline this class's costing follows.
-  compression_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Plastic & Rubber'], machineClassKeywords: ['Compression Molding', 'Compression Press'] },
+  compression_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding'], machineClassKeywords: ['Compression Molding', 'Compression Press'] },
   // Real, distinct machine class (2026-09-02). Real machine pool:
   // memory/Injection/machine/reaction_injection_molding_machines.json (2
   // machines, e.g. "Gusmer-Decker Reactor IP-40"). RIM genuinely injects
@@ -1078,7 +1132,7 @@ export const MACHINE_REGISTRY = {
   // does not apply. Costed by its own computeReactionInjectionMoldingCost(),
   // real fill time from injectionRateMm3PerS, honest disclosed gap for the
   // chemical cure/reaction time (no real cure-kinetics data exists).
-  reaction_injection_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Plastic & Rubber'], machineClassKeywords: ['Reaction Injection', 'RIM', 'Reactor'] },
+  reaction_injection_molding: { commodityCodes: [] as string[], processGroupKeywords: ['Injection Molding', 'Plastic Molding'], machineClassKeywords: ['Reaction Injection', 'RIM', 'Reactor'] },
   // Real, DB-backed class (Platform Architecture Remediation Phase 1) —
   // computeSurfaceTreatmentLine() (cost-surface-treatment.ts) already used
   // this exact literal for every ProcessLineCost it emits; it was never

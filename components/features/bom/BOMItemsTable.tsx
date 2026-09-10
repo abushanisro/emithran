@@ -492,7 +492,7 @@ export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTab
                       </div>
                       <div className="text-sm">
                         <p className="text-muted-foreground text-xs mb-0.5">Annual Volume</p>
-                        <p className="font-medium text-foreground truncate">{item.annualVolume.toLocaleString()}</p>
+                        <p className="font-medium text-foreground truncate">{item.annualVolume?.toLocaleString() ?? '—'}</p>
                       </div>
                       <div className="text-sm">
                         <p className="text-muted-foreground text-xs mb-0.5">Material</p>

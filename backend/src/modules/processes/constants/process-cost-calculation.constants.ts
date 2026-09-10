@@ -54,7 +54,19 @@ export const PROCESS_COST_CONSTANTS = {
       MAX: 1000,           // Maximum number of operators/stations
     },
     CYCLE_TIME: {
-      MIN: 1,              // Minimum 1 second cycle time
+      // A cycle time is a continuous physical quantity, and the engines derive
+      // it as one: roll bending computes rollFeedLengthMm / rollingSpeedMmPerSec
+      // + prebendTimeSec, so a short feed at a real rolling speed produces a
+      // genuinely sub-second cycle. High-speed presses are the same story at one
+      // stroke per part. Nothing in the real physics models has a one-second
+      // floor.
+      //
+      // MIN was 1, which rejected the engines' own output: a real live 3 Roll
+      // Bending line persisted at 0.6 s, and every cost preview for it failed
+      // validation and rendered as "$0.00" -- the calculator refusing the number
+      // the router had just written. The only real lower bound is "greater than
+      // zero", so it is expressed as an exclusive bound rather than a magnitude.
+      EXCLUSIVE_MIN: 0,
       MAX: 1000000,        // Maximum cycle time in seconds
     },
     PARTS_PER_CYCLE: {

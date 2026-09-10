@@ -190,15 +190,3 @@ export class ProcessCalculatorMappingListResponseDto {
   @ApiProperty()
   limit!: number;
 }
-
-// DTO for getting unique values for filters
-export class ProcessHierarchyDto {
-  @ApiProperty({ type: [String] })
-  processGroups!: string[];
-
-  @ApiProperty({ type: [String] })
-  processRoutes!: string[];
-
-  @ApiProperty({ type: [String] })
-  operations!: string[];
-}

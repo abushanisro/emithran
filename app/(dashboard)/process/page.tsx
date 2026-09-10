@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ComboboxWithPresets } from '@/components/ui/combobox-with-presets';
 import { X, Edit2, Trash2, Plus, Save, XCircle, Loader2, Settings, Search, Database, Upload, Download, Info, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   useProcesses,
@@ -31,7 +32,6 @@ import {
   useCreateProcessCalculatorMapping,
   useUpdateProcessCalculatorMapping,
   useDeleteProcessCalculatorMapping,
-  useProcessHierarchy,
   useImportProcessCalculatorMappings,
   useClearAllProcessCalculatorMappings,
   type ProcessCalculatorMapping,
@@ -48,6 +48,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { InlineReferenceTableEditor } from '@/components/features/calculators/builder/InlineReferenceTableEditor';
 import { useAuth } from '@/lib/providers/auth';
+import { adaptMappingsToProcessCatalogTree } from '@/lib/processCatalog/process-catalog-tree';
 
 // Helper function to convert snake_case to camelCase
 const snakeToCamel = (str: string): string => {
@@ -173,7 +174,19 @@ export default function ProcessPage() {
     // than hiding the gap behind a toggle.
     limit: 1000,
   });
-  const { data: processHierarchy } = useProcessHierarchy();
+  // Always-unfiltered fetch for the Add/Edit Mapping dialog's own group/
+  // route/operation pickers — deliberately NOT the page-filtered
+  // `calculatorMappings` above (would wrongly narrow the picker to
+  // whatever group/route the page's own filter happens to be set to) and
+  // NOT useProcessHierarchy() (process_calculator_mappings.process_group
+  // WHERE is_active=true — hides real, existing-but-inactive groups like
+  // "Machining", whose 43 rows have no calculator wired yet but are still
+  // real rows an admin should be able to select/edit here). Only fetched
+  // while the dialog is actually open.
+  const { data: allMappingsForPicker } = useProcessCalculatorMappings(
+    { limit: 1000 },
+    { enabled: isAddMappingDialogOpen },
+  );
 
 
   // Bulk update mutation
@@ -1198,64 +1211,74 @@ export default function ProcessPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             {(() => {
-              const allMappings = calculatorMappings?.mappings ?? [];
-              // The real, complete, unfiltered taxonomy — calculatorMappings
-              // itself is scoped to the page's current group/route/search
-              // filters, so deriving groups from it would wrongly narrow this
-              // dialog's own group picker to whatever's currently filtered.
-              const availableGroups = (processHierarchy?.processGroups && processHierarchy.processGroups.length > 0)
-                ? processHierarchy.processGroups
-                : [...new Set(allMappings.map(m => m.processGroup))].sort();
-              const availableRoutes = [...new Set(
-                allMappings.filter(m => !mappingFormData.processGroup || m.processGroup === mappingFormData.processGroup)
-                  .map(m => m.processRoute)
-              )].sort();
-              const availableOps = [...new Set(
-                allMappings.filter(m =>
-                  (!mappingFormData.processGroup || m.processGroup === mappingFormData.processGroup) &&
-                  (!mappingFormData.processRoute || m.processRoute === mappingFormData.processRoute)
-                ).map(m => m.operation)
-              )].sort();
+              // The real, complete, unfiltered taxonomy — allMappingsForPicker
+              // is fetched with no group/route/search filter (see its own
+              // declaration above), so it never wrongly narrows this dialog's
+              // pickers to the page's current filter state, and never hides
+              // a real-but-inactive group (e.g. "Machining", whose 43 rows
+              // have no calculator wired yet but are still real, editable
+              // rows).
+              //
+              // Built through the SAME shared catalog-tree adapter every other
+              // taxonomy surface uses, with includeInactive so real-but-inactive
+              // rows stay authorable here (see the note above).
+              //
+              // The presets below are strictly SCOPED to the level above them.
+              // They used to fall back to "every route in the catalog" whenever
+              // no group was chosen yet, and "every operation in the catalog"
+              // whenever no group AND no route were chosen — the exact same
+              // three-unrelated-flat-lists defect that made the retired
+              // /calculator-mappings/hierarchy endpoint unusable, except here it
+              // was on the one screen that WRITES this taxonomy. An admin who
+              // picked Machining's "Drilling" or "Tapping" while intending a
+              // Sheet Metal mapping created precisely the cross-group pollution
+              // the picking surfaces then had to display.
+              //
+              // Scoped, not restricted: ComboboxWithPresets still accepts a
+              // freely typed value, so adding a genuinely new group, route or
+              // operation works exactly as before — it is only the *suggestions*
+              // that now stay within the parent selection.
+              const pickerTree = adaptMappingsToProcessCatalogTree(
+                allMappingsForPicker?.mappings ?? [],
+                { includeInactive: true },
+              );
+              const pickerGroupNode = pickerTree.find(g => g.label === mappingFormData.processGroup);
+              const pickerRouteNode = pickerGroupNode?.children.find(r => r.label === mappingFormData.processRoute);
+
+              const availableGroups = pickerTree.map(g => g.label).sort();
+              // No group chosen yet => nothing to suggest. An empty preset list
+              // is honest ("pick a group first, or type a new route"); a list of
+              // every route in the database is not.
+              const availableRoutes = (pickerGroupNode?.children ?? []).map(r => r.label).sort();
+              const availableOps = (pickerRouteNode?.children ?? []).map(o => o.label).sort();
               return (
                 <>
                   <div className="grid gap-2">
                     <Label htmlFor="processGroup">Process Group <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="processGroup"
+                    <ComboboxWithPresets
                       value={mappingFormData.processGroup}
-                      onChange={(e) => setMappingFormData({ ...mappingFormData, processGroup: e.target.value, processRoute: '', operation: '' })}
-                      placeholder="Type or select a process group"
-                      list="processGroups-list"
+                      onChange={(v) => setMappingFormData({ ...mappingFormData, processGroup: v, processRoute: '', operation: '' })}
+                      presets={availableGroups} placeholder="Select or type a process group…"
+                      typePlaceholder="Select or type (e.g. Machining)…" heading="Process groups on file"
                     />
-                    <datalist id="processGroups-list">
-                      {availableGroups.map(g => <option key={g} value={g} />)}
-                    </datalist>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="processRoute">Process Route <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="processRoute"
+                    <ComboboxWithPresets
                       value={mappingFormData.processRoute}
-                      onChange={(e) => setMappingFormData({ ...mappingFormData, processRoute: e.target.value, operation: '' })}
-                      placeholder="Type or select a process route"
-                      list="processRoutes-list"
+                      onChange={(v) => setMappingFormData({ ...mappingFormData, processRoute: v, operation: '' })}
+                      presets={availableRoutes} placeholder="Select or type a process route…"
+                      typePlaceholder="Select or type (e.g. 5 Axis Mill)…" heading="Process routes on file"
                     />
-                    <datalist id="processRoutes-list">
-                      {availableRoutes.map(r => <option key={r} value={r} />)}
-                    </datalist>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="operation">Operation <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="operation"
+                    <ComboboxWithPresets
                       value={mappingFormData.operation}
-                      onChange={(e) => setMappingFormData({ ...mappingFormData, operation: e.target.value })}
-                      placeholder="Type or select an operation"
-                      list="operations-list"
+                      onChange={(v) => setMappingFormData({ ...mappingFormData, operation: v })}
+                      presets={availableOps} placeholder="Select or type an operation…"
+                      typePlaceholder="Select or type an operation…" heading="Operations on file"
                     />
-                    <datalist id="operations-list">
-                      {availableOps.map(o => <option key={o} value={o} />)}
-                    </datalist>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="calculatorName">Calculator Name <span className="text-muted-foreground text-xs">(optional)</span></Label>

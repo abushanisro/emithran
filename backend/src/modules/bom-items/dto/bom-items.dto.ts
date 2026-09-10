@@ -68,10 +68,17 @@ export class CreateBOMItemDto {
   @Min(0)
   quantity: number;
 
-  @ApiProperty({ example: 10000 })
+  /**
+   * Parts per year. Optional: a part can be created before anyone knows its
+   * volume, and the system must be able to say so rather than invent one.
+   * `@Min(1)` because zero parts a year is not a volume, it is an absence —
+   * and an absence is expressed by omitting the field, not by sending 0.
+   */
+  @ApiProperty({ example: 10000, required: false })
+  @IsOptional()
   @IsNumber()
-  @Min(0)
-  annualVolume: number;
+  @Min(1)
+  annualVolume?: number;
 
   @ApiPropertyOptional({ example: 'pcs' })
   @IsOptional()

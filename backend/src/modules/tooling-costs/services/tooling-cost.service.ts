@@ -10,6 +10,7 @@
 
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { declareCostRecordCurrency } from '../../bom-items/costing/shared/core/persisted-currency-contract';
 import {
   CreateToolingCostDto,
   UpdateToolingCostDto,
@@ -182,7 +183,14 @@ export class ToolingCostService {
         lead_time: dto.leadTime,
         notes: dto.notes,
         is_active: dto.isActive ?? true,
-        currency: 'USD',
+
+        // Currency provenance (migration 708, P1b-i). The stored value stays
+        // 'USD' so nothing existing changes, but the row is marked unverified,
+        // because that literal was demonstrably not describing the data: all
+        // three live tooling rows hold INR while this line asserted USD. The
+        // tooling DTO has no currency field, so there is nothing here to
+        // declare honestly -- adding one is the follow-up.
+        ...declareCostRecordCurrency({ storedCurrencyFallback: 'USD' }),
       };
 
       const { data, error } = await client

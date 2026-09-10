@@ -1,0 +1,6 @@
+# Test-only dependencies for the CAD engine.
+#
+# Deliberately NOT in requirements.txt or Dockerfile: the production image
+# Railway builds should not carry test tooling. Dockerfile.dev layers these on
+# top of that image so tests run against the exact production runtime.
+pytest==8.3.4

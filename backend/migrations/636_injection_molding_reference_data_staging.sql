@@ -17,7 +17,7 @@
 --
 -- Source: memory/Injection/variables/digital_factory_variables.json (303
 -- named engineering constants) and memory/Injection/process/digital_
--- factory_processes_and_rates.json digitalFactory_aPrioriUSA section (21
+-- factory_processes_and_rates.json USA settings section (21
 -- named rate/tolerance/markup settings under its one "Default" profile, and
 -- 7 tool/mold material property records). The Germany-labeled section
 -- process to default-machine list is NOT re-staged here -- that data is

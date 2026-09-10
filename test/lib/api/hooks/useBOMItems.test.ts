@@ -38,6 +38,33 @@ describe('invalidateBOMItemUpdateQueries — P0.5 material-grade DFM staleness f
     expect(invalidatedKeys).toContainEqual(['bom-items', 'item-1', 'route-comparison']);
   });
 
+  it('seeds the detail cache from the response so an annual-volume edit shows up without a refetch', () => {
+    // The Cost Guide derives Batch Size from annual volume SERVER-side and reads
+    // it back through the item (resolvedCostingInputs). Invalidation alone left
+    // the panel showing the previous volume's batch size until the refetch
+    // returned -- and on a real part /cost-summary takes ~13s while
+    // /bom-items/:id takes ~0.7s, so "not changing instantly" was the whole
+    // user-visible symptom. The PUT already returns the complete resolved item,
+    // so seeding is the same data the refetch would bring, not a guess.
+    const queryClient = new QueryClient();
+    const fresh = updatedItem({ annualVolume: 1_000 });
+
+    invalidateBOMItemUpdateQueries(queryClient, fresh);
+
+    // bomItemKeys.detail(id) === ['bom-items', 'detail', id] -- the exact key useBOMItem reads.
+    expect(queryClient.getQueryData(['bom-items', 'detail', 'item-1'])).toEqual(fresh);
+  });
+
+  it('still invalidates the detail key it seeded, so a partial payload self-corrects', () => {
+    const queryClient = new QueryClient();
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    invalidateBOMItemUpdateQueries(queryClient, updatedItem());
+
+    const invalidatedKeys = spy.mock.calls.map((call) => (call[0] as { queryKey: unknown[] }).queryKey);
+    expect(invalidatedKeys).toContainEqual(['bom-items', 'detail', 'item-1']);
+  });
+
   it('scopes the dfm-scores invalidation to the specific item that was updated, not every item', () => {
     const queryClient = new QueryClient();
     const spy = vi.spyOn(queryClient, 'invalidateQueries');
