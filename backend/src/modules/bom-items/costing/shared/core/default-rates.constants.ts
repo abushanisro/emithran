@@ -1129,7 +1129,12 @@ export const MACHINE_REGISTRY = {
   cnc_mill_turn:  { commodityCodes: ['CNC-MILLTURN'],                                                                                processGroupKeywords: ['Mill-Turn', 'Turn-Mill', 'Machining'],                                                                               machineClassKeywords: ['Mill-Turn', 'MillTurn', 'Turn Mill', 'Mill Turn'] },
   // SM-IM-* = India injection molder commodity codes (100T / 200T / 500T).
   // 'Plastic Molding' is the exact process_group in process_calculator_mappings
-  // and process_taxonomy (migration 647 — renamed from 'Plastic & Rubber').
+  // and process_taxonomy (migration 733 — the category label for all 4 real
+  // sibling processes: Injection/Compression/Reaction Injection/Structural
+  // Foam Molding; migration 647 had already renamed mhr_records/mhr_benchmark_
+  // rates/lhr_benchmark_rates/lhr_records to this same label, but
+  // process_taxonomy/process_calculator_mappings were left on the interim
+  // 'Injection Molding' name from migration 614 until 733 finished it).
   injection_molding: { commodityCodes: ['IM-SMALL', 'IM-MED', 'IM-LARGE', 'SM-IM-100T', 'SM-IM-200T', 'SM-IM-500T'],             processGroupKeywords: ['Injection Molding', 'Plastic Molding', 'Injection Mold', 'Plastics'],                            machineClassKeywords: ['Injection Molding', 'Injection Molder', 'IMM', 'Injection Mold'] },
   // Real, distinct machine class (2026-09-02 process-duplicate-audit fix) —
   // previously "Structural foam molding" shared machine_class='compression_molding'

@@ -2952,7 +2952,10 @@ export class BOMItemsService {
    * here. Several classes bill at a genuinely different, more specific skill
    * tier than their hierarchy processGroup (turret_punch → 'Turret',
    * deburring → 'Deburr', cmm → 'Quality', the CNC classes → 'CNC Machining',
-   * injection_molding → 'Plastic Molding' (migration 647) — see migration 424's own comment
+   * injection_molding → 'Plastic Molding' (migration 733 — migration 424 had
+   * originally set this to 'Plastic & Rubber' and it was never updated when
+   * migration 647 renamed lhr_benchmark_rates/lhr_records to 'Plastic Molding',
+   * a real join-miss bug 733 also fixes) — see migration 424's own comment
    * for the real wage-data sources behind each). tapping's correct tier is
    * family-dependent (sheet-metal/milled/turned parts each tap on a different
    * real process_calculator_mappings row) — resolveProcessIdentities already
