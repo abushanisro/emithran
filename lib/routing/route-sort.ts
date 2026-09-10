@@ -137,9 +137,21 @@ export function sortRouteNodes(
  * Empty groups are dropped, and group order follows the first occurrence in
  * the input so a backend that returns only forming routes still reads right.
  */
-export function groupRouteNodes(nodes: RouteNode[]): RouteGroup[] {
+export function groupRouteNodes(
+  nodes: RouteNode[],
+  // The 'cutting'/'forming' family split and its default copy describe Sheet
+  // Metal's real routing model (a shared cut->bend->finish chain vs. a
+  // single-operation press/roll). Injection Molding's real routes are tagged
+  // 'cutting' too (see RouteResultDto.processFamily's own doc comment — IM
+  // "has no forming concept" so it reuses that tag structurally), but they
+  // are NOT alternative cutting methods for a shared downstream chain — each
+  // is its own complete, self-contained molding process. Callers outside
+  // Sheet Metal pass real copy for their own family instead of inheriting
+  // sheet-metal-specific wording; omitting this keeps Sheet Metal unchanged.
+  cuttingMetaOverride?: { title: string; description: string },
+): RouteGroup[] {
   const meta: Record<RouteGroup['family'], { title: string; description: string }> = {
-    cutting: {
+    cutting: cuttingMetaOverride ?? {
       title: 'Cut, then form and finish',
       description: 'Alternative cutting methods for the same downstream chain. Pick one.',
     },
