@@ -27,6 +27,7 @@ import {
   laserSpeedFactor,
 } from '../costing/shared/core/default-rates.constants';
 import { computeCycleTime } from '../costing/injection-molding/process/cycle-time';
+import { getEnginesForFamily } from '../costing/shared/core/manufacturing-process-registry';
 
 export interface RawGeometry {
   volume: number;
@@ -300,6 +301,47 @@ export class AutoFillService {
         `[classify] Python family overrides TypeScript process: CNC Machining → ${processSuggestion.processType} ` +
         `(family confidence ${cadFamilyClassification.confidence})`,
       );
+    }
+
+    // 2c2. Mirror of 2c in the other direction — a real, confirmed live bug
+    // (2026-09-10): classifyProcess()'s FIRST gate (geo.sheetThicknessMm > 0,
+    // below) fires on almost any part with a fairly uniform wall (including a
+    // genuine injection-molded shell — a uniform wall is a design rule of
+    // molding too), so it can hand back 'Sheet Metal Laser Cutting'/'Sheet
+    // Metal Bending' before Python's real, scored family classifier
+    // (detect_part_family(), rewritten same day) is ever consulted. Steps 2b/
+    // veto-upheld/2c only ever move TS's guess TOWARD Sheet Metal or correct
+    // it when Python explicitly vetoed sheet_metal — none of them handle
+    // Python confidently (>=0.70) naming a DIFFERENT real family while TS's
+    // heuristic already jumped to Sheet Metal. Without this step, a
+    // confidently-classified injection-molded/CNC part keeps a hardcoded
+    // Sheet Metal process label no matter how sure the real classifier is.
+    if (
+      processSuggestion.processType.startsWith('Sheet Metal') &&
+      cadFamilyClassification.family !== 'sheet_metal' &&
+      cadFamilyClassification.family !== null &&
+      (cadFamilyClassification.confidence ?? 0) >= 0.70
+    ) {
+      const correctedProcessType = await this.resolveDbDrivenProcessLabel(
+        cadFamilyClassification.family,
+        accessToken,
+      );
+      if (correctedProcessType) {
+        this.logger.debug(
+          `[classify] Python family (${cadFamilyClassification.family}, confidence ` +
+          `${cadFamilyClassification.confidence}) overrides TypeScript's premature Sheet Metal ` +
+          `guess (${processSuggestion.processType}) → ${correctedProcessType}`,
+        );
+        processSuggestion.processType = correctedProcessType;
+        processSuggestion.processConfidence = cadFamilyClassification.confidence ?? processSuggestion.processConfidence;
+        effectiveFamily = cadFamilyClassification;
+      } else {
+        this.logger.warn(
+          `[classify] Python family (${cadFamilyClassification.family}) has no real, registered ` +
+          `process_taxonomy row on file for its registered machine class(es) — leaving TypeScript's ` +
+          `Sheet Metal guess in place rather than fabricating a process label`,
+        );
+      }
     }
 
     // 2d. Replace flat heuristic cycle time with physics estimate.
@@ -1352,6 +1394,50 @@ export class AutoFillService {
       bendAngles: [],
       featureSource: 'mesh_inference',
     };
+  }
+
+  // A CAD-detected family (detect_part_family()'s literal output) is not a
+  // process/route id anywhere else in this platform — it maps to the real,
+  // registered engine "processFamily" identifiers MANUFACTURING_PROCESS_
+  // REGISTRY already declares (CncMillingEngine='cnc_milling', CncTurningEngine
+  // ='cnc_turning' — cnc_mill_turn is registered as a CncTurningEngine
+  // instance, so mill_turn also resolves there — InjectionMoldingEngine=
+  // 'injection_molding'). This is a narrow vocabulary bridge between two
+  // code-level enums that already exist, not a fabricated business mapping.
+  private static readonly CAD_FAMILY_TO_REGISTRY_PROCESS_FAMILY: Record<string, string> = {
+    injection_molded: 'injection_molding',
+    cnc_milled: 'cnc_milling',
+    cnc_turned: 'cnc_turning',
+    mill_turn: 'cnc_turning',
+  };
+
+  /**
+   * Resolves a CAD-detected family to a real, live process_taxonomy label —
+   * never a hardcoded process-name string. Looks up the real registered
+   * machine class(es) for that family (from MANUFACTURING_PROCESS_REGISTRY),
+   * then queries process_taxonomy for a real, currently-'production' row on
+   * one of those classes and returns its real process_group. Returns null
+   * (a disclosed gap, not a guess) when no real registered/production row
+   * exists for the family — the caller must never fabricate a label itself.
+   */
+  private async resolveDbDrivenProcessLabel(
+    cadFamily: string,
+    accessToken: string,
+  ): Promise<string | null> {
+    const registryFamily = AutoFillService.CAD_FAMILY_TO_REGISTRY_PROCESS_FAMILY[cadFamily];
+    if (!registryFamily) return null;
+    const machineClasses = getEnginesForFamily(registryFamily).map((e) => e.machineClass);
+    if (machineClasses.length === 0) return null;
+
+    const client = this.supabaseService.getClient(accessToken);
+    const { data, error } = await client
+      .from('process_taxonomy')
+      .select('process_group')
+      .in('machine_class', machineClasses)
+      .eq('roadmap_status', 'production')
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    return (data[0] as { process_group: string }).process_group;
   }
 
   // ────────────────────────────────────────────────────────────────────────────
