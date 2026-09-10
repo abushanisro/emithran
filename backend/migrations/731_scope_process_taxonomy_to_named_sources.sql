@@ -31,37 +31,47 @@
 -- correctly-wired set) AND "Plastic Molding" (26 rows) -- an orphaned
 -- duplicate of the pre-613-trim unscoped set, never merged or removed.
 --
--- A REAL BUG CAUGHT WHILE WRITING THIS MIGRATION, BEFORE IT WAS EVER RUN
+-- TWO REAL BUGS CAUGHT WHILE WRITING/RUNNING THIS MIGRATION, BEFORE ANY DATA
+-- WAS EVER LOST
 --
--- A first draft of this migration simply re-ran 613's original blanket
--- `DELETE ... WHERE process_group = 'Machining'` against both tables. That
--- would have been WRONG today: 613 was written 2026-09-01, before migration
--- 691 (later) backfilled 41 real, sourced process_taxonomy_operations rows
--- for Machining (memory/machining/operations_full.json's 41 real station
--- processes -- confirmed live: Machining has 110 process_taxonomy rows, 41
--- with real detail matching 691 1:1, 69 without). A blanket delete would
--- have destroyed that real, later-added data. Fixed below: the Machining
--- delete is scoped to ONLY rows with zero process_taxonomy_operations
--- detail (the 69 genuine legacy/undetailed rows 613 always meant to
--- remove) -- the 41 real, detailed rows are explicitly preserved.
+-- 1. A first draft simply re-ran 613's original blanket
+--    `DELETE ... WHERE process_group = 'Machining'` against both tables.
+--    That would have been WRONG today: 613 was written 2026-09-01, before
+--    migration 691 (later) backfilled 41 real, sourced
+--    process_taxonomy_operations rows for Machining
+--    (memory/machining/operations_full.json's 41 real station processes --
+--    confirmed live: Machining has 110 process_taxonomy rows, 41 with real
+--    detail matching 691 1:1, 69 without). Fixed: the Machining delete is
+--    scoped to rows with zero process_taxonomy_operations detail.
 --
--- A second risk considered and guarded against (not just assumed away):
--- process_calculator_mappings could, in principle, hold live, active
--- catalog rows for the real registered CNC (cnc_3ax_vmc/cnc_4ax_vmc/
--- cnc_5ax_mc/cnc_lathe/cnc_lathe_live/cnc_mill_turn), CMM inspection
--- (cmm), surface treatment (surface_treatment), or injection molding
--- (injection_molding) engines (manufacturing-process-registry.ts) under
--- one of the groups this migration touches. Deleting those would silently
--- break the Add Operation picker / manual workflow-step validation for a
--- live, working process. Pre-flight guard 2 below aborts loudly instead of
--- guessing if any such row is found.
+-- 2. A second draft added a pre-flight guard for real, registered,
+--    live-costing engines (CNC/CMM/Surface Treatment/Injection Molding,
+--    manufacturing-process-registry.ts) under the groups this migration
+--    touches, rather than assuming none existed -- and running it live
+--    caught exactly that: "Post Processing" has 2 real active rows wired to
+--    live engines --
+--
+--      Post Processing / Surface Treatment / "Surface Treatment"  -> surface_treatment
+--      Post Processing / Inspection        / "CMM Inspection"     -> cmm
+--
+--    Deleting these would have silently broken the Add Operation picker and
+--    manual workflow-step validation for two real, live, working processes.
+--    Fixed: every DELETE below explicitly excludes any row (in either table)
+--    whose machine_class -- or, for process_taxonomy, whose matching
+--    process_calculator_mappings row's machine_class -- belongs to a real
+--    registered engine, for ALL FOUR groups (Assembly/Post Processing/
+--    Packing & Delivery/Machining), not just Machining's CNC classes. The
+--    exclusion is unconditional -- if a future engine is registered under
+--    one of these groups, add its machine_class to the list below before
+--    re-running.
 --
 -- THE FIX
 --
 -- 1. Finish 613's original, still-valid deletion for Assembly/Post
---    Processing/Packing & Delivery (confirmed live: zero
---    process_taxonomy_operations detail across all three -- nothing real
---    to lose) and Machining's undetailed legacy rows only.
+--    Processing/Packing & Delivery/Machining, excluding: (a) any row wired
+--    to a real registered engine's machine_class, (b) for Machining only,
+--    any process_taxonomy row that already carries real
+--    process_taxonomy_operations detail (migration 691).
 -- 2. Remove the "Plastic Molding" duplicate group. Any row that already
 --    carries real process_taxonomy_operations detail is name-matched
 --    against the 4 known-real Injection Molding operations first (a
@@ -76,8 +86,7 @@
 --    need applying" -- this migration + the existing 636/637+ Injection
 --    Molding seed together are the current, correct state.
 --
--- SAFETY: same backup-table + FK pre-flight-guard pattern as 613, plus the
--- two additional guards above.
+-- SAFETY: same backup-table + FK pre-flight-guard pattern as 613.
 --
 -- Idempotent: every DELETE is scoped to the exact current (stale) group
 -- names/content; re-running after success is a no-op throughout.
@@ -87,8 +96,9 @@
 
 BEGIN;
 
--- ── Pre-flight guard 1 (same as 613): no mhr_records row may be linked via
--- canonical_process_id to a process_taxonomy row this migration deletes. ───
+-- ── Pre-flight guard 1 (same as 613, updated for the live-engine exclusion
+-- below): no mhr_records row may be linked via canonical_process_id to a
+-- process_taxonomy row this migration deletes. ─────────────────────────────
 DO $$
 DECLARE
   blocking_count INTEGER;
@@ -96,39 +106,22 @@ BEGIN
   SELECT count(*) INTO blocking_count
   FROM mhr_records mr
   JOIN process_taxonomy pt ON pt.id = mr.canonical_process_id
-  WHERE pt.process_group IN ('Assembly', 'Post Processing', 'Packing & Delivery')
-     OR pt.process_group = 'Plastic Molding'
-     OR (pt.process_group = 'Machining'
-         AND NOT EXISTS (SELECT 1 FROM process_taxonomy_operations pto WHERE pto.canonical_process_id = pt.id));
+  WHERE (
+    (pt.process_group IN ('Assembly', 'Post Processing', 'Packing & Delivery', 'Machining')
+     AND NOT EXISTS (
+       SELECT 1 FROM process_calculator_mappings pcm
+        WHERE pcm.process_group = pt.process_group AND pcm.operation = pt.process_name
+          AND pcm.machine_class IN ('cnc_3ax_vmc','cnc_4ax_vmc','cnc_5ax_mc','cnc_lathe','cnc_lathe_live','cnc_mill_turn','cmm','surface_treatment','injection_molding')
+     )
+     AND (pt.process_group != 'Machining' OR NOT EXISTS (SELECT 1 FROM process_taxonomy_operations pto WHERE pto.canonical_process_id = pt.id)))
+    OR pt.process_group = 'Plastic Molding'
+  );
   IF blocking_count > 0 THEN
-    RAISE EXCEPTION 'Migration 731 aborted: % mhr_records row(s) are linked (via canonical_process_id) to a process_taxonomy row this migration would delete. Run: SELECT mr.id, mr.machine_name, pt.process_group, pt.process_name FROM mhr_records mr JOIN process_taxonomy pt ON pt.id = mr.canonical_process_id WHERE pt.process_group IN (''Assembly'',''Post Processing'',''Packing & Delivery'') OR pt.process_group = ''Plastic Molding'' OR (pt.process_group = ''Machining'' AND NOT EXISTS (SELECT 1 FROM process_taxonomy_operations pto WHERE pto.canonical_process_id = pt.id)); -- to see which, then decide whether to null their canonical_process_id first or keep those specific rows.', blocking_count;
+    RAISE EXCEPTION 'Migration 731 aborted: % mhr_records row(s) are linked (via canonical_process_id) to a process_taxonomy row this migration would delete. Investigate before re-running.', blocking_count;
   END IF;
 END $$;
 
--- ── Pre-flight guard 2 (new): abort if a row this migration would delete
--- from process_calculator_mappings has a machine_class belonging to a real,
--- registered, live-costing engine (manufacturing-process-registry.ts) --
--- do not silently break a working process's Add Operation / manual
--- workflow-step validation path. ────────────────────────────────────────────
-DO $$
-DECLARE
-  live_engine_count INTEGER;
-BEGIN
-  SELECT count(*) INTO live_engine_count
-  FROM process_calculator_mappings
-  WHERE (process_group IN ('Assembly', 'Post Processing', 'Packing & Delivery', 'Machining')
-         OR process_group = 'Plastic Molding')
-    AND machine_class IN (
-      'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc',
-      'cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn',
-      'cmm', 'surface_treatment', 'injection_molding'
-    );
-  IF live_engine_count > 0 THEN
-    RAISE EXCEPTION 'Migration 731 aborted: % process_calculator_mappings row(s) in a group this migration would delete from reference a real, registered, live-costing engine machine_class. Run: SELECT process_group, process_route, operation, machine_class, is_active FROM process_calculator_mappings WHERE (process_group IN (''Assembly'',''Post Processing'',''Packing & Delivery'',''Machining'') OR process_group = ''Plastic Molding'') AND machine_class IN (''cnc_3ax_vmc'',''cnc_4ax_vmc'',''cnc_5ax_mc'',''cnc_lathe'',''cnc_lathe_live'',''cnc_mill_turn'',''cmm'',''surface_treatment'',''injection_molding''); -- to see which, then decide whether to keep or re-point them before re-running.', live_engine_count;
-  END IF;
-END $$;
-
--- ── Pre-flight guard 3 (new): abort if any "Plastic Molding" row that
+-- ── Pre-flight guard 2 (new): abort if any "Plastic Molding" row that
 -- carries real process_taxonomy_operations detail is NOT one of the 4
 -- known-real Injection Molding operations -- do not silently delete
 -- unrecognized real detail. ────────────────────────────────────────────────
@@ -152,24 +145,43 @@ CREATE TABLE IF NOT EXISTS process_taxonomy_backup_731 AS
   SELECT * FROM process_taxonomy;
 
 -- ── 1. Finish 613's original deletion (never took) ─────────────────────────
--- process_calculator_mappings: blanket for Assembly/Post Processing/
--- Packing & Delivery/Machining -- guard 2 above already confirmed none of
--- these rows carry a real registered engine's machine_class.
+-- process_calculator_mappings: Assembly/Post Processing/Packing &
+-- Delivery/Machining, excluding any row wired to a real registered engine
+-- (confirmed live: Post Processing/Surface Treatment -> surface_treatment,
+-- Post Processing/CMM Inspection -> cmm -- both explicitly preserved).
 DELETE FROM process_calculator_mappings
- WHERE process_group IN ('Assembly', 'Post Processing', 'Packing & Delivery', 'Machining');
+ WHERE process_group IN ('Assembly', 'Post Processing', 'Packing & Delivery', 'Machining')
+   AND (machine_class IS NULL OR machine_class NOT IN (
+     'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc',
+     'cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn',
+     'cmm', 'surface_treatment', 'injection_molding'
+   ));
 
--- process_taxonomy: blanket for Assembly/Post Processing/Packing &
--- Delivery (confirmed live: zero rows in any of these three carry real
--- process_taxonomy_operations detail).
-DELETE FROM process_taxonomy
- WHERE process_group IN ('Assembly', 'Post Processing', 'Packing & Delivery');
+-- process_taxonomy: Assembly/Post Processing/Packing & Delivery, same
+-- live-engine exclusion (matched by (process_group, operation)=
+-- (process_group, process_name) against process_calculator_mappings, so
+-- this is correct regardless of whether process_taxonomy.machine_class has
+-- itself been backfilled yet by migration 725's trigger).
+DELETE FROM process_taxonomy pt
+ WHERE pt.process_group IN ('Assembly', 'Post Processing', 'Packing & Delivery')
+   AND NOT EXISTS (
+     SELECT 1 FROM process_calculator_mappings pcm
+      WHERE pcm.process_group = pt.process_group AND pcm.operation = pt.process_name
+        AND pcm.machine_class IN ('cnc_3ax_vmc','cnc_4ax_vmc','cnc_5ax_mc','cnc_lathe','cnc_lathe_live','cnc_mill_turn','cmm','surface_treatment','injection_molding')
+   );
 
--- process_taxonomy: Machining scoped to UNDETAILED rows only -- the 41 real,
--- sourced rows migration 691 added (memory/machining/operations_full.json)
--- are explicitly preserved, never touched by this migration.
+-- process_taxonomy: Machining, excluding BOTH live-registered-engine rows
+-- AND the 41 real, sourced rows migration 691 added
+-- (memory/machining/operations_full.json) -- explicitly preserved, never
+-- touched by this migration.
 DELETE FROM process_taxonomy pt
  WHERE pt.process_group = 'Machining'
-   AND NOT EXISTS (SELECT 1 FROM process_taxonomy_operations pto WHERE pto.canonical_process_id = pt.id);
+   AND NOT EXISTS (SELECT 1 FROM process_taxonomy_operations pto WHERE pto.canonical_process_id = pt.id)
+   AND NOT EXISTS (
+     SELECT 1 FROM process_calculator_mappings pcm
+      WHERE pcm.process_group = pt.process_group AND pcm.operation = pt.process_name
+        AND pcm.machine_class IN ('cnc_3ax_vmc','cnc_4ax_vmc','cnc_5ax_mc','cnc_lathe','cnc_lathe_live','cnc_mill_turn','cmm','surface_treatment','injection_molding')
+   );
 
 -- ── 2. Remove the orphaned "Plastic Molding" duplicate ──────────────────────
 -- process_calculator_mappings: per migration 647's own header this group
@@ -190,14 +202,18 @@ NOTIFY pgrst, 'reload schema';
 --
 -- SELECT process_group, count(*) FROM process_calculator_mappings GROUP BY process_group ORDER BY process_group;
 -- -- Expect: Sheet Metal (unaffected count), Injection Molding (unaffected
--- -- count). No Assembly/Post Processing/Packing & Delivery/Machining/
--- -- Plastic Molding rows.
+-- -- count), Post Processing 2 (Surface Treatment + CMM Inspection only).
+-- -- No Assembly/Packing & Delivery/Machining/Plastic Molding rows.
 --
 -- SELECT process_group, count(*) FROM process_taxonomy GROUP BY process_group ORDER BY process_group;
 -- -- Expect: Sheet Metal 67 (unaffected), Injection Molding 4 (unaffected),
 -- -- Machining 41 (down from 110 -- only the real, detailed station rows
--- -- from migration 691 remain). No Assembly/Post Processing/Packing &
--- -- Delivery/Plastic Molding rows.
+-- -- from migration 691 remain), Post Processing 2 (Surface Treatment +
+-- -- CMM Inspection). No Assembly/Packing & Delivery/Plastic Molding rows.
+--
+-- SELECT process_group, operation, machine_class FROM process_calculator_mappings WHERE process_group = 'Post Processing';
+-- -- Expect exactly 2 rows: Surface Treatment (surface_treatment), CMM
+-- -- Inspection (cmm) -- confirms both real live engines survived untouched.
 --
 -- SELECT count(*) FROM process_taxonomy pt JOIN process_taxonomy_operations pto ON pto.canonical_process_id = pt.id WHERE pt.process_group = 'Machining';
 -- -- Expect 41 -- confirms every real detailed Machining row survived.
