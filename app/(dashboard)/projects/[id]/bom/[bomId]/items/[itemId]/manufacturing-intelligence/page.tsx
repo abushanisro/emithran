@@ -1063,8 +1063,30 @@ function buildProcessTree(
   // tapping features" in this tree while the costed route correctly had no
   // tapping at all. Two definitions of the same route, and this one was not the
   // one being quoted.
-  const recs = overrideProcesses?.map((p) => ({ process: p, estimated_time_sec: null as number | null }))
-    ?? fg?.processRecommendations
+  // Real, confirmed live gap (2026-09-11): an injection-molded part with real,
+  // manually-added Direct Process Costs (Mold Setup/Injection/Packing/Cooling/
+  // Ejection/Inspections — all real cost.processLines) still showed a
+  // completely empty Process Step tree (only the top-level part row, zero
+  // operation children) — because fg?.processRecommendations is a Sheet-Metal-
+  // shaped, cad-engine-computed recommendation list that is never populated
+  // for this family, and no route had been explicitly applied/recommended
+  // (overrideProcesses unset) even though real costed process lines already
+  // existed. The exact same "cost lines as a real, already-computed process
+  // list" fallback already exists elsewhere on this page (the Part/Complexity
+  // summary card's routeFromCost) — reused here rather than reinvented, so the
+  // tree reflects what was actually costed instead of showing nothing.
+  const overrideRecs = overrideProcesses?.map((p) => ({ process: p, estimated_time_sec: null as number | null }));
+  const fgRecs = fg?.processRecommendations;
+  const costRecs = cost?.processLines?.length
+    ? cost.processLines.map((l) => ({ process: l.process, estimated_time_sec: l.cycleTimeMin * 60 }))
+    : null;
+  // `?? []` alone would stop here the moment fgRecs is a real EMPTY array
+  // (not null/undefined) — `??` only falls through on nullish, not on falsy
+  // length — so each candidate is explicitly checked for real content before
+  // falling through to the next.
+  const recs = (overrideRecs && overrideRecs.length > 0 ? overrideRecs : null)
+    ?? (fgRecs && fgRecs.length > 0 ? fgRecs : null)
+    ?? costRecs
     ?? [];
 
   const substrate = classifySubstrate(`${item.materialGrade ?? ''} ${item.material ?? ''}`);
