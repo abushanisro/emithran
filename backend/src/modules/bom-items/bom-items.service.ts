@@ -4952,7 +4952,16 @@ export class BOMItemsService {
     // if this returns undefined (e.g. laserParams unavailable).
     const smLaserCalc = (cutLengthMm > 0 || pierceCount > 0)
       ? await this.resolvePhysicsQuantity(accessToken, {
-          machineClass: 'fiber_laser',
+          // Root-caused 2026-09-10: this was hardcoded 'fiber_laser' even
+          // though smLaserTechnology/smLaserParams above already resolve
+          // per the ACTUAL selected machine (fiber or co2). Harmless while
+          // co2_laser had zero real data (any gap looked the same either
+          // way), but wrong on its face — a real co2 machine's calculator
+          // resolution and gap context must come from its own real
+          // process_calculator_mappings row (machine_class=co2_laser,
+          // migration 722), not fiber_laser's, now that migration 727 seeds
+          // real co2 cutting-speed/pierce-time data behind it.
+          machineClass: smLaserTechnology === 'co2' ? 'co2_laser' : 'fiber_laser',
           process: 'Laser Cutting',
           targetFieldNames: ['Total Time'],
           seedScope: {
@@ -4970,9 +4979,9 @@ export class BOMItemsService {
             // from disclosed model-spec seed data (not this unit's own
             // verified nameplate) must never let this line read as
             // 'verified' just because a real, sourced row was found for it.
-            'Cutting Speed': `sm_lookup_laser_cut — ${grade || 'material'}, ${sheetThicknessMm}mm sheet` +
+            'Cutting Speed': `sm_lookup_laser_cut (laser_technology=${smLaserTechnology}) — ${grade || 'material'}, ${sheetThicknessMm}mm sheet` +
               (smLaserPowerEstimated ? ` at an ESTIMATED (not verified) machine power` : ''),
-            'Piercing Time Per Start': `sm_lookup_laser_cut — same row as Cutting Speed`,
+            'Piercing Time Per Start': `sm_lookup_laser_cut (laser_technology=${smLaserTechnology}) — same row as Cutting Speed`,
           },
           lookupTableByField: {
             'Cutting Speed': 'sm_lookup_laser_cut',
@@ -6248,38 +6257,69 @@ export class BOMItemsService {
       : this.emptyPhysicsResult(['Total Time']);
     const rcLaserCycleTimeSec = rcLaserCalc.outputs['Total Time'];
 
-    // CO2 laser has no cycle-time source, and that is a deliberate, documented
-    // state -- not a bug and not something to paper over with fiber numbers.
-    // Migration 457 added the laser_technology axis to sm_lookup_laser_cut and
-    // seeded ZERO co2 rows, because no published CO2 cutting-speed/pierce-time
-    // table met this app's sourcing bar (the real conditions live only inside
-    // the machine's own control). getLaserParams(..., 'co2') therefore returns
-    // dataFound:false by design, and no physics calculator is registered for
-    // co2_laser either.
-    //
-    // The bug this closes: the context spread below handed cuttingSecFromCalculator
-    // AND physicsGap to fiber_laser only. co2_laser received neither, so
-    // computeLaserCuttingCost fell through to its defensive branch and warned
-    // "no calculator result and no reported gap (unexpected; check
-    // resolvePhysicsQuantity)" -- blaming a phantom resolver bug for a real,
-    // recorded data gap. An explicit gap makes the route fail closed for the
-    // true reason, and says exactly what would make it costable.
-    //
-    // unsupported_operation (not missing_lookup) is the honest gapType: it is
-    // not one absent row for this part's material/thickness, it is the entire
-    // technology having no seeded data at any material or thickness.
-    const rcCo2LaserGap: UnsupportedOperationGap = {
-      gapType: 'unsupported_operation',
-      process: 'Laser Cutting',
-      machineClass: 'co2_laser',
-      reason:
-        'no CO2 cutting-speed/pierce-time data exists for any material or thickness -- '
-        + 'sm_lookup_laser_cut is fiber-only by design (migration 457, which found no '
-        + 'published CO2 table meeting the sourcing bar). CO2 cycle time stays '
-        + 'unavailable until real CO2 cutting conditions are sourced; fiber data is '
-        + 'never substituted for it.',
-      requiredCapability: 'sm_lookup_laser_cut rows with laser_technology = co2',
-    };
+    // CO2 laser: real cycle-time source since migration 727 (2026-09-10) —
+    // until then this was a deliberate, documented gap (migration 457 seeded
+    // ZERO co2 rows because no published CO2 table met this app's sourcing
+    // bar at the time). memory/sheetmetal/lookuptable/sheet_metal_nesting_
+    // cut_rate_combined.json (added 2026-08-20, after migration 457) turned
+    // out to carry real, carefully-sourced 'Laser Cut' machineType rows —
+    // exactly the real technology this app's co2_laser class covers (see
+    // migration 722's cross-file reconciliation) — so migration 727 seeded
+    // them. Same real resolution pattern as fiber_laser above (own power,
+    // own getLaserParams('co2') call, own resolvePhysicsQuantity call against
+    // the SAME registered "Laser Cut" calculator fiber_laser's collapsed slot
+    // can also resolve through — process_calculator_mappings' real "Laser
+    // Cut" row already carries co2_laser's machine_class post-722, so this
+    // is the real, live calculator, not a second formula) — never a second,
+    // parallel cost formula, and still fails closed with a real, structured
+    // gap (not fiber substitution) for any material/thickness/power this
+    // migration's real data doesn't cover.
+    const rcCo2LaserPowerW: number | null = (mhrRates.co2Laser.selection?.balanced?.candidate as any)?.capability?.powerKw
+      ? (mhrRates.co2Laser.selection!.balanced.candidate as any).capability.powerKw * 1000
+      : null;
+    const rcCo2LaserPowerEstimated = (mhrRates.co2Laser.selection?.balanced?.candidate as any)?.capabilitySource === 'seed';
+    const rcCo2LaserParams = (grade && rcCo2LaserPowerW != null) ? await this.smLookup.getLaserParams(grade, thk, rcCo2LaserPowerW, 'co2') : null;
+    const rcCo2LaserCalc = (cutLengthMm > 0 || pierceCount > 0)
+      ? await this.resolvePhysicsQuantity(accessToken, {
+          machineClass: 'co2_laser',
+          process: 'Laser Cutting',
+          targetFieldNames: ['Total Time'],
+          seedScope: {
+            'Cutting Length': cutLengthMm,
+            'No Of Starts': pierceCount,
+            ...(rcCo2LaserParams?.dataFound ? {
+              'Cutting Speed': rcCo2LaserParams.cuttingSpeedMPerMin,
+              'Piercing Time Per Start': rcCo2LaserParams.pierceTimeMin,
+            } : {}),
+          },
+          seedProvenance: {
+            'Cutting Length': 'CAD feature extraction — total cut path length',
+            'No Of Starts': 'CAD feature extraction — pierce/start count',
+            'Cutting Speed': `sm_lookup_laser_cut (laser_technology=co2) — ${grade || 'material'}, ${thk}mm sheet` +
+              (rcCo2LaserPowerEstimated ? ` at an ESTIMATED (not verified) machine power` : ''),
+            'Piercing Time Per Start': 'sm_lookup_laser_cut (laser_technology=co2) — same row as Cutting Speed',
+          },
+          lookupTableByField: {
+            'Cutting Speed': 'sm_lookup_laser_cut',
+            'Piercing Time Per Start': 'sm_lookup_laser_cut',
+          },
+          ...(rcCo2LaserPowerW == null ? {
+            lookupResolutions: {
+              'Cutting Speed': {
+                table: 'sm_lookup_laser_cut',
+                policy: await this.smLookup.resolveLookupPolicy('sm_lookup_laser_cut', 'INTERPOLATE'),
+                queryParams: [{
+                  column: 'laser_power_w',
+                  value: `unknown — ${(mhrRates.co2Laser.selection?.balanced?.candidate as any)?.machineName ?? mhrRates.co2Laser.machineName ?? 'the selected laser'} has no verified power_kw on file (never inferred from its name)`,
+                }],
+                matchedRow: null,
+                nearestRows: [],
+              },
+            },
+          } : {}),
+        })
+      : this.emptyPhysicsResult(['Total Time']);
+    const rcCo2LaserCycleTimeSec = rcCo2LaserCalc.outputs['Total Time'];
 
     // Same pattern for waterjet (migration 398's sm_lookup_waterjet_cut) — resolved
     // ONCE here and passed into computeWaterjetCost as plain numbers, exactly like
@@ -7610,13 +7650,16 @@ export class BOMItemsService {
           physicsGap: rcLaserCalc.gap,
           confidence: rcLaserCalc.confidence,
         } : {}),
-        // co2_laser gets a real, structured gap instead of silence -- see
-        // rcCo2LaserGap above. Deliberately NO cuttingSecFromCalculator: there
-        // is no CO2 cycle time to pass, and reusing the fiber_laser calculator
-        // result here is exactly the substitution migration 457 forbids.
+        // co2_laser: real cycle time since migration 727 -- see rcCo2LaserCalc
+        // above. Same shape as fiber_laser's own block: cuttingSecFromCalculator
+        // when the real co2 lookup resolved, a real structured physicsGap
+        // (never fiber substitution) when it didn't.
         ...(engine.machineClass === 'co2_laser' ? {
-          physicsGap: rcCo2LaserGap,
-          confidence: 'unsupported' as ConfidenceLevel,
+          cuttingSecFromCalculator: rcCo2LaserCycleTimeSec,
+          calculatorId: rcCo2LaserCalc.calculatorId,
+          calculatorVersion: rcCo2LaserCalc.calculatorVersion,
+          physicsGap: rcCo2LaserCalc.gap,
+          confidence: rcCo2LaserCalc.confidence,
         } : {}),
       });
       const isFormingRoute = formingMachineClasses.has(engine.machineClass);

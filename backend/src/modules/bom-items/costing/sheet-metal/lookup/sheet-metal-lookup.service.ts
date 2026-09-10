@@ -241,12 +241,22 @@ export class SheetMetalLookupService {
     }
 
     const pierceTimeMin = row.pierce_time_min != null ? Number(row.pierce_time_min) : null;
-    const kerfMm = row.kerf_mm != null ? Number(row.kerf_mm) : null;
-    // If any expected column is null, treat the row as incomplete — dataFound:false
-    // ensures the caller emits a warning rather than silently using fallback values.
-    if (pierceTimeMin == null || kerfMm == null) {
+    // pierce_time_min gates completeness — it is real, load-bearing data
+    // (deriveFeatureOpsFromLaserParams uses it directly to time every pierce).
+    // kerf_mm does NOT gate completeness: confirmed by direct read that no
+    // real caller anywhere reads LaserCutParams.kerfMm (cost/cycle time comes
+    // entirely from cuttingSpeedMPerMin + pierceTimeMin) — it used to sit
+    // here as an extra require-all-columns check with no consumer behind it,
+    // silently rejecting an otherwise-complete, usable row (real cutting
+    // speed + real pierce time) whenever a source table's kerf column simply
+    // wasn't populated for that row (root-caused 2026-09-10 wiring real CO2
+    // laser data — memory/sheetmetal/lookuptable/sheet_metal_nesting_cut_
+    // rate_combined.json's real 'Laser Cut' rows have no kerf column at all).
+    // 0 here matches the existing noData sentinel below, not a guess.
+    if (pierceTimeMin == null) {
       return noData;
     }
+    const kerfMm = row.kerf_mm != null ? Number(row.kerf_mm) : 0;
     return {
       cuttingSpeedMPerMin: Number(row.cutting_speed_m_per_min),
       pierceTimeMin,

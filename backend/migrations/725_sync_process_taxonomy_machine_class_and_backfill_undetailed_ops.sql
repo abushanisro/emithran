@@ -177,15 +177,23 @@ CREATE TRIGGER trigger_sync_process_taxonomy_machine_class
 --     "Shearing Machine" category (10 machines, includes "Default Shear").
 --
 --   Co2 Laser Cutting: NOT touched by this migration at all (not even a
---     default_machine_name). User decision (2026-09-10), asked and
---     confirmed explicitly: strictly per process_operations.json and
---     process_machine_data.json — the two named reference-taxonomy source
---     files — "Co2 Laser Cutting"/"CO2" appears in neither, so it is
---     deactivated instead of detailed. See migration 726, which runs after
---     this one and deactivates the live process_calculator_mappings row +
---     the one real mhr_records machine (Quattro) that had been classified
---     co2_laser, and reverts this migration's own Part A auto-promotion for
---     it back to machine_class=NULL/roadmap_status='not_modeled'.
+--     default_machine_name). User decision (2026-09-10): the human-facing
+--     name for this real 24-machine pool stays "Laser Cut"/"Laser Cutting"
+--     (matching machine_library.json's own "Laser Cutting Machine" category
+--     label and the live catalog's active "Laser Cut" operation) — never
+--     "CO2 Laser Cutter"/"CO2 Laser". "Co2 Laser Cutting" is therefore a real,
+--     disclosed, duplicate operation NAME for that same pool (same shape as
+--     "Fiber Laser Cut" before migration 715's dedup), left undetailed here
+--     on purpose rather than given Part B detail. See migration 728, which
+--     runs after this one and deactivates the live process_calculator_
+--     mappings row for it. Quattro's own machine_class ('co2_laser',
+--     migration 456 — independently verified via AMADA's own official
+--     documentation) is a separate, correct, real machine identity and is
+--     NOT reverted by 728: this is a catalog-operation-name retirement, not a
+--     machine-identity question. Migration 728 also reverts this migration's
+--     own Part A auto-promotion for the "Co2 Laser Cutting" taxonomy row back
+--     to machine_class=NULL/roadmap_status='not_modeled', so a deactivated
+--     operation does not keep reading as "production" in process_taxonomy.
 
 INSERT INTO process_taxonomy_operations (canonical_process_id, operation_category, feature_type, raw_compound_string, notes)
 SELECT pt.id, 'Flanging', 'ComplexHole', 'Hole Extrusion (Burring):Flanging//ComplexHole',
