@@ -1,6 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
+import { ROLLUP_REPORTING_CURRENCY } from '../costing/shared/core/persisted-currency-contract';
+import {
+  computeCurrencyAwareRollup,
+  RollupInputKind,
+  RollupSourceAmount,
+} from './bom-item-rollup';
 import { BomItemCostDto, BomItemCostSummaryDto, UpdateBomItemCostDto } from '../dto/bom-item-cost.dto';
 import { snakeCase } from 'snake-case';
 import { camelCase } from 'camel-case';
@@ -10,6 +17,9 @@ export class BomItemCostService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
+    // One FX snapshot per rollup comes from here. ExchangeRateModule is already
+    // imported by BomItemsModule, so this needs no module change.
+    private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
   /**
@@ -170,92 +180,145 @@ export class BomItemCostService {
       .select('id, quantity')
       .eq('parent_item_id', bomItemId);
 
-    let childrenCost = 0;
+    // ── P1b-iii: the one currency-aware rollup ───────────────────────────────
+    //
+    // Every monetary input is read from its SOURCE record together with the
+    // currency declarations migrations 707/708 added, and handed to
+    // computeCurrencyAwareRollup, which converts each trusted amount exactly
+    // once through a SINGLE resolved FX snapshot. Nothing is summed here.
+    //
+    // This replaced a version that:
+    //   * read raw_material_cost and process_cost off the aggregate row rather
+    //     than from source records -- which stopped working the moment the
+    //     P1b-ii triggers stopped writing them;
+    //   * selected `total_cost_per_part` from packaging_logistics_cost_records
+    //     and procured_parts_cost_records. That column does not exist on
+    //     either table (verified live), so the query errored, the error was
+    //     never checked, and BOTH categories silently rolled up as 0;
+    //   * summed amounts of unknown denomination and then declared the result
+    //     final by clearing is_stale.
+    const client = this.supabaseService.getClient(accessToken);
+    const amounts: RollupSourceAmount[] = [];
 
+    // Children: a child total is denominated in that child reporting currency
+    // and is only trustworthy if the child itself rolled up cleanly. Mapping
+    // child integrity onto the basis vocabulary makes an untrusted child block
+    // its parent, which is the correct behaviour for an assembly tree.
     if (!childrenError && children && children.length > 0) {
       const childIds = children.map(c => c.id);
-
-      const { data: childCosts, error: costsError } = await this.supabaseService
-        .getClient(accessToken)
+      const { data: childCosts, error: costsError } = await client
         .from('bom_item_costs')
-        .select('bom_item_id, total_cost')
+        .select('bom_item_id, total_cost, currency_code, currency_integrity')
         .in('bom_item_id', childIds);
-
-      if (!costsError && childCosts) {
-        // Calculate children cost considering quantities
-        for (const child of children) {
-          const childCost = childCosts.find(cc => cc.bom_item_id === child.id);
-          if (childCost) {
-            childrenCost += (parseFloat(childCost.total_cost) || 0) * (parseFloat(child.quantity) || 1);
-          }
-        }
+      if (costsError) {
+        this.logger.error(`Error fetching children costs: ${costsError.message}`, 'BomItemCostService');
+        throw new NotFoundException(`Cannot roll up ${bomItemId}: children costs unavailable`);
+      }
+      for (const child of children) {
+        const cc = childCosts?.find(x => x.bom_item_id === child.id);
+        if (!cc) continue;
+        amounts.push({
+          kind: 'direct_children',
+          amount: (parseFloat(cc.total_cost) || 0) * (parseFloat(child.quantity) || 1),
+          currency: cc.currency_code ?? null,
+          basis: cc.currency_integrity === 'consistent' ? 'local' : 'legacy_unverified',
+          ref: child.id,
+        });
       }
     }
 
-    // Fetch packaging & logistics costs for this item
-    const { data: packagingCosts } = await this.supabaseService
-      .getClient(accessToken)
-      .from('packaging_logistics_cost_records')
-      .select('total_cost_per_part')
-      .eq('bom_item_id', bomItemId)
-      .eq('is_active', true);
+    // The five source tables. Column names are the real ones, and every error
+    // is checked -- an unreadable source must abort the rollup, never quietly
+    // contribute zero.
+    const sources: Array<{
+      table: string; kind: RollupInputKind; amountCol: string; hasCurrency: boolean;
+    }> = [
+      { table: 'raw_material_cost_records',        kind: 'raw_material',        amountCol: 'total_cost',           hasCurrency: true },
+      { table: 'packaging_logistics_cost_records', kind: 'packaging_logistics', amountCol: 'total_cost',           hasCurrency: true },
+      { table: 'procured_parts_cost_records',      kind: 'procured_parts',      amountCol: 'total_cost',           hasCurrency: true },
+      { table: 'tooling_cost_records',             kind: 'tooling',             amountCol: 'total_cost',           hasCurrency: true },
+      { table: 'process_cost_records',             kind: 'process',             amountCol: 'total_cost_per_part',  hasCurrency: true },
+    ];
 
-    const packagingLogisticsCost = packagingCosts?.reduce((sum, record) =>
-      sum + (parseFloat(record.total_cost_per_part) || 0), 0) || 0;
+    for (const src of sources) {
+      const { data, error } = await client
+        .from(src.table)
+        .select(`id, ${src.amountCol}, currency, cost_currency_basis`)
+        .eq('bom_item_id', bomItemId)
+        .eq('is_active', true);
+      if (error) {
+        this.logger.error(`Rollup source ${src.table} unreadable: ${error.message}`, 'BomItemCostService');
+        throw new NotFoundException(
+          `Cannot roll up ${bomItemId}: ${src.table} could not be read (${error.message})`,
+        );
+      }
+      for (const row of data ?? []) {
+        amounts.push({
+          kind: src.kind,
+          amount: parseFloat((row as Record<string, any>)[src.amountCol]) || 0,
+          currency: (row as Record<string, any>).currency ?? null,
+          basis: (row as Record<string, any>).cost_currency_basis ?? null,
+          ref: (row as Record<string, any>).id ?? null,
+        });
+      }
+    }
 
-    // Fetch procured parts costs for this item
-    const { data: procuredCosts } = await this.supabaseService
-      .getClient(accessToken)
-      .from('procured_parts_cost_records')
-      .select('total_cost_per_part')
-      .eq('bom_item_id', bomItemId)
-      .eq('is_active', true);
+    // ONE snapshot for this entire rollup. convertOptional returns null rather
+    // than guessing when the snapshot has no rate, which is what lets the core
+    // fail closed instead of inventing an FX rate.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const reportingCurrency = ROLLUP_REPORTING_CURRENCY;
+    const rollup = computeCurrencyAwareRollup({
+      amounts,
+      reportingCurrency,
+      rateToReporting: (from) =>
+        from === reportingCurrency ? 1 : (rates.convertOptional(from, reportingCurrency) ?? null),
+    });
 
-    const procuredPartsCost = procuredCosts?.reduce((sum, record) =>
-      sum + (parseFloat(record.total_cost_per_part) || 0), 0) || 0;
+    // Provenance is written either way: a refusal is as much a result as a
+    // total, and the row must be able to explain which input blocked it.
+    const patch: Record<string, unknown> = {
+      currency_integrity: rollup.integrity,
+      rollup_provenance: rollup.provenance as unknown as Record<string, unknown>,
+      updated_at: new Date().toISOString(),
+    };
 
-    // Fetch tooling costs for this item
-    const { data: toolingCosts } = await this.supabaseService
-      .getClient(accessToken)
-      .from('tooling_cost_records')
-      .select('total_cost')
-      .eq('bom_item_id', bomItemId)
-      .eq('is_active', true);
+    if (rollup.trusted && rollup.totals) {
+      const t = rollup.totals;
+      const sgaPercentage = parseFloat(costRecord.sgaPercentage as any) || 0;
+      const profitPercentage = parseFloat(costRecord.profitPercentage as any) || 0;
+      Object.assign(patch, {
+        currency_code:            rollup.reportingCurrency,
+        raw_material_cost:        t.raw_material,
+        packaging_logistics_cost: t.packaging_logistics,
+        procured_parts_cost:      t.procured_parts,
+        process_cost:             t.process,
+        tooling_cost:             t.tooling,
+        direct_children_cost:     t.direct_children,
+        own_cost:                 t.own_cost,
+        total_cost:               t.total_cost,
+        unit_cost:                t.unit_cost,
+        extended_cost:            t.total_cost * (parseFloat(item.quantity) || 1),
+        selling_price:            t.total_cost * (1 + sgaPercentage / 100) * (1 + profitPercentage / 100),
+        // Only a complete, fully-converted rollup clears staleness.
+        is_stale:                 false,
+        last_calculated_at:       new Date().toISOString(),
+      });
+    } else {
+      // Fail closed. Existing money is left EXACTLY as it stands -- not zeroed,
+      // not converted, not guessed -- and the aggregate stays stale so nothing
+      // downstream mistakes it for a settled figure.
+      patch.is_stale = true;
+      this.logger.warn(
+        `Rollup for ${bomItemId} left stale (${rollup.integrity}): untrusted inputs ` +
+        `[${rollup.provenance.untrustedKinds.join(', ')}]`,
+        'BomItemCostService',
+      );
+    }
 
-    const toolingCost = toolingCosts?.reduce((sum, record) =>
-      sum + (parseFloat(record.total_cost) || 0), 0) || 0;
-
-    // Calculate own cost (all direct costs for this item)
-    const rawMaterialCost = parseFloat(costRecord.rawMaterialCost as any) || 0;
-    const processCost = parseFloat(costRecord.processCost as any) || 0;
-    const ownCost = rawMaterialCost + processCost + toolingCost + packagingLogisticsCost + procuredPartsCost;
-    const totalCost = ownCost + childrenCost;
-    const unitCost = totalCost;
-    const extendedCost = totalCost * (parseFloat(item.quantity) || 1);
-
-    // Calculate selling price with margins
-    const sgaPercentage = parseFloat(costRecord.sgaPercentage as any) || 0;
-    const profitPercentage = parseFloat(costRecord.profitPercentage as any) || 0;
-    const sellingPrice = totalCost * (1 + sgaPercentage / 100) * (1 + profitPercentage / 100);
-
-    // Update cost record
-    const { data: updated, error: updateError } = await this.supabaseService
-      .getClient(accessToken)
+    const { data: updated, error: updateError } = await client
       .from('bom_item_costs')
-      .update({
-        tooling_cost: toolingCost,
-        packaging_logistics_cost: packagingLogisticsCost,
-        procured_parts_cost: procuredPartsCost,
-        direct_children_cost: childrenCost,
-        own_cost: ownCost,
-        total_cost: totalCost,
-        unit_cost: unitCost,
-        extended_cost: extendedCost,
-        selling_price: sellingPrice,
-        is_stale: false,
-        last_calculated_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update(patch)
       .eq('bom_item_id', bomItemId)
       .select()
       .single();
@@ -265,7 +328,13 @@ export class BomItemCostService {
       throw new NotFoundException(`Failed to update cost for BOM item ${bomItemId}`);
     }
 
-    this.logger.log(`Recalculated cost for BOM item ${bomItemId}: total=${totalCost}`, 'BomItemCostService');
+    this.logger.log(
+      rollup.trusted && rollup.totals
+        ? `Rolled up BOM item ${bomItemId}: total=${rollup.totals.total_cost} ${rollup.reportingCurrency} ` +
+          `(integrity=${rollup.integrity}, rates=${JSON.stringify(rollup.provenance.fxRates)})`
+        : `Rolled up BOM item ${bomItemId}: no total written (integrity=${rollup.integrity}), money left unchanged`,
+      'BomItemCostService',
+    );
 
     return this.transformToCamelCase(updated) as BomItemCostDto;
   }

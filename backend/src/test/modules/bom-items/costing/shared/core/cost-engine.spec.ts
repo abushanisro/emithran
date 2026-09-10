@@ -1,4 +1,5 @@
 import { computeCostSummary, applyPersistedRouteToSummary, type CostEngineInput, type MHRRateInput, type AppliedProcessCostRecord } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
+import { getEnginesForFamily, getProcessLabelForClass } from '../../../../../../modules/bom-items/costing/shared/core/manufacturing-process-registry';
 import type { LookupGap, UnsupportedOperationGap } from '../../../../../../modules/bom-items/dto/cost-breakdown.dto';
 import { planInspection, finalizeInspectionLine, type InspectionInput } from '../../../../../../modules/bom-items/costing/shared/process/inspection-engine';
 import type { NestingResult } from '../../../../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
@@ -555,9 +556,19 @@ describe('applyPersistedRouteToSummary — P0.2 applied-route authority', () => 
     };
   }
 
+  // The same set production supplies: every registered route core process,
+  // from the registry rather than a list maintained beside it.
+  const CORE_PROCESS_CLASSES = new Set<string>([
+    ...getEnginesForFamily('sheet_metal_cutting'),
+    ...getEnginesForFamily('sheet_metal_forming'),
+  ].map((e) => e.machineClass as string).concat('press_brake'));
+  const FORMING_PROCESS_CLASSES = new Set<string>(
+    getEnginesForFamily('sheet_metal_forming').map((e) => e.machineClass as string),
+  );
+
   it('pre-apply path is byte-for-byte unchanged when no active process_cost_records row exists', () => {
     const preApply = computeCostSummary(baseInput());
-    const result = applyPersistedRouteToSummary(preApply, []);
+    const result = applyPersistedRouteToSummary(preApply, [], getProcessLabelForClass());
     expect(result).toEqual(preApply);
     expect(result.processLines.find((l) => l.process === 'Laser Cutting')).toBeDefined();
   });
@@ -565,7 +576,7 @@ describe('applyPersistedRouteToSummary — P0.2 applied-route authority', () => 
   it('applied Waterjet: Cost Summary agrees with the persisted record on the full costing identity, not just the process name', () => {
     const preApply = computeCostSummary(baseInput());
     const record = appliedRecord({ machine_class: 'waterjet' });
-    const result = applyPersistedRouteToSummary(preApply, [record]);
+    const result = applyPersistedRouteToSummary(preApply, [record], getProcessLabelForClass());
 
     // Cannot fabricate or fall back to Laser Cutting.
     expect(result.processLines.find((l) => l.process === 'Laser Cutting')).toBeUndefined();
@@ -581,10 +592,15 @@ describe('applyPersistedRouteToSummary — P0.2 applied-route authority', () => 
     expect(line.totalCost).toBe(record.total_cost_per_part);          // total_cost_per_part
 
     // Aggregates recomputed to reflect the swap, not the discarded laser line.
-    expect(result.totalProcessCost).toBe(
-      result.processLines.reduce((s, l) => s + l.totalCost, 0),
+    // Compared to 10 decimal places rather than bit-exactly: the engine rounds
+    // its aggregate while this sums already-rounded line values, so the two
+    // agree to far beyond currency precision but not always in the last float
+    // bit (56.35 vs 56.349999999999994). The assertion is about which lines the
+    // aggregate covers, not IEEE-754 accumulation order.
+    expect(result.totalProcessCost).toBeCloseTo(
+      result.processLines.reduce((s, l) => s + l.totalCost, 0), 10,
     );
-    expect(result.totalCost).toBe(result.materialCost + result.totalProcessCost);
+    expect(result.totalCost).toBeCloseTo(result.materialCost + result.totalProcessCost, 10);
     expect(result.cycleTimes.laserMin).toBe(0);
   });
 
@@ -600,7 +616,7 @@ describe('applyPersistedRouteToSummary — P0.2 applied-route authority', () => 
       direct_rate: 620,
       total_cost_per_part: 18.9,
     });
-    const result = applyPersistedRouteToSummary(preApply, [record]);
+    const result = applyPersistedRouteToSummary(preApply, [record], getProcessLabelForClass());
 
     expect(result.processLines.find((l) => l.process === 'Laser Cutting')).toBeUndefined();
     expect(result.processLines.find((l) => l.process === 'Waterjet Cutting')).toBeUndefined();
@@ -617,9 +633,29 @@ describe('applyPersistedRouteToSummary — P0.2 applied-route authority', () => 
     expect(result.cycleTimes.laserMin).toBe(0);
   });
 
-  it('applied Press Brake: an edited/persisted bending record overrides the live recompute independently of cutting', () => {
+  it('applied Press Brake: an edited/persisted bending record is authoritative, and so is the cutting row beside it', () => {
     const preApply = computeCostSummary(baseInput());
     const liveLaser = preApply.processLines.find((l) => l.process === 'Laser Cutting')!;
+
+    // This test previously passed the press-brake row ALONE and asserted the
+    // laser line stayed at its live value ("independently of cutting"). That
+    // assertion described the hybrid persisted/live model, which is exactly
+    // what an applied route must not be: on a real item it let a persisted CMM
+    // row read 0.21 while the Cost Guide charged a freshly resolved 0.39 for
+    // the same operation.
+    //
+    // The generation is now the whole quote, so the realistic input is both
+    // operations, and BOTH must come from the snapshot.
+    const laserRow = appliedRecord({
+      machine_class: 'fiber_laser',
+      machine_name: 'Test Fiber Laser',
+      operation: 'laser_cutting',
+      process_route: 'Laser Cutting',
+      cycle_time: 72,
+      setup_time: 15,
+      direct_rate: 880,
+      total_cost_per_part: 31.5,
+    });
     const record = appliedRecord({
       machine_class: 'press_brake',
       machine_name: 'Test 160T Brake',
@@ -631,11 +667,20 @@ describe('applyPersistedRouteToSummary — P0.2 applied-route authority', () => 
       direct_rate: 410,
       total_cost_per_part: 9.4,
     });
-    const result = applyPersistedRouteToSummary(preApply, [record]);
+    const result = applyPersistedRouteToSummary(preApply, [laserRow, record], getProcessLabelForClass());
 
-    // Cutting line is untouched -- Press Brake is an independent operation,
-    // not an alternative to the cutting technology.
-    expect(result.processLines.find((l) => l.process === 'Laser Cutting')).toEqual(liveLaser);
+    // The cutting line is the PERSISTED one, not the live recompute — the
+    // inverse of what this test used to assert, and the point of the change.
+    const cutting = result.processLines.find((l) => l.machineClass === 'fiber_laser')!;
+    expect(cutting.totalCost).toBe(laserRow.total_cost_per_part);
+    expect(cutting.machineName).toBe(laserRow.machine_name);
+    expect(cutting).not.toEqual(liveLaser);
+
+    // Exactly the two persisted operations, nothing carried over live.
+    expect(result.processLines).toHaveLength(2);
+    expect(result.totalProcessCost).toBeCloseTo(
+      laserRow.total_cost_per_part + record.total_cost_per_part, 10,
+    );
 
     const line = result.processLines.find((l) => l.process === 'Press Brake')!;
     expect(line).toBeDefined();
@@ -654,7 +699,7 @@ describe('applyPersistedRouteToSummary — P0.2 applied-route authority', () => 
     // SAME "no fabrication" discipline holds for the applied-cost read path.
     const preApply = computeCostSummary(baseInput());
     const record = appliedRecord({ machine_class: 'waterjet', mhr_id: null });
-    const result = applyPersistedRouteToSummary(preApply, [record]);
+    const result = applyPersistedRouteToSummary(preApply, [record], getProcessLabelForClass());
     const line = result.processLines.find((l) => l.process === 'Waterjet Cutting')!;
     expect(line.rateSource).toBe('default_rate'); // honest, since mhr_id is absent -- never fabricated as 'mhr_database'
     expect(line.totalCost).toBe(record.total_cost_per_part);

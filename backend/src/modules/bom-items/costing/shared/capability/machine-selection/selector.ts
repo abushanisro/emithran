@@ -21,6 +21,7 @@ import {
   IM_TIEBAR_ADDEND_MM,
   TONNAGE_MARGIN,
   type LaserRequirement,
+  type LaserMaterialFamily,
   type MachineRequirement,
 } from './physics';
 import {
@@ -57,7 +58,12 @@ const BASE_COLUMNS =
   'id, machine_name, commodity_code, process_group, machine_class, ' +
   'total_machine_hour_rate, manual_mhr_value, fully_burdened_local_per_hr, ' +
   'capacity_utilization_rate, operators, usd_lhr_total, ' +
-  'press_cycle_time_s, handling_time_const_s, handling_time_mass_coeff_s_per_kg, setup_time_hr';
+  'press_cycle_time_s, handling_time_const_s, handling_time_mass_coeff_s_per_kg, setup_time_hr, ' +
+  // The two components the canonical MHR is DEFINED as (migration 581:
+  // MHR = Direct Overhead + Indirect Overhead). Carried so the benchmark
+  // override guard can tell a real, self-consistent machine rate apart from
+  // a mis-scaled import — see applyBenchmarkOverrideIfNeeded.
+  'direct_overhead_rate, indirect_overhead_rate';
 
 // ── Row classification (same guards as the legacy resolveMHRRates) ────────────
 
@@ -84,6 +90,8 @@ interface RawMachineRow {
   handling_time_const_s?: number | string | null;
   handling_time_mass_coeff_s_per_kg?: number | string | null;
   setup_time_hr?: number | string | null;
+  direct_overhead_rate?: number | string | null;
+  indirect_overhead_rate?: number | string | null;
   // Capability columns — absent until migration 324 runs
   max_x_mm?: number | string | null;
   max_y_mm?: number | string | null;
@@ -354,6 +362,8 @@ export async function fetchMachinePool(
       handlingConstS: num(raw.handling_time_const_s),
       handlingMassCoeffSPerKg: num(raw.handling_time_mass_coeff_s_per_kg),
       setupTimeHr: num(raw.setup_time_hr),
+      directOverheadRate: num(raw.direct_overhead_rate),
+      indirectOverheadRate: num(raw.indirect_overhead_rate),
     });
   }
 
@@ -385,14 +395,22 @@ export async function fetchMachinePool(
 // 'imported' capability -- worse than today's honest "no data" gap. Needs the
 // real tier legend sourced before this can be backfilled; do not infer it
 // from column position alone.
-export function laserThicknessLimit(cap: MachineCapability, req: LaserRequirement): number | null {
-  switch (req.materialFamily) {
+// Shared per-material-family thickness lookup — the same MS/SS/AL/CU capability
+// columns back laser, shear (real machine_library.json "Shearing Machine" data
+// is max_thickness_steel_mm/_stainless_steel_mm/_aluminum_mm/_copper_mm, the
+// exact same fields), and plasma cut/punch. One lookup, not one per class.
+export function materialThicknessLimit(cap: MachineCapability, materialFamily: LaserMaterialFamily): number | null {
+  switch (materialFamily) {
     case 'MS': return cap.maxThicknessMsMm ?? cap.maxThicknessMm;
     case 'SS': return cap.maxThicknessSsMm ?? cap.maxThicknessMm;
     case 'AL': return cap.maxThicknessAlMm ?? cap.maxThicknessMm;
     case 'CU': return cap.maxThicknessCuMm ?? cap.maxThicknessMm;
     default:   return cap.maxThicknessMm ?? cap.maxThicknessMsMm;
   }
+}
+
+export function laserThicknessLimit(cap: MachineCapability, req: LaserRequirement): number | null {
+  return materialThicknessLimit(cap, req.materialFamily);
 }
 
 // Flat stock can be rotated 90° on the bed — accept either orientation.
@@ -487,6 +505,31 @@ export function isCapable(
       if (cap.maxThicknessMm != null && cap.maxThicknessMm < req.thicknessMm) return false;
       return fitsBed(cap, req.bedLengthMm, req.bedWidthMm);
     }
+    case 'shear': {
+      const limit = materialThicknessLimit(cap, req.materialFamily);
+      if (limit != null && limit < req.thicknessMm) return false;
+      if (cap.maxLengthMm != null && cap.maxLengthMm < req.cutLengthMm * BED_MARGIN) return false;
+      return true;
+    }
+    case 'plasma_cut':
+      return fitsBed(cap, req.bedLengthMm, req.bedWidthMm);
+    case 'laser_punch': {
+      if (cap.maxTonnage != null && cap.maxTonnage < req.tonnage * TONNAGE_MARGIN) return false;
+      const limit = materialThicknessLimit(cap, req.materialFamily);
+      if (limit != null && limit < req.thicknessMm) return false;
+      return fitsBed(cap, req.bedLengthMm, req.bedWidthMm);
+    }
+    case 'press_forming': {
+      if (cap.maxTonnage != null && cap.maxTonnage < req.tonnage * TONNAGE_MARGIN) return false;
+      const limit = materialThicknessLimit(cap, req.materialFamily);
+      if (limit != null && limit < req.thicknessMm) return false;
+      return fitsBed(cap, req.bedLengthMm, req.bedWidthMm);
+    }
+    case 'roll_bending': {
+      if (cap.maxThicknessMsMm != null && cap.maxThicknessMsMm < req.thicknessMm) return false;
+      if (cap.maxLengthMm != null && cap.maxLengthMm < req.rollLengthMm * BED_MARGIN) return false;
+      return true;
+    }
     case 'vmc': {
       if (cap.maxXMm != null && cap.maxXMm < req.xMm * ENVELOPE_MARGIN) return false;
       if (cap.maxYMm != null && cap.maxYMm < req.yMm * ENVELOPE_MARGIN) return false;
@@ -572,6 +615,49 @@ export function fitScore(candidate: MachineCandidate, req: MachineRequirement): 
       if (x != null) parts.push(x);
       if (y != null) parts.push(y);
       if (thk != null) parts.push(thk);
+      break;
+    }
+    case 'shear': {
+      const thk = ratio(req.thicknessMm, materialThicknessLimit(cap, req.materialFamily));
+      const len = ratio(req.cutLengthMm * BED_MARGIN, cap.maxLengthMm);
+      if (thk != null) parts.push(thk);
+      if (len != null) parts.push(len);
+      break;
+    }
+    case 'plasma_cut': {
+      const x = ratio(req.bedLengthMm * BED_MARGIN, cap.maxXMm);
+      const y = ratio(req.bedWidthMm * BED_MARGIN, cap.maxYMm);
+      if (x != null) parts.push(x);
+      if (y != null) parts.push(y);
+      break;
+    }
+    case 'laser_punch': {
+      const t = ratio(req.tonnage * TONNAGE_MARGIN, cap.maxTonnage);
+      const thk = ratio(req.thicknessMm, materialThicknessLimit(cap, req.materialFamily));
+      const x = ratio(req.bedLengthMm * BED_MARGIN, cap.maxXMm);
+      const y = ratio(req.bedWidthMm * BED_MARGIN, cap.maxYMm);
+      if (t != null) parts.push(t);
+      if (thk != null) parts.push(thk);
+      if (x != null) parts.push(x);
+      if (y != null) parts.push(y);
+      break;
+    }
+    case 'press_forming': {
+      const t = ratio(req.tonnage * TONNAGE_MARGIN, cap.maxTonnage);
+      const thk = ratio(req.thicknessMm, materialThicknessLimit(cap, req.materialFamily));
+      const x = ratio(req.bedLengthMm * BED_MARGIN, cap.maxXMm);
+      const y = ratio(req.bedWidthMm * BED_MARGIN, cap.maxYMm);
+      if (t != null) parts.push(t);
+      if (thk != null) parts.push(thk);
+      if (x != null) parts.push(x);
+      if (y != null) parts.push(y);
+      break;
+    }
+    case 'roll_bending': {
+      const thk = ratio(req.thicknessMm, cap.maxThicknessMsMm);
+      const len = ratio(req.rollLengthMm * BED_MARGIN, cap.maxLengthMm);
+      if (thk != null) parts.push(thk);
+      if (len != null) parts.push(len);
       break;
     }
     case 'vmc': {
@@ -674,6 +760,43 @@ function buildReasons(
         reasons.push(`Part ${r0(req.bedLengthMm)}×${r0(req.bedWidthMm)} mm fits ${r0(cap.maxXMm)}×${r0(cap.maxYMm)} mm bed`);
       }
       break;
+    case 'shear': {
+      const limit = materialThicknessLimit(cap, req.materialFamily);
+      if (limit != null) reasons.push(`Thickness ${r0(req.thicknessMm)} mm (${req.materialFamily}) ≤ ${r0(limit)} mm machine limit`);
+      if (cap.maxLengthMm != null) reasons.push(`Cut length ${r0(req.cutLengthMm)} mm ≤ ${r0(cap.maxLengthMm)} mm shear bed`);
+      break;
+    }
+    case 'plasma_cut':
+      if (cap.maxXMm != null && cap.maxYMm != null) {
+        reasons.push(`Part ${r0(req.bedLengthMm)}×${r0(req.bedWidthMm)} mm fits ${r0(cap.maxXMm)}×${r0(cap.maxYMm)} mm bed`);
+      }
+      reasons.push('Thickness feasibility not gated here — see the real per-part cutting-rate table used at costing time');
+      break;
+    case 'laser_punch': {
+      reasons.push(`Requires ${r0(req.tonnage * TONNAGE_MARGIN)} t (incl. 15% margin)` +
+        (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
+      const limit = materialThicknessLimit(cap, req.materialFamily);
+      if (limit != null) reasons.push(`Thickness ${r0(req.thicknessMm)} mm (${req.materialFamily}) ≤ ${r0(limit)} mm machine limit`);
+      if (cap.maxXMm != null && cap.maxYMm != null) {
+        reasons.push(`Part ${r0(req.bedLengthMm)}×${r0(req.bedWidthMm)} mm fits ${r0(cap.maxXMm)}×${r0(cap.maxYMm)} mm bed`);
+      }
+      break;
+    }
+    case 'press_forming': {
+      reasons.push(`Requires ${r0(req.tonnage * TONNAGE_MARGIN)} t (incl. 15% margin, blanking-force estimate)` +
+        (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
+      const limit = materialThicknessLimit(cap, req.materialFamily);
+      if (limit != null) reasons.push(`Thickness ${r0(req.thicknessMm)} mm (${req.materialFamily}) ≤ ${r0(limit)} mm machine limit`);
+      if (cap.maxXMm != null && cap.maxYMm != null) {
+        reasons.push(`Part ${r0(req.bedLengthMm)}×${r0(req.bedWidthMm)} mm fits ${r0(cap.maxXMm)}×${r0(cap.maxYMm)} mm bed`);
+      }
+      break;
+    }
+    case 'roll_bending': {
+      if (cap.maxThicknessMsMm != null) reasons.push(`Thickness ${r0(req.thicknessMm)} mm (mild steel) ≤ ${r0(cap.maxThicknessMsMm)} mm machine limit`);
+      if (cap.maxLengthMm != null) reasons.push(`Roll length ${r0(req.rollLengthMm)} mm ≤ ${r0(cap.maxLengthMm)} mm roll capacity`);
+      break;
+    }
     case 'vmc':
       if (cap.maxXMm != null && cap.maxYMm != null && cap.maxZMm != null) {
         reasons.push(`Part ${r0(req.xMm)}×${r0(req.yMm)}×${r0(req.zMm)} mm fits ` +
@@ -728,6 +851,20 @@ function buildCapabilityCheck(
   req: MachineRequirement,
   opts?: { allowUnknownLaserThickness?: boolean },
 ): CapabilityCheck | null {
+  if (req.kind === 'shear') {
+    const limit = materialThicknessLimit(candidate.capability, req.materialFamily);
+    return {
+      parameter: 'Thickness',
+      materialGrade: req.materialGrade,
+      value: req.thicknessMm,
+      limit,
+      unit: 'mm',
+      // Shear has no confirmed systemic zero-data gap (unlike laser's P0.7
+      // fail-closed case) — a null limit is ungated, matching isCapable's
+      // shear case above, not a separate fail-closed policy invented here.
+      supported: limit != null ? limit >= req.thicknessMm : true,
+    };
+  }
   if (req.kind !== 'laser') return null;
   const limit = laserThicknessLimit(candidate.capability, req);
   return {
@@ -809,6 +946,8 @@ function makeDefaultCandidate(_location: string, cls: MachineClass, fallbackRate
     handlingConstS: null,
     handlingMassCoeffSPerKg: null,
     setupTimeHr: null,
+    directOverheadRate: null,
+    indirectOverheadRate: null,
   };
 }
 

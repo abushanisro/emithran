@@ -2,7 +2,7 @@ import { ROUTER_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/default-r
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
-import { noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
+import { noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
 export interface RouterInput {
@@ -59,10 +59,18 @@ export function computeRouterCost(input: RouterInput): RouterResult {
     warnings.push("2-Axis Router: plunge/pierce time is not modeled — no real plunge-time data on file, so only linear cutting time is charged");
   }
 
-  if (input.setupMin == null) {
-    warnings.push("2-Axis Router: setup time from fallback — seed sm_lookup_op_setup_time for 'router_2axis'");
-  }
-  const setupMin = input.setupMin ?? ROUTER_SETUP_MIN;
+  // Real setup time, most-specific real source first: this machine's own
+  // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
+  // row, then the cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: "Router Cutting",
+    machineSetupTimeHr: rate.setupTimeHr,
+    operationSetupMin: input.setupMin,
+    classDefaultMin: ROUTER_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  const setupMin = setup.setupMin;
+  if (setup.warning) warnings.push(setup.warning);
 
   const t = eMithranTerms({
     mhrPerHr: rate.rate,
@@ -84,6 +92,8 @@ export function computeRouterCost(input: RouterInput): RouterResult {
     buildCuttingProcessLine({
       process: "Router Cutting",
       processIdentity: input.processIdentity,
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: t.setupCost,
       runCost: t.machineCost + t.laborCost,
       totalCost: t.total,
@@ -101,6 +111,7 @@ export function computeRouterCost(input: RouterInput): RouterResult {
 export class RouterEngine extends BaseCuttingEngine {
   readonly machineClass = 'router_2axis';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Router Cutting';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     return computeRouterCost({

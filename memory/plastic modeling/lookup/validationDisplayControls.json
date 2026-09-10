@@ -1,0 +1,22 @@
+{
+  "name": "validationDisplayControls",
+  "sourceFilePath": "lookupTables/Component/validationDisplayControls.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Panel Name",
+    "Display"
+  ],
+  "records": [
+    { "Panel Name": "Blank Size", "Display": "no" },
+    { "Panel Name": "Build Direction", "Display": "no" },
+    { "Panel Name": "Draw Direction", "Display": "yes" },
+    { "Panel Name": "Machining", "Display": "no" },
+    { "Panel Name": "Main Surface", "Display": "no" },
+    { "Panel Name": "No Cost Feature", "Display": "no" },
+    { "Panel Name": "Ram Direction", "Display": "no" },
+    { "Panel Name": "Routing", "Display": "yes" },
+    { "Panel Name": "Stock Form", "Display": "no" },
+    { "Panel Name": "Tolerances", "Display": "no" },
+    { "Panel Name": "Uncosted GCDs", "Display": "yes" }
+  ]
+}

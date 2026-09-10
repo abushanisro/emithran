@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { resolveCostingInputs, type CostingInputs } from '../costing/shared/physics/costing-inputs';
 import { BOMItemType } from './bom-items.dto';
 
 /**
@@ -31,7 +32,15 @@ export class BOMItemResponseDto {
   quantity: number;
 
   @ApiProperty({ example: 10000 })
-  annualVolume: number;
+  /**
+   * Parts per year, or `null` when genuinely not on file.
+   *
+   * Was `number`, fed by `Number(row.annual_volume)` — which turns a NULL into
+   * 0, a real quantity, and exactly the reinterpretation this field exists to
+   * avoid. The column carried NOT NULL DEFAULT 1000 until migration 705, so
+   * `null` only appears on rows created after it.
+   */
+  annualVolume: number | null;
 
   @ApiPropertyOptional({ example: 'pcs' })
   unit?: string;
@@ -89,6 +98,21 @@ export class BOMItemResponseDto {
 
   @ApiPropertyOptional({ example: { sheetThicknessMm: 2 }, description: 'Generic Cost Guide manual-override bag, keyed by scenario input name — see costing/scenario-overrides.ts' })
   scenarioOverrides?: Record<string, unknown>;
+
+  /**
+   * The costing inputs this item resolves to right now, from its own persisted
+   * scenario and columns — the same canonical resolver the costing endpoints
+   * use, with no request parameters applied.
+   *
+   * Carried here because this response is cheap and the costing endpoints are
+   * not: cost-summary is a documented 14-40s call on a nesting cache miss, and
+   * the scenario panel was blocking Batch Size and Production Life on it. A new
+   * item, which has no scenario overrides to seed from, therefore showed a
+   * dash where its effective inputs belong until a full costing run returned.
+   * Resolving here costs nothing — the row is already loaded — and gives the UI
+   * the same answer immediately.
+   */
+  resolvedCostingInputs?: CostingInputs;
 
   @ApiPropertyOptional({ example: 'drawing' })
   materialSource?: string;
@@ -174,7 +198,11 @@ export class BOMItemResponseDto {
     dto.itemType = row.item_type;
     dto.parentItemId = row.parent_item_id || undefined;
     dto.quantity = Number(row.quantity);
-    dto.annualVolume = Number(row.annual_volume);
+    // NULL stays null. `Number(null)` is 0, which would present a part with no
+    // volume on file as a part someone said makes zero units a year.
+    dto.annualVolume = row.annual_volume === null || row.annual_volume === undefined
+      ? null
+      : Number(row.annual_volume);
     dto.unit = row.unit || undefined;
     dto.material = row.material || undefined;
     dto.materialGrade = row.material_grade || undefined;
@@ -194,6 +222,11 @@ export class BOMItemResponseDto {
     dto.thumbnailUrl = row.thumbnail_url || undefined;
     dto.manufacturingFamilyOverride = row.manufacturing_family_override || undefined;
     dto.scenarioOverrides = (row.scenario_overrides && typeof row.scenario_overrides === 'object') ? row.scenario_overrides : undefined;
+    // Same resolver, same precedence, no request overrides — see the field's doc.
+    dto.resolvedCostingInputs = resolveCostingInputs({
+      scenarioOverrides: dto.scenarioOverrides ?? null,
+      item: { annualVolume: dto.annualVolume },
+    });
     dto.materialSource     = row.material_source ?? undefined;
     dto.materialConfidence = row.material_confidence !== null && row.material_confidence !== undefined ? Number(row.material_confidence) : undefined;
     dto.sheetThicknessMm   = row.sheet_thickness_mm    !== null && row.sheet_thickness_mm    !== undefined ? Number(row.sheet_thickness_mm)    : undefined;

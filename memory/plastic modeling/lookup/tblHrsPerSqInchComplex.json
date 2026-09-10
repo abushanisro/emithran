@@ -1,0 +1,21 @@
+{
+  "name": "tblHrsPerSqInchComplex",
+  "sourceFilePath": "lookupTables/Component/tblHrsPerSqInchComplex.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Hrs Per Sq Inch Complex (hr)",
+    "Surface Area Complex (in^2)"
+  ],
+  "records": [
+    { "Hrs Per Sq Inch Complex (hr)": 0.0900, "Surface Area Complex (in^2)": 3500.00 },
+    { "Hrs Per Sq Inch Complex (hr)": 0.0900, "Surface Area Complex (in^2)": 5000.00 },
+    { "Hrs Per Sq Inch Complex (hr)": 0.0900, "Surface Area Complex (in^2)": 99999999.00 },
+    { "Hrs Per Sq Inch Complex (hr)": 0.1020, "Surface Area Complex (in^2)": 3000.00 },
+    { "Hrs Per Sq Inch Complex (hr)": 0.1080, "Surface Area Complex (in^2)": 2500.00 },
+    { "Hrs Per Sq Inch Complex (hr)": 0.1140, "Surface Area Complex (in^2)": 1500.00 },
+    { "Hrs Per Sq Inch Complex (hr)": 0.1260, "Surface Area Complex (in^2)": 1000.00 },
+    { "Hrs Per Sq Inch Complex (hr)": 0.1560, "Surface Area Complex (in^2)": 500.00 },
+    { "Hrs Per Sq Inch Complex (hr)": 0.1800, "Surface Area Complex (in^2)": 250.00 },
+    { "Hrs Per Sq Inch Complex (hr)": 0.2100, "Surface Area Complex (in^2)": 100.00 }
+  ]
+}

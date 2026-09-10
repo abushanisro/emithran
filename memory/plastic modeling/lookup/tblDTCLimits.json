@@ -1,0 +1,15 @@
+{
+  "name": "tblDTCLimits",
+  "sourceFilePath": "lookupTables/Component/tblDTCLimits.csv",
+  "fields": [
+    "Process",
+    "Name",
+    "Limit",
+    "Notes"
+  ],
+  "records": [
+    { "Process": "Compression Molding", "Name": "Cutout Utilization Threshold", "Limit": 0.80, "Notes": "Used to flag when material utilization beneath a threshold where a part would benefit from cutouts not being capped." },
+    { "Process": "Compression Molding", "Name": "Max Thickness Cure Time", "Limit": 3.00, "Notes": "Multiplied by the max thickness of the majority of the part. Used to flag when the part has an excessively thick portion in relation to the majority of the part which will increase the cure time." },
+    { "Process": "Other", "Name": "Blind Hole LD Ratio", "Limit": 2.00, "Notes": "Deprecated in CMV290. Used to flag when blind holes have high LD ratios." }
+  ]
+}

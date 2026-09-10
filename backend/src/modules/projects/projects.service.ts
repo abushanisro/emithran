@@ -5,6 +5,7 @@ import { ProjectResponseDto, ProjectListResponseDto } from './dto/project-respon
 import { AddTeamMemberDto, UpdateTeamMemberDto, TeamMemberResponseDto, TeamMembersListResponseDto, TeamMemberRole } from './dto/project-team-member.dto';
 import { ProjectsRepository } from './projects.repository';
 import { Logger as CustomLogger } from '@/common/logger/logger.service';
+import { PERSISTED_PROCESS_COST_COLUMNS, resolvePersistedProcessCost } from '../bom-items/costing/shared/core/persisted-process-cost';
 
 @Injectable()
 export class ProjectsService {
@@ -409,28 +410,21 @@ export class ProjectsService {
         recordCostMap.set(r.bom_item_id, (recordCostMap.get(r.bom_item_id) || 0) + cost);
       }
 
+      // P1b-iv-b: prefer the persisted engine cost, same as the BOM-level
+      // rollup. This was the fifth copy of the rate-only formula, and like the
+      // others it could not see labour, QA inspection sampling or yield loss --
+      // so project totals silently disagreed with the quote they came from.
+      // The shared resolver falls back to this exact formula only for rows with
+      // nothing stored, so no legacy project total moves.
       const { data: pcRows } = await client
         .from('process_cost_records')
-        .select('bom_item_id, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
+        .select(`bom_item_id, ${PERSISTED_PROCESS_COST_COLUMNS}`)
         .in('bom_item_id', allItemIds)
         .eq('is_active', true);
 
       for (const r of pcRows ?? []) {
-        const machineRate  = parseFloat(r.machine_rate)    || 0;
-        const laborRate    = parseFloat(r.labor_rate)      || 0;
-        const setupManning = parseFloat(r.setup_manning)   || 0;
-        const setupTimeMin = parseFloat(r.setup_time)      || 0;
-        const batchSize    = parseFloat(r.batch_size)      || 1;
-        const heads        = parseFloat(r.heads)           || 0;
-        const cycleTimeSec = parseFloat(r.cycle_time)      || 0;
-        const ppc          = parseFloat(r.parts_per_cycle) || 1;
-        const scrap        = parseFloat(r.scrap)           || 0;
-        const setupCost = batchSize > 0
-          ? (setupTimeMin / 60) * (machineRate + laborRate * setupManning) / batchSize : 0;
-        const cycleCost = ppc > 0
-          ? (cycleTimeSec / 3600) * (machineRate + laborRate * heads) / ppc : 0;
-        const cost = (setupCost + cycleCost) * (1 + scrap / 100);
-        recordCostMap.set(r.bom_item_id, (recordCostMap.get(r.bom_item_id) || 0) + cost);
+        const { totalCostPerPart } = resolvePersistedProcessCost(r);
+        recordCostMap.set(r.bom_item_id, (recordCostMap.get(r.bom_item_id) || 0) + totalCostPerPart);
       }
 
       const { data: bcRows } = await client

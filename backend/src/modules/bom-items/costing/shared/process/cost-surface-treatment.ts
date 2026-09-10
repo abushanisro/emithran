@@ -62,6 +62,12 @@ export function computeSurfaceTreatmentLine(
     }
     return {
       process: `Surface Treatment (${dbRate.label})`,
+      // Explicitly zero, not absent. A dip/coat line is priced per m2 against a
+      // minimum lot charge and has no machine setup — that is a real statement
+      // about this process, and stating it is what lets the write path tell it
+      // apart from an engine that simply failed to resolve a setup time.
+      setupTimeMin: 0,
+      setupTimeSource: 'class_default' as const,
       setupCost: 0,
       runCost: 0,
       totalCost: 0,
@@ -81,6 +87,9 @@ export function computeSurfaceTreatmentLine(
   const perPart = r2(totalCost);
   return {
     process: `Surface Treatment (${dbRate.label})`,
+    // See the same field on the unavailable-cost branch above.
+    setupTimeMin: 0,
+    setupTimeSource: 'class_default' as const,
     setupCost: 0,
     runCost: perPart,
     totalCost: perPart,

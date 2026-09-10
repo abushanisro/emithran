@@ -1,0 +1,180 @@
+{
+  "name": "foamingAgents",
+  "file_path": "lookupTables/Component/foamingAgents.csv",
+  "columns": [
+    "Agent Name",
+    "Material Type",
+    "Cost CFA (USD / kg)",
+    "Percent CFA"
+  ],
+  "records": [
+    {
+      "agent_name": "5-phenyltetrazole",
+      "material_type": "Nylon",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "5-phenyltetrazole",
+      "material_type": "PBT",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "5-phenyltetrazole",
+      "material_type": "PET",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "5-phenyltetrazole",
+      "material_type": "Polycarbonate",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "5-phenyltetrazole",
+      "material_type": "PPS",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Azodicarbonamide",
+      "material_type": "ABS",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Azodicarbonamide",
+      "material_type": "Acetal",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Azodicarbonamide",
+      "material_type": "Acrylic",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Azodicarbonamide",
+      "material_type": "PBT",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Azodicarbonamide",
+      "material_type": "PET",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Azodicarbonamide",
+      "material_type": "Polypropylene",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Azodicarbonamide",
+      "material_type": "Polystyrene",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Azodicarbonamide",
+      "material_type": "PPS",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "P-toluenesulfonylsemicarbazide",
+      "material_type": "ABS",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "P-toluenesulfonylsemicarbazide",
+      "material_type": "Nylon",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "P-toluenesulfonylsemicarbazide",
+      "material_type": "Polypropylene",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "P-toluenesulfonylsemicarbazide",
+      "material_type": "Polystyrene",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "ABS",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "Nylon",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "PBT",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "PET",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "Polypropylene",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "Polystyrene",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "PPS",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "TPA",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "TPE",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "TPO",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    },
+    {
+      "agent_name": "Sodium bicarbonate/citric acid ester",
+      "material_type": "TPU",
+      "cost_cfa_usd_per_kg": 0.044,
+      "percent_cfa": 0.005
+    }
+  ]
+}

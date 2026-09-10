@@ -2,7 +2,7 @@ import { LASER_PUNCH_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/defa
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
-import { noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
+import { noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
 export interface LaserPunchInput {
@@ -69,10 +69,18 @@ export function computeLaserPunchCost(input: LaserPunchInput): LaserPunchResult 
 
   const cuttingMin = (punchingSec + toolChangeSec + nibblingSec) / 60;
 
-  if (input.setupMin == null) {
-    warnings.push("Laser Punch: setup time from fallback — seed sm_lookup_op_setup_time for 'laser_punch'");
-  }
-  const setupMin = input.setupMin ?? LASER_PUNCH_SETUP_MIN;
+  // Real setup time, most-specific real source first: this machine's own
+  // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
+  // row, then the cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: "Laser Punch",
+    machineSetupTimeHr: rate.setupTimeHr,
+    operationSetupMin: input.setupMin,
+    classDefaultMin: LASER_PUNCH_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  const setupMin = setup.setupMin;
+  if (setup.warning) warnings.push(setup.warning);
 
   const t = eMithranTerms({
     mhrPerHr: rate.rate,
@@ -94,6 +102,8 @@ export function computeLaserPunchCost(input: LaserPunchInput): LaserPunchResult 
     buildCuttingProcessLine({
       process: "Laser Punch",
       processIdentity: input.processIdentity,
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: t.setupCost,
       runCost: t.machineCost + t.laborCost,
       totalCost: t.total,
@@ -114,6 +124,7 @@ export function computeLaserPunchCost(input: LaserPunchInput): LaserPunchResult 
 export class LaserPunchEngine extends BaseCuttingEngine {
   readonly machineClass = 'laser_punch';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Laser Punch';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     return computeLaserPunchCost({

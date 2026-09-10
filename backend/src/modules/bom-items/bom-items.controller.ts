@@ -15,7 +15,6 @@ import {
   NotFoundException,
   Logger,
   Patch,
-  Optional,
   InternalServerErrorException,
   UseGuards,
 } from '@nestjs/common';
@@ -47,8 +46,15 @@ import { CADAnalysisService } from './services/cad-analysis.service';
 import { AutoFillService } from './services/auto-fill.service';
 import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService, type MaterialCandidate } from './services/material-intelligence.service';
-import { ManufacturingRulesService } from '../manufacturing-rules/manufacturing-rules.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { findRouteDataGaps } from './costing/shared/core/engine-kernel';
+import { RouteResultDto } from './dto/route-comparison.dto';
+import {
+  PersistedLineCurrency,
+  resolveBenchmarkLabourRate,
+  resolvePersistedCostCurrencyBasis,
+} from './costing/shared/core/persisted-currency-contract';
+import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-process-cost';
 import axios from 'axios';
 
 // Define User type if not available
@@ -58,11 +64,16 @@ interface User {
   [key: string]: any;
 }
 
+// The persisted-money currency contract (migration 707) lives in
+// costing/shared/core/persisted-currency-contract.ts, next to the cost kernel
+// it describes, so its two decisions can be tested against real currency codes
+// without standing up a controller and a database.
+
 // machine_class → process_group, mirroring the fuller vocabulary already used
 // for display in manufacturing-intelligence/page.tsx's
 // deriveProcessGroupFromMachineClass, and the process_group set
 // lhr_benchmark_rates actually has coverage for (migrations 369/371/375:
-// Sheet Metal, Machining, Assembly, Post Processing, Plastic & Rubber,
+// Sheet Metal, Machining, Assembly, Post Processing, Plastic Molding,
 // Quality). Built once at module load — a single Map.get() per line instead
 // of scanning several arrays with .includes() on every call.
 const MACHINE_CLASS_TO_PROCESS_GROUP: ReadonlyMap<string, string> = new Map([
@@ -75,7 +86,7 @@ const MACHINE_CLASS_TO_PROCESS_GROUP: ReadonlyMap<string, string> = new Map([
   ...['ndt_test', 'heat_treat_furnace', 'anodize', 'powder_coat', 'plating', 'chem_treatment', 'laser_marking', 'deburring', 'cleaning']
     .map((c) => [c, 'Post Processing'] as const),
   ...['injection_molding', 'thermoforming', 'blow_molding', 'extrusion', 'rotational_molding', 'rubber_molding', 'compression_molding']
-    .map((c) => [c, 'Plastic & Rubber'] as const),
+    .map((c) => [c, 'Plastic Molding'] as const),
 ]);
 
 @ApiTags('BOM Items')
@@ -92,7 +103,6 @@ export class BOMItemsController {
     private readonly autoFillService: AutoFillService,
     private readonly dfmScoringService: DFMScoringService,
     private readonly materialIntelligenceService: MaterialIntelligenceService,
-    @Optional() private readonly manufacturingRules: ManufacturingRulesService | undefined,
     private readonly supabaseService: SupabaseService,
     private readonly exchangeRateService: ExchangeRateService,
   ) {}
@@ -444,10 +454,31 @@ export class BOMItemsController {
     const geo = result.geometry;
     const sug = result.suggestions;
 
+    // Carry the true-shape nest result across the re-analysis.
+    //
+    // analyzeAndSuggest builds featureGraph.summary as a fresh object, so this
+    // cache used to be destroyed on every Reanalyze. An uncached resolve walks
+    // all 5 STANDARD_SHEETS sequentially against cad-engine's single-threaded
+    // /nest (13-30s per sheet on real parts), and BOTH cost-summary and
+    // route-comparison resolve it, concurrently, on the very next page load —
+    // which is what made those two requests hang until the client gave up.
+    //
+    // Safe to carry because validity is no longer "the summary was not
+    // rewritten": isTrueNestCostingCacheValid now also requires the cache's
+    // inputFingerprint to match the geometry it is being reused for, so a
+    // re-analysis that genuinely changed the flat pattern, thickness, density
+    // or volume produces a different fingerprint and the stale entry is refused
+    // rather than reused. A no-op re-analysis keeps its valid result.
+    const priorNestCache = (bomItem.featureGraph as any)?.summary?.trueNestCostingCache;
+    const featureGraph = result.featureGraph as any;
+    const featureGraphWithNestCache = priorNestCache
+      ? { ...featureGraph, summary: { ...(featureGraph?.summary ?? {}), trueNestCostingCache: priorNestCache } }
+      : featureGraph;
+
     // Sync all geometry + classification fields, not just featureGraph.
     // material / materialGrade are intentionally excluded — those come from 2D drawing analysis and user input.
     const updateData: UpdateBOMItemDto = {
-      featureGraph: result.featureGraph as object,
+      featureGraph: featureGraphWithNestCache as object,
       holeCount: geo.holeCount,
       bendCount: geo.bendCount,
       cutLengthMm: geo.cutLengthMm,
@@ -1245,7 +1276,9 @@ export class BOMItemsController {
         partNumber:  `${baseName.toUpperCase().slice(0, 8)}-${timestamp}-ASM`,
         description: `Assembly — ${baseName}`,
         quantity:    1,
-        annualVolume: 1000,
+        // No annualVolume. This is an assembly shell created to hold imported
+        // children; nobody has stated its yearly demand, and writing 1000 here
+        // made that up. It now stays unresolved until someone sets it.
         unitCost:    0,
         unit:        'pcs',
       },
@@ -1333,16 +1366,21 @@ export class BOMItemsController {
     @Param('id') id: string,
     @Query('batchSize') batchSize: string,
     @Query('location') location: string,
+    @Query('productionLifeYears') productionLifeYears: string,
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     if (!location) throw new BadRequestException('location query param is required — send the digital factory location with each costing request');
+    // No `?? 1` here any more: an absent batch size is passed through as
+    // undefined so the canonical resolver (costing-inputs.ts) applies the one
+    // default. A fallback here would be a second, competing default.
     return this.bomItemsService.getCostSummary(
       id,
       user.id,
       token,
-      batchSize ? parseInt(batchSize, 10) : 1,
+      batchSize ? parseInt(batchSize, 10) : undefined,
       location,
+      productionLifeYears ? Number(productionLifeYears) : undefined,
     );
   }
 
@@ -1388,16 +1426,21 @@ export class BOMItemsController {
     @Param('id') id: string,
     @Query('batchSize') batchSize: string,
     @Query('location') location: string,
+    @Query('productionLifeYears') productionLifeYears: string,
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     if (!location) throw new BadRequestException('location query param is required — send the digital factory location with each costing request');
+    // No `?? 1` here any more: an absent batch size is passed through as
+    // undefined so the canonical resolver (costing-inputs.ts) applies the one
+    // default. A fallback here would be a second, competing default.
     return this.bomItemsService.getRouteComparison(
       id,
       user.id,
       token,
-      batchSize ? parseInt(batchSize, 10) : 1,
+      batchSize ? parseInt(batchSize, 10) : undefined,
       location,
+      productionLifeYears ? Number(productionLifeYears) : undefined,
     );
   }
 
@@ -1410,16 +1453,21 @@ export class BOMItemsController {
     @Param('id') id: string,
     @Query('batchSize') batchSize: string,
     @Query('location') location: string,
+    @Query('productionLifeYears') productionLifeYears: string,
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {
     if (!location) throw new BadRequestException('location query param is required — send the digital factory location with each costing request');
+    // No `?? 1` here any more: an absent batch size is passed through as
+    // undefined so the canonical resolver (costing-inputs.ts) applies the one
+    // default. A fallback here would be a second, competing default.
     return this.bomItemsService.getCandidateRoutes(
       id,
       user.id,
       token,
-      batchSize ? parseInt(batchSize, 10) : 1,
+      batchSize ? parseInt(batchSize, 10) : undefined,
       location,
+      productionLifeYears ? Number(productionLifeYears) : undefined,
     );
   }
 
@@ -1477,130 +1525,25 @@ export class BOMItemsController {
     );
   }
 
-  @Post(':id/auto-fill-processes')
-  @ApiOperation({ summary: 'Deterministically map CAD features → process cost records using the rules engine (no AI, no credits)' })
-  @ApiResponse({ status: 201, description: 'Auto-filled process records created' })
-  async autoFillProcesses(
-    @Param('id') id: string,
-    @CurrentUser() user: User,
-    @AccessToken() token: string,
-  ): Promise<{ created: number; operations: string[] }> {
-    if (!this.manufacturingRules) {
-      throw new InternalServerErrorException('ManufacturingRulesService not available');
-    }
-
-    const item = await this.bomItemsService.findOne(id, user.id, token);
-    const db = this.supabaseService.getClient(token);
-
-    const materialGrade = item.materialGrade ?? 'IS2062 E250';
-    const family = (item.familyClassification ?? 'machined').toLowerCase();
-    const isSheetMetal = family.includes('sheet') || family.includes('metal');
-    const isPlastic = family.includes('plastic') || family.includes('injection') || family.includes('polymer');
-
-    // Build operation list from CAD features
-    const ops: Array<{ operation: string; processGroup: string; geometry: Record<string, unknown> }> = [];
-
-    if (isSheetMetal) {
-      const t = item.sheetThicknessMm ?? 2;
-      const cutLen = item.cutLengthMm ?? Math.sqrt(item.flatPatternAreaMm2 ?? 50000) * 4;
-      const pierces = (item.pierceCount ?? 0) + (item.holeCount ?? 0) + 1;
-      ops.push({ operation: 'laser_cutting', processGroup: 'Sheet Metal', geometry: { thicknessMm: t, cutLengthMm: cutLen, pierceCount: pierces } });
-      if ((item.bendCount ?? 0) > 0) {
-        ops.push({ operation: 'press_brake', processGroup: 'Sheet Metal', geometry: { bendCount: item.bendCount, materialThicknessMm: t, bendLengthMm: item.maxLength ?? 300, tensileStrengthMpa: 400 } });
-      }
-      if ((item.holeCount ?? 0) > 0) {
-        ops.push({ operation: 'drilling', processGroup: 'Sheet Metal', geometry: { diameterMm: 6, depthMm: t, holeCount: item.holeCount } });
-      }
-    } else if (isPlastic) {
-      const vol = item.volume ?? 10000;
-      ops.push({ operation: 'injection_molding', processGroup: 'Plastic & Rubber', geometry: { polymerId: materialGrade, wallThicknessMm: 2.5, projectedAreaMm2: item.flatPatternAreaMm2 ?? Math.pow(vol / 50, 0.67) * 100, shotVolumeCm3: (vol / 1000) * 1.2 } });
-    } else {
-      const vol = item.volume ?? 100000;
-      const sizeMm = Math.cbrt(vol);
-      ops.push({ operation: 'milling', processGroup: 'CNC Machining', geometry: { cutterDiameterMm: 16, cuttingLengthMm: sizeMm * 3, widthMm: sizeMm * 0.5, depthMm: sizeMm * 0.4 } });
-      if ((item.holeCount ?? 0) > 0) {
-        ops.push({ operation: 'drilling', processGroup: 'CNC Machining', geometry: { diameterMm: 8, depthMm: sizeMm * 0.5, holeCount: item.holeCount } });
-      }
-      ops.push({ operation: 'turning', processGroup: 'CNC Machining', geometry: { diameterMm: sizeMm, lengthMm: sizeMm * 1.5, materialRemovalMm: sizeMm * 0.05 } });
-    }
-
-    ops.push({ operation: 'inspection', processGroup: 'Quality', geometry: {} });
-
-    // Delete previous auto-fill records for this item
-    await db.from('process_cost_records').delete().eq('bom_item_id', id).eq('notes', 'auto_fill_from_cad');
-
-    const insertedOps: string[] = [];
-    let opNbr = 10;
-
-    for (const op of ops) {
-      let cycleTimeSec = 300; // 5-minute default for inspection / fallback
-      let machineRate = 0;
-      let mhrId: string | null = null;
-      let machineName: string | null = null;
-
-      if (op.operation !== 'inspection') {
-        try {
-          const result = await this.manufacturingRules!.evaluate({
-            operation: op.operation,
-            materialGrade,
-            featureGeometry: op.geometry,
-          });
-          cycleTimeSec = result.totalCycleTimeSec;
-
-          // Look up best matching MHR by machine category hint
-          const hint = result.machineRequirements?.machineCategoryHint ?? op.operation;
-          const searchTerm = this.getMhrSearchTerm(hint);
-          const { data: mhrRows } = await db
-            .from('mhr_records')
-            .select('id, machine_name, total_machine_hour_rate')
-            .or(`process_group.ilike.%${searchTerm}%,machine_name.ilike.%${searchTerm}%`)
-            .not('total_machine_hour_rate', 'is', null)
-            .order('total_machine_hour_rate', { ascending: true })
-            .limit(1);
-
-          if (mhrRows && mhrRows.length > 0) {
-            const mhr = mhrRows[0] as { id: string; machine_name: string | null; total_machine_hour_rate: number };
-            mhrId = mhr.id;
-            machineName = mhr.machine_name;
-            machineRate = (Number(mhr.total_machine_hour_rate) / 3600) * cycleTimeSec;
-          }
-        } catch (err) {
-          this.logger.warn(`[auto-fill] Rules engine failed for ${op.operation}: ${(err as Error).message}`);
-        }
-      }
-
-      const { error } = await db.from('process_cost_records').insert({
-        bom_item_id: id,
-        user_id: user.id,
-        mhr_id: mhrId,
-        machine_name: machineName,
-        op_nbr: opNbr,
-        machine_rate: machineRate,
-        labor_rate: 0,
-        setup_manning: 1,
-        setup_time: 15,
-        batch_size: 1,
-        heads: 1,
-        cycle_time: cycleTimeSec,
-        parts_per_cycle: 1,
-        scrap: 0,
-        currency: 'INR',
-        is_active: true,
-        process_group: op.processGroup,
-        operation: op.operation,
-        notes: 'auto_fill_from_cad',
-      });
-
-      if (error) {
-        this.logger.error(`[auto-fill] Insert failed for ${op.operation}: ${error.message}`);
-      } else {
-        insertedOps.push(op.operation);
-        opNbr += 10;
-      }
-    }
-
-    return { created: insertedOps.length, operations: insertedOps };
-  }
+  // POST :id/auto-fill-processes was removed here (2026-09-06).
+  //
+  // It created process_cost_records directly from invented manufacturing
+  // inputs when the real ones were absent:
+  //   materialGrade ?? 'IS2062 E250'      a steel grade for a missing material
+  //   sheetThicknessMm ?? 2               an invented thickness
+  //   flatPatternAreaMm2 ?? 50000         an invented blank area
+  //   tensileStrengthMpa: 400             an invented material property
+  //   diameterMm: 6                       an invented hole size
+  // Those five values then drove cutting length, bend force and cycle time, so
+  // a part with incomplete CAD data received a fully-costed routing built on
+  // numbers nobody had measured.
+  //
+  // Removed rather than repaired, on evidence: no frontend or backend caller,
+  // no test, and no row in process_cost_records has ever carried its
+  // `auto_fill_from_cad` marker (0 rows, against 26 auto_fill_from_route and
+  // 20 auto_fill_from_custom_route). The real, engine-backed paths that
+  // replaced it are apply-route and apply-custom-route, which refuse to
+  // persist an operation whose costing data is missing (findRouteDataGaps).
 
   // ── Apply a selected manufacturing route → write process_cost_records ─────────
   @Post(':id/apply-route')
@@ -1618,13 +1561,28 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ApplyRouteResult> {
-    const batchSize = dto.batchSize ?? 1;
-    const location  = dto.location  ?? 'USA';
+    // Required and validated by the DTO — no substitution here. This was
+    // `dto.location ?? 'USA'`, which priced and PERSISTED an apply at USA
+    // rates whenever the caller stated no location.
+    const location  = dto.location;
 
-    // 1. Fetch the authoritative route comparison from the engine
+    // 1. Fetch the authoritative route comparison from the engine.
+    // batchSize is passed through UNRESOLVED (undefined when the caller states
+    // none) so getRouteComparison resolves it canonically: request -> the item's
+    // persisted scenario override -> the one default in COSTING_INPUT_DEFAULTS.
+    // A `?? 1` here was a second, competing default: applying a route without an
+    // explicit batch persisted records at batch 1 while the item's own scenario
+    // said 100,000, so every freshly applied row was immediately stale against
+    // the scenario that produced it.
+    // localOut receives the routes in factory-local currency, captured inside
+    // getRouteComparison just before its single conversion to display currency
+    // (P1b-iv-c). The response itself is unchanged.
+    const localOut: { routes?: RouteResultDto[]; localCurrency?: string } = {};
     const comparison = await this.bomItemsService.getRouteComparison(
-      id, user.id, token, batchSize, location,
+      id, user.id, token, dto.batchSize, location, undefined, localOut,
     );
+    // The batch the route was ACTUALLY costed at — persist that, not the request.
+    const batchSize = comparison.resolvedInputs.batchSize;
 
     // 2. Find the requested route
     const route = comparison.routes.find((r) => r.routeId === dto.routeId);
@@ -1649,8 +1607,36 @@ export class BOMItemsController {
       );
     }
 
+    // P1b-iv-c: persist what the ENGINES charged, in the factory local
+    // currency, not what the response was converted to for display.
+    //
+    // localRoutes is the pre-conversion snapshot getRouteComparison filled in
+    // (see its localCurrencyOut parameter). The response is still used for
+    // everything else -- feasibility, warnings, the route the user picked --
+    // because only the money differs between the two.
+    const localRoute = localOut.routes?.find((r) => r.routeId === dto.routeId);
+    if (!localRoute?.processLines?.length) {
+      // Never fall back to the display-currency lines: that is precisely the
+      // mislabelled money this phase removes. Fail loudly instead.
+      throw new BadRequestException(
+        `Route '${dto.routeId}' produced no pre-conversion process lines — cannot persist ` +
+        `local-currency costs. No records were written.`,
+      );
+    }
+
     const insertedOps = await this.writeProcessLinesAsRecords(
-      id, route.processLines, batchSize, location, user, token, `auto_fill_from_route:${dto.routeId}`,
+      id, localRoute.processLines, batchSize, location, user, token, `auto_fill_from_route:${dto.routeId}`,
+      {
+        // The engines compute in the factory local currency, and these lines
+        // were captured before the single conversion point, so the money is
+        // local by construction -- no conversion was applied to reach it.
+        lineCurrency:  localOut.localCurrency ?? LOCATION_INFO[location]?.code ?? 'USD',
+        localCurrency: localOut.localCurrency ?? LOCATION_INFO[location]?.code ?? null,
+        // Nothing converted these values, so there is no rate to record. A
+        // 'local' row asserts currency === cost_currency_local, which the
+        // database enforces via ck_process_cost_records_local_agrees.
+        rateFromLocal: null,
+      },
     );
 
     this.logger.log(`[apply-route] partId=${id} route=${dto.routeId} wrote ${insertedOps.length} ops`);
@@ -1687,12 +1673,16 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ApplyCustomRouteResult> {
-    const batchSize = dto.batchSize ?? 1;
-    const location  = dto.location  ?? 'USA';
+    // Required and validated by the DTO — no substitution here. This was
+    // `dto.location ?? 'USA'`, which priced and PERSISTED an apply at USA
+    // rates whenever the caller stated no location.
+    const location  = dto.location;
 
+    // Same canonical resolution as applyRoute above — see its comment.
     const comparison = await this.bomItemsService.getRouteComparison(
-      id, user.id, token, batchSize, location,
+      id, user.id, token, dto.batchSize, location,
     );
+    const batchSize = comparison.resolvedInputs.batchSize;
     // Own snapshot for resolveRealMachineRate below — getRouteComparison already
     // took its own internally; both read the same short-TTL cache in practice.
     const rates = await this.exchangeRateService.getSnapshot(token);
@@ -1768,6 +1758,19 @@ export class BOMItemsController {
     const routeLabel = `Custom: ${dto.steps.map((s) => s.process).join(' + ')}`;
     const insertedOps = await this.writeProcessLinesAsRecords(
       id, orderedLines, batchSize, location, user, token, `auto_fill_from_custom_route:${id}`,
+      {
+        // resolveRealMachineRate puts every rate through rates.toUsd() before
+        // returning it, so these lines are USD whatever the factory currency
+        // is. This caller was always honest about its denomination -- only
+        // applyRoute above was not.
+        lineCurrency:  'USD',
+        localCurrency: LOCATION_INFO[location]?.code ?? null,
+        // The real local-to-USD factor from the same snapshot those rates were
+        // converted with: one unit of local currency expressed in USD. Exact,
+        // not a stand-in -- and 1 for a USA factory because no conversion
+        // happened there.
+        rateFromLocal: rates.toUsd(1, LOCATION_INFO[location]?.code ?? 'USD'),
+      },
     );
 
     this.logger.log(`[apply-custom-route] partId=${id} wrote ${insertedOps.length} ops: ${insertedOps.join(', ')}` +
@@ -1787,9 +1790,16 @@ export class BOMItemsController {
   // mhr_records row for this location > cheapest mhr_benchmark_rates row
   // (converted from its USD storage convention to local currency) > null
   // (honest no-rate-on-file, never a fabricated number).
-  // Returns rate in USD — matches getRouteComparison's processLines (also USD,
-  // see BOMItemsService.normalizeRouteComparisonToUsd), since this is merged
-  // with those lines before writeProcessLinesAsRecords inserts them together.
+  // Returns rate in USD, via rates.toUsd() regardless of factory currency —
+  // which is why applyCustomRoute declares lineCurrency 'USD' when it calls
+  // writeProcessLinesAsRecords (see PersistedLineCurrency).
+  //
+  // NOTE: this does NOT match getRouteComparison's processLines in general.
+  // Those are converted to the DISPLAY currency by
+  // normalizeRouteComparisonToCurrency, which is USD only when no scenario
+  // currency override is in play. The two producers are denominated
+  // differently on purpose, and each states its own currency rather than
+  // sharing an assumption.
   private async resolveRealMachineRate(
     machineClass: string,
     location: string,
@@ -1836,6 +1846,10 @@ export class BOMItemsController {
     lines: Array<{
       process: string; machineClass: string; machineName?: string | null; hourlyRate: number;
       cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } };
+      /** Real un-amortised setup minutes the engine charged for this line — see resolveSetupMinutes(). */
+      setupTimeMin?: number;
+      /** Real machine crew size from mhr_records, via the selected candidate. */
+      operators?: number | null;
       physicsGap?: PhysicsGap | null;
       // Inspection (and any other class priced via a flat resolved resource
       // rate, not the CNC/laser-style machineSelection candidate list) has no
@@ -1843,50 +1857,150 @@ export class BOMItemsController {
       // these directly on the line instead (see inspection-engine.ts).
       mhrId?: string | null;
       benchmarkMhrId?: string | number | null;
+      /**
+       * The money eMithranTerms charged for this line. Persisted verbatim into
+       * setup_cost_per_part / total_cycle_cost_per_part / total_cost_per_part,
+       * which buildLineFromAppliedRecord reads straight back out — so an
+       * applied line and the line it was built from are the same numbers.
+       * Optional because apply-custom-route composes steps the engine has not
+       * costed (they carry cycleTimeMin 0 and are listed in
+       * needsManualCycleTime). Those persist as NULL -- genuinely unresolved --
+       * rather than as a 0 that would read as a real, free operation.
+       */
+      setupCost?: number;
+      runCost?: number;
+      totalCost?: number;
+      /**
+       * The labour hour rate the engine actually costed this line at, and which
+       * of the four real sources resolveSetupMinutes used for setupTimeMin.
+       * Both are already on every engine line and neither was ever persisted,
+       * so an applied quote could not say what labour rate produced it, nor
+       * whether its setup came from the selected machine or a class default.
+       * Persisted verbatim into line_labour_rate / setup_time_source
+       * (migration 718). Optional: a producer that resolves neither writes
+       * NULL rather than a stand-in.
+       */
+      labourRate?: number | null;
+      setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'class_default';
     }>,
     batchSize: number,
     location: string,
     user: User,
     token: string,
     notesTag: string,
+    /**
+     * What currency the `lines` money above is denominated in, and how it got
+     * there. Never assumed -- each caller states it from a real resolved value:
+     * applyRoute passes getRouteComparison's own `currency` (the display
+     * currency normalizeRouteComparisonToCurrency converted those lines to),
+     * applyCustomRoute passes USD because resolveRealMachineRate puts every
+     * rate through rates.toUsd() regardless of factory.
+     *
+     * Before migration 707 this function stamped currency:'USD' on every row
+     * unconditionally. That was true only on the default path --
+     * resolveDisplayCurrency returns USD unless a scenario FX snapshot
+     * overrides it -- and silently mislabelled real INR/CNY money as USD under
+     * a scenario currency override.
+     */
+    currencyContext: PersistedLineCurrency,
   ): Promise<string[]> {
-    // Manufacturing Physics Calculator architecture: process_cost_records.cycle_time
-    // is NUMERIC(12,2) NOT NULL CHECK (cycle_time >= 1) (migration 034) — a line
-    // whose cycle time couldn't be resolved (physicsGap set, or cycleTimeMin <=~0
-    // for a process that was still included in the route) is schema-impossible to
-    // persist. Reject the WHOLE apply-route request before touching any existing
-    // data — previously an insert failure here was only logged and the loop moved
+    // process_cost_records.cycle_time is NUMERIC(12,2) holding SECONDS. This
+    // check used to justify itself by citing migration 034's
+    // CHECK (cycle_time >= 1) and calling an unresolved cycle time
+    // "schema-impossible to persist". It was not: 034 declares that constraint
+    // inside CREATE TABLE IF NOT EXISTS over a table that already existed, so it
+    // was never installed, and two live rows hold cycle_time = 0. This guard is
+    // the ONLY thing that prevents it, which is why it rejects rather than
+    // skips. Migration 717 finally puts CHECK (cycle_time > 0) on the table --
+    // > 0, not >= 1, because a real press or roll operation genuinely cycles in
+    // under a second (a live Roll Bending row is 0.60s).
+    //
+    // A line whose cycle time couldn't be resolved (physicsGap set, or
+    // cycleTimeMin <=~0 for a process that was still included in the route) must
+    // not reach the database. Reject the WHOLE apply-route request before
+    // touching any existing data — previously an insert failure here was only logged and the loop moved
     // on, which (after the delete below already ran) silently dropped that one
     // process line from the part's active routing with no error surfaced to the
     // user and no way to recover the deleted prior rows.
-    for (const line of lines) {
-      const cycleTimeSecRounded = Math.round(line.cycleTimeMin * 60 * 100) / 100;
-      if (line.physicsGap || cycleTimeSecRounded < 1) {
-        const gap = line.physicsGap;
-        const reason = gap
-          ? (gap.gapType === 'missing_lookup'
-              ? gap.requiredAction
-              : gap.reason)
-          : 'cycle time resolved to less than 1 second, which this system cannot persist as a real machine cycle';
-        throw new BadRequestException(
-          `Cannot apply this route — '${line.process}' cycle time is unavailable: ${reason}. ` +
-          `No records were written.`,
-        );
-      }
+    // findRouteDataGaps is this same rule, extracted so route RANKING uses it too
+    // (engine-kernel.ts). Before that, a route whose data was missing was
+    // ranked cheapest — because the missing operation cost $0 — and then failed
+    // here when the user tried to apply it. Ranking and persistence now agree by
+    // construction: any route offered as selectable is one this will accept.
+    const dataGaps = findRouteDataGaps(lines);
+    const firstGap = dataGaps[0];
+    if (firstGap) {
+      throw new BadRequestException(
+        `Cannot apply this route — '${firstGap.process}' cycle time is unavailable: ${firstGap.reason}. ` +
+        `No records were written.`,
+      );
     }
+
+    // P1a rollup gate (migration 707, constraint
+    // ck_process_cost_records_rollup_usd_until_p1b).
+    //
+    // total_cost_per_part has a second consumer with the opposite currency
+    // requirement to the cost summary overlay: sync_process_cost_to_bom_item
+    // copies it into bom_item_costs.process_cost, an aggregate that sits beside
+    // raw_material_cost, packaging, procured and tooling -- all USD-native --
+    // and that has no currency column of its own. A BOM can span factories in
+    // different countries, so that aggregate cannot be denominated in any one
+    // factory local currency either.
+    //
+    // So until the rollup understands currency (P1b), persisting anything but
+    // USD here would push that currency into every BOM and project total
+    // through a currency-blind SQL trigger -- a strictly larger financial
+    // defect than the double-conversion P1 exists to fix. Refuse loudly.
+    //
+    // This is reachable today only under a scenario currency override, where
+    // the previous hardcoded currency:'USD' silently mislabelled the money
+    // instead. An error is the honest form of the same situation.
+    // The P1a rollup gate is gone as of P1b-iv-c.
+    //
+    // It existed because bom_item_costs was fed by currency-blind SQL triggers,
+    // so a non-USD process row would have been summed into BOM and project
+    // totals as though it were dollars. Both halves of that are now fixed:
+    // migration 709 and 712 made every rollup trigger invalidate-only, and the
+    // application rollup converts each declared input exactly once through a
+    // single FX snapshot (bom-item-rollup.ts). A local-currency row is now the
+    // intended state rather than a hazard, and the database agrees --
+    // migration 712 dropped ck_process_cost_records_rollup_usd_until_p1b.
 
     const db = this.supabaseService.getClient(token);
 
-    await db.from('process_cost_records').delete().eq('bom_item_id', id).eq('is_active', true);
+    // -- Atomicity ------------------------------------------------------------
+    // The whole replacement happens inside one database transaction, in
+    // replace_active_process_cost_records (migration 704). It cannot be done
+    // from here: neither ordering of two separate statements is safe.
+    //
+    //   delete-then-insert  a failure after the delete leaves the item with
+    //                       fewer operations, or none. Confirmed live: an
+    //                       apply-route call rejected on a bad user id
+    //                       destroyed all five of a parts operations.
+    //   insert-then-delete  violates uq_process_cost_records_active_op (the
+    //                       partial unique index on (bom_item_id, op_nbr)
+    //                       WHERE is_active), because both generations use op
+    //                       numbers 10, 20, 30... Confirmed live: re-apply
+    //                       failed outright.
+    //
+    // Rows are still fully built first, so every lookup and validation happens
+    // before the database is asked to change anything.
 
-    // process_cost_records.machine_rate is always stored in USD. Every `lines`
-    // entry is already USD by the time it reaches here — real geometry-computed
-    // lines come from getRouteComparison (normalizeRouteComparisonToUsd), catalog-
-    // only lines come from resolveRealMachineRate (also returns USD) — so no
-    // conversion happens in this function anymore (a local-currency static pivot
-    // used to run here, double-converting once both sources became USD-native).
+    // Currency is no longer assumed here. This block used to assert that
+    // "every `lines` entry is already USD by the time it reaches here", naming
+    // a function (normalizeRouteComparisonToUsd) that has since become
+    // normalizeRouteComparisonToCurrency — and that is exactly the point: the
+    // claim held only while conversion always targeted USD. Once a scenario
+    // currency override could select something else, applyRoute began handing
+    // this function real INR/CNY money that it stamped 'USD' anyway.
+    //
+    // The caller now states the denomination (currencyContext), the row records
+    // it, and the rollup gate above rejects what the BOM aggregate cannot
+    // accept. Migration 707.
 
     const insertedOps: string[] = [];
+    /** Every row, fully built, before anything existing is touched. */
+    const rowsToInsert: Record<string, unknown>[] = [];
     let opNbr = 10;
 
     // Pre-fetch benchmark labour rates for this location from the global shared table.
@@ -1898,19 +2012,31 @@ export class BOMItemsController {
       .eq('location', location)
       .order('lhr', { ascending: true });
 
-    // Build group-keyed lookup: processGroup → benchmark LHR for that group.
-    // When DB has no row for a group, LHR defaults to 0 — visible as a gap, not a silently wrong rate.
+    // Build group-keyed lookup: processGroup → benchmark LHR for that group,
+    // denominated in the SAME currency as the money on the lines being
+    // persisted (currencyContext.lineCurrency).
+    //
+    // This rule used to be "if the row is not USD, take lhr_usd_effective" —
+    // i.e. always USD, because until P1b-iv-c the caller only ever persisted
+    // USD. applyRoute now persists the factory-LOCAL route, so that rule made
+    // direct_rate = <local machine rate> + <USD labour rate>: two currencies
+    // added together. Live lhr_benchmark_rates, India / Sheet Metal, shows the
+    // size of it — lhr 144.46 INR/hr against lhr_usd_effective 1.73 USD/hr.
+    //
+    // resolveBenchmarkLabourRate picks the column that IS the target currency
+    // and returns null when neither is, so an undenominatable rate stays a
+    // visible 0 gap rather than a wrong-currency number silently summed into
+    // direct_rate.
     const lhrByGroup = new Map<string, number>();
     for (const row of benchmarkRows ?? []) {
       const group = row.process_group as string;
       if (!lhrByGroup.has(group)) {
-        const effectiveLhr =
-          row.currency && row.currency !== 'USD' && Number(row.lhr_usd_effective) > 0
-            ? Number(row.lhr_usd_effective)
-            : Number(row.lhr);
-        lhrByGroup.set(group, effectiveLhr);
+        const rate = resolveBenchmarkLabourRate(row, currencyContext.lineCurrency);
+        if (rate != null) lhrByGroup.set(group, rate);
       }
     }
+    // When DB has no row for a group — or no column in the right currency —
+    // LHR is 0: visible as a gap, not a silently wrong rate.
     const pickLHR = (group: string): { id: null; lhr: number } =>
       ({ id: null, lhr: lhrByGroup.get(group) ?? 0 });
 
@@ -1945,7 +2071,12 @@ export class BOMItemsController {
       const processGroup = hierarchyRow?.process_group
         ?? this.deriveProcessGroupFromMachineClass(line.machineClass);
       const processRoute = hierarchyRow?.process_route ?? null;
-      // Store machine_rate in USD always — line.hourlyRate already is (see comment above).
+      // machine_rate is denominated in currencyContext.lineCurrency, like every
+      // other money column on the row. It is line.hourlyRate verbatim — the
+      // rate the engine actually charged this line at — and applyRoute now
+      // supplies pre-conversion (factory-local) lines, so this is local there
+      // and USD on the applyCustomRoute path. It was previously commented as
+      // "USD always", which stopped being true at P1b-iv-c.
       const machineRate  = line.hourlyRate;
       // process_cost_records.cycle_time is NUMERIC(12,2) — round to 2dp, not
       // to a whole integer. Rounding to an integer here silently threw away
@@ -1963,7 +2094,7 @@ export class BOMItemsController {
       // fetched above, no second query.
       const lhr = pickLHR(hierarchyRow?.lhr_process_group ?? processGroup);
 
-      const { error } = await db.from('process_cost_records').insert({
+      rowsToInsert.push({
         bom_item_id:    id,
         user_id:        user.id,
         op_nbr:         opNbr,
@@ -2014,37 +2145,108 @@ export class BOMItemsController {
         labor_rate:     lhr.lhr,
         lhr_id:         null,
         direct_rate:    machineRate + lhr.lhr,
-        setup_manning:  1,
-        setup_time:     15,
+        // Real, per-machine values — never the literal 15 min / 1 operator this
+        // wrote for every process on every machine regardless of what the cost
+        // engine had actually charged. `line.setupTimeMin` is the un-amortised
+        // setup resolveSetupMinutes() picked (this machine's own
+        // mhr_records.setup_time_hr first, then the per-operation lookup, then
+        // the cited class constant), so the persisted row and the engine's own
+        // setupCost finally describe the same setup. `operators` is the real
+        // machine crew size from mhr_records, already carried on the selected
+        // candidate. Both fall back to the previous literals ONLY when the line
+        // genuinely reports nothing, so a not-yet-migrated producer degrades to
+        // exactly today's behaviour rather than writing a null into a column the
+        // UI divides by.
+        setup_manning:  line.operators ?? 1,
+        // No fallback. findRouteDataGaps above rejects the whole apply when a
+        // line has no resolved setup time, so by here one always exists.
+        //
+        // This read `line.setupTimeMin ?? 15`. PressStrokeEngine — Standard
+        // Press, Tandem Press, Progressive Die and Shearing — was the one
+        // sheet-metal engine that never put its setup on the line, so all four
+        // persisted setup_time = 15 while having been COSTED from 30min
+        // (PRESS_STROKE_SETUP_MIN, the setup_time_hr shared by all 8 real press
+        // machines) or 22.8min for shearing. The Cost Guide re-derives setup
+        // cost from this column, so it showed roughly half the setup the quote
+        // had charged. Fifteen minutes came from nowhere: no machine, no
+        // lookup, no published figure.
+        setup_time:     line.setupTimeMin!,
         batch_size:     batchSize,
         heads:          1,
         cycle_time:     cycleTimeSec,
         parts_per_cycle: 1,
         scrap:          0,
-        currency:       'USD',
+        // Was the literal 'USD'. Now the currency this money is actually in,
+        // stated by the caller (see PersistedLineCurrency) -- with the local
+        // currency and the rate that got it here recorded alongside, so the row
+        // describes its own denomination instead of leaving every reader to
+        // assume one. Migration 707.
+        currency:       currencyContext.lineCurrency,
+        // 'converted' when the caller supplied both the local currency and the
+        // rate that reached `currency`, 'legacy_unverified' when it could not.
+        // Becomes 'local' in P1b. See resolvePersistedCostCurrencyBasis for why
+        // false traceability is worse than an admitted gap.
+        cost_currency_basis:     resolvePersistedCostCurrencyBasis(currencyContext),
+        cost_currency_local:     currencyContext.localCurrency,
+        cost_fx_rate_from_local: currencyContext.rateFromLocal,
         is_active:      true,
         notes:          notesTag,
+        // The engine line's own money, passed straight through. These three
+        // columns exist on process_cost_records and were never written, so
+        // buildLineFromAppliedRecord read them back as `?? 0` and the Cost
+        // Guide showed every OVERLAID operation at zero once a route was
+        // applied. Measured on a real part: Cost Guide 0.03988 vs the applied
+        // route 0.04096, the difference being exactly Laser Cutting +
+        // Press Brake, the two lines the overlay replaces.
+        //
+        // Nothing is computed here. `setupCost`, `runCost` and `totalCost` are
+        // what eMithranTerms already charged for this line, and
+        // buildLineFromAppliedRecord maps them back 1:1 in the other direction
+        // (setup_cost_per_part -> setupCost, total_cycle_cost_per_part ->
+        // runCost, total_cost_per_part -> totalCost), so a persisted line and
+        // the line it came from are the same numbers.
+        setup_cost_per_part:       line.setupCost ?? null,
+        total_cycle_cost_per_part: line.runCost ?? null,
+        total_cost_per_part:       line.totalCost ?? null,
+        // Costed-operation provenance (migration 718).
+        //
+        // line_hourly_rate is line.hourlyRate verbatim and UNROUNDED -- the
+        // machine hour rate this line was costed at, which is what
+        // ProcessLineCost.hourlyRate means everywhere else. It duplicates
+        // machine_rate on rows this writer produces, and that is deliberate:
+        // machine_rate has carried three different conventions across
+        // historical producers, so it cannot be read as this without knowing
+        // who wrote the row. engine_version is what says who wrote it.
+        //
+        // line_labour_rate is the rate the ENGINE costed with, not the
+        // benchmark re-lookup in `lhr` above. The two can differ -- lhr is
+        // re-resolved here by process group, while the engine used whatever it
+        // resolved for the selected machine -- and the honest value to record
+        // against this line is the one that produced its cost. Null when the
+        // producer resolved none, never lhr.lhr as a substitute.
+        line_hourly_rate:  line.hourlyRate,
+        line_labour_rate:  line.labourRate ?? null,
+        engine_version:    COST_ENGINE_CONTRACT_VERSION,
+        setup_time_source: line.setupTimeSource ?? null,
       });
 
-      if (error) {
-        this.logger.error(`[apply-route] insert failed op=${operation}: ${error.message}`);
-        // Previously this only logged and moved on, leaving the loop to report
-        // overall success (201, full insertedOps-based toast) while this one
-        // operation was silently absent from the applied route with no trace
-        // for the user — confirmed live: Press Brake and Hole Extrusion
-        // (Burring) both vanished from an "applied successfully" custom route
-        // with no error shown, because their inserts individually failed here
-        // and nothing downstream ever saw that. Row deletion above has already
-        // committed, so surfacing this loudly (instead of pretending the whole
-        // route applied) is the only way the user finds out re-applying is
-        // needed rather than trusting an incomplete, wrongly-"successful" route.
-        throw new InternalServerErrorException(
-          `Failed to write process cost record for '${operation}': ${error.message}. ` +
-          `${insertedOps.length} operation(s) were written before this failure — re-apply the route to retry.`,
-        );
-      }
       insertedOps.push(line.process);
       opNbr += 10;
+    }
+
+    // One transactional swap. `bom_item_id` and `is_active` are set by the
+    // function, so a caller cannot write a row onto a different item or insert
+    // an inactive generation by accident.
+    const { error: replaceErr } = await db.rpc('replace_active_process_cost_records', {
+      p_bom_item_id: id,
+      p_rows: rowsToInsert.map(({ bom_item_id, is_active, ...row }) => row),
+    });
+    if (replaceErr) {
+      this.logger.error(`[apply-route] transactional replace failed for bom_item ${id}: ${replaceErr.message}`);
+      throw new InternalServerErrorException(
+        `Failed to apply the route: ${replaceErr.message}. ` +
+        `No changes were made - the previous routing is intact.`,
+      );
     }
 
     return insertedOps;
@@ -2070,7 +2272,7 @@ export class BOMItemsController {
   // Processing rate. im_* is kept as a prefix check since MACHINE_CLASS_TO_
   // PROCESS_GROUP only has exact-match entries.
   private deriveProcessGroupFromMachineClass(machineClass: string): string {
-    if (machineClass.startsWith('im_')) return 'Plastic & Rubber';
+    if (machineClass.startsWith('im_')) return 'Plastic Molding';
     return MACHINE_CLASS_TO_PROCESS_GROUP.get(machineClass) ?? 'CNC Machining';
   }
 }

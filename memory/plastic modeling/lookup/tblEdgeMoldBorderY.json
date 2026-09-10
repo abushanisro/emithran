@@ -1,0 +1,15 @@
+{
+  "name": "tblEdgeMoldBorderY",
+  "sourceFilePath": "lookupTables/Component/tblEdgeMoldBorderY.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Edge Mold Border Y (mm)",
+    "Max Press Force (kN)"
+  ],
+  "records": [
+    { "Edge Mold Border Y (mm)": 90.00, "Max Press Force (kN)": 298.92 },
+    { "Edge Mold Border Y (mm)": 152.00, "Max Press Force (kN)": 1992.80 },
+    { "Edge Mold Border Y (mm)": 165.00, "Max Press Force (kN)": 9964.00 },
+    { "Edge Mold Border Y (mm)": 165.00, "Max Press Force (kN)": 99999999.00 }
+  ]
+}

@@ -12,6 +12,10 @@ export interface ProcessCostInput {
   opNbr?: number;
   description?: string;
   processGroup?: string;
+  /** Real HR Rates machine category this line is costed against (migration 719),
+   *  e.g. '3 Roll Bender'. Chosen in Edit Process Cost alongside Process; NULL on
+   *  engine-generated lines, which identify themselves through `operation`. */
+  category?: string;
   processRoute?: string;
   operation?: string;
   /** Digital Factory location this process was configured for (India, USA, China, ...) */
@@ -50,12 +54,16 @@ export interface CreateProcessCostDto extends ProcessCostInput {
    *  still resolve a real machine_name/machine_class instead of the record
    *  ending up with no machine identity at all. */
   benchmarkMhrId?: string | number;
-  lhrId?: string;
+  /** null CLEARS the link. Edit Process Cost always derives labour from the
+   *  selected machine's own rate now, so it sends null to release a stale FK
+   *  left by a line originally saved through the removed labour picker —
+   *  undefined would be dropped from the JSON and leave the record claiming a
+   *  labour record it no longer uses. */
+  lhrId?: string | null;
   /** id of the lhr_benchmark_rates row selected, when the picked labour rate is
-   *  a benchmark (★) rate rather than a real lhr_records row — lets the
-   *  backend still resolve a real labor_type instead of the record ending up
-   *  with no labour identity at all. */
-  benchmarkLhrId?: string | number;
+   *  a benchmark (★) rate rather than a real lhr_records row. null clears it,
+   *  same reasoning as lhrId above. */
+  benchmarkLhrId?: string | number | null;
   isActive?: boolean;
   notes?: string;
 }
@@ -65,6 +73,10 @@ export interface ProcessCostRecord {
   opNbr: number;
   description?: string;
   processGroup?: string;
+  /** Real HR Rates machine category this line is costed against (migration 719),
+   *  e.g. '3 Roll Bender'. Chosen in Edit Process Cost alongside Process; NULL on
+   *  engine-generated lines, which identify themselves through `operation`. */
+  category?: string;
   processRoute?: string;
   operation?: string;
   mhrId?: string;

@@ -1,0 +1,26 @@
+{
+  "name": "tblSlideSizes",
+  "sourceFilePath": "lookupTables/Component/tblSlideSizes.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Core Pin Dia (mm)",
+    "Core Retainer Thickness (mm)",
+    "Wear Plate Thickness (mm)",
+    "Slide Body Length (mm)"
+  ],
+  "records": [
+    { "Core Pin Dia (mm)": 3.56, "Core Retainer Thickness (mm)": 6.35, "Wear Plate Thickness (mm)": 6.35, "Slide Body Length (mm)": 44.45 },
+    { "Core Pin Dia (mm)": 3.96, "Core Retainer Thickness (mm)": 7.92, "Wear Plate Thickness (mm)": 6.35, "Slide Body Length (mm)": 44.45 },
+    { "Core Pin Dia (mm)": 6.35, "Core Retainer Thickness (mm)": 7.92, "Wear Plate Thickness (mm)": 6.35, "Slide Body Length (mm)": 44.45 },
+    { "Core Pin Dia (mm)": 11.10, "Core Retainer Thickness (mm)": 12.70, "Wear Plate Thickness (mm)": 6.35, "Slide Body Length (mm)": 50.80 },
+    { "Core Pin Dia (mm)": 12.70, "Core Retainer Thickness (mm)": 19.05, "Wear Plate Thickness (mm)": 6.35, "Slide Body Length (mm)": 50.80 },
+    { "Core Pin Dia (mm)": 15.88, "Core Retainer Thickness (mm)": 22.23, "Wear Plate Thickness (mm)": 6.35, "Slide Body Length (mm)": 63.50 },
+    { "Core Pin Dia (mm)": 22.23, "Core Retainer Thickness (mm)": 25.40, "Wear Plate Thickness (mm)": 6.35, "Slide Body Length (mm)": 63.50 },
+    { "Core Pin Dia (mm)": 25.40, "Core Retainer Thickness (mm)": 31.75, "Wear Plate Thickness (mm)": 12.70, "Slide Body Length (mm)": 63.50 },
+    { "Core Pin Dia (mm)": 31.75, "Core Retainer Thickness (mm)": 31.75, "Wear Plate Thickness (mm)": 12.70, "Slide Body Length (mm)": 69.85 },
+    { "Core Pin Dia (mm)": 38.10, "Core Retainer Thickness (mm)": 38.10, "Wear Plate Thickness (mm)": 12.70, "Slide Body Length (mm)": 69.85 },
+    { "Core Pin Dia (mm)": 63.50, "Core Retainer Thickness (mm)": 38.10, "Wear Plate Thickness (mm)": 12.70, "Slide Body Length (mm)": 76.20 },
+    { "Core Pin Dia (mm)": 76.20, "Core Retainer Thickness (mm)": 38.10, "Wear Plate Thickness (mm)": 12.70, "Slide Body Length (mm)": 82.55 },
+    { "Core Pin Dia (mm)": 999999.00, "Core Retainer Thickness (mm)": 50.80, "Wear Plate Thickness (mm)": 12.70, "Slide Body Length (mm)": 82.55 }
+  ]
+}

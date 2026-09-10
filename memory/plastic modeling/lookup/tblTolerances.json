@@ -1,0 +1,14 @@
+{
+  "name": "tblTolerances",
+  "sourceFilePath": "lookupTables/Component/tblTolerances.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Tolerance Factor",
+    "Tolerance Name"
+  ],
+  "records": [
+    { "Tolerance Factor": 0.25, "Tolerance Name": "Low Tolerance +/-0.254 (+/-0.010\")" },
+    { "Tolerance Factor": 0.45, "Tolerance Name": "Medium Tolerance +/-0.127 (+/-0.005\")" },
+    { "Tolerance Factor": 0.80, "Tolerance Name": "High Tolerance +/-0.051 (+/-0.002\")" }
+  ]
+}

@@ -58,7 +58,6 @@ export default function VendorsPage() {
   const [industryInput, setIndustryInput] = useState('');
   const [processInput, setProcessInput] = useState('');
   const [certificationInput, setCertificationInput] = useState('');
-  const [customCityMode, setCustomCityMode] = useState(false);
 
   // Build query from filters
   const query: VendorQuery = useMemo(() => {
@@ -145,12 +144,23 @@ export default function VendorsPage() {
     const industries = new Set<string>();
     const certifications = new Set<string>();
     const cities = new Set<string>();
+    // States come from the same place every other option list here already
+    // comes from: the vendor rows themselves. See the create-vendor form below
+    // for why a hardcoded list could not work.
+    const states = new Set<string>();
+    const citiesByStateFromData = new Map<string, Set<string>>();
 
     allVendors.forEach(vendor => {
       vendor.process?.forEach(s => services.add(s));
       vendor.industries?.forEach(i => industries.add(i));
       vendor.certifications?.forEach(c => certifications.add(c));
       if (vendor.city) cities.add(vendor.city);
+      if (vendor.state) states.add(vendor.state);
+      if (vendor.state && vendor.city) {
+        const set = citiesByStateFromData.get(vendor.state) ?? new Set<string>();
+        set.add(vendor.city);
+        citiesByStateFromData.set(vendor.state, set);
+      }
     });
 
     return {
@@ -158,6 +168,8 @@ export default function VendorsPage() {
       industries: Array.from(industries).sort(),
       certifications: Array.from(certifications).sort(),
       cities: Array.from(cities).sort(),
+      states: Array.from(states).sort(),
+      citiesByState: citiesByStateFromData,
     };
   }, [allVendors]);
 
@@ -224,7 +236,6 @@ export default function VendorsPage() {
         setIndustryInput('');
         setProcessInput('');
         setCertificationInput('');
-        setCustomCityMode(false);
         // Navigate to the new vendor's detail page
         router.push(`/vendors/${vendor.id}`);
       },
@@ -293,45 +304,31 @@ export default function VendorsPage() {
     }
   };
 
-  // Indian States and Cities data
-  const indianStates = [
-    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
-    'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
-    'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
-    'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
-    'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-    'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
-    'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
-  ];
-
-  const citiesByState: Record<string, string[]> = {
-    'Karnataka': ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi', 'Davangere', 'Ballari', 'Vijayapura'],
-    'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', 'Solapur', 'Kolhapur', 'Thane'],
-    'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 'Erode', 'Vellore'],
-    'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Gandhinagar', 'Anand'],
-    'Delhi': ['New Delhi', 'Central Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi'],
-    'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad', 'Khammam', 'Karimnagar', 'Ramagundam'],
-    'Haryana': ['Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Hisar', 'Rohtak', 'Karnal', 'Sonipat'],
-    'Uttar Pradesh': ['Lucknow', 'Kanpur', 'Ghaziabad', 'Agra', 'Varanasi', 'Meerut', 'Allahabad', 'Noida'],
-    'West Bengal': ['Kolkata', 'Howrah', 'Durgapur', 'Asansol', 'Siliguri', 'Haldia'],
-    'Rajasthan': ['Jaipur', 'Jodhpur', 'Udaipur', 'Kota', 'Ajmer', 'Bikaner', 'Alwar'],
-    'Punjab': ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Mohali', 'Chandigarh'],
-    'Madhya Pradesh': ['Indore', 'Bhopal', 'Jabalpur', 'Gwalior', 'Ujjain', 'Sagar', 'Ratlam'],
-    'Andhra Pradesh': ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Tirupati'],
-    'Kerala': ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam', 'Kannur'],
-    'Odisha': ['Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur'],
-    'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Hazaribagh'],
-    'Chhattisgarh': ['Raipur', 'Bhilai', 'Bilaspur', 'Korba', 'Durg'],
-    'Uttarakhand': ['Dehradun', 'Haridwar', 'Roorkee', 'Haldwani', 'Rudrapur'],
-    'Goa': ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa', 'Ponda'],
-    'Chandigarh': ['Chandigarh'],
-  };
-
-  const availableCities = useMemo(() => {
-    const list = newVendorData.state ? citiesByState[newVendorData.state] : undefined;
-    return list ?? [];
-  }, [newVendorData.state]);
+  // State/city suggestions come from the vendor records themselves — the same
+  // source every other option list on this page uses (see filterOptions).
+  //
+  // This replaced a hardcoded 36-entry Indian state list and a 20-state,
+  // ~130-city map, which could not represent the data actually in the table:
+  // of 647 live vendors, real `state` values include 'Shandong Sheng' and
+  // 'Baoan Qu' (China), and most of the 48 cities in use were absent from the
+  // map. Sixteen of the 36 states had no cities at all, so choosing one gave an
+  // empty dropdown.
+  //
+  // No geography table is invented here either. There is no master
+  // states/cities reference data in this system, and seeding one would be
+  // fabricating reference data. The vendor row IS the source of truth for where
+  // a vendor is, so the field suggests what exists and accepts anything new.
+  const stateSuggestions = filterOptions.states;
+  const citySuggestions = useMemo(() => {
+    // Cities seen in the chosen state first; fall back to every known city so a
+    // new state still offers something useful instead of nothing.
+    const forState = newVendorData.state
+      ? filterOptions.citiesByState.get(newVendorData.state)
+      : undefined;
+    return forState && forState.size > 0
+      ? Array.from(forState).sort()
+      : filterOptions.cities;
+  }, [newVendorData.state, filterOptions]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1259,85 +1256,41 @@ export default function VendorsPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">State</label>
-                  <Select
-                    {...(newVendorData.state !== undefined ? { value: newVendorData.state } : {})}
-                    onValueChange={(value) => {
-                      setNewVendorData({ ...newVendorData, state: value, city: '' });
-                      setCustomCityMode(false);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {indianStates.map((state) => (
-                        <SelectItem key={state} value={state}>
-                          {state}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <label className="text-sm font-medium">State / Province</label>
+                  {/* Suggestions from the vendor table, free text for anything
+                      new. A fixed list cannot hold the real data — 647 vendors
+                      include Chinese provinces. */}
+                  <Input
+                    list="vendor-state-suggestions"
+                    placeholder={stateSuggestions.length ? 'Select or type a state / province' : 'Enter state / province'}
+                    value={newVendorData.state ?? ''}
+                    onChange={(e) => setNewVendorData({ ...newVendorData, state: e.target.value })}
+                  />
+                  <datalist id="vendor-state-suggestions">
+                    {stateSuggestions.map((state) => (
+                      <option key={state} value={state} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">City</label>
-                  {availableCities.length > 0 ? (
-                    <>
-                      {!customCityMode ? (
-                        <Select
-                          {...(newVendorData.city !== undefined ? { value: newVendorData.city } : {})}
-                          onValueChange={(value) => {
-                            if (value === 'custom') {
-                              setCustomCityMode(true);
-                              setNewVendorData({ ...newVendorData, city: '' });
-                            } else {
-                              setNewVendorData({ ...newVendorData, city: value });
-                            }
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select city" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[200px]">
-                            {availableCities.map((city) => (
-                              <SelectItem key={city} value={city}>
-                                {city}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value="custom">
-                              <span className="text-muted-foreground italic">+ Enter custom city</span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Enter city name"
-                            value={newVendorData.city}
-                            onChange={(e) => setNewVendorData({ ...newVendorData, city: e.target.value })}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setCustomCityMode(false);
-                              setNewVendorData({ ...newVendorData, city: '' });
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <Input
-                      placeholder={newVendorData.state ? "Enter city name" : "Select state first"}
-                      value={newVendorData.city}
-                      onChange={(e) => setNewVendorData({ ...newVendorData, city: e.target.value })}
-                      disabled={!newVendorData.state}
-                    />
-                  )}
+                  {/* Same contract as State above: suggest what the table
+                      already contains, accept anything. The old version showed
+                      a dropdown only for the 20 hardcoded states and a bare
+                      text box (disabled until a state was picked) for the rest,
+                      which is why a custom-city escape hatch had to exist at
+                      all. It no longer does. */}
+                  <Input
+                    list="vendor-city-suggestions"
+                    placeholder={citySuggestions.length ? 'Select or type a city' : 'Enter city'}
+                    value={newVendorData.city ?? ''}
+                    onChange={(e) => setNewVendorData({ ...newVendorData, city: e.target.value })}
+                  />
+                  <datalist id="vendor-city-suggestions">
+                    {citySuggestions.map((city) => (
+                      <option key={city} value={city} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Country</label>

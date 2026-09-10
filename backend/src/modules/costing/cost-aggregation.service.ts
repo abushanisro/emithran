@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { PERSISTED_PROCESS_COST_COLUMNS, resolvePersistedProcessCost } from '../bom-items/costing/shared/core/persisted-process-cost';
 
 export interface CostDriver {
   label: string;
@@ -127,7 +128,7 @@ export class CostAggregationService {
         .eq('is_active', true),
       client
         .from('process_cost_records')
-        .select('op_nbr, operation, process_group, process_route, machine_name, machine_class, labor_type, location, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap, mhr_id, lhr_id, feature_type')
+        .select(`op_nbr, operation, process_group, process_route, machine_name, machine_class, labor_type, location, mhr_id, lhr_id, feature_type, ${PERSISTED_PROCESS_COST_COLUMNS}`)
         .eq('bom_item_id', bomItemId)
         .eq('is_active', true)
         .order('op_nbr', { ascending: true }),
@@ -201,28 +202,17 @@ export class CostAggregationService {
     });
     const rawMaterialCost = materialLines.reduce((s, m) => s + m.totalCost, 0);
 
-    // ── Process lines — compute from raw timing/rate fields
-    // Formula: setupPerPart = (setup_time_min/60 × (MHR + LHR × manning)) / batch_size
-    //          cyclePerPart = (cycle_time_sec/3600 × (MHR + LHR × heads)) / parts_per_cycle
-    //          totalPerPart = (setupPerPart + cyclePerPart) × (1 + scrap/100)
+    // ── Process lines — prefer the persisted engine cost (P1b-iv-b)
+    //
+    // This used to re-derive every line from the rate columns with the formula
+    // now living in resolvePersistedProcessCost, which is a poorer cost model:
+    // it cannot see labour, QA inspection sampling or yield loss. Measured
+    // live, 51 of the 55 active rows that carry a stored engine cost disagreed
+    // with the re-derivation by more than 1%. The shared resolver reads the
+    // stored value and falls back to this exact formula only for rows that have
+    // none, so no legacy total moves.
     const processLines: ProcessLine[] = (processRows ?? []).map(r => {
-      const machineRate  = parseFloat(r.machine_rate)    || 0;
-      const laborRate    = parseFloat(r.labor_rate)      || 0;
-      const setupManning = parseFloat(r.setup_manning)   || 0;
-      const setupTimeMin = parseFloat(r.setup_time)      || 0;
-      const batchSize    = parseFloat(r.batch_size)      || 1;
-      const heads        = parseFloat(r.heads)           || 0;
-      const cycleTimeSec = parseFloat(r.cycle_time)      || 0;
-      const ppc          = parseFloat(r.parts_per_cycle) || 1;
-      const scrap        = parseFloat(r.scrap)           || 0;
-
-      const setupCostPerPart  = batchSize > 0
-        ? (setupTimeMin / 60) * (machineRate + laborRate * setupManning) / batchSize
-        : 0;
-      const cycleCostPerPart  = ppc > 0
-        ? (cycleTimeSec / 3600) * (machineRate + laborRate * heads) / ppc
-        : 0;
-      const totalCostPerPart  = (setupCostPerPart + cycleCostPerPart) * (1 + scrap / 100);
+      const { totalCostPerPart, setupCostPerPart, cycleCostPerPart } = resolvePersistedProcessCost(r);
 
       return {
         opNbr:         parseInt(r.op_nbr)      || 0,
@@ -233,15 +223,18 @@ export class CostAggregationService {
         machineClass:  r.machine_class         ?? null,
         laborType:     r.labor_type            ?? null,
         location:      r.location              ?? null,
-        machineRate,
-        laborRate,
-        cycleTimeSec,
-        setupTimeMin,
-        batchSize,
-        heads,
-        setupManning,
-        partsPerCycle: ppc,
-        scrap,
+        // Disclosure fields: the stored inputs, reported as-is. They no longer
+        // drive the cost above (the engine value does), so they are shown, not
+        // used -- see resolvePersistedProcessCost.
+        machineRate:   parseFloat(r.machine_rate)    || 0,
+        laborRate:     parseFloat(r.labor_rate)      || 0,
+        cycleTimeSec:  parseFloat(r.cycle_time)      || 0,
+        setupTimeMin:  parseFloat(r.setup_time)      || 0,
+        batchSize:     parseFloat(r.batch_size)      || 1,
+        heads:         parseFloat(r.heads)           || 0,
+        setupManning:  parseFloat(r.setup_manning)   || 0,
+        partsPerCycle: parseFloat(r.parts_per_cycle) || 1,
+        scrap:         parseFloat(r.scrap)           || 0,
         setupCostPerPart,
         cycleCostPerPart,
         totalCostPerPart,

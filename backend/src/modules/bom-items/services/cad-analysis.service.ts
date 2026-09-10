@@ -36,6 +36,43 @@ interface GeometryAnalysisResponse {
   performance_metrics: any;
 }
 
+/**
+ * Renders FastAPI's 422 `detail` as something a person can act on.
+ *
+ * `detail` is an array of `{ loc, msg, type }` validation errors. Each is
+ * rendered as "field: message" using the real `loc` path the engine reported,
+ * so the warning names exactly which request field it rejected and why. A
+ * string detail is passed through unchanged; anything else is JSON-serialised
+ * rather than coerced, because "[object Object]" is what this exists to remove.
+ */
+function describeValidationDetail(detail: unknown): string {
+  if (detail == null) return 'cad-engine returned 422 with no detail';
+  if (typeof detail === 'string') return detail;
+
+  if (Array.isArray(detail)) {
+    const parts = detail.map((e) => {
+      if (typeof e === 'string') return e;
+      const err = e as { loc?: unknown[]; msg?: string; type?: string };
+      // Drop the leading 'body'/'query' segment — it is the same for every
+      // error and adds nothing to the diagnosis.
+      const path = Array.isArray(err.loc)
+        ? err.loc.filter((seg) => seg !== 'body' && seg !== 'query').join('.')
+        : '';
+      const msg = err.msg ?? err.type ?? JSON.stringify(e);
+      return path ? `${path}: ${msg}` : msg;
+    });
+    // Identical errors across many array elements (e.g. every outline point)
+    // collapse to one entry with a count, so the warning stays readable.
+    const counts = new Map<string, number>();
+    for (const part of parts) counts.set(part, (counts.get(part) ?? 0) + 1);
+    return [...counts.entries()]
+      .map(([part, n]) => (n > 1 ? `${part} (x${String(n)})` : part))
+      .join('; ');
+  }
+
+  return JSON.stringify(detail);
+}
+
 @Injectable()
 export class CADAnalysisService {
   private readonly logger = new Logger(CADAnalysisService.name);
@@ -1293,7 +1330,15 @@ export class CADAnalysisService {
       };
     } catch (error: any) {
       if (error?.response?.status === 422) {
-        const reason = error.response.data?.detail || 'cad-engine returned 422 with no detail';
+        // FastAPI returns 422 `detail` as an ARRAY of structured validation
+        // errors, not a string. Interpolating it into a string-typed field
+        // produced "[object Object],[object Object],..." — confirmed live, nine
+        // per candidate sheet — which destroyed the only explanation of why
+        // true-shape nesting failed for EVERY standard sheet and silently fell
+        // back to rectangle-grid nesting. The utilisation and material cost that
+        // fallback produces are real, but the reason it was needed was
+        // unreadable, so nobody could act on it.
+        const reason = describeValidationDetail(error.response.data?.detail);
         this.logger.warn(`True-nest could not be computed (cad-engine 422): ${reason}`);
         return { result: null, reason };
       }

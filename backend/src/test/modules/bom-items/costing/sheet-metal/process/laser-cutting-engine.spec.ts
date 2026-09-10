@@ -1,4 +1,5 @@
-import { computeLaserCuttingCost, type LaserCuttingInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/laser-cutting-engine';
+import { computeLaserCuttingCost, Co2LaserCuttingEngine, type LaserCuttingInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/laser-cutting-engine';
+import type { UnsupportedOperationGap } from '../../../../../../modules/bom-items/dto/cost-breakdown.dto';
 import { LASER_SETUP_MIN } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 
@@ -34,8 +35,8 @@ describe('computeLaserCuttingCost — direct-labor cost (Track B Phase 1 bug fix
     const expectedSetupCost = (20 / 60) * rateWithLabor.rate / input.batchSize + dlrMin * 20 / input.batchSize;
     const expectedRunCost = (input.cuttingSecFromCalculator! / 3600) * rateWithLabor.rate + dlrMin * cuttingMin;
 
-    expect(line.setupCost).toBeCloseTo(Math.round(expectedSetupCost * 100) / 100, 5);
-    expect(line.runCost).toBeCloseTo(Math.round(expectedRunCost * 100) / 100, 5);
+    expect(line.setupCost).toBeCloseTo(expectedSetupCost, 5);
+    expect(line.runCost).toBeCloseTo(expectedRunCost, 5);
     expect(line.labourRate).toBe(rateWithLabor.labourRate);
     // Before this fix, laser's cost never included a labor term at all — pin
     // that the run cost is now strictly greater than machine-rate-only cost.
@@ -52,20 +53,135 @@ describe('computeLaserCuttingCost — direct-labor cost (Track B Phase 1 bug fix
     const line = result.processLines[0];
 
     expect(line.labourRate).toBeNull();
-    expect(line.runCost).toBeCloseTo(Math.round(((input.cuttingSecFromCalculator! / 3600) * rateNoLabor.rate) * 100) / 100, 5);
+    expect(line.runCost).toBeCloseTo(((input.cuttingSecFromCalculator! / 3600) * rateNoLabor.rate), 5);
   });
 
   it('falls back to LASER_SETUP_MIN with a disclosed warning when no setupMin is supplied', () => {
     const input = baseInput({ laserRate: rateWithLabor, setupMin: undefined });
     const result = computeLaserCuttingCost(input);
-    expect(result.warnings).toContain("Laser: setup time from fallback — seed sm_lookup_op_setup_time for 'laser'");
+    // Disclosed because NEITHER real source resolved: no per-machine
+    // setup_time_hr on this rate and no sm_lookup_op_setup_time row.
+    expect(result.warnings.some((w) => w.startsWith('Laser Cutting: setup time from fallback'))).toBe(true);
+    expect(result.processLines[0]!.setupTimeMin).toBeCloseTo(LASER_SETUP_MIN, 5);
+    expect(result.processLines[0]!.setupTimeSource).toBe('class_default');
     const dlrMin = rateWithLabor.labourRate! / 60;
     const expectedSetupCost = (LASER_SETUP_MIN / 60) * rateWithLabor.rate / input.batchSize + dlrMin * LASER_SETUP_MIN / input.batchSize;
-    expect(result.processLines[0].setupCost).toBeCloseTo(Math.round(expectedSetupCost * 100) / 100, 5);
+    expect(result.processLines[0].setupCost).toBeCloseTo(expectedSetupCost, 5);
   });
 
   it('returns no process lines when there is nothing to cut', () => {
     const result = computeLaserCuttingCost(baseInput({ cutLengthMm: 0, pierceCount: 0, cuttingSecFromCalculator: undefined }));
     expect(result.processLines).toHaveLength(0);
+  });
+});
+
+// ── CO2 laser: the gap must be reported for its real, documented reason ──
+//
+// Migration 457 deliberately seeded ZERO co2 rows into sm_lookup_laser_cut (no
+// published CO2 cutting-speed/pierce-time table met the sourcing bar), so
+// co2_laser has no cycle-time source and must fail closed. Before this fix the
+// route-comparison caller handed cuttingSecFromCalculator AND physicsGap to
+// fiber_laser only; co2_laser got neither, so the engine fell through to its
+// defensive branch and warned "no calculator result and no reported gap
+// (unexpected; check resolvePhysicsQuantity)" -- reporting a phantom resolver
+// bug in place of a real recorded data gap.
+describe('Co2LaserCuttingEngine — reports the real CO2 data gap, never a phantom resolver bug', () => {
+  const co2Rate: MHRRateInput = {
+    rate: 30.13,
+    source: 'mhr_database',
+    machineClass: 'co2_laser',
+    machineName: 'Laser Cutter - 8000 Watts',
+    commodityCode: null,
+    labourRate: 9,
+  };
+
+  // The exact gap bom-items.service.ts now supplies for co2_laser.
+  const co2Gap: UnsupportedOperationGap = {
+    gapType: 'unsupported_operation',
+    process: 'Laser Cutting',
+    machineClass: 'co2_laser',
+    reason:
+      'no CO2 cutting-speed/pierce-time data exists for any material or thickness -- '
+      + 'sm_lookup_laser_cut is fiber-only by design (migration 457, which found no '
+      + 'published CO2 table meeting the sourcing bar). CO2 cycle time stays '
+      + 'unavailable until real CO2 cutting conditions are sourced; fiber data is '
+      + 'never substituted for it.',
+    requiredCapability: 'sm_lookup_laser_cut rows with laser_technology = co2',
+  };
+
+  it('names the CO2 data gap and does not blame resolvePhysicsQuantity', () => {
+    const result = computeLaserCuttingCost(baseInput({
+      laserRate: co2Rate,
+      setupMin: 20,
+      cuttingSecFromCalculator: undefined,
+      physicsGap: co2Gap,
+    }));
+
+    const gapWarning = result.warnings.find((w) => w.startsWith('Laser cutting cycle time unavailable'));
+    expect(gapWarning).toBeDefined();
+    expect(gapWarning).toContain('sm_lookup_laser_cut is fiber-only by design');
+    expect(gapWarning).toContain('migration 457');
+    // The point of the fix: the misleading defensive message must be gone.
+    expect(gapWarning).not.toContain('unexpected');
+    expect(gapWarning).not.toContain('resolvePhysicsQuantity');
+  });
+
+  it('costs no cutting time rather than substituting fiber cycle time', () => {
+    const result = computeLaserCuttingCost(baseInput({
+      laserRate: co2Rate,
+      setupMin: 20,
+      cuttingSecFromCalculator: undefined,
+      physicsGap: co2Gap,
+    }));
+    // Fails closed: zero cutting minutes, and no run cost invented for it.
+    expect(result.cuttingMin).toBe(0);
+    expect(result.processLines[0]!.cycleTimeMin).toBe(0);
+  });
+
+  it('still hits the honest gap path when driven through the registered engine', () => {
+    // Guards the wiring, not just the formula: the registered co2_laser engine
+    // must forward the caller gap into the shared formula unchanged.
+    const engine = new Co2LaserCuttingEngine();
+    expect(engine.machineClass).toBe('co2_laser');
+
+    const result = engine.computeCost({
+      cutLengthMm: 1000,
+      pierceCount: 5,
+      batchSize: 10,
+      grade: 'SS304',
+      sheetThicknessMm: 3,
+      rate: co2Rate,
+      cuttingSecFromCalculator: undefined,
+      physicsGap: co2Gap,
+      opSetupMin: 20,
+    } as unknown as Parameters<Co2LaserCuttingEngine['computeCost']>[0]);
+
+    const gapWarning = result.warnings.find((w) => w.startsWith('Laser cutting cycle time unavailable'));
+    expect(gapWarning).toContain('fiber-only by design');
+    expect(gapWarning).not.toContain('unexpected');
+  });
+});
+
+// ── One operation for the profile and its compatible through-holes ────────────
+//
+// A laser pierces and cuts every through-hole in the same pass that cuts the
+// outer profile. The engine is handed the combined cut length and the pierce
+// count and must emit exactly ONE process line for the whole blank — adding a
+// second, separate hole-making operation on top would charge the same holes
+// twice.
+describe('computeLaserCuttingCost — profile and through-holes in one operation', () => {
+  it('emits a single Laser Cutting line covering profile plus pierces', () => {
+    const result = computeLaserCuttingCost(baseInput({
+      laserRate: rateWithLabor, setupMin: 20, cutLengthMm: 1000, pierceCount: 14,
+    }));
+    expect(result.processLines).toHaveLength(1);
+    expect(result.processLines[0].process).toBe('Laser Cutting');
+  });
+
+  it('still emits one line when the part has no holes at all', () => {
+    const result = computeLaserCuttingCost(baseInput({
+      laserRate: rateWithLabor, setupMin: 20, pierceCount: 0,
+    }));
+    expect(result.processLines).toHaveLength(1);
   });
 });

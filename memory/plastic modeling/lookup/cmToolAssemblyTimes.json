@@ -1,0 +1,70 @@
+{
+  "name": "cmToolAssemblyTimes",
+  "file_path": "lookupTables/Component/cmToolAssemblyTimes.csv",
+  "columns": [
+    "Name",
+    "Assembly Time (hr)"
+  ],
+  "records": [
+    {
+      "name": "Air Poppet",
+      "assembly_time_hr": 0.006
+    },
+    {
+      "name": "Ejector Guide Pin And Bushing",
+      "assembly_time_hr": 2.0
+    },
+    {
+      "name": "Ejector Pin",
+      "assembly_time_hr": 0.25
+    },
+    {
+      "name": "Electrical Connections Or Switches",
+      "assembly_time_hr": 1.5
+    },
+    {
+      "name": "Guide Pin",
+      "assembly_time_hr": 0.25
+    },
+    {
+      "name": "Heater Lines",
+      "assembly_time_hr": 0.25
+    },
+    {
+      "name": "Hydraulic Cylinder",
+      "assembly_time_hr": 10.0
+    },
+    {
+      "name": "Leader Pins And Shoulder Bushings",
+      "assembly_time_hr": 5.0
+    },
+    {
+      "name": "Limit Switch",
+      "assembly_time_hr": 1.0
+    },
+    {
+      "name": "Return Pins And Shoulder Bushings",
+      "assembly_time_hr": 1.0
+    },
+    {
+      "name": "Rib Insert",
+      "assembly_time_hr": 0.25
+    },
+    {
+      "name": "Side Locks",
+      "assembly_time_hr": 0.5
+    },
+    {
+      "name": "Socket Head Screws Short",
+      "assembly_time_hr": 0.01
+    },
+    {
+      "name": "Support Pillar",
+      "assembly_time_hr": 0.08
+    },
+    {
+      "name": "Thermocouples",
+      "assembly_time_hr": 0.02
+    }
+  ]
+}

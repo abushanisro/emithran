@@ -2,7 +2,7 @@ import { PLASMA_PUNCH_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/def
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
-import { noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
+import { noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
 // Despite the "Punch" name, the only real data available for this class is a
@@ -60,10 +60,18 @@ export function computePlasmaPunchCost(input: PlasmaPunchInput): PlasmaPunchResu
   }
   const cuttingMin = (cuttingSec + pierceSec) / 60;
 
-  if (input.setupMin == null) {
-    warnings.push("Plasma Punch: setup time from fallback — seed sm_lookup_op_setup_time for 'plasma_punch'");
-  }
-  const setupMin = input.setupMin ?? PLASMA_PUNCH_SETUP_MIN;
+  // Real setup time, most-specific real source first: this machine's own
+  // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
+  // row, then the cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: 'Plasma Punch',
+    machineSetupTimeHr: rate.setupTimeHr,
+    operationSetupMin: input.setupMin,
+    classDefaultMin: PLASMA_PUNCH_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  const setupMin = setup.setupMin;
+  if (setup.warning) warnings.push(setup.warning);
 
   const t = eMithranTerms({
     mhrPerHr: rate.rate,
@@ -85,6 +93,8 @@ export function computePlasmaPunchCost(input: PlasmaPunchInput): PlasmaPunchResu
     buildCuttingProcessLine({
       process: 'Plasma Punch',
       processIdentity: input.processIdentity,
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: t.setupCost,
       runCost: t.machineCost + t.laborCost,
       totalCost: t.total,
@@ -104,6 +114,7 @@ export function computePlasmaPunchCost(input: PlasmaPunchInput): PlasmaPunchResu
 export class PlasmaPunchEngine extends BaseCuttingEngine {
   readonly machineClass = 'plasma_punch';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Plasma Punch';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     return computePlasmaPunchCost({

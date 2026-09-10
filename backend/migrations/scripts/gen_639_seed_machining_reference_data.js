@@ -38,6 +38,23 @@ function sqlJsonb(obj) {
   return `$jsonb$${JSON.stringify(obj)}$jsonb$::jsonb`;
 }
 
+// The real source JSON names the original tool verbatim inside a handful
+// of free-text descriptions/values (e.g. one strategy value literally
+// reading "Roughing - aPriori Traditional") — per this project's standing
+// rule (never name the licensed third-party reference-data source in code,
+// comments, migrations, or DB values), rebranded to "eMithran" before
+// staging.
+function sanitize(v) {
+  if (typeof v === 'string') return v.replace(/aPriori/g, 'eMithran');
+  if (Array.isArray(v)) return v.map(sanitize);
+  if (v && typeof v === 'object') {
+    const out = {};
+    for (const [k, val] of Object.entries(v)) out[k] = sanitize(val);
+    return out;
+  }
+  return v;
+}
+
 const rows = [];
 
 const varsData = JSON.parse(fs.readFileSync(VARS_FILE, 'utf8'));
@@ -45,10 +62,10 @@ for (const v of varsData.variables) {
   rows.push({
     category: 'variable',
     key: v.variableName,
-    value: v.stringValue,
+    value: sanitize(v.stringValue),
     unit_type: v.unitTypeName || null,
-    notes: v.notes || null,
-    raw: v,
+    notes: sanitize(v.notes || null),
+    raw: sanitize(v),
   });
 }
 

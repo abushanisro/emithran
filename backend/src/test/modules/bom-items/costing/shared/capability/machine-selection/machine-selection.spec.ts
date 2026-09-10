@@ -6,6 +6,11 @@ import {
   punchingRequirement,
   vmcRequirement,
   waterjetRequirement,
+  shearRequirement,
+  plasmaCutRequirement,
+  laserPunchRequirement,
+  pressFormingRequirement,
+  rollBendingRequirement,
 } from '../../../../../../../modules/bom-items/costing/shared/capability/machine-selection/physics';
 import { classifyMachineRecord, fitScore, isCapable, selectMachine } from '../../../../../../../modules/bom-items/costing/shared/capability/machine-selection/selector';
 import type { MachineCandidate } from '../../../../../../../modules/bom-items/dto/machine-selection.dto';
@@ -45,6 +50,8 @@ function candidate(overrides: {
     handlingConstS: null,
     handlingMassCoeffSPerKg: null,
     setupTimeHr: null,
+  directOverheadRate: null,
+  indirectOverheadRate: null,
   };
 }
 
@@ -56,6 +63,36 @@ describe('physics', () => {
     expect(classifyLaserMaterial('IS2062 Gr B')).toBe('MS');
     expect(classifyLaserMaterial('C110 Copper')).toBe('CU');
     expect(classifyLaserMaterial(null)).toBe('OTHER');
+  });
+
+  it('classifies the JIS carbon-steel sheet family as MS, coated or not', () => {
+    // SECC is the most common grade in this deployment and used to classify as
+    // OTHER, while CRCA and SPCC -- the same material class -- classified as MS.
+    // The zinc coating does not change the base steel: G3313 SECC/SECD/SECE are
+    // the electro-galvanized G3141 SPCC/SPCD/SPCE grades, and G3302 SGCC/SGCD
+    // the hot-dip ones. The live raw_materials row for SECC carries
+    // uts_mpa 270 / shearing_strength 216, which are mild-steel values.
+    for (const grade of ['SPCC', 'SPCD', 'SPCE', 'SECC', 'SECD', 'SECE', 'SGCC', 'SGCD']) {
+      expect(classifyLaserMaterial(grade)).toBe('MS');
+    }
+    // European/Indian mild-steel designations that were also falling through.
+    expect(classifyLaserMaterial('DC01')).toBe('MS');
+    expect(classifyLaserMaterial('E250')).toBe('MS');
+    expect(classifyLaserMaterial('E350 - High Strength Plate')).toBe('MS');
+  });
+
+  it('does not swallow non-ferrous or stainless grades into MS', () => {
+    // Guards the widened MS branch against over-matching -- the failure mode
+    // that would silently quote a stainless or aluminium part on mild-steel
+    // capability limits.
+    expect(classifyLaserMaterial('SS304')).toBe('SS');
+    expect(classifyLaserMaterial('SS316L')).toBe('SS');
+    expect(classifyLaserMaterial('AA6061-T6')).toBe('AL');
+    expect(classifyLaserMaterial('AL6101')).toBe('AL');
+    expect(classifyLaserMaterial('Generic CuZn39Pb3')).toBe('CU');
+    // Plastics must not become steel just because nothing else matched.
+    expect(classifyLaserMaterial('Generic Polyamide 11')).toBe('OTHER');
+    expect(classifyLaserMaterial('Acetal / Delrin - Natural')).toBe('OTHER');
   });
 
   // pressBrakeRequirement takes a plain resolved utsMpa (no grade string, no
@@ -595,5 +632,437 @@ describe('P0.4 — integration: buildPartRequirements() feeds selectMachine() wi
       const tooSmallBed = candidate({ machineId: 'small-bed', machineClass: 'fiber_laser', hourlyRate: 40, capability: { maxXMm: 500, maxYMm: 300 } });
       expect(isCapable(tooSmallBed, req, { allowUnknownLaserThickness: true })).toBe(false);
     });
+  });
+});
+
+// Machine Economics backlog, Part 1 — shear was previously assigned the SAME
+// LaserRequirement as fiber/CO2 laser (bom-items.service.ts's buildPartRequirements,
+// pre-fix), which combined with no real capability data on file for any shear
+// machine meant laser's fail-closed null-thickness policy marked EVERY shear
+// machine not capable — worse than an uninformative fallback. These tests
+// prove the real fix: a dedicated ShearRequirement (per-material thickness +
+// shear bed length), real seed-registry entries for all 10 real Shearing
+// Machine machines, and real production wiring.
+describe('Machine Economics — shear gets its own real ShearRequirement', () => {
+  const location = 'India';
+
+  it('rejects a machine whose real per-material thickness limit is below the job, accepts one above it', () => {
+    const thin = candidate({
+      machineId: 'thin-shear', machineClass: 'shear', hourlyRate: 40,
+      capability: { maxThicknessMsMm: 3, maxThicknessSsMm: 2.5, maxThicknessAlMm: 4, maxThicknessCuMm: 4, maxLengthMm: 3000 },
+    });
+    const thick = candidate({
+      machineId: 'thick-shear', machineClass: 'shear', hourlyRate: 60,
+      capability: { maxThicknessMsMm: 13, maxThicknessSsMm: 11, maxThicknessAlMm: 20, maxThicknessCuMm: 20, maxLengthMm: 3000 },
+    });
+    const req = shearRequirement({ thicknessMm: 6, materialGrade: 'CRCA', cutLengthMm: 1000 });
+    expect(isCapable(thin, req)).toBe(false);  // 3mm MS limit < 6mm job
+    expect(isCapable(thick, req)).toBe(true);  // 13mm MS limit ≥ 6mm job
+    const result = selectMachine({ pool: [thin, thick], location, machineClass: 'shear', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('thick-shear');
+  });
+
+  it('checks the correct real material-family column — a stainless job rejects a machine whose SS limit (not MS limit) is too low', () => {
+    const msStrongSsWeak = candidate({
+      machineId: 'ms-strong', machineClass: 'shear', hourlyRate: 50,
+      capability: { maxThicknessMsMm: 13, maxThicknessSsMm: 2, maxThicknessAlMm: 20, maxThicknessCuMm: 20, maxLengthMm: 3000 },
+    });
+    const req = shearRequirement({ thicknessMm: 6, materialGrade: 'SS304', cutLengthMm: 1000 });
+    expect(req.materialFamily).toBe('SS');
+    expect(isCapable(msStrongSsWeak, req)).toBe(false); // real SS limit (2mm) governs, not the MS limit (13mm)
+  });
+
+  it('rejects on real shear bed length even when thickness is within range', () => {
+    const shortBed = candidate({
+      machineId: 'short-bed', machineClass: 'shear', hourlyRate: 40,
+      capability: { maxThicknessMsMm: 13, maxThicknessSsMm: 11, maxThicknessAlMm: 20, maxThicknessCuMm: 20, maxLengthMm: 1000 },
+    });
+    const req = shearRequirement({ thicknessMm: 3, materialGrade: 'CRCA', cutLengthMm: 2500 });
+    expect(isCapable(shortBed, req)).toBe(false); // 1000mm bed < 2500mm cut × BED_MARGIN
+  });
+
+  it('a machine with no real spec data on file stays selectable (ungated on null, matching waterjet/turret_punch — shear has no confirmed systemic data gap the way laser did, so no fail-closed policy was invented for it), scored neutrally rather than fabricated as a confident fit', () => {
+    const noData = candidate({ machineId: 'no-data-shear', machineClass: 'shear', hourlyRate: 40 });
+    const req = shearRequirement({ thicknessMm: 6, materialGrade: 'CRCA', cutLengthMm: 1000 });
+    expect(isCapable(noData, req)).toBe(true);
+    expect(fitScore(noData, req)).toBe(0.5); // neutral — no real spec parts contributed to the fit average
+    const result = selectMachine({ pool: [noData], location, machineClass: 'shear', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('no-data-shear'); // still a real selection, not a crash
+  });
+
+  it('production wiring: buildPartRequirements() produces a real ShearRequirement for shear, not a shared LaserRequirement', () => {
+    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const requirements = (svc as any).buildPartRequirements({
+      family: 'sheet_metal',
+      grade: 'CRCA',
+      sheetThicknessMm: 3,
+      bendCount: 0,
+      flatPatternAreaMm2: 1200 * 800,
+      flatLenMm: 1200,
+      flatWidMm: 800,
+      bboxXMm: 1200,
+      bboxYMm: 800,
+      bboxZMm: 3,
+      weightKg: 5,
+      utsMpa: 410,
+    });
+    expect(requirements.shear?.kind).toBe('shear');
+    expect(requirements.shear?.thicknessMm).toBe(3);
+    expect(requirements.shear?.cutLengthMm).toBe(1200); // max(flatLen, flatWid)
+    // fiber/CO2 laser must still get the laser requirement, unmodified
+    expect(requirements.fiber_laser?.kind).toBe('laser');
+  });
+});
+
+// Machine Economics backlog, Part 1 — plasma_cut had the same LaserRequirement
+// mis-assignment defect as shear, plus a real, separate mhr_records bug: its
+// 13 real machines were tagged machine_class='plasma' (not the real
+// registered PlasmaCuttingEngine's 'plasma_cut'), so classifyMachineRecord()
+// silently dropped most of them from the pool entirely (fixed by migration
+// 697, alongside the capability backfill). Real machine_library.json data has
+// no thickness field for this class — bed size only (see
+// PlasmaCutRequirement's own doc comment for why thickness stays ungated
+// here rather than fabricating a power→thickness formula).
+describe('Machine Economics — plasma_cut gets its own real PlasmaCutRequirement', () => {
+  const location = 'India';
+
+  it('rejects a machine whose real bed is too small, accepts one that fits', () => {
+    const small = candidate({
+      machineId: 'small-plasma', machineClass: 'plasma_cut', hourlyRate: 40,
+      capability: { maxXMm: 2000, maxYMm: 1000, powerKw: 0.1 },
+    });
+    const large = candidate({
+      machineId: 'large-plasma', machineClass: 'plasma_cut', hourlyRate: 80,
+      capability: { maxXMm: 27000, maxYMm: 3100, powerKw: 100 },
+    });
+    const req = plasmaCutRequirement({ bedLengthMm: 6000, bedWidthMm: 2000 });
+    expect(isCapable(small, req)).toBe(false);
+    expect(isCapable(large, req)).toBe(true);
+    const result = selectMachine({ pool: [small, large], location, machineClass: 'plasma_cut', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('large-plasma');
+  });
+
+  it('a machine with no real bed data on file stays selectable (ungated), never a crash', () => {
+    const noData = candidate({ machineId: 'no-data-plasma', machineClass: 'plasma_cut', hourlyRate: 40 });
+    const req = plasmaCutRequirement({ bedLengthMm: 3000, bedWidthMm: 1500 });
+    expect(isCapable(noData, req)).toBe(true);
+    const result = selectMachine({ pool: [noData], location, machineClass: 'plasma_cut', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('no-data-plasma');
+  });
+
+  it('production wiring: buildPartRequirements() produces a real PlasmaCutRequirement for plasma_cut, not a shared LaserRequirement', () => {
+    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const requirements = (svc as any).buildPartRequirements({
+      family: 'sheet_metal',
+      grade: 'CRCA',
+      sheetThicknessMm: 3,
+      bendCount: 0,
+      flatPatternAreaMm2: 1200 * 800,
+      flatLenMm: 1200,
+      flatWidMm: 800,
+      bboxXMm: 1200,
+      bboxYMm: 800,
+      bboxZMm: 3,
+      weightKg: 5,
+      utsMpa: 410,
+    });
+    expect(requirements.plasma_cut?.kind).toBe('plasma_cut');
+    expect(requirements.plasma_cut?.bedLengthMm).toBe(1200);
+    expect(requirements.plasma_cut?.bedWidthMm).toBe(800);
+    expect(requirements.fiber_laser?.kind).toBe('laser');
+  });
+});
+
+// Machine Economics backlog, Part 1 — plasma_punch has no real dimensional
+// capability data anywhere in the sourced reference data (confirmed via
+// plasma-punch-engine.ts's own doc comment and machine_library.json's
+// "Plasma Punch" category fields — power_watts only). Building a dedicated
+// MachineRequirement kind here would have nothing real to gate on, so
+// 'generic' is the honest, correct classification — but it was previously
+// getting the laser-shaped `cutReq` instead (same false-rejection defect as
+// shear/plasma_cut before their fixes).
+describe('Machine Economics — plasma_punch correctly gets a generic requirement, not a shared LaserRequirement', () => {
+  it('production wiring: buildPartRequirements() assigns kind:generic for plasma_punch', () => {
+    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const requirements = (svc as any).buildPartRequirements({
+      family: 'sheet_metal',
+      grade: 'CRCA',
+      sheetThicknessMm: 3,
+      bendCount: 0,
+      flatPatternAreaMm2: 1200 * 800,
+      flatLenMm: 1200,
+      flatWidMm: 800,
+      bboxXMm: 1200,
+      bboxYMm: 800,
+      bboxZMm: 3,
+      weightKg: 5,
+      utsMpa: 410,
+    });
+    expect(requirements.plasma_punch?.kind).toBe('generic');
+    expect(requirements.fiber_laser?.kind).toBe('laser');
+  });
+
+  it('a plasma_punch machine with no real capability data is always capable (generic has no dimensional gate)', () => {
+    const noData = candidate({ machineId: 'no-data-pp', machineClass: 'plasma_punch', hourlyRate: 40 });
+    expect(isCapable(noData, { kind: 'generic' })).toBe(true);
+  });
+});
+
+// Machine Economics backlog, Part 1 — laser_punch has the richest real data
+// of this backlog (real press_force_kn, real per-material thickness, real
+// bed size — machine_library.json confirmed all 26 real "Laser Punch / Punch
+// Press" machines have clean, unambiguous per-material thickness fields, no
+// P0.7-style unlabeled-tier gap). Real capability backfilled directly into
+// mhr_records via migration 699's sm_reference_data JOIN — never hardcoded.
+describe('Machine Economics — laser_punch gets its own real LaserPunchRequirement', () => {
+  const location = 'India';
+
+  it('rejects a machine whose real tonnage capacity is below the job, accepts one above it', () => {
+    const weak = candidate({
+      machineId: 'weak-lp', machineClass: 'laser_punch', hourlyRate: 40,
+      capability: { maxTonnage: 5, maxThicknessMsMm: 6, maxThicknessSsMm: 4, maxThicknessAlMm: 8, maxThicknessCuMm: 8, maxXMm: 2500, maxYMm: 1250 },
+    });
+    const strong = candidate({
+      machineId: 'strong-lp', machineClass: 'laser_punch', hourlyRate: 90,
+      capability: { maxTonnage: 30, maxThicknessMsMm: 6, maxThicknessSsMm: 4, maxThicknessAlMm: 8, maxThicknessCuMm: 8, maxXMm: 2500, maxYMm: 1250 },
+    });
+    // tonnage = (cutLengthMm × thicknessMm × shearStrengthMpa / 9810) × 1.25
+    // = (50 × 3 × 400 / 9810) × 1.25 ≈ 7.64 t; ×TONNAGE_MARGIN(1.15) ≈ 8.79 t required
+    const req = laserPunchRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'CRCA',
+      bedLengthMm: 1200, bedWidthMm: 800,
+    });
+    expect(isCapable(weak, req)).toBe(false); // 5t capacity < 8.79t required
+    expect(isCapable(strong, req)).toBe(true); // 30t capacity ≥ 8.79t required
+    const result = selectMachine({ pool: [weak, strong], location, machineClass: 'laser_punch', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('strong-lp');
+  });
+
+  it('checks the correct real material-family thickness column — a stainless job rejects a machine whose SS limit (not MS limit) is too low', () => {
+    const msStrongSsWeak = candidate({
+      machineId: 'ms-strong-lp', machineClass: 'laser_punch', hourlyRate: 50,
+      capability: { maxTonnage: 30, maxThicknessMsMm: 6, maxThicknessSsMm: 1, maxThicknessAlMm: 8, maxThicknessCuMm: 8, maxXMm: 2500, maxYMm: 1250 },
+    });
+    const req = laserPunchRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'SS304',
+      bedLengthMm: 1200, bedWidthMm: 800,
+    });
+    expect(req.materialFamily).toBe('SS');
+    expect(isCapable(msStrongSsWeak, req)).toBe(false); // real SS limit (1mm) governs, not the MS limit (6mm)
+  });
+
+  it('rejects on real bed size even when tonnage and thickness are within range', () => {
+    const smallBed = candidate({
+      machineId: 'small-bed-lp', machineClass: 'laser_punch', hourlyRate: 40,
+      capability: { maxTonnage: 30, maxThicknessMsMm: 6, maxThicknessSsMm: 4, maxThicknessAlMm: 8, maxThicknessCuMm: 8, maxXMm: 800, maxYMm: 500 },
+    });
+    const req = laserPunchRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'CRCA',
+      bedLengthMm: 1200, bedWidthMm: 800,
+    });
+    expect(isCapable(smallBed, req)).toBe(false);
+  });
+
+  it('a machine with no real spec data on file stays selectable (ungated on null, same honest degrade as every other class), scored neutrally rather than fabricated as a confident fit', () => {
+    const noData = candidate({ machineId: 'no-data-lp', machineClass: 'laser_punch', hourlyRate: 40 });
+    const req = laserPunchRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'CRCA',
+      bedLengthMm: 1200, bedWidthMm: 800,
+    });
+    expect(isCapable(noData, req)).toBe(true);
+    const result = selectMachine({ pool: [noData], location, machineClass: 'laser_punch', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('no-data-lp');
+  });
+
+  it('production wiring: buildPartRequirements() produces a real LaserPunchRequirement for laser_punch, not a shared LaserRequirement', () => {
+    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const requirements = (svc as any).buildPartRequirements({
+      family: 'sheet_metal',
+      grade: 'CRCA',
+      sheetThicknessMm: 3,
+      bendCount: 0,
+      flatPatternAreaMm2: 1200 * 800,
+      flatLenMm: 1200,
+      flatWidMm: 800,
+      bboxXMm: 1200,
+      bboxYMm: 800,
+      bboxZMm: 3,
+      weightKg: 5,
+      utsMpa: 410,
+    });
+    expect(requirements.laser_punch?.kind).toBe('laser_punch');
+    expect(requirements.laser_punch?.bedLengthMm).toBe(1200); // = flatLenMm
+    expect(requirements.laser_punch?.bedWidthMm).toBe(800); // = flatWidMm
+    expect(requirements.fiber_laser?.kind).toBe('laser');
+  });
+});
+
+// Machine Economics backlog — forming-family completion (2026-09-04):
+// buildPartRequirements() previously never looped the sheet_metal_forming
+// engine family at all, so standard_press/tandem_press/progressive_die_press/
+// roll_bending_2/3/4 always fell back to { kind: 'generic' } inside
+// resolveMHRRates()'s selectMachine() call — zero tonnage/bed/thickness
+// gating regardless of the part. Real capability backfilled directly into
+// mhr_records via migration 701, from real sm_reference_data already staged
+// for these classes (migrations 505/508/585) — never hardcoded.
+describe('Machine Economics — standard_press/tandem_press get their own real PressRequirement', () => {
+  const location = 'India';
+
+  it('rejects a machine whose real tonnage capacity is below the job, accepts one above it', () => {
+    const weak = candidate({
+      machineId: 'weak-sp', machineClass: 'standard_press', hourlyRate: 40,
+      capability: { maxTonnage: 5, maxThicknessMsMm: 25, maxThicknessSsMm: 23, maxThicknessAlMm: 31, maxThicknessCuMm: 31, maxXMm: 703, maxYMm: 701 },
+    });
+    const strong = candidate({
+      machineId: 'strong-sp', machineClass: 'standard_press', hourlyRate: 90,
+      capability: { maxTonnage: 200, maxThicknessMsMm: 25, maxThicknessSsMm: 23, maxThicknessAlMm: 31, maxThicknessCuMm: 31, maxXMm: 703, maxYMm: 701 },
+    });
+    // tonnage = (50 × 3 × 400 / 9810) × 1.25 ≈ 7.64 t; ×TONNAGE_MARGIN(1.15) ≈ 8.79 t required
+    const req = pressFormingRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'CRCA',
+      bedLengthMm: 600, bedWidthMm: 600,
+    });
+    expect(isCapable(weak, req)).toBe(false);
+    expect(isCapable(strong, req)).toBe(true);
+    const result = selectMachine({ pool: [weak, strong], location, machineClass: 'standard_press', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('strong-sp');
+  });
+
+  it('checks the correct real material-family thickness column — a stainless job rejects a machine whose SS limit (not MS limit) is too low', () => {
+    const msStrongSsWeak = candidate({
+      machineId: 'ms-strong-tp', machineClass: 'tandem_press', hourlyRate: 50,
+      capability: { maxTonnage: 200, maxThicknessMsMm: 30, maxThicknessSsMm: 1, maxThicknessAlMm: 38, maxThicknessCuMm: 38, maxXMm: 1500, maxYMm: 1200 },
+    });
+    const req = pressFormingRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'SS304',
+      bedLengthMm: 600, bedWidthMm: 600,
+    });
+    expect(req.materialFamily).toBe('SS');
+    expect(isCapable(msStrongSsWeak, req)).toBe(false); // real SS limit (1mm) governs, not the MS limit (30mm)
+  });
+
+  it('rejects on real bed size even when tonnage and thickness are within range', () => {
+    const smallBed = candidate({
+      machineId: 'small-bed-sp', machineClass: 'standard_press', hourlyRate: 40,
+      capability: { maxTonnage: 200, maxThicknessMsMm: 25, maxThicknessSsMm: 23, maxThicknessAlMm: 31, maxThicknessCuMm: 31, maxXMm: 400, maxYMm: 300 },
+    });
+    const req = pressFormingRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'CRCA',
+      bedLengthMm: 1200, bedWidthMm: 800,
+    });
+    expect(isCapable(smallBed, req)).toBe(false);
+  });
+
+  it('progressive_die_press only has real coverage for aluminum thickness — a stainless job stays ungated (no fabricated SS limit), an aluminum job is genuinely gated', () => {
+    const alOnlyData = candidate({
+      machineId: 'al-only-pd', machineClass: 'progressive_die_press', hourlyRate: 60,
+      capability: { maxTonnage: 200, maxThicknessAlMm: 2, maxXMm: 2150, maxYMm: 1430 }, // maxThicknessSsMm/MsMm/CuMm real-absent (null)
+    });
+    const ssReq = pressFormingRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'SS304',
+      bedLengthMm: 600, bedWidthMm: 600,
+    });
+    expect(isCapable(alOnlyData, ssReq)).toBe(true); // no real SS data on file for this class — ungated, not fabricated-false
+    const alReq = pressFormingRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'AL6061',
+      bedLengthMm: 600, bedWidthMm: 600,
+    });
+    expect(isCapable(alOnlyData, alReq)).toBe(false); // real AL limit (2mm) < 3mm job
+  });
+
+  it('a machine with no real spec data on file stays selectable (ungated on null, same honest degrade as every other class)', () => {
+    const noData = candidate({ machineId: 'no-data-sp', machineClass: 'standard_press', hourlyRate: 40 });
+    const req = pressFormingRequirement({
+      cutLengthMm: 50, materialShearStrengthMpa: 400, thicknessMm: 3, materialGrade: 'CRCA',
+      bedLengthMm: 600, bedWidthMm: 600,
+    });
+    expect(isCapable(noData, req)).toBe(true);
+    const result = selectMachine({ pool: [noData], location, machineClass: 'standard_press', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('no-data-sp');
+  });
+
+  it('production wiring: buildPartRequirements() produces real PressRequirements for standard_press/tandem_press/progressive_die_press, not the generic fallback', () => {
+    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const requirements = (svc as any).buildPartRequirements({
+      family: 'sheet_metal',
+      grade: 'CRCA',
+      sheetThicknessMm: 3,
+      bendCount: 0,
+      flatPatternAreaMm2: 1200 * 800,
+      flatLenMm: 1200,
+      flatWidMm: 800,
+      bboxXMm: 1200,
+      bboxYMm: 800,
+      bboxZMm: 3,
+      weightKg: 5,
+      utsMpa: 410,
+      materialShearStrengthMpa: 400,
+    });
+    expect(requirements.standard_press?.kind).toBe('press_forming');
+    expect(requirements.tandem_press?.kind).toBe('press_forming');
+    expect(requirements.progressive_die_press?.kind).toBe('press_forming');
+    expect(requirements.standard_press?.bedLengthMm).toBe(1200); // = flatLenMm
+    expect(requirements.standard_press?.bedWidthMm).toBe(800); // = flatWidMm
+    expect(requirements.fiber_laser?.kind).toBe('laser'); // unrelated cutting classes unaffected
+  });
+});
+
+describe('Machine Economics — roll_bending_2/3/4 get their own real RollBendingRequirement', () => {
+  const location = 'India';
+
+  it('rejects a machine whose real mild-steel thickness limit is below the job, accepts one above it', () => {
+    const thin = candidate({
+      machineId: 'thin-rb', machineClass: 'roll_bending_3', hourlyRate: 40,
+      capability: { maxThicknessMsMm: 1, maxLengthMm: 2050 },
+    });
+    const thick = candidate({
+      machineId: 'thick-rb', machineClass: 'roll_bending_3', hourlyRate: 60,
+      capability: { maxThicknessMsMm: 5, maxLengthMm: 2050 },
+    });
+    const req = rollBendingRequirement({ thicknessMm: 3, rollLengthMm: 1500 });
+    expect(isCapable(thin, req)).toBe(false); // 1mm MS limit < 3mm job
+    expect(isCapable(thick, req)).toBe(true); // 5mm MS limit ≥ 3mm job
+    const result = selectMachine({ pool: [thin, thick], location, machineClass: 'roll_bending_3', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('thick-rb');
+  });
+
+  it('rejects on real roll working length even when thickness is within range', () => {
+    const shortRoll = candidate({
+      machineId: 'short-roll', machineClass: 'roll_bending_2', hourlyRate: 40,
+      capability: { maxThicknessMsMm: 5, maxLengthMm: 300 },
+    });
+    const req = rollBendingRequirement({ thicknessMm: 2, rollLengthMm: 2000 });
+    expect(isCapable(shortRoll, req)).toBe(false); // 300mm roll length < 2000mm × BED_MARGIN
+  });
+
+  it('a machine with no real spec data on file stays selectable (ungated on null), scored neutrally rather than fabricated as a confident fit', () => {
+    const noData = candidate({ machineId: 'no-data-rb', machineClass: 'roll_bending_4', hourlyRate: 40 });
+    const req = rollBendingRequirement({ thicknessMm: 3, rollLengthMm: 1500 });
+    expect(isCapable(noData, req)).toBe(true);
+    const result = selectMachine({ pool: [noData], location, machineClass: 'roll_bending_4', requirement: req });
+    expect(result.balanced.candidate.machineId).toBe('no-data-rb');
+  });
+
+  it('production wiring: buildPartRequirements() produces real RollBendingRequirements for roll_bending_2/3/4, not the generic fallback', () => {
+    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const requirements = (svc as any).buildPartRequirements({
+      family: 'sheet_metal',
+      grade: 'CRCA',
+      sheetThicknessMm: 3,
+      bendCount: 2,
+      flatPatternAreaMm2: 1200 * 800,
+      flatLenMm: 1200,
+      flatWidMm: 800,
+      bboxXMm: 1200,
+      bboxYMm: 800,
+      bboxZMm: 3,
+      weightKg: 5,
+      utsMpa: 410,
+    });
+    expect(requirements.roll_bending_2?.kind).toBe('roll_bending');
+    expect(requirements.roll_bending_3?.kind).toBe('roll_bending');
+    expect(requirements.roll_bending_4?.kind).toBe('roll_bending');
+    expect(requirements.roll_bending_2?.rollLengthMm).toBe(1200); // = max(flatLenMm, flatWidMm)
+    expect(requirements.press_brake?.kind).toBe('press_brake'); // unrelated bendCount>0 path unaffected
   });
 });

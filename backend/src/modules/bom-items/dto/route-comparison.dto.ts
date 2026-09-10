@@ -1,5 +1,6 @@
-import type { ProcessLineCost, RouteResultSustainability } from "./cost-breakdown.dto";
+import type { ProcessLineCost, ResolvedCostingInputsDto, RouteResultSustainability } from "./cost-breakdown.dto";
 import type { CapabilityReasonCode } from '../costing/shared/capability/machine-capability';
+import type { RouteDataGap } from '../costing/shared/core/engine-kernel';
 
 // Was a closed string-literal union of exactly the route ids known at the
 // time (3 sheet-metal-cutting + CNC/injection-molding families). Widened to
@@ -55,6 +56,35 @@ export interface RouteResultDto {
   totalProcessCost: number;
   totalCost: number | null;  // null when isFeasible === false — prevents sort/ML pollution
   isFeasible: boolean;       // false when the machine cannot physically produce this part
+  /**
+   * False when this route's own process has no blank-generation operation in
+   * the seeded catalog taxonomy — today only 2/3/4 Roll Bending, whose
+   * operations are StraightBend / Form / As Formed//CurvedSurface / As
+   * Formed//CurvedWall / Coil Uncoil and never //Blank. Such a route is priced
+   * over a smaller scope of work than the routes beside it (it carries no
+   * blanking cost at all), so it is excluded from the recommendation and from
+   * the badges while staying fully visible and manually selectable.
+   *
+   * Optional: only the sheet-metal comparison resolves it. CNC and
+   * injection-molding routes have no blanking concept and leave it unset,
+   * which every consumer must read as "no evidence against this route".
+   */
+  producesBlank?: boolean;
+  /**
+   * False when an operation on this route has no real costing data on file, so
+   * its price is an artefact of absent data rather than an economic result.
+   *
+   * Deliberately separate from `isFeasible`, which means physical capability:
+   * a Tandem Press may be entirely capable of this part while having no
+   * press_cycle_time_s on file for the selected machine. The route stays
+   * visible with its warnings intact; it is only barred from winning a badge or
+   * an automatic selection. Computed with the SAME predicate apply-route
+   * enforces before persisting (isRouteDataComplete, engine-kernel.ts), so any
+   * route Auto can pick is a route apply-route will accept.
+   */
+  dataComplete: boolean;
+  /** The specific missing-data reasons behind `dataComplete: false`. Empty when complete. */
+  dataGaps: RouteDataGap[];
   cycleTimes: {
     cuttingMin: number;
     pressBrakeMin: number;
@@ -75,6 +105,17 @@ export interface RouteResultDto {
 export interface RouteComparisonDto {
   bomItemId: string;
   batchSize: number;
+  /**
+   * The route this comparison recommends: the cheapest candidate that is both
+   * physically capable and fully costed — the same rule behind the "Lowest
+   * cost" badge, stated once so automatic routing and the badge cannot
+   * disagree. `null` when no candidate qualifies, which callers must treat as
+   * "no recommendation" rather than picking something.
+   *
+   * Automatic route selection consumes this. Manual selection does not: a route
+   * the user chose is never replaced by it. See selectRecommendedRoute().
+   */
+  recommendedRouteId: RouteId | null;
   materialCost: number;
   materialGrade: string;
   grossWeightKg: number;
@@ -86,4 +127,13 @@ export interface RouteComparisonDto {
   currencySymbol: string; // display symbol for `currency`, e.g. '$'
   toUsdRate?: number;     // amount_local × toUsdRate = amount in `currency` — see normalizeRouteComparisonToCurrency
   usdToDisplayRate?: number; // amount_usd × usdToDisplayRate = amount in `currency` — see cost-breakdown.dto.ts's own doc comment for why this differs from toUsdRate
+}
+
+/**
+ * What the route-comparison endpoint returns. Separate from RouteComparisonDto
+ * for the same reason CostSummaryResponseDto is separate from CostSummaryDto:
+ * only the entry point that resolved the inputs can state them.
+ */
+export interface RouteComparisonResponseDto extends RouteComparisonDto {
+  resolvedInputs: ResolvedCostingInputsDto;
 }

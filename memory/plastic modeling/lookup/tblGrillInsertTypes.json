@@ -1,0 +1,14 @@
+{
+  "name": "tblGrillInsertTypes",
+  "sourceFilePath": "lookupTables/Component/tblGrillInsertTypes.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Grill Area (in^2)",
+    "Grill Insert Size"
+  ],
+  "records": [
+    { "Grill Area (in^2)": 16.00, "Grill Insert Size": "smallGrill" },
+    { "Grill Area (in^2)": 64.00, "Grill Insert Size": "mediumGrill" },
+    { "Grill Area (in^2)": 144.00, "Grill Insert Size": "largeGrill" }
+  ]
+}

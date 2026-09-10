@@ -1,0 +1,111 @@
+# Local development runtime for the CAD engine.
+#
+# Why this file exists: pythonocc-core ships unsigned .pyd binaries. Windows 11
+# Smart App Control blocks them at load time (CodeIntegrity event 3077, policy
+# {0283AC0F-FFF1-49AE-ADA1-8A933130CAD6}) and SAC has no allowlist or exclusion
+# mechanism, so `python main.py` cannot work natively on Windows while SAC is
+# enforcing. Running the engine in the same Linux image Railway builds from
+# sidesteps that and removes dev/prod drift at the same time.
+#
+#   docker compose -f docker-compose.dev.yml up --build
+#   docker compose -f docker-compose.dev.yml run --rm cad-engine pytest test -q
+#
+# The image is built from the production Dockerfile unchanged; only the source
+# mount, the reloader and the port map are development-specific.
+#
+# Relationship to the root ../docker-compose.yml: that file is the full
+# platform stack (postgres/redis/rabbitmq/minio/backend/frontend) and its
+# interpolation hard-requires POSTGRES_PASSWORD, SUPABASE_URL and friends, so
+# it cannot bring up cad-engine on its own. This file is the single-service
+# dev loop only - it is not a fork of that stack, and runtime settings that
+# matter in production still live in the Dockerfile and the root stack.
+
+services:
+  cad-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mithran-cad-engine:dev
+    container_name: mithran-cad-engine-dev
+    ports:
+      - "5000:5000"
+    volumes:
+      # Live source. Shadows the image's baked /app copy so edits made on the
+      # Windows side apply without a rebuild.
+      - .:/app
+      # Anonymous volumes so container-written caches never land on the
+      # Windows/OneDrive mount, where they would be slow and cross-platform dirty.
+      - /app/__pycache__
+      - /app/.pytest_cache
+    env_file:
+      - .env
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "5000"
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      # inotify does not propagate across the Windows drvfs mount, so the
+      # reloader must poll to notice edits made from the Windows side.
+      WATCHFILES_FORCE_POLLING: "true"
+    # main.py hardcodes reload=False (correct for production), so the dev loop
+    # invokes uvicorn directly instead of patching the production entrypoint.
+    #
+    # NOT `conda run`: it supervises the process it launches, so when uvicorn's
+    # reloader respawns its worker the wrapper tears down and the container dies
+    # with exit 255. Activating the env and `exec`-ing makes uvicorn PID 1, so it
+    # owns its own children and receives signals directly. Activation is kept
+    # (rather than calling the interpreter by path) so OCCT sees the same
+    # environment the conda env sets up.
+    command:
+      - bash
+      - -lc
+      - >-
+        source /opt/conda/etc/profile.d/conda.sh &&
+        conda activate cad-env &&
+        exec python -m uvicorn main:app --host 0.0.0.0 --port 5000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  # Test runner. Same runtime as the service above, plus pytest.
+  # Build order matters: this image is FROM mithran-cad-engine:dev.
+  #   docker compose -f docker-compose.dev.yml build cad-engine
+  #   docker compose -f docker-compose.dev.yml build tests
+  #   docker compose -f docker-compose.dev.yml run --rm tests
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        BASE_IMAGE: mithran-cad-engine:dev
+    image: mithran-cad-engine:test
+    profiles: ["test"]
+    volumes:
+      - .:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
+    env_file:
+      - .env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    # `conda run` is fine here, unlike the server above: this is a one-shot
+    # process with no reloader, and its exit code propagates correctly.
+    command:
+      - conda
+      - run
+      - --no-capture-output
+      - -n
+      - cad-env
+      # `python -m pytest`, not bare `pytest`: there is no test/__init__.py and
+      # no pytest config, so bare pytest puts /app/test on sys.path instead of
+      # /app and every `from sheet_metal import ...` fails. The -m form prepends
+      # the working directory, which is how the suite runs natively too.
+      - python
+      - -m
+      - pytest
+      - test
+      - -q

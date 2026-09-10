@@ -1,0 +1,56 @@
+{
+  "name": "injectionTimeAdjustmentFactors",
+  "file_path": "lookupTables/Component/injectionTimeAdjustmentFactors.csv",
+  "columns": [
+    "Attribute",
+    "Number",
+    "Adjustment Factor"
+  ],
+  "records": [
+    {
+      "attribute": "Cavities Per Mold",
+      "number": 3,
+      "adjustment_factor": 1.0
+    },
+    {
+      "attribute": "Cavities Per Mold",
+      "number": 5,
+      "adjustment_factor": 1.02
+    },
+    {
+      "attribute": "Cavities Per Mold",
+      "number": 8,
+      "adjustment_factor": 1.05
+    },
+    {
+      "attribute": "Cavities Per Mold",
+      "number": 999999,
+      "adjustment_factor": 1.1
+    },
+    {
+      "attribute": "Gates Per Cavity",
+      "number": 1,
+      "adjustment_factor": 0.6
+    },
+    {
+      "attribute": "Gates Per Cavity",
+      "number": 2,
+      "adjustment_factor": 0.4
+    },
+    {
+      "attribute": "Gates Per Cavity",
+      "number": 3,
+      "adjustment_factor": 0.3
+    },
+    {
+      "attribute": "Gates Per Cavity",
+      "number": 4,
+      "adjustment_factor": 0.25
+    },
+    {
+      "attribute": "Gates Per Cavity",
+      "number": 999999,
+      "adjustment_factor": 0.25
+    }
+  ]
+}

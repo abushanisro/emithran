@@ -329,6 +329,12 @@ export function finalizeInspectionLine(input: InspectionInput, plan: InspectionP
       processRoute: input.processIdentity.processRoute,
       operation: input.processIdentity.operation,
     } : {}),
+    // Inspection charges NO setup: a first-article pass is amortised into the
+    // cycle time via amortizeDivisor above, not billed as a separate setup
+    // line, so CMM_SETUP_MIN is deliberately unused here. Reporting the 0
+    // explicitly stops apply-route persisting a literal 15 min for this line —
+    // a saved record claiming a setup the engine never charged.
+    setupTimeMin: 0,
     setupCost: 0,
     runCost: r2(runCost + laborCost),
     totalCost: r2(runCost + laborCost),

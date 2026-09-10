@@ -83,12 +83,16 @@ function ProcessCostBreakdown({ p, sym = '$', rate = 1 }: { p: any; sym?: string
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* Calculator path + inputs */}
       <div>
-        {(p.processGroup || p.processRoute || p.operation) && (
+        {(p.processGroup || p.category || p.processRoute || p.operation) && (
           <>
             <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 flex items-center gap-1">
               <Calculator className="h-2.5 w-2.5" /> Calculator Assigned
             </p>
-            {p.processGroup && <BRow label="Group"     value={p.processGroup} icon="calc" />}
+            {/* Process + Category is how a line is configured now (migration 719).
+                Route/Operation are still shown when present because a line created
+                before that carries them, and they are preserved on save. */}
+            {p.processGroup && <BRow label="Process"   value={p.processGroup} icon="db" />}
+            {p.category    && <BRow label="Category"   value={p.category}     icon="db" />}
             {p.processRoute && <BRow label="Route"     value={p.processRoute} icon="calc" />}
             {p.operation    && <BRow label="Operation" value={p.operation}    icon="calc" />}
             <Divider />
@@ -248,17 +252,27 @@ export function ManufacturingProcessSection({
           data: {
             opNbr: data.opNbr,
             processGroup: data.group,
+            category: data.category,
             processRoute: data.processRoute,
             operation: data.operation,
             mhrId: data.mhrId || undefined,
-            lhrId: data.lhrId || undefined,
+            // `?? null`, not `|| undefined`: undefined is dropped from the JSON
+            // and the backend only touches a field whose key is present, so a
+            // stale labour FK would survive a save that no longer uses one.
+            lhrId: data.lhrId ?? null,
+            benchmarkLhrId: data.benchmarkLhrId ?? null,
             directRate: data.directRate || data.laborRate || 0,
             indirectRate: data.indirectRate || 0,
             fringeRate: data.fringeRate || 0,
             machineRate: data.machineRate || 0,
             machineValue: data.machineValue || 0,
             laborRate: data.laborRate || 0,
-            shiftPatternHoursPerDay: data.shiftPatternHoursPerDay || 8,
+            // No `|| 8`. The dialog now sends the selected machine's real
+            // shifts_per_day x hours_per_shift, or nothing when the machine has
+            // no shift pattern on file. Defaulting here wrote a fabricated 8 on
+            // every line — and nothing reads this column anyway (the engine
+            // declares the field but no calculation uses it).
+            shiftPatternHoursPerDay: data.shiftPatternHoursPerDay,
             setupManning: data.setupManning,
             setupTime: data.setupTime,
             batchSize: data.batchSize,
@@ -276,6 +290,7 @@ export function ManufacturingProcessSection({
           bomItemId,
           opNbr: data.opNbr,
           processGroup: data.group,
+          category: data.category,
           processRoute: data.processRoute,
           operation: data.operation,
           mhrId: data.mhrId || undefined,
@@ -286,7 +301,8 @@ export function ManufacturingProcessSection({
           machineRate: data.machineRate || 0,
           machineValue: data.machineValue || 0,
           laborRate: data.laborRate || 0,
-          shiftPatternHoursPerDay: data.shiftPatternHoursPerDay || 8,
+          // Same as the update path above — no fabricated default.
+          shiftPatternHoursPerDay: data.shiftPatternHoursPerDay,
           setupManning: data.setupManning,
           setupTime: data.setupTime,
           batchSize: data.batchSize,
@@ -377,7 +393,7 @@ export function ManufacturingProcessSection({
                           {proc.opNbr != null && (
                             <span className="text-[9px] tabular-nums text-muted-foreground/50 font-mono w-5 shrink-0">{proc.opNbr}</span>
                           )}
-                          <p className="text-xs font-medium truncate">{proc.operation || proc.processGroup || 'Process'}</p>
+                          <p className="text-xs font-medium truncate">{proc.category || proc.operation || proc.processGroup || 'Process'}</p>
                           {proc.timingSource && proc.timingSource !== 'default' && (
                             <span className={`text-[9px] px-1 rounded font-mono shrink-0 ${
                               proc.timingSource === 'feature_geometry' || proc.timingSource === 'machining_rules'
@@ -535,6 +551,9 @@ export function ManufacturingProcessSection({
                                 {process.processGroup && (
                                   <div className="font-semibold text-primary">{process.processGroup}</div>
                                 )}
+                                {process.category && (
+                                  <div className="text-muted-foreground">{process.category}</div>
+                                )}
                                 {process.processRoute && (
                                   <div className="text-muted-foreground">{process.processRoute}</div>
                                 )}
@@ -545,7 +564,7 @@ export function ManufacturingProcessSection({
                                 {process.machineName && (
                                   <div className="text-[10px] text-muted-foreground/70 font-mono">{process.machineName}</div>
                                 )}
-                                {!process.processGroup && !process.processRoute && !process.operation && (
+                                {!process.processGroup && !process.category && !process.processRoute && !process.operation && (
                                   <div className="text-muted-foreground italic text-xs">No process assigned</div>
                                 )}
                               </div>

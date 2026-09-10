@@ -2,7 +2,7 @@ import { OXYFUEL_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/default-
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
-import { noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
+import { noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
 export interface OxyfuelInput {
@@ -69,10 +69,18 @@ export function computeOxyfuelCost(input: OxyfuelInput): OxyfuelResult {
   }
   const cuttingMin = (cuttingSec + pierceSec) / 60;
 
-  if (input.setupMin == null) {
-    warnings.push("OxyFuel Cut: setup time from fallback — seed sm_lookup_op_setup_time for 'oxyfuel_cut'");
-  }
-  const setupMin = input.setupMin ?? OXYFUEL_SETUP_MIN;
+  // Real setup time, most-specific real source first: this machine's own
+  // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
+  // row, then the cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: "OxyFuel Cut",
+    machineSetupTimeHr: rate.setupTimeHr,
+    operationSetupMin: input.setupMin,
+    classDefaultMin: OXYFUEL_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  const setupMin = setup.setupMin;
+  if (setup.warning) warnings.push(setup.warning);
 
   const t = eMithranTerms({
     mhrPerHr: rate.rate,
@@ -94,6 +102,8 @@ export function computeOxyfuelCost(input: OxyfuelInput): OxyfuelResult {
     buildCuttingProcessLine({
       process: "OxyFuel Cut",
       processIdentity: input.processIdentity,
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: t.setupCost,
       runCost: t.machineCost + t.laborCost,
       totalCost: t.total,
@@ -115,6 +125,7 @@ export function computeOxyfuelCost(input: OxyfuelInput): OxyfuelResult {
 export class OxyfuelCuttingEngine extends BaseCuttingEngine {
   readonly machineClass = 'oxyfuel_cut';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'OxyFuel Cut';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     return computeOxyfuelCost({

@@ -26,6 +26,10 @@ const ALREADY_SHOWN = new Set([
   'laborRateUsdHr', 'directOverheadRateUsdHr', 'indirectOverheadRateUsdHr',
   'numberOfOperators', 'wageGradeName', 'machineCategory',
   'machinePriceUsd', 'setupTimeHr',
+  // Injection Molding's real machine JSON (memory/Injection/machine/*.json)
+  // names the same 4 fields above with a "UsdPerHr" suffix instead of
+  // "UsdHr", plus its own primaryId duplicating name — same dedup intent.
+  'primaryId', 'laborRateUsdPerHr', 'directOverheadRateUsdPerHr', 'indirectOverheadRateUsdPerHr',
 ]);
 
 // camelCase key -> display label, for keys whose auto-generated label would
@@ -82,8 +86,31 @@ function formatValue(v: unknown): string {
   return String(v);
 }
 
+// The rate/labour and machine-ownership inputs. These are skipped by default
+// (ALREADY_SHOWN) because the MHR form renders them as real editable inputs —
+// but on a COST surface nothing else shows them, and they are exactly the
+// factors a quote is built from, so `includeCoreFields` opts them back in and
+// these two groups give them a home.
+const RATE_LABOUR_FIELDS = new Set([
+  'laborRateUsdHr', 'laborRateUsdPerHr',
+  'directOverheadRateUsdHr', 'directOverheadRateUsdPerHr',
+  'indirectOverheadRateUsdHr', 'indirectOverheadRateUsdPerHr',
+  'overheadMultiplier', 'numberOfOperators', 'laborTimeStandard',
+  'wageGradeName', 'workCenterLaborRateFactor', 'setupTimeHr', 'specialToolSetupHr',
+]);
+
+const OWNERSHIP_FIELDS = new Set([
+  'machinePriceUsd', 'machineLifeYr', 'machineUptimePct', 'avgUtilization',
+  'goodPartYield', 'annualMaintenanceFactorPct', 'installationFactorPct',
+  'salvageValueFactorPct', 'suppliesCostUsdYr', 'suppliesCostUsdPerHr',
+  'footprintAllowanceFactor', 'machinePowerKw', 'powerWatts',
+  'machineLengthMm', 'machineWidthMm', 'weightKg',
+]);
+
 function groupOf(key: string): string {
   const lower = key.toLowerCase();
+  if (RATE_LABOUR_FIELDS.has(key)) return 'Rates & Labour';
+  if (OWNERSHIP_FIELDS.has(key)) return 'Ownership & Economics';
   if (['machineCategory', 'isPreferred', 'machineManufacturerLocation', 'deNestingMethod', 'note'].includes(key)) {
     return 'Identity & Provenance';
   }
@@ -102,6 +129,8 @@ function groupOf(key: string): string {
 
 const GROUP_ORDER = [
   'Identity & Provenance',
+  'Rates & Labour',
+  'Ownership & Economics',
   'Geometry & Envelope',
   'Thickness & Material Limits',
   'Cycle Time & Speed',
@@ -113,6 +142,27 @@ const GROUP_ORDER = [
   'Other Process Parameters',
 ];
 
+// Sheet Metal's machine_library.json rows are already flat. Injection
+// Molding's real machine JSON (memory/Injection/machine/*.json) nests
+// fields under accounting/time/rates/limits/other/yields/machine/
+// bottomUpOverheadRateInputs/manufacturerInformation — this recurses those
+// down to their leaf keys so the same grouping/labeling logic below handles
+// both shapes with no per-domain branching. A no-op on an already-flat
+// object. Leaf keys already follow this file's own camelCase+unit-suffix
+// convention (laborRateUsdPerHr, clampingForceKn, ...), so no renaming is
+// needed — only de-nesting.
+function flattenRaw(raw: Record<string, any>): Record<string, any> {
+  const flat: Record<string, any> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      Object.assign(flat, flattenRaw(value));
+    } else {
+      flat[key] = value;
+    }
+  }
+  return flat;
+}
+
 /**
  * `alreadyShownElsewhere` lets a caller mark camelCase fields as "already
  * shown as a real editable number elsewhere on this page" (e.g.
@@ -121,6 +171,16 @@ const GROUP_ORDER = [
 export function groupMachineLibraryDetail(
   raw: Record<string, any> | null | undefined,
   alreadyShownElsewhere?: Record<string, number | string | undefined>,
+  options?: {
+    /**
+     * Include the rate/labour and machine-ownership fields that ALREADY_SHOWN
+     * suppresses by default. Those are hidden for the MHR form, which renders
+     * each of them as its own editable input — but a cost surface shows none of
+     * them, and they are precisely the factors the quote is built from. Default
+     * false, so the existing caller is byte-for-byte unaffected.
+     */
+    includeCoreFields?: boolean;
+  },
 ): MachineLibraryDetailGroup[] {
   if (!raw) return [];
   const extraSkip = new Set(
@@ -130,8 +190,14 @@ export function groupMachineLibraryDetail(
   );
 
   const byGroup = new Map<string, MachineLibraryDetailGroup>();
-  for (const [key, value] of Object.entries(raw)) {
-    if (ALREADY_SHOWN.has(key) || extraSkip.has(key)) continue;
+  const suppressed = options?.includeCoreFields
+    // 'name'/'description'/'machineCategory' stay suppressed even then: the
+    // caller already titles the panel with the machine name and category.
+    ? new Set(['name', 'description', 'primaryId', 'categoryDataNote'])
+    : ALREADY_SHOWN;
+
+  for (const [key, value] of Object.entries(flattenRaw(raw))) {
+    if (suppressed.has(key) || extraSkip.has(key)) continue;
     if (value === null || value === undefined || value === '') continue;
     const group = groupOf(key);
     if (!byGroup.has(group)) byGroup.set(group, { title: group, entries: [] });

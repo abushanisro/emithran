@@ -1,0 +1,72 @@
+{
+  "name": "cmStandardToolingComponents",
+  "file_path": "lookupTables/Component/cmStandardToolingComponents.csv",
+  "columns": [
+    "Name",
+    "Unit Cost (USD)",
+    "Quantity",
+    "Notes"
+  ],
+  "records": [
+    {
+      "name": "Air Poppet",
+      "unit_cost_usd": 25.0,
+      "quantity": 30.0,
+      "notes": ""
+    },
+    {
+      "name": "Ejector Guide Pin Bushing",
+      "unit_cost_usd": 30.0,
+      "quantity": 6.0,
+      "notes": ""
+    },
+    {
+      "name": "Ejector Pin",
+      "unit_cost_usd": 5.0,
+      "quantity": null,
+      "notes": "Ejector Pin quantities are calculated in the cost model"
+    },
+    {
+      "name": "Electrical Connection Or Switch",
+      "unit_cost_usd": null,
+      "quantity": 1.0,
+      "notes": "Cost included in machine price"
+    },
+    {
+      "name": "Guide Bush",
+      "unit_cost_usd": 100.0,
+      "quantity": 4.0,
+      "notes": ""
+    },
+    {
+      "name": "Guide Pin",
+      "unit_cost_usd": 100.0,
+      "quantity": 4.0,
+      "notes": ""
+    },
+    {
+      "name": "Hydraulic Cylinder",
+      "unit_cost_usd": 350.0,
+      "quantity": 4.0,
+      "notes": ""
+    },
+    {
+      "name": "Limit Switch",
+      "unit_cost_usd": 50.0,
+      "quantity": 4.0,
+      "notes": ""
+    },
+    {
+      "name": "Return Pin And Shoulder Bushing",
+      "unit_cost_usd": 35.0,
+      "quantity": 6.0,
+      "notes": ""
+    },
+    {
+      "name": "Side Lock",
+      "unit_cost_usd": 160.0,
+      "quantity": 4.0,
+      "notes": ""
+    }
+  ]
+}

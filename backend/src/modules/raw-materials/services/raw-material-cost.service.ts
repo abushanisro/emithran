@@ -12,6 +12,7 @@ import { Injectable, NotFoundException, InternalServerErrorException, BadRequest
 import { Logger } from '../../../common/logger/logger.service';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
+import { declareCostRecordCurrency } from '../../bom-items/costing/shared/core/persisted-currency-contract';
 import {
   CreateRawMaterialCostDto,
   UpdateRawMaterialCostDto,
@@ -178,6 +179,15 @@ export class RawMaterialCostService {
     // Looks up the location-specific price column so India materials (cost_india) aren't silently zeroed.
     let resolvedUnitCost = createDto.unitCost ?? 0;
     let priceLookupFailed = false;
+    // Migration 708 (P1b-i). Default: undeclared. A unitCost supplied by the
+    // caller is stored VERBATIM -- the conversion below sits behind the
+    // `resolvedUnitCost === 0` branch -- and the create DTO has no currency
+    // field, so for a hand-entered price there is genuinely nothing to declare.
+    // Marked unverified rather than assumed USD: this table is USD only on the
+    // auto-derive path, and the row does not otherwise record which path made
+    // it. Giving the caller a way to state a currency is a follow-up (it needs
+    // a DTO and form field), not something to fabricate here.
+    let currencyProvenance = declareCostRecordCurrency({});
     if (resolvedUnitCost === 0 && createDto.materialName) {
       const lookup = await this.lookupMaterialPrice(
         accessToken, createDto.materialName, createDto.country ?? '',
@@ -199,6 +209,14 @@ export class RawMaterialCostService {
       if (lookup.found && lookup.price > 0) {
         const rates = await this.exchangeRateService.getSnapshot(accessToken);
         resolvedUnitCost = rates.toUsd(lookup.price, lookup.currency);
+        // Migration 708: record the conversion this path just performed, so the
+        // stored row can prove it is USD instead of relying on a convention.
+        // rates.toUsd(1, code) is the same factor applied to the price above --
+        // one unit of the source currency in USD.
+        currencyProvenance = declareCostRecordCurrency({
+          declaredCurrency: 'USD',
+          convertedFrom: { fromCurrency: lookup.currency, rateToStored: rates.toUsd(1, lookup.currency) },
+        });
       } else {
         resolvedUnitCost = lookup.price;
       }
@@ -290,6 +308,10 @@ export class RawMaterialCostService {
       bom_item_id: createDto.bomItemId,
       process_route_id: createDto.processRouteId,
       project_id: createDto.projectId,
+
+      // Currency provenance (migration 708). Spread as the database names the
+      // columns so this payload cannot drift from the schema.
+      ...currencyProvenance,
     };
 
     // Debug log the data being inserted

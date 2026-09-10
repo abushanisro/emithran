@@ -1,0 +1,35 @@
+{
+  "name": "plasticizingRateByClampForce",
+  "sourceFilePath": "lookupTables/Component/plasticizingRateByClampForce.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Clamp Force (kN)",
+    "Plasticizing Rate (g / s)"
+  ],
+  "records": [
+    { "Clamp Force (kN)": 150.00, "Plasticizing Rate (g / s)": 0.56 },
+    { "Clamp Force (kN)": 250.00, "Plasticizing Rate (g / s)": 1.00 },
+    { "Clamp Force (kN)": 350.00, "Plasticizing Rate (g / s)": 1.34 },
+    { "Clamp Force (kN)": 500.00, "Plasticizing Rate (g / s)": 2.43 },
+    { "Clamp Force (kN)": 800.00, "Plasticizing Rate (g / s)": 4.13 },
+    { "Clamp Force (kN)": 1000.00, "Plasticizing Rate (g / s)": 4.98 },
+    { "Clamp Force (kN)": 1300.00, "Plasticizing Rate (g / s)": 6.08 },
+    { "Clamp Force (kN)": 1500.00, "Plasticizing Rate (g / s)": 7.05 },
+    { "Clamp Force (kN)": 2000.00, "Plasticizing Rate (g / s)": 11.18 },
+    { "Clamp Force (kN)": 2500.00, "Plasticizing Rate (g / s)": 20.90 },
+    { "Clamp Force (kN)": 3200.00, "Plasticizing Rate (g / s)": 27.95 },
+    { "Clamp Force (kN)": 4000.00, "Plasticizing Rate (g / s)": 42.53 },
+    { "Clamp Force (kN)": 5000.00, "Plasticizing Rate (g / s)": 60.76 },
+    { "Clamp Force (kN)": 6500.00, "Plasticizing Rate (g / s)": 117.25 },
+    { "Clamp Force (kN)": 8500.00, "Plasticizing Rate (g / s)": 118.13 },
+    { "Clamp Force (kN)": 10000.00, "Plasticizing Rate (g / s)": 118.13 },
+    { "Clamp Force (kN)": 13000.00, "Plasticizing Rate (g / s)": 160.13 },
+    { "Clamp Force (kN)": 16000.00, "Plasticizing Rate (g / s)": 158.38 },
+    { "Clamp Force (kN)": 20000.00, "Plasticizing Rate (g / s)": 208.25 },
+    { "Clamp Force (kN)": 23000.00, "Plasticizing Rate (g / s)": 208.25 },
+    { "Clamp Force (kN)": 27000.00, "Plasticizing Rate (g / s)": 296.63 },
+    { "Clamp Force (kN)": 32000.00, "Plasticizing Rate (g / s)": 373.63 },
+    { "Clamp Force (kN)": 40000.00, "Plasticizing Rate (g / s)": 337.75 },
+    { "Clamp Force (kN)": 9999990.00, "Plasticizing Rate (g / s)": 337.75 }
+  ]
+}

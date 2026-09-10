@@ -13,6 +13,7 @@ import { Logger } from '../../../common/logger/logger.service';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { getCurrencyForLocation } from '../../mhr/constants/mhr-calculation.constants';
+import { PERSISTED_PROCESS_COST_COLUMNS, PersistedProcessCostRow, resolvePersistedProcessCost, sumPersistedProcessCost } from '../../bom-items/costing/shared/core/persisted-process-cost';
 import {
   CreateProcessCostDto,
   UpdateProcessCostDto,
@@ -290,12 +291,24 @@ export class ProcessCostService {
    *      it reaches the frontend — strip the prefix before querying, same as
    *      the MHR benchmark case.
    *
-   * Neither given → null (a genuine flat manual-rate entry, not an error).
+   *   3. mhrId → the selected machine's OWN labour classification. Edit
+   *      Process Cost no longer offers an independent labour picker: a
+   *      machine's labour rate is mhr_records.usd_lhr_total on its own row,
+   *      and resolveMHRRates() already treats that specific rate as
+   *      authoritative over a generic (location, process_group) wage-grade
+   *      lookup. Without this source every line saved that way would report
+   *      no labour identity at all, even though the rate charged is a real,
+   *      attributable value — so the identity is read from the same row the
+   *      rate came from: its wage_grade, which is the labour classification
+   *      HR Rates itself assigns the machine.
+   *
+   * None given → null (a genuine flat manual-rate entry, not an error).
    */
   private async deriveLaborFields(
     lhrId: string | null | undefined,
     benchmarkLhrId: string | number | null | undefined,
     accessToken: string,
+    mhrId?: string | null | undefined,
   ): Promise<{ labor_type: string | null }> {
     if (lhrId) {
       const { data, error } = await this.supabaseService
@@ -343,6 +356,41 @@ export class ProcessCostService {
       }
 
       return { labor_type: data.labour_type ?? null };
+    }
+
+    if (mhrId) {
+      const { data, error } = await this.supabaseService
+        .getClient(accessToken)
+        .from('mhr_records')
+        .select('wage_grade, machine_name, usd_lhr_total')
+        .eq('id', mhrId)
+        .maybeSingle();
+
+      // Deliberately NOT a BadRequestException like the two branches above.
+      // Those are explicit user selections, so an unresolvable id is a real
+      // error; this is a derivation from a machine that deriveMachineFields
+      // has already validated, and the labour IDENTITY is a label, not the
+      // rate. Failing the whole save over a missing label would be worse than
+      // recording the rate with no name attached.
+      if (error) {
+        this.logger.error(
+          `Error resolving MHR ${mhrId} for labor_type derivation: ${error.message}`,
+          'ProcessCostService',
+        );
+        return { labor_type: null };
+      }
+      if (!data) return { labor_type: null };
+
+      // Only claim a machine-derived labour identity when that machine really
+      // has a labour rate of its own; otherwise the rate on this line came from
+      // a manual entry and naming the machine would misattribute it.
+      if (!(Number(data.usd_lhr_total) > 0)) return { labor_type: null };
+
+      return {
+        labor_type: data.wage_grade
+          ? `${data.wage_grade} (${data.machine_name ?? 'machine rate'})`
+          : `Machine rate (${data.machine_name ?? mhrId})`,
+      };
     }
 
     return { labor_type: null };
@@ -401,7 +449,12 @@ export class ProcessCostService {
     }
 
     const machineFields = await this.deriveMachineFields(createDto.mhrId, createDto.benchmarkMhrId, accessToken);
-    const laborFields = await this.deriveLaborFields(createDto.lhrId, createDto.benchmarkLhrId, accessToken);
+    const laborFields = await this.deriveLaborFields(
+      createDto.lhrId,
+      createDto.benchmarkLhrId,
+      accessToken,
+      createDto.mhrId,
+    );
 
     // Prepare database record
     const recordData = {
@@ -410,6 +463,9 @@ export class ProcessCostService {
       process_group: createDto.processGroup,
       process_route: createDto.processRoute,
       operation: createDto.operation,
+      // Real HR Rates machine category (migration 719). NULL on engine-generated
+      // lines, which identify themselves through `operation` instead.
+      category: createDto.category ?? null,
       location: createDto.location ?? null,
       mhr_id: createDto.mhrId,
       benchmark_mhr_id: createDto.benchmarkMhrId ?? null,
@@ -571,8 +627,21 @@ export class ProcessCostService {
     // Same gating for labor_type — only re-derive when lhrId/benchmarkLhrId is
     // actually part of this update payload.
     let laborFields: { labor_type: string | null } | undefined;
-    if (updateDto.lhrId !== undefined || updateDto.benchmarkLhrId !== undefined) {
-      laborFields = await this.deriveLaborFields(updateDto.lhrId, updateDto.benchmarkLhrId, accessToken);
+    // mhrId is now a labour source too, so a patch that only changes the
+    // machine must re-derive the labour identity as well — otherwise a line
+    // re-pointed at a different machine keeps the previous machine's label
+    // beside the new machine's rate.
+    if (
+      updateDto.lhrId !== undefined
+      || updateDto.benchmarkLhrId !== undefined
+      || updateDto.mhrId !== undefined
+    ) {
+      laborFields = await this.deriveLaborFields(
+        updateDto.lhrId,
+        updateDto.benchmarkLhrId,
+        accessToken,
+        updateDto.mhrId ?? existing.mhr_id,
+      );
     }
 
     // A rate field present in THIS patch arrives in the local currency for
@@ -624,6 +693,7 @@ export class ProcessCostService {
     if (updateDto.processGroup !== undefined) updateData.process_group = updateDto.processGroup;
     if (updateDto.processRoute !== undefined) updateData.process_route = updateDto.processRoute;
     if (updateDto.operation !== undefined) updateData.operation = updateDto.operation;
+    if (updateDto.category !== undefined) updateData.category = updateDto.category;
     if (updateDto.location !== undefined) updateData.location = updateDto.location;
     if (updateDto.mhrId !== undefined) updateData.mhr_id = updateDto.mhrId;
     if (updateDto.benchmarkMhrId !== undefined) updateData.benchmark_mhr_id = updateDto.benchmarkMhrId;
@@ -788,7 +858,23 @@ export class ProcessCostService {
       if (error.message.includes('invalid number')) {
         throw new BadRequestException('All numeric input values must be valid numbers.');
       }
-      
+
+      // The engine validates its own inputs and throws a plain Error naming the
+      // exact field and bound. Those are 400-class input problems, not server
+      // faults, and collapsing them into a generic 500 threw away the one piece
+      // of information the caller needed: a real 0.6 s cycle time was being
+      // rejected by a bad floor, and every client saw only "failed due to an
+      // unexpected error" while the UI rendered a confident "$0.00".
+      if (error.message.startsWith('Cycle Time must be')
+        || error.message.startsWith('Batch Size must be')
+        || error.message.startsWith('Parts Per Cycle must be')
+        || error.message.startsWith('Setup Time must be')
+        || error.message.startsWith('Heads must be')
+        || error.message.startsWith('Scrap must be')
+        || error.message.includes('must be between')) {
+        throw new BadRequestException(error.message);
+      }
+
       throw new InternalServerErrorException('Process cost calculation failed due to an unexpected error. Please verify your input values.');
     }
   }
@@ -821,11 +907,26 @@ export class ProcessCostService {
 
     const calculationResult = this.calculationEngine.calculate(input);
 
+    // P1b-iv-b: a stored cost wins over a re-derivation.
+    //
+    // This method recomputed all three cost figures on EVERY read, which
+    // silently replaced the engine cost with a rate-only re-derivation --
+    // measured live, 51 of 55 rows that carry a stored value disagree with
+    // that re-derivation by more than 1%, ratios 0.285x to 1.963x.
+    //
+    // Recomputing here is not needed to reflect edits: create (line ~445) and
+    // update (line ~668) both persist what the calculation engine produced, so
+    // the stored value is always current for anything saved through this
+    // service. The engine still runs, because the other fields it returns
+    // (total_cost_before_scrap, scrap_adjustment) are not stored anywhere --
+    // only the three costs now defer to what is on the row.
+    const stored = resolvePersistedProcessCost(record);
+
     return {
       ...record,
-      total_cost_per_part: calculationResult.totalCostPerPart,
-      setup_cost_per_part: calculationResult.setupCostPerPart,
-      total_cycle_cost_per_part: calculationResult.totalCycleCostPerPart,
+      total_cost_per_part: stored.source === 'stored' ? stored.totalCostPerPart : calculationResult.totalCostPerPart,
+      setup_cost_per_part: stored.source === 'stored' ? stored.setupCostPerPart : calculationResult.setupCostPerPart,
+      total_cycle_cost_per_part: stored.source === 'stored' ? stored.cycleCostPerPart : calculationResult.totalCycleCostPerPart,
       total_cost_before_scrap: calculationResult.totalCostBeforeScrap,
       scrap_adjustment: calculationResult.scrapAdjustment,
       total_batch_cost: calculationResult.totalBatchCost,
@@ -851,7 +952,7 @@ export class ProcessCostService {
     // fallback for rows saved before that engine existed, where the column is still null.
     const { data: costs, error } = await client
       .from('process_cost_records')
-      .select('total_cost_per_part, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
+      .select(PERSISTED_PROCESS_COST_COLUMNS)
       .eq('bom_item_id', bomItemId)
       .eq('is_active', true);
 
@@ -860,22 +961,17 @@ export class ProcessCostService {
       throw new InternalServerErrorException('Failed to fetch process costs');
     }
 
-    const totalCost = costs?.reduce((sum, r) => {
-      if (r.total_cost_per_part != null) return sum + parseFloat(r.total_cost_per_part);
-
-      const mr  = parseFloat(r.machine_rate)    || 0;
-      const lr  = parseFloat(r.labor_rate)      || 0;
-      const sm  = parseFloat(r.setup_manning)   || 0;
-      const st  = parseFloat(r.setup_time)      || 0;
-      const bs  = parseFloat(r.batch_size)      || 1;
-      const hd  = parseFloat(r.heads)           || 0;
-      const ct  = parseFloat(r.cycle_time)      || 0;
-      const ppc = parseFloat(r.parts_per_cycle) || 1;
-      const sc  = parseFloat(r.scrap)           || 0;
-      const setup = bs > 0 ? (st / 60) * (mr + lr * sm) / bs : 0;
-      const cycle = ppc > 0 ? (ct / 3600) * (mr + lr * hd) / ppc : 0;
-      return sum + (setup + cycle) * (1 + sc / 100);
-    }, 0) || 0;
+    // P1b-iv-b: this prefer-stored-then-derive logic was written out here and
+    // again in the bulk path below, and a third and fourth time in
+    // boms.service.ts and cost-aggregation.service.ts (those two without the
+    // prefer-stored half). One implementation now.
+    // Cast at the boundary: Supabase infers no row type from a select list that
+    // is not a string literal, and PERSISTED_PROCESS_COST_COLUMNS is shared
+    // deliberately so every caller selects exactly the columns the resolver
+    // reads.
+    const { total: totalCost } = sumPersistedProcessCost(
+      (costs ?? []) as unknown as PersistedProcessCostRow[],
+    );
 
     this.logger.log(`Total process cost for BOM item ${bomItemId}: ${totalCost}`, 'ProcessCostService');
     return totalCost;
@@ -893,7 +989,7 @@ export class ProcessCostService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('process_cost_records')
-      .select('bom_item_id, total_cost_per_part, machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, cycle_time, parts_per_cycle, scrap')
+      .select(`bom_item_id, ${PERSISTED_PROCESS_COST_COLUMNS}`)
       .in('bom_item_id', bomItemIds)
       .eq('is_active', true);
 
@@ -904,24 +1000,8 @@ export class ProcessCostService {
 
     const totals: Record<string, number> = Object.fromEntries(bomItemIds.map(id => [id, 0]));
     for (const row of data ?? []) {
-      let computed: number;
-      if (row.total_cost_per_part != null) {
-        computed = parseFloat(row.total_cost_per_part);
-      } else {
-        const mr  = parseFloat(row.machine_rate)    || 0;
-        const lr  = parseFloat(row.labor_rate)      || 0;
-        const sm  = parseFloat(row.setup_manning)   || 0;
-        const st  = parseFloat(row.setup_time)      || 0;
-        const bs  = parseFloat(row.batch_size)      || 1;
-        const hd  = parseFloat(row.heads)           || 0;
-        const ct  = parseFloat(row.cycle_time)      || 0;
-        const ppc = parseFloat(row.parts_per_cycle) || 1;
-        const sc  = parseFloat(row.scrap)           || 0;
-        const setup = bs > 0 ? (st / 60) * (mr + lr * sm) / bs : 0;
-        const cycle = ppc > 0 ? (ct / 3600) * (mr + lr * hd) / ppc : 0;
-        computed = (setup + cycle) * (1 + sc / 100);
-      }
-      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + computed;
+      const { totalCostPerPart } = resolvePersistedProcessCost(row);
+      totals[row.bom_item_id] = (totals[row.bom_item_id] ?? 0) + totalCostPerPart;
     }
     return totals;
   }

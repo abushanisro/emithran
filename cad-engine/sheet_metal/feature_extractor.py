@@ -16,6 +16,12 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
 
 from sheet_metal.features.perforation import detect_perforation_patterns
+from sheet_metal.features.rolled_form import detect_rolled_forms, count_recognized as count_recognized_rolled_forms
+from sheet_metal.features.formed_feature import detect_formed_features, count_recognized as count_recognized_formed_features
+from sheet_metal.features.lance import detect_lances, count_recognized as count_recognized_lances
+from sheet_metal.bend_relationships import compute_bend_flange_relationships
+from shared.stable_face_id import build_stable_face_id_map
+from shared.feature_contract import build_normalized_feature, FEATURE_CONTRACT_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +141,38 @@ class SheetMetalFeatureExtractor:
                     dominant_normal = (dnx / dmag, dny / dmag, dnz / dmag)
             except Exception as e:
                 logger.warning(f"[SheetMetal] dominant normal extraction failed: {e}")
+
+        # Lance (partial-cut, material-remains-attached, displaced flap)
+        # recognition -- promotes a candidate lance to a confident detection
+        # when the base panel's own boundary encloses the hinge as a genuine
+        # interior hole (a real 3-sided slit cut from the panel's interior),
+        # rather than the hinge sitting on the panel's outer contour (an
+        # ordinary edge/corner tab). See sheet_metal/features/lance.py for
+        # the full reasoning and its real, disclosed verification scope.
+        # Additive: does not change bend_count/bend_radii or any other bend_*
+        # field -- those remain live costing inputs, unchanged.
+        lances: List[Dict[str, Any]] = []
+        if raw_cylinders_full and sheet_thickness > 0 and bbox_minmax:
+            try:
+                panel_dims = [
+                    bbox_minmax["xmax"] - bbox_minmax["xmin"],
+                    bbox_minmax["ymax"] - bbox_minmax["ymin"],
+                    bbox_minmax["zmax"] - bbox_minmax["zmin"],
+                ]
+                # Exclude whichever dimension is closest to the sheet's own
+                # thickness -- that is the through-thickness direction, not a
+                # real panel extent -- same reasoning _analyze_wall_thickness_
+                # real's "thinnest dimension" proxy already applies in reverse.
+                planar_dims = sorted(
+                    d for d in panel_dims if abs(d - sheet_thickness) > sheet_thickness * 0.5
+                ) or sorted(panel_dims)
+                panel_min_dim_mm = planar_dims[0] if planar_dims else 0.0
+                lances = detect_lances(
+                    shape, dominant_normal, sheet_thickness, panels, panel_min_dim_mm, raw_cylinders_full,
+                )
+            except Exception as e:
+                logger.warning(f"[SheetMetal] lance detection failed: {e}")
+        lance_count = count_recognized_lances(lances)
 
         cut_length = 0.0
         cut_length_breakdown = {"outer_profile_mm": 0.0, "circular_holes_mm": 0.0, "internal_profiles_mm": 0.0}
@@ -273,6 +311,40 @@ class SheetMetalFeatureExtractor:
         except Exception as e:
             logger.warning(f"[SheetMetal] perforation detection failed: {e}")
         perforation_count = len(perforation_groups)
+
+        # Continuous rolled curvature -- the one signal that tells a roll-bent
+        # part from a press-brake-bent one. Reads the raw cylinder tuples
+        # BEFORE _collect_dedup_bends' sweep/radius rejection (which is exactly
+        # what drops a rolled face today), and changes none of the bend outputs
+        # below: those are live costing inputs. See
+        # sheet_metal/features/rolled_form.py for the rule and why only the
+        # >180deg case is a confident detection.
+        rolled_forms: List[Dict[str, Any]] = []
+        try:
+            if raw_cylinders_full and sheet_thickness > 0:
+                rolled_forms = detect_rolled_forms(raw_cylinders_full, sheet_thickness, dominant_normal)
+        except Exception as e:
+            logger.warning(f"[SheetMetal] rolled-form detection failed: {e}")
+        rolled_form_count = count_recognized_rolled_forms(rolled_forms)
+
+        # Formed feature (dimple/emboss) recognition -- promotes a candidate
+        # blind cylindrical cavity to a confident detection when the sheet's
+        # OPPOSITE face has its own local void at the same footprint (material
+        # worked from both faces, not just removed from the front). See
+        # sheet_metal/features/formed_feature.py for the full reasoning and
+        # its real, sourced depth classification. Scoped exactly like
+        # perforation/rolled-form above: additive, real topology only, empty
+        # rather than fabricated when the signal isn't there.
+        formed_features: List[Dict[str, Any]] = []
+        if dominant_face is not None and bbox_minmax:
+            try:
+                known_hole_centroids_mm = [(c[0], c[1], c[2]) for c in holes.get("centroids_mm", [])]
+                formed_features = detect_formed_features(
+                    shape, dominant_face, bbox_minmax, sheet_thickness, known_hole_centroids_mm,
+                )
+            except Exception as e:
+                logger.warning(f"[SheetMetal] formed-feature detection failed: {e}")
+        formed_feature_count = count_recognized_formed_features(formed_features)
 
         slots: Dict[str, Any] = {"count": 0}
         try:
@@ -434,12 +506,62 @@ class SheetMetalFeatureExtractor:
                         "region_bbox_mm": region["region_bbox_mm"],
                         "occurrences": region["occurrences"],
                     })
+                # Stable, content-based face identity -- independent of OCC's
+                # runtime enumeration order (which every face_idx above IS,
+                # per this function's own docstring: "NOT stable across STEP
+                # regeneration"). Additive: existing consumers keep using
+                # face_idx unchanged; this only adds a way to look up a
+                # persistent identity for the SAME ordinal. See
+                # shared/stable_face_id.py for the full reasoning.
+                stable_face_ids: Dict[int, str] = {}
+                try:
+                    stable_face_ids = build_stable_face_id_map(shape)
+                except Exception as e:
+                    logger.warning(f"[SheetMetal] stable_face_id build failed: {e}")
+
+                # Deterministic, versioned, normalized feature contract --
+                # shared/feature_contract.py already defines the envelope
+                # (FEATURE_CONTRACT_VERSION, build_normalized_feature()) but
+                # had zero real call sites. Additive layer on top of
+                # v2_features: one normalized record per real occurrence,
+                # every field traced to a fact v2_features already computed
+                # -- this does not replace v2_features/feature_graph_v2's
+                # existing ad-hoc shape, per feature_contract.py's own
+                # docstring.
+                normalized_features: List[Dict[str, Any]] = []
+                try:
+                    for group in v2_features:
+                        f_type = group.get("feature_type", "unknown")
+                        group_id = group.get("id", f_type)
+                        for i, occ in enumerate(group.get("occurrences", []) or []):
+                            face_ids = list(occ.get("face_ids", []) or [])
+                            nf = build_normalized_feature(
+                                feature_id=f"{group_id}_{i}",
+                                feature_type=f_type,
+                                source_face_ids=face_ids,
+                                geometric_parameters={k: v for k, v in occ.items() if k != "face_ids"},
+                                recognition_method=f"sheet_metal.{f_type}",
+                                recognition_status=occ.get("recognition_status", "recognized"),
+                            )
+                            # Enrichment, not part of build_normalized_feature()'s
+                            # own tested contract shape -- cross-run identity
+                            # for consumers that want it, alongside the
+                            # ordinal source_face_ids every existing consumer
+                            # already reads.
+                            nf["source_face_stable_ids"] = [stable_face_ids.get(fid) for fid in face_ids]
+                            normalized_features.append(nf)
+                except Exception as e:
+                    logger.warning(f"[SheetMetal] normalized_features build failed: {e}")
+
                 feature_graph_v2 = {
                     "metadata": {
                         "face_map": face_map or [],
                         "stl_tri_total": face_map_tri_total or None,
+                        "stable_face_ids": stable_face_ids,
+                        "feature_contract_version": FEATURE_CONTRACT_VERSION,
                     },
                     "features": v2_features,
+                    "normalized_features": normalized_features,
                 }
                 logger.info(
                     f"[SheetMetal] feature_graph_v2: {len(v2_features)} feature types, "
@@ -447,6 +569,37 @@ class SheetMetalFeatureExtractor:
                 )
             except Exception as e:
                 logger.warning(f"[SheetMetal] feature_graph_v2 build failed: {e}")
+
+        # Bend-to-bend / bend-to-flange relationships (signed fold direction)
+        # -- real geometric facts (flange width, fold-relative orientation)
+        # via bend_relationships.py's proven edge/face-adjacency technique,
+        # applied to the real per-physical-bend face_ids feature_graph_v2
+        # already computed above. Additive: does not decide any hem/return-
+        # flange verdict itself (deliberately left to DFM, per that module's
+        # own docstring) -- only exposes the real facts a DFM/process-
+        # planning consumer needs to make one.
+        bend_flange_relationships: List[Dict[str, Any]] = []
+        if feature_graph_v2 and raw_cylinders_full and sheet_thickness > 0 and bbox_minmax:
+            try:
+                real_bends = [
+                    occ for f in feature_graph_v2.get("features", []) if f.get("feature_type") == "bend"
+                    for occ in f.get("occurrences", [])
+                    if occ.get("face_ids")
+                ]
+                if len(real_bends) >= 2:
+                    planar_dims = [
+                        d for d in (
+                            bbox_minmax["xmax"] - bbox_minmax["xmin"],
+                            bbox_minmax["ymax"] - bbox_minmax["ymin"],
+                            bbox_minmax["zmax"] - bbox_minmax["zmin"],
+                        ) if abs(d - sheet_thickness) > sheet_thickness * 0.5
+                    ]
+                    sheet_width_mm = max(planar_dims) if planar_dims else (bbox_minmax["xmax"] - bbox_minmax["xmin"])
+                    bend_flange_relationships = compute_bend_flange_relationships(
+                        shape, real_bends, sheet_width_mm,
+                    )
+            except Exception as e:
+                logger.warning(f"[SheetMetal] bend_flange_relationships failed: {e}")
 
         # Material utilization / nesting metrics — the flat pattern's real
         # material footprint is its bounding RECTANGLE (what a nesting sheet
@@ -511,6 +664,44 @@ class SheetMetalFeatureExtractor:
             # normal pierce time) -- never a replacement for it.
             "perforation_count": perforation_count,
             "perforation_groups": perforation_groups,
+            # Real continuous-curvature (roll-bent) recognition. rolled_form_count
+            # counts CONFIDENT detections only (a single cylindrical face
+            # sweeping past 180deg, which a press brake cannot form in one hit);
+            # rolled_form_candidates additionally carries 'ambiguous' entries
+            # (large radius, sweep within press-brake range) so a consumer can
+            # disclose them without treating them as detections. Additive: every
+            # bend_* field above is unchanged.
+            "rolled_form_count": rolled_form_count,
+            "rolled_form_candidates": rolled_forms,
+            # Real formed-feature (dimple/emboss) recognition -- see
+            # sheet_metal/features/formed_feature.py. formed_feature_count
+            # counts CONFIDENT detections only (the sheet's back face has its
+            # own local void at the same footprint -- material worked from
+            # both faces, not just removed); formed_feature_candidates
+            # additionally carries 'ambiguous' entries (forming_spike.py's
+            # existing candidate set with no back-void evidence either way)
+            # so a consumer can disclose them without treating them as
+            # detections. Additive: no existing hole/counterbore/countersink
+            # field above is changed.
+            "formed_feature_count": formed_feature_count,
+            "formed_feature_candidates": formed_features,
+            # Real lance recognition -- see sheet_metal/features/lance.py.
+            # lance_count counts CONFIDENT detections only (the base panel's
+            # own boundary encloses the hinge as a genuine interior hole);
+            # lance_candidates additionally carries 'ambiguous' entries
+            # (lancing_spike.py's existing candidate set with no enclosure
+            # evidence either way) so a consumer can disclose them without
+            # treating them as detections. Additive: no bend_* field above
+            # is changed.
+            "lance_count": lance_count,
+            "lance_candidates": lances,
+            # Real bend-to-bend/bend-to-flange geometric facts -- see
+            # bend_relationships.py. NOT a hem/return-flange verdict (that is
+            # DFM's decision); flange_width_mm and fold_relative_orientation
+            # are real, sourced facts a DFM consumer applies its own
+            # reconciled threshold (hemReturnFlangeLengthMin) to. Additive:
+            # no bend_* field above is changed.
+            "bend_flange_relationships": bend_flange_relationships,
             "counterbore_count": counterbores["count"],
             "counterbore_groups": counterbores["groups"],
             "countersink_count": countersinks["count"],

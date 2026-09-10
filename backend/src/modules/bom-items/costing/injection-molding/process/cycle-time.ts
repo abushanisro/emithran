@@ -181,16 +181,53 @@ export function computeCoolingTimeSec(
 // v_front: material melt-front velocity (mm/s) from RESIN_THERMAL_TABLE.vFront.
 //
 // Physical minimum 0.5 s (shot start overhead — check-valve travel, barrel delay).
+//
+// Real cavity-count/gate-count adjustment factors (migration 663) then scale
+// this base estimate — see CAVITIES_PER_MOLD_FILL_FACTORS/
+// GATES_PER_CAVITY_FILL_FACTORS below.
 
 export const IM_FILL_MIN_SEC = 0.5;
 const IM_FLOW_LENGTH_FACTOR = 0.60; // fraction of longest bbox dimension
 
+// Real multiplicative fill-time adjustment factors (migration 663,
+// injectionTimeAdjustmentFactors.json — 9 real rows). Ceiling-bucketed:
+// ["at most N cavities/gates" -> factor], same "first tier that covers it"
+// lookup shape as SPI_MOLD_CLASSES/MOLD_CLASS_ORDER in the cost-engine file.
+// Cavities Per Mold: more cavities per mold slightly increases fill time
+// (more melt volume per shot). Gates Per Cavity: more gates per cavity
+// meaningfully reduces fill time (parallel flow paths fill faster).
+export const CAVITIES_PER_MOLD_FILL_FACTORS: ReadonlyArray<readonly [number, number]> = [
+  [3, 1.00],
+  [5, 1.02],
+  [8, 1.05],
+  [999_999, 1.10],
+];
+export const GATES_PER_CAVITY_FILL_FACTORS: ReadonlyArray<readonly [number, number]> = [
+  [1, 0.60],
+  [2, 0.40],
+  [3, 0.30],
+  [4, 0.25],
+  [999_999, 0.25],
+];
+
+function ceilingBucketFactor(breakpoints: ReadonlyArray<readonly [number, number]>, value: number): number {
+  for (const [threshold, factor] of breakpoints) {
+    if (value <= threshold) return factor;
+  }
+  return breakpoints[breakpoints.length - 1][1];
+}
+
 export function computeFillTimeSec(
   longestBboxMm: number,
   props: ResinThermalProps,
+  cavityCount: number = 1,
+  gatesPerCavity: number = 1,
 ): number {
   const lFlow = longestBboxMm * IM_FLOW_LENGTH_FACTOR;
-  const tFill = lFlow / Math.max(props.vFront, 10);
+  const tFillBase = lFlow / Math.max(props.vFront, 10);
+  const cavityFactor = ceilingBucketFactor(CAVITIES_PER_MOLD_FILL_FACTORS, Math.max(cavityCount, 1));
+  const gateFactor = ceilingBucketFactor(GATES_PER_CAVITY_FILL_FACTORS, Math.max(gatesPerCavity, 1));
+  const tFill = tFillBase * cavityFactor * gateFactor;
   return Math.max(IM_FILL_MIN_SEC, Math.round(tFill * 10) / 10);
 }
 
@@ -368,6 +405,14 @@ export function computeCycleTime(input: {
   // 2026-09-02) — see lookupResinProps' own doc comment. Optional; falls
   // back to the cited generic resin-family table field-by-field when absent.
   realResinInputs?: RealResinInputs | null;
+  // Real fill-time adjustment factors (migration 663) — see
+  // CAVITIES_PER_MOLD_FILL_FACTORS/GATES_PER_CAVITY_FILL_FACTORS above.
+  // cavityCount defaults to 1 (single-cavity, matches prior behavior when
+  // omitted). gatesPerCavity defaults to 1 — no real per-part gate-count
+  // signal exists anywhere in this app yet, so every caller implicitly
+  // assumes a single gate per cavity until that signal exists.
+  cavityCount?: number;
+  gatesPerCavity?: number;
 }): CycleTimeResult {
   const { wallMm, longestBboxMm, bboxMidMm, volumeMm3, projectedAreaMm2, grade } = input;
   const isLsr = input.isLsr ?? isSiliconeGrade(grade);
@@ -386,7 +431,7 @@ export function computeCycleTime(input: {
 
   // LSR: cure time replaces cooling; fill and pack apply normally.
   const coolSec  = isLsr ? computeLsrCureTime(wall) : computeCoolingTimeSec(wall, props);
-  const fillSec  = computeFillTimeSec(longestBboxMm, props);
+  const fillSec  = computeFillTimeSec(longestBboxMm, props, input.cavityCount ?? 1, input.gatesPerCavity ?? 1);
   const packSec  = isLsr ? 0 : computePackTimeSec(coolSec); // LSR has no pack/hold phase
   const ejectSec = IM_EJECT_SEC;
 

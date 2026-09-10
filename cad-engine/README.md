@@ -91,40 +91,96 @@ Convert STEP file to STL and return as base64
 
 ## Local Development
 
-### Prerequisites
-```bash
-python 3.11+
-pip
+The engine runs in a Linux container, not natively on the host.
+For day-to-day start/stop/test commands see [`RUNNING.md`](./RUNNING.md);
+this section covers why, and first-time setup.
+
+### Why not `python main.py` on Windows
+
+pythonocc-core ships unsigned `.pyd` binaries. With Windows 11 Smart App Control
+enforcing, Code Integrity refuses to map them into `python.exe`:
+
+```
+ImportError: DLL load failed while importing _GeomAbs:
+An Application Control policy has blocked this file.
 ```
 
-### Installation
-```bash
-cd cad-engine
-pip install -r requirements.txt
+That is an operating-system policy block (CodeIntegrity event 3077, SAC policy
+`{0283AC0F-FFF1-49AE-ADA1-8A933130CAD6}`), not a broken install. Smart App
+Control exposes no allowlist or exclusion mechanism, and locally trusted or
+self-signed certificates do not satisfy it, so reinstalling the conda package or
+re-signing the binaries cannot fix it. The container is the supported path, and
+it also makes local runs match the image Railway deploys.
+
+### One-time host setup (Windows)
+
+Requires WSL2. Docker Engine runs inside the distro, so Docker Desktop is not
+needed and no Windows administrator rights are required beyond WSL itself.
+
+```powershell
+wsl --install -d Ubuntu-24.04 --no-launch
+wsl -d Ubuntu-24.04 -u root bash /mnt/c/Users/<you>/.../cad-engine/scripts/provision-wsl-docker.sh
+wsl --shutdown
+wsl -d Ubuntu-24.04 -- docker version
 ```
+
+`scripts/provision-wsl-docker.sh` is idempotent: it enables systemd and drvfs
+`metadata` in `/etc/wsl.conf`, creates a non-root user, and installs Docker
+Engine plus the Compose plugin from Docker's official apt repository.
 
 ### Run
+
 ```bash
-python main.py
-# Server runs on http://localhost:5000
+# inside the distro, from the cad-engine directory
+docker compose -f docker-compose.dev.yml up --build
+# http://localhost:5000/health - also reachable from Windows
 ```
+
+The source tree is bind-mounted and uvicorn runs with `--reload`, so edits made
+on the Windows side take effect without a rebuild.
+
+### Tests
+
+`pytest` is intentionally absent from the production image. `Dockerfile.dev`
+layers it (and `requirements-dev.txt`) on top of that image, so tests run
+against the exact production runtime without shipping test tooling to Railway.
+Build the base first, since the test image is `FROM mithran-cad-engine:dev`:
+
+```bash
+docker compose -f docker-compose.dev.yml build cad-engine
+docker compose -f docker-compose.dev.yml build tests
+docker compose -f docker-compose.dev.yml run --rm tests
+```
+
+### macOS and Linux hosts
+
+Smart App Control is Windows-only. There, `pip install -r requirements.txt` plus
+`python main.py` works natively, and the compose file above works unchanged.
 
 ## Docker Deployment
 
+Production images are built from `Dockerfile` (miniconda3 + pythonocc-core
+7.7.2). Railway builds it directly via `railway.json`; the root
+`../docker-compose.yml` wires the same image into the full platform stack
+alongside postgres, redis, rabbitmq, minio, backend and frontend.
+
 ### Build
+
 ```bash
 docker build -t mithran-cad-engine .
 ```
 
 ### Run
+
 ```bash
 docker run -p 5000:5000 mithran-cad-engine
 ```
 
-### Using docker-compose
+### Full platform stack
+
 ```bash
-# From project root
-docker-compose up cad-engine
+# from the repository root, with the root .env populated
+docker compose up cad-engine
 ```
 
 ## Conversion Pipeline

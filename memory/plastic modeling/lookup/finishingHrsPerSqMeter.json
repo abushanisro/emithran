@@ -1,0 +1,131 @@
+{
+  "name": "finishingHrsPerSqMeter",
+  "file_path": "lookupTables/Component/finishingHrsPersqMeter.csv",
+  "columns": [
+    "Surface Area (m^2)",
+    "Hrs Per Sq Meter (hr / m^2)",
+    "Complexity"
+  ],
+  "records": [
+    {
+      "surface_area_m2": 0.06,
+      "hrs_per_sq_meter_hr_m2": 232.5,
+      "complexity": "Simple"
+    },
+    {
+      "surface_area_m2": 0.06,
+      "hrs_per_sq_meter_hr_m2": 279.0,
+      "complexity": "Average"
+    },
+    {
+      "surface_area_m2": 0.06,
+      "hrs_per_sq_meter_hr_m2": 325.5,
+      "complexity": "Complex"
+    },
+    {
+      "surface_area_m2": 0.16,
+      "hrs_per_sq_meter_hr_m2": 195.3,
+      "complexity": "Simple"
+    },
+    {
+      "surface_area_m2": 0.16,
+      "hrs_per_sq_meter_hr_m2": 241.8,
+      "complexity": "Average"
+    },
+    {
+      "surface_area_m2": 0.16,
+      "hrs_per_sq_meter_hr_m2": 279.0,
+      "complexity": "Complex"
+    },
+    {
+      "surface_area_m2": 0.32,
+      "hrs_per_sq_meter_hr_m2": 158.1,
+      "complexity": "Simple"
+    },
+    {
+      "surface_area_m2": 0.32,
+      "hrs_per_sq_meter_hr_m2": 195.3,
+      "complexity": "Average"
+    },
+    {
+      "surface_area_m2": 0.32,
+      "hrs_per_sq_meter_hr_m2": 241.8,
+      "complexity": "Complex"
+    },
+    {
+      "surface_area_m2": 0.65,
+      "hrs_per_sq_meter_hr_m2": 120.9,
+      "complexity": "Simple"
+    },
+    {
+      "surface_area_m2": 0.65,
+      "hrs_per_sq_meter_hr_m2": 158.1,
+      "complexity": "Average"
+    },
+    {
+      "surface_area_m2": 0.65,
+      "hrs_per_sq_meter_hr_m2": 195.3,
+      "complexity": "Complex"
+    },
+    {
+      "surface_area_m2": 0.97,
+      "hrs_per_sq_meter_hr_m2": 102.3,
+      "complexity": "Simple"
+    },
+    {
+      "surface_area_m2": 0.97,
+      "hrs_per_sq_meter_hr_m2": 139.5,
+      "complexity": "Average"
+    },
+    {
+      "surface_area_m2": 0.97,
+      "hrs_per_sq_meter_hr_m2": 176.7,
+      "complexity": "Complex"
+    },
+    {
+      "surface_area_m2": 1.61,
+      "hrs_per_sq_meter_hr_m2": 93.0,
+      "complexity": "Simple"
+    },
+    {
+      "surface_area_m2": 1.61,
+      "hrs_per_sq_meter_hr_m2": 120.9,
+      "complexity": "Average"
+    },
+    {
+      "surface_area_m2": 1.61,
+      "hrs_per_sq_meter_hr_m2": 167.4,
+      "complexity": "Complex"
+    },
+    {
+      "surface_area_m2": 1.94,
+      "hrs_per_sq_meter_hr_m2": 83.7,
+      "complexity": "Simple"
+    },
+    {
+      "surface_area_m2": 1.94,
+      "hrs_per_sq_meter_hr_m2": 111.6,
+      "complexity": "Average"
+    },
+    {
+      "surface_area_m2": 1.94,
+      "hrs_per_sq_meter_hr_m2": 158.1,
+      "complexity": "Complex"
+    },
+    {
+      "surface_area_m2": 2.26,
+      "hrs_per_sq_meter_hr_m2": 74.4,
+      "complexity": "Simple"
+    },
+    {
+      "surface_area_m2": 2.26,
+      "hrs_per_sq_meter_hr_m2": 102.3,
+      "complexity": "Average"
+    },
+    {
+      "surface_area_m2": 2.26,
+      "hrs_per_sq_meter_hr_m2": 139.5,
+      "complexity": "Complex"
+    }
+  ]
+}

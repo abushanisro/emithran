@@ -2,7 +2,7 @@ import { PLASMA_CUT_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/defau
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
-import { noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
+import { noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
 export interface PlasmaCutInput {
@@ -70,10 +70,18 @@ export function computePlasmaCutCost(input: PlasmaCutInput): PlasmaCutResult {
   }
   const cuttingMin = (cuttingSec + pierceSec) / 60;
 
-  if (input.setupMin == null) {
-    warnings.push("Plasma Cut: setup time from fallback — seed sm_lookup_op_setup_time for 'plasma_cut'");
-  }
-  const setupMin = input.setupMin ?? PLASMA_CUT_SETUP_MIN;
+  // Real setup time, most-specific real source first: this machine's own
+  // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
+  // row, then the cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: 'Plasma Cut',
+    machineSetupTimeHr: rate.setupTimeHr,
+    operationSetupMin: input.setupMin,
+    classDefaultMin: PLASMA_CUT_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  const setupMin = setup.setupMin;
+  if (setup.warning) warnings.push(setup.warning);
 
   const t = eMithranTerms({
     mhrPerHr: rate.rate,
@@ -95,6 +103,8 @@ export function computePlasmaCutCost(input: PlasmaCutInput): PlasmaCutResult {
     buildCuttingProcessLine({
       process: 'Plasma Cut',
       processIdentity: input.processIdentity,
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: t.setupCost,
       runCost: t.machineCost + t.laborCost,
       totalCost: t.total,
@@ -115,6 +125,7 @@ export function computePlasmaCutCost(input: PlasmaCutInput): PlasmaCutResult {
 export class PlasmaCuttingEngine extends BaseCuttingEngine {
   readonly machineClass = 'plasma_cut';
   readonly processFamily = 'sheet_metal_cutting';
+  readonly processLabel = 'Plasma Cut';
 
   computeCost(context: CuttingProcessContext): CuttingProcessResult {
     return computePlasmaCutCost({

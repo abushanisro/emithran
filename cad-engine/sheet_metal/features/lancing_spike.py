@@ -100,6 +100,12 @@ def _classify_candidates(
             "feature_type": "candidate_lance",
             "hinge_length_mm": round(hinge_length, 2),
             "flange_area_mm2": round(flange_area, 2),
+            # The base/parent-panel-side neighbor face id (the larger-area
+            # real neighbor, opposite the flap) -- additive, forwarded only
+            # when the real-OCC wrapper supplied it. _classify_candidates'
+            # own filtering never reads it; sheet_metal/features/lance.py's
+            # promotion test does.
+            "base_face_id": b.get("base_face_id"),
             "centroid_mm": list(b.get("centroid_mm", [0.0, 0.0, 0.0])),
             "face_ids": list(b.get("face_ids", [])),
             "recognition_status": "ambiguous",
@@ -151,9 +157,18 @@ def detect_candidate_lances(
         face_idx = int(c[8])
         neighbor_ids = adjacency.get(face_idx, set())
         flange_area = min((face_area.get(n, 0.0) for n in neighbor_ids), default=None)
+        # The base/parent-panel side of this bend -- the LARGER-area real
+        # neighbor, opposite the flap. Used only by lance.py's promotion
+        # test (does the notch here sit inside the base panel's own
+        # interior, or on its outer boundary); _classify_candidates' own
+        # filtering never reads it.
+        base_face_id = (
+            max(neighbor_ids, key=lambda n: face_area.get(n, 0.0)) if neighbor_ids else None
+        )
         bend_candidates.append({
             "axial_length_mm": c[9] if len(c) > 9 else 0.0,
             "flange_area_mm2": flange_area,
+            "base_face_id": base_face_id,
             "centroid_mm": [c[2], c[3], c[4]],
             "face_ids": [face_idx],
         })

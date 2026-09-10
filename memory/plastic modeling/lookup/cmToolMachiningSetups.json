@@ -1,0 +1,101 @@
+{
+  "name": "cmToolMachiningSetups",
+  "file_path": "lookupTables/Component/cmToolMachiningSetups.csv",
+  "columns": [
+    "Name",
+    "Number of Setups",
+    "Setup Time (hr)"
+  ],
+  "records": [
+    {
+      "name": "Cavity Plate CNC",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 2.0
+    },
+    {
+      "name": "Cavity Plate General Machining",
+      "number_of_setups": 2.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Clamp Plate Drilling",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Clamp Plate General Machining",
+      "number_of_setups": 2.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Core Plate CNC",
+      "number_of_setups": 2.0,
+      "setup_time_hr": 2.0
+    },
+    {
+      "name": "Core Plate General Machining",
+      "number_of_setups": 2.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Edge Chamfer General Machining",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 0.5
+    },
+    {
+      "name": "Ejector Box Plates Drilling",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Ejector Box Plates General Machining",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Ejector Box Rails Drilling",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Ejector Box Rails General Machining",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Guide Pin Boring",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 0.5
+    },
+    {
+      "name": "Guide Pin Drilling",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Insert Pocket",
+      "number_of_setups": 2.0,
+      "setup_time_hr": 1.0
+    },
+    {
+      "name": "Parting Line Spotting",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 2.0
+    },
+    {
+      "name": "Support Pillars",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 0.1
+    },
+    {
+      "name": "Tool Insert Machining",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 0.5
+    },
+    {
+      "name": "Vent Machining",
+      "number_of_setups": 1.0,
+      "setup_time_hr": 1.0
+    }
+  ]
+}

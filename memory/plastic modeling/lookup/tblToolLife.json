@@ -1,0 +1,28 @@
+{
+  "name": "tblToolLife",
+  "sourceFilePath": "lookupTables/Component/tblToolLife.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Material Type",
+    "Num Shots Per Tool"
+  ],
+  "records": [
+    { "Material Type": "ABS", "Num Shots Per Tool": 144000 },
+    { "Material Type": "Acetal", "Num Shots Per Tool": 278000 },
+    { "Material Type": "Acrylic", "Num Shots Per Tool": 257000 },
+    { "Material Type": "Nylon", "Num Shots Per Tool": 278000 },
+    { "Material Type": "PBT", "Num Shots Per Tool": 144000 },
+    { "Material Type": "PET", "Num Shots Per Tool": 428000 },
+    { "Material Type": "Polycarbonate", "Num Shots Per Tool": 144000 },
+    { "Material Type": "Polypropylene", "Num Shots Per Tool": 321000 },
+    { "Material Type": "Polystyrene", "Num Shots Per Tool": 428000 },
+    { "Material Type": "Polyurethane", "Num Shots Per Tool": 144000 },
+    { "Material Type": "PPS", "Num Shots Per Tool": 144000 },
+    { "Material Type": "TPA", "Num Shots Per Tool": 428000 },
+    { "Material Type": "TPE", "Num Shots Per Tool": 428000 },
+    { "Material Type": "TPO", "Num Shots Per Tool": 428000 },
+    { "Material Type": "TPS", "Num Shots Per Tool": 428000 },
+    { "Material Type": "TPU", "Num Shots Per Tool": 428000 },
+    { "Material Type": "TPV", "Num Shots Per Tool": 428000 }
+  ]
+}

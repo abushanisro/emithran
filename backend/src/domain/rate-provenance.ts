@@ -21,6 +21,11 @@
 //   'lhr_cross_location' — a real DB row, but borrowed from a different
 //                        location as a substitute, not this location's own
 //                        data → REFERENCE (real data, reference use).
+//   'wage_grade_bucket' — a real average across real machines sharing a
+//                        real wage grade (resolveWageGradeBucketRates,
+//                        bom-items.service.ts), not one specific machine's
+//                        own rate → BENCHMARK (same tier as the other
+//                        real-but-aggregated rate sources above).
 import type { MHRRateInput, LhrRateSource } from './cost-result';
 
 export type RateProvenanceTier = 'REAL' | 'BENCHMARK' | 'ESTIMATE' | 'REFERENCE' | 'NO_RATE';
@@ -39,6 +44,7 @@ const LHR_SOURCE_TO_PROVENANCE: Record<LhrRateSource, RateProvenanceTier> = {
   lhr_benchmark: 'BENCHMARK',
   lhr_cross_location: 'REFERENCE',
   no_lhr_rate: 'NO_RATE',
+  wage_grade_bucket: 'BENCHMARK',
 };
 
 export function provenanceOfMhrSource(source: MHRRateInput['source']): RateProvenanceTier {

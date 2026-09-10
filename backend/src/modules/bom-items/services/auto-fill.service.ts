@@ -73,6 +73,34 @@ export interface RawGeometry {
   // keyholes — anything that isn't the outer boundary or a plain round
   // hole), alongside the existing cutLengthBreakdown.internalProfilesMm length.
   extrudedFlangeCount?: number;
+  // Confident continuous-curvature (roll-bent) detections only — see
+  // cad-engine/sheet_metal/features/rolled_form.py. Ambiguous candidates are
+  // deliberately NOT counted here.
+  rolledFormCount?: number;
+  // Confident formed-feature (dimple/emboss) detections only — see
+  // cad-engine/sheet_metal/features/formed_feature.py. A candidate is only
+  // counted here when the sheet's opposite face has its own local void at
+  // the same footprint (material worked from both faces, not just removed).
+  // No costing engine consumes this yet — detection only, same as
+  // thinWebCount/internalProfileCount below until a real forming cost model
+  // is built.
+  formedFeatureCount?: number;
+  // Confident lance detections only — see cad-engine/sheet_metal/features/
+  // lance.py. No costing engine consumes this yet.
+  lanceCount?: number;
+  // Real bend-to-bend/bend-to-flange geometric facts (flange_width_mm,
+  // fold_relative_orientation) — see cad-engine/sheet_metal/bend_
+  // relationships.py. NOT a hem/return-flange verdict; that decision belongs
+  // to DFM scoring, which applies its own reconciled hemReturnFlangeLengthMin
+  // threshold to these real facts. Not yet read by any consumer.
+  bendFlangeRelationships?: Array<{
+    bendAFaceIds: number[];
+    bendBFaceIds: number[];
+    sharedFlangeFaceId: number;
+    flangeWidthMm: number | null;
+    foldRelativeOrientation: number | null;
+    recognitionStatus: 'recognized' | 'ambiguous';
+  }>;
   thinWebCount?: number;
   internalProfileCount?: number;
   // Nesting/material-utilization metrics (bounding rectangle of the TRUE
@@ -298,18 +326,29 @@ export class AutoFillService {
       `${physicsResult.cycleTimeMin.toFixed(2)} min (${physicsResult.source}, whole process incl. cut+pierce+deburr — not the final per-operation cycle time)`,
     );
 
-    // 3. Lookup material
-    const materialResult = await this.suggestMaterial(
-      rawGeometry, processSuggestion.processType, effectiveFamily.family ?? '', userId, accessToken, location,
-    );
-
-    // 4. Calculate weight (volume mm³ → cm³ × density g/cm³ → kg)
-    const density = materialResult?.density ?? 2.7; // default aluminium density
-    const weightKg = (rawGeometry.volume / 1000) * density / 1000;
-
+    // 3. Material is NOT suggested. The engineer chooses it.
+    //
+    // suggestMaterial() used to run here and it never read the CAD file at all:
+    // it queried raw_materials for anything with material_group ILIKE '%Ferrous%',
+    // took the first 10 by density, and returned the MEDIAN one. That is how
+    // "Generic CuZn39Pb3" -- a brass -- arrived on 1.5mm sheet-steel parts whose
+    // own drawing title block says SECC at 0.92 confidence. It was a guess
+    // presented as an extraction.
+    //
+    // 4. Weight is NOT computed either, because it cannot be.
+    //
+    // weight = volume x density, and density came from that same guessed row
+    // (falling back to a hardcoded 2.7 aluminium when even the guess failed).
+    // So the weight was arbitrary to exactly the degree the material was, while
+    // being labelled "Auto-extracted" in the UI. Volume, surface area and the
+    // bounding box are real measurements off the solid and are still returned;
+    // weight follows once a real material is chosen and its real density applies.
+    //
+    // 0 means "not known", and the client fills the field only for a positive
+    // value, so the box stays empty rather than showing a confident 0.0000 kg.
     const geometry: AutoFillGeometryDto = {
       ...rawGeometry,
-      weight: parseFloat(weightKg.toFixed(4)),
+      weight: 0,
     };
 
     // 5. MHR lookup
@@ -324,7 +363,10 @@ export class AutoFillService {
       geometry,
       mhrRate,
       lhrRate,
-      materialResult?.unitCost ?? null,
+      // No material chosen yet, so no material cost. The calculator already
+      // handles a null here; it never got one before because the guess above
+      // always produced some number.
+      null,
       accessToken,
     );
 
@@ -332,10 +374,12 @@ export class AutoFillService {
     const suggestions: AutoFillSuggestionsDto = {
       name: this.inferName(fileName),
       partNumber: this.generatePartNumber(fileName),
-      materialCategory: materialResult?.category ?? 'FERROUS_NON_FERROUS',
-      materialGrade: materialResult?.grade ?? '',
-      materialId: materialResult?.id ?? null,
-      density: materialResult?.density ?? null,
+      // The category selector's starting position, not a claim about this part.
+      materialCategory: 'FERROUS_NON_FERROUS',
+      // Empty on purpose — see step 3 above. The engineer picks the material.
+      materialGrade: '',
+      materialId: null,
+      density: null,
       processType: processSuggestion.processType,
       familyClassification: effectiveFamily.family,
       familyConfidence: effectiveFamily.confidence,
@@ -344,7 +388,9 @@ export class AutoFillService {
     };
 
     const costs: AutoFillCostsDto = {
-      materialCostPerKg: materialResult?.unitCost ?? null,
+      // null until a material is chosen — see step 3. Previously this reported
+      // the price of the arbitrarily-picked median-density row.
+      materialCostPerKg: null,
       mhrRate,
       lhrRate,
       estimatedCycleTimeMin: processSuggestion.estimatedCycleTimeMin,
@@ -353,7 +399,10 @@ export class AutoFillService {
     };
 
     // 9. Confidence
-    const confidence = this.calculateConfidence(cadEngineAvailable, !!materialResult, processSuggestion, !!costResult.estimatedUnitCost);
+    // materialResolved is false by construction now: no material is suggested,
+    // so the confidence score must not credit one. It counted a guessed row as a
+    // resolved material and inflated the score for every part.
+    const confidence = this.calculateConfidence(cadEngineAvailable, false, processSuggestion, !!costResult.estimatedUnitCost);
 
     // 10. Feature Graph (Phase 1: count-level summary + process recommendations)
     const featureGraph = this.buildFeatureGraph(rawGeometry, processSuggestion, effectiveFamily, cadResult);
@@ -441,22 +490,31 @@ export class AutoFillService {
     if (geo.flatPatternAreaMm2 > 0) signals.push('Flat pattern detected');
     if (geo.holeCount > 0) signals.push(`${geo.holeCount} holes detected`);
 
-    const processMap: Record<string, string[]> = {
-      'Sheet Metal Laser Cutting': ['Fiber Laser Cutting', 'CNC Press Brake', 'Deburring'],
-      'Sheet Metal Bending':       ['Fiber Laser Cutting', 'CNC Press Brake', 'Deburring'],
-      'Sheet Metal':               ['Fiber Laser Cutting', 'CNC Press Brake', 'Deburring'], // legacy safety net
-      'CNC Machining':             ['CNC Milling', 'Drilling', 'Deburring'],
-      'CNC Turning':               ['CNC Turning', 'Deburring'],
-      'Die Casting':               ['Die Casting', 'Deburring', 'Inspection'],
-      'Injection Moulding':        ['Injection Moulding', 'Inspection'],
-      'Injection Molding':         ['Injection Moulding', 'Inspection'],
-    };
-    const processes = processMap[proc.processType] ?? ['Manufacturing'];
-    const processRecommendations = processes.map((p, i) => ({
-      sequence: i + 1,
-      process: p,
-      status: i === 0 ? 'recommended' : 'optional',
-    }));
+    // No process route is recommended here, and none is invented.
+    //
+    // This used to be a hardcoded processMap: a coarse process-type string in,
+    // a fixed list of process names out. 'Sheet Metal Bending' always produced
+    // ['Fiber Laser Cutting', 'CNC Press Brake', 'Deburring'] regardless of what
+    // the CAD actually contained -- the same three steps for a flat blank with
+    // no bends as for a 12-bend chassis, and never the burring, tapping or
+    // inspection a real part might need. It was a generic sequence presented as
+    // a recommendation.
+    //
+    // It was also load-bearing in a way that made it worse than cosmetic: the
+    // list always contained 'CNC Press Brake', and cost-summary reads it
+    // (`routeHasBending`) to estimate 1 bend whenever CAD and the drawing both
+    // report zero. So a genuinely flat part was given a fabricated bend, sourced
+    // from a map that had never looked at it.
+    //
+    // The real authority already exists and is the one that quotes: the
+    // registered ManufacturingProcessEngine set, gated by real detected
+    // features and real machine capability, assembled by getRouteComparison and
+    // applied through apply-route. Emitting an empty list here means the Cost
+    // Guide shows no operations until that authority has actually run, which is
+    // exactly what its own Direct Process Costs panel already promises:
+    // "Operations and costs are computed from the applied scenario against the
+    // refreshed geometry -- never before it."
+    const processRecommendations: Array<{ sequence: number; process: string; status: string }> = [];
 
     // Phase 1 aggregate cost drivers — typed for formula routing in Phase 2
     type CostDriverType =
@@ -555,6 +613,10 @@ export class AutoFillService {
         acuteCornerCount:     geo.acuteCornerCount,
         smallHoleCount:       geo.smallHoleCount,
         extrudedFlangeCount:  geo.extrudedFlangeCount,
+        rolledFormCount:      geo.rolledFormCount,
+        formedFeatureCount:   geo.formedFeatureCount,
+        lanceCount:           geo.lanceCount,
+        bendFlangeRelationships: geo.bendFlangeRelationships,
         thinWebCount:         geo.thinWebCount,
         internalProfileCount: geo.internalProfileCount,
         // Injection-molded features — promoted from InjectionMoldedFeatureExtractor
@@ -1110,6 +1172,19 @@ export class AutoFillService {
       acuteCornerCount: smf?.acute_corner_count != null ? safe(smf.acute_corner_count, 0) : undefined,
       smallHoleCount: smf?.small_hole_count != null ? safe(smf.small_hole_count, 0) : undefined,
       extrudedFlangeCount: smf?.extruded_flange_count != null ? safe(smf.extruded_flange_count, 0) : undefined,
+      rolledFormCount: smf?.rolled_form_count != null ? safe(smf.rolled_form_count, 0) : undefined,
+      formedFeatureCount: smf?.formed_feature_count != null ? safe(smf.formed_feature_count, 0) : undefined,
+      lanceCount: smf?.lance_count != null ? safe(smf.lance_count, 0) : undefined,
+      bendFlangeRelationships: Array.isArray(smf?.bend_flange_relationships)
+        ? smf.bend_flange_relationships.map((r: any) => ({
+            bendAFaceIds: r.bend_a_face_ids ?? [],
+            bendBFaceIds: r.bend_b_face_ids ?? [],
+            sharedFlangeFaceId: r.shared_flange_face_id,
+            flangeWidthMm: r.flange_width_mm ?? null,
+            foldRelativeOrientation: r.fold_relative_orientation ?? null,
+            recognitionStatus: r.recognition_status,
+          }))
+        : undefined,
       thinWebCount: smf?.thin_web_count != null ? safe(smf.thin_web_count, 0) : undefined,
       internalProfileCount: smf?.internal_profile_count != null ? safe(smf.internal_profile_count, 0) : undefined,
       boundingRectMm2: smf?.flat_pattern_bounding_rect_mm2 ? safe(smf.flat_pattern_bounding_rect_mm2, 0) : undefined,
@@ -1486,78 +1561,6 @@ export class AutoFillService {
   // MATERIAL LOOKUP
   // ────────────────────────────────────────────────────────────────────────────
 
-  private async suggestMaterial(
-    geo: RawGeometry,
-    processType: string,
-    familyHint: string,
-    userId: string,
-    accessToken: string,
-    location?: string,
-  ): Promise<{ id: string; grade: string; density: number; unitCost: number; category: string } | null> {
-    try {
-      const client = this.supabaseService.getClient(accessToken);
-      const isPlastic = processType === 'Injection Molding';
-      const isCNCFamily = ['mill_turn', 'cnc_milled', 'cnc_turned'].includes(familyHint);
-
-      // Select the location-appropriate price column so India materials (cost_india)
-      // are not silently zeroed by reading the generic USD cost column.
-      // Matches LOCATION_INFO.materialCol in default-rates.ts.
-      const PRICE_COL: Record<string, string> = {
-        India: 'cost_india', USA: 'cost_usa', Germany: 'cost_germany',
-        France: 'cost_france', 'W. Europe': 'cost_europe', 'E. Europe': 'cost_e_europe',
-        UK: 'cost_uk', China: 'cost_china', Vietnam: 'cost_vietnam', Mexico: 'cost_mexico',
-      };
-      const priceCol = PRICE_COL[location ?? ''] ?? 'cost_india';
-
-      let query = client
-        .from('raw_materials')
-        .select(`id, material, material_grade, density, ${priceCol}, cost_india, material_group`)
-        .ilike('material_group', isPlastic ? '%Plastic%' : '%Ferrous%')
-        .not('density', 'is', null)
-        .order('density', { ascending: true })
-        .limit(10);
-
-      // CNC machined parts use bar/billet stock — exclude sheet/plate materials
-      // so the suggestion reflects what the machinist actually buys.
-      if (isCNCFamily) {
-        query = (query as any)
-          .not('material_grade', 'ilike', '%Sheet%')
-          .not('material_grade', 'ilike', '%Plate%')
-          .not('material', 'ilike', '%Sheet%')
-          .not('material', 'ilike', '%Plate%');
-      }
-
-      const { data, error } = await query;
-
-      if (error || !data?.length) return null;
-
-      // Filter to physically plausible densities (g/cm³), then take the median
-      const valid = data.filter((r: any) => {
-        const d = parseFloat(r.density);
-        return isFinite(d) && d >= (isPlastic ? 0.5 : 1.5) && d <= 22;
-      });
-      if (!valid.length) return null;
-      const sorted = [...valid].sort((a: any, b: any) => (a.density ?? 0) - (b.density ?? 0));
-      const best: any = sorted[Math.floor(sorted.length / 2)];
-
-      // Prefer location-specific column; fall back to cost_india, then generic cost
-      const locPrice = parseFloat((best as any)[priceCol]);
-      const unitCost = (isFinite(locPrice) && locPrice > 0)
-        ? locPrice
-        : (parseFloat((best as any).cost_india) || parseFloat((best as any).cost) || 0);
-      return {
-        id: best.id,
-        grade: best.material_grade ?? best.material ?? '',
-        density: parseFloat(best.density) || 2.7,
-        unitCost,
-        category: (best.material_group ?? '').toLowerCase().includes('plastic') ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS',
-      };
-    } catch (e) {
-      this.logger.warn(`Material lookup failed: ${e.message}`);
-      return null;
-    }
-  }
-
   // ────────────────────────────────────────────────────────────────────────────
   // MHR LOOKUP
   // ────────────────────────────────────────────────────────────────────────────
@@ -1769,6 +1772,10 @@ export class AutoFillService {
       acuteCornerCount: geo.acuteCornerCount,
       smallHoleCount: geo.smallHoleCount,
       extrudedFlangeCount: geo.extrudedFlangeCount,
+      rolledFormCount: geo.rolledFormCount,
+      formedFeatureCount: geo.formedFeatureCount,
+      lanceCount: geo.lanceCount,
+      bendFlangeRelationships: geo.bendFlangeRelationships,
       thinWebCount: geo.thinWebCount,
       internalProfileCount: geo.internalProfileCount,
       rapidTraverseSec: geo.rapidTraverseSec,

@@ -95,7 +95,7 @@ export function MachineSelector({
   // Root cause of the "$0.25/hr shows as $0/hr" bug: this was the only one of
   // 8 rate-display call sites in the app using maximumFractionDigits: 0 (a
   // 0-decimal rate display is lossy for any rate under $1) — every other real
-  // rate display in this codebase (ProcessCostDialog, DraftLineCard,
+  // rate display in this codebase (ProcessCostDialog,
   // DatabaseRecordPicker, MHRFormDialog, ManufacturingProcessSection) already
   // uses .toFixed(2), which is the actual established convention here. Match
   // it exactly rather than inventing a magnitude threshold.

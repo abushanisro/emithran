@@ -23,6 +23,8 @@ export type { EMithranTermsArgs, EMithranTermsResult } from './engine-kernel';
 // instead of inline math; computeCostSummary() below composes them exactly
 // as it composed the inline blocks before extraction.
 import { computePressBrakeCost } from '../../sheet-metal/process/press-brake-engine';
+import { shouldAddSeparatePressBrakeLine } from './engine-kernel';
+import { composeFeatureDrivenOperations, composeOperationSequence } from '../../sheet-metal/operation/feature-driven-operations';
 import { computeDeburringCost } from '../../sheet-metal/operation/deburring-engine';
 import { computeTappingCost } from '../../sheet-metal/operation/tapping-engine';
 import { computeHoleExtrusionCost } from '../../sheet-metal/operation/hole-extrusion-engine';
@@ -31,6 +33,7 @@ import { computeCountersinkingCost } from '../../sheet-metal/operation/countersi
 import { computeReamingCost } from '../../sheet-metal/operation/reaming-engine';
 import { computePemInsertionCost } from '../../sheet-metal/operation/pem-insertion-engine';
 import { computeLaserCuttingCost } from '../../sheet-metal/process/laser-cutting-engine';
+import { overlayRejectionReason, type PersistedCostCurrencyBasis } from './persisted-currency-contract';
 
 // P0.6 (Machine Economics, provenance-visibility phase) — mirrors MHRRateInput's
 // own `source` tiering, but for the labor-rate side (resolveLHRRates' 4-pass
@@ -41,7 +44,33 @@ import { computeLaserCuttingCost } from '../../sheet-metal/process/laser-cutting
 // benchmarked rows) — an explicit, approved override that takes precedence
 // over the location+process_group lhr_records/lhr_benchmark_rates lookup for
 // that specific machine's operations, per user decision 2026-08-27.
-export type LhrRateSource = 'lhr_database' | 'lhr_benchmark' | 'lhr_cross_location' | 'no_lhr_rate' | 'mhr_machine_specific';
+// 'wage_grade_bucket' — resolveWageGradeBucketRates (2026-09-03): average
+// real usd_lhr_total across all mhr_records rows (this location) sharing
+// this class's real, sourced wage_grade value (Sheet Metal: migration 643;
+// Injection Molding: migration 645). Used only when no specific machine
+// rate exists; sits above the process_group fallback below it in
+// precedence.
+export type LhrRateSource = 'lhr_database' | 'lhr_benchmark' | 'lhr_cross_location' | 'no_lhr_rate' | 'mhr_machine_specific' | 'wage_grade_bucket';
+
+/**
+ * The 3-tier labour-rate precedence (bom-items.service.ts's buildOutput,
+ * extracted for isolated unit testing): a specific machine's own real rate
+ * always wins; failing that, a real wage-grade bucket average (Sheet
+ * Metal/Injection Molding only, where real data exists); failing that, the
+ * process_group fallback. Never fabricates a rate — every tier is either a
+ * real resolved number or absent, and absence here means the caller has no
+ * rate for this class at all (source stays 'no_lhr_rate').
+ */
+export function resolveLabourRate(
+  perMachineLhr: number | null | undefined,
+  wageGradeBucketRate: number | null | undefined,
+  processGroupRate: { rate: number; source: LhrRateSource } | null | undefined,
+): { rate: number | null; source: LhrRateSource } {
+  if (perMachineLhr != null) return { rate: perMachineLhr, source: 'mhr_machine_specific' };
+  if (wageGradeBucketRate != null) return { rate: wageGradeBucketRate, source: 'wage_grade_bucket' };
+  if (processGroupRate != null) return { rate: processGroupRate.rate, source: processGroupRate.source };
+  return { rate: null, source: 'no_lhr_rate' };
+}
 
 export interface MHRRateInput {
   rate: number;
@@ -71,6 +100,15 @@ export interface MHRRateInput {
   // consumers (2026-09-02) since they have no per-operation setup-time
   // lookup table the way Sheet Metal classes do.
   setupTimeHr?: number | null;
+  /**
+   * The two components the canonical MHR is DEFINED as (migration 581:
+   * MHR = Direct Overhead + Indirect Overhead). Present so the benchmark
+   * override guard can recognise a rate that IS that canonical sum and
+   * therefore cannot be a mis-scaled import — see
+   * applyBenchmarkOverrideIfNeeded in bom-items.service.ts.
+   */
+  directOverheadRate?: number | null;
+  indirectOverheadRate?: number | null;
   // The selected machine's own MachineCandidate.laborRateUsdHr (raw, before
   // buildOutput applies precedence against the process-group lhrRates map) —
   // never read directly by cost-engine.ts; buildOutput folds it into the
@@ -141,7 +179,13 @@ export interface CostEngineInput {
   // falls back to that operation's own default-rates.ts constant — the
   // caller has already pushed a disclosed warning for any key it fell back
   // on (same convention as handlingTimeMin/toolSetupBrakeMin/samplingRate).
-  opSetupMinByOp?: Partial<Record<'tapping' | 'counterbore' | 'countersink' | 'pem_insertion' | 'burring' | 'ream', number>>;
+  /**
+   * Real per-operation setup minutes from sm_lookup_op_setup_time, or `null`
+   * for an operation with no row. Null, not 0 — resolveSetupMinutes treats 0 as
+   * "never populated" and falls through, and encoding the absence as a real
+   * quantity is what let a press line charge $0.00 setup.
+   */
+  opSetupMinByOp?: Partial<Record<'tapping' | 'counterbore' | 'countersink' | 'pem_insertion' | 'burring' | 'ream', number | null>>;
 
   // ── Calculator-evaluated cycle times (single source of truth) ─────────────
   // Manufacturing Physics Calculator architecture: resolved by the caller via
@@ -406,7 +450,14 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     nestingResult,
     handlingTimeMin = 0.25,
     toolSetupBrakeMin = 10,
-    samplingRate = 0.08,
+    // 0, not a sampling percentage. This defaulted to 0.08, so a caller that
+    // omitted it silently inspected 8% of every batch and multiplied that into
+    // the QA term of every process line. Sampling comes from
+    // sm_lookup_sampling_plan, which already returns { rate: 0, dataFound:
+    // false } when it has no row for a batch size — a real gap, disclosed, and
+    // costing nothing. Every operation engine already uses `?? 0` for the same
+    // reason; this was the one place that guessed instead.
+    samplingRate = 0,
     inspectionTimeMin = 0.5,
     opSetupMinByOp,
     directLaborRatePerHr,
@@ -520,72 +571,21 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
   processLines.push(...laserResult.processLines);
   const laserMin = laserResult.cuttingMin;
 
-  // ── Hole Extrusion (Burring) — feature-driven, runs before Press Brake AND
-  // Tapping ──────────────────────────────────────────────────────────────────
-  // Forms the extruded hole flange/collar (e.g. drawing callout "2X M3 BURLING
-  // BACK CONVEX") before the hole is threaded — physically required ordering.
-  // Also moved ahead of Press Brake/Deburring: the thread sits in the
-  // extruded collar, so the collar is formed and tapped while the part is
-  // still flat — tapping into an already-bent flange risks tool access/
-  // interference, and this sequencing also avoids handling an already-bent
-  // part through tapping.
-  //
-  // Manufacturing Physics Calculator architecture: cycle time comes from the
-  // real "Sheet Metal - Hole Extrusion (Burring)" DB calculator ONLY (real
-  // forming-force physics + sm_lookup_manual_stroke stroke-time lookup), via
-  // bom-items.service.ts's resolvePhysicsQuantity — `burringPhysicsGap`
-  // carries the real, structured reason when it can't resolve a value.
-  // Machine class is a generic 'hole_forming' (not hardcoded to a turret
-  // punch) — resolved through the same real mhr_records/benchmark pipeline
-  // as every other class, so it's driven by what a shop actually has on file.
-  const extrudedFlangeCount = input.extrudedFlangeCount ?? 0;
-  if (extrudedFlangeCount > 0 && opSetupMinByOp?.burring == null) {
-    warnings.push(`Hole extrusion (burring) setup time not on file — generic default applied (${BURRING_SETUP_MIN} min)`);
-  }
-  const holeFormingRate = input.mhrRates?.holeForming
-    ?? { rate: 0, source: 'no_db_rate' as const, machineClass: 'hole_forming', machineName: null, commodityCode: null };
-  const burringResult = computeHoleExtrusionCost({
-    extrudedFlangeCount, batchSize,
-    rate: holeFormingRate,
-    processIdentity: input.processIdentityByMachineClass?.[holeFormingRate.machineClass],
-    cycleTimeSecFromCalculator: input.burringCycleTimeSecFromCalculator,
-    fallbackSetupMin: opSetupMinByOp?.burring ?? BURRING_SETUP_MIN,
-    calculatorId: input.burringCalculatorId,
-    calculatorVersion: input.burringCalculatorVersion,
-    physicsGap: input.burringPhysicsGap,
-    confidence: input.burringConfidence,
+  // ── Feature-driven operations — the canonical composer ────────────────────
+  // Which secondary operations this part needs, and in what order, is decided
+  // in exactly one place now: composeFeatureDrivenOperations(). This function
+  // used to assemble all nine inline while getRouteComparison() independently
+  // assembled four of them, so the same part had two different operation
+  // sequences and two different totals depending on which path you looked at.
+  // The engines, their gating on real feature counts, and every formula are
+  // unchanged — only the ownership of the composition moved.
+  const featureDriven = composeFeatureDrivenOperations(input, {
     dlrPerHr, qairPerHr, inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
     netMatCost, netWeightKg, scrapPricePerKg,
   });
-  warnings.push(...burringResult.warnings);
-  processLines.push(...burringResult.processLines);
-
-  // ── Tapping ───────────────────────────────────────────────────────────────
-  // Manufacturing Physics Calculator architecture: cycle time comes from the
-  // real "Machining - Tapping" DB calculator ONLY (physics_key='tapping' —
-  // dispatches to the exact same computeTapPhysics() rigid-tapping physics
-  // the interactive popup uses), via bom-items.service.ts's
-  // resolveTappingCycleTimeSec/resolvePhysicsQuantity. No second, independent
-  // formula here anymore: when the calculator can't resolve a value (no
-  // calculator registered for machine class 'tapping'), `tappingPhysicsGap`
-  // carries the real, structured reason and this line is still emitted
-  // (never silently omitted) with cycleTimeMin 0 and that gap attached.
-  const tappingResult = computeTappingCost({
-    threadCount: threads.length, batchSize,
-    rate: tappingRate,
-    processIdentity: input.processIdentityByMachineClass?.[tappingRate.machineClass],
-    cycleTimeSecFromCalculator: input.tappingCycleTimeSecFromCalculator,
-    fallbackSetupMin: opSetupMinByOp?.tapping ?? TAPPING_SETUP_MIN,
-    calculatorId: input.tappingCalculatorId,
-    calculatorVersion: input.tappingCalculatorVersion,
-    physicsGap: input.tappingPhysicsGap,
-    confidence: input.tappingConfidence,
-    dlrPerHr, qairPerHr, inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
-    netMatCost, netWeightKg, scrapPricePerKg,
-  });
-  warnings.push(...tappingResult.warnings);
-  processLines.push(...tappingResult.processLines);
-  const tappingMin = tappingResult.cycleTimeMin;
+  warnings.push(...featureDriven.warnings);
+  const tappingMin = featureDriven.cycleMinutes.tappingMin;
+  const deburrMin = featureDriven.cycleMinutes.deburrMin;
 
   // ── Press brake ───────────────────────────────────────────────────────────
   // Manufacturing Physics Calculator architecture: cycle time and setup time
@@ -615,183 +615,20 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     netMatCost, netWeightKg, scrapPricePerKg,
   });
   warnings.push(...pressBrakeResult.warnings);
-  processLines.push(...pressBrakeResult.processLines);
+  // NOT pushed here — it is the route's core forming step and is placed into
+  // the sequence below, so pushing it here too would double-charge bending.
   const pressBrakeMin = pressBrakeResult.cycleTimeMin;
 
-  // ── Deburring ─────────────────────────────────────────────────────────────
-  // Manufacturing Physics Calculator architecture: cycle time comes from the
-  // real "Sheet Metal - Deburring" DB calculator ONLY (physics_key='deburring'
-  // — dispatches to the exact same computeDeburrCycleSec() the interactive
-  // popup uses), via bom-items.service.ts's resolvePhysicsQuantity. No
-  // second, independent formula here anymore: when the calculator can't
-  // resolve a value, `deburrPhysicsGap` carries the real, structured reason
-  // and this line is still emitted with cycleTimeMin 0 and that gap attached.
-  // Deburr has its own real, differentiated 'Deburr' process-group LHR rate
-  // (lhr_benchmark_rates — e.g. a BLS-cited "Manual Deburr Operator" figure),
-  // distinct from and typically lower than the generic 'Sheet Metal' rate
-  // every other process used to fall back to — passed through as this
-  // engine's own dlrPerHr fallback exactly as before.
-  const deburrResult = computeDeburringCost({
-    cutLengthMm,
-    rate: deburrRate,
-    processIdentity: input.processIdentityByMachineClass?.[deburrRate.machineClass],
-    cycleTimeSecFromCalculator: input.deburrCycleTimeSecFromCalculator,
-    calculatorId: input.deburrCalculatorId,
-    calculatorVersion: input.deburrCalculatorVersion,
-    physicsGap: input.deburrPhysicsGap,
-    confidence: input.deburrConfidence,
-    dlrPerHr, qairPerHr, inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
-    netMatCost, netWeightKg, scrapPricePerKg,
-  });
-  warnings.push(...deburrResult.warnings);
-  processLines.push(...deburrResult.processLines);
-  const deburrMin = deburrResult.cycleTimeMin;
+  // The route's core operations with the feature-driven ones placed around
+  // them — the one canonical final operation sequence. Sheet metal's primary
+  // quote path always bends on a press brake, so it is always the core forming
+  // step here; a forming route (which bends in-process) passes none.
+  processLines.push(...composeOperationSequence({
+    coreCutting: [],
+    coreForming: pressBrakeResult.processLines,
+    featureDriven,
+  }));
 
-  // ── Counterboring (feature-driven: only present when the extractor found a
-  // counterbore hole — see SheetMetalFeatureExtractorService) ────────────────
-  const drillPressRate = input.mhrRates?.drillPress
-    ?? { rate: 0, source: 'no_db_rate' as const, machineClass: 'drill_press', machineName: null, commodityCode: null };
-  // Manufacturing Physics Calculator architecture: cycle time comes from the
-  // real "Sheet Metal - Counterboring" DB calculator ONLY (real rigid-
-  // drilling physics — RPM from cutting speed/diameter, machining time from
-  // feed rate), via bom-items.service.ts's resolveHoleOperationCycleTimeSec.
-  // No second, independent formula and no sm_lookup_counterbore dependency
-  // here anymore — `counterborePhysicsGap` carries the real, structured
-  // reason when the calculator can't resolve a value.
-  const counterboreCount = input.counterboreCount ?? 0;
-  if (counterboreCount > 0 && opSetupMinByOp?.counterbore == null) {
-    warnings.push(`Counterboring setup time not on file — generic default applied (${COUNTERBORE_SETUP_MIN} min)`);
-  }
-  const counterboreResult = computeCounterboringCost({
-    counterboreCount, batchSize,
-    rate: drillPressRate,
-    processIdentity: input.processIdentityByMachineClass?.[drillPressRate.machineClass],
-    cycleTimeSecFromCalculator: input.counterboreCycleTimeSecFromCalculator,
-    fallbackSetupMin: opSetupMinByOp?.counterbore ?? COUNTERBORE_SETUP_MIN,
-    calculatorId: input.counterboreCalculatorId,
-    calculatorVersion: input.counterboreCalculatorVersion,
-    physicsGap: input.counterborePhysicsGap,
-    confidence: input.counterboreConfidence,
-    dlrPerHr, qairPerHr, inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
-    netMatCost, netWeightKg, scrapPricePerKg,
-  });
-  warnings.push(...counterboreResult.warnings);
-  processLines.push(...counterboreResult.processLines);
-
-  // ── Countersinking (feature-driven) ───────────────────────────────────────
-  // Same architecture as Counterboring above — real "Sheet Metal -
-  // Countersinking" DB calculator, 25%-of-drill-speed design rule baked into
-  // the resolver, real cone geometry for depth. No sm_lookup_countersink
-  // dependency here anymore.
-  const countersinkCount = input.countersinkCount ?? 0;
-  if (countersinkCount > 0 && opSetupMinByOp?.countersink == null) {
-    warnings.push(`Countersinking setup time not on file — generic default applied (${COUNTERSINK_SETUP_MIN} min)`);
-  }
-  const countersinkResult = computeCountersinkingCost({
-    countersinkCount, batchSize,
-    rate: drillPressRate,
-    processIdentity: input.processIdentityByMachineClass?.[drillPressRate.machineClass],
-    cycleTimeSecFromCalculator: input.countersinkCycleTimeSecFromCalculator,
-    fallbackSetupMin: opSetupMinByOp?.countersink ?? COUNTERSINK_SETUP_MIN,
-    calculatorId: input.countersinkCalculatorId,
-    calculatorVersion: input.countersinkCalculatorVersion,
-    physicsGap: input.countersinkPhysicsGap,
-    confidence: input.countersinkConfidence,
-    dlrPerHr, qairPerHr, inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
-    netMatCost, netWeightKg, scrapPricePerKg,
-  });
-  warnings.push(...countersinkResult.warnings);
-  processLines.push(...countersinkResult.processLines);
-
-  // ── PEM Insertion (feature-driven: hole diameter + sheet thickness matched
-  // against sm_lookup_pem_hardware by the caller — recognition, not geometry) ──
-  // Manufacturing Physics Calculator architecture: cycle time comes from the
-  // real "Sheet Metal - PEM Insertion" DB calculator ONLY, via
-  // resolvePhysicsQuantity — `pemPhysicsGap` carries the real, structured
-  // reason when it can't resolve a value (never a missing-hardware-match,
-  // which is a recognition result, not a gap — see the caller's own comment).
-  const pemCount = input.pemCount ?? 0;
-  if (pemCount > 0 && opSetupMinByOp?.pem_insertion == null) {
-    warnings.push(`PEM insertion setup time not on file — generic default applied (${PEM_INSERTION_SETUP_MIN} min)`);
-  }
-  const pemRate = input.mhrRates?.pemPress
-    ?? { rate: 0, source: 'no_db_rate' as const, machineClass: 'pem_press', machineName: null, commodityCode: null };
-  const pemResult = computePemInsertionCost({
-    pemCount, batchSize,
-    rate: pemRate,
-    processIdentity: input.processIdentityByMachineClass?.[pemRate.machineClass],
-    cycleTimeSecFromCalculator: input.pemCycleTimeSecFromCalculator,
-    fallbackSetupMin: opSetupMinByOp?.pem_insertion ?? PEM_INSERTION_SETUP_MIN,
-    calculatorId: input.pemCalculatorId,
-    calculatorVersion: input.pemCalculatorVersion,
-    physicsGap: input.pemPhysicsGap,
-    confidence: input.pemConfidence,
-    dlrPerHr, qairPerHr, inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
-    netMatCost, netWeightKg, scrapPricePerKg,
-  });
-  warnings.push(...pemResult.warnings);
-  processLines.push(...pemResult.processLines);
-
-  // ── Drill + Ream + CMM Inspection (tight-tolerance holes) ─────────────────
-  // Additive secondary op: the laser/punch still pierces every hole (unchanged
-  // above); reaming brings a pierced hole to final tolerance when the drawing's
-  // tightest callout can't be held by piercing alone. Part-level approximation
-  // (see CostEngineInput.tightestToleranceMm doc) — applies to all holes on the
-  // part, not just the specific toleranced one, until per-feature GD&T linkage exists.
-  //
-  // Manufacturing Physics Calculator architecture: cycle time comes from the
-  // real "Machining - Reaming" DB calculator ONLY (real rigid-reaming
-  // physics — RPM from cutting speed/diameter, machining time from feed
-  // rate, using real HSS reaming speed/feed data — see default-rates.ts's
-  // REAM_SURFACE_SPEED_M_MIN_BY_MATERIAL for citations), via
-  // bom-items.service.ts's resolvePhysicsQuantity. No flat per-hole
-  // constant here anymore — `reamPhysicsGap` carries the real, structured
-  // reason when the calculator can't resolve a value.
-  const tightTolerance = input.tightestToleranceMm ?? null;
-  const allHoleCount = input.holeCount ?? 0;
-  const reamTriggered = tightTolerance != null && tightTolerance > 0
-    && tightTolerance < TIGHT_TOLERANCE_REAM_THRESHOLD_MM && allHoleCount > 0;
-  if (reamTriggered && opSetupMinByOp?.ream == null) {
-    warnings.push(`Reaming setup time not on file — generic default applied (${REAM_SETUP_MIN} min)`);
-  }
-  const reamResult = computeReamingCost({
-    reamHoleCount: reamTriggered ? allHoleCount : 0,
-    tightestToleranceMm: tightTolerance,
-    batchSize,
-    rate: drillPressRate,
-    processIdentity: input.processIdentityByMachineClass?.[drillPressRate.machineClass],
-    cycleTimeSecFromCalculator: input.reamCycleTimeSecFromCalculator,
-    fallbackSetupMin: opSetupMinByOp?.ream ?? REAM_SETUP_MIN,
-    calculatorId: input.reamCalculatorId,
-    calculatorVersion: input.reamCalculatorVersion,
-    physicsGap: input.reamPhysicsGap,
-    confidence: input.reamConfidence,
-    dlrPerHr, qairPerHr, inspTimeMin: inspectionTimeMin, samplingRate, yieldPct,
-    netMatCost, netWeightKg, scrapPricePerKg,
-  });
-  warnings.push(...reamResult.warnings);
-  processLines.push(...reamResult.processLines);
-
-  // ── Inspection (general-purpose, tiered — see costing/inspection-engine.ts) ─
-  // Fully resolved by the caller before this function runs (see
-  // CostEngineInput.inspectionResult's own doc comment) — this engine just
-  // consumes the real processLines/warnings, never computes inspection
-  // physics itself.
-  if (input.inspectionResult) {
-    processLines.push(...input.inspectionResult.processLines);
-    warnings.push(...input.inspectionResult.warnings);
-  }
-
-  // ── Surface treatment ─────────────────────────────────────────────────────
-  const stLine = computeSurfaceTreatmentLine(
-    input.surfaceTreatment ?? null,
-    input.surfaceAreaMm2 ?? 0,
-    batchSize,
-    location ?? '__default__',
-    warnings,
-    input.surfaceTreatmentDbRate,
-  );
-  if (stLine) processLines.push(stLine);
 
   const totalProcessCost = processLines.reduce((s, l) => s + l.totalCost, 0);
   const totalCost = materialCost + totalProcessCost;
@@ -878,30 +715,251 @@ export interface AppliedProcessCostRecord {
   setup_cost_per_part: number;
   total_cycle_cost_per_part: number;
   total_cost_per_part: number;
+  // Added for complete-generation authority. Optional because
+  // applyPersistedRouteToSummary itself never reads them -- only
+  // selectAppliedGeneration does, and it treats a missing value as
+  // "cannot establish", which fails closed.
+  op_nbr?: number | null;
+  currency?: string | null;
+  cost_currency_basis?: PersistedCostCurrencyBasis | null;
+  batch_size?: number | string | null;
+  location?: string | null;
+  notes?: string | null;
+  /**
+   * Costed-operation provenance (migration 718). Optional because every row
+   * written before it is NULL here, and a reader must degrade to the legacy
+   * interpretation rather than treat absence as a value.
+   *
+   * line_hourly_rate exists because direct_rate does not have one meaning in
+   * this table: across live active rows it is variously machine + labour
+   * (Face milling 2600 + 36.21 = 2636.21), the machine rate alone (Laser Cut
+   * 19.227545 against a machine_rate of 19.00), or neither (Inspect, 0 beside a
+   * real 46.67 labour rate). ProcessLineCost.hourlyRate is unambiguously the
+   * MACHINE rate -- eMithranTerms takes mhrPerHr and dlrPerHr separately -- so
+   * a column that means exactly that had to be added rather than elected.
+   */
+  line_hourly_rate?: number | string | null;
+  line_labour_rate?: number | string | null;
+  engine_version?: string | null;
+  setup_time_source?: ProcessLineCost['setupTimeSource'] | null;
 }
 
-const APPLIED_CUTTING_CLASSES = ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet'];
-const APPLIED_PROCESS_LABEL_FOR_CLASS: Record<string, string> = {
-  fiber_laser: 'Laser Cutting',
-  co2_laser: 'Laser Cutting',
-  turret_punch: 'Turret Punching',
-  waterjet: 'Waterjet Cutting',
-  press_brake: 'Press Brake',
-};
-const APPLIED_CUTTING_LABELS = ['Laser Cutting', 'Turret Punching', 'Waterjet Cutting'];
+/* ────────────────────────────────────────────────────────────────────────────
+ * Applied-generation authority
+ *
+ * An applied route is a COMPLETE costing snapshot. Before this, the Cost Guide
+ * overlaid only the operations whose machine_class appeared in
+ * getRouteCoreProcessClasses() -- 17 cutting/forming classes plus press_brake --
+ * and recomputed every secondary operation (deburring, PEM, inspection) live on
+ * each request.
+ *
+ * Measured on a real applied route (item 83e8d472, sm-standard-press):
+ *
+ *   op10 standard_press  persisted 0.283693  live 0.283693   overlaid
+ *   op20 deburring       persisted 0.300000  live 0.300000   recomputed
+ *   op30 pem_press       persisted 0.240000  live 0.240000   recomputed
+ *   op40 cmm             persisted 0.210000  live 0.390000   recomputed  <-- 0.18
+ *                                            ----------------------------------
+ *   persisted total 1.033693   Cost Guide total 1.213693   delta 0.180000
+ *
+ * The whole delta was one operation: the persisted CMM row captured
+ * machine_rate = 0, while the engine later resolved an existing $40/hr USA
+ * inspection-bench benchmark. Cycle time was identical in both (16.2 s), so
+ * 16.2/3600 x 40 = 0.18 exactly.
+ *
+ * Two operations agreed by luck, which is what made the mixture dangerous: it
+ * looked correct until any input behind a secondary operation moved. A quote
+ * cannot be part snapshot and part live recompute.
+ *
+ * So the generation is now authoritative in full, and a rate that resolves
+ * differently later does NOT change an applied quote. Re-apply is the explicit
+ * refresh.
+ * ──────────────────────────────────────────────────────────────────────────── */
 
-function buildLineFromAppliedRecord(row: AppliedProcessCostRecord): ProcessLineCost {
+export interface AppliedGenerationContext {
+  /** Currency the summary was computed in -- the factory local currency. */
+  summaryCurrency: string;
+  /** Batch size the current request resolved. */
+  resolvedBatchSize: number;
+  /** Location the current request resolved. */
+  resolvedLocation: string;
+}
+
+export type AppliedGenerationVerdict =
+  | { usable: true; rows: AppliedProcessCostRecord[]; tag: string }
+  | { usable: false; reason: string };
+
+/**
+ * The notes tag applyRoute / applyCustomRoute stamps on every row it writes.
+ * A row without one was not produced by applying a route -- it is a manually
+ * created record, and a set of those is not a route snapshot.
+ */
+const appliedRouteTag = (notes: string | null | undefined): string | null =>
+  typeof notes === 'string' && /^auto_fill_from_(custom_)?route:/.test(notes) ? notes : null;
+
+const numOrNull = (v: number | string | null | undefined): number | null => {
+  if (v === null || v === undefined) return null;
+  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n : null;
+};
+
+/**
+ * Decide whether the active rows form one applied-route generation that may be
+ * treated as authoritative, or nothing at all.
+ *
+ * Deliberately all-or-nothing. Returning a partial set would reintroduce the
+ * hybrid persisted/live cost model this exists to remove, so anything
+ * unestablished makes the whole generation unusable and the caller keeps the
+ * live summary -- one coherent answer either way, with a reason that can be
+ * surfaced.
+ */
+export function selectAppliedGeneration(
+  rows: readonly AppliedProcessCostRecord[],
+  ctx: AppliedGenerationContext,
+): AppliedGenerationVerdict {
+  if (rows.length === 0) return { usable: false, reason: 'no active process cost records' };
+
+  // 1. One applied-route generation, and nothing else mixed in. This is what
+  //    stops an unrelated manually created row from being treated as a route
+  //    snapshot -- and manual rows are the majority of this table.
+  const tags = rows.map((r) => appliedRouteTag(r.notes));
+  const manual = tags.filter((t) => t === null).length;
+  if (manual > 0) {
+    return {
+      usable: false,
+      reason: `${manual} of ${rows.length} active operations were not written by applying a route ` +
+        `(no auto_fill_from_route tag) -- not a route snapshot`,
+    };
+  }
+  const distinctTags = [...new Set(tags as string[])];
+  if (distinctTags.length > 1) {
+    return { usable: false, reason: `active rows span ${distinctTags.length} generations: ${distinctTags.join(', ')}` };
+  }
+
+  // 2. Complete: every operation must carry the cost the engine charged. A NULL
+  //    means the operation was never costed (apply-custom-route persists those
+  //    deliberately), and a snapshot missing a price is not a quote.
+  const uncosted = rows.filter((r) => numOrNull(r.total_cost_per_part) === null);
+  if (uncosted.length > 0) {
+    return {
+      usable: false,
+      reason: `${uncosted.length} of ${rows.length} operations have no persisted cost ` +
+        `(${uncosted.map((r) => r.machine_class).join(', ')})`,
+    };
+  }
+
+  // 3. The snapshot must describe the scenario being asked about. Cost per part
+  //    is a function of batch size, so a snapshot taken at another batch answers
+  //    a different question -- showing it would be as wrong as recomputing it.
+  const batches = [...new Set(rows.map((r) => numOrNull(r.batch_size)))];
+  if (batches.length > 1) {
+    return { usable: false, reason: `rows disagree on batch size (${batches.join(', ')})` };
+  }
+  if (batches[0] === null) {
+    return { usable: false, reason: 'snapshot records no batch size' };
+  }
+  if (batches[0] !== ctx.resolvedBatchSize) {
+    return {
+      usable: false,
+      reason: `snapshot was costed at batch ${batches[0]}, this request resolves batch ${ctx.resolvedBatchSize}`,
+    };
+  }
+
+  const locations = [...new Set(rows.map((r) => r.location ?? null))];
+  if (locations.length > 1) {
+    return { usable: false, reason: `rows disagree on location (${locations.join(', ')})` };
+  }
+  if (locations[0] !== ctx.resolvedLocation) {
+    return {
+      usable: false,
+      reason: `snapshot location ${locations[0] ?? 'null'} differs from the requested ${ctx.resolvedLocation}`,
+    };
+  }
+
+  // 4. Currency, unchanged from the P1b-iv-a contract but now all-or-nothing:
+  //    the summary is in one denomination and a snapshot in another cannot be
+  //    mixed into it. Nothing is converted here.
+  for (const r of rows) {
+    const rejection = overlayRejectionReason(
+      { currency: r.currency ?? null, cost_currency_basis: r.cost_currency_basis ?? null },
+      ctx.summaryCurrency,
+    );
+    if (rejection) {
+      return { usable: false, reason: `op${r.op_nbr ?? '?'} (${r.machine_class}): ${rejection}` };
+    }
+  }
+
+  const ordered = [...rows].sort((a, b) => (numOrNull(a.op_nbr) ?? 0) - (numOrNull(b.op_nbr) ?? 0));
+  return { usable: true, rows: ordered, tag: distinctTags[0] };
+}
+
+// Which machine class performs the route's core process is answered by the
+// MANUFACTURING_PROCESS_REGISTRY, not by a list maintained here. This used to be
+// a hardcoded allowlist of four classes —
+//   ['fiber_laser', 'co2_laser', 'turret_punch', 'waterjet']
+// — plus a parallel list of their display labels. Sixteen route classes are
+// registered, so twelve of them (every press, every roll bending, plasma,
+// oxyfuel, shear, laser punch, router) were silently excluded: applying one of
+// those routes left this summary still describing the laser default it had
+// replaced. Confirmed live: a part with Standard Press applied still reported
+// Laser Cutting + Press Brake from this path.
+//
+// The caller passes the registry's own set, and lines are matched by
+// machineClass — an exact key the engine already puts on every line — so a
+// newly registered process is covered with no edit here.
+
+function buildLineFromAppliedRecord(
+  row: AppliedProcessCostRecord,
+  processLabelForClass: Readonly<Record<string, string>>,
+): ProcessLineCost {
   return {
-    process: APPLIED_PROCESS_LABEL_FOR_CLASS[row.machine_class] ?? row.machine_class,
+    // The engine registered for this machine class names the process — the same
+    // string that engine puts on its own line, so an applied row and a computed
+    // one read identically. Replaces a hardcoded four-class label map. The
+    // persisted catalog fields are the fallback only: process_route is the
+    // route GROUP for some families ("Bending/Floating /Forming"), not a
+    // process name, so it cannot be the primary source.
+    process: processLabelForClass[row.machine_class] ?? row.process_route ?? row.operation ?? row.machine_class,
     processGroup: row.process_group ?? undefined,
     processRoute: row.process_route ?? undefined,
     operation: row.operation ?? undefined,
-    setupCost: r2(Number(row.setup_cost_per_part ?? 0)),
-    runCost: r2(Number(row.total_cycle_cost_per_part ?? 0)),
-    totalCost: r2(Number(row.total_cost_per_part ?? 0)),
+    // Read back at full precision, NOT r2. These are per-PART costs, and on a
+    // high-volume part they are legitimately sub-cent: the real SECC part
+    // measured here costs 0.00023952 for Laser Cutting and 0.00035928 for Press
+    // Brake. r2 rounds both to 0.00, so the Cost Guide showed the two overlaid
+    // operations as free even once the columns were being written — the second
+    // half of the same defect, and invisible until the round trip was tested.
+    //
+    // The engine does not round these on its own lines (route comparison
+    // reports 0.00023952383...), so rounding them here is what broke
+    // persisted-equals-engine. Money is formatted for display by the UI, which
+    // already applies the currency contract; this layer must not pre-round.
+    setupCost: Number(row.setup_cost_per_part ?? 0),
+    runCost: Number(row.total_cycle_cost_per_part ?? 0),
+    totalCost: Number(row.total_cost_per_part ?? 0),
     cycleTimeMin: Number(row.cycle_time ?? 0) / 60,
     setupTimeMin: Number(row.setup_time ?? 0),
-    hourlyRate: r2(Number(row.direct_rate ?? 0)),
+    // ProcessLineCost.hourlyRate is the MACHINE hour rate: eMithranTerms takes
+    // mhrPerHr and dlrPerHr as two separate arguments, and every engine sets
+    // hourlyRate from MHRRateInput.rate with labourRate carried beside it.
+    //
+    // This read direct_rate, which on a newly applied row is machine + labour.
+    // Measured on live row fce24614 (3 Roll Bending, Faccin HCU 300 X 1): the
+    // engine costed at the machine rate of 15.85/hr, and the applied line
+    // reported direct_rate 62.52 -- the same operation showing a 3.9x higher
+    // rate purely because a route had been applied.
+    //
+    // direct_rate cannot simply be swapped for machine_rate, because it holds
+    // three different conventions across historical producers (see
+    // AppliedProcessCostRecord.line_hourly_rate). So migration 718 added a
+    // column that means one thing, and only rows that carry it are read the new
+    // way. A legacy row reads exactly as it did before -- unchanged, not
+    // silently reinterpreted with a meaning its producer never intended.
+    hourlyRate: row.line_hourly_rate != null
+      ? Number(row.line_hourly_rate)
+      : r2(Number(row.direct_rate ?? 0)),
+    labourRate: row.line_labour_rate != null ? Number(row.line_labour_rate) : undefined,
+    setupTimeSource: row.setup_time_source ?? undefined,
     rateSource: row.mhr_id ? 'mhr_database' : 'default_rate',
     machineClass: row.machine_class,
     machineName: row.machine_name ?? null,
@@ -909,46 +967,119 @@ function buildLineFromAppliedRecord(row: AppliedProcessCostRecord): ProcessLineC
   };
 }
 
+/**
+ * One operation whose persisted cost no longer matches what the engine would
+ * charge for it now.
+ */
+export interface AppliedGenerationDrift {
+  machineClass: string;
+  process: string;
+  persistedTotalCost: number;
+  liveTotalCost: number;
+}
+
+/**
+ * Compare an authoritative generation against what the engine currently
+ * computes, so a stale snapshot can be DISCLOSED rather than silently trusted.
+ *
+ * WHY THIS IS NECESSARY, NOT DECORATION
+ *
+ * A persisted row records its inputs (batch, location, rates, machine linkage)
+ * but nothing about the engine/rate state it was resolved under. Item 83e8d472
+ * showed what that costs: its CMM row was written with machine_rate = 0 and no
+ * machine link, because at that moment nothing resolved an inspection resource.
+ * The engine now resolves an existing $40/hr bench (bm-mhr-251) that has been
+ * on file since 2026-07-22, and a fresh apply persists it correctly -- verified
+ * behaviourally. So the row is simply old.
+ *
+ * Both possible silent behaviours are wrong:
+ *   recompute it live  -> an applied quote changes because a rate resolved
+ *                         differently, which is not a quote.
+ *   freeze it silently -> the quote keeps a number nobody can tell is stale.
+ *
+ * So the snapshot stays authoritative -- a rate change must never move an
+ * applied quote -- and the divergence is surfaced instead, with re-apply as the
+ * explicit refresh.
+ *
+ * Comparison is on totalCost, the only quantity that answers the question a
+ * user cares about ("would re-applying change this number?"). Tolerance is
+ * relative, because per-part costs are legitimately sub-cent.
+ */
+export function detectAppliedGenerationDrift(
+  appliedRows: readonly AppliedProcessCostRecord[],
+  liveLines: readonly ProcessLineCost[],
+  processLabelForClass: Readonly<Record<string, string>>,
+): AppliedGenerationDrift[] {
+  const drift: AppliedGenerationDrift[] = [];
+  for (const row of appliedRows) {
+    const live = liveLines.find((l) => l.machineClass === row.machine_class);
+    if (!live) continue; // the engine no longer composes this operation at all
+    const persisted = Number(row.total_cost_per_part ?? 0);
+    const current = Number(live.totalCost ?? 0);
+    const tolerance = Math.max(1e-9, Math.abs(persisted) * 0.01);
+    if (Math.abs(current - persisted) > tolerance) {
+      drift.push({
+        machineClass: row.machine_class,
+        process: processLabelForClass[row.machine_class] ?? row.operation ?? row.machine_class,
+        persistedTotalCost: persisted,
+        liveTotalCost: current,
+      });
+    }
+  }
+  return drift;
+}
+
 export function applyPersistedRouteToSummary(
   summary: CostSummaryDto,
+  /**
+   * The authoritative applied generation, already validated by
+   * selectAppliedGeneration. Every row becomes a process line; nothing is
+   * merged with a live value.
+   */
   appliedRows: AppliedProcessCostRecord[],
+  /** Each registered engine's own process label, keyed by machine class. */
+  processLabelForClass: Readonly<Record<string, string>>,
 ): CostSummaryDto {
-  const cuttingRow = appliedRows.find((r) => APPLIED_CUTTING_CLASSES.includes(r.machine_class));
-  const pbRow = appliedRows.find((r) => r.machine_class === 'press_brake');
-  if (!cuttingRow && !pbRow) return summary;
+  if (appliedRows.length === 0) return summary;
 
-  const processLines = [...summary.processLines];
-  let laserMin = summary.cycleTimes.laserMin;
-  let pressBrakeMin = summary.cycleTimes.pressBrakeMin;
-  let extraCuttingMin = 0; // cycleTimes has no turret/waterjet slot — folded into totalMin only
+  // The generation IS the operation list. Previously this replaced at most two
+  // lines -- the core cutting row and press_brake -- and left every other line
+  // as the engine had just computed it, which is what produced a Cost Guide
+  // total 0.18 above its own persisted generation. There is no allowlist here
+  // any more and no class-based matching: whatever was persisted is what the
+  // quote contains.
+  //
+  // Nothing is calculated. buildLineFromAppliedRecord maps stored columns onto
+  // the line 1:1 -- no rate x time, no setup re-amortisation.
+  const processLines = appliedRows.map((r) => buildLineFromAppliedRecord(r, processLabelForClass));
 
-  if (cuttingRow) {
-    const appliedLine = buildLineFromAppliedRecord(cuttingRow);
-    const idx = processLines.findIndex((l) => APPLIED_CUTTING_LABELS.includes(l.process));
-    if (idx >= 0) processLines[idx] = appliedLine; else processLines.push(appliedLine);
-    const isLaser = cuttingRow.machine_class === 'fiber_laser' || cuttingRow.machine_class === 'co2_laser';
-    laserMin = isLaser ? appliedLine.cycleTimeMin : 0;
-    extraCuttingMin = isLaser ? 0 : appliedLine.cycleTimeMin;
-  }
+  // A forming route that bends in-process simply has no press_brake row in its
+  // generation, so the rule that used to strip that line is now expressed by
+  // the data instead of re-derived here.
+  const minutesFor = (pred: (cls: string) => boolean): number =>
+    processLines.filter((l) => pred(l.machineClass)).reduce((s, l) => s + l.cycleTimeMin, 0);
 
-  if (pbRow) {
-    const appliedLine = buildLineFromAppliedRecord(pbRow);
-    const idx = processLines.findIndex((l) => l.process === 'Press Brake');
-    if (idx >= 0) processLines[idx] = appliedLine; else processLines.push(appliedLine);
-    pressBrakeMin = appliedLine.cycleTimeMin;
-  }
-
-  const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
+  // Unrounded, for the same reason the per-line costs are: these are per-PART
+  // totals, and r2 turns a real sub-cent quote into 0.00. Display rounding is
+  // the UI currency contract's job.
+  //
+  // cycleTimes.totalMin keeps its r2 — that is minutes, a different quantity
+  // with its own documented rounding contract (see r2/r3 above).
+  const totalProcessCost = processLines.reduce((s, l) => s + l.totalCost, 0);
   return {
     ...summary,
     processLines,
     totalProcessCost,
-    totalCost: r2(summary.materialCost + totalProcessCost),
+    totalCost: summary.materialCost + totalProcessCost,
     cycleTimes: {
       ...summary.cycleTimes,
-      laserMin,
-      pressBrakeMin,
-      totalMin: r2(laserMin + pressBrakeMin + summary.cycleTimes.tappingMin + summary.cycleTimes.deburrMin + extraCuttingMin),
+      // Derived from the same authoritative rows, so the time summary can no
+      // longer describe a different set of operations than the cost summary.
+      laserMin: minutesFor((c) => c === 'fiber_laser' || c === 'co2_laser'),
+      pressBrakeMin: minutesFor((c) => c === 'press_brake'),
+      tappingMin: minutesFor((c) => c === 'tapping'),
+      deburrMin: minutesFor((c) => c === 'deburring'),
+      totalMin: r2(processLines.reduce((s, l) => s + l.cycleTimeMin, 0)),
     },
   };
 }

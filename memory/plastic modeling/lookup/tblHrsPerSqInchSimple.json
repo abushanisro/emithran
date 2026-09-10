@@ -1,0 +1,21 @@
+{
+  "name": "tblHrsPerSqInchSimple",
+  "sourceFilePath": "lookupTables/Component/tblHrsPerSqInchSimple.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Hrs Per Sq Inch Simple (hr)",
+    "Surface Area Simple (in^2)"
+  ],
+  "records": [
+    { "Hrs Per Sq Inch Simple (hr)": 0.0460, "Surface Area Simple (in^2)": 99999999.00 },
+    { "Hrs Per Sq Inch Simple (hr)": 0.0480, "Surface Area Simple (in^2)": 3500.00 },
+    { "Hrs Per Sq Inch Simple (hr)": 0.0480, "Surface Area Simple (in^2)": 5000.00 },
+    { "Hrs Per Sq Inch Simple (hr)": 0.0540, "Surface Area Simple (in^2)": 3000.00 },
+    { "Hrs Per Sq Inch Simple (hr)": 0.0600, "Surface Area Simple (in^2)": 2500.00 },
+    { "Hrs Per Sq Inch Simple (hr)": 0.0660, "Surface Area Simple (in^2)": 1500.00 },
+    { "Hrs Per Sq Inch Simple (hr)": 0.0780, "Surface Area Simple (in^2)": 1000.00 },
+    { "Hrs Per Sq Inch Simple (hr)": 0.1020, "Surface Area Simple (in^2)": 500.00 },
+    { "Hrs Per Sq Inch Simple (hr)": 0.1260, "Surface Area Simple (in^2)": 250.00 },
+    { "Hrs Per Sq Inch Simple (hr)": 0.1500, "Surface Area Simple (in^2)": 100.00 }
+  ]
+}

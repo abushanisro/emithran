@@ -1,0 +1,24 @@
+{
+  "name": "partHandlingTimes",
+  "sourceFilePath": "lookupTables/Component/partHandlingTimes.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Part Handling Time (s)",
+    "Box Length (mm)",
+    "Box Width (mm)"
+  ],
+  "records": [
+    { "Part Handling Time (s)": 10.00, "Box Length (mm)": 179.60, "Box Width (mm)": 179.60 },
+    { "Part Handling Time (s)": 12.00, "Box Length (mm)": 304.80, "Box Width (mm)": 179.60 },
+    { "Part Handling Time (s)": 15.00, "Box Length (mm)": 304.80, "Box Width (mm)": 304.80 },
+    { "Part Handling Time (s)": 20.00, "Box Length (mm)": 914.40, "Box Width (mm)": 304.80 },
+    { "Part Handling Time (s)": 25.00, "Box Length (mm)": 914.40, "Box Width (mm)": 914.40 },
+    { "Part Handling Time (s)": 40.00, "Box Length (mm)": 1828.80, "Box Width (mm)": 609.60 },
+    { "Part Handling Time (s)": 50.00, "Box Length (mm)": 1828.80, "Box Width (mm)": 1828.80 },
+    { "Part Handling Time (s)": 70.00, "Box Length (mm)": 4572.00, "Box Width (mm)": 914.40 },
+    { "Part Handling Time (s)": 80.00, "Box Length (mm)": 4572.00, "Box Width (mm)": 1828.80 },
+    { "Part Handling Time (s)": 210.00, "Box Length (mm)": 15240.00, "Box Width (mm)": 1828.80 },
+    { "Part Handling Time (s)": 240.00, "Box Length (mm)": 30480.00, "Box Width (mm)": 1828.80 },
+    { "Part Handling Time (s)": 300.00, "Box Length (mm)": 999999999.00, "Box Width (mm)": 999999999.00 }
+  ]
+}

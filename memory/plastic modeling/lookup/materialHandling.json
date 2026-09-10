@@ -1,0 +1,18 @@
+{
+  "name": "materialHandling",
+  "sourceFilePath": "lookupTables/Component/materialHandling.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Handling Time (s)",
+    "Weight (kg)"
+  ],
+  "records": [
+    { "Handling Time (s)": 5.00, "Weight (kg)": 0.45 },
+    { "Handling Time (s)": 5.00, "Weight (kg)": 4.55 },
+    { "Handling Time (s)": 15.00, "Weight (kg)": 22.73 },
+    { "Handling Time (s)": 20.00, "Weight (kg)": 45.45 },
+    { "Handling Time (s)": 23.00, "Weight (kg)": 113.64 },
+    { "Handling Time (s)": 27.00, "Weight (kg)": 227.27 },
+    { "Handling Time (s)": 30.00, "Weight (kg)": 454.55 }
+  ]
+}

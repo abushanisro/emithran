@@ -63,3 +63,72 @@ describe('computePressBrakeCost — Platform Architecture Remediation Phase 1 (e
     expect(line.machineClass).toBe('press_brake');
   });
 });
+
+// ── Setup-time tiering (2026-09-05) ───────────────────────────────────────────
+// Press brake is the only sheet-metal engine with a part-specific calculator
+// tier, and the only one whose calculator output is already per-piece — its
+// real stored formula is "Tool Loading Time / Lot Size" (calculators/009),
+// labelled "Setup Time (min/piece)". Everything here pins that asymmetry,
+// because getting it wrong charges a whole batch's setup on every single part.
+describe('computePressBrakeCost — real setup-time tiering', () => {
+  it('treats the calculator value as PER PIECE and does not amortise it again', () => {
+    const perPiece = 0.5;
+    const result = computePressBrakeCost(baseInput({
+      batchSize: 10, setupTimeMinFromCalculator: perPiece, rate: { ...realRate, labourRate: 20 },
+    }));
+    // setupCost = (mhr/60 + dlr/60 * operators) * setupTimeMinPerPiece
+    const expected = (40 / 60 + 20 / 60 * 1) * perPiece;
+    expect(result.processLines[0]!.setupCost).toBeCloseTo(Math.round(expected * 100) / 100, 5);
+  });
+
+  it('reports the un-amortised batch setup on the line, recovered from the per-piece value', () => {
+    // 0.5 min/piece over a lot of 10 IS 5 minutes of real tool loading — that
+    // is what apply-route must persist, not the per-piece figure.
+    const line = computePressBrakeCost(baseInput({
+      batchSize: 10, setupTimeMinFromCalculator: 0.5,
+    })).processLines[0]!;
+    expect(line.setupTimeMin).toBeCloseTo(5, 5);
+    expect(line.setupTimeSource).toBe('calculator');
+  });
+
+  it('uses the selected machine own setup_time_hr when the calculator produced none', () => {
+    const line = computePressBrakeCost(baseInput({
+      batchSize: 10,
+      setupTimeMinFromCalculator: undefined,
+      rate: { ...realRate, setupTimeHr: 0.75 },   // the real Heller value: 45 min
+      operationSetupMin: 30,
+      fallbackSetupMin: 20,
+    })).processLines[0]!;
+    expect(line.setupTimeMin).toBeCloseTo(45, 5);
+    expect(line.setupTimeSource).toBe('machine');
+  });
+
+  it('falls to the real per-operation lookup before the class constant', () => {
+    const line = computePressBrakeCost(baseInput({
+      setupTimeMinFromCalculator: undefined, operationSetupMin: 30, fallbackSetupMin: 20,
+    })).processLines[0]!;
+    expect(line.setupTimeMin).toBeCloseTo(30, 5);
+    expect(line.setupTimeSource).toBe('operation_lookup');
+  });
+
+  it('falls to the class constant last, and discloses that it did', () => {
+    const result = computePressBrakeCost(baseInput({
+      setupTimeMinFromCalculator: undefined, operationSetupMin: null, fallbackSetupMin: 20,
+    }));
+    expect(result.processLines[0]!.setupTimeMin).toBeCloseTo(20, 5);
+    expect(result.processLines[0]!.setupTimeSource).toBe('class_default');
+    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
+  });
+
+  it('lets two press brakes with different real setup times cost differently', () => {
+    const cheap = computePressBrakeCost(baseInput({
+      setupTimeMinFromCalculator: undefined, rate: { ...realRate, setupTimeHr: 0.25 },
+    })).processLines[0]!;
+    const slow = computePressBrakeCost(baseInput({
+      setupTimeMinFromCalculator: undefined, rate: { ...realRate, setupTimeHr: 0.75 },
+    })).processLines[0]!;
+    expect(cheap.setupTimeMin).toBeCloseTo(15, 5);
+    expect(slow.setupTimeMin).toBeCloseTo(45, 5);
+    expect(slow.setupCost).toBeGreaterThan(cheap.setupCost);
+  });
+});

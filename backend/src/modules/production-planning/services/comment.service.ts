@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '@/common/supabase/supabase.service';
 import { 
   CreateCommentDto, 
@@ -9,6 +9,8 @@ import {
 
 @Injectable()
 export class CommentService {
+  private readonly logger = new Logger(CommentService.name);
+
   constructor(private readonly supabaseService: SupabaseService) {}
 
   /**
@@ -42,7 +44,7 @@ export class CommentService {
         .single();
 
       if (error) {
-        console.error('Database error creating comment:', error);
+        this.logger.error('Database error creating comment:', error);
         throw new BadRequestException('Failed to create comment');
       }
 
@@ -85,7 +87,7 @@ export class CommentService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('Database error fetching comments:', error);
+        this.logger.error('Database error fetching comments:', error);
         throw new BadRequestException('Failed to fetch comments');
       }
 
@@ -135,7 +137,7 @@ export class CommentService {
         .single();
 
       if (error) {
-        console.error('Database error updating comment:', error);
+        this.logger.error('Database error updating comment:', error);
         throw new BadRequestException('Failed to update comment');
       }
 
@@ -177,7 +179,7 @@ export class CommentService {
         .eq('created_by', userId);
 
       if (error) {
-        console.error('Database error deleting comment:', error);
+        this.logger.error('Database error deleting comment:', error);
         throw new BadRequestException('Failed to delete comment');
       }
 
@@ -209,7 +211,7 @@ export class CommentService {
       .eq('remark_id', remarkId);
 
     if (error) {
-      console.error('Error getting comments count:', error);
+      this.logger.error('Error getting comments count:', error);
       return 0;
     }
 

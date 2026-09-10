@@ -14,7 +14,8 @@ export interface BOMItem {
   description?: string;
   itemType: 'assembly' | 'sub_assembly' | 'child_part';
   quantity: number;
-  annualVolume: number;
+  /** Parts per year, or `null` when genuinely not on file (see migration 705). */
+  annualVolume: number | null;
   unit?: string;
   material?: string;
   materialGrade?: string;
@@ -59,6 +60,13 @@ export interface BOMItem {
   // A present key wins over the CAD-extracted value for that input in every
   // costing calculation; absent/cleared falls through to the real CAD value.
   scenarioOverrides?: Record<string, unknown>;
+  /**
+   * The costing inputs this item resolves to from its own persisted scenario,
+   * echoed on the (fast) item fetch so the scenario panel does not have to wait
+   * on the slow cost-summary call to know its own effective Batch Size and
+   * Production Life.
+   */
+  resolvedCostingInputs?: ResolvedCostingInputs;
   // Phase 1 sheet metal extracted fields
   sheetThicknessMm?: number;
   cutLengthMm?: number;
@@ -95,6 +103,28 @@ export interface MaterialCandidate {
   processCompatibility: Array<{ process: string; suitability: string }>;
 }
 
+export interface MaterialDensityResult {
+  density_g_cm3: number | null;
+  material_name: string | null;
+  material_grade: string | null;
+}
+
+// Real material_density_lookup / raw_materials density, keyed by the part's
+// own material grade (or material name as a fallback) — same endpoint
+// BOMItemDialog.tsx already calls ad-hoc (apiClient.get, no shared hook) to
+// auto-fill weight from volume. Extracted as a reusable hook so read-only
+// consumers (e.g. manufacturing-intelligence's mass estimate) get the same
+// real, sourced density instead of a hardcoded material-agnostic default.
+export function useMaterialDensity(grade: string | null | undefined) {
+  return useQuery({
+    queryKey: ['material-density', grade ?? null],
+    queryFn: () => apiClient.get<MaterialDensityResult>(`/bom-items/material-density?grade=${encodeURIComponent(grade as string)}`),
+    enabled: useAuthEnabledWith(!!grade?.trim()),
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+  });
+}
+
 export function useMaterialIntelligence(itemId: string | undefined) {
   return useQuery({
     queryKey: ['material-intelligence', itemId],
@@ -112,7 +142,8 @@ export interface CreateBOMItemDto {
   description?: string | undefined;
   itemType: 'assembly' | 'sub_assembly' | 'child_part';
   quantity: number;
-  annualVolume: number;
+  /** Optional: omit when nobody has stated the volume. Never send a stand-in. */
+  annualVolume?: number | undefined;
   unit?: string | undefined;
   material?: string | undefined;
   materialCategory?: string | undefined;
@@ -252,6 +283,17 @@ export function useCreateBOMItem() {
 // Extracted (not inlined) so the invalidation set — the entire behavior this
 // bug is about — is directly testable without rendering the hook.
 export function invalidateBOMItemUpdateQueries(queryClient: QueryClient, data: BOMItem): void {
+  // Seed the detail cache from the response BEFORE invalidating, so anything
+  // reading the item re-renders on the new values immediately instead of after
+  // a refetch round trip. The PUT already returns the complete, freshly
+  // resolved item -- including resolvedCostingInputs -- so this is the same
+  // data the refetch would fetch, not an optimistic guess that could be wrong.
+  //
+  // Why it matters: the Cost Guide derives Batch Size from annual volume
+  // server-side, so an Annual Volume edit could not visibly move Batch Size
+  // until the item came back. The invalidate below still runs, so a stale or
+  // partial payload self-corrects on the refetch.
+  queryClient.setQueryData(bomItemKeys.detail(data.id), data);
   queryClient.invalidateQueries({ queryKey: bomItemKeys.list(data.bomId) });
   queryClient.invalidateQueries({ queryKey: bomItemKeys.detail(data.id) });
   queryClient.invalidateQueries({ queryKey: ['bom-items', data.id, 'cost-summary'] });
@@ -627,6 +669,17 @@ export interface ProcessLineCost {
   runCost: number;
   totalCost: number;
   cycleTimeMin: number;
+  /** Real un-amortised setup minutes for one batch (backend resolveSetupMinutes). */
+  setupTimeMin?: number;
+  /**
+   * Which real source that setup time came from — 'machine' is the selected
+   * machine's own mhr_records.setup_time_hr, 'operation_lookup' a real
+   * sm_lookup_op_setup_time row, 'class_default' the cited per-class constant.
+   * Disclosed so the UI never shows a class default as a measured machine spec.
+   */
+  setupTimeSource?: 'machine' | 'operation_lookup' | 'class_default';
+  /** Real per-machine operator headcount this line was costed with. */
+  operators?: number | null;
   hourlyRate: number;
   rateSource: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override';
   machineClass: string;
@@ -752,6 +805,8 @@ export interface CostSummaryDto {
     totalMin: number;
   };
   batchSize: number;
+  /** Every costing input this result was computed at, with provenance. */
+  resolvedInputs: ResolvedCostingInputs;
   family: string;
   setupCount?: number;
   materialRemoval?: {
@@ -828,9 +883,59 @@ export interface BlankSpecDto {
   confidence?: ConfidenceLevel;
 }
 
-export function useCostSummary(itemId: string | undefined, batchSize: number = 1, location = 'USA') {
+
+/**
+ * Query string for the costing endpoints. `batchSize` is omitted entirely when
+ * not stated, so the server resolves it from the persisted scenario rather than
+ * receiving a number this layer invented.
+ */
+function costingQuery(batchSize: number | undefined, location: string): string {
+  const params = new URLSearchParams({ location });
+  if (batchSize !== undefined) params.set('batchSize', String(batchSize));
+  return params.toString();
+}
+
+/**
+ * The cost-summary cache key and URL, defined once.
+ *
+ * Callers that reach for `queryClient` directly (prefetching after an Apply,
+ * reading the live cache instead of a closure-captured result) previously built
+ * both by hand. Four such copies existed; they had to be edited in lockstep with
+ * this hook, and a copy that disagreed silently read or wrote a different cache
+ * slot than the one the UI renders from.
+ */
+export function costSummaryQueryKey(
+  itemId: string | undefined,
+  batchSize: number | undefined,
+  location: string,
+) {
+  return ['bom-items', itemId, 'cost-summary', batchSize, location] as const;
+}
+
+export function costSummaryUrl(
+  itemId: string,
+  batchSize: number | undefined,
+  location: string,
+): string {
+  return `/bom-items/${itemId}/cost-summary?${costingQuery(batchSize, location)}`;
+}
+
+/**
+ * `batchSize` is the batch to REQUEST, and `undefined` is a real value here: it
+ * means "do not state one — price this against the batch size already persisted
+ * on the item's scenario". The server then resolves request -> scenario override
+ * -> its single canonical default and echoes the answer back in
+ * `resolvedInputs`. Passing a number instead is an explicit override for this
+ * one call.
+ *
+ * A default of 1 used to sit on this parameter. It was not reachable in
+ * practice (every caller passed something) but it was a second place a costing
+ * default lived, and the Cost Guide's own useState(250) was a third. There is
+ * now exactly one, on the server.
+ */
+export function useCostSummary(itemId: string | undefined, batchSize: number | undefined, location = 'USA') {
   return useQuery({
-    queryKey: ['bom-items', itemId, 'cost-summary', batchSize, location],
+    queryKey: costSummaryQueryKey(itemId, batchSize, location),
     queryFn: () =>
       // On a true-shape-nest cache miss, the backend evaluates EVERY viable
       // standard sheet size (up to 5) via real, synchronous cad-engine
@@ -841,22 +946,28 @@ export function useCostSummary(itemId: string | undefined, batchSize: number = 1
       // must cover the cumulative worst case across all candidates, not
       // just one. Once cached, subsequent requests return quickly.
       apiClient.get<CostSummaryDto>(
-        `/bom-items/${itemId}/cost-summary?batchSize=${batchSize}&location=${encodeURIComponent(location)}`,
+        costSummaryUrl(itemId ?? '', batchSize, location),
         { timeout: 180000 },
       ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
-    // MHR/LHR rates and process-mapping data this summary depends on are edited
-    // out-of-band (HR Rates page, Calculators/Process admin, direct migrations)
-    // at any time, with no realtime push to an already-open tab. Once this exact
-    // (itemId, batchSize, location) key was ever fetched during the current page
-    // session, staleTime elapsing alone never re-fetches it without some trigger —
-    // and this manufacturing-intelligence page keeps its cost panel mounted for
-    // the whole session, so a rate fixed elsewhere can look permanently "still
-    // broken" here even though the server is already correct (same root cause as
-    // the identical fix on useMHRRecords in useMHR.ts). Force a fresh fetch on
-    // every mount instead so "Recalculate Cost" isn't the only way to see it.
-    refetchOnMount: 'always',
+    // NOT refetchOnMount: 'always'.
+    //
+    // That was set so a rate edited out-of-band (HR Rates page, Calculators
+    // admin, a migration) could not look permanently "still broken" in an
+    // already-open tab. The cost it imposed was far larger than the problem it
+    // solved: this is a documented 14-40s computation on a true-shape-nest cache
+    // miss, and every remount paid it — so switching to the Cost tab, or back to
+    // it, re-ran the whole quote and sat on "Calculating cost..." each time.
+    //
+    // staleTime above already refetches once the data is 5 minutes old, which
+    // covers the out-of-band edit case on any normal navigation. For the case it
+    // was really aimed at — a tab left open across an edit — the page has an
+    // explicit "Recalculate Cost" action, and every mutation that can change
+    // this result already invalidates the key by prefix
+    // (invalidateBOMItemUpdateQueries). Forcing a full recompute on every mount
+    // on top of all three was redundant.
+    refetchOnMount: false,
   });
 }
 
@@ -951,15 +1062,51 @@ export interface RouteCapability {
   warnings: string[];
 }
 
+export interface RouteDataGap {
+  process: string;
+  machineClass: string;
+  reason: string;
+}
+
 export interface RouteResultDto {
   routeId: RouteId;
   routeLabel: string;
+  // 'cutting' routes (Laser/Turret/Waterjet/Shear/Plasma/OxyFuel/Router) are
+  // mutually-exclusive alternatives for the same cut+bend+deburr+inspect
+  // chain; 'forming' routes (Standard/Tandem/Progressive-Die Press, Roll
+  // Bending) are complete, structurally different single-process
+  // alternatives with no separate Press Brake/Deburr step. A picker that
+  // lets the user choose ONE cutting method must filter to 'cutting'.
+  processFamily: 'cutting' | 'forming';
+  // Real, database-driven tooling-economics note — only set for the 2
+  // forming classes with a sourced sm_reference_data annual-volume
+  // threshold (progressive_die_press / tandem_press). null for every other
+  // route, including when the part's own annual volume isn't set.
+  toolingVolumeNote: string | null;
   processLines: ProcessLineCost[];
   materialCost: number;
   abrasiveCost: number;
   totalProcessCost: number;
   totalCost: number;
   isFeasible: boolean;       // false when the machine cannot physically produce this part — mirrors backend route-comparison.dto.ts
+  /**
+   * False when this route's process has no blank-generation operation in the
+   * catalog taxonomy (today only 2/3/4 Roll Bending) — it is priced over a
+   * smaller scope of work than the routes beside it, so it is never
+   * recommended or badged, but stays visible and manually selectable. Unset on
+   * CNC/injection-molding routes, which have no blanking concept: read
+   * undefined as "no evidence against this route".
+   */
+  producesBlank?: boolean;
+  /**
+   * False when an operation on this route has no real costing data on file, so
+   * its price is an artefact of absent data rather than an economic result.
+   * Distinct from isFeasible (physical capability). Such a route stays visible
+   * with its warnings, but is never badged or auto-selected as the optimum.
+   */
+  dataComplete: boolean;
+  /** The specific missing-data reasons behind dataComplete: false. */
+  dataGaps: RouteDataGap[];
   cycleTimes: {
     cuttingMin: number;
     pressBrakeMin: number;
@@ -977,9 +1124,61 @@ export interface RouteResultDto {
   routeComplexityScore?: number;
 }
 
+/**
+ * Where a resolved costing input actually came from. Mirrors the backend's
+ * CostingInputSource (costing/shared/physics/costing-inputs.ts) — returned by
+ * the API rather than inferred here, so a real persisted figure can be told
+ * apart from a fallback without probing for sentinel values.
+ */
+export type CostingInputSource =
+  | 'request'
+  | 'scenario_override'
+  | 'item_column'
+  /** Computed from another real input on this item (batch size from annual volume). */
+  | 'derived'
+  | 'default'
+  | 'absent';
+
+/**
+ * The costing inputs a response was actually computed at. This is the seed for
+ * the UI's own scenario state: taking these instead of keeping a second copy
+ * with its own default is what stops the screen and the engine disagreeing
+ * about which batch size a number belongs to.
+ */
+export interface ResolvedCostingInputs {
+  batchSize: number;
+  location: string | null;
+  /** null when no real annual volume is on file — never a fabricated figure. */
+  annualVolume: number | null;
+  productionLifeYears: number;
+  /**
+   * What this item's annual volume implies for batch size, whether or not it
+   * won. Disclosure only — read it to explain why `batchSize` differs, never
+   * as the value to price against, and never re-derive it here (the
+   * batches-per-year policy lives only in the backend resolver).
+   */
+  derivedBatchSize: number | null;
+  provenance: {
+    batchSize: CostingInputSource;
+    location: CostingInputSource;
+    annualVolume: CostingInputSource;
+    productionLifeYears: CostingInputSource;
+  };
+}
+
 export interface RouteComparisonDto {
   bomItemId: string;
   batchSize: number;
+  /** Every costing input this comparison was computed at, with provenance. */
+  resolvedInputs: ResolvedCostingInputs;
+  /**
+   * The route the backend recommends: cheapest among candidates that are both
+   * physically capable and fully costed. `null` when none qualifies — treat that
+   * as "no recommendation", never as a reason to pick something.
+   *
+   * Automatic routing applies this. Manual routing ignores it.
+   */
+  recommendedRouteId: string | null;
   materialCost: number;
   materialGrade: string;
   grossWeightKg: number;
@@ -993,22 +1192,23 @@ export interface RouteComparisonDto {
   usdToDisplayRate?: number;
 }
 
-export function useRouteComparison(itemId: string | undefined, batchSize: number = 1, location = 'USA') {
+/** `batchSize` semantics are identical to useCostSummary above. */
+export function useRouteComparison(itemId: string | undefined, batchSize: number | undefined, location = 'USA') {
   return useQuery({
     queryKey: ["bom-items", itemId, "route-comparison", batchSize, location],
     queryFn: () =>
       // Observed taking 8-18s in practice — same timeout fix as useCostSummary above.
       apiClient.get<RouteComparisonDto>(
-        `/bom-items/${itemId}/route-comparison?batchSize=${batchSize}&location=${encodeURIComponent(location)}`,
+        `/bom-items/${itemId}/route-comparison?${costingQuery(batchSize, location)}`,
         { timeout: 60000 },
       ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
-    // Same staleness class as useCostSummary above — force a fresh fetch every
-    // mount so an MHR/mapping change made out-of-band is never masked by a
-    // result cached from earlier in the same page session.
-    refetchOnMount: 'always',
+    // Same reasoning as useCostSummary above: staleTime, prefix invalidation on
+    // every relevant mutation, and the explicit Recalculate action already cover
+    // out-of-band edits. This is an 8-18s call; remounting should not re-run it.
+    refetchOnMount: false,
   });
 }
 
@@ -1037,16 +1237,17 @@ export interface CandidateRouteComparisonDto {
   candidates: CandidateRouteDto[];
 }
 
+/** `batchSize` semantics are identical to useCostSummary above. */
 export function useCandidateRoutes(
   itemId: string | undefined,
-  batchSize: number = 1,
+  batchSize: number | undefined,
   location = 'USA',
 ) {
   return useQuery({
     queryKey: ['bom-items', itemId, 'candidate-routes', batchSize, location],
     queryFn: () =>
       apiClient.get<CandidateRouteComparisonDto>(
-        `/bom-items/${itemId}/candidate-routes?batchSize=${batchSize}&location=${encodeURIComponent(location)}`,
+        `/bom-items/${itemId}/candidate-routes?${costingQuery(batchSize, location)}`,
       ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,

@@ -442,7 +442,20 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
           onDragOver={e   => handleDragOver(e, item)}
           onDragLeave={handleDragLeave}
           onDrop={e       => handleDrop(e, item)}
-          onClick={e      => { if (isDragging) { e.preventDefault(); e.stopPropagation(); } }}
+          onClick={e      => {
+            if (isDragging) { e.preventDefault(); e.stopPropagation(); return; }
+            // Clicking the card opens Manufacturing Intelligence -- the same
+            // destination as the Cpu button in the action row.
+            //
+            // Anything inside an explicit control keeps its own meaning, so the
+            // check is on the control rather than on each handler: every action
+            // in this card (2D, 3D, Intelligence, Add, Edit, Delete, expand) is
+            // a real <button>, and the thumbnail stops its own click. Excluding
+            // by role here means a control added later is covered without
+            // having to remember to stop propagation in it.
+            if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="button"]')) return;
+            onViewItem?.(item, 'intelligence');
+          }}
           className={[
             'rounded-md border bg-card text-card-foreground shadow-sm border-l-4 transition-all duration-200 relative',
             getBorderColor(item.itemType, depth),
@@ -520,7 +533,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                       {item.bomLevel || getDefaultBomLevel(item.itemType)}
                     </Badge>
                   </div>
-                  <div><span className="text-muted-foreground">Volume: </span><span className="font-medium">{item.annualVolume.toLocaleString()}</span></div>
+                  <div><span className="text-muted-foreground">Volume: </span><span className="font-medium">{item.annualVolume?.toLocaleString() ?? '—'}</span></div>
                   <div><span className="text-muted-foreground">Type: </span><span className="font-medium">{item.makeBuy === 'buy' ? 'Buy' : 'Make'}</span></div>
 
                   <div className="col-span-2 sm:col-span-3 lg:col-span-2">

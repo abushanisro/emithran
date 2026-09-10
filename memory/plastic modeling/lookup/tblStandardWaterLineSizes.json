@@ -1,0 +1,14 @@
+{
+  "name": "tblStandardWaterLineSizes",
+  "sourceFilePath": "lookupTables/Component/tblStandardWaterLineSizes.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Water Line Diameter (mm)"
+  ],
+  "records": [
+    { "Water Line Diameter (mm)": 6.00 },
+    { "Water Line Diameter (mm)": 8.00 },
+    { "Water Line Diameter (mm)": 10.00 },
+    { "Water Line Diameter (mm)": 12.00 }
+  ]
+}

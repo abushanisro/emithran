@@ -1,0 +1,195 @@
+{
+  "name": "layoutNumCav",
+  "file_path": "lookupTables/Component/layoutNumCav.csv",
+  "columns": [
+    "Cavities Length Wise",
+    "Cavities Width Wise",
+    "Coefficient Runner Region Width",
+    "Number of Cavities",
+    "Layout Balance"
+  ],
+  "records": [
+    {
+      "cavities_length_wise": 1.0,
+      "cavities_width_wise": 1.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 1,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 1.0,
+      "cavities_width_wise": 2.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 2,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 1.0,
+      "cavities_width_wise": 4.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 4,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 1.0,
+      "cavities_width_wise": 8.0,
+      "coefficient_runner_region_width": 2.0,
+      "number_of_cavities": 8,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 2.0,
+      "cavities_width_wise": 1.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 2,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 2.0,
+      "cavities_width_wise": 2.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 4,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 2.0,
+      "cavities_width_wise": 4.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 8,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 2.0,
+      "cavities_width_wise": 8.0,
+      "coefficient_runner_region_width": 2.0,
+      "number_of_cavities": 16,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 2.0,
+      "cavities_width_wise": 16.0,
+      "coefficient_runner_region_width": 3.0,
+      "number_of_cavities": 32,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 2.0,
+      "cavities_width_wise": 32.0,
+      "coefficient_runner_region_width": 4.0,
+      "number_of_cavities": 64,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 4.0,
+      "cavities_width_wise": 1.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 4,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 4.0,
+      "cavities_width_wise": 2.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 8,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 4.0,
+      "cavities_width_wise": 4.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 16,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 4.0,
+      "cavities_width_wise": 8.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 32,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 4.0,
+      "cavities_width_wise": 16.0,
+      "coefficient_runner_region_width": 3.0,
+      "number_of_cavities": 64,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 4.0,
+      "cavities_width_wise": 32.0,
+      "coefficient_runner_region_width": 4.0,
+      "number_of_cavities": 128,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 8.0,
+      "cavities_width_wise": 1.0,
+      "coefficient_runner_region_width": 2.0,
+      "number_of_cavities": 8,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 8.0,
+      "cavities_width_wise": 2.0,
+      "coefficient_runner_region_width": 2.0,
+      "number_of_cavities": 16,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 8.0,
+      "cavities_width_wise": 4.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 32,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 8.0,
+      "cavities_width_wise": 8.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 64,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 8.0,
+      "cavities_width_wise": 16.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 128,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 16.0,
+      "cavities_width_wise": 2.0,
+      "coefficient_runner_region_width": 3.0,
+      "number_of_cavities": 32,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 16.0,
+      "cavities_width_wise": 4.0,
+      "coefficient_runner_region_width": 3.0,
+      "number_of_cavities": 64,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 16.0,
+      "cavities_width_wise": 8.0,
+      "coefficient_runner_region_width": 1.0,
+      "number_of_cavities": 128,
+      "layout_balance": "natural"
+    },
+    {
+      "cavities_length_wise": 32.0,
+      "cavities_width_wise": 2.0,
+      "coefficient_runner_region_width": 4.0,
+      "number_of_cavities": 64,
+      "layout_balance": "artificial"
+    },
+    {
+      "cavities_length_wise": 32.0,
+      "cavities_width_wise": 4.0,
+      "coefficient_runner_region_width": 4.0,
+      "number_of_cavities": 128,
+      "layout_balance": "artificial"
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-import { X, Download, FileText, Maximize2, Upload, Loader2, Box, Cpu } from 'lucide-react';
+import { X, Download, FileText, Maximize2, Upload, Loader2, Box } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
@@ -13,7 +13,6 @@ import { apiConfig } from '@/lib/api/config';
 import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import dynamic from 'next/dynamic';
-import ManufacturingIntelligenceView from './ManufacturingIntelligenceView';
 
 const DXFViewerComponent = dynamic(
   () => import('@/components/ui/dxf-viewer-component').then((m) => m.DXFViewerComponent),
@@ -24,12 +23,10 @@ interface BOMItemDetailPanelProps {
   item: BOMItem | null;
   onClose: () => void;
   onUpdate?: () => void;
-  preferredView?: '2d' | '3d' | 'intelligence';
-  projectId?: string;
-  bomId?: string;
+  preferredView?: '2d' | '3d';
 }
 
-export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3d', projectId, bomId }: BOMItemDetailPanelProps) {
+export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3d' }: BOMItemDetailPanelProps) {
   const [file2dUrl, setFile2dUrl] = useState<string | null>(null);
   const [file3dUrl, setFile3dUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,7 +34,7 @@ export function BOMItemDetailPanel({ item, onClose, onUpdate, preferredView = '3
   const [imageView, setImageView] = useState<'fit' | 'full'>('fit');
   const [selectedFile2d, setSelectedFile2d] = useState<File | null>(null);
   const [selectedFile3d, setSelectedFile3d] = useState<File | null>(null);
-  const [activeTab, setActiveTab] = useState<'3d' | '2d' | 'intelligence'>('3d');
+  const [activeTab, setActiveTab] = useState<'3d' | '2d'>('3d');
   const [manufacturingFeatures] = useState<ManufacturingFeature[]>([]);
   const [selectedFeature, setSelectedFeature] = useState<ManufacturingFeature | null>(null);
   const [showFeatures] = useState(false);
@@ -68,16 +65,14 @@ interface ManufacturingFeature {
     setFile2dUrl(prev => { if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev); return null; });
 
     // Set default active tab
-    if (preferredView === 'intelligence') {
-      setActiveTab('intelligence');
-    } else if (preferredView === '2d' && item.file2dPath) {
+    if (preferredView === '2d' && item.file2dPath) {
       setActiveTab('2d');
     } else if (item.file3dPath) {
       setActiveTab('3d');
     } else if (item.file2dPath) {
       setActiveTab('2d');
     } else {
-      setActiveTab('intelligence');
+      setActiveTab('3d');
     }
 
     const loadFileUrls = async () => {
@@ -232,17 +227,6 @@ interface ManufacturingFeature {
               {isDxfFile ? 'DXF Drawing' : '2D Drawing'}
             </button>
           )}
-          <button
-            onClick={() => setActiveTab('intelligence')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'intelligence'
-                ? 'border-primary text-primary bg-primary/5'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Cpu className="h-4 w-4 inline mr-2" />
-            Manufacturing Intelligence
-          </button>
         </div>
       </div>
 
@@ -341,7 +325,7 @@ interface ManufacturingFeature {
               </div>
             )}
 
-                {!item.file2dPath && !item.file3dPath && activeTab !== 'intelligence' && (
+                {!item.file2dPath && !item.file3dPath && (
                   <div className="border rounded-lg p-6">
                 <div className="text-center mb-6">
                   <Upload className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
@@ -415,23 +399,6 @@ interface ManufacturingFeature {
                 </div>
                 )}
 
-            {/* Manufacturing Intelligence Tab Content */}
-            {activeTab === 'intelligence' && (
-              <div className="h-full overflow-y-auto">
-                <ManufacturingIntelligenceView
-                  item={item}
-                  {...(projectId !== undefined ? { projectId } : {})}
-                  {...(bomId !== undefined ? { bomId } : {})}
-                  onFeatureSelect={(_selection) => {
-                    // Phase 2: pass face/edge IDs to ModelViewer for highlighting
-                    // For now: switch to 3D view so user can see the model
-                    if (item.file3dPath) {
-                      setActiveTab('3d');
-                    }
-                  }}
-                />
-              </div>
-            )}
       </div>
     </div>
   );

@@ -239,10 +239,12 @@ export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
   }, []);
 
   return (
+    // The click stops here: the BOM card this sits in navigates to
+    // Manufacturing Intelligence, and the thumbnail means "open the viewer".
     <div
       ref={containerRef}
       className="relative flex-shrink-0 w-[120px] h-[90px] rounded-md overflow-hidden cursor-pointer group"
-      onClick={onClick}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       {/* Skeleton during load */}
       {(phase === 'idle' || phase === 'fetching' || phase === 'rendering') && (

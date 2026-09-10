@@ -77,6 +77,11 @@ export class CreateProcessCostDto {
   @IsString()
   operation?: string;
 
+  @ApiPropertyOptional({ description: 'Real HR Rates machine category this line is costed against (migration 719)', example: '3 Roll Bender' })
+  @IsOptional()
+  @IsString()
+  category?: string;
+
   @ApiPropertyOptional({ description: 'Digital Factory location this process was configured for (India, USA, China, ...) — lets Edit Process Cost re-scope its MHR/LHR dropdowns to the right location on reopen', example: 'USA' })
   @IsOptional()
   @IsString()
@@ -298,6 +303,11 @@ export class UpdateProcessCostDto {
   @IsOptional()
   @IsString()
   operation?: string;
+
+  @ApiPropertyOptional({ description: 'Real HR Rates machine category this line is costed against (migration 719)', example: '3 Roll Bender' })
+  @IsOptional()
+  @IsString()
+  category?: string;
 
   @ApiPropertyOptional({ description: 'Digital Factory location this process was configured for (India, USA, China, ...) — lets Edit Process Cost re-scope its MHR/LHR dropdowns to the right location on reopen', example: 'USA' })
   @IsOptional()
@@ -585,6 +595,9 @@ export class ProcessCostResponseDto {
   @ApiPropertyOptional({ description: 'Operation name', example: 'Part Assembly' })
   operation?: string;
 
+  @ApiPropertyOptional({ description: 'Real HR Rates machine category this line is costed against (migration 719). NULL on engine-generated lines, which identify themselves through operation instead.', example: '3 Roll Bender' })
+  category?: string | null;
+
   // Resource References
   @ApiPropertyOptional({ description: 'Machine Hour Record ID' })
   mhrId?: string;
@@ -730,6 +743,7 @@ export class ProcessCostResponseDto {
       processGroup: row.process_group || '',
       processRoute: row.process_route || '',
       operation: row.operation || '',
+      category: row.category ?? null,
       mhrId: row.mhr_id,
       benchmarkMhrId: row.benchmark_mhr_id ?? undefined,
       lhrId: row.lhr_id,

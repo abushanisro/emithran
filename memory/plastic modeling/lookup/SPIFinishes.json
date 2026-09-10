@@ -1,0 +1,25 @@
+{
+  "name": "SPIFinishes",
+  "sourceFilePath": "lookupTables/Component/SPIFinishes.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Finish Name",
+    "Standard",
+    "Hrs Per Sq Meter (hr / m^2)"
+  ],
+  "records": [
+    { "Finish Name": "As - Machined", "Standard": "None", "Hrs Per Sq Meter (hr / m^2)": 0.00 },
+    { "Finish Name": "SPI A1 - Super High Gloss", "Standard": "SPI A1", "Hrs Per Sq Meter (hr / m^2)": 1400.00 },
+    { "Finish Name": "SPI A2 - High Gloss", "Standard": "SPI A2", "Hrs Per Sq Meter (hr / m^2)": 1300.00 },
+    { "Finish Name": "SPI A3 - Normal Gloss", "Standard": "SPI A3", "Hrs Per Sq Meter (hr / m^2)": 1200.00 },
+    { "Finish Name": "SPI B1 - Fine Semi-Gloss", "Standard": "SPI B1", "Hrs Per Sq Meter (hr / m^2)": 950.00 },
+    { "Finish Name": "SPI B2 - Medium Semi-Gloss", "Standard": "SPI B2", "Hrs Per Sq Meter (hr / m^2)": 775.00 },
+    { "Finish Name": "SPI B3 - Normal Semi-Gloss", "Standard": "SPI B3", "Hrs Per Sq Meter (hr / m^2)": 600.00 },
+    { "Finish Name": "SPI C1 - Fine Matte", "Standard": "SPI C1", "Hrs Per Sq Meter (hr / m^2)": 375.00 },
+    { "Finish Name": "SPI C2 - Medium Matte", "Standard": "SPI C2", "Hrs Per Sq Meter (hr / m^2)": 245.00 },
+    { "Finish Name": "SPI C3 - Normal Matte", "Standard": "SPI C3", "Hrs Per Sq Meter (hr / m^2)": 200.00 },
+    { "Finish Name": "SPI D1 - Satin", "Standard": "SPI D1", "Hrs Per Sq Meter (hr / m^2)": 187.50 },
+    { "Finish Name": "SPI D2 - Dull", "Standard": "SPI D2", "Hrs Per Sq Meter (hr / m^2)": 98.00 },
+    { "Finish Name": "SPI D3 - Rough", "Standard": "SPI D3", "Hrs Per Sq Meter (hr / m^2)": 50.00 }
+  ]
+}

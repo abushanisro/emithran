@@ -1,0 +1,41 @@
+{
+  "name": "cmColorantMaterials",
+  "file_path": "lookupTables/Component/cmColorantMaterials.csv",
+  "columns": [
+    "Colorant Type",
+    "Unit Cost (USD / kg)",
+    "Default Colorant"
+  ],
+  "records": [
+    {
+      "colorant_type": "Carbon Black Pigment",
+      "unit_cost_usd_per_kg": 5.22,
+      "default_colorant": false
+    },
+    {
+      "colorant_type": "Chrome Color Pigment",
+      "unit_cost_usd_per_kg": 4.01,
+      "default_colorant": false
+    },
+    {
+      "colorant_type": "Inorganic Pigment",
+      "unit_cost_usd_per_kg": 4.33,
+      "default_colorant": false
+    },
+    {
+      "colorant_type": "None",
+      "unit_cost_usd_per_kg": 0.0,
+      "default_colorant": true
+    },
+    {
+      "colorant_type": "Organic Pigment",
+      "unit_cost_usd_per_kg": 6.07,
+      "default_colorant": false
+    },
+    {
+      "colorant_type": "Titanium Dioxide Pigment",
+      "unit_cost_usd_per_kg": 4.49,
+      "default_colorant": false
+    }
+  ]
+}

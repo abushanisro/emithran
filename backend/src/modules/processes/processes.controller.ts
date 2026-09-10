@@ -33,7 +33,6 @@ import {
   QueryProcessCalculatorMappingsDto,
   ProcessCalculatorMappingResponseDto,
   ProcessCalculatorMappingListResponseDto,
-  ProcessHierarchyDto,
 } from './dto/process-calculator-mapping.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -71,13 +70,6 @@ export class ProcessesController {
       token,
       organizationId,
     );
-  }
-
-  @Get('calculator-mappings/hierarchy')
-  @ApiOperation({ summary: 'Get unique process hierarchy values for filters' })
-  @ApiResponse({ status: 200, description: 'Process hierarchy retrieved successfully', type: ProcessHierarchyDto })
-  async getProcessHierarchy(@AccessToken() token: string): Promise<ProcessHierarchyDto> {
-    return this.processesService.getProcessHierarchy(token);
   }
 
   @Get('variables')

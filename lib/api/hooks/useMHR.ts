@@ -129,6 +129,19 @@ export function useMHRCategories(processGroup?: string) {
   });
 }
 
+export function useMHRProcessGroups() {
+  return useQuery({
+    queryKey: [...mhrKeys.all, 'process-groups'],
+    queryFn: () => mhrApi.getProcessGroups(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+    select: (data) => data ?? [],
+  });
+}
+
 export function useMHRLocations() {
   return useQuery({
     queryKey: [...mhrKeys.all, 'locations'],
@@ -146,6 +159,18 @@ export function useMHRManufacturerCountries() {
   return useQuery({
     queryKey: [...mhrKeys.all, 'manufacturer-countries'],
     queryFn: () => mhrApi.getManufacturerCountries(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+  });
+}
+
+export function useMHRWageGrades() {
+  return useQuery({
+    queryKey: [...mhrKeys.all, 'wage-grades'],
+    queryFn: () => mhrApi.getWageGrades(),
     staleTime: 1000 * 60 * 5,
     retry: false,
     refetchOnMount: 'always',

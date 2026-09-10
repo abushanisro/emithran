@@ -20,7 +20,6 @@ import {
   QueryProcessCalculatorMappingsDto,
   ProcessCalculatorMappingResponseDto,
   ProcessCalculatorMappingListResponseDto,
-  ProcessHierarchyDto,
   ProcessTaxonomyHint,
 } from './dto/process-calculator-mapping.dto';
 
@@ -942,51 +941,6 @@ export class ProcessesService {
     return { message: 'Process calculator mapping deleted successfully' };
   }
 
-  /**
-   * Get unique process hierarchy values for filter dropdowns
-   */
-  async getProcessHierarchy(accessToken: string): Promise<ProcessHierarchyDto> {
-    this.logger.log('Fetching process hierarchy', 'ProcessesService');
-
-    const { data, error } = await this.supabaseService
-      .getClient(accessToken)
-      .from('process_calculator_mappings')
-      .select('process_group, process_route, operation, machine_class')
-      .eq('is_active', true);
-
-    if (error) {
-      this.logger.error(`Error fetching process hierarchy: ${error.message}`, 'ProcessesService');
-      throw new InternalServerErrorException(`Failed to fetch process hierarchy: ${error.message}`);
-    }
-
-    const HEADER_SKIP = new Set(['s.no', 'sno', 's no', 'sl no', 'basic info', 'location',
-      'process group', 'process route', 'process_group', 'process_route', 'operation',
-      'name', 'type', 'category', 'description', 'serial no', 'sr no']);
-
-    const isValidName = (v: any): boolean => {
-      if (v == null || typeof v !== 'string') return false;
-      const t = v.trim();
-      return (
-        t.length > 0 &&
-        t.length <= 100 &&
-        isNaN(Number(t)) &&
-        !t.includes('|') &&
-        !t.includes('USD→INR') &&
-        !t.includes('USD->INR') &&
-        !HEADER_SKIP.has(t.toLowerCase())
-      );
-    };
-
-    const processGroups = [...new Set(data.map((row) => row.process_group).filter(isValidName))].sort();
-    const processRoutes = [...new Set(data.map((row) => row.process_route).filter(isValidName))].sort();
-    const operations = [...new Set(data.map((row) => row.operation).filter(isValidName))].sort();
-
-    return {
-      processGroups,
-      processRoutes,
-      operations,
-    };
-  }
 
   // ============================================================================
   // DOMAIN REFERENCE VARIABLES (sm_reference_data / im_reference_data)
@@ -1014,9 +968,28 @@ export class ProcessesService {
           : 'machining_reference_data';
     const client = this.supabaseService.getClient(accessToken);
 
+    // Explicit allow-list, not an exclude-list — sm_reference_data has grown
+    // 5 OTHER staging categories this endpoint was never meant to surface
+    // (lookup_table: 2,914 rows already served by the Process page's own
+    // per-route Lookup Tables dialog; machine: 1,757; material: 609;
+    // operation: 391; process: 24 — vs. only ~560 real variable/wage_grade
+    // rows). An exclude-list is fragile against future staging categories;
+    // this allow-list is exactly what "Variables" (constants, wage grades,
+    // rate-profile settings, tool-material properties) means for this page.
+    // Necessary because PostgREST hard-caps every response at 1000 rows
+    // server-side regardless of a larger client-requested .limit() — with
+    // no category filter, sorting by category ascending meant whichever
+    // large non-Variables category sorted first (lookup_table, then
+    // machine) silently consumed the entire capped response before ever
+    // reaching 'variable' or 'wage_grade' — confirmed live 2026-09-03:
+    // Sheet Metal's Variables view was showing raw 'machine' spec rows
+    // with no wage_grade category chip available at all.
+    const VARIABLE_CATEGORIES = ['variable', 'wage_grade', 'rate_profile', 'tool_material'];
+
     let query = client
       .from(table)
       .select('id, category, source_region, source_version, key, value, unit_type, notes', { count: 'exact' })
+      .in('category', VARIABLE_CATEGORIES)
       .order('category', { ascending: true })
       .order('key', { ascending: true });
 
@@ -1030,7 +1003,7 @@ export class ProcessesService {
       throw new InternalServerErrorException(`Failed to fetch ${domain} variables: ${error.message}`);
     }
 
-    const { data: categoryRows } = await client.from(table).select('category');
+    const { data: categoryRows } = await client.from(table).select('category').in('category', VARIABLE_CATEGORIES).limit(10000);
     const categories = [...new Set((categoryRows ?? []).map((r: any) => r.category))].sort();
 
     // When the same (category, key) was sourced more than once at different

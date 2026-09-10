@@ -1,0 +1,17 @@
+{
+  "name": "tblSpiType",
+  "sourceFilePath": "lookupTables/Component/tblSpiType.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Spi Type",
+    "Num Annual Mold Cycles",
+    "Use Insert"
+  ],
+  "records": [
+    { "Spi Type": 101, "Num Annual Mold Cycles": 9999999999.00, "Use Insert": "true" },
+    { "Spi Type": 102, "Num Annual Mold Cycles": 1000000.00, "Use Insert": "true" },
+    { "Spi Type": 103, "Num Annual Mold Cycles": 500000.00, "Use Insert": "false" },
+    { "Spi Type": 104, "Num Annual Mold Cycles": 100000.00, "Use Insert": "false" },
+    { "Spi Type": 105, "Num Annual Mold Cycles": 5000.00, "Use Insert": "false" }
+  ]
+}

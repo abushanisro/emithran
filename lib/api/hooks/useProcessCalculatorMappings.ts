@@ -32,12 +32,6 @@ export interface ProcessCalculatorMapping {
   taxonomy?: ProcessTaxonomyHint;
 }
 
-export interface ProcessHierarchy {
-  processGroups: string[];
-  processRoutes: string[];
-  operations: string[];
-}
-
 export interface QueryProcessCalculatorMappingsParams {
   processGroup?: string;
   processRoute?: string;
@@ -65,7 +59,6 @@ export interface UpdateProcessCalculatorMappingDto extends Partial<CreateProcess
 const QUERY_KEYS = {
   mappings: (params?: QueryProcessCalculatorMappingsParams) => ['process-calculator-mappings', params],
   mapping: (id: string) => ['process-calculator-mapping', id],
-  hierarchy: () => ['process-hierarchy'],
 };
 
 // API Functions
@@ -81,10 +74,6 @@ const processCalculatorMappingsApi = {
 
   getOne: async (id: string) => {
     return apiClient.get<ProcessCalculatorMapping>(`/processes/calculator-mappings/${id}`);
-  },
-
-  getHierarchy: async () => {
-    return apiClient.get<ProcessHierarchy>('/processes/calculator-mappings/hierarchy');
   },
 
   create: async (data: CreateProcessCalculatorMappingDto) => {
@@ -147,16 +136,6 @@ export function useProcessCalculatorMapping(id: string) {
   });
 }
 
-export function useProcessHierarchy() {
-  return useQuery({
-    queryKey: QUERY_KEYS.hierarchy(),
-    queryFn: () => processCalculatorMappingsApi.getHierarchy(),
-    // Same reasoning as useProcessCalculatorMappings above.
-    refetchOnMount: 'always',
-    throwOnError: false,
-  });
-}
-
 export function useCreateProcessCalculatorMapping() {
   const queryClient = useQueryClient();
 
@@ -164,7 +143,6 @@ export function useCreateProcessCalculatorMapping() {
     mutationFn: (data: CreateProcessCalculatorMappingDto) => processCalculatorMappingsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['process-calculator-mappings'] });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hierarchy() });
     },
   });
 }
@@ -178,7 +156,6 @@ export function useUpdateProcessCalculatorMapping() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['process-calculator-mappings'] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.mapping(id) });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hierarchy() });
     },
   });
 }
@@ -190,7 +167,6 @@ export function useDeleteProcessCalculatorMapping() {
     mutationFn: (id: string) => processCalculatorMappingsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['process-calculator-mappings'] });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hierarchy() });
     },
   });
 }
@@ -202,7 +178,6 @@ export function useImportProcessCalculatorMappings() {
       processCalculatorMappingsApi.importExcel(file, replaceExisting),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['process-calculator-mappings'] });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hierarchy() });
     },
   });
 }
@@ -213,7 +188,6 @@ export function useClearAllProcessCalculatorMappings() {
     mutationFn: () => processCalculatorMappingsApi.clearAll(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['process-calculator-mappings'] });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hierarchy() });
     },
   });
 }

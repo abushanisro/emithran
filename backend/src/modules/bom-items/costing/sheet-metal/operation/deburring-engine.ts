@@ -77,6 +77,17 @@ export function computeDeburringCost(input: DeburringInput): DeburringResult {
         processRoute: input.processIdentity.processRoute,
         operation: input.processIdentity.operation,
       } : {}),
+      // Deburring charges NO setup, by construction: this engine has no
+      // batchSize input and no per-class setup constant, and passes
+      // setupTimeMin: 0 into eMithranTerms above. Reporting that 0 explicitly
+      // is the point — apply-route was persisting a literal 15 min for this
+      // line, so the saved record claimed a setup the engine never charged.
+      //
+      // NOT changed to the machine's real setup_time_hr here: that would start
+      // charging setup on an operation that never has, which is a cost-model
+      // decision rather than a hardcode to remove. (No effect on this
+      // deployment either way — "Default Deslag" has a real setup_time_hr of 0.)
+      setupTimeMin: 0,
       setupCost: 0,
       runCost: Math.round((t.machineCost + t.laborCost) * 100) / 100,
       totalCost: Math.round(t.total * 100) / 100,

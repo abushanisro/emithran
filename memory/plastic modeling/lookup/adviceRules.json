@@ -1,0 +1,102 @@
+{
+  "name": "adviceRules",
+  "file_path": "LookupTables/Components/adviceRules.csv",
+  "advice_rules": [
+    {
+      "advice_rule_name": "CavityFinishCheck",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "CavityFixureCheck",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "ExternalUndercut",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "FlexibleHolder",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "HighBlindHoleLengthToDiameterRatio",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "HighFlowRatio",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "HighHoleLengthToDiameterRatio",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "InsufficientPartAngle",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "InsufficientRegionAvailable",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "InternalCutoutsappedCheck",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "InternalUndercut",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "MaxWallThicknessCurrentTimeCheck",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "MoldRatingCheck",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "NonRegrindableMaterial",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "NumeralStockCheck",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "PositiveMoldType",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "RequiredDraftsFreeCheck",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "SharpExternalEdge",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "SharpInternalEdge",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "SimpleHoleCouldBeFormed",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "SimpleHoleRequiresMachining",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "ThickSection",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "ThinWallAroundHole",
+      "enabled": true
+    },
+    {
+      "advice_rule_name": "VoidRequiresMachining",
+      "enabled": true
+    }
+  ]
+}

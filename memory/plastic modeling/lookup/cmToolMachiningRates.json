@@ -1,0 +1,101 @@
+{
+  "name": "cmToolMachiningRates",
+  "file_path": "lookupTables/Component/cmToolMachiningRates.csv",
+  "columns": [
+    "Name",
+    "Rate",
+    "Units"
+  ],
+  "records": [
+    {
+      "name": "Cavity Core Plate General Machining",
+      "rate": 0.32,
+      "units": "m2/hr"
+    },
+    {
+      "name": "Cavity Core Plate Roughing",
+      "rate": 68306.0,
+      "units": "mm3/min"
+    },
+    {
+      "name": "Chamfering General Machining",
+      "rate": 12.7,
+      "units": "m/hr"
+    },
+    {
+      "name": "Clamp Plate General Machining",
+      "rate": 2.9,
+      "units": "m2/hr"
+    },
+    {
+      "name": "Coarse Texture Finishing",
+      "rate": 15500.0,
+      "units": "S/m2"
+    },
+    {
+      "name": "Coordinate Measuring",
+      "rate": 0.1,
+      "units": "m2/hr"
+    },
+    {
+      "name": "EDM Electrode Burn",
+      "rate": 68.28,
+      "units": "mm3/min"
+    },
+    {
+      "name": "Ejector Box Plates General Machining",
+      "rate": 2.9,
+      "units": "m2/hr"
+    },
+    {
+      "name": "Ejector Box Rails General Machining",
+      "rate": 2.9,
+      "units": "m2/hr"
+    },
+    {
+      "name": "Guide Pin Hole Drilling",
+      "rate": 25.4,
+      "units": "mm/min"
+    },
+    {
+      "name": "Heater Line Drilling",
+      "rate": 25.4,
+      "units": "mm/min"
+    },
+    {
+      "name": "Insert Pocket Machining",
+      "rate": 136612.0,
+      "units": "mm3/min"
+    },
+    {
+      "name": "Parting Line Spotting Average",
+      "rate": 0.03,
+      "units": "m2/hr"
+    },
+    {
+      "name": "Parting Line Spotting Complex",
+      "rate": 0.02,
+      "units": "m2/hr"
+    },
+    {
+      "name": "Parting Line Spotting Simple",
+      "rate": 0.04,
+      "units": "m2/hr"
+    },
+    {
+      "name": "Rib CNC Machining",
+      "rate": 17076.0,
+      "units": "mm3/min"
+    },
+    {
+      "name": "Standard Hole Drilling",
+      "rate": 57.15,
+      "units": "mm/min"
+    },
+    {
+      "name": "Vent General Machining",
+      "rate": 0.25,
+      "units": "each"
+    }
+  ]
+}

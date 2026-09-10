@@ -391,14 +391,19 @@ export class MHRService {
   }
 
   /**
-   * Read-only full machine_library.json detail for one mhr_records row —
+   * Read-only full machine reference detail for one mhr_records row —
    * powers the HR Rates edit dialog's "Capability" tab read-only lookup
    * (replaces a free-text "paste raw JSON yourself" field with the real,
    * sourced data). Matches by benchmark_source_key first (exact, set at
    * import/create time — see resolveEconomicsForCreate); falls back to an
    * unambiguous machine-name match for older rows saved before that column
-   * existed. Never guesses: an ambiguous or missing match returns found:false
-   * rather than a wrong machine's specs.
+   * existed, or for Injection Molding's 127 real machines (migration 633),
+   * which have no benchmark_source_key at all. Checks sm_reference_data
+   * (Sheet Metal's machine_library.json, migration 479), then
+   * im_reference_data (Injection Molding's real machine JSON, migration
+   * 648), then machining_reference_data (Machining's real machine JSON,
+   * migration 692) — never guesses: an ambiguous or missing match returns
+   * found:false rather than a wrong machine's specs.
    */
   async getReferenceDetail(id: string, accessToken: string): Promise<MHRReferenceDetailDto> {
     if (!this.isValidUUID(id)) {
@@ -428,14 +433,42 @@ export class MHRService {
     }
 
     if (row.machine_name?.trim()) {
-      const { data } = await client
+      const nameLower = row.machine_name.trim().toLowerCase();
+
+      const { data: smData } = await client
         .from('sm_reference_data')
         .select('key, raw')
         .eq('category', 'machine');
-      const nameLower = row.machine_name.trim().toLowerCase();
-      const matches = (data ?? []).filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
-      if (matches.length === 1) {
-        return { found: true, sourceKey: matches[0].key, raw: matches[0].raw ?? null };
+      const smMatches = (smData ?? []).filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+      if (smMatches.length === 1) {
+        return { found: true, sourceKey: smMatches[0].key, raw: smMatches[0].raw ?? null };
+      }
+
+      // Injection Molding's real 127-machine dataset (migration 633) has no
+      // benchmark_source_key set, so it only ever reaches this name-match
+      // fallback — mirrors the sm_reference_data block above exactly, just
+      // against im_reference_data category='machine' (migration 648).
+      const { data: imData } = await client
+        .from('im_reference_data')
+        .select('key, raw')
+        .eq('category', 'machine');
+      const imMatches = (imData ?? []).filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+      if (imMatches.length === 1) {
+        return { found: true, sourceKey: imMatches[0].key, raw: imMatches[0].raw ?? null };
+      }
+
+      // Machining's real machine dataset (migration 692, partial — more
+      // categories/regions to follow) also has no benchmark_source_key set,
+      // so it only ever reaches this name-match fallback — mirrors the
+      // sm_reference_data/im_reference_data blocks above exactly, just
+      // against machining_reference_data category='machine'.
+      const { data: machData } = await client
+        .from('machining_reference_data')
+        .select('key, raw')
+        .eq('category', 'machine');
+      const machMatches = (machData ?? []).filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+      if (machMatches.length === 1) {
+        return { found: true, sourceKey: machMatches[0].key, raw: machMatches[0].raw ?? null };
       }
     }
 
@@ -1809,8 +1842,9 @@ export class MHRService {
   // against the actual process_calculator_mappings taxonomy (2026-08-27):
   // fiber_laser/press_brake are Sheet Metal (same domain as their verified
   // category above); cnc_lathe/cnc_3ax_vmc/cnc_5ax_mc are Machining;
-  // injection_molding is Plastic & Rubber; cmm and deburring are Post
-  // Processing (real "Inspection"/"Deburring" routes under that group).
+  // injection_molding is Plastic Molding (migration 647 — renamed from
+  // "Plastic & Rubber"); cmm and deburring are Post Processing (real
+  // "Inspection"/"Deburring" routes under that group).
   // benchmark_source_key rows need no entry here — 100% of
   // machine_library.json is Sheet Metal (CLAUDE.md's domain-by-domain
   // roadmap), so any row with a benchmark match is always that group.
@@ -1820,7 +1854,7 @@ export class MHRService {
     cnc_lathe: 'Machining',
     cnc_3ax_vmc: 'Machining',
     cnc_5ax_mc: 'Machining',
-    injection_molding: 'Plastic & Rubber',
+    injection_molding: 'Plastic Molding',
     cmm: 'Post Processing',
     deburring: 'Post Processing',
   };
@@ -1844,19 +1878,25 @@ export class MHRService {
    * real category variety lives in the global/benchmark rows every user
    * shares.
    *
-   * `processGroup`, when given, scopes the result to that real process group
-   * (via MACHINE_CLASS_PROCESS_GROUP for machine_class fallback rows, or
-   * "Sheet Metal" for any benchmark_source_key row) — without this, every
-   * category from every domain was returned regardless of which Process the
-   * form's Process field had selected, so picking "Machining" still listed
-   * Sheet Metal categories (281 of ~294 rows are Sheet Metal, drowning out
-   * the rest).
+   * `processGroup`, when given, scopes the result to that real process
+   * group — preferred source is the row's own real process_group column
+   * (a direct, reliable value across every domain as of migrations
+   * 646/647 for Plastic Molding and 694 for Machining). Only legacy rows
+   * with process_group still NULL fall back to the older heuristic
+   * (MACHINE_CLASS_PROCESS_GROUP for machine_class rows, or "Sheet Metal"
+   * for any benchmark_source_key row — real when this heuristic was
+   * written, since 100% of benchmark_source_key rows were Sheet Metal at
+   * the time, but no longer: migration 693 gave Machining's 141 real rows
+   * a benchmark_source_key too, which silently miscategorized every one
+   * of them as "Sheet Metal" here until this fix, hiding all of
+   * Machining's real categories from the form's Category field whenever
+   * "Machining" was the selected Process).
    */
   async getDistinctCategories(accessToken: string, processGroup?: string): Promise<string[]> {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
-      .select('benchmark_source_key, machine_class')
+      .select('benchmark_source_key, machine_class, process_group')
       .limit(20000);
 
     if (error) {
@@ -1866,7 +1906,8 @@ export class MHRService {
 
     const categories = (data ?? []).map((r: any) => {
       const fromKey = r.benchmark_source_key?.split(':')[0]?.trim();
-      const rowGroup = fromKey ? 'Sheet Metal' : (r.machine_class ? MHRService.MACHINE_CLASS_PROCESS_GROUP[r.machine_class] : undefined);
+      const rowGroup = r.process_group
+        || (fromKey ? 'Sheet Metal' : (r.machine_class ? MHRService.MACHINE_CLASS_PROCESS_GROUP[r.machine_class] : undefined));
       if (processGroup && rowGroup !== processGroup) return null;
       if (fromKey) return fromKey;
       if (!r.machine_class) return null;
@@ -1874,6 +1915,40 @@ export class MHRService {
     }).filter(Boolean) as string[];
 
     return [...new Set(categories)].sort();
+  }
+
+  /**
+   * Real distinct process_group values on file in mhr_records — the direct,
+   * authoritative column (reliably set across every domain as of migrations
+   * 646/647 for Plastic Molding and 694 for Machining; Sheet Metal has
+   * always had it). Not scoped to userId — migration 578 made every
+   * machine_library row global (user_id NULL), so a per-user query here
+   * would return nothing for most real rows.
+   *
+   * Deliberately NOT the same source as the Process Calculator Mappings
+   * page's useProcessHierarchy() (process_calculator_mappings.process_group
+   * WHERE is_active=true) — that table's is_active flag reflects whether a
+   * calculator is wired to a route, an unrelated concept from "does this
+   * process group have real HR Rates machines on file". Migration 691 left
+   * every Machining process_calculator_mappings row inactive (no
+   * machine_class registered yet — see that migration's own comment), which
+   * silently hid "Machining" from the MHR form's Process suggestions even
+   * though 141 real machines already exist for it in mhr_records.
+   */
+  async getDistinctProcessGroups(accessToken: string): Promise<string[]> {
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('mhr_records')
+      .select('process_group')
+      .not('process_group', 'is', null)
+      .limit(20000);
+
+    if (error) {
+      this.logger.error(`Error fetching distinct process groups: ${error.message}`, 'MHRService');
+      return [];
+    }
+
+    return [...new Set(data?.map((r: any) => r.process_group).filter(Boolean) as string[])].sort();
   }
 
   async getDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
@@ -1890,6 +1965,30 @@ export class MHRService {
     }
 
     return [...new Set(data?.map((r: any) => r.manufacturer_country).filter(Boolean) as string[])].sort();
+  }
+
+  // Real distinct wage_grade values actually live on mhr_records — replaces
+  // the "Add/Edit MHR" form's old hardcoded 3-option Skilled/Semi-Skilled/
+  // Unskilled dropdown (migration 577's fabricated classification, now
+  // corrected by migrations 643/649 to real per-process grades like
+  // '3 - Metal', '3 - Plastic'). A hardcoded option list would otherwise go
+  // stale the moment real data adds a new grade string, and would silently
+  // let a user overwrite a real value with a fabricated one by picking the
+  // only options offered.
+  async getDistinctWageGrades(accessToken: string): Promise<string[]> {
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken)
+      .from('mhr_records')
+      .select('wage_grade')
+      .not('wage_grade', 'is', null)
+      .limit(20000);
+
+    if (error) {
+      this.logger.error(`Error fetching distinct wage grades: ${error.message}`, 'MHRService');
+      return [];
+    }
+
+    return [...new Set(data?.map((r: any) => r.wage_grade).filter(Boolean) as string[])].sort();
   }
 
   // Deliberately NOT scoped by user_id (matches getDistinctManufacturerCountries,

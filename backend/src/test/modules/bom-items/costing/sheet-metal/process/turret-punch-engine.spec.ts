@@ -93,7 +93,7 @@ describe('computeTurretPunchCost — direct labour cost', () => {
     const line = result.processLines[0];
 
     expect(line.labourRate).toBeNull();
-    expect(line.runCost).toBeCloseTo(Math.round((result.cuttingMin / 60) * 90 * 100) / 100, 5);
+    expect(line.runCost).toBeCloseTo((result.cuttingMin / 60) * 90, 5);
   });
 });
 

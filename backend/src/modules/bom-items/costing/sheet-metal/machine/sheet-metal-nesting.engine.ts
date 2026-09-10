@@ -69,6 +69,73 @@ export interface TrueNestCostingCache {
   sheetWeightKg: number;
   grossWeightPerPartKg: number;
   cachedAt?: string;
+  /** The geometry this result was computed from — see trueNestInputFingerprint. */
+  inputFingerprint?: string;
+}
+
+/**
+ * A stable fingerprint of every real input a true-shape nest result depends on.
+ *
+ * WHY THIS EXISTS
+ *
+ * The cache used to be validated on kerf and edge margin alone. That was only
+ * safe because Reanalyze rebuilds featureGraph.summary as a fresh object and
+ * therefore silently DESTROYED the cache — so a geometry change could never
+ * reuse a stale result, but neither could an identical re-analysis reuse a
+ * perfectly valid one. Since an uncached resolve walks all 5 STANDARD_SHEETS
+ * sequentially against cad-engine's single-threaded /nest endpoint (13-30s per
+ * sheet on real parts), that made every Reanalyze cost 65-150s on the next
+ * cost-summary AND again on the next route-comparison, which is what timed the
+ * page out.
+ *
+ * Carrying the cache across Reanalyze is only correct if validity is tied to
+ * the geometry rather than to the accident of the summary being rewritten.
+ * This fingerprint is that tie: outline, holes, thickness, density and net
+ * weight are exactly the inputs resolveTrueShapeNestCosting feeds to /nest and
+ * to selectBestTrueNestCandidate. Same geometry -> same fingerprint -> reuse.
+ * Any real geometry change -> different fingerprint -> recompute.
+ *
+ * Coordinates are rounded to 0.01 mm before hashing so floating-point noise
+ * from an identical re-extraction does not invalidate a valid cache, while a
+ * real change of a hundredth of a millimetre still does.
+ */
+export function trueNestInputFingerprint(input: {
+  outlinePointsMm: unknown;
+  holesMm: unknown;
+  thicknessMm: number;
+  densityKgM3: number;
+  netWeightKg: number;
+}): string {
+  const r2 = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.round(n * 100) / 100 : null);
+  const norm = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(norm);
+    if (typeof v === 'number') return r2(v);
+    if (v && typeof v === 'object') {
+      const o = v as Record<string, unknown>;
+      // Key order is not guaranteed across re-extraction, so sort it.
+      return Object.keys(o).sort().map((k) => [k, norm(o[k])]);
+    }
+    return v ?? null;
+  };
+
+  const payload = JSON.stringify([
+    norm(input.outlinePointsMm),
+    norm(input.holesMm),
+    r2(input.thicknessMm),
+    r2(input.densityKgM3),
+    // Net weight moves gross weight per part directly, and it is derived from
+    // CAD volume, so a volume change must invalidate the cache too.
+    typeof input.netWeightKg === 'number' ? Math.round(input.netWeightKg * 1e6) / 1e6 : null,
+  ]);
+
+  // FNV-1a — deterministic, dependency-free, and this is a cache key, not a
+  // security boundary.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < payload.length; i++) {
+    h ^= payload.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${h.toString(16)}-${payload.length.toString(16)}`;
 }
 
 // A cached true-shape-nest costing result (bom-items.service.ts's
@@ -84,10 +151,15 @@ export function isTrueNestCostingCacheValid(
   cache: unknown,
   kerfMm: number,
   edgeMarginMm: number,
+  inputFingerprint?: string,
 ): cache is TrueNestCostingCache {
   if (!cache || typeof cache !== 'object') return false;
   const c = cache as Record<string, unknown>;
   const closeEnough = (a: unknown, b: number) => typeof a === 'number' && Math.abs(a - b) < 0.01;
+  // The cache now survives Reanalyze, so geometry is what makes it valid — a
+  // cache written before fingerprinting existed, or one written from different
+  // geometry, is refused rather than silently reused at the old parts-per-sheet.
+  if (inputFingerprint !== undefined && c.inputFingerprint !== inputFingerprint) return false;
   return (
     closeEnough(c.kerfMm, kerfMm) &&
     closeEnough(c.edgeMarginMm, edgeMarginMm) &&

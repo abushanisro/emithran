@@ -45,12 +45,15 @@ describe('computeRouterCost — real material-family cutting speed', () => {
     const line = result.processLines[0]!;
 
     expect(line.setupCost).toBeGreaterThanOrEqual(0);
-    expect(result.warnings.some((w) => w.includes("seed sm_lookup_op_setup_time for 'router_2axis'"))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
+    expect(line.setupTimeSource).toBe('class_default');
   });
 
   it('uses a real resolved setup time without warning when provided', () => {
     const result = computeRouterCost(baseInput({ setupMin: 45 }));
-    expect(result.warnings.some((w) => w.includes('seed sm_lookup_op_setup_time'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(false);
+    expect(result.processLines[0]!.setupTimeMin).toBeCloseTo(45, 5);
+    expect(result.processLines[0]!.setupTimeSource).toBe('operation_lookup');
   });
 });
 
@@ -84,7 +87,7 @@ describe('computeRouterCost — direct labour cost', () => {
     const line = result.processLines[0]!;
 
     expect(line.labourRate).toBeNull();
-    expect(line.runCost).toBeCloseTo(Math.round((result.cuttingMin / 60) * 40 * 100) / 100, 5);
+    expect(line.runCost).toBeCloseTo((result.cuttingMin / 60) * 40, 5);
   });
 
   it('falls back to a no_db_rate machine rate (not a guessed number) when no rate is resolved at all', () => {

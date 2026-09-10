@@ -4,7 +4,7 @@ import type { CapabilityCheck, PartGeometryForCapability } from '../../shared/ca
 import { checkMachineCapability } from '../../shared/capability/machine-capability';
 import type { MachineCapability } from '../../shared/capability/machine-selection/seed-registry';
 import type { ManufacturingProcessEngine } from '../../shared/core/manufacturing-process.types';
-import { eMithranTerms } from '../../shared/core/engine-kernel';
+import { eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 
 // Extracted verbatim from cost-engine.ts's inline Hole Extrusion (Burring)
 // block (Platform Architecture Remediation Phase 1 — engine registry
@@ -16,6 +16,8 @@ export interface HoleExtrusionInput {
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
   cycleTimeSecFromCalculator?: number;
   fallbackSetupMin: number; // opSetupMinByOp?.burring ?? BURRING_SETUP_MIN, per-batch
+  /** Real sm_lookup_op_setup_time minutes for this operation, when a row exists. */
+  operationSetupMin?: number | null;
   calculatorId?: string | null;
   calculatorVersion?: number | null;
   physicsGap?: PhysicsGap | null;
@@ -52,7 +54,18 @@ export function computeHoleExtrusionCost(input: HoleExtrusionInput): HoleExtrusi
     warnings.push('Hole extrusion (burring) cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');
   }
 
-  const setupTimeMin = input.fallbackSetupMin / Math.max(input.batchSize, 1);
+  // Real setup time, most-specific real source first — this machine own
+  // mhr_records.setup_time_hr, then the per-operation lookup, then the
+  // cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: 'Hole Extrusion (Burring)',
+    machineSetupTimeHr: input.rate.setupTimeHr,
+    operationSetupMin: input.operationSetupMin,
+    classDefaultMin: input.fallbackSetupMin,
+    machineName: input.rate.machineName,
+  });
+  if (setup.warning) warnings.push(setup.warning);
+  const setupTimeMin = setup.setupMin / Math.max(input.batchSize, 1);
 
   const t = eMithranTerms({
     mhrPerHr: input.rate.rate,
@@ -82,6 +95,8 @@ export function computeHoleExtrusionCost(input: HoleExtrusionInput): HoleExtrusi
         processRoute: input.processIdentity.processRoute,
         operation: input.processIdentity.operation,
       } : {}),
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: Math.round(t.setupCost * 100) / 100,
       runCost: Math.round((t.machineCost + t.laborCost) * 100) / 100,
       totalCost: Math.round(t.total * 100) / 100,

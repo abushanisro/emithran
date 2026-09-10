@@ -1,0 +1,22 @@
+{
+  "name": "tblToolCoating",
+  "sourceFilePath": "lookupTables/Component/tblToolCoating.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Coating Cost Factor (USD / kg)",
+    "Coating Type",
+    "Tool Life Improvement Factor"
+  ],
+  "records": [
+    { "Coating Cost Factor (USD / kg)": 0.00, "Coating Type": "None", "Tool Life Improvement Factor": 1.00 },
+    { "Coating Cost Factor (USD / kg)": 1.90, "Coating Type": "Tribo-coating", "Tool Life Improvement Factor": 1.10 },
+    { "Coating Cost Factor (USD / kg)": 2.80, "Coating Type": "Electroless Nickel", "Tool Life Improvement Factor": 1.40 },
+    { "Coating Cost Factor (USD / kg)": 3.50, "Coating Type": "Electroless Teflon", "Tool Life Improvement Factor": 1.70 },
+    { "Coating Cost Factor (USD / kg)": 4.10, "Coating Type": "Nitrided Steel", "Tool Life Improvement Factor": 1.90 },
+    { "Coating Cost Factor (USD / kg)": 4.40, "Coating Type": "Electroplated Chromium", "Tool Life Improvement Factor": 2.00 },
+    { "Coating Cost Factor (USD / kg)": 6.90, "Coating Type": "Plasma Sprayed", "Tool Life Improvement Factor": 3.00 },
+    { "Coating Cost Factor (USD / kg)": 18.20, "Coating Type": "PVD TiN", "Tool Life Improvement Factor": 7.20 },
+    { "Coating Cost Factor (USD / kg)": 19.10, "Coating Type": "CVD TiC", "Tool Life Improvement Factor": 7.50 },
+    { "Coating Cost Factor (USD / kg)": 26.60, "Coating Type": "DuplexVariantic", "Tool Life Improvement Factor": 14.40 }
+  ]
+}

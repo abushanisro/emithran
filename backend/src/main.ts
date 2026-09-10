@@ -11,6 +11,7 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { CustomValidationPipe } from './common/pipes/validation.pipe';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { RequestCacheInterceptor } from './common/interceptors/request-cache.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { Logger } from './common/logger/logger.service';
 
@@ -126,6 +127,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(
     new LoggingInterceptor(logger),
     new TransformInterceptor(),
+    new RequestCacheInterceptor(),
   );
 
   // Test route registration immediately

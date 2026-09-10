@@ -6,7 +6,7 @@
 -- Context: raw_materials already carries real, populated per-grade thermal
 -- properties for 511/574 rows (melting_temp_c, mold_temp_c, specific_heat_melt,
 -- thermal_conductivity_melt, eject_deflection_temp_c, clamping_pressure_mpa),
--- almost certainly imported from the same aPriori source as
+-- almost certainly imported from the same licensed reference-data source as
 -- memory/Injection/materials_final.json at some earlier point. That source
 -- file also carries real cureTimeMin data for 35 real thermoset SMC/BMC
 -- materials (Unsaturated Polyester / Vinyl Ester, real values 30-40 min) --

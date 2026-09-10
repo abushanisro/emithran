@@ -2,7 +2,7 @@ import { ROLL_BENDING_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/def
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
-import { noRateFallback, eMithranTerms } from '../../shared/core/engine-kernel';
+import { noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
 export interface RollBendingInput {
@@ -63,10 +63,18 @@ export function computeRollBendingCost(
   }
   const cycleMin = cycleSec / 60;
 
-  if (input.setupMin == null) {
-    warnings.push(`${processLabel}: setup time from fallback — seed sm_lookup_op_setup_time for '${machineClass}'`);
-  }
-  const setupMin = input.setupMin ?? ROLL_BENDING_SETUP_MIN;
+  // Real setup time, most-specific real source first: this machine's own
+  // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
+  // row, then the cited class constant. See resolveSetupMinutes().
+  const setup = resolveSetupMinutes({
+    process: processLabel,
+    machineSetupTimeHr: rate.setupTimeHr,
+    operationSetupMin: input.setupMin,
+    classDefaultMin: ROLL_BENDING_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  const setupMin = setup.setupMin;
+  if (setup.warning) warnings.push(setup.warning);
 
   const t = eMithranTerms({
     mhrPerHr: rate.rate,
@@ -88,6 +96,8 @@ export function computeRollBendingCost(
     buildCuttingProcessLine({
       process: processLabel,
       processIdentity: input.processIdentity,
+      setupTimeMin: setup.setupMin,
+      setupTimeSource: setup.source,
       setupCost: t.setupCost,
       runCost: t.machineCost + t.laborCost,
       totalCost: t.total,
@@ -112,7 +122,7 @@ export function computeRollBendingCost(
 export class RollBendingEngine extends BaseCuttingEngine {
   readonly machineClass: 'roll_bending_2' | 'roll_bending_3' | 'roll_bending_4';
   readonly processFamily = 'sheet_metal_forming';
-  private readonly processLabel: string;
+  readonly processLabel: string;
 
   constructor(machineClass: 'roll_bending_2' | 'roll_bending_3' | 'roll_bending_4', processLabel: string) {
     super();

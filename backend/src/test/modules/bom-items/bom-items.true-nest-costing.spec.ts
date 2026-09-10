@@ -9,7 +9,7 @@
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
-import { STANDARD_SHEETS } from '../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
+import { STANDARD_SHEETS, trueNestInputFingerprint } from '../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
 import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { type SupabaseService } from '../../../common/supabase/supabase.service';
@@ -32,6 +32,19 @@ const OUTLINE = [[0, 0], [50, 0], [50, 100], [0, 100]]; // 50x100mm rectangle --
 const NET_WEIGHT_KG = 1.234;
 const DENSITY_KG_M3 = 7850;
 const THICKNESS_MM = 1.6;
+
+// A cache entry is only a cache entry if it is stamped with the geometry it was
+// computed from -- see trueNestInputFingerprint. Reanalyze now carries the cache
+// forward instead of destroying it, so the fingerprint is what keeps a stale
+// entry from being reused against changed geometry.
+const fingerprintFor = (summary: { flatPatternHolesMm: unknown }) =>
+  trueNestInputFingerprint({
+    outlinePointsMm: OUTLINE,
+    holesMm: summary.flatPatternHolesMm,
+    thicknessMm: THICKNESS_MM,
+    densityKgM3: DENSITY_KG_M3,
+    netWeightKg: NET_WEIGHT_KG,
+  });
 
 function buildService(computeTrueNest: jest.Mock) {
   const cadAnalysisService = { computeTrueNest } as unknown as CADAnalysisService;
@@ -103,6 +116,7 @@ describe('resolveTrueShapeNestCosting — deterministic true-shape costing (no r
       trueNestCostingCache: {
         sheetWidthMm: 1500, sheetLengthMm: 3000, kerfMm: 0.56, edgeMarginMm: 2,
         partsPerSheet: 45, utilizationPct: 55.0, sheetWeightKg: 56.52, grossWeightPerPartKg: 1.256,
+        inputFingerprint: fingerprintFor({ flatPatternHolesMm: [] }),
       },
     };
 
@@ -126,6 +140,9 @@ describe('resolveTrueShapeNestCosting — deterministic true-shape costing (no r
       trueNestCostingCache: {
         sheetWidthMm: 1500, sheetLengthMm: 3000, kerfMm: 0.10 /* different kerf than requested below */, edgeMarginMm: 2,
         partsPerSheet: 45, utilizationPct: 55.0, sheetWeightKg: 56.52, grossWeightPerPartKg: 1.256,
+        // Stamped, so this test really exercises the kerf gate rather than
+        // passing because the entry has no fingerprint at all.
+        inputFingerprint: fingerprintFor({ flatPatternHolesMm: [] }),
       },
     };
 
@@ -223,5 +240,81 @@ describe('RTP2 batch-250 consumption math (D+E) -- same formula getCostSummary a
     // consumption and would silently understate real material usage.
     const wrongFormula = batchSize * selection.grossWeightPerPartKg;
     expect(actualBatchGrossMaterialKg).not.toBeCloseTo(wrongFormula, 0);
+  });
+});
+
+// ── The Reanalyze hang (root-caused 2026-09-09 from a live timeout) ───────────
+//
+// Reanalyze rebuilds featureGraph.summary from scratch, which used to destroy
+// trueNestCostingCache. An uncached resolve walks all 5 STANDARD_SHEETS
+// sequentially against cad-engine's single-threaded /nest -- 13-30s per sheet on
+// real parts -- and BOTH cost-summary and route-comparison resolve it on the
+// next page load, concurrently. Together that is minutes of work, and the
+// client gave up first: "ApiError: An unexpected error occurred", then
+// "Service temporarily unavailable" once the circuit breaker tripped.
+describe('resolveTrueShapeNestCosting — surviving Reanalyze without going stale', () => {
+  const cacheFor = (holesMm: unknown) => ({
+    sheetWidthMm: 1500, sheetLengthMm: 3000, kerfMm: 0.56, edgeMarginMm: 2,
+    partsPerSheet: 45, utilizationPct: 55.0, sheetWeightKg: 56.52, grossWeightPerPartKg: 1.256,
+    inputFingerprint: fingerprintFor({ flatPatternHolesMm: holesMm }),
+  });
+
+  it('reuses a cache carried across a Reanalyze that did not change the geometry', async () => {
+    const computeTrueNest = jest.fn(); // must NOT be called
+    const { call } = buildService(computeTrueNest);
+
+    // Same geometry, freshly re-extracted: a new summary object carrying the
+    // prior cache forward, exactly what the reanalyze endpoint now writes.
+    const reanalysed = {
+      flatPatternOutlinePointsMm: OUTLINE.map(([x, y]) => [x, y]),
+      flatPatternHolesMm: [],
+      trueNestCostingCache: cacheFor([]),
+    };
+
+    const result = await call(reanalysed);
+    expect(computeTrueNest).not.toHaveBeenCalled();
+    expect(result.selection?.partsPerSheet).toBe(45);
+  });
+
+  it('refuses a carried cache when the re-analysis really changed the flat pattern', async () => {
+    const computeTrueNest = jest.fn(() => Promise.resolve({ result: { partsPerSheet: 50, utilizationPct: 99 }, reason: '' }));
+    const { call } = buildService(computeTrueNest);
+
+    // The cache was computed with no holes; this part now has one. Carrying it
+    // forward must NOT mean trusting it — the old parts-per-sheet and gross
+    // weight would silently price the new geometry.
+    await call({
+      flatPatternOutlinePointsMm: OUTLINE,
+      flatPatternHolesMm: [{ x: 10, y: 10, d: 8 }],
+      trueNestCostingCache: cacheFor([]),
+    });
+
+    expect(computeTrueNest).toHaveBeenCalledTimes(STANDARD_SHEETS.length);
+  });
+
+  it('does the sheet walk once when two requests resolve the same part concurrently', async () => {
+    // cost-summary and route-comparison, both on the same page load, both
+    // missing the cache. Before single-flighting, this ran the whole 5-sheet
+    // walk twice — visible in the cad-engine log as every sheet size requested
+    // twice, back to back.
+    const computeTrueNest = jest.fn(() => Promise.resolve({ result: { partsPerSheet: 50, utilizationPct: 99 }, reason: '' }));
+    const { call } = buildService(computeTrueNest);
+    const summary = { flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] };
+
+    const [a, b] = await Promise.all([call(summary), call(summary)]);
+
+    expect(computeTrueNest).toHaveBeenCalledTimes(STANDARD_SHEETS.length);
+    expect(a).toEqual(b);
+  });
+
+  it('does not let a finished flight serve a later request with different geometry', async () => {
+    const computeTrueNest = jest.fn(() => Promise.resolve({ result: { partsPerSheet: 50, utilizationPct: 99 }, reason: '' }));
+    const { call } = buildService(computeTrueNest);
+
+    await call({ flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] });
+    computeTrueNest.mockClear();
+    await call({ flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [{ x: 5, y: 5, d: 3 }] });
+
+    expect(computeTrueNest).toHaveBeenCalledTimes(STANDARD_SHEETS.length);
   });
 });

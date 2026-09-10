@@ -1,0 +1,30 @@
+{
+  "name": "cmToolAssemblyNumOperators",
+  "file_path": "lookupTables/Component/cmToolAssemblyNumOperators.csv",
+  "columns": [
+    "Mold Base Area (m^2)",
+    "Num Operators Required"
+  ],
+  "records": [
+    {
+      "mold_base_area_m2": 1.0,
+      "num_operators_required": 1.0
+    },
+    {
+      "mold_base_area_m2": 2.0,
+      "num_operators_required": 2.0
+    },
+    {
+      "mold_base_area_m2": 3.0,
+      "num_operators_required": 3.0
+    },
+    {
+      "mold_base_area_m2": 4.0,
+      "num_operators_required": 4.0
+    },
+    {
+      "mold_base_area_m2": 100.0,
+      "num_operators_required": 5.0
+    }
+  ]
+}

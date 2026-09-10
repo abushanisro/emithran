@@ -562,6 +562,178 @@ export class SheetMetalLookupService {
     return typeof setupTimeHr === 'number' && setupTimeHr > 0 ? setupTimeHr * 60 : null;
   }
 
+  // ── Forming-route tooling-economics thresholds (2026-09-04) ────────────────
+  // Real, licensed USA-region sm_reference_data 'variable' rows (migration
+  // 479): progDieAnnualVolumeLimit ("Annual volume limit for a progressive
+  // die operation. Below this value, a progressive die operation is not
+  // economical...") and stageToolingAnnualVolumeLimit (same shape, for
+  // Tandem Press's hard tooling — "stage tooling" is the real reference-data
+  // term for it; migration 500/609's processDefaultMachine:Tandem Press ->
+  // tool_shop_name 'StageDiemaker1' confirms the link). Queried live rather
+  // than baked into a TS constant, unlike WATERJET_LEAD_IN_MM's pattern
+  // above, because this value directly drives a real per-quote economic
+  // verdict shown to the user — a future reference-data correction must take
+  // effect without a redeploy. Standard Press / Roll Bending 2/3/4 have no
+  // such sourced threshold anywhere in the real reference data — none is
+  // fabricated for them; callers must treat those two as the ONLY gated
+  // classes.
+  async getToolingAnnualVolumeThresholds(): Promise<{ progressiveDie: number | null; stageTooling: number | null }> {
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('key, value')
+      .eq('category', 'variable')
+      .in('key', ['progDieAnnualVolumeLimit', 'stageToolingAnnualVolumeLimit']);
+    if (error || !data?.length) return { progressiveDie: null, stageTooling: null };
+    const byKey = new Map(data.map((r) => [r.key as string, Number(r.value)]));
+    const progressiveDie = byKey.get('progDieAnnualVolumeLimit');
+    const stageTooling = byKey.get('stageToolingAnnualVolumeLimit');
+    return {
+      progressiveDie: typeof progressiveDie === 'number' && Number.isFinite(progressiveDie) ? progressiveDie : null,
+      stageTooling: typeof stageTooling === 'number' && Number.isFinite(stageTooling) ? stageTooling : null,
+    };
+  }
+
+  // ── Progressive Die / Tandem Press hard-tooling cost inputs (2026-09-10) ────
+  // Real, licensed sm_reference_data 'variable' rows (migration 479) that
+  // progressive-die-tooling-engine.ts needs to price the real die build — the
+  // same source these process-side threshold variables already come from
+  // (getToolingAnnualVolumeThresholds, above). Every value here is real; the
+  // caller must still supply the one thing this file cannot: what the die
+  // actually looks like (station count, feature counts), which it derives
+  // from real, already-extracted CAD features.
+  async getProgressiveDieToolingVariables(): Promise<{
+    dieBlockThicknessMm: number | null;
+    dieBlockLengthAllowanceMm: number | null;
+    dieBlockWidthAllowanceMm: number | null;
+    heatTreatCostUsdPerKg: number | null;
+    toolingMarkupPct: number | null;
+    sgAndAPct: number | null;
+    profitPct: number | null;
+    // Real per-die-block build-hour figures + design/assembly/debug/rework
+    // percentages (sm_reference_data, migration 479) — consumed by
+    // progressive-die-tooling-engine.ts's estimateToolBuildHours to compute a
+    // real, disclosed, UNPRICED toolmaker-hours estimate (no toolroom labor
+    // rate exists anywhere in this platform to convert them to a dollar
+    // figure — see that file's own doc comment for why).
+    dbCncSetupHrs: number | null;
+    dbMillingHrs: number | null;
+    dbCncHrsPerPocket: number | null;
+    dbMilledPocketsPerDieBlock: number | null;
+    dbGrindingHrsPerDieBlock: number | null;
+    dbDrillingHrsPerDieBlock: number | null;
+    dbWireEdmSetupHrs: number | null;
+    designHoursPct: number | null;
+    assemblyHoursPct: number | null;
+    debugHoursPct: number | null;
+    reworkHoursPct: number | null;
+    /** assyHrsCompProgDie — Progressive-Die-only dial; no equivalent exists for Tandem Press. */
+    progDieAssemblyDial: number | null;
+  }> {
+    const keys = [
+      'dieBlockThickness', 'dieBlockLengthAllowance', 'dieBlockWidthAllowance',
+      'stdHeatTreatCostPerKgProgDie', 'orMarkupPercent', 'percentSGandA', 'percentProfit',
+      'dbCncSetupHrs', 'dbMillingHrs', 'dbCncHrsPerPocket', 'dbMilledPocketsPerDieBlock',
+      'dbGrindingHrsPerDieBlock', 'dbDrillingHrsPerDieBlock', 'dbWireEdmSetupHrs',
+      'orDesignPercent', 'orAssemblyPercent', 'orDebugPercent', 'orReworkPercent',
+      'assyHrsCompProgDie',
+    ];
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('key, value')
+      .eq('category', 'variable')
+      .in('key', keys);
+    const none = {
+      dieBlockThicknessMm: null, dieBlockLengthAllowanceMm: null, dieBlockWidthAllowanceMm: null,
+      heatTreatCostUsdPerKg: null, toolingMarkupPct: null, sgAndAPct: null, profitPct: null,
+      dbCncSetupHrs: null, dbMillingHrs: null, dbCncHrsPerPocket: null, dbMilledPocketsPerDieBlock: null,
+      dbGrindingHrsPerDieBlock: null, dbDrillingHrsPerDieBlock: null, dbWireEdmSetupHrs: null,
+      designHoursPct: null, assemblyHoursPct: null, debugHoursPct: null, reworkHoursPct: null,
+      progDieAssemblyDial: null,
+    };
+    if (error || !data?.length) return none;
+    const byKey = new Map(data.map((r) => [r.key as string, Number(r.value)]));
+    const num = (k: string) => {
+      const v = byKey.get(k);
+      return typeof v === 'number' && Number.isFinite(v) ? v : null;
+    };
+    // orMarkupPercent/orDesignPercent/orAssemblyPercent/orDebugPercent/
+    // orReworkPercent are all seeded as whole numbers ('10' meaning 10%);
+    // percentSGandA/percentProfit are seeded as fractions ('.1' meaning
+    // 10%) — real, sourced, and genuinely stored in two different
+    // conventions (verified directly against migration 479's own seeded
+    // values). Normalised to fractions here, once, so every caller
+    // multiplies the same way.
+    const pct = (k: string) => { const v = num(k); return v === null ? null : v / 100; };
+    return {
+      dieBlockThicknessMm: num('dieBlockThickness'),
+      dieBlockLengthAllowanceMm: num('dieBlockLengthAllowance'),
+      dieBlockWidthAllowanceMm: num('dieBlockWidthAllowance'),
+      heatTreatCostUsdPerKg: num('stdHeatTreatCostPerKgProgDie'),
+      toolingMarkupPct: pct('orMarkupPercent'),
+      sgAndAPct: num('percentSGandA'),
+      profitPct: num('percentProfit'),
+      dbCncSetupHrs: num('dbCncSetupHrs'),
+      dbMillingHrs: num('dbMillingHrs'),
+      dbCncHrsPerPocket: num('dbCncHrsPerPocket'),
+      dbMilledPocketsPerDieBlock: num('dbMilledPocketsPerDieBlock'),
+      dbGrindingHrsPerDieBlock: num('dbGrindingHrsPerDieBlock'),
+      dbDrillingHrsPerDieBlock: num('dbDrillingHrsPerDieBlock'),
+      dbWireEdmSetupHrs: num('dbWireEdmSetupHrs'),
+      designHoursPct: pct('orDesignPercent'),
+      assemblyHoursPct: pct('orAssemblyPercent'),
+      debugHoursPct: pct('orDebugPercent'),
+      reworkHoursPct: pct('orReworkPercent'),
+      progDieAssemblyDial: num('assyHrsCompProgDie'),
+    };
+  }
+
+  /**
+   * Real per-component progressive-die / stage-tooling BOM costs — staged
+   * verbatim from the licensed reference dataset (migration 720,
+   * memory/sheetmetal/lookuptable/component_standard_costs.json). One row per
+   * (component, model) pair actually on file; `model` is null for
+   * single-variant components.
+   */
+  async getToolingComponentCosts(): Promise<Array<{
+    componentName: string; model: string | null; sizeMm: number | null;
+    costUsd: number; weightKg: number | null;
+  }>> {
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_lookup_tooling_component_costs')
+      .select('component_name, model, size_mm, cost_usd, weight_kg');
+    if (error || !data?.length) return [];
+    return data.map((r: any) => ({
+      componentName: r.component_name as string,
+      model: (r.model ?? null) as string | null,
+      sizeMm: r.size_mm != null ? Number(r.size_mm) : null,
+      costUsd: Number(r.cost_usd),
+      weightKg: r.weight_kg != null ? Number(r.weight_kg) : null,
+    }));
+  }
+
+  /**
+   * Real per-kg tooling coating cost for one (toolMaterial, coatingType) pair
+   * — staged verbatim (migration 721,
+   * memory/sheetmetal/lookuptable/coating_cost_table.json). Returns null when
+   * this exact pair has no real seeded rate; never substitutes a different
+   * pair's rate.
+   */
+  async getToolingCoatingCostPerKg(toolMaterial: string, coatingType: string): Promise<number | null> {
+    const db = this.supabase.getAdminClient();
+    const { data, error } = await db
+      .from('sm_lookup_tooling_coating_cost')
+      .select('coating_cost_usd_per_kg')
+      .eq('tool_material', toolMaterial)
+      .eq('coating_type', coatingType)
+      .maybeSingle();
+    if (error || !data) return null;
+    const v = Number(data.coating_cost_usd_per_kg);
+    return Number.isFinite(v) ? v : null;
+  }
+
   // ── 2-Axis Router cutting params (Track B Phase 2, tblRouterUtilities.json) ──
   // Real data covers only Aluminum/Copper — see ROUTER_FAMILY_KEY's own
   // comment. Multiple tool_diameter_mm rows exist per material family, all
@@ -963,9 +1135,24 @@ export class SheetMetalLookupService {
   // result. No fallback constant when the table has no row yet for this
   // operation — callers disclose the gap (dataFound:false) and must not price
   // a fabricated setup time; 0 here is a neutral placeholder, never charged.
-  resolveOpSetupMin(resolved: { minutes: Map<string, number>; dataFound: Set<string> }, operation: string): { minutes: number; dataFound: boolean } {
+  /**
+   * The real per-operation setup minutes, or `null` when this operation has no
+   * sm_lookup_op_setup_time row.
+   *
+   * A miss used to return `minutes: 0`, and callers pass `.minutes` straight
+   * into engines. Sixteen engines survived that only because
+   * resolveSetupMinutes rejects 0 as "the column was never populated"; the one
+   * that had its own chain (PressStrokeEngine) accepted it via `!= null` and
+   * charged $0.00 setup on every Standard Press, Tandem Press, Progressive Die
+   * and Shearing line -- while the machine carried a real setup_time_hr. That
+   * table has 11 rows and none of them is a press class, so the miss was the
+   * normal case there, not an edge one.
+   *
+   * `null` makes the absence unrepresentable as a quantity.
+   */
+  resolveOpSetupMin(resolved: { minutes: Map<string, number>; dataFound: Set<string> }, operation: string): { minutes: number | null; dataFound: boolean } {
     if (resolved.dataFound.has(operation)) return { minutes: resolved.minutes.get(operation)!, dataFound: true };
-    return { minutes: 0, dataFound: false };
+    return { minutes: null, dataFound: false };
   }
 
   // ── Per-feature, per-method inspection cycle time (sec) ───────────────────

@@ -1,0 +1,15 @@
+{
+  "name": "tblCavityPlateDepthBorder",
+  "sourceFilePath": "lookupTables/Component/tblCavityPlateDepthBorder.csv",
+  "digitalFactory": "aPriori USA",
+  "fields": [
+    "Cavity Plate Depth Border (in)",
+    "Max Press Force (kN)"
+  ],
+  "records": [
+    { "Cavity Plate Depth Border (in)": 3.00, "Max Press Force (kN)": 498.20 },
+    { "Cavity Plate Depth Border (in)": 4.00, "Max Press Force (kN)": 3985.60 },
+    { "Cavity Plate Depth Border (in)": 5.00, "Max Press Force (kN)": 14946.00 },
+    { "Cavity Plate Depth Border (in)": 5.50, "Max Press Force (kN)": 999999999.00 }
+  ]
+}
