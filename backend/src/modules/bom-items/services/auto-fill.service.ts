@@ -269,9 +269,16 @@ export class AutoFillService {
     if (cadFamilyClassification.sheetMetalVetoed && processSuggestion.processType.startsWith('Sheet Metal')) {
       // The process heuristic also thinks "flat = sheet" — align it with the veto,
       // following whichever family Python's veto disambiguation actually picked
-      // (uniform-wall shell → molded; stepped plate → machined).
-      processSuggestion.processType =
-        cadFamilyClassification.family === 'injection_molded' ? 'Injection Molding' : 'CNC Machining';
+      // (uniform-wall shell → molded; stepped plate → machined). Real, DB-driven
+      // label (resolveDbDrivenProcessLabel) — never a hardcoded process-name
+      // string; falls back to 'CNC Machining' only when the veto's own
+      // disambiguation didn't land on a family the registry recognizes (it
+      // always picks 'injection_molded' or 'cnc_milled' today, both covered).
+      const vetoProcessType = await this.resolveDbDrivenProcessLabel(
+        cadFamilyClassification.family ?? 'cnc_milled',
+        accessToken,
+      );
+      processSuggestion.processType = vetoProcessType ?? 'CNC Machining';
       this.logger.debug(
         `[classify] Sheet-metal veto upheld: ${cadFamilyClassification.family ?? 'cnc_milled'} — ` +
         `process → ${processSuggestion.processType}`,
