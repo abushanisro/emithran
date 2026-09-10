@@ -49,6 +49,7 @@ import { toast } from 'sonner';
 import { InlineReferenceTableEditor } from '@/components/features/calculators/builder/InlineReferenceTableEditor';
 import { useAuth } from '@/lib/providers/auth';
 import { adaptMappingsToProcessCatalogTree } from '@/lib/processCatalog/process-catalog-tree';
+import { useCollapsedGroups } from '@/lib/utils/useCollapsedGroups';
 
 // Helper function to convert snake_case to camelCase
 const snakeToCamel = (str: string): string => {
@@ -80,6 +81,10 @@ export default function ProcessPage() {
   // aliases — process_taxonomy, migration 609/610) is expanded inline.
   // Single-select accordion — opening one closes any other, so the page
   // never accumulates several open detail panels at once.
+  // Category sub-grouping within each process_group card (machine_category,
+  // migration 732) — same collapse-state shape HR Rates already uses for its
+  // own category grouping (lib/utils/useCollapsedGroups.ts).
+  const collapsedCategories = useCollapsedGroups([]);
   const [expandedOpId, setExpandedOpId] = useState<string | null>(null);
   const toggleOpExpanded = (id: string) => {
     setExpandedOpId((prev) => (prev === id ? null : id));
@@ -931,6 +936,23 @@ export default function ProcessPage() {
                 grouped[m.processGroup]!.push(m);
               }
 
+              // Category sub-grouping within each process_group (machine_category,
+              // migration 732) — real, verified categories only (Sheet Metal so
+              // far). A group with zero real categories renders exactly as before
+              // (one flat pill list, no sub-header) so every other process_group
+              // is visually unchanged until it gets its own verified pass.
+              const UNCATEGORIZED = '__uncategorized__';
+              const categorySubgroups: Record<string, Record<string, typeof allMappings>> = {};
+              for (const [group, ops] of Object.entries(grouped)) {
+                const byCategory: Record<string, typeof allMappings> = {};
+                for (const op of ops) {
+                  const cat = op.machineCategory ?? UNCATEGORIZED;
+                  if (!byCategory[cat]) byCategory[cat] = [];
+                  byCategory[cat]!.push(op);
+                }
+                categorySubgroups[group] = byCategory;
+              }
+
               if (filtered.length === 0) {
                 return (
                   <div className="text-center py-12 text-muted-foreground">
@@ -982,10 +1004,40 @@ export default function ProcessPage() {
                           </button>
                         </div>
                       </div>
-                      {/* Operations — flat, no route tier */}
-                      <div className="p-3">
+                      {/* Operations — category sub-grouped when this process_group has
+                          any real, verified machine_category (migration 732); a group
+                          with none renders its single UNCATEGORIZED bucket with no
+                          sub-header, i.e. exactly the prior flat layout. */}
+                      <div className="p-3 space-y-2">
+                        {(() => {
+                          const byCategory = categorySubgroups[group] ?? { [UNCATEGORIZED]: ops };
+                          const categoryNames = Object.keys(byCategory);
+                          const hasRealCategories = categoryNames.some((c) => c !== UNCATEGORIZED);
+                          // Real categories first (alphabetical), uncategorized last.
+                          const orderedCategories = [
+                            ...categoryNames.filter((c) => c !== UNCATEGORIZED).sort((a, b) => a.localeCompare(b)),
+                            ...(byCategory[UNCATEGORIZED] ? [UNCATEGORIZED] : []),
+                          ];
+                          return orderedCategories.map((catName) => {
+                            const catOps = byCategory[catName]!;
+                            const collapseKey = `${group}::${catName}`;
+                            const isCatCollapsed = hasRealCategories && collapsedCategories.isCollapsed(collapseKey);
+                            return (
+                              <div key={catName}>
+                                {hasRealCategories && (
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-1.5 py-1 text-left text-xs font-semibold text-foreground hover:text-primary"
+                                    onClick={() => collapsedCategories.toggle(collapseKey)}
+                                  >
+                                    {isCatCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                    {catName === UNCATEGORIZED ? 'Uncategorized' : catName}
+                                    <span className="font-normal text-muted-foreground">({catOps.length})</span>
+                                  </button>
+                                )}
+                                {!isCatCollapsed && (
                               <div className="flex flex-wrap gap-1.5 items-start">
-                                {ops.map((op) => {
+                                {catOps.map((op) => {
                                   // Inactive rows must never show taxonomy detail, even when they
                                   // share a canonical_process_id with an active row (the correct,
                                   // intended shape once duplicates are consolidated onto one real
@@ -1104,6 +1156,11 @@ export default function ProcessPage() {
                                   );
                                 })}
                               </div>
+                                )}
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
                   ))}
