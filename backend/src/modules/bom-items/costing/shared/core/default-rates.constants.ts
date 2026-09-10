@@ -1,4 +1,12 @@
-export const LASER_SETUP_MIN = 15;       // minutes per batch
+// Corrected 2026-09-10: was 15 with no citation. All 65 real
+// machine_library.json laser-cutting rows report the identical real
+// setup_time_hr=0.08 (4.8min) uniformly — "Fiber Laser Cutting Machine" (26),
+// "Laser Cutting Machine" (24, the real co2_laser fleet), and "3D Laser
+// Cutting Machine" (15) — same disclosed-fallback convention as
+// WATERJET_SETUP_MIN/OXYFUEL_SETUP_MIN below. Used only when a specific
+// machine's own mhr_records.setup_time_hr is absent (resolveSetupMinutes()
+// prefers that real per-machine value first — see laser-cutting-engine.ts).
+export const LASER_SETUP_MIN = 4.8;      // minutes per batch — real, cited above
 export const PRESS_BRAKE_SETUP_MIN = 20;
 export const TAPPING_SETUP_MIN = 10;
 export const CMM_SETUP_MIN = 15;         // per batch — program recall + fixture + datum alignment
