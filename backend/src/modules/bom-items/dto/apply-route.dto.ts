@@ -15,7 +15,7 @@ const SUPPORTED_LOCATIONS = Object.keys(LOCATION_INFO);
 // valid here with no separate edit. CNC/injection-molding ids are unrelated
 // route families with their own fixed, real machine/tonnage tiers — not part
 // of this registry.
-const VALID_ROUTE_IDS: RouteId[] = [
+export const VALID_ROUTE_IDS: RouteId[] = [
   ...getCuttingRouteIds(),
   ...getFormingRouteIds(),
   'cnc-3ax', 'cnc-4ax', 'cnc-5ax',

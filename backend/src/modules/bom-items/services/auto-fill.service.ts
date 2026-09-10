@@ -306,11 +306,18 @@ export class AutoFillService {
     // We don't have materialGrade yet (that comes from step 3), so use null — the
     // physics engine falls back to mild-steel baseline for sheet metal, which is the
     // most conservative (slowest) speed. Material grade is applied in step 5 costs.
+    // Real IM wall thickness (cadMI.features.wall_thickness_nominal_mm), when the
+    // part was actually classified injection_molded and cad-engine computed it —
+    // never geo.sheetThicknessMm, a different, sheet-metal-shaped geometric fact
+    // (see computePhysicsCycleTime's own IM branch for why that reuse was wrong).
+    const imWallThicknessNominalMm: number | undefined =
+      cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence?.features?.wall_thickness_nominal_mm;
     const physicsResult = this.computePhysicsCycleTime(
       processSuggestion.processType,
       rawGeometry,
       null, // material grade not yet resolved
       processSuggestion.estimatedCycleTimeMin,
+      imWallThicknessNominalMm,
     );
     processSuggestion.estimatedCycleTimeMin = physicsResult.cycleTimeMin;
     // NOTE: this is a whole-process (cut+pierce+bend+deburr combined), pre-
@@ -1457,6 +1464,7 @@ export class AutoFillService {
     geo: RawGeometry,
     materialGrade: string | null,
     heuristicCycleTimeMin: number,
+    imWallThicknessNominalMm?: number,
   ): { cycleTimeMin: number; source: 'physics' | 'heuristic' } {
     const isSheetMetal = processType.startsWith('Sheet Metal');
     const isIM = processType === 'Injection Molding' || processType === 'Injection Moulding';
@@ -1498,8 +1506,15 @@ export class AutoFillService {
 
     // ── Injection Molding ─────────────────────────────────────────────────────
     if (isIM) {
-      const wallMm = geo.sheetThicknessMm > 0
-        ? geo.sheetThicknessMm                // sheet thickness re-used as wall proxy
+      // Root-caused: this used to fall back to geo.sheetThicknessMm as a "wall
+      // thickness proxy" — a different, sheet-metal-shaped geometric fact
+      // (antiparallel-face-pair gauge), silently wrong for an actual IM part.
+      // Real wall thickness (cadMI.features.wall_thickness_nominal_mm, computed
+      // by InjectionMoldedFeatureExtractor) is preferred here; the disclosed
+      // thinWallCount-based heuristic only applies when that real value is
+      // unavailable (e.g. Python family classifier didn't reach the IM gate).
+      const wallMm = imWallThicknessNominalMm && imWallThicknessNominalMm > 0
+        ? imWallThicknessNominalMm
         : geo.thinWallCount > 0 ? 2.0 : 3.0; // fallback: 2mm thin-wall, 3mm standard
       const bb = geo.boundingBox;
       const dims = [bb.length, bb.width, bb.height].filter((d) => d > 0).sort((a, b) => b - a);

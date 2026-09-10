@@ -28,6 +28,7 @@ import type {
 import type { IMProcessTree, MoldingSubtype } from './process-tree';
 import { isSiliconeGrade } from './process-tree';
 import type { InjectionMoldingSignals } from './routing-engine';
+import { computeMoldToolingCost } from './mold-tooling-engine';
 import { buildInjectionMoldingRoute } from './routing-engine';
 import {
   computeCycleTime,
@@ -95,25 +96,40 @@ const SELF_DEGATE_TYPES: ReadonlySet<GateType> = new Set(['hot_tip', 'sub']);
 // 101/102, false for 103-105) — whether the mold uses a replaceable
 // hardened cavity insert — a real signal not modeled anywhere in this
 // engine yet; disclosed here as a follow-up, not added in this pass.
+//
+// baseCostUsd was removed from this table (2026-09-10) — those 5 flat
+// dollar figures had no DB/migration/literature citation anywhere (unlike
+// lifeShotRating above). Mold cost is now computed from the real, itemized
+// mold-tooling BOM (mold-tooling-engine.ts) instead of a per-class constant
+// — mold class now drives only the life-rating check in recommendMoldClass.
 
 export type MoldClass = 'Class101' | 'Class102' | 'Class103' | 'Class104' | 'Class105';
 
 interface MoldClassSpec {
   lifeShotRating: number; // shots the mold is rated for
-  baseCostUsd: number;    // single-cavity base cost (USD)
 }
 
 const SPI_MOLD_CLASSES: Record<MoldClass, MoldClassSpec> = {
-  Class101: { lifeShotRating: 9_999_999_999, baseCostUsd: 50_000 },
-  Class102: { lifeShotRating:     1_000_000, baseCostUsd: 25_000 },
-  Class103: { lifeShotRating:       500_000, baseCostUsd: 12_000 },
-  Class104: { lifeShotRating:       100_000, baseCostUsd:  5_000 },
-  Class105: { lifeShotRating:         5_000, baseCostUsd:  1_500 },
+  Class101: { lifeShotRating: 9_999_999_999 },
+  Class102: { lifeShotRating:     1_000_000 },
+  Class103: { lifeShotRating:       500_000 },
+  Class104: { lifeShotRating:       100_000 },
+  Class105: { lifeShotRating:         5_000 },
 };
 
 // Ordered from cheapest to most expensive — pick first class whose rated life
 // covers the required lifetime shots.
 const MOLD_CLASS_ORDER: MoldClass[] = ['Class105', 'Class104', 'Class103', 'Class102', 'Class101'];
+
+// Multi-cavity scaling: real per-additional-cavity component-count data was
+// not found in any sourced table (see mold-tooling-engine.ts's own doc
+// comment) — this +35%-of-base-per-additional-cavity figure is retained as a
+// disclosed engineering estimate, unchanged from before the BOM-cost fix,
+// applied now to the real itemized BOM subtotal instead of a flat SPI
+// per-class constant.
+export function computeMoldCost(baseCostUsd: number, cavityCount: number): number {
+  return baseCostUsd + Math.max(0, cavityCount - 1) * baseCostUsd * 0.35;
+}
 
 export function recommendMoldClass(
   lifetimeShots: number,
@@ -135,15 +151,6 @@ export function recommendMoldClass(
     cls = MOLD_CLASS_ORDER[Math.min(MOLD_CLASS_ORDER.length - 1, idx + 1)] ?? cls;
   }
   return cls;
-}
-
-export function computeMoldCost(
-  moldClass: MoldClass,
-  cavityCount: number,
-): number {
-  const spec = SPI_MOLD_CLASSES[moldClass];
-  // Additional cavities cost ~35% of base each (shared base plate, guide pins, ejector system)
-  return spec.baseCostUsd + Math.max(0, cavityCount - 1) * spec.baseCostUsd * 0.35;
 }
 
 // ── Cavity count recommendation ───────────────────────────────────────────────
@@ -663,7 +670,18 @@ export function computeInjectionMoldedCostSummary(
     // Unscrewing cores add mold complexity beyond parting line — treat as additional undercut bump.
     const effectiveUndercutCount = (signals.undercutCount ?? 0) + ((signals as any).unscrewingCoreCount ?? 0);
     const moldClass = recommendMoldClass(lifetimeShots, signals.partingComplexity ?? null, effectiveUndercutCount);
-    const moldCostUsd = r2(computeMoldCost(moldClass, cavityCount));
+
+    // Real required mold-window area (projected area x cavity count) — same
+    // bbox-product fallback cycle-time.ts already uses when CAD hasn't
+    // supplied a real projected area (see recommendGateType, cycle-time.ts:328).
+    const projectedAreaMm2 = signals.projectedAreaMm2 ?? (bboxMax * bboxMid);
+    const moldBaseAreaMm2 = Math.max(0, projectedAreaMm2) * cavityCount;
+    const moldTooling = computeMoldToolingCost({
+      moldBaseAreaMm2,
+      cavityCount,
+      undercutCount: effectiveUndercutCount,
+    });
+    const moldCostUsd = r2(computeMoldCost(moldTooling.bomSubtotalUsd, cavityCount));
     const moldCostPerPartUsd = r2(moldCostUsd / (annualVol * prodLife));
     toolingResult = {
       moldClass,
@@ -672,7 +690,14 @@ export function computeInjectionMoldedCostSummary(
       moldCostPerPartUsd,
       annualVolume: annualVol,
       productionLifeYears: prodLife,
+      moldBomSubtotalUsd: moldTooling.bomSubtotalUsd,
+      moldMissingComponents: moldTooling.missingComponents,
+      moldEstimatedDesignHrs: moldTooling.estimatedDesignHrs,
+      moldEstimatedMachiningHrs: moldTooling.estimatedMachiningHrs,
+      moldEstimatedAssemblyHrs: moldTooling.estimatedAssemblyHrs,
+      moldEstimatedAssemblyOperators: moldTooling.estimatedAssemblyOperators,
     };
+    warnings.push(...moldTooling.warnings);
     if (moldCostPerPartUsd > materialCostPerKg * netWeightKg * 2) {
       warnings.push(
         `Tooling-dominated: mold cost $${moldCostUsd.toFixed(0)} amortizes to $${moldCostPerPartUsd.toFixed(3)}/part — ` +
