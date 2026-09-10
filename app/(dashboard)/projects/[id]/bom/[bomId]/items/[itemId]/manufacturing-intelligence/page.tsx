@@ -2653,6 +2653,18 @@ function CostSummaryTab({
                     <span className="text-xs tabular-nums text-foreground shrink-0">+{fmtL((setupPerPart + cyclePerPart) * (scrap / 100) * fromUsd)}</span>
                   </div>
                 )}
+                {/* Per-line total — Setup + Run + Scrap, the same real figure
+                    already shown on this line's collapsed header ($ and %
+                    of Total Direct Process) and in the Edit Process Cost
+                    dialog's own "Total Cost" field — surfaced here too so the
+                    per-line breakdown is self-contained without needing to
+                    collapse the row to see what it adds up to. */}
+                <div className="flex items-baseline justify-between gap-2 min-w-0 border-t border-border/20 pt-1">
+                  <span className="text-xs font-medium text-foreground truncate min-w-0">Total</span>
+                  <span className="text-xs font-medium tabular-nums text-foreground shrink-0">
+                    {fmtL((setupPerPart + cyclePerPart) * (1 + scrap / 100) * fromUsd)}
+                  </span>
+                </div>
 
                 {/* Full real machine specification behind this line — every
                     staged field for the machine actually costed, not a curated
