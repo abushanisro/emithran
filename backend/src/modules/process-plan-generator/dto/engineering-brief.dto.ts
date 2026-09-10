@@ -9,7 +9,7 @@ export type PartFamily =
   | 'cnc_turned'
   | 'cnc_milled'
   | 'sheet_metal'
-  | 'injection_molded'
+  | 'plastic_molded'
   | 'out_of_scope';
 
 export interface PartFamilyDecision {

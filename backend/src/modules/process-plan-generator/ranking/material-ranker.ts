@@ -42,7 +42,7 @@ const PREFERRED_MATERIALS_BY_FAMILY: Record<Exclude<PartFamily, 'out_of_scope'>,
   cnc_turned:       ['aluminium', 'aluminum', 'mild steel', 'ms', 'en8', 'en24', 'stainless', 'ss304', 'ss316', 'brass', 'copper', 'free cutting steel'],
   cnc_milled:       ['aluminium', 'aluminum', 'mild steel', 'en8', 'en19', 'en24', 'stainless', 'ss304', 'ss316', 'p20', 'h13', 'tool steel'],
   sheet_metal:      ['mild steel', 'ms', 'cold rolled', 'crca', 'galvanized', 'galvanised', 'gi', 'stainless', 'ss304', 'aluminium sheet', 'aluminum sheet', 'aluminium 5052', 'aluminium 6061', 'aluminium 1100', 'aluminium 3003', 'aluminum 5052', 'aluminum 6061'],
-  injection_molded: ['abs', 'pp', 'polypropylene', 'pc', 'polycarbonate', 'nylon', 'pa6', 'pa66', 'pom', 'acetal', 'delrin', 'hdpe', 'ldpe', 'peek', 'tpu', 'tpe', 'plastic'],
+  plastic_molded: ['abs', 'pp', 'polypropylene', 'pc', 'polycarbonate', 'nylon', 'pa6', 'pa66', 'pom', 'acetal', 'delrin', 'hdpe', 'ldpe', 'peek', 'tpu', 'tpe', 'plastic'],
 };
 
 const EXCLUDED_MATERIALS_BY_FAMILY: Partial<Record<Exclude<PartFamily, 'out_of_scope'>, string[]>> = {

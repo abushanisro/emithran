@@ -350,7 +350,7 @@ const FAMILY_GROUP: Record<string, string> = {
   sheet_metal: 'Sheet Metal',
   cnc_milled: 'CNC Machining',
   cnc_turned: 'CNC Turning',
-  injection_molded: 'Plastic Molding',
+  plastic_molded: 'Plastic Molding',
   casting: 'Die Casting',
   forging: 'Forging',
   weldment: 'Welding',
@@ -720,14 +720,14 @@ function FeatureBreakdown({
 }
 // SPECIFIC-process label (the CAD family's own detected process, one level
 // finer than FAMILY_GROUP's category above — 'Injection Moulded' here is
-// deliberately narrower than FAMILY_GROUP.injection_molded's 'Plastic
+// deliberately narrower than FAMILY_GROUP.plastic_molded's 'Plastic
 // Molding' category; the CAD classifier itself has no sub-classification
 // among Injection/Compression/RIM/Structural Foam Molding yet, so this
-// always reads 'Injection Moulded' for the injection_molded family today).
+// always reads 'Injection Moulded' for the plastic_molded family today).
 function familyLabel(f: string): string {
   const m: Record<string, string> = {
     sheet_metal: 'Sheet Metal', cnc_milled: 'CNC Milled', cnc_turned: 'CNC Turned',
-    mill_turn: 'Mill-Turn', injection_molded: 'Injection Moulded',
+    mill_turn: 'Mill-Turn', plastic_molded: 'Injection Moulded',
     casting: 'Casting', forging: 'Forging',
     extrusion: 'Extrusion', weldment: 'Weldment', additive: 'Additive',
   };
@@ -1182,7 +1182,7 @@ function buildProcessTree(
     // the first real operation in this part's own resolved list is, whatever
     // that operation happens to be named or however many/few steps the
     // engineer chose to add.
-    const isFirstOpForFamily = family === 'injection_molded' && opIdx === 0;
+    const isFirstOpForFamily = family === 'plastic_molded' && opIdx === 0;
 
     // Only the real, DB-resolved machine from the live cost engine is ever
     // shown here — no fabricated placeholder. Matched by EXACT process name
@@ -1594,7 +1594,7 @@ function buildProcessTree(
     }
 
     if (isInspection) {
-      if (family === 'injection_molded') {
+      if (family === 'plastic_molded') {
         // Injection-molded QC: visual → dimensional → weight check (routing engine baseline).
         featureNodes.push({
           id: 'feat_im_visual', kind: 'feature', label: 'Visual Inspection',
@@ -1646,7 +1646,7 @@ function buildProcessTree(
   });
 
   // Inject Threaded Features from drawing intelligence for CNC families
-  const isCNCFamily = family !== 'sheet_metal' && family !== 'injection_molded';
+  const isCNCFamily = family !== 'sheet_metal' && family !== 'plastic_molded';
   const diThreadSpecs = isCNCFamily
     ? ((item.drawingIntelligence as any)?.threads as Array<{ size: string; pitch: number; count: number }> | undefined)
     : undefined;
@@ -2798,6 +2798,71 @@ function CostSummaryTab({
                   </div>
                 )}
 
+                {/* Real clamp/shot tonnage math for this machine — same
+                    formula and per-polymer-family clamp-factor table
+                    (resolveMaterialClampFactor, machine-selector-im.ts)
+                    evaluateIMCandidate uses to score/accept machines during
+                    route comparison, now also shown for the actual applied
+                    quote instead of only in the Process tab's route-compare
+                    cards. cost.injectionMolding only exists on an
+                    injection-molded quote — its own presence is the gate, no
+                    separate family check needed. Scoped to the real IM
+                    machine-class rows (Mold Setup/Injection/Packing/Cooling/
+                    Ejection) — an Inspection or manual-rate row has no clamp
+                    tonnage to show. */}
+                {cost.injectionMolding && IM_MACHINE_CLASSES.has(proc.machineClass ?? '') && (
+                  <div className="border-t border-border/20 pt-1.5 space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                      Tonnage / Clamp Force
+                    </p>
+                    {cost.injectionMolding.clampRequiredT != null ? (
+                      <div className="flex items-baseline justify-between gap-2 min-w-0">
+                        <span className="text-xs text-muted-foreground truncate min-w-0">
+                          Required{cost.injectionMolding.materialClampFactor != null
+                            ? ` (${fmt(cost.injectionMolding.projectedAreaCm2, 0)} cm² × ${cost.injectionMolding.cavityCount} cav × ${cost.injectionMolding.materialClampFactor.toFixed(2)} t/cm² × 1.15)`
+                            : ''}
+                        </span>
+                        <span className="text-xs tabular-nums text-foreground shrink-0">
+                          {fmt(cost.injectionMolding.clampRequiredT, 0)}T
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] italic text-muted-foreground/60">
+                        Real clamp requirement unavailable — no projected area on file yet.
+                      </p>
+                    )}
+                    {cost.injectionMolding.clampMachineT != null && (
+                      <div className="flex items-baseline justify-between gap-2 min-w-0">
+                        <span className="text-xs text-muted-foreground truncate min-w-0">Machine capacity</span>
+                        <span className="text-xs tabular-nums text-foreground shrink-0">
+                          {fmt(cost.injectionMolding.clampMachineT, 0)}T
+                        </span>
+                      </div>
+                    )}
+                    {cost.injectionMolding.clampUtilPct != null && (
+                      <div className="flex items-baseline justify-between gap-2 min-w-0">
+                        <span className="text-xs text-muted-foreground truncate min-w-0">Clamp utilization</span>
+                        <span className={cn(
+                          'text-xs tabular-nums shrink-0',
+                          cost.injectionMolding.clampUtilPct > 100 ? 'text-red-500 font-medium' : 'text-foreground',
+                        )}>
+                          {fmt(cost.injectionMolding.clampUtilPct, 0)}%
+                          {cost.injectionMolding.clampUtilPct > 100 ? ' — over capacity' : ''}
+                        </span>
+                      </div>
+                    )}
+                    {cost.injectionMolding.shotRequiredG != null && cost.injectionMolding.shotMachineG != null && (
+                      <div className="flex items-baseline justify-between gap-2 min-w-0">
+                        <span className="text-xs text-muted-foreground truncate min-w-0">Shot required / machine</span>
+                        <span className="text-xs tabular-nums text-foreground shrink-0">
+                          {fmt(cost.injectionMolding.shotRequiredG, 0)}g / {fmt(cost.injectionMolding.shotMachineG, 0)}g
+                          {cost.injectionMolding.shotUtilPct != null ? ` (${fmt(cost.injectionMolding.shotUtilPct, 0)}%)` : ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Full real machine specification behind this line — every
                     staged field for the machine actually costed, not a curated
                     subset. Reuses the same reference-detail endpoint and
@@ -3164,6 +3229,45 @@ function RouteComparisonCard({
                       <p className="text-xs font-medium tabular-nums text-foreground">{sym}{fmt(route.abrasiveCost, 2)}</p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Clamp tonnage / shot capacity — real per-part sizing math for
+                  injection-molding tonnage-tier routes only (evaluateIMCandidate,
+                  machine-selector-im.ts). Required = projected area × cavities ×
+                  material clamp factor × 1.15 safety margin, checked against this
+                  tier's real (or, absent a DB machine, synthetic) machine rating —
+                  never a fixed number per route, it changes with the part. */}
+              {!incapable && route.injectionMolding && (
+                <div className="px-3 py-2 border-t border-border/30 grid grid-cols-2 gap-2 bg-background">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Clamp Tonnage</p>
+                    <p className="text-xs font-medium tabular-nums text-foreground">
+                      {route.injectionMolding.clampRequiredT != null
+                        ? `${fmt(route.injectionMolding.clampRequiredT, 0)}T req / ${fmt(route.injectionMolding.clampMachineT ?? 0, 0)}T machine`
+                        : `${fmt(route.injectionMolding.clampMachineT ?? 0, 0)}T machine`}
+                    </p>
+                    {route.injectionMolding.clampUtilPct != null && (
+                      <p className="text-[10px] text-muted-foreground tabular-nums">
+                        {fmt(route.injectionMolding.clampUtilPct, 0)}% utilization
+                        {route.injectionMolding.machineDataSource === 'synthetic' ? ' · class estimate' : ''}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Shot / Cavities</p>
+                    <p className="text-xs font-medium tabular-nums text-foreground">
+                      {route.injectionMolding.shotRequiredG != null && route.injectionMolding.shotMachineG != null
+                        ? `${fmt(route.injectionMolding.shotRequiredG, 0)}g / ${fmt(route.injectionMolding.shotMachineG, 0)}g`
+                        : '—'}
+                      {' · '}{route.injectionMolding.cavityCount}-cavity
+                    </p>
+                    {route.injectionMolding.shotUtilPct != null && (
+                      <p className="text-[10px] text-muted-foreground tabular-nums">
+                        {fmt(route.injectionMolding.shotUtilPct, 0)}% shot util · {route.injectionMolding.gateType} gate
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -4150,6 +4254,11 @@ interface WorkflowStep {
   options: WorkflowStepOption[];
 }
 
+// The 4 real Plastic Molding machine_class slugs (migration 633/645/734) —
+// used to scope the Tonnage/Clamp Force panel to rows actually costed on one
+// of these real machines, never on an Inspection/manual-rate row.
+const IM_MACHINE_CLASSES = new Set(['injection_molding', 'compression_molding', 'reaction_injection_molding', 'structural_foam_molding']);
+
 // The 3 real Injection Molding route ids apply-route.dto.ts's VALID_ROUTE_IDS
 // actually accepts (backend/src/modules/bom-items/dto/apply-route.dto.ts) —
 // one real registered engine (injection_molding machine class), 3 real
@@ -4386,7 +4495,7 @@ function RouteSelectionDialog({
   const isSheetMetal = partFamily === 'sheet_metal';
   // Real, confirmed live gap (2026-09-11): the Workflow Builder rendered a
   // completely empty table for injection-molded parts — WORKFLOW_KB (the
-  // fixed-family fallback path) has no 'injection_molded' entry, and the
+  // fixed-family fallback path) has no 'plastic_molded' entry, and the
   // real comparison-driven pane above it is gated to isSheetMetal only. The
   // backend's getRouteComparison() already computes real, priced IM routes
   // for this exact item (3 real tonnage-tier presses using the real
@@ -4394,7 +4503,7 @@ function RouteSelectionDialog({
   // Structural Foam Molding for cost comparison — see bom-items.service.ts's
   // imRoutes assembly) through the SAME endpoint useRouteComparison already
   // calls — this was a frontend wiring gap, not a missing backend capability.
-  const isIM = partFamily === 'injection_molded';
+  const isIM = partFamily === 'plastic_molded';
 
   // ── Universal real machine/rate resolution — ONE fetch each, no fixed
   // per-class array. The old array existed because React hooks can't be
@@ -4936,7 +5045,7 @@ function RouteSelectionDialog({
     onApplied();
   }
 
-  // ═══ IM path (injection_molded): pick one of the real, priced routes
+  // ═══ IM path (plastic_molded): pick one of the real, priced routes
   // getRouteComparison() already computed — no per-step composition, since
   // each real IM route (a real registered engine: Injection Molding at 3
   // tonnage tiers, or Compression/Reaction Injection/Structural Foam
@@ -5022,7 +5131,7 @@ function RouteSelectionDialog({
             />
           </div>
         ) : isIM ? (
-          /* IM path (injection_molded): a real, priced route list — no
+          /* IM path (plastic_molded): a real, priced route list — no
              per-step composition pane, since each real route here is already
              a complete quote (see handleApplyIM's own comment). The right
              pane is a read-only view of the selected route's real
@@ -7689,7 +7798,7 @@ function PartDetailTab({
   const cncFeatures: any = (fg as any)?.cnc_features ?? null;
 
   const family = item.familyClassification ?? fg?.classification?.family ?? '';
-  const isIM = family === 'injection_molded';
+  const isIM = family === 'plastic_molded';
   const isSM = family === 'sheet_metal';
 
   // IM-specific summary fields (zero-default so downstream display logic is clean)
@@ -9557,7 +9666,7 @@ function GeometricCostDriversPanel({
   type GCDTab = 'geo' | 'cost' | 'props' | 'detail' | 'design';
   const [tab, setTab] = useState<GCDTab>('geo');
   const family = item.familyClassification ?? fg?.classification?.family ?? '';
-  const isIM = family === 'injection_molded';
+  const isIM = family === 'plastic_molded';
   // Same real field derivation already proven working elsewhere on this page
   // (the Part/Complexity summary card, ~line 7430) — reused here for the
   // Geometry tab, not reinvented. Injection-molded parts have none of the
@@ -10552,7 +10661,7 @@ export default function ManufacturingIntelligencePage() {
     tightestToleranceMm: item?.tightestToleranceMm ?? item?.drawingIntelligence?.tightest_tolerance_mm ?? null,
   }), [item?.tightestToleranceMm, item?.drawingIntelligence?.tightest_tolerance_mm]);
 
-  const isInjectionMolded = fg?.classification?.family === 'injection_molded';
+  const isInjectionMolded = fg?.classification?.family === 'plastic_molded';
   const imFeatures = ((fg as any)?.imHeatmapFeatures ?? null) as IMHeatmapFeatures | null;
 
   const imSignals = useMemo((): IMHeatmapSignals | null => {

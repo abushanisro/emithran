@@ -838,6 +838,37 @@ export interface CostSummaryDto {
   costOverrides?: Record<string, number>;
   sustainability?: SustainabilitySummaryDto;
   blankSpec?: BlankSpecDto;
+  /** Present only when family === 'plastic_molded' — see InjectionMoldingBreakdown. */
+  injectionMolding?: InjectionMoldingBreakdown;
+}
+
+/**
+ * Mirrors the backend's InjectionMoldingBreakdown (cost-breakdown.dto.ts).
+ * The clamp/shot fields are the same real per-polymer-family formula
+ * (resolveMaterialClampFactor, machine-selector-im.ts) evaluateIMCandidate
+ * uses to score/accept machines during route comparison, now also computed
+ * for this single active/applied quote's selected machine.
+ */
+export interface InjectionMoldingBreakdown {
+  moldingSubtype: 'standard' | 'lsr' | 'insert' | 'overmold' | 'gas_assisted' | 'two_shot' | 'unscrewing';
+  cavityCount: number;
+  cavityConstrainedBy: 'clamp' | 'shot_capacity' | 'economic' | 'default';
+  runnerSystemType: 'hot' | 'cold';
+  runnerScrapKg: number;
+  gateType: string;
+  undercutCount: number | null;
+  partingComplexity: number | null;
+  cycleTimeSec: number;
+  cavityCycleTimeSec: number;
+  costConfidence: number;
+  projectedAreaCm2?: number | null;
+  materialClampFactor?: number | null;
+  clampRequiredT?: number | null;
+  clampMachineT?: number | null;
+  clampUtilPct?: number | null;
+  shotRequiredG?: number | null;
+  shotMachineG?: number | null;
+  shotUtilPct?: number | null;
 }
 
 export interface BlankSpecDto {
@@ -1068,6 +1099,26 @@ export interface RouteDataGap {
   reason: string;
 }
 
+/**
+ * Real, per-part injection-molding clamp/shot sizing detail behind an IM
+ * tonnage-tier route — mirrors backend route-comparison.dto.ts's
+ * RouteInjectionMoldingDetail. Set only on the 3 real injection_molding
+ * tonnage-tier routes (small/medium/large); Compression/Reaction Injection/
+ * Structural Foam Molding routes leave this unset since clamp tonnage
+ * doesn't apply to them the same way.
+ */
+export interface RouteInjectionMoldingDetail {
+  clampRequiredT: number | null;
+  clampMachineT: number | null;
+  clampUtilPct: number | null;
+  shotRequiredG: number | null;
+  shotMachineG: number | null;
+  shotUtilPct: number | null;
+  cavityCount: number;
+  gateType: string;
+  machineDataSource: 'imported' | 'synthetic';
+}
+
 export interface RouteResultDto {
   routeId: RouteId;
   routeLabel: string;
@@ -1122,6 +1173,8 @@ export interface RouteResultDto {
   setupCount?: number;
   machineCapabilityWarnings?: string[];
   routeComplexityScore?: number;
+  /** Real clamp-tonnage/shot-capacity sizing detail — set only on IM tonnage-tier routes. */
+  injectionMolding?: RouteInjectionMoldingDetail;
 }
 
 /**

@@ -6,7 +6,7 @@
 //
 // Run: npm run test -- spi-mold-classification
 
-import { recommendMoldClass, computeMoldCost } from '../../../../../../modules/bom-items/costing/injection-molding/process/cost-injection-molding-engine';
+import { recommendMoldClass, computeMoldCost } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 
 describe('recommendMoldClass — real SPI lifeShotRating values (migration 682)', () => {
   it('a >1,000,000-shot lifetime now correctly lands on Class101 (previously would have needed a class that does not exist, or over-bumped)', () => {

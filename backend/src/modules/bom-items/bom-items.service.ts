@@ -27,15 +27,16 @@ import type { CNCCostInput, CNCMachineClass } from './costing/machining/process/
 import { BlankOptimizerService } from './costing/sheet-metal/machine/blank-optimizer.service';
 import { buildOperationSequence, injectDrawingIntelligence } from './costing/machining/operation/operation-sequencer';
 import type { OperationLine } from './costing/machining/operation/operation-sequencer';
-import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT, recommendCavityCount } from './costing/injection-molding/process/cost-injection-molding-engine';
-import { computeCompressionMoldingCost } from './costing/injection-molding/process/cost-compression-molding-engine';
-import { computeReactionInjectionMoldingCost } from './costing/injection-molding/process/cost-reaction-injection-molding-engine';
-import type { InjectionMoldingCostInput } from './costing/injection-molding/process/cost-injection-molding-engine';
-import { isPlasticGrade } from './costing/injection-molding/process/process-tree';
+import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT, recommendCavityCount } from './costing/plastic-molding/process/cost-injection-molding-engine';
+import { computeCompressionMoldingCost } from './costing/plastic-molding/process/cost-compression-molding-engine';
+import { computeReactionInjectionMoldingCost } from './costing/plastic-molding/process/cost-reaction-injection-molding-engine';
+import type { InjectionMoldingCostInput } from './costing/plastic-molding/process/cost-injection-molding-engine';
+import { isPlasticGrade } from './costing/plastic-molding/process/process-tree';
 import {
   selectIMmachinesByTier,
+  resolveMaterialClampFactor,
   type IMSelectionRequirements,
-} from './costing/injection-molding/machine/machine-selector-im';
+} from './costing/plastic-molding/machine/machine-selector-im';
 import {
   MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL,
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
@@ -1405,15 +1406,24 @@ export class BOMItemsService {
       requirements.cnc_mill_turn = latheReq;
     }
 
-    if (input.family === 'injection_molded') {
+    if (input.family === 'plastic_molded') {
       // Projected area (mold-opening direction) approximated as the footprint in
       // the two largest bbox dims — Phase 1 approximation; true projected area
       // in the actual pull direction is a Phase 2 refinement (see plan doc).
       const dims = [input.bboxXMm, input.bboxYMm, input.bboxZMm].sort((a, b) => b - a);
       const projectedAreaMm2 = dims[0] * dims[1];
-      requirements.injection_molding = injectionMoldingRequirement({
+      const imRequirement = injectionMoldingRequirement({
         projectedAreaMm2,
-        materialGrade: input.grade,
+        // Real, sourced per-polymer-family clamp factor (Rosato/Brydson/
+        // Griff/SPI) — the SAME table evaluateIMCandidate uses to score
+        // machines during route comparison. Fixes a real, confirmed live gap
+        // (2026-09-11): the machine that actually gets SELECTED for the
+        // applied quote used to be gated on a separate, cruder, uncited
+        // 8-entry table (physics.ts's own former classifyResinFamily/
+        // MATERIAL_PRESSURE_FACTOR_TON_CM2), so "which machine is physically
+        // capable" and "how does this route compare to alternatives" could
+        // disagree on the same part's same material.
+        materialClampFactor: resolveMaterialClampFactor(input.grade),
         // Shot weight = finished part + runner allowance (same constant the
         // cost engine's material model uses — one number, not two copies).
         shotWeightG: input.weightKg > 0
@@ -1422,6 +1432,38 @@ export class BOMItemsService {
         partLengthMm: dims[0],
         partWidthMm: dims[1],
       });
+      requirements.injection_molding = imRequirement;
+      // Structural Foam Molding and Reaction Injection Molding machines were
+      // staged (migration 633) with the IDENTICAL real clamp/tie-bar/shot-
+      // capacity schema as Injection Molding (confirmed: same source JSON
+      // shape — clampingForceKn/tieBarDistanceHorMm/tieBarDistanceVertMm/
+      // shotSizeGppsG/min+maxMoldHeightMm — and the same mhr_records columns
+      // populated for both classes). Root-caused (2026-09-11): these 2
+      // classes previously got NO requirement here at all, so resolveMHRRates'
+      // selectMachine() always fell back to `{ kind: 'generic' }` for them —
+      // isCapable('generic') always returns true and fitScore('generic') is a
+      // flat 0.7 for every candidate regardless of part size, so "machine
+      // selection" for these 2 classes was, in effect, cost-only, never
+      // checked against this part's real clamp/shot/tie-bar requirement even
+      // though the real per-machine data to check it against was already on
+      // file. The clamp-force sizing physics is the same physical process
+      // (mold clamped shut against injection/reaction pressure) as Injection
+      // Molding, so the identical formula applies as-is — no new formula
+      // invented, no fabricated data.
+      requirements.structural_foam_molding = imRequirement;
+      requirements.reaction_injection_molding = imRequirement;
+      // Compression Molding is NOT wired the same way: its real staged data
+      // (migration 633) carries max_tonnage (from real pressForceKn) but
+      // tie_bar_x/y_mm, shot_capacity_grams, and min/max_mold_height_mm are
+      // all NULL for every compression_molding row — it has no shot/tie-bar
+      // concept (a compression press simply closes on a pre-loaded charge).
+      // No sourced clamp-force-vs-projected-area pressure factor exists
+      // anywhere in the reference data for compression molding specifically
+      // (Injection Molding's real per-polymer clamp-factor table is sourced
+      // for injection pressure, not compression pressure — reusing it here
+      // would be fabricating a number this domain has never measured). Left
+      // as the honest 'generic' fallback rather than guessed — a disclosed
+      // gap, not a silent one.
     }
 
     return requirements;
@@ -3230,7 +3272,7 @@ export class BOMItemsService {
   // geometry proposes, material routes, user override is final.
   //   1. manufacturing_family_override — explicit user intent, always wins
   //      (e.g. machined-PEEK prototype pinned to cnc_milled).
-  //   2. Thermoplastic grade → injection_molded, whatever the shape classifier
+  //   2. Thermoplastic grade → plastic_molded, whatever the shape classifier
   //      guessed (a PA66 cover and an aluminium cover are the same geometry).
   //   3. Non-sheet-formable alloy on a sheet-shaped part → cnc_milled (flat
   //      bronze casting can never run a laser + press-brake route).
@@ -3249,9 +3291,9 @@ export class BOMItemsService {
       input.item.familyClassification ??
       (input.sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown');
 
-    if (isPlasticGrade(input.grade) && geoFamily !== 'injection_molded') {
+    if (isPlasticGrade(input.grade) && geoFamily !== 'plastic_molded') {
       return {
-        family: 'injection_molded',
+        family: 'plastic_molded',
         familySource: 'material',
         warning:
           `Material "${input.grade}" is a thermoplastic — routed to injection molding ` +
@@ -4653,18 +4695,43 @@ export class BOMItemsService {
       };
     }
 
-    if (family === 'injection_molded') {
+    if (family === 'plastic_molded') {
       const imBbox = [
         ((item as any).maxLength ?? 0) as number,
         ((item as any).maxWidth ?? 0) as number,
         ((item as any).maxHeight ?? 0) as number,
       ].sort((a, b) => b - a);
-      // Derive machine physical specs from seed registry for cavity count model.
+      // Real, confirmed live gap (2026-09-11): this used to look up machine
+      // capability by NAME against seed-registry.ts's ~40-entry regex pattern
+      // list (lookupSeedCapability) — a name-guessing fallback meant for a
+      // machine with no real DB row at all. But mhrRates.injectionMolding was
+      // already resolved (physics-based selectMachine(), above) against the
+      // REAL machine pool, and that resolution already carries the exact
+      // machine's own real mhr_records.max_tonnage/shot_capacity_grams on
+      // its candidate — the name-pattern lookup was silently discarding that
+      // real, already-resolved data and re-guessing from the name string
+      // instead, which is exactly why an unlisted real machine name (e.g.
+      // "Netstal Synergy 1200", not one of the ~40 patterns) fell through to
+      // undefined every time, regardless of what was actually in the DB for
+      // it. Read the real, already-resolved capability directly; only fall
+      // back to the name-pattern guess for the genuine gap that mechanism
+      // exists for — a class-default/synthetic candidate with no real DB row
+      // to read from at all.
+      const selectedImCandidate = mhrRates.injectionMolding.selection?.balanced?.candidate;
+      const machineSpec = selectedImCandidate?.capability?.maxTonnage != null
+        ? selectedImCandidate.capability
+        : lookupSeedCapability(mhrRates.injectionMolding.machineName);
       // Tonnage from machine name → kN (1 metric ton = 10 kN).
-      const machineSpec = lookupSeedCapability(mhrRates.injectionMolding.machineName);
       const clampTonnageKN = machineSpec?.maxTonnage != null ? machineSpec.maxTonnage * 10 : undefined;
-      // Shot capacity: ~0.9 × tonnage (industry rule of thumb; see cost-injection-molding-engine.ts)
-      const shotCapacityCm3 = machineSpec?.maxTonnage != null ? machineSpec.maxTonnage * 0.9 : undefined;
+      // Shot capacity: real mhr_records.shot_capacity_grams when the resolved
+      // candidate has one, converted to cm³ via this part's real material
+      // density (same real conversion getRouteComparison's tier loop already
+      // uses) — else the ~0.9 × tonnage industry rule of thumb (see
+      // cost-injection-molding-engine.ts) used only for the seed/synthetic
+      // fallback path, which has no real shot-capacity column to read.
+      const shotCapacityCm3 = selectedImCandidate?.capability?.shotCapacityGrams != null && materialDensityKgM3 > 0
+        ? selectedImCandidate.capability.shotCapacityGrams / (materialDensityKgM3 / 1000)
+        : machineSpec?.maxTonnage != null ? machineSpec.maxTonnage * 0.9 : undefined;
 
       // Wall thickness: prefer CAD-extracted nominal value. When unavailable (0),
       // fall back to the minimum bounding-box dimension — for flat/thin-walled
@@ -4722,6 +4789,57 @@ export class BOMItemsService {
       };
       const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       imResult.warnings.push(...materialWarnings);
+
+      // Real clamp/shot tonnage math for the ACTIVE quote's selected machine —
+      // same per-polymer-family clamp-factor table and formula
+      // (resolveMaterialClampFactor, machine-selector-im.ts) evaluateIMCandidate
+      // already uses to accept/reject/score machines during route comparison
+      // (getRouteComparison, below). Confirmed live gap (2026-09-11): this
+      // single active/applied quote never ran that real per-material formula
+      // at all — only the cruder melting-point-tiered "Estimated clamp force"
+      // warning text (which has no per-material factor, no cavity-count
+      // scaling, no real selected-machine tonnage). Both numbers can diverge
+      // for materials outside the two crude Tm bands, and neither was ever
+      // shown as a structured, sourced number a user could inspect — just a
+      // pre-formatted warning sentence. Computed only when a real projected
+      // area exists (same gate the warning text above already uses).
+      if (imResult.injectionMolding && imBbox[0] * imBbox[1] > 0) {
+        const projAreaCm2 = (imBbox[0] * imBbox[1]) / 100;
+        const materialClampFactor = resolveMaterialClampFactor(grade);
+        const cavityCount = imResult.injectionMolding.cavityCount;
+        const clampRequiredT = projAreaCm2 * cavityCount * materialClampFactor * 1.15;
+        const clampMachineT = machineSpec?.maxTonnage ?? null;
+        const clampUtilPct = clampMachineT != null && clampMachineT > 0
+          ? Math.round((clampRequiredT / clampMachineT) * 1000) / 10
+          : null;
+
+        // Shot requirement: this engine's own per-part gross (shot) weight —
+        // grossWeightKg already includes ITS OWN runner-scrap% allowance
+        // (see runnerPct above) — extended to a full multi-cavity shot with
+        // the same 1.10 real-world margin evaluateIMCandidate applies.
+        // Deliberately NOT re-deriving runner weight via the tier-loop's
+        // separate real-geometry method (estimateRunnerVolumeCm3) — that is a
+        // different, also-real runner-accounting convention, and mixing the
+        // two would double-count the runner allowance.
+        const shotRequiredG = imResult.grossWeightKg * 1000 * cavityCount * 1.10;
+        const shotMachineG = machineSpec?.shotCapacityGrams ?? null;
+        const shotUtilPct = shotMachineG != null && shotMachineG > 0
+          ? Math.round((shotRequiredG / shotMachineG) * 1000) / 10
+          : null;
+
+        imResult.injectionMolding = {
+          ...imResult.injectionMolding,
+          projectedAreaCm2: Math.round(projAreaCm2 * 10) / 10,
+          materialClampFactor,
+          clampRequiredT: Math.round(clampRequiredT * 10) / 10,
+          clampMachineT,
+          clampUtilPct,
+          shotRequiredG: Math.round(shotRequiredG * 10) / 10,
+          shotMachineG,
+          shotUtilPct,
+        };
+      }
+
       this.attachMachineSelections(imResult.processLines, mhrRates);
       this.appendRateWarnings(imResult, location, mhrRates.benchmarkMap, rateWarnThresholds);
       this.applyCostOverrides(imResult, costOverrides);
@@ -6548,7 +6666,7 @@ export class BOMItemsService {
         comparisonWarnings: ['No 3D model analysed — upload a STEP/STL file for accurate routing.'],
       };
     }
-    if (family === 'injection_molded') {
+    if (family === 'plastic_molded') {
       const imBboxRC = [
         ((item as any).maxLength ?? 0) as number,
         ((item as any).maxWidth ?? 0) as number,
@@ -6729,6 +6847,21 @@ export class BOMItemsService {
             wasteCostInr: cost.sustainability.wasteCostInr,
             sustainabilityScore: cost.sustainability.sustainabilityScore,
           } : undefined,
+          // Real per-part clamp/shot sizing behind this tier — the same
+          // evaluateIMCandidate() numbers that decided capability/scoring
+          // above, now exposed so the frontend can show the actual tonnage
+          // math instead of just the pass/fail badge.
+          injectionMolding: {
+            clampRequiredT: ev?.clampRequiredT ?? null,
+            clampMachineT: ev?.clampMachineT ?? tier.syntheticTonnageT,
+            clampUtilPct: ev?.clampUtil != null ? Math.round(ev.clampUtil * 1000) / 10 : null,
+            shotRequiredG: ev?.shotRequiredG ?? null,
+            shotMachineG: ev?.shotMachineG ?? null,
+            shotUtilPct: ev?.shotUtil != null ? Math.round(ev.shotUtil * 1000) / 10 : null,
+            cavityCount: cost.injectionMolding?.cavityCount ?? cavityCountEst,
+            gateType: cost.injectionMolding?.gateType ?? 'edge',
+            machineDataSource: isSynthetic ? 'synthetic' : 'imported',
+          },
         } satisfies RouteResultDto;
       });
 
@@ -6811,9 +6944,20 @@ export class BOMItemsService {
         capability: {
           cuttingCapable: rimCapable, pressBrakeCapable: rimCapable, overallCapable: rimCapable,
           confidence: rimCapable ? 'medium' : 'low',
-          estimatedTonnage: null,
+          // Real per-machine clamp tonnage now that RIM's identical-schema
+          // machines are gated by the same injectionMoldingRequirement()
+          // physics as Injection Molding (buildPartRequirements) — see that
+          // function's comment on why RIM reuses the IM clamp formula as-is.
+          estimatedTonnage: mhrRates.reactionInjectionMolding.selection?.balanced?.candidate?.capability?.maxTonnage ?? null,
           reasonCodes: rimCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
-          warnings: rimCapable ? [] : ['No real reaction_injection_molding machine rate resolved for this location'],
+          // Real reason from selectMachine() — distinguishes "no machine of
+          // this class exists" from "real machines exist but none fit this
+          // part's clamp/footprint requirement", now that RIM is capability-
+          // gated instead of always-generic.
+          warnings: rimCapable ? [] : [
+            mhrRates.reactionInjectionMolding.selection?.balanced?.reasons?.[0]
+              ?? 'No real reaction_injection_molding machine rate resolved for this location',
+          ],
         },
         warnings: [...rimResult.warnings, ...comparisonWarnings], ratesSource: RATES_SOURCE_LABEL,
       } satisfies RouteResultDto);
@@ -6853,9 +6997,16 @@ export class BOMItemsService {
         capability: {
           cuttingCapable: structuralFoamCapable, pressBrakeCapable: structuralFoamCapable, overallCapable: structuralFoamCapable,
           confidence: structuralFoamCapable ? 'medium' : 'low',
-          estimatedTonnage: null,
+          // Real per-machine clamp tonnage now that Structural Foam Molding's
+          // identical-schema machines are gated by the same
+          // injectionMoldingRequirement() physics as Injection Molding
+          // (buildPartRequirements) — see that function's comment.
+          estimatedTonnage: mhrRates.structuralFoamMolding.selection?.balanced?.candidate?.capability?.maxTonnage ?? null,
           reasonCodes: structuralFoamCapable ? [] : ['NO_REAL_MACHINE_RATE' as any],
-          warnings: structuralFoamCapable ? [] : ['No real structural_foam_molding machine rate resolved for this location'],
+          warnings: structuralFoamCapable ? [] : [
+            mhrRates.structuralFoamMolding.selection?.balanced?.reasons?.[0]
+              ?? 'No real structural_foam_molding machine rate resolved for this location',
+          ],
         },
         warnings: structuralFoamCost.warnings, ratesSource: structuralFoamCost.ratesSource,
         sustainability: structuralFoamCost.sustainability ? {

@@ -26,7 +26,7 @@ import {
   PRESS_BRAKE_SEC_PER_BEND,
   laserSpeedFactor,
 } from '../costing/shared/core/default-rates.constants';
-import { computeCycleTime } from '../costing/injection-molding/process/cycle-time';
+import { computeCycleTime } from '../costing/plastic-molding/process/cycle-time';
 import { getEnginesForFamily } from '../costing/shared/core/manufacturing-process-registry';
 
 export interface RawGeometry {
@@ -273,7 +273,7 @@ export class AutoFillService {
       // label (resolveDbDrivenProcessLabel) — never a hardcoded process-name
       // string; falls back to 'CNC Machining' only when the veto's own
       // disambiguation didn't land on a family the registry recognizes (it
-      // always picks 'injection_molded' or 'cnc_milled' today, both covered).
+      // always picks 'plastic_molded' or 'cnc_milled' today, both covered).
       const vetoProcessType = await this.resolveDbDrivenProcessLabel(
         cadFamilyClassification.family ?? 'cnc_milled',
         accessToken,
@@ -356,7 +356,7 @@ export class AutoFillService {
     // physics engine falls back to mild-steel baseline for sheet metal, which is the
     // most conservative (slowest) speed. Material grade is applied in step 5 costs.
     // Real IM wall thickness (cadMI.features.wall_thickness_nominal_mm), when the
-    // part was actually classified injection_molded and cad-engine computed it —
+    // part was actually classified plastic_molded and cad-engine computed it —
     // never geo.sheetThicknessMm, a different, sheet-metal-shaped geometric fact
     // (see computePhysicsCycleTime's own IM branch for why that reuse was wrong).
     const imWallThicknessNominalMm: number | undefined =
@@ -437,8 +437,8 @@ export class AutoFillService {
       // with the metals category — the Material Grade search filters by
       // category, so a real plastic grade like PA66 was invisible/unsearchable
       // no matter what the user typed, even though the CAD classifier had
-      // already correctly identified the part as injection_molded.
-      materialCategory: effectiveFamily.family === 'injection_molded' ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS',
+      // already correctly identified the part as plastic_molded.
+      materialCategory: effectiveFamily.family === 'plastic_molded' ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS',
       // Empty on purpose — see step 3 above. The engineer picks the material.
       materialGrade: '',
       materialId: null,
@@ -602,7 +602,7 @@ export class AutoFillService {
     }
 
     const isSheetMetal = family.family === 'sheet_metal' || proc.processType.includes('Sheet Metal');
-    const isInjectionMolded = family.family === 'injection_molded';
+    const isInjectionMolded = family.family === 'plastic_molded';
 
     const cadV2: any =
       cadResult?.geometry_features?.manufacturing_features
@@ -781,7 +781,7 @@ export class AutoFillService {
     let id = 0;
 
     const cadMI = cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence;
-    const isIM = cadMI?.detected_family === 'injection_molded';
+    const isIM = cadMI?.detected_family === 'plastic_molded';
 
     // ── Injection Molding DFM ──────────────────────────────────────────────────
     if (isIM && cadMI?.features) {
@@ -973,7 +973,7 @@ export class AutoFillService {
     const cadMI = cadResult?.geometry_features?.manufacturing_features?.manufacturing_intelligence;
     const isIM =
       proc.processType.includes('Injection') ||
-      cadMI?.detected_family === 'injection_molded';
+      cadMI?.detected_family === 'plastic_molded';
 
     // ── Injection Molding validation checks ───────────────────────────────────
     if (isIM && cadMI?.features) {
@@ -1419,7 +1419,7 @@ export class AutoFillService {
   // 'injection_molding'). This is a narrow vocabulary bridge between two
   // code-level enums that already exist, not a fabricated business mapping.
   private static readonly CAD_FAMILY_TO_REGISTRY_PROCESS_FAMILY: Record<string, string> = {
-    injection_molded: 'injection_molding',
+    plastic_molded: 'injection_molding',
     cnc_milled: 'cnc_milling',
     cnc_turned: 'cnc_turning',
     mill_turn: 'cnc_turning',

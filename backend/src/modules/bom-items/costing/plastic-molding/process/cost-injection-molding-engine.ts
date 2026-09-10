@@ -41,44 +41,56 @@ function r2(n: number): number { return Math.round(n * 100) / 100; }
 function r3(n: number): number { return Math.round(n * 1000) / 1000; }
 
 // ── Constants not replaced by Phase 4 cycle-time engine ───────────────────────
-// These govern operations outside the molding cycle and are not material-
-// or geometry-dependent in a way that warrants a physics model at this fidelity.
 
-const IM_SETUP_MIN = 60;               // mold mounting + trial shots, amortized per batch
 const IM_DEFAULT_WALL_MM = 2.0;        // Menges cooling fallback when wall not measured
-
-// Material drying — hygroscopic resins. Dryer runs unattended; only the
-// attended load/unload labour is costed, amortized per batch.
-const IM_DRYING_ATTENDED_MIN = 15;
-
-// Secondary
-const IM_TRIM_SEC_PER_10CM2 = 5;       // gate/runner trim scaled by surface area
-const IM_TRIM_MIN_SEC = 3;             // every cold gate leaves at least a vestige
-const IM_DEFLASH_SEC = 20;             // manual flash removal, per part
-// Phase 3: side action (slide/lifter).
-// 2.5 s/undercut: 0.5 s hydraulic/spring actuation + 2 s mold-open travel delay.
-const IM_SIDE_ACTION_SEC_PER_UNDERCUT = 2.5;
-const IM_INSERT_SEC_PER_INSERT = 8;    // post-mold press/heat-stake (legacy)
-const IM_INSERT_LOADING_SEC_PER_INSERT = 20; // in-mold placement per insert (manual)
-const IM_INSERT_INSPECTION_SEC = 15;   // pull test / torque check (sampled, per part amortized)
-const IM_WELD_SEC_PER_JOINT = 12;      // ultrasonic weld cycle per joint
-const IM_UNSCREWING_CORE_SEC = 4;      // hydraulic rack-and-pinion per core per shot
-
-// LSR — compound dosing and secondary cure oven
-const IM_LSR_DOSING_ATTENDED_MIN = 10; // metering head setup + purge, per batch (attended)
-const IM_LSR_DOSING_RUN_SEC = 90;      // per-part: connect + dose A+B before each shot
-// Secondary cure oven: 4h oven at 200°C, amortized. Oven MHR ≈ deburrRate proxy
-// (low-capital oven, operator checks batch).  4h oven total = 240 min / batch.
-const IM_LSR_SECONDARY_CURE_OVEN_MIN = 240; // oven time per batch
-
-// Inspection
-const IM_VISUAL_SEC = 10;
-const IM_DIMENSIONAL_MIN = 5;
-const IM_WEIGHT_CHECK_SEC = 5;
 
 // Material — exported: machine selection uses the same runner allowance to
 // compute shot weight (one number, not two drifting copies).
 export const IM_RUNNER_SCRAP_PCT = 8;  // runner/sprue material lost per shot (cold runner)
+
+// ── Removed, uncited constants (2026-09-11) ───────────────────────────────────
+// This block used to hold 16 named-literal time constants (mold setup 60min,
+// material drying 15min, gate trim 5s/10cm², deflash 20s, side-action
+// 2.5s/undercut, insert install/load/inspect, ultrasonic weld 12s/joint, core
+// unscrewing 4s, LSR dosing/secondary-cure-oven, visual/dimensional/weight-
+// check inspection) with zero source anywhere in the reference data — checked
+// against every file under memory/plastic modeling/ (variables, lookup,
+// process): no drying/setup/inspection/handling time exists for this domain
+// there (toolDryingTime is TOOL cleaning, an unrelated real variable; the
+// cm* setup-time variables are Compression Molding heater-line machining
+// only). Root-caused and removed per explicit user direction (2026-09-11):
+// a real, sourced $0 (operation genuinely not costed, disclosed below) is
+// correct; a plausible-looking $0.24 built on an invented 60-minute mold-
+// setup guess is not — it looked "database driven" (real rate × time) while
+// the time itself was never measured. The operations below are still
+// ROUTED (routing-engine.ts's real geometry rules — hygroscopic resin needs
+// drying, N undercuts need side action, etc. — are real signals, unchanged)
+// but no longer COSTED: each routed-but-uncosted operation below emits a
+// disclosure warning instead of a process line, so a real, still-needed
+// operation is flagged as a genuine gap rather than silently priced from a
+// guess or silently dropped with no trace at all.
+const UNCOSTED_OPERATION_LABELS: Record<string, string> = {
+  mold_setup: 'Mold Setup (mounting + trial shots)',
+  material_drying: 'Material Drying',
+  gate_trimming: 'Gate Trimming',
+  deflashing: 'Deflashing',
+  side_action: 'Side Action (Slide/Lifter)',
+  core_unscrewing: 'Core Unscrewing',
+  insert_loading: 'Insert Loading (In-Mold)',
+  insert_inspection: 'Insert Pull Test',
+  insert_installation: 'Insert Installation',
+  lsr_compound_dosing: 'LSR Compound Dosing',
+  secondary_cure_oven: 'Secondary Cure Oven',
+  ultrasonic_welding: 'Ultrasonic Welding',
+  visual_inspection: 'Visual Inspection',
+  dimensional_inspection: 'Dimensional Inspection (First Article)',
+  weight_check: 'Weight Check',
+};
+
+function uncostedOpWarning(label: string, detail?: string): string {
+  return `⚠ ${label} required${detail ? ` (${detail})` : ''} — not costed: no sourced time/rate ` +
+    'data exists for this operation yet; excluded from Direct Process Costs rather than estimated.';
+}
 
 // Hot-tip and sub gates self-de-gate; no vestige trimming needed.
 const SELF_DEGATE_TYPES: ReadonlySet<GateType> = new Set(['hot_tip', 'sub']);
@@ -469,159 +481,120 @@ export function computeInjectionMoldedCostSummary(
   let inspectionMin = 0;
 
   if (routed.has('lsr_compound_dosing')) {
-    const dosingSetupMin = IM_LSR_DOSING_ATTENDED_MIN / batch;
-    const dosingRunMin   = IM_LSR_DOSING_RUN_SEC / 60;
-    setupMin += dosingSetupMin;
-    secondaryMin += dosingRunMin;
-    processLines.push(makeLine('LSR Compound Dosing',
-      r2((dosingSetupMin / 60) * deburrRate.rate),
-      r2((dosingRunMin / 60) * deburrRate.rate),
-      dosingSetupMin + dosingRunMin, deburrRate));
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.lsr_compound_dosing, 'LSR two-component A+B metering'));
   }
 
   if (routed.has('material_drying')) {
-    const dryMin = IM_DRYING_ATTENDED_MIN / batch;
-    setupMin += dryMin;
-    const dryerRate: MHRRateInput = { ...deburrRate, machineClass: 'material_drying', machineName: 'Material Dryer / Hopper' };
-    processLines.push(makeLine('Material Drying', r2((dryMin / 60) * deburrRate.rate), 0, dryMin, dryerRate));
+    warnings.push(uncostedOpWarning(
+      UNCOSTED_OPERATION_LABELS.material_drying,
+      materialGrade ? `${materialGrade} is hygroscopic` : undefined,
+    ));
   }
 
   if (routed.has('mold_setup')) {
-    const moldSetupMin = IM_SETUP_MIN / batch;
-    setupMin += moldSetupMin;
-    processLines.push(makeLine('Mold Setup', r2((moldSetupMin / 60) * mhrRate.rate), 0, moldSetupMin, mhrRate));
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.mold_setup));
   }
 
-  // Phase 4 in-cycle steps — times from the thermal/rheology model, not constants.
-  // LSR: cooling is replaced by lsr_curing (Arrhenius); packing is absent for LSR.
-  // Each step gets its own process line so the breakdown stays auditable; cavityCount
-  // amortizes machine time per part (multi-cavity: same cycle produces N parts).
-  const inCycleSteps: Array<{ id: string; label: string; sec: number }> = [
-    { id: 'injection',  label: 'Injection',              sec: cycleTime.fillSec  },
-    { id: 'packing',    label: 'Packing/Holding',        sec: cycleTime.packSec  },
-    { id: 'cooling',    label: 'Cooling',                sec: isLsr ? 0 : cycleTime.coolSec },
-    { id: 'lsr_curing', label: 'LSR Curing (Thermoset)', sec: isLsr ? cycleTime.coolSec : 0 },
-    { id: 'ejection',   label: 'Ejection',               sec: cycleTime.ejectSec },
+  // Phase 4 in-cycle steps — times from the thermal/rheology model, not
+  // constants. LSR: cooling is replaced by lsr_curing (Arrhenius); packing is
+  // absent for LSR. cavityCount amortizes machine time per part (multi-
+  // cavity: same cycle produces N parts).
+  //
+  // Combined into ONE real process line, not one line per internal phase.
+  // Root cause (2026-09-11, user-reported): the previous one-line-per-phase
+  // breakdown (Injection/Packing/Cooling/Ejection) had no catalog counterpart
+  // of its own — this domain's real, database-driven process list is exactly
+  // 4 named processes (migration 736), this one included, not a 5th-8th
+  // phase-level entry — and, all sharing one machine_class, it broke
+  // matchedEngineLine's machine_class-only lookup (stored-process-lines.ts):
+  // every row matched whichever line came first, so Packing/Holding,
+  // Cooling, and Ejection all rendered the identical duplicated machine/
+  // tonnage/cycle-time block. Each phase's own physics-derived time is still
+  // computed and summed here — nothing is discarded — it is just no longer
+  // split into separate user-facing rows. The line's label is the real
+  // catalog process name for whichever of the 2 real machine classes that
+  // share this function actually costed it (injection_molding vs
+  // structural_foam_molding — both real, both in the 4-process catalog).
+  const MOLDING_PROCESS_LABEL: Record<string, string> = {
+    injection_molding: 'Injection Molding',
+    structural_foam_molding: 'Structural Foam Molding',
+  };
+  const inCycleSteps: Array<{ id: string; sec: number }> = [
+    { id: 'injection',  sec: cycleTime.fillSec  },
+    { id: 'packing',    sec: cycleTime.packSec  },
+    { id: 'cooling',    sec: isLsr ? 0 : cycleTime.coolSec },
+    { id: 'lsr_curing', sec: isLsr ? cycleTime.coolSec : 0 },
+    { id: 'ejection',   sec: cycleTime.ejectSec },
   ];
-  for (const step of inCycleSteps) {
-    if (!routed.has(step.id)) continue;
-    const stepMin = (step.sec / cavityCount) / 60;
-    moldingMin += stepMin;
-    processLines.push(makeLine(step.label, 0, r2((stepMin / 60) * mhrRate.rate), stepMin, mhrRate));
+  const inCycleSec = inCycleSteps.reduce((s, step) => s + (routed.has(step.id) ? step.sec : 0), 0);
+  if (inCycleSec > 0) {
+    const inCycleMin = (inCycleSec / cavityCount) / 60;
+    moldingMin += inCycleMin;
+    const processLabel = MOLDING_PROCESS_LABEL[mhrRate.machineClass] ?? 'Injection Molding';
+    processLines.push(makeLine(processLabel, 0, r2((inCycleMin / 60) * mhrRate.rate), inCycleMin, mhrRate));
   }
 
   if (routed.has('gate_trimming')) {
-    const trimSec = surfaceArea > 0
-      ? Math.max(IM_TRIM_MIN_SEC, (surfaceArea / 100_000) * IM_TRIM_SEC_PER_10CM2)
-      : IM_TRIM_MIN_SEC;
-    const trimMin = trimSec / 60;
-    secondaryMin += trimMin;
-    processLines.push(makeLine('Gate Trimming', 0, r2((trimMin / 60) * deburrRate.rate), trimMin, deburrRate));
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.gate_trimming));
   }
 
   if (routed.has('deflashing')) {
-    const deflashMin = IM_DEFLASH_SEC / 60;
-    secondaryMin += deflashMin;
-    processLines.push(makeLine('Deflashing', 0, r2((deflashMin / 60) * deburrRate.rate), deflashMin, deburrRate));
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.deflashing));
   }
 
-  // Phase 3: side action — in-cycle machine time on the IMM, one actuation per
-  // undercut per shot.
   if (routed.has('side_action')) {
-    const undercuts = Math.max(signals.undercutCount ?? 1, 1);
-    const slideMin = (undercuts * IM_SIDE_ACTION_SEC_PER_UNDERCUT / cavityCount) / 60;
-    moldingMin += slideMin;
-    processLines.push(
-      makeLine('Side Action (Slide/Lifter)', 0, r2((slideMin / 60) * mhrRate.rate), slideMin, mhrRate),
-    );
+    warnings.push(uncostedOpWarning(
+      UNCOSTED_OPERATION_LABELS.side_action,
+      `${signals.undercutCount ?? '?'} undercut feature(s) — slide/lifter tooling required`,
+    ));
   }
 
-  // Core unscrewing — in-cycle hydraulic/servo rotation, priced as IMM time.
   if (routed.has('core_unscrewing')) {
-    const cores = Math.max((signals as any).unscrewingCoreCount ?? 1, 1);
-    const coreMin = (cores * IM_UNSCREWING_CORE_SEC / cavityCount) / 60;
-    moldingMin += coreMin;
-    processLines.push(
-      makeLine('Core Unscrewing', 0, r2((coreMin / 60) * mhrRate.rate), coreMin, mhrRate),
-    );
+    warnings.push(uncostedOpWarning(
+      UNCOSTED_OPERATION_LABELS.core_unscrewing,
+      `${(signals as any).unscrewingCoreCount ?? '?'} unscrewing core(s) — hydraulic/servo rotation required`,
+    ));
   }
 
-  // Insert loading — in-mold placement before shot (insert molding subtype).
   if (routed.has('insert_loading')) {
-    const inserts = Math.max(signals.insertCount ?? 1, 1);
-    const loadMin = (inserts * IM_INSERT_LOADING_SEC_PER_INSERT) / 60;
-    secondaryMin += loadMin;
-    processLines.push(
-      makeLine('Insert Loading (In-Mold)', 0, r2((loadMin / 60) * deburrRate.rate), loadMin, deburrRate),
-    );
+    warnings.push(uncostedOpWarning(
+      UNCOSTED_OPERATION_LABELS.insert_loading,
+      `${signals.insertCount ?? '?'} insert(s)`,
+    ));
   }
 
-  // Insert inspection — pull test / torque check, sampled (batch-amortized).
   if (routed.has('insert_inspection')) {
-    const amortizedInspMin = IM_INSERT_INSPECTION_SEC / 60 / Math.max(batch / 10, 1);
-    inspectionMin += amortizedInspMin;
-    processLines.push(
-      makeLine('Insert Pull Test', r2((amortizedInspMin / 60) * inspectionRate.rate), 0, amortizedInspMin, inspectionRate),
-    );
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_inspection));
   }
 
-  // Legacy post-mold insert installation (standard subtype with inserts).
   if (routed.has('insert_installation')) {
-    const inserts = Math.max(signals.insertCount ?? 0, 1);
-    const insertMin = (inserts * IM_INSERT_SEC_PER_INSERT) / 60;
-    secondaryMin += insertMin;
-    processLines.push(
-      makeLine('Insert Installation', 0, r2((insertMin / 60) * deburrRate.rate), insertMin, deburrRate),
-    );
+    warnings.push(uncostedOpWarning(
+      UNCOSTED_OPERATION_LABELS.insert_installation,
+      `${signals.insertCount ?? '?'} insert candidate(s)`,
+    ));
   }
 
-  // LSR secondary cure oven — post-mold batch oven, 4h at 200°C, batch-amortized.
   if (routed.has('secondary_cure_oven')) {
-    const ovenMin = IM_LSR_SECONDARY_CURE_OVEN_MIN / batch;
-    setupMin += ovenMin;
-    processLines.push(
-      makeLine('Secondary Cure Oven', r2((ovenMin / 60) * deburrRate.rate), 0, ovenMin, deburrRate),
-    );
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.secondary_cure_oven));
   }
 
   if (routed.has('ultrasonic_welding')) {
-    const joints = Math.max(signals.assemblyFeatureCount ?? 0, 1);
-    const weldMin = (joints * IM_WELD_SEC_PER_JOINT) / 60;
-    secondaryMin += weldMin;
-    processLines.push(
-      makeLine('Ultrasonic Welding', 0, r2((weldMin / 60) * deburrRate.rate), weldMin, deburrRate),
-    );
+    warnings.push(uncostedOpWarning(
+      UNCOSTED_OPERATION_LABELS.ultrasonic_welding,
+      `${signals.assemblyFeatureCount ?? '?'} assembly/weld feature(s)`,
+    ));
   }
 
   if (routed.has('visual_inspection')) {
-    const vMin = IM_VISUAL_SEC / 60;
-    inspectionMin += vMin;
-    processLines.push(makeLine('Visual Inspection', 0, r2((vMin / 60) * inspectionRate.rate), vMin, inspectionRate));
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.visual_inspection));
   }
 
   if (routed.has('dimensional_inspection')) {
-    // Dimensional inspection for injection-molded parts is a first-article check
-    // (ISIR / PPAP-style measurement of the first shot), NOT per-part 100%
-    // inspection. Per-part CMM-level checking is only applied for aerospace/
-    // medical parts — that level is handled by the CMM operation in other routes.
-    // Cost is batch-amortized: one 5-minute check covers the whole production run.
-    const amortizedMin = IM_DIMENSIONAL_MIN / batch;
-    inspectionMin += amortizedMin;
-    processLines.push(
-      makeLine(
-        'Dimensional Inspection (First Article)',
-        r2((amortizedMin / 60) * inspectionRate.rate),
-        0,
-        amortizedMin,
-        inspectionRate,
-      ),
-    );
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.dimensional_inspection));
   }
 
   if (routed.has('weight_check')) {
-    const wMin = IM_WEIGHT_CHECK_SEC / 60;
-    inspectionMin += wMin;
-    processLines.push(makeLine('Weight Check', 0, r2((wMin / 60) * inspectionRate.rate), wMin, inspectionRate));
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.weight_check));
   }
 
   // ── Totals ──────────────────────────────────────────────────────────────────

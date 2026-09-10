@@ -245,7 +245,7 @@ export class RetrievalService {
 
     // ── Run scope classifier (now with drawing-promoted fields + DB materialFamily) ──
     // If the user has pinned a manufacturing family, skip the classifier —
-    // UNLESS the override is injection_molded but the material is clearly a
+    // UNLESS the override is plastic_molded but the material is clearly a
     // ferrous/non-ferrous metal (physically impossible — always a stale DB value).
     const familyOverride = bomRow.manufacturing_family_override as string | null | undefined;
     // DB-backed stale-override detection: prefer materialFamily from DB; fall back to regex.
@@ -254,7 +254,7 @@ export class RetrievalService {
       : /(steel|iron|alumin|brass|copper|titanium|inox|ss\s*3|is\s*2|is\s*1|en\s*[0-9]|crca|gi\s+sheet|galv|mild\s+steel|stainless|\bms\b)/i.test(
           bomBrief.materialHint ?? '',
         );
-    const staleImOverride = familyOverride === 'injection_molded' && isDefinitelyMetal;
+    const staleImOverride = familyOverride === 'plastic_molded' && isDefinitelyMetal;
     const scope = (familyOverride && !staleImOverride)
       ? (() => {
           this.logger.log(`[assemble] Manual family override "${familyOverride}" for ${bomItemId} — skipping classifier`);
@@ -263,7 +263,7 @@ export class RetrievalService {
       : (() => {
           if (staleImOverride) {
             this.logger.warn(
-              `[assemble] manufacturing_family_override="injection_molded" contradicted by ` +
+              `[assemble] manufacturing_family_override="plastic_molded" contradicted by ` +
               (bomBrief.materialFamily
                 ? `DB material_family "${bomBrief.materialFamily}"`
                 : `metal keyword in "${bomBrief.materialHint}"`) +

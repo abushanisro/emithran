@@ -519,14 +519,14 @@ export interface CostSummaryDto {
   // Routed process tree (injection molding today; other families as their
   // routing engines migrate to the tree structure). Each operation carries the
   // rule that selected it — the route's audit trail, line by line.
-  processTree?: import('../costing/injection-molding/process/process-tree').IMProcessTree;
+  processTree?: import('../costing/plastic-molding/process/process-tree').IMProcessTree;
 
   // Injection-molding-specific piece-cost breakdown (separate from tooling).
-  // Present only when family === 'injection_molded'.
+  // Present only when family === 'plastic_molded'.
   injectionMolding?: InjectionMoldingBreakdown;
 
   // Tooling cost — always separate from pieceCostUsd.
-  // Present only when family === 'injection_molded' and annualVolume / productionLifeYears provided.
+  // Present only when family === 'plastic_molded' and annualVolume / productionLifeYears provided.
   tooling?: ToolingCostDto;
 }
 
@@ -542,6 +542,31 @@ export interface InjectionMoldingBreakdown {
   cycleTimeSec: number;           // Menges (thermoplastic) or Arrhenius (LSR)
   cavityCycleTimeSec: number;     // cycleTime / cavityCount
   costConfidence: number;         // 0.0–1.0
+
+  // Real clamp-force / shot-capacity math for THIS quote's selected machine —
+  // the same formula and per-polymer-family clamp-factor table
+  // (resolveMaterialClampFactor, machine-selector-im.ts) that
+  // evaluateIMCandidate() uses to accept/reject/score machines during route
+  // comparison, now computed here too so the single active/applied quote
+  // shows the real numbers instead of only the cruder melting-point-tiered
+  // "Estimated clamp force" warning string. All optional: null when a real
+  // projected area or a real selected-machine tonnage isn't available yet.
+  /** Real projected area used for the clamp calculation. */
+  projectedAreaCm2?: number | null;
+  /** Per-polymer-family factor (tons/cm²) resolveMaterialClampFactor resolved for this material. */
+  materialClampFactor?: number | null;
+  /** projectedAreaCm2 × cavityCount × materialClampFactor × 1.15 safety margin. */
+  clampRequiredT?: number | null;
+  /** The selected machine's own real clamp tonnage (mhr_records / seed capability). */
+  clampMachineT?: number | null;
+  /** clampRequiredT / clampMachineT × 100. */
+  clampUtilPct?: number | null;
+  /** Real required shot weight: (part + runner weight) × cavityCount × 1.10. */
+  shotRequiredG?: number | null;
+  /** The selected machine's own real shot capacity. */
+  shotMachineG?: number | null;
+  /** shotRequiredG / shotMachineG × 100. */
+  shotUtilPct?: number | null;
 }
 
 export interface ToolingCostDto {

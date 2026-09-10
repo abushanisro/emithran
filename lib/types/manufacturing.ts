@@ -6,7 +6,7 @@ export type FeatureType =
 
 export type ManufacturingFamily =
   | 'sheet_metal' | 'cnc_milled' | 'cnc_turned'
-  | 'injection_molded' | 'casting' | 'forging'
+  | 'plastic_molded' | 'casting' | 'forging'
   | 'extrusion' | 'weldment' | 'additive';
 
 export type CostDriverType =
@@ -211,7 +211,7 @@ export interface FeatureGraphSummary {
   extrudedFlangeCount?: number;
   thinWebCount?: number;
   internalProfileCount?: number;
-  // Injection-molded Phase-1 features (present when family = injection_molded)
+  // Injection-molded Phase-1 features (present when family = plastic_molded)
   wallThicknessNominalMm?: number;
   wallThicknessMinMm?: number;
   wallThicknessMaxMm?: number;

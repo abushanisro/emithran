@@ -486,50 +486,38 @@ export function latheRequirement(input: {
 // the standard shop-floor sizing rule (eMithran/industry convention). Phase 1
 // approximates projected area with the part's bbox footprint (the true
 // projected-area-in-mold-opening-direction is a Phase 2 refinement — see the
-// injection-molding plan doc). Keyed by the SAME resin-family strings already
-// used for material cost lookup (MATERIAL_DEFAULTS in default-rates.ts) so
-// there is one resin classification scheme, not two.
-// Reference bands (converted from the common tons/in² shop convention,
-// 1 in² = 6.4516 cm²): easy-flow commodity resins ~2-3 tons/in² (0.31-0.47
-// tons/cm²), general engineering resins (nylon/PA, acetal/POM) ~4-6 tons/in²
-// (0.62-0.93 tons/cm²), higher-viscosity/glass-filled resins ~6-8 tons/in²
-// (0.93-1.24 tons/cm²).
-export const MATERIAL_PRESSURE_FACTOR_TON_CM2: Record<string, number> = {
-  ABS: 0.55,
-  PLASTIC: 0.65, // generic/unknown thermoplastic — mid-band
-  NYLON: 0.75,
-  PA6: 0.75,
-  PA66: 0.75,
-  POM: 0.8,
-  ACETAL: 0.8,
-  DELRIN: 0.8,
-  PEEK: 1.1, // high-viscosity engineering resin
-  __default__: 0.65,
-};
-
-export function classifyResinFamily(grade: string | null): string {
-  if (!grade) return '__default__';
-  const gradeUpper = grade.toUpperCase();
-  return (
-    Object.keys(MATERIAL_PRESSURE_FACTOR_TON_CM2).find(
-      (k) => k !== '__default__' && gradeUpper.includes(k),
-    ) ?? '__default__'
-  );
-}
+// injection-molding plan doc). The material clamp factor itself is resolved
+// by the caller (resolveMaterialClampFactor, machine-selector-im.ts) — see
+// injectionMoldingRequirement's own doc comment for why.
 
 export function injectionMoldingRequirement(input: {
   projectedAreaMm2: number;
-  materialGrade: string | null;
+  // Real per-polymer-family clamp factor (tons/cm²) — resolved ONCE by the
+  // caller (resolveMaterialClampFactor, machine-selector-im.ts: a real,
+  // sourced 40+-family table cited to Rosato/Brydson/Griff/SPI) and passed in
+  // as a plain number, per this file's own header contract ("this file never
+  // sees a grade string or does its own classification/lookup"). This
+  // function used to violate that contract directly — classifying
+  // materialGrade itself via a separate, smaller, uncited 8-entry table
+  // (MATERIAL_PRESSURE_FACTOR_TON_CM2/classifyResinFamily) that gave the
+  // ACTUAL machine-selection gate a cruder, differently-sourced number than
+  // the one already computed for route comparison (evaluateIMCandidate).
+  // Real, confirmed live gap (2026-09-11).
+  materialClampFactor: number;
+  // Cavity count is not yet known at machine-selection time (it is itself
+  // partly a function of the selected machine's clamp tonnage — see
+  // recommendCavityCount, cost-injection-molding-engine.ts) — this remains a
+  // single-cavity-basis requirement, same as before. A genuinely
+  // multi-cavity part may need a larger machine than this alone selects;
+  // route comparison's im-*-tier routes resolve cavity count themselves
+  // before scoring each tier and are the more complete number for that case.
   shotWeightG?: number | null;
   partLengthMm?: number;
   partWidthMm?: number;
 }): InjectionMoldingRequirement {
-  const resinFamily = classifyResinFamily(input.materialGrade);
-  const pressureFactor =
-    MATERIAL_PRESSURE_FACTOR_TON_CM2[resinFamily] ?? MATERIAL_PRESSURE_FACTOR_TON_CM2.__default__;
   const projectedAreaMm2 = Math.max(input.projectedAreaMm2, 0);
   const projectedAreaCm2 = projectedAreaMm2 / 100; // 1 cm² = 100 mm²
-  const clampTonnageRequired = projectedAreaCm2 * pressureFactor;
+  const clampTonnageRequired = projectedAreaCm2 * input.materialClampFactor;
   return {
     kind: 'injection_molding',
     clampTonnageRequired,

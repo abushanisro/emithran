@@ -20,14 +20,14 @@ const FAMILY_TYPE_PREFERENCE: Record<Exclude<PartFamily, 'out_of_scope'>, string
   cnc_turned:       ['cutting_tool', 'jig', 'gauge', 'fixture', 'other'],
   cnc_milled:       ['cutting_tool', 'fixture', 'jig', 'gauge', 'other'],
   sheet_metal:      ['die', 'mold', 'fixture', 'jig', 'gauge', 'cutting_tool', 'other'],
-  injection_molded: ['mold', 'die', 'fixture', 'gauge', 'other'],
+  plastic_molded: ['mold', 'die', 'fixture', 'gauge', 'other'],
 };
 
 const FAMILY_KEYWORDS: Record<Exclude<PartFamily, 'out_of_scope'>, string[]> = {
   cnc_turned:       ['insert', 'ccmt', 'dcmt', 'turning', 'boring', 'lathe', 'parting', 'thread'],
   cnc_milled:       ['end mill', 'face mill', 'milling', 'slot', 'drill', 'reamer', 'cutter'],
   sheet_metal:      ['laser', 'punch', 'die', 'bend', 'brake', 'shear', 'nozzle', 'lens'],
-  injection_molded: ['mold base', 'cavity', 'core', 'ejector', 'runner', 'gate', 'hot runner', 'cooling channel'],
+  plastic_molded: ['mold base', 'cavity', 'core', 'ejector', 'runner', 'gate', 'hot runner', 'cooling channel'],
 };
 
 const norm = (s: string | null | undefined) => (s ?? '').toLowerCase();

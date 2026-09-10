@@ -52,9 +52,9 @@ export class ScopeClassifierService {
       }
       if (bom.materialFamily === 'polymer_thermoplastic' || bom.materialFamily === 'polymer_thermoset') {
         this.logger.log(
-          `[classify] DB material_family "${bom.materialFamily}" for "${bom.materialHint}" → injection_molded`,
+          `[classify] DB material_family "${bom.materialFamily}" for "${bom.materialHint}" → plastic_molded`,
         );
-        return this.inScope('injection_molded', `Material family "${bom.materialFamily}" resolved from DB → injection moulding`, 0.92);
+        return this.inScope('plastic_molded', `Material family "${bom.materialFamily}" resolved from DB → injection moulding`, 0.92);
       }
     }
 
@@ -72,7 +72,7 @@ export class ScopeClassifierService {
         cnc_turned:        'cnc_turned',
         cnc_milled:        'cnc_milled',
         mill_turn:         'cnc_turned',
-        injection_molded:  'injection_molded',
+        plastic_molded:  'plastic_molded',
       };
       const mapped = familyMap[dfm.cadDetectedFamily];
       if (mapped) {
@@ -87,7 +87,7 @@ export class ScopeClassifierService {
           ((fill < 0.10 && storedMinDim < 200) ||
             (dfm.sheetThicknessMm > 0 && dfm.sheetThicknessMm < 10) ||
             (dfm.bendCount > 0 && fill < 0.30));
-        // Guard against injection_molded being assigned to a ferrous/non-ferrous metal part.
+        // Guard against plastic_molded being assigned to a ferrous/non-ferrous metal part.
         // Thin-walled metal enclosures (e.g. IS2062 sheet brackets) can be misread as
         // polymer shells by the OCC topology classifier. Use DB material_family first;
         // fall back to regex when DB lookup returned null.
@@ -96,7 +96,7 @@ export class ScopeClassifierService {
           : /(steel|iron|alumin|brass|copper|titanium|inox|ss\s*3|is\s*2|is\s*1|en\s*[0-9]|crca|gi\s+sheet|galv|mild\s+steel|stainless|\bms\b|\bhr\b|\bcr\b)/i.test(
               bom.materialHint ?? '',
             );
-        const imContradiction = mapped === 'injection_molded' && isDefinitelyMetal;
+        const imContradiction = mapped === 'plastic_molded' && isDefinitelyMetal;
         if (sheetContradiction || imContradiction) {
           this.logger.warn(
             `[classify] Stored CAD family "${dfm.cadDetectedFamily}" contradicted by ` +
