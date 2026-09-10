@@ -350,15 +350,19 @@ export function BOMItemDialog({
     return failureCount < 2;
   };
 
-  // Query A — unique material names, filtered by category when selected
+  // Query A — unique material names. Deliberately NOT filtered by
+  // materialCategory: the category selector is a real, sourced fact once a
+  // material is chosen, but it is only a starting guess before that (an
+  // auto-classified injection-molded part previously defaulted to
+  // FERROUS_NON_FERROUS and made every real plastic grade unsearchable no
+  // matter what was typed — a confirmed live bug, 2026-09-10). Search now
+  // always queries the full raw_materials database regardless of category.
   const { data: rawMaterialsData, isLoading: isLoadingMaterials } = useQuery<RawMaterialsResponse>({
-    queryKey: ['raw-materials-names', debouncedMaterialSearch, materialCategory],
+    queryKey: ['raw-materials-names', debouncedMaterialSearch],
     queryFn: async (): Promise<RawMaterialsResponse> => {
       const endpoint = '/raw-materials/enhanced';
       const params: Record<string, unknown> = { limit: 1000 };
       if (debouncedMaterialSearch?.trim()) params.search = debouncedMaterialSearch.trim();
-      if (materialCategory === 'PLASTIC_RUBBER') params.category = 'PLASTIC';
-      else if (materialCategory === 'FERROUS_NON_FERROUS') params.category = 'FERROUS';
       try {
         return (await apiClient.get(endpoint, { params })) as RawMaterialsResponse;
       } catch (error: unknown) {
