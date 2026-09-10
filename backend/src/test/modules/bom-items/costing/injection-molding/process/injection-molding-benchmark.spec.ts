@@ -189,6 +189,53 @@ describe('computeInjectionMoldedCostSummary', () => {
     expect(toolingDominantWarning).toBe(true);
   });
 
+  // mold-tooling-engine.ts wiring (2026-09-10): moldCostUsd is now derived
+  // from a real, itemized purchased-component BOM instead of a flat
+  // uncited SPI_MOLD_CLASSES.baseCostUsd constant.
+  it('mold cost is derived from the real mold-tooling BOM subtotal, not a flat per-class constant', () => {
+    const result = computeInjectionMoldedCostSummary(baseInput({
+      annualVolume: 10_000,
+      productionLifeYears: 3,
+      signals: { projectedAreaMm2: 8000, undercutCount: 0 },
+    }));
+    // Real fixed-baseline components (Air Poppet, Ejector Guide Pin Bushing,
+    // Guide Bush, Guide Pin, Limit Switch, Return Pin And Shoulder Bushing)
+    // price to a real, non-zero, non-flat-class-constant subtotal.
+    expect(result.tooling?.moldBomSubtotalUsd).toBeGreaterThan(0);
+    expect(result.tooling?.moldCostUsd).toBeGreaterThan(0);
+    // No SPI-class flat baseCostUsd figure (50_000/25_000/12_000/5_000/1_500)
+    // survives — moldCostUsd now equals the real itemized BOM subtotal
+    // (single cavity here, so no +35%/cavity scaling applies).
+    expect(result.tooling?.moldCostUsd).toBe(result.tooling?.moldBomSubtotalUsd);
+    expect([50_000, 25_000, 12_000, 5_000, 1_500]).not.toContain(result.tooling?.moldCostUsd);
+    // Real design/machining/assembly hours are disclosed, never priced.
+    expect(result.tooling?.moldEstimatedDesignHrs).toBeGreaterThan(0);
+    expect(result.tooling?.moldEstimatedMachiningHrs).toBeGreaterThan(0);
+    // Ejector Pin's quantity is not derivable from any sourced table — real,
+    // disclosed gap, not a fabricated count.
+    expect(result.tooling?.moldMissingComponents).toEqual(
+      expect.arrayContaining([expect.stringContaining('Ejector Pin')]),
+    );
+  });
+
+  it('mold cost scales with real side-action hardware only when the part has an undercut', () => {
+    const withoutUndercut = computeInjectionMoldedCostSummary(baseInput({
+      annualVolume: 10_000,
+      productionLifeYears: 3,
+      signals: { projectedAreaMm2: 8000, undercutCount: 0 },
+    }));
+    const withUndercut = computeInjectionMoldedCostSummary(baseInput({
+      annualVolume: 10_000,
+      productionLifeYears: 3,
+      signals: { projectedAreaMm2: 8000, undercutCount: 1 },
+    }));
+    // Hydraulic Cylinder + Side Lock (real per-undercut hardware) only price
+    // in when the part genuinely has an undercut requiring a slide.
+    expect(withUndercut.tooling!.moldBomSubtotalUsd!).toBeGreaterThan(
+      withoutUndercut.tooling!.moldBomSubtotalUsd!,
+    );
+  });
+
   it('case 5 — runner scrap: hot runner has 0 scrap, cold runner has scrap', () => {
     const coldResult = computeInjectionMoldedCostSummary(baseInput({
       materialGrade: 'PP',   // → edge gate (cold runner)
