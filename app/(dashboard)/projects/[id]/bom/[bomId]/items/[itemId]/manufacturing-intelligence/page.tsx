@@ -330,6 +330,12 @@ const INSPECTION_KB: Record<string, KBFeature> = {
   },
 };
 
+// CATEGORY-level label (the umbrella domain a CAD family belongs to — matches
+// process_taxonomy.process_group, migration 733). 'Plastic Molding' covers
+// all 4 real sibling processes (Injection/Compression/Reaction Injection/
+// Structural Foam Molding) — deliberately different from familyLabel()'s
+// 'Injection Moulded' below, which names the SPECIFIC process. Both are
+// correct at their own grain; do not "fix" one to match the other.
 const FAMILY_GROUP: Record<string, string> = {
   sheet_metal: 'Sheet Metal',
   cnc_milled: 'CNC Machining',
@@ -702,6 +708,12 @@ function FeatureBreakdown({
     </div>
   );
 }
+// SPECIFIC-process label (the CAD family's own detected process, one level
+// finer than FAMILY_GROUP's category above — 'Injection Moulded' here is
+// deliberately narrower than FAMILY_GROUP.injection_molded's 'Plastic
+// Molding' category; the CAD classifier itself has no sub-classification
+// among Injection/Compression/RIM/Structural Foam Molding yet, so this
+// always reads 'Injection Moulded' for the injection_molded family today).
 function familyLabel(f: string): string {
   const m: Record<string, string> = {
     sheet_metal: 'Sheet Metal', cnc_milled: 'CNC Milled', cnc_turned: 'CNC Turned',
