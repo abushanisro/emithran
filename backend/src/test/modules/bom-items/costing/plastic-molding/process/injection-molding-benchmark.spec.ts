@@ -9,8 +9,8 @@ import {
   computeInjectionMoldedCostSummary,
   recommendCavityCount,
   recommendMoldClass,
-} from '../../../../../../modules/bom-items/costing/injection-molding/process/cost-injection-molding-engine';
-import type { InjectionMoldingCostInput } from '../../../../../../modules/bom-items/costing/injection-molding/process/cost-injection-molding-engine';
+} from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
+import type { InjectionMoldingCostInput } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 
 // Fixture MHR rates (realistic INR rates, not defaults)
 const mockMhr = (rate: number) => ({
@@ -126,7 +126,7 @@ describe('computeInjectionMoldedCostSummary', () => {
       materialDensityKgM3: 900,
       materialSource: 'db',
       batchSize: 1000,
-      family: 'injection_molded',
+      family: 'plastic_molded',
       ...BASE_RATES,
       clampTonnageKN: 570,
       shotCapacityCm3: 51,
@@ -157,8 +157,12 @@ describe('computeInjectionMoldedCostSummary', () => {
       shotCapacityCm3: 135,
       batchSize: 5000,
     }));
-    const dryingLine = result.processLines.find((l) => l.process === 'Material Drying');
-    expect(dryingLine).toBeDefined();
+    // Material Drying is routed (real signal: ABS is hygroscopic) but not
+    // costed (no sourced drying-time data) — disclosed as a warning instead
+    // of a fabricated process line (2026-09-11).
+    expect(result.processTree!.operations.map((o) => o.id)).toContain('material_drying');
+    expect(result.processLines.find((l) => l.process === 'Material Drying')).toBeUndefined();
+    expect(result.warnings.some((w) => /Material Drying/.test(w))).toBe(true);
     // Multi-cavity expected at 50k/yr with 150T machine
     expect(result.injectionMolding!.cavityCount).toBeGreaterThanOrEqual(1);
   });
@@ -175,8 +179,12 @@ describe('computeInjectionMoldedCostSummary', () => {
         projectedAreaMm2: 8000,
       },
     }));
-    const sideActionLine = result.processLines.find((l) => l.process.includes('Side Action'));
-    expect(sideActionLine).toBeDefined();
+    // Side Action is routed (real signal: 1 undercut) but not costed (no
+    // sourced actuation-time data) — disclosed as a warning instead of a
+    // fabricated process line (2026-09-11).
+    expect(result.processTree!.operations.map((o) => o.id)).toContain('side_action');
+    expect(result.processLines.find((l) => l.process.includes('Side Action'))).toBeUndefined();
+    expect(result.warnings.some((w) => /Side Action/.test(w))).toBe(true);
   });
 
   it('case 4 — prototype PP, 200/yr → mold Class 105, tooling dominant warning', () => {
@@ -264,8 +272,12 @@ describe('computeInjectionMoldedCostSummary', () => {
     expect(opIds).not.toContain('material_drying');
     expect(im.cycleTimeSec).toBeGreaterThanOrEqual(20);
     expect(im.cycleTimeSec).toBeLessThanOrEqual(60);  // 2mm wall, Arrhenius + fill + eject
+    // LSR Compound Dosing is routed (real signal: LSR moldingSubtype) but not
+    // costed (no sourced dosing-time data) — disclosed as a warning instead
+    // of a fabricated process line (2026-09-11).
     const lineLabels = result.processLines.map((l) => l.process);
-    expect(lineLabels.some((l) => /lsr.*dosing/i.test(l))).toBe(true);
+    expect(lineLabels.some((l) => /lsr.*dosing/i.test(l))).toBe(false);
+    expect(result.warnings.some((w) => /LSR Compound Dosing/.test(w))).toBe(true);
   });
 
   it('case 8 — insert housing, 3 inserts: insert_loading routed; insert process lines present', () => {
@@ -279,10 +291,11 @@ describe('computeInjectionMoldedCostSummary', () => {
     expect(im.moldingSubtype).toBe('insert');
     expect(opIds).toContain('insert_loading');
     expect(opIds).toContain('insert_inspection');
-    // insert_loading process line must be present with non-zero run cost
-    const insertLine = result.processLines.find((l) => /insert.*load/i.test(l.process));
-    expect(insertLine).toBeDefined();
-    expect(insertLine!.cycleTimeMin).toBeGreaterThan(0);
+    // Insert Loading is routed (real signal: 3 inserts, insert subtype) but
+    // not costed (no sourced loading-time data) — disclosed as a warning
+    // instead of a fabricated process line (2026-09-11).
+    expect(result.processLines.find((l) => /insert.*load/i.test(l.process))).toBeUndefined();
+    expect(result.warnings.some((w) => /Insert Loading/.test(w))).toBe(true);
   });
 
   it('case 9 — unscrewing cores: core_unscrewing routed; mold class bumped vs baseline', () => {

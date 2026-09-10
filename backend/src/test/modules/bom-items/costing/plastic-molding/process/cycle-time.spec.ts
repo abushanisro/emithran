@@ -17,7 +17,7 @@ import {
   computeFillTimeSec,
   RESIN_THERMAL_TABLE,
   type RealResinInputs,
-} from '../../../../../../modules/bom-items/costing/injection-molding/process/cycle-time';
+} from '../../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
 
 describe('lookupResinProps — fallback table (unchanged, no real data)', () => {
   it('known grade, no real data → exact fallback table row', () => {

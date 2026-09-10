@@ -2372,10 +2372,30 @@ export function ProcessCostDialog({
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-primary">
-              {editData ? 'Edit Process Cost' : 'Create Process Cost'}
+              {editData
+                ? `Edit Process Cost${(savedOperation || savedProcessRoute) ? ` — ${savedOperation || savedProcessRoute}` : ''}`
+                : 'Create Process Cost'}
             </DialogTitle>
             <DialogDescription>
               Configure process parameters, select resources, and calculate costs
+              {/* Injection Molding (and Compression/Reaction Injection/Structural
+                  Foam Molding) machines run several distinct cycle steps — Mold
+                  Setup, Injection, Packing/Holding, Cooling, Ejection — as
+                  separate saved rows on the SAME machine/category (unlike Sheet
+                  Metal, where one machine category usually IS the operation).
+                  The Process/Category picker below is scoped to the machine's
+                  HR Rates classification only (it cannot select a specific
+                  cycle step), so without this the title and this dialog gave
+                  no prominent indication of WHICH step was being edited —
+                  every one of those rows looked identical ("Plastic Molding /
+                  Injection Molding") until you noticed the small read-only
+                  note further down. */}
+              {editData && (savedOperation || savedProcessRoute) && (
+                <span className="block mt-1 text-xs">
+                  Editing the real saved operation <span className="font-medium">{savedOperation || savedProcessRoute}</span> —
+                  Process/Category below describe the machine's HR Rates classification, not this specific step.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 

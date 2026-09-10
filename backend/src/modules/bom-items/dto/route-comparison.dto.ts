@@ -22,6 +22,38 @@ export interface RouteCapability {
   warnings: string[];
 }
 
+/**
+ * Real, per-part injection-molding clamp/shot sizing detail behind an IM
+ * tonnage-tier route — the actual numbers evaluateIMCandidate() computed for
+ * THIS part against the tier's real (or, absent a DB machine, synthetic)
+ * machine, not just the pass/fail RouteCapability above. Set only on the 3
+ * real injection_molding tonnage-tier routes (small/medium/large) — the
+ * clamp-tonnage/shot-capacity constraint model doesn't apply to Compression/
+ * Reaction Injection/Structural Foam Molding, so those routes leave this
+ * unset rather than fabricate a clamp number for a press that isn't clamped
+ * the same way.
+ */
+export interface RouteInjectionMoldingDetail {
+  /** Required clamp force for this part (projected area × cavities × material factor × 1.15 margin), metric tons-force. */
+  clampRequiredT: number | null;
+  /** The evaluated machine's real clamp rating (DB machine) or the tier's synthetic fallback tonnage. */
+  clampMachineT: number | null;
+  /** clampRequiredT / clampMachineT as a 0-100 percentage. null when projected area is unknown. */
+  clampUtilPct: number | null;
+  /** Required shot weight for this part (part + runner) × cavities × 1.10 margin, grams. */
+  shotRequiredG: number | null;
+  /** The evaluated machine's real shot capacity, grams. null when the machine has no shot-capacity figure on file. */
+  shotMachineG: number | null;
+  /** shotRequiredG / shotMachineG as a 0-100 percentage. null when shotMachineG is unknown. */
+  shotUtilPct: number | null;
+  /** Real cavity count this route was costed at (recommendCavityCount, constrained by clamp/shot/economics). */
+  cavityCount: number;
+  /** Real gate-type recommendation (recommendGateType) driving cycle time / trimming for this route. */
+  gateType: string;
+  /** Whether this DB machine's clamp/shot data came from imported reference data or a class-tier synthetic fallback. */
+  machineDataSource: 'imported' | 'synthetic';
+}
+
 export interface RouteResultDto {
   routeId: RouteId;
   routeLabel: string;
@@ -100,6 +132,8 @@ export interface RouteResultDto {
   setupCount?: number;
   machineCapabilityWarnings?: string[];
   routeComplexityScore?: number;  // 0–100: holes + pockets + threads + setups + GD&T
+  /** Real clamp-tonnage/shot-capacity sizing detail — set only on IM tonnage-tier routes. See RouteInjectionMoldingDetail. */
+  injectionMolding?: RouteInjectionMoldingDetail;
 }
 
 export interface RouteComparisonDto {

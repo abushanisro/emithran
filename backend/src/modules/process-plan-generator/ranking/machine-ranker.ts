@@ -25,7 +25,7 @@ const MACHINE_KEYWORDS_BY_FAMILY: Record<Exclude<PartFamily, 'out_of_scope'>, st
   cnc_turned:       ['lathe', 'turning', 'turn center', 'cnc lathe', 'vmc lathe', 'swiss', 'turn-mill'],
   cnc_milled:       ['vmc', 'mill', 'milling', 'machining center', 'hmc', 'cnc machining', 'vertical machining', '5-axis', 'router'],
   sheet_metal:      ['laser', 'press brake', 'shear', 'punch', 'turret', 'bending', 'cnc bending', 'fiber laser', 'press', 'bender', 'roll', 'stamping', 'forming', 'blanking'],
-  injection_molded: ['injection', 'injection molding', 'im machine', 'mold', 'mould', 'plastics', 'press im', 'milacron', 'engel', 'fanuc im', 'haitian', 'arburg'],
+  plastic_molded: ['injection', 'injection molding', 'im machine', 'mold', 'mould', 'plastics', 'press im', 'milacron', 'engel', 'fanuc im', 'haitian', 'arburg'],
 };
 
 const norm = (s: string | null | undefined): string => (s ?? '').toLowerCase().trim();

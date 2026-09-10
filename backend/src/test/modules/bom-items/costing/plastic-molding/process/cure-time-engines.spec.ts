@@ -11,8 +11,8 @@
 //
 // Run: npm run test -- cure-time-engines
 
-import { computeCompressionMoldingCost } from '../../../../../../modules/bom-items/costing/injection-molding/process/cost-compression-molding-engine';
-import { computeReactionInjectionMoldingCost } from '../../../../../../modules/bom-items/costing/injection-molding/process/cost-reaction-injection-molding-engine';
+import { computeCompressionMoldingCost } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-compression-molding-engine';
+import { computeReactionInjectionMoldingCost } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 
 const realMachineRate = (machineClass: string): MHRRateInput => ({

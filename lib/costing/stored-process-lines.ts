@@ -75,11 +75,22 @@ export interface StoredProcessRow {
   heads?: number | null;
   partsPerCycle?: number | null;
   scrap?: number | null;
+  /**
+   * This row's own real operation identity — read (category falling back to
+   * operation, the same precedence the rest of the app already uses to LABEL
+   * a stored row) to disambiguate which live engine line is actually THIS
+   * row, when its machine_class alone is not enough. See matchedEngineLine's
+   * own doc comment for why machine_class alone stopped being enough.
+   */
+  operation?: string | null;
+  category?: string | null;
 }
 
 /** Only the parts of a live engine line this module needs. */
 export interface EngineLineLite {
   machineClass?: string | null;
+  /** This line's own process label (ProcessLineCost.process) — see matchedEngineLine. */
+  process?: string | null;
   cycleTimeMin: number;
   machineSelection?: {
     overridden?: boolean;
@@ -187,9 +198,32 @@ export function resolveStoredProcessLines<
   const batchSize = Math.max(num(effective.batchSize, 1), 1);
 
   return rows.map((row) => {
-    const matchedEngineLine = engineLines.find(
+    // machine_class alone identifies the RIGHT candidate exactly when a class
+    // has one engine line per part (true for almost every class: one Fiber
+    // Laser Cutting line, one Press Brake line, ...). It stopped being enough
+    // for injection_molding (and its 3 real siblings): ONE machine costs
+    // several distinct, individually-priced cycle phases sharing that SAME
+    // class — Injection/Packing/Cooling/Ejection/LSR Curing. Confirmed live
+    // (2026-09-11): Packing/Holding, Cooling, and Ejection all matched
+    // whichever line `.find` happened to hit first, so all three rows showed
+    // the identical machine alternatives, "Why" reasoning, cycle time, and
+    // clamp-tonnage numbers — three different real operations rendered as
+    // one duplicated block. When a class has more than one live line, an
+    // exact match on the row's own real operation identity (category, else
+    // operation — the same fields the rest of the app already reads to LABEL
+    // this row) picks the right one; with none matching, this returns no
+    // match rather than guessing one of several equally-plausible wrong
+    // answers.
+    const classMatches = engineLines.filter(
       (l) => l.machineClass && row.machineClass && l.machineClass === row.machineClass,
-    ) ?? null;
+    );
+    const rowOperation = (row.category || row.operation || '').trim().toLowerCase();
+    const matchedEngineLine =
+      (rowOperation
+        ? classMatches.find((l) => (l.process ?? '').trim().toLowerCase() === rowOperation)
+        : undefined)
+      ?? (classMatches.length === 1 ? classMatches[0] : undefined)
+      ?? null;
 
     const liveCycleSec = matchedEngineLine ? matchedEngineLine.cycleTimeMin * 60 : null;
     const hasSavedMachine = Boolean(row.mhrId) || Boolean(row.machineName);

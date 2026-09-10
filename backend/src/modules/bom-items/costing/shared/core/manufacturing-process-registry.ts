@@ -21,7 +21,7 @@ import { ReamingEngine } from '../../sheet-metal/operation/reaming-engine';
 import { PemInsertionEngine } from '../../sheet-metal/operation/pem-insertion-engine';
 import { CncMillingEngine } from '../../machining/process/cnc-milling-registry-engine';
 import { CncTurningEngine } from '../../machining/process/cnc-turning-registry-engine';
-import { InjectionMoldingEngine } from '../../injection-molding/process/injection-molding-registry-engine';
+import { InjectionMoldingEngine } from '../../plastic-molding/process/injection-molding-registry-engine';
 import { InspectionRegistryEngine } from '../process/inspection-registry-engine';
 import { SurfaceTreatmentEngine } from '../process/surface-treatment-registry-engine';
 
