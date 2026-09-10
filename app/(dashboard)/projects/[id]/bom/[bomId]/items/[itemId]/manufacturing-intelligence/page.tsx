@@ -10177,6 +10177,16 @@ export default function ManufacturingIntelligencePage() {
             await applyRoute.mutateAsync({ routeId: applyId, ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : {}), location: factoryDraft });
             applyMachineOverrides();
           } catch { /* errors surfaced by the mutation's own onError toast */ }
+        } else {
+          // Real, confirmed bug (2026-09-11): a selectedManualRoute reaching
+          // here with none of dynamicCuttingRouteId/directApplyRouteId set,
+          // and an id (KB_TO_APPLY_ROUTE has no such key) that isn't a real
+          // apply target, silently did nothing — no mutation call, no error,
+          // while the Process Routing panel already showed "Manual routing"
+          // with this route's label as if it had been applied. Surfacing
+          // this closes the gap between what the UI showed and what was
+          // actually written.
+          toast.error(`"${route.label}" cannot be applied — no real route target was resolved for it. Reopen Workflow Builder and pick a route again.`);
         }
       }
     }
