@@ -9291,6 +9291,37 @@ function GeometricCostDriversPanel({
 }) {
   type GCDTab = 'geo' | 'cost' | 'props' | 'detail' | 'design';
   const [tab, setTab] = useState<GCDTab>('geo');
+  const family = item.familyClassification ?? fg?.classification?.family ?? '';
+  const isIM = family === 'injection_molded';
+  // Same real field derivation already proven working elsewhere on this page
+  // (the Part/Complexity summary card, ~line 7430) — reused here for the
+  // Geometry tab, not reinvented. Injection-molded parts have none of the
+  // Sheet Metal fields that tab otherwise renders (sheetThicknessMm/
+  // holeCount/bendCount/cutLengthMm/flatPatternAreaMm2 are all real null/0
+  // for this family — confirmed live, 2026-09-10), so the tab rendered
+  // empty for an IM part even though the CAD engine already computes real
+  // IM feature data.
+  const imGeo = useMemo(() => {
+    const imS = (fg?.summary as any) ?? {};
+    const wallNominalMm: number | null = imS.wallThicknessNominalMm || null;
+    const wallMinMm: number | null = imS.wallThicknessMinMm || null;
+    const wallMaxMm: number | null = imS.wallThicknessMaxMm || null;
+    const ribCount: number = imS.ribCount ?? imS.ribCountProxy ?? 0;
+    const throughHoleCount: number = imS.throughHoleCount ?? 0;
+    const blindFeatureCount: number = imS.blindFeatureCount ?? 0;
+    const undercutFaceCount: number = imS.undercutFaceCount ?? 0;
+    const undraftedFaceCount: number = imS.undraftedFaceCount ?? 0;
+    const insertCandidateCount: number = imS.insertCandidateCount ?? 0;
+    const partingComplexity: number | null = imS.partingComplexity ?? null;
+    const avgDraftDeg: number | null = imS.avgDraftAngleDeg ?? null;
+    const hasData =
+      !!wallNominalMm || ribCount > 0 || throughHoleCount > 0 || blindFeatureCount > 0 ||
+      undercutFaceCount > 0 || undraftedFaceCount > 0 || insertCandidateCount > 0 || partingComplexity != null;
+    return {
+      wallNominalMm, wallMinMm, wallMaxMm, ribCount, throughHoleCount, blindFeatureCount,
+      undercutFaceCount, undraftedFaceCount, insertCandidateCount, partingComplexity, avgDraftDeg, hasData,
+    };
+  }, [fg?.summary]);
   const leaves = collectLeaves(tree);
   const selected = selectedId ? findNode(tree, selectedId) : null;
   const typedCostDrivers = fg?.summary?.costDrivers ?? [];
@@ -9353,6 +9384,70 @@ function GeometricCostDriversPanel({
       {/* Geometry tab */}
       {tab === 'geo' && (
         <div className="flex-1 overflow-y-auto divide-y divide-border/40">
+          {isIM && imGeo.hasData && (
+            <>
+              {imGeo.wallNominalMm != null && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Wall Thickness (nominal)</span>
+                  <span className="text-xs font-medium tabular-nums">{fmt(imGeo.wallNominalMm, 2)} mm</span>
+                </div>
+              )}
+              {imGeo.wallMinMm != null && imGeo.wallMaxMm != null && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Wall Thickness (min – max)</span>
+                  <span className="text-xs font-medium tabular-nums">{fmt(imGeo.wallMinMm, 2)} – {fmt(imGeo.wallMaxMm, 2)} mm</span>
+                </div>
+              )}
+              {imGeo.throughHoleCount > 0 && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Through Holes</span>
+                  <span className="text-xs font-medium tabular-nums">{fmtInt(imGeo.throughHoleCount)}</span>
+                </div>
+              )}
+              {imGeo.blindFeatureCount > 0 && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Bosses / Blind Holes</span>
+                  <span className="text-xs font-medium tabular-nums">{fmtInt(imGeo.blindFeatureCount)}</span>
+                </div>
+              )}
+              {imGeo.ribCount > 0 && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Ribs</span>
+                  <span className="text-xs font-medium tabular-nums">{fmtInt(imGeo.ribCount)}</span>
+                </div>
+              )}
+              {imGeo.undercutFaceCount > 0 && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Undercuts</span>
+                  <span className="text-xs font-medium tabular-nums">{fmtInt(imGeo.undercutFaceCount)}</span>
+                </div>
+              )}
+              {imGeo.undraftedFaceCount > 0 && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Undrafted Faces</span>
+                  <span className="text-xs font-medium tabular-nums">{fmtInt(imGeo.undraftedFaceCount)}</span>
+                </div>
+              )}
+              {imGeo.avgDraftDeg != null && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Avg. Draft Angle</span>
+                  <span className="text-xs font-medium tabular-nums">{fmt(imGeo.avgDraftDeg, 1)}°</span>
+                </div>
+              )}
+              {imGeo.insertCandidateCount > 0 && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Insert Candidates</span>
+                  <span className="text-xs font-medium tabular-nums">{fmtInt(imGeo.insertCandidateCount)}</span>
+                </div>
+              )}
+              {imGeo.partingComplexity != null && (
+                <div className="flex items-baseline px-3 py-1.5 gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate">Parting Complexity</span>
+                  <span className="text-xs font-medium tabular-nums">{Math.round(imGeo.partingComplexity * 100)}%</span>
+                </div>
+              )}
+            </>
+          )}
           {summary.sheetThicknessMm > 0 && (
             <div className="flex items-baseline px-3 py-1.5 gap-2">
               <span className="text-[10px] text-muted-foreground flex-1 truncate">Sheet Thickness</span>
@@ -9391,7 +9486,13 @@ function GeometricCostDriversPanel({
               <span className="text-xs font-medium tabular-nums">{fmt(summary.flatPatternAreaMm2, 0)} mm²</span>
             </div>
           )}
-          {!summary.holeCount && !summary.bendCount && !summary.cutLengthMm && !summary.flatPatternAreaMm2 && !summary.sheetThicknessMm && (
+          {!isIM && !summary.holeCount && !summary.bendCount && !summary.cutLengthMm && !summary.flatPatternAreaMm2 && !summary.sheetThicknessMm && (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
+              <AlertCircle className="h-6 w-6 opacity-30" />
+              <p className="text-[11px]">Run Auto-Fill to see geometry.</p>
+            </div>
+          )}
+          {isIM && !imGeo.hasData && (
             <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
               <AlertCircle className="h-6 w-6 opacity-30" />
               <p className="text-[11px]">Run Auto-Fill to see geometry.</p>
