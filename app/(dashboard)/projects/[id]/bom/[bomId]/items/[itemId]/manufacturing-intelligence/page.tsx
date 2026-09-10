@@ -36,7 +36,7 @@ import { RouteCompareList } from '@/components/features/workflow/RouteCompareLis
 import { RouteStepEditor } from '@/components/features/workflow/RouteStepEditor';
 import type { AddOperationOption } from '@/components/features/workflow/AddOperationPicker';
 import { adaptRoutesToTree, RouteTreeValidationError, type RouteNode } from '@/lib/routing/route-tree';
-import type { RouteSortMode } from '@/lib/routing/route-sort';
+import { selectTopRoutes, type RouteSortMode } from '@/lib/routing/route-sort';
 import type { WorkflowRouteStep } from '@/lib/routing/route-step';
 import { sequenceProcessRows } from '@/lib/routing/process-sequence';
 import {
@@ -369,12 +369,23 @@ const DEFAULT_VALIDATION_CONFIG: ValidationConfig = {
 // registered engines. Its process names are also the canonical ones the cost
 // lines carry, which this table's were not. See activeOverrideProcesses.
 
-// Maps KB_ROUTE_ALTERNATIVES IDs → apply-route DTO IDs accepted by the backend.
+// Maps a fixed-family (WORKFLOW_KB) option id → apply-route DTO id accepted
+// by the backend. Only ever consulted by the fixed-family path below
+// (handleApplyFixed) — the sheet-metal dynamic path (handleSetRouteDynamic)
+// always sets dynamicCuttingRouteId, so applyScenario's branch that reads
+// this map is unreachable for any sheet-metal route id. The three 'sm-*'
+// entries that used to sit here (sm-laser/sm-turret/sm-waterjet, left over
+// from the deleted KB_ROUTE_ALTERNATIVES table) were exactly that: dead,
+// stale keys nothing could ever look up — real sheet-metal route ids
+// (sm-laser, sm-laser-cut, sm-laser-3d, sm-oxyfuel, sm-shear,
+// sm-cut-to-length, sm-laser-punch, sm-plasma, sm-plasma-punch, sm-router,
+// sm-standard-press, sm-tandem-press, sm-progressive-die, sm-roll-bending-2/
+// 3/4 — manufacturing-process-registry.ts's ROUTE_ID_FOR_CLASS) are resolved
+// entirely through applyCustomRoute/dynamicCuttingRouteId instead. Removed
+// 2026-09-10 rather than kept "in sync" with a registry this map structurally
+// cannot reach.
 // Grinding has no backend route, so it's absent — clicking it only updates local UI.
 const KB_TO_APPLY_ROUTE: Record<string, string> = {
-  'sm-laser':    'sm-laser',
-  'sm-turret':   'sm-turret',
-  'sm-waterjet': 'sm-waterjet',
   'cm-3axis':    'cnc-3ax',
   'cm-4axis':    'cnc-4ax',
   'cm-5axis':    'cnc-5ax',
@@ -4368,26 +4379,29 @@ function RouteSelectionDialog({
   //
   // computeRouteScore still renders its per-route score breakdown as advisory
   // commentary; it no longer picks anything.
-  // The OVERALL recommendation, which may well be a FORMING route (Roll
-  // Bending / Standard / Tandem Press / Progressive Die) -- on a real SECC
-  // part at 1,000/yr the cheapest route is 3 Roll Bending. Correct for badging
-  // and for the compare list, which should mark the genuinely recommended row.
+  // The backend recommendation (selectRecommendedRoute, bom-items.service.ts's
+  // attachToRoutes) is restricted to processFamily === 'cutting' by explicit
+  // product decision: a FORMING route (Roll Bending / Standard / Tandem /
+  // Progressive Die Press) produces the finished part in one operation with no
+  // separate Press Brake step, so it has no cut → bend → finish chain for this
+  // cutting-only Workflow Builder to stage and edit — it stays visible, priced,
+  // and manually selectable via the Route Comparison card, just never the
+  // automatic pick. recommendedCuttingId is therefore already a cutting route
+  // whenever a candidate qualifies (never forming), which is also why
+  // topRouteIds below is computed over `realRoutes` (cutting-only), not the
+  // combined cutting+forming set.
   const recommendedCuttingId = comparison.data?.recommendedRouteId ?? null;
-  // ...and the same recommendation ONLY IF it is a cutting route.
-  //
-  // cuttingRouteId drives selectedRouteNode, sharedLines, cuttingLineByRouteId
-  // and dynamicCuttingStep, every one of which is cutting-only by construction
-  // (see the realRoutes filter above and its comment). Seeding it with a
-  // forming route id therefore rendered that forming route's HEADER above a
-  // CUTTING route's step chain: observed live as "3 Roll Bending / CAD-optimal"
-  // whose operations were Press Brake -> Deburring -> PEM Insertion ->
-  // Inspection, with the roll-bending operation itself missing, a Press Brake
-  // step the route's own disclosure says does not exist, and a builder total of
-  // $1.04 against the engine's $1.15.
-  //
-  // The engine and the persisted process_cost_records were both correct
-  // throughout ("3 Roll Bending", Faccin HCU 300 X 1, $0.1846) -- this was
-  // purely the builder pointing a cutting-only pipeline at a forming route.
+  // Up to the top 3 real cutting routes for this part, same ranking as
+  // recommendedCuttingId's single winner (selectTopRoutes uses the identical
+  // eligibility gate/tie-break as the backend's own selectRecommendedRoute), so
+  // the comparison list always surfaces the real best few candidates instead of
+  // pinning only one — topRouteIds[0] always equals recommendedCuttingId
+  // whenever a candidate qualifies.
+  const topRouteIds = selectTopRoutes(realRoutes, 3).map((r) => r.routeId);
+  // Defensive real-data consistency check, not a second recommendation: the
+  // backend already guarantees recommendedCuttingId is a cutting route, so
+  // this only protects against a route id the backend named that this
+  // cutting-only view somehow doesn't have a line for (e.g. a stale cache).
   const recommendedCuttingRouteId =
     recommendedCuttingId && cuttingLineByRouteId.has(recommendedCuttingId)
       ? recommendedCuttingId
@@ -4474,11 +4488,12 @@ function RouteSelectionDialog({
       return;
     }
 
-    // No existing dynamic route to restore — default to the CAD-optimal
-    // cutting route for this part's real geometry (computeRouteScore).
-    // recommendedCuttingRouteId, never the overall recommendation: when the
-    // cheapest route is a forming one it has no cutting line to stage, and
-    // realRoutes[0] (cutting-only) is the honest default.
+    // No existing dynamic route to restore — default to recommendedCuttingRouteId,
+    // the real backend recommendation (always a cutting route, by the
+    // processFamily==='cutting' gate in attachToRoutes). realRoutes[0] only
+    // applies in the genuine edge case where no cutting route qualifies at all
+    // (every one infeasible or data-incomplete for this part) — real backend
+    // data, just an arbitrary UI focus with nothing left to rank.
     setCuttingRouteId(recommendedCuttingRouteId ?? realRoutes[0]!.routeId);
     setAdditionalSteps(sharedLines.map((l, i) => ({
       key: `${l.process}-${i}`, process: l.process, machineClass: l.machineClass,
@@ -4745,7 +4760,7 @@ function RouteSelectionDialog({
               nodes={routeTree}
               selectedId={cuttingRouteId}
               onSelect={(node) => selectCuttingRoute(node.id)}
-              recommendedId={recommendedCuttingId}
+              recommendedIds={topRouteIds}
               sortMode={sortMode}
               onSortModeChange={setSortMode}
               currencySymbol={currencySymbol}
@@ -4768,10 +4783,8 @@ function RouteSelectionDialog({
               }}
               materialCost={selectedRouteDto?.materialCost ?? null}
               currencySymbol={currencySymbol}
-              // Compared against the cutting default actually seeded above. Using
-              // the overall recommendation here labelled the staged cutting
-              // route "Custom" whenever a forming route was the cheapest, even
-              // though the user had chosen nothing.
+              // Compared against the exact same default the seeding effect above
+              // computed, so the two can never disagree.
               provenanceLabel={cuttingRouteId
                 ? (cuttingRouteId === (recommendedCuttingRouteId ?? realRoutes[0]?.routeId) ? 'CAD-optimal' : 'Custom')
                 : null}

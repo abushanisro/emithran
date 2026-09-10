@@ -46,6 +46,13 @@ export interface MachineCandidate {
   pressCycleTimeS: number | null;
   handlingConstS: number | null;
   handlingMassCoeffSPerKg: number | null;
+  // mhr_records.cut_to_length_cycle_const_s / cut_to_length_cycle_mass_coeff_s_per_kg /
+  // cut_to_length_cut_speed_s — Cut To Length Line's real per-machine linear
+  // feed-to-length cycle-time formula plus its fixed real shear-stroke
+  // duration (migration 724). null for every other machine class.
+  cutToLengthCycleConstS: number | null;
+  cutToLengthCycleMassCoeffSPerKg: number | null;
+  cutToLengthCutSpeedS: number | null;
   // mhr_records.setup_time_hr — real per-machine setup time, generically
   // available for any class (2026-09-02, added for Compression Molding /
   // Reaction Injection Molding, which have no per-operation lookup table

@@ -59,6 +59,7 @@ const BASE_COLUMNS =
   'total_machine_hour_rate, manual_mhr_value, fully_burdened_local_per_hr, ' +
   'capacity_utilization_rate, operators, usd_lhr_total, ' +
   'press_cycle_time_s, handling_time_const_s, handling_time_mass_coeff_s_per_kg, setup_time_hr, ' +
+  'cut_to_length_cycle_const_s, cut_to_length_cycle_mass_coeff_s_per_kg, cut_to_length_cut_speed_s, ' +
   // The two components the canonical MHR is DEFINED as (migration 581:
   // MHR = Direct Overhead + Indirect Overhead). Carried so the benchmark
   // override guard can tell a real, self-consistent machine rate apart from
@@ -89,6 +90,9 @@ interface RawMachineRow {
   press_cycle_time_s?: number | string | null;
   handling_time_const_s?: number | string | null;
   handling_time_mass_coeff_s_per_kg?: number | string | null;
+  cut_to_length_cycle_const_s?: number | string | null;
+  cut_to_length_cycle_mass_coeff_s_per_kg?: number | string | null;
+  cut_to_length_cut_speed_s?: number | string | null;
   setup_time_hr?: number | string | null;
   direct_overhead_rate?: number | string | null;
   indirect_overhead_rate?: number | string | null;
@@ -361,6 +365,9 @@ export async function fetchMachinePool(
       pressCycleTimeS: num(raw.press_cycle_time_s),
       handlingConstS: num(raw.handling_time_const_s),
       handlingMassCoeffSPerKg: num(raw.handling_time_mass_coeff_s_per_kg),
+      cutToLengthCycleConstS: num(raw.cut_to_length_cycle_const_s),
+      cutToLengthCycleMassCoeffSPerKg: num(raw.cut_to_length_cycle_mass_coeff_s_per_kg),
+      cutToLengthCutSpeedS: num(raw.cut_to_length_cut_speed_s),
       setupTimeHr: num(raw.setup_time_hr),
       directOverheadRate: num(raw.direct_overhead_rate),
       indirectOverheadRate: num(raw.indirect_overhead_rate),
@@ -945,6 +952,9 @@ function makeDefaultCandidate(_location: string, cls: MachineClass, fallbackRate
     pressCycleTimeS: null,
     handlingConstS: null,
     handlingMassCoeffSPerKg: null,
+    cutToLengthCycleConstS: null,
+    cutToLengthCycleMassCoeffSPerKg: null,
+    cutToLengthCutSpeedS: null,
     setupTimeHr: null,
     directOverheadRate: null,
     indirectOverheadRate: null,

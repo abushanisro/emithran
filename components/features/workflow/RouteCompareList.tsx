@@ -32,8 +32,13 @@ export interface RouteCompareListProps {
   nodes: RouteNode[];
   selectedId: string | null;
   onSelect: (node: RouteNode) => void;
-  /** Real CAD-optimal route for this part's geometry (computeRouteScore), or null when unscored. */
-  recommendedId: string | null;
+  /**
+   * Up to the top 3 real routes for this part (selectTopRoutes — cheapest
+   * among capable/feasible/fully-costed candidates), most-recommended first.
+   * Empty when no candidate qualifies. Always pinned to the top of their
+   * respective group in 'recommended' sort mode.
+   */
+  recommendedIds: readonly string[];
   sortMode: RouteSortMode;
   onSortModeChange: (mode: RouteSortMode) => void;
   currencySymbol: string;
@@ -61,13 +66,13 @@ function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'viole
 }
 
 export function RouteCompareList({
-  nodes, selectedId, onSelect, recommendedId, sortMode, onSortModeChange, currencySymbol,
+  nodes, selectedId, onSelect, recommendedIds, sortMode, onSortModeChange, currencySymbol,
   isLoading = false, errorMessage = null,
 }: RouteCompareListProps) {
   const groupId = useId();
   const listRef = useRef<HTMLDivElement>(null);
 
-  const groups = groupRouteNodes(sortRouteNodes(nodes, sortMode, recommendedId));
+  const groups = groupRouteNodes(sortRouteNodes(nodes, sortMode, recommendedIds));
   const costScale = maxRouteCost(nodes);
   const selectableIds = groups.flatMap((g) => g.nodes.filter((n) => n.selectable).map((n) => n.id));
 
@@ -149,7 +154,7 @@ export function RouteCompareList({
             <div className="divide-y divide-border/40">
               {group.nodes.map((node) => {
                 const isSelected = node.id === selectedId;
-                const isRecommended = node.id === recommendedId;
+                const recommendedRank = recommendedIds.indexOf(node.id);
                 const barPct = costScale && node.cost !== null && costScale > 0
                   ? Math.max(2, Math.round((node.cost / costScale) * 100))
                   : null;
@@ -200,7 +205,8 @@ export function RouteCompareList({
                         <span className={cn('text-[13px] leading-tight', isSelected ? 'font-semibold' : 'font-medium')}>
                           {node.label}
                         </span>
-                        {isRecommended && <Badge tone="blue">CAD-optimal</Badge>}
+                        {recommendedRank === 0 && <Badge tone="blue">CAD-optimal</Badge>}
+                        {recommendedRank > 0 && <Badge tone="blue">Recommended</Badge>}
                         {node.badges.lowestCost && <Badge tone="emerald">Lowest cost</Badge>}
                         {node.badges.fastest && <Badge tone="violet">Fastest</Badge>}
                         {node.badges.bestQuality && <Badge tone="amber">Best quality</Badge>}

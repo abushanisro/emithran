@@ -1,4 +1,4 @@
-import { computeLaserCuttingCost, Co2LaserCuttingEngine, LaserCutEngine, ThreeDLaserCuttingEngine, type LaserCuttingInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/laser-cutting-engine';
+import { computeLaserCuttingCost, Co2LaserCuttingEngine, ThreeDLaserCuttingEngine, type LaserCuttingInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/laser-cutting-engine';
 import type { UnsupportedOperationGap } from '../../../../../../modules/bom-items/dto/cost-breakdown.dto';
 import { LASER_SETUP_MIN } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
@@ -186,45 +186,28 @@ describe('computeLaserCuttingCost — profile and through-holes in one operation
   });
 });
 
-// ── laser_cut / laser_3d: real, separately-specced Digital Factory pools ──
+// ── laser_3d: a real, separately-specced Digital Factory pool ────────────
 //
 // Root-caused 2026-09-10, confirmed by real machine_library.json schemas:
-// "Fiber Laser Cutting Machine" (max_thickness_1..5_mm per-material fields),
-// "Laser Cutting Machine" (no per-material thickness fields at all), and
-// "3D Laser Cutting Machine" (uniquely carries bed_height_mm, a real Z-axis
-// dimension) are three structurally different real machine categories, not
-// three names for the same thing. Each engine reuses the exact same real
-// cost formula (computeLaserCuttingCost has no technology-specific
-// assumption baked in) — only the registered machineClass differs, so
-// route comparison can find each real pool through its own class.
-describe('LaserCutEngine / ThreeDLaserCuttingEngine — real, separate machine classes', () => {
-  it('LaserCutEngine is registered on laser_cut, not fiber_laser or co2_laser', () => {
-    const engine = new LaserCutEngine();
-    expect(engine.machineClass).toBe('laser_cut');
-    expect(engine.processFamily).toBe('sheet_metal_cutting');
-  });
-
+// "3D Laser Cutting Machine" uniquely carries bed_height_mm (a real Z-axis
+// dimension) — a structurally different real machine category from flat-
+// sheet fiber/CO2 laser cutting. Reuses the exact same real cost formula
+// (computeLaserCuttingCost has no technology-specific assumption baked in)
+// — only the registered machineClass differs, so route comparison can find
+// this real pool through its own class.
+//
+// "Laser Cutting Machine" (24 machines, e.g. "Cincinnati CL 850") was
+// briefly given its own 'laser_cut' class + LaserCutEngine the same day,
+// before memory/sheetmetal/machine/india_base.json's independent "CO2 Laser
+// Cutter" category (the same 24 machines, confirmed name-for-name) showed
+// that split was wrong — those machines resolve through the existing
+// Co2LaserCuttingEngine/co2_laser class instead (see default-rates.
+// constants.ts's co2_laser entry and Co2LaserCuttingEngine's own test above).
+describe('ThreeDLaserCuttingEngine — real, separate machine class', () => {
   it('ThreeDLaserCuttingEngine is registered on laser_3d, not fiber_laser', () => {
     const engine = new ThreeDLaserCuttingEngine();
     expect(engine.machineClass).toBe('laser_3d');
     expect(engine.processFamily).toBe('sheet_metal_cutting');
-  });
-
-  it('LaserCutEngine prices a real "Laser Cutting Machine" the same real formula as fiber/CO2', () => {
-    const laserCutRate: MHRRateInput = {
-      rate: 42.5, source: 'mhr_database', machineClass: 'laser_cut',
-      machineName: 'Cincinnati CL 850', commodityCode: null, labourRate: 9,
-    };
-    const engine = new LaserCutEngine();
-    const result = engine.computeCost({
-      cutLengthMm: 1000, pierceCount: 5, batchSize: 10, grade: 'SS304', sheetThicknessMm: 3,
-      rate: laserCutRate, cuttingSecFromCalculator: 120, opSetupMin: 20,
-    } as unknown as Parameters<LaserCutEngine['computeCost']>[0]);
-
-    expect(result.processLines).toHaveLength(1);
-    expect(result.processLines[0].process).toBe('Laser Cutting');
-    expect(result.processLines[0].hourlyRate).toBe(laserCutRate.rate);
-    expect(result.processLines[0].totalCost).toBeGreaterThan(0);
   });
 
   it('ThreeDLaserCuttingEngine prices a real "3D Laser Cutting Machine" the same real formula', () => {
