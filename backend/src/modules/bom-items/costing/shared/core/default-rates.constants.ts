@@ -880,6 +880,13 @@ export const PLASMA_PUNCH_SETUP_MIN = 30; // per batch
 // convention as every other setup-min constant.
 export const ROLL_BENDING_SETUP_MIN = 30; // per batch
 
+// Cut To Length Line (2026-09-10) — used only when the selected machine's own
+// mhr_records.setup_time_hr is absent. Real, cited default: all 8 real
+// machine_library.json "Cut To Length Line (CTL)" rows carry the identical
+// setup_time_hr=0.14 (8.4min) — same disclosed-fallback convention as every
+// other setup-min constant above.
+export const CUT_TO_LENGTH_SETUP_MIN = 8.4; // per batch
+
 export const RATES_SOURCE_LABEL = 'Location benchmark rates v2 (2026)';
 
 // Every costing endpoint must default to the SAME location. A summary priced in
@@ -936,14 +943,18 @@ export const MACHINE_REGISTRY = {
   // the bug that had "Quattro" (a real AMADA CO2 laser) tagged fiber_laser
   // in mhr_records, which then silently applied fiber-laser cutting-speed
   // assumptions to a machine that doesn't use fiber-laser physics at all.
-  co2_laser:      { commodityCodes: [],                                                                                              processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'CO2 Laser', 'Laser Cutting'],                                                 machineClassKeywords: ['CO2 Laser', 'CO2'] },
-  // The real "Laser Cutting Machine" Digital Factory pool (24 machines,
-  // user-confirmed distinct specs from Fiber Laser Cutting Machine). Reuses
-  // the SAME real "Laser Cut" operation and the SAME verified fiber-laser-
-  // shaped cutting-speed calculator (migration 715/457 — a calculator/
-  // formula choice, not a machine-pool claim) but resolves its rate/
-  // capability from THIS class's own real machine pool, not fiber_laser's.
-  laser_cut:      { commodityCodes: [],                                                                                              processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'Laser Cutting'],                                                              machineClassKeywords: ['Laser Cut', 'Laser Cutter', 'Laser Cutting Machine'] },
+  //
+  // Corrected 2026-09-10: machine_library.json's "Laser Cutting Machine"
+  // category (24 machines, e.g. "Cincinnati CL 850", "Quattro") is NOT a
+  // fourth, separate real machine pool — memory/sheetmetal/machine/
+  // india_base.json independently names this exact same 24-machine set
+  // "CO2 Laser Cutter" (confirmed name-for-name, only OCR-level spelling
+  // differences like "FO-Mil" vs "FO-MII"). A short-lived 'laser_cut' class
+  // briefly split these 24 machines out on their own (same-day migration
+  // 722 draft, never run) before this cross-file reconciliation caught the
+  // error — reverted; they resolve through this co2_laser class instead,
+  // where "Quattro" (migration 456) already lived.
+  co2_laser:      { commodityCodes: [],                                                                                              processGroupKeywords: ['Laser', 'Sheet Metal', 'Sheet metal', 'CO2 Laser', 'Laser Cutting'],                                                 machineClassKeywords: ['CO2 Laser', 'CO2', 'Laser Cut', 'Laser Cutter', 'Laser Cutting Machine'] },
   // The real "3D Laser Cutting Machine" Digital Factory pool (15 machines,
   // user-confirmed distinct specs) — 3D/tube/5-axis laser cutting, a
   // genuinely different capability from flat-sheet cutting (real taxonomy
@@ -997,6 +1008,15 @@ export const MACHINE_REGISTRY = {
   // (process_calculator_mappings), distinct from the other cutting engines'
   // 'Cutting' route — a real, pre-existing distinction, not introduced here.
   shear:          { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Sheet Cutting', 'Cutting'],                                                            machineClassKeywords: ['Shear', 'Shearing'] },
+  // Cut To Length Line (2026-09-10) — real cost engine (cut-to-length-engine.ts)
+  // for all 8 real machines in machine_library.json's "Cut To Length Line
+  // (CTL)" category. Confirmed (migration 572) as a genuine, previously
+  // unwired gap: zero process_calculator_mappings row and every one of its 40
+  // real mhr_records rows (8 machines x 5 locations) carried machine_class =
+  // NULL. machineClassKeywords deliberately specific ('Cut To Length',
+  // 'CTL') so it never keyword-matches Shearing's own class above, despite
+  // both being coil/blank-processing machines in the same process group.
+  cut_to_length:  { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Sheet Cutting', 'Cutting'],                                                            machineClassKeywords: ['Cut To Length', 'CTL'] },
   // Laser Punch (2026-09-01) — real cost engine + real per-machine physics
   // (sm_reference_data 'laserPunchMachine:*' rows) for all 26 real machines
   // in machine_library.json's "Laser Punch / Punch Press" category. Fixes a

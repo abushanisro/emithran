@@ -122,7 +122,7 @@ import { CADAnalysisService } from './services/cad-analysis.service';
  * test/modules/bom-items/route-core-classes.spec.ts.
  */
 export const MHR_RATE_MACHINE_CLASSES: readonly MachineClass[] = [
-  'fiber_laser', 'co2_laser', 'laser_cut', 'laser_3d', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet', 'router_2axis', 'oxyfuel_cut', 'shear', 'laser_punch', 'plasma_cut', 'plasma_punch',
+  'fiber_laser', 'co2_laser', 'laser_3d', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet', 'router_2axis', 'oxyfuel_cut', 'shear', 'cut_to_length', 'laser_punch', 'plasma_cut', 'plasma_punch',
   'standard_press', 'tandem_press', 'progressive_die_press', 'roll_bending_2', 'roll_bending_3', 'roll_bending_4',
   'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn',
   'injection_molding', 'compression_molding', 'structural_foam_molding', 'reaction_injection_molding', 'drill_press', 'pem_press', 'hole_forming',
@@ -1929,14 +1929,17 @@ export class BOMItemsService {
      */
     fiberLaser: MHRRateInput;
     co2Laser: MHRRateInput;
-    // Root-caused 2026-09-10, confirmed directly by the user: 'Laser Cut'
-    // (generic) and '3D Laser Cut' machine pools are two more genuinely
-    // separate, separately-specced real Digital Factory machine classes —
-    // see default-rates.constants.ts's laser_cut/laser_3d MACHINE_REGISTRY
-    // entries for the full history. Published the same way fiberLaser/
-    // co2Laser are, for the same reason (route comparison needs a rate per
-    // real machine class, not just the collapsed single-line slot above).
-    laserCut: MHRRateInput;
+    // Root-caused 2026-09-10, confirmed directly by the user: "3D Laser
+    // Cutting Machine" is a genuinely separate, separately-specced real
+    // Digital Factory machine class — see default-rates.constants.ts's
+    // laser_3d MACHINE_REGISTRY entry for the full history. Published the
+    // same way fiberLaser/co2Laser are, for the same reason (route
+    // comparison needs a rate per real machine class, not just the
+    // collapsed single-line slot above). "Laser Cutting Machine" (24
+    // machines) was briefly split into its own 'laser_cut' class the same
+    // day before a cross-file reconciliation (machine_library.json vs
+    // india_base.json) confirmed it's the same real pool as co2_laser — it
+    // resolves through co2Laser above instead, no separate field needed.
     laser3d: MHRRateInput;
     pressBrake: MHRRateInput;
     deburring: MHRRateInput;
@@ -1950,6 +1953,10 @@ export class BOMItemsService {
     router: MHRRateInput;
     oxyfuelCut: MHRRateInput;
     shear: MHRRateInput;
+    // Cut To Length Line (added 2026-09-10) — 8 real machines, a genuine
+    // previously-unwired gap (migration 572/724). Published the same way
+    // every other real cutting-family machine class is, for route comparison.
+    cutToLength: MHRRateInput;
     laserPunch: MHRRateInput;
     plasmaCut: MHRRateInput;
     plasmaPunch: MHRRateInput;
@@ -2077,6 +2084,9 @@ export class BOMItemsService {
         pressCycleTimeS: rate.pressCycleTimeS ?? null,
         handlingConstS: rate.handlingConstS ?? null,
         handlingMassCoeffSPerKg: rate.handlingMassCoeffSPerKg ?? null,
+        cutToLengthCycleConstS: rate.cutToLengthCycleConstS ?? null,
+        cutToLengthCycleMassCoeffSPerKg: rate.cutToLengthCycleMassCoeffSPerKg ?? null,
+        cutToLengthCutSpeedS: rate.cutToLengthCutSpeedS ?? null,
         setupTimeHr: rate.setupTimeHr ?? null,
         directOverheadRate: rate.directOverheadRate ?? null,
         indirectOverheadRate: rate.indirectOverheadRate ?? null,
@@ -2208,7 +2218,6 @@ export class BOMItemsService {
         // for the single Cost Guide line.
         fiberLaser:       get('fiber_laser'),
         co2Laser:         get('co2_laser'),
-        laserCut:         get('laser_cut'),
         laser3d:          get('laser_3d'),
         pressBrake:       get('press_brake'),
         deburring:        get('deburring'),
@@ -2222,6 +2231,7 @@ export class BOMItemsService {
         router:           get('router_2axis'),
         oxyfuelCut:       get('oxyfuel_cut'),
         shear:            get('shear'),
+        cutToLength:      get('cut_to_length'),
         laserPunch:       get('laser_punch'),
         plasmaCut:        get('plasma_cut'),
         plasmaPunch:      get('plasma_punch'),
@@ -2290,6 +2300,9 @@ export class BOMItemsService {
             pressCycleTimeS: cand.pressCycleTimeS,
             handlingConstS: cand.handlingConstS,
             handlingMassCoeffSPerKg: cand.handlingMassCoeffSPerKg,
+            cutToLengthCycleConstS: cand.cutToLengthCycleConstS,
+            cutToLengthCycleMassCoeffSPerKg: cand.cutToLengthCycleMassCoeffSPerKg,
+            cutToLengthCutSpeedS: cand.cutToLengthCutSpeedS,
             setupTimeHr: cand.setupTimeHr,
             // Carried so applyBenchmarkOverrideIfNeeded can recognise a rate
             // that IS the canonical Direct + Indirect sum (migration 581).
@@ -6391,7 +6404,17 @@ export class BOMItemsService {
         ...normalized,
         // Computed AFTER currency normalisation so the comparison is made on the
         // figures the caller actually receives, not pre-conversion ones.
-        recommendedRouteId: selectRecommendedRoute(normalized.routes)?.routeId ?? null,
+        //
+        // Restricted to processFamily === 'cutting' by explicit product
+        // decision: automatic routing must always stage a cut → bend → finish
+        // chain the Workflow Builder can walk step by step, never a
+        // single-operation forming route (Standard/Tandem/Progressive-Die
+        // Press, Roll Bending) even when one is cheaper — those stay visible,
+        // priced, and manually selectable via the Route Comparison card, just
+        // never the automatic pick. A no-op for CNC/injection-molding routes,
+        // which are always tagged 'cutting' already (they have no forming
+        // concept), so this touches sheet-metal recommendation only.
+        recommendedRouteId: selectRecommendedRoute(normalized.routes.filter((r) => r.processFamily === 'cutting'))?.routeId ?? null,
         resolvedInputs: costingInputs,
       };
     };
@@ -7033,15 +7056,15 @@ export class BOMItemsService {
       // separate real fleets and must be compared as separate routes.
       mhrRates.fiberLaser.machineClass,
       mhrRates.co2Laser.machineClass,
-      // Two more genuinely distinct real laser machine pools — see
-      // default-rates.constants.ts's laser_cut/laser_3d entries.
-      mhrRates.laserCut.machineClass,
+      // Genuinely distinct real 3D/tube laser machine pool — see
+      // default-rates.constants.ts's laser_3d entry.
       mhrRates.laser3d.machineClass,
       mhrRates.turret.machineClass,
       mhrRates.waterjet.machineClass,
       mhrRates.router.machineClass,
       mhrRates.oxyfuelCut.machineClass,
       mhrRates.shear.machineClass,
+      mhrRates.cutToLength.machineClass,
       mhrRates.laserPunch.machineClass,
       mhrRates.plasmaCut.machineClass,
       mhrRates.plasmaPunch.machineClass,
@@ -7512,15 +7535,15 @@ export class BOMItemsService {
       // which is the route that used to disappear without a word.
       [mhrRates.fiberLaser.machineClass, mhrRates.fiberLaser],
       [mhrRates.co2Laser.machineClass, mhrRates.co2Laser],
-      // Two more genuinely distinct real laser machine pools — see
-      // default-rates.constants.ts's laser_cut/laser_3d entries.
-      [mhrRates.laserCut.machineClass, mhrRates.laserCut],
+      // Genuinely distinct real 3D/tube laser machine pool — see
+      // default-rates.constants.ts's laser_3d entry.
       [mhrRates.laser3d.machineClass, mhrRates.laser3d],
       [mhrRates.turret.machineClass, mhrRates.turret],
       [mhrRates.waterjet.machineClass, mhrRates.waterjet],
       [mhrRates.router.machineClass, mhrRates.router],
       [mhrRates.oxyfuelCut.machineClass, mhrRates.oxyfuelCut],
       [mhrRates.shear.machineClass, mhrRates.shear],
+      [mhrRates.cutToLength.machineClass, mhrRates.cutToLength],
       [mhrRates.laserPunch.machineClass, mhrRates.laserPunch],
       [mhrRates.plasmaCut.machineClass, mhrRates.plasmaCut],
       [mhrRates.plasmaPunch.machineClass, mhrRates.plasmaPunch],
@@ -7628,7 +7651,18 @@ export class BOMItemsService {
     // recommendation can never name different routes: physically capable, feasible
     // as a route, actually producing the blank it is being priced against, and
     // fully costed.
+    //
+    // processFamily === 'cutting' is part of this gate by explicit product
+    // decision: a 'forming' route (Standard/Tandem/Progressive-Die Press, Roll
+    // Bending) produces the finished part in one single operation with no
+    // separate Press Brake step, so the Workflow Builder — whose whole
+    // contract is staging a cut → bend → finish chain it can then edit step by
+    // step — has nothing to build from one. Auto routing and these top badges
+    // must therefore only ever pick among the 'Cut, then form and finish'
+    // alternatives; a forming route stays fully visible, priced, and manually
+    // selectable via the Route Comparison card, just never the automatic pick.
     const isEligible = (r: RouteResultDto) =>
+      r.processFamily === 'cutting' &&
       r.capability.overallCapable && r.isFeasible && r.producesBlank !== false && r.dataComplete;
     const capableRoutes = routes.filter(isEligible);
 

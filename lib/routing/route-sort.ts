@@ -8,15 +8,62 @@ import type { RouteNode } from './route-tree';
 // cycleTimes.totalMin, node.feasible = isFeasible). Nothing here invents,
 // weights, or blends a score.
 //
-// In particular 'recommended' is NOT a synthetic ranking of all routes:
-// computeRouteScore (page.tsx) only has real, hand-authored engineering
-// judgment for the 3 cutting methods in CUTTING_ROUTE_IDS, so this mode does
-// exactly two honest things — pin that one CAD-optimal route to the top, and
-// keep every other route in the order the backend returned it. Iterating the
-// rest through a neutral default score would be exactly the fabricated
-// confidence the routing registry redesign was meant to prevent.
+// In particular 'recommended' is NOT a synthetic ranking of every route: it
+// pins the real top few (selectTopRoutes — same cheapest/feasible/capable/
+// fully-costed eligibility as the backend's own selectRecommendedRoute) to
+// the top, in rank order, and keeps every other route in the order the
+// backend returned it. Iterating the rest through a neutral default score
+// would be exactly the fabricated confidence the routing registry redesign
+// was meant to prevent — real ranking stops where the real cost data's
+// eligibility gate stops.
 
 export type RouteSortMode = 'recommended' | 'cost' | 'time';
+
+/** The subset of RouteResultDto (see route-comparison.dto.ts) selectTopRoutes needs. */
+export interface RankableRoute {
+  routeId: string;
+  totalCost: number | null;
+  cycleTimes: { totalMin: number };
+  capability: { overallCapable: boolean };
+  dataComplete: boolean;
+  isFeasible: boolean;
+  producesBlank?: boolean;
+}
+
+/**
+ * Mirrors the backend's selectRecommendedRoute (engine-kernel.ts) exactly —
+ * same eligibility gate (capable, feasible, produces its own blank, fully
+ * costed), same cheapest-then-fastest-then-id tie-break.
+ */
+function rankEligible<T extends RankableRoute>(routes: readonly T[]): T[] {
+  const eligible = routes.filter(
+    (r) =>
+      r.capability.overallCapable &&
+      r.isFeasible &&
+      r.producesBlank !== false &&
+      r.dataComplete &&
+      typeof r.totalCost === 'number',
+  );
+  return [...eligible].sort((a, b) => {
+    const costDiff = (a.totalCost as number) - (b.totalCost as number);
+    if (costDiff !== 0) return costDiff;
+    const timeDiff = a.cycleTimes.totalMin - b.cycleTimes.totalMin;
+    if (timeDiff !== 0) return timeDiff;
+    return a.routeId < b.routeId ? -1 : a.routeId > b.routeId ? 1 : 0;
+  });
+}
+
+/**
+ * The top `n` routes by the same real ranking (cheapest, then fastest, then
+ * route id) — always up to 3 real, priced, capable candidates surfaced
+ * together instead of a single winner, so the comparison list can pin and
+ * badge more than one genuinely good option. Shorter than `n` (down to
+ * empty) when fewer than `n` routes are eligible; never padded with an
+ * ineligible route to reach the count.
+ */
+export function selectTopRoutes<T extends RankableRoute>(routes: readonly T[], n: number): T[] {
+  return rankEligible(routes).slice(0, n);
+}
 
 export const ROUTE_SORT_MODES: { id: RouteSortMode; label: string }[] = [
   { id: 'recommended', label: 'Recommended' },
@@ -50,9 +97,10 @@ function ascWithNullsLast(a: number | null, b: number | null): number {
 export function sortRouteNodes(
   nodes: RouteNode[],
   mode: RouteSortMode,
-  recommendedId: string | null,
+  recommendedIds: readonly string[],
 ): RouteNode[] {
   const indexOf = new Map(nodes.map((n, i) => [n.id, i] as const));
+  const rankOf = new Map(recommendedIds.map((id, i) => [id, i] as const));
   return [...nodes].sort((a, b) => {
     if (a.feasible !== b.feasible) return a.feasible ? -1 : 1;
 
@@ -62,9 +110,14 @@ export function sortRouteNodes(
     } else if (mode === 'time') {
       const byTime = ascWithNullsLast(a.cycleTimeMin, b.cycleTimeMin);
       if (byTime !== 0) return byTime;
-    } else if (recommendedId) {
-      if (a.id === recommendedId) return -1;
-      if (b.id === recommendedId) return 1;
+    } else {
+      const rankA = rankOf.get(a.id);
+      const rankB = rankOf.get(b.id);
+      if (rankA !== undefined || rankB !== undefined) {
+        if (rankA === undefined) return 1;
+        if (rankB === undefined) return -1;
+        if (rankA !== rankB) return rankA - rankB;
+      }
     }
 
     // Stable fallback: whatever order the backend returned.

@@ -94,6 +94,20 @@ export interface MHRRateInput {
   pressCycleTimeS?: number | null;
   handlingConstS?: number | null;
   handlingMassCoeffSPerKg?: number | null;
+  // The selected machine's own mhr_records.cut_to_length_cycle_const_s /
+  // cut_to_length_cycle_mass_coeff_s_per_kg / cut_to_length_cut_speed_s —
+  // Cut To Length Line's real linear feed-to-length formula plus its fixed
+  // real shear-stroke duration (memory/sheetmetal/machine/machine_library.json,
+  // staged into mhr_records.specs by migration 538, promoted to real
+  // dedicated columns by migration 724 — same "promote to a real column when
+  // a real registered engine consumes it" precedent as migration 608's
+  // press_cycle_time_s). Only cut_to_length reads these; every other class
+  // leaves them null. handlingConstS/handlingMassCoeffSPerKg above are
+  // reused as-is for CTL's own real handling-time formula — same physical
+  // concept, same columns, not duplicated.
+  cutToLengthCycleConstS?: number | null;
+  cutToLengthCycleMassCoeffSPerKg?: number | null;
+  cutToLengthCutSpeedS?: number | null;
   // The selected machine's own mhr_records.setup_time_hr (via
   // MachineCandidate — see its own doc comment). Generic across any class;
   // Compression Molding / Reaction Injection Molding are the first real

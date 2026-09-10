@@ -204,23 +204,19 @@ export function lookupSeedCapability(machineName: string | null): Partial<Machin
 // so unknown machines never silently win jobs they may not handle.
 export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapability>> = {
   fiber_laser:    { maxXMm: 2500, maxYMm: 1250, maxThicknessMsMm: 12, maxThicknessSsMm: 8, maxThicknessAlMm: 6, maxThicknessCuMm: 3 },
-  // No conservative envelope default here on purpose (unlike fiber_laser
-  // above) — CO2 laser machines vary far more widely in real bed size/power
-  // than this app has seen enough real examples of yet (only "Quattro" on
-  // file so far), so a generic floor would be a guess with no real machines
-  // behind it. An unclassified/unverified CO2 laser gets EMPTY_CAPABILITY
-  // only — a real, honest "no capability on file" state, not a number.
-  co2_laser:      {},
-  // laser_cut (added 2026-09-10, user-confirmed distinct real Digital
-  // Factory pool, memory/sheetmetal/machine/machine_library.json's "Laser
-  // Cutting Machine" category, 24 real machines e.g. "Cincinnati CL 850").
-  // Real minimum bed X/Y across all 24 real machines on file (1250x1150mm) —
-  // same conservative-floor convention fiber_laser above uses, sourced from
-  // real data, not guessed. No per-material max-thickness fields: unlike
-  // Fiber Laser Cutting Machine's schema (max_thickness_1..5_mm), this
-  // category's real records carry no per-material thickness data at all, so
-  // none is fabricated here.
-  laser_cut:      { maxXMm: 1250, maxYMm: 1150 },
+  // Corrected 2026-09-10: "only Quattro on file" was stale the moment
+  // machine_library.json's "Laser Cutting Machine" category (24 machines,
+  // e.g. "Cincinnati CL 850") was cross-checked against india_base.json,
+  // which independently names this exact same 24-machine set "CO2 Laser
+  // Cutter" (confirmed name-for-name, only OCR-level spelling differences).
+  // A short-lived 'laser_cut' class briefly carried this real conservative
+  // floor on its own before the reconciliation caught the error — moved
+  // here instead. Real minimum bed X/Y across all 24 real machines on file
+  // (1250x1150mm), same conservative-floor convention fiber_laser above
+  // uses. No per-material max-thickness fields: unlike Fiber Laser Cutting
+  // Machine's schema (max_thickness_1..5_mm), this category's real records
+  // carry no per-material thickness data at all, so none is fabricated here.
+  co2_laser:      { maxXMm: 1250, maxYMm: 1150 },
   // 3D Laser (added 2026-09-10, user-confirmed distinct real pool,
   // "3D Laser Cutting Machine" category, 15 real machines e.g. "3D Laser -
   // 3300 Watts"). Real minimum bed X/Y/Z across all 15 real machines
@@ -272,6 +268,18 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   // here — this empty default is only the last-resort tier for a shear
   // row the migration hasn't reached (e.g. added after the migration ran).
   shear:          {},
+  // No conservative envelope default — 8 real Cut To Length Line machines
+  // (2026-09-10) span 1.75-12mm max steel thickness / 1219-2438mm real coil
+  // width (roll_width_mm), too wide a real spread for one class-wide floor
+  // (same reasoning as shear directly above). Real per-machine capability
+  // (max_thickness_ms/ss/al/cu_mm, max_y_mm from roll_width_mm) is backfilled
+  // directly into mhr_records by migration 724 from the already-staged
+  // specs JSONB (migration 538), same migration-driven pattern as shear/
+  // laser_punch/plasma_cut — not hardcoded here. Brass has no real
+  // max_thickness_brass_mm column on MachineCapability at all (disclosed
+  // omission — the other 4 materials' real data is backfilled, brass's is
+  // not fabricated into an unrelated field).
+  cut_to_length:  {},
   // No conservative envelope default — 26 real Laser Punch / Punch Press
   // machines (2026-09-01) span 200-4000W / 220-300kN press force / a wide
   // sheet-size range, too wide a real spread for one class-wide floor.

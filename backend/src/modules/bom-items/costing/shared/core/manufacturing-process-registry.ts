@@ -1,9 +1,10 @@
 import type { ManufacturingProcessEngine } from './manufacturing-process.types';
-import { LaserCuttingEngine, Co2LaserCuttingEngine, LaserCutEngine, ThreeDLaserCuttingEngine } from '../../sheet-metal/process/laser-cutting-engine';
+import { LaserCuttingEngine, Co2LaserCuttingEngine, ThreeDLaserCuttingEngine } from '../../sheet-metal/process/laser-cutting-engine';
 import { TurretPunchEngine } from '../../sheet-metal/process/turret-punch-engine';
 import { WaterjetEngine } from '../../sheet-metal/process/waterjet-engine';
 import { OxyfuelCuttingEngine } from '../../sheet-metal/process/oxyfuel-cutting-engine';
 import { ShearingEngine } from '../../sheet-metal/process/shearing-engine';
+import { CutToLengthEngine } from '../../sheet-metal/process/cut-to-length-engine';
 import { LaserPunchEngine } from '../../sheet-metal/process/laser-punch-engine';
 import { PlasmaCuttingEngine } from '../../sheet-metal/process/plasma-cutting-engine';
 import { PlasmaPunchEngine } from '../../sheet-metal/process/plasma-punch-engine';
@@ -64,12 +65,12 @@ import { SurfaceTreatmentEngine } from '../process/surface-treatment-registry-en
 export const MANUFACTURING_PROCESS_REGISTRY: ManufacturingProcessEngine<any, any, any, any>[] = [
   new LaserCuttingEngine(),
   new Co2LaserCuttingEngine(),
-  new LaserCutEngine(),
   new ThreeDLaserCuttingEngine(),
   new TurretPunchEngine(),
   new WaterjetEngine(),
   new OxyfuelCuttingEngine(),
   new ShearingEngine(),
+  new CutToLengthEngine(),
   new LaserPunchEngine(),
   new PlasmaCuttingEngine(),
   new PlasmaPunchEngine(),
@@ -111,13 +112,13 @@ export function getEnginesForFamily(processFamily: string): ManufacturingProcess
 export const ROUTE_ID_FOR_CLASS: Record<string, string> = {
   fiber_laser: 'sm-laser',
   co2_laser: 'sm-co2-laser',
-  laser_cut: 'sm-laser-cut',
   laser_3d: 'sm-laser-3d',
   turret_punch: 'sm-turret',
   waterjet: 'sm-waterjet',
   router_2axis: 'sm-router',
   oxyfuel_cut: 'sm-oxyfuel',
   shear: 'sm-shear',
+  cut_to_length: 'sm-cut-to-length',
   laser_punch: 'sm-laser-punch',
   plasma_cut: 'sm-plasma',
   plasma_punch: 'sm-plasma-punch',
@@ -131,13 +132,13 @@ export const ROUTE_ID_FOR_CLASS: Record<string, string> = {
 export const ROUTE_LABEL_FOR_CLASS: Record<string, string> = {
   fiber_laser: 'Fiber Laser + Press Brake',
   co2_laser: 'CO2 Laser + Press Brake',
-  laser_cut: 'Laser Cut + Press Brake',
   laser_3d: '3D Laser + Press Brake',
   turret_punch: 'Turret Punch + Press Brake',
   waterjet: 'Waterjet + Press Brake',
   router_2axis: '2-Axis Router + Press Brake',
   oxyfuel_cut: 'OxyFuel Cut + Press Brake',
   shear: 'Shearing + Press Brake',
+  cut_to_length: 'Cut To Length Line + Press Brake',
   laser_punch: 'Laser Punch + Press Brake',
   plasma_cut: 'Plasma Cut + Press Brake',
   plasma_punch: 'Plasma Punch + Press Brake',
