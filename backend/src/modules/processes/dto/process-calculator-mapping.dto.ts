@@ -126,6 +126,18 @@ export class ProcessCalculatorMappingResponseDto {
   @ApiPropertyOptional({ description: 'Real lhr_records/lhr_benchmark_rates process_group this machine class is billed against; undefined means the same as processGroup (migration 424).' })
   lhrProcessGroup?: string;
 
+  // Real HR-Rates-style machine category (migration 732) — the same
+  // benchmark_source_key-prefix category HR Rates groups machines by
+  // (mhrCategoryOf.ts), verified per machine_class against
+  // machine_library.json rather than derived by a live join (machine_class
+  // is not reliably 1:1 with a real category — see migration 732's own
+  // header). Distinct from taxonomy.operations[].operationCategory, which
+  // is a different, per-operation feature-type concept. undefined for a
+  // row whose machine_class has no verified category yet — a real,
+  // disclosed gap, never guessed.
+  @ApiPropertyOptional({ description: 'Real HR-Rates-style machine category for this row\'s machine_class (migration 732), verified not derived — undefined when not yet verified.' })
+  machineCategory?: string;
+
   @ApiPropertyOptional()
   calculatorId?: string;
 
@@ -165,6 +177,7 @@ export class ProcessCalculatorMappingResponseDto {
       operation: row.operation,
       machineClass: row.machine_class ?? undefined,
       lhrProcessGroup: row.lhr_process_group ?? undefined,
+      machineCategory: row.machine_category ?? undefined,
       calculatorId: row.calculator_id,
       calculatorName: row.calculator_name,
       isActive: row.is_active,

@@ -22,6 +22,10 @@ export interface ProcessCalculatorMapping {
   operation: string;
   machineClass?: string;
   lhrProcessGroup?: string;
+  /** Real HR-Rates-style machine category (migration 732), verified per
+   *  machine_class, not derived — undefined when not yet verified for this
+   *  row's class. Distinct from taxonomy.operations[].operationCategory. */
+  machineCategory?: string;
   calculatorId?: string;
   calculatorName?: string;
   isActive: boolean;
