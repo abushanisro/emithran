@@ -10,6 +10,8 @@ import math
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
 
+from sheet_metal.feature_extractor import SheetMetalFeatureExtractor
+
 logger = logging.getLogger(__name__)
 
 
