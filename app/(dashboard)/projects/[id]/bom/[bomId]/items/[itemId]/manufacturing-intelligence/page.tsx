@@ -1046,6 +1046,7 @@ function buildProcessTree(
   overrideProcesses?: string[],
   cost?: CostSummaryDto | null,
   materialDensityGcm3?: number | null,
+  procRecords?: Array<{ opNbr?: number; category?: string; operation?: string; processGroup?: string; machineName?: string; isActive?: boolean }> | null,
 ): ProcessTreeNode {
   const family = resolveDisplayFamily(item, fg);
   const groupLabel = FAMILY_GROUP[family] ?? 'Manufacturing';
@@ -1077,6 +1078,44 @@ function buildProcessTree(
   // tree reflects what was actually costed instead of showing nothing.
   const overrideRecs = overrideProcesses?.map((p) => ({ process: p, estimated_time_sec: null as number | null }));
   const fgRecs = fg?.processRecommendations;
+  // Real, confirmed live gap (2026-09-11): once no route was ever "applied"
+  // (only individual rows added via Add Process), this used to fall straight
+  // through to `costRecs` below — the cost ENGINE's own hypothetical
+  // recompute of every step it would run (including steps like "Material
+  // Drying"/"Weight Check" that the user never actually added), each
+  // re-matched to whichever machine the engine's OWN default selection
+  // picked. That is a second, independent representation of "what this
+  // part's process is" — confirmed live, it disagreed with Direct Process
+  // Costs both on WHICH steps exist and on WHICH machine runs each one
+  // (tree: "Arburg Allrounder 420 C..."; Direct Process Costs, from the
+  // same item's real stored rows: "Netstal Synergy 1200"). Direct Process
+  // Costs already settled this exact question for engine vs. stored data
+  // (see the "engine rows shown only when no stored records exist" comment
+  // at this file's DIRECT PROCESS COSTS section) — the tree must agree with
+  // it, not maintain its own separate answer. `procRecords` (real
+  // process_cost_records rows for this item) now takes priority over the
+  // engine's own costRecs fallback whenever real stored rows exist.
+  const storedRecs = procRecords?.length
+    ? [...procRecords]
+        .filter((r) => r.isActive !== false)
+        .sort((a, b) => (a.opNbr ?? 0) - (b.opNbr ?? 0))
+        .map((r) => ({
+          process: r.category || r.operation || r.processGroup || 'Process',
+          estimated_time_sec: null as number | null,
+        }))
+    : null;
+  // Real machine actually recorded on the stored row for a given process
+  // label — kept separate from `recs` itself (whose candidates come from
+  // three structurally different sources with no common "machine" field)
+  // so any path through the fallback chain below can still show the real
+  // selected machine for a step that has one, instead of falling through to
+  // the engine's own (possibly different) default-machine recompute.
+  const storedMachineByProcess = new Map<string, string>();
+  for (const r of procRecords ?? []) {
+    if (r.isActive === false) continue;
+    const label = r.category || r.operation || r.processGroup;
+    if (label && r.machineName) storedMachineByProcess.set(label, r.machineName);
+  }
   const costRecs = cost?.processLines?.length
     ? cost.processLines.map((l) => ({ process: l.process, estimated_time_sec: l.cycleTimeMin * 60 }))
     : null;
@@ -1085,6 +1124,7 @@ function buildProcessTree(
   // length — so each candidate is explicitly checked for real content before
   // falling through to the next.
   const recs = (overrideRecs && overrideRecs.length > 0 ? overrideRecs : null)
+    ?? (storedRecs && storedRecs.length > 0 ? storedRecs : null)
     ?? (fgRecs && fgRecs.length > 0 ? fgRecs : null)
     ?? costRecs
     ?? [];
@@ -1107,6 +1147,32 @@ function buildProcessTree(
     const isTurning = rec.process.includes('Turning');
     const isMilling = !isTurning && (rec.process.includes('Milling') || rec.process.includes('Machining'));
     const isMolding = rec.process.includes('Moulding') || rec.process.includes('Molding');
+    // Real, confirmed live bug (2026-09-11): this whole IM feature-detail
+    // block (Moulded Part / Undercuts / Undrafted Faces — the CAD-detected,
+    // click-to-highlight nodes) was gated on `isMolding` alone, which matched
+    // a single coarse CAD-recommendation entry like "Injection Molding".
+    // Once real per-step operations (Mold Setup/Injection/Packing/Cooling/
+    // Ejection — the SAME cost.processLines fallback added this session)
+    // replaced that coarse entry, none of their real names contain
+    // "Molding"/"Moulding", so `isMolding` was never true again and this
+    // entire block silently stopped running — the CAD engine kept computing
+    // real undercut/undrafted/wall-thickness data, but it had nowhere left
+    // to attach to in the tree.
+    //
+    // A second exact-name match (`rec.process === 'Injection'`) was tried
+    // next, but has the identical fragility one level down: once `recs`
+    // preferred the item's own REAL stored process_cost_records (see
+    // storedRecs above) over the engine's full hypothetical step list, a
+    // part whose engineer added Mold Setup/Packing/Cooling/Ejection/
+    // Inspections by hand — without ever adding a line literally named
+    // "Injection" — has no rec named "Injection" at all, so that match
+    // failed too, even though this is unambiguously an injection-molded
+    // part. This geometry (Moulded Part / Undercuts / Undrafted Faces) is
+    // PART-level, not specific to any one named step — it belongs wherever
+    // the first real operation in this part's own resolved list is, whatever
+    // that operation happens to be named or however many/few steps the
+    // engineer chose to add.
+    const isFirstOpForFamily = family === 'injection_molded' && opIdx === 0;
 
     // Only the real, DB-resolved machine from the live cost engine is ever
     // shown here — no fabricated placeholder. Matched by EXACT process name
@@ -1122,7 +1188,9 @@ function buildProcessTree(
     // A machine that hasn't been resolved yet shows '—', never a plausible-
     // looking specific spec (e.g. "Fiber Laser 6kW") that was never selected.
     const matchedCostLine = cost?.processLines?.find((l) => l.process === rec.process);
-    const realMachineName = matchedCostLine?.machineName ?? null;
+    // The real stored row's own machine wins over the engine's own recompute
+    // whenever both exist for the same process label — see storedMachineByProcess.
+    const realMachineName = storedMachineByProcess.get(rec.process) ?? matchedCostLine?.machineName ?? null;
     const machine = rec.process === 'Inspection'
       ? (needsCmm ? 'CMM' : 'Inspection Bench')
       : realMachineName ?? '—';
@@ -1306,10 +1374,13 @@ function buildProcessTree(
           attrs: [{ name: 'Count', value: String(summary.holeCount) }, { name: 'Process', value: 'Drilling' }],
         });
       }
-    } else if (isMolding) {
+    } else if (isMolding || isFirstOpForFamily) {
       // ── In-cycle sub-ops as feature nodes ──────────────────────────────────
       // Each step in the molding cycle gets its own feature row so the cost
       // engineer can see WHAT drives cycle time without opening the cost panel.
+      // Real, sourced-once-then-shared IM feature values, used below by both
+      // the synthetic sub-step nodes (isMolding-only path) and the always-
+      // relevant Moulded Part/Undercuts/Undrafted nodes (both paths).
       const wall = summary.wallThicknessNominalMm ?? 2.0;
       const wallMin = summary.wallThicknessMinMm;
       const wallMax = summary.wallThicknessMaxMm;
@@ -1327,6 +1398,15 @@ function buildProcessTree(
       const avgDraftDeg = (summary as any).avgDraftAngleDeg ?? null;
       const partingComplexity = (summary as any).partingComplexity ?? null;
 
+      // Synthetic sub-step documentation nodes — only meaningful when `recs`
+      // came from a single coarse CAD recommendation (isMolding, e.g. one
+      // "Injection Molding" entry with no real per-step breakdown yet). Once
+      // real per-step operations exist (Mold Setup/Injection/Packing/Cooling/
+      // Ejection as their own top-level tree nodes, sourced from real
+      // cost.processLines), these would be pure duplicates of those real
+      // nodes — so they're gated on isMolding specifically, not the broader
+      // isMolding || isFirstOpForFamily this whole branch runs under.
+      if (isMolding) {
       featureNodes.push({
         id: 'feat_im_setup', kind: 'feature', label: 'Mold Setup',
         factory, machine,
@@ -1369,6 +1449,7 @@ function buildProcessTree(
         factory, machine,
         attrs: [{ name: 'Eject time', value: '~2.5 sec (mold open + ejector stroke + part release)' }],
       });
+      }
       featureNodes.push({
         id: 'feat_im_part', kind: 'feature', label: 'Moulded Part',
         factory, machine,
@@ -10183,8 +10264,8 @@ export default function ManufacturingIntelligencePage() {
   const materialDensityGcm3 = materialDensityResult?.density_g_cm3 ?? null;
 
   const tree = useMemo(
-    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3) : null,
-    [item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3],
+    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, procRecordsForTree?.records ?? null) : null,
+    [item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, procRecordsForTree],
   );
 
   const treeProcessNames = useMemo(() => {
