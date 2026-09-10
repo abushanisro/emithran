@@ -430,8 +430,15 @@ export class AutoFillService {
     const suggestions: AutoFillSuggestionsDto = {
       name: this.inferName(fileName),
       partNumber: this.generatePartNumber(fileName),
-      // The category selector's starting position, not a claim about this part.
-      materialCategory: 'FERROUS_NON_FERROUS',
+      // The category selector's starting position — derived from the real
+      // classified family, not a blind default. A real, confirmed live bug
+      // (2026-09-10): this was hardcoded to FERROUS_NON_FERROUS regardless of
+      // family, so a genuinely injection-molded part (e.g. PA66) got created
+      // with the metals category — the Material Grade search filters by
+      // category, so a real plastic grade like PA66 was invisible/unsearchable
+      // no matter what the user typed, even though the CAD classifier had
+      // already correctly identified the part as injection_molded.
+      materialCategory: effectiveFamily.family === 'injection_molded' ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS',
       // Empty on purpose — see step 3 above. The engineer picks the material.
       materialGrade: '',
       materialId: null,
