@@ -2032,11 +2032,23 @@ export function ProcessCostDialog({
     };
   }, [calculatorOpen]);
 
-  // Load edit data (wait for data to be loaded before populating)
+  // Load edit data. Every field this effect sets comes straight off the
+  // already-available `editData` object — none of them need the live HR
+  // Rates catalog/MHR list to have loaded first. A real, confirmed live bug
+  // (2026-09-10): this used to gate on `!isLoadingCatalog && !isLoadingMHR`
+  // (the MHR fetch alone can pull up to 10,000 rows), so on a fresh page
+  // load — the first time a saved line was opened for edit, before that
+  // fetch's result was cached — every field (Process, Category, even the
+  // Machine picker) rendered as if nothing were selected, staying that way
+  // until the dialog was closed and reopened (by then the fetch had
+  // resolved from cache). The saved value stays visible/selectable in every
+  // dropdown regardless of whether its live options list has finished
+  // loading — that's what withSaved()/withSavedMachines() below already do,
+  // independently of this gate — so waiting here served no purpose.
   useEffect(() => {
     if (!open) { setEditDataApplied(false); return; }
 
-    if (editData && open && !isLoadingCatalog && !isLoadingMHR && !editDataApplied) {
+    if (editData && open && !editDataApplied) {
       setEditDataApplied(true);
       // Reset per-record override flags whenever a (new or different) record's
       // data loads. Without this, once the user manually picks a machine/labour
@@ -2118,7 +2130,7 @@ export function ProcessCostDialog({
       setFacilityRateId(undefined);
       setUserOverrodeMHR(false);
     }
-  }, [editData, open, isLoadingCatalog, isLoadingMHR, mhrData, existingProcesses, autoOpenCalculator]);
+  }, [editData, open, autoOpenCalculator]);
 
   // Effective rates: dropdown selection → manual input → editData stored fallback.
   // Non-machine operations (Raw Material / Packing & Delivery / General-General) never
