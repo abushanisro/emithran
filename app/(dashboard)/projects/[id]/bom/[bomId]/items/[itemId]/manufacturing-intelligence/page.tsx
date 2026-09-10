@@ -2446,7 +2446,17 @@ function CostSummaryTab({
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-[10px] tabular-nums text-muted-foreground/50 font-mono w-5 shrink-0 text-right">{opNbr}</span>
                     <span className="text-sm text-foreground">
-                      {isExpanded ? '▾' : '▸'} {proc.operation || proc.processGroup || 'Process'}
+                      {/* category is the real identity for a manually-added line
+                          (ProcessCostDialog's "2. Category" picker, migration 719) —
+                          operation is only ever set on an engine-generated line, and
+                          processGroup is the coarse domain label, a last resort. A
+                          real, confirmed live bug (2026-09-10): this previously
+                          checked operation first, so every manually-added line (which
+                          intentionally leaves operation blank) fell all the way to
+                          processGroup — e.g. a Plastic Molding part's manually-added
+                          line displayed as "Plastic Molding" (the domain) instead of
+                          the real category actually picked (e.g. "Injection Molding"). */}
+                      {isExpanded ? '▾' : '▸'} {proc.category || proc.operation || proc.processGroup || 'Process'}
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap pl-[26px]">

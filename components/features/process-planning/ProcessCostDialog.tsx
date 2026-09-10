@@ -2299,9 +2299,12 @@ export function ProcessCostDialog({
       // shiftPatternHoursPerDay on its input interface but no calculation reads
       // it -- and an honest empty beats a number that looks measured.
       shiftPatternHoursPerDay: shiftPatternHoursPerDayFromMachine,
-      // Display name for this line. Category is what identifies it now, with
-      // a pre-719 line falling back to the operation it was created with.
-      operationName: selectedCategory || savedOperation || '',
+      // Display name for this line is the `category` field above (migration
+      // 719) — a pre-719 line falls back to `operation`. A stale
+      // `operationName` field used to be sent here too, but the backend has
+      // never recognized it (no such column/DTO property exists) — it was
+      // silently dropped on every save. Removed rather than left as a
+      // misleading no-op; category already carries this line's real name.
       processRouteName: savedProcessRoute || '',
       machineRate: effectiveMachineRate,
       laborRate: effectiveLaborRate,
