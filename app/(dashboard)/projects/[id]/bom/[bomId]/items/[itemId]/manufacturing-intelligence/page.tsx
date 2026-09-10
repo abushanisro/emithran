@@ -109,6 +109,16 @@ interface ManualRouteOption {
   // cutting line — so this must be prepended at the call site, or the
   // cutting operation is silently missing from every applied route.
   dynamicCuttingStep?: { process: string; machineClass: string };
+  // A real, already-valid apply-route.dto.ts routeId (e.g. one of the 3 real
+  // Injection Molding tonnage tiers) to apply directly via the plain
+  // applyRoute mutation — for a family whose real routes are already
+  // complete, self-contained multi-line quotes (no separate cutting +
+  // additional-steps composition the way Sheet Metal's dynamic path needs).
+  // Distinct from dynamicCuttingRouteId (Sheet Metal's composed-route
+  // identity) and from KB_TO_APPLY_ROUTE (the legacy fixed-family lookup) —
+  // this is the real id itself, sourced straight from the backend's own
+  // route-comparison result, never a second hand-kept mapping table.
+  directApplyRouteId?: string;
 }
 
 interface RouteScoringContext {
@@ -1734,13 +1744,44 @@ function computeOperationVisual(
   if (l.includes('turning') || l.includes('milling') || l.includes('machining'))
     return merge('op-all', v2Features, '#64748b');
   // ── Injection molding operations ──
+  // Real, confirmed live gap (2026-09-11): this section only ever matched
+  // 'injection mould(ing)'/'injection mold(ing)' — the OLD coarse single-
+  // recommendation label. The real per-step operations now populating the
+  // tree (cost-injection-molding-engine.ts's own makeLine labels: 'Mold
+  // Setup', 'Injection', 'Packing/Holding', 'Cooling', 'Ejection', 'Weight
+  // Check') don't contain that substring, so clicking any of them produced
+  // no highlight at all — confirmed live, the exact "no process-level
+  // highlight" gap reported alongside the missing feature nodes. Each real
+  // step gets the whole-part tint (none of these individual steps has its
+  // own distinct face-level geometry beyond the undercut/undraft/parting
+  // detail already handled by computeFeatureNodeVisual's feat_im_* nodes).
   if (l.includes('material drying') || l.includes('drying'))
     return null; // Pre-process — no part geometry involved yet
-  if (l.includes('injection mould') || l.includes('injection mold')) {
+  if (l === 'mold setup' || l === 'mould setup') {
+    const hl = buildFullModelHL('op-mold-setup', faceMap);
+    return hl ? { highlight: hl, color: '#94a3b8' } : null; // slate — tooling/machine setup
+  }
+  if (l.includes('injection mould') || l.includes('injection mold') || l === 'injection') {
     const hl = buildFullModelHL('op-injection', faceMap);
     return hl ? { highlight: hl, color: '#f97316' } : null; // orange — molten cavity fill
   }
-  if (l.includes('gate trimming') || l.includes('degating')) {
+  if (l.includes('packing') || l.includes('holding')) {
+    const hl = buildFullModelHL('op-packing', faceMap);
+    return hl ? { highlight: hl, color: '#fb923c' } : null; // amber-orange — pack/hold pressure
+  }
+  if (l === 'cooling') {
+    const hl = buildFullModelHL('op-cooling', faceMap);
+    return hl ? { highlight: hl, color: '#38bdf8' } : null; // sky blue — cooling
+  }
+  if (l === 'ejection') {
+    const hl = buildFullModelHL('op-ejection', faceMap);
+    return hl ? { highlight: hl, color: '#94a3b8' } : null; // slate — part release
+  }
+  if (l.includes('weight check')) {
+    const hl = buildFullModelHL('op-weight-check', faceMap);
+    return hl ? { highlight: hl, color: '#e2e8f0' } : null; // light — quality overlay
+  }
+  if (l.includes('gate trimming') || l.includes('degating') || l.includes('deflashing')) {
     const hl = buildFullModelHL('op-gate-trim', faceMap);
     return hl ? { highlight: hl, color: '#eab308' } : null; // yellow — secondary bench op
   }
@@ -4109,6 +4150,14 @@ interface WorkflowStep {
   options: WorkflowStepOption[];
 }
 
+// The 3 real Injection Molding route ids apply-route.dto.ts's VALID_ROUTE_IDS
+// actually accepts (backend/src/modules/bom-items/dto/apply-route.dto.ts) —
+// one real registered engine (injection_molding machine class), 3 real
+// tonnage tiers. Kept in sync by inspection, same as REAL_PROCESS_ORDER above;
+// a 4th tier or a validated compression/RIM/structural-foam apply path needs
+// this list updated alongside that DTO array, never independently guessed.
+const IM_DIRECT_APPLY_ROUTE_IDS = new Set(['im-small-50t', 'im-standard-200t', 'im-large-500t']);
+
 const WORKFLOW_KB: Record<string, WorkflowStep[]> = {
   // sheet_metal was here. Removed 2026-09-07: dead for its own family (the
   // dialog renders the comparison-driven pane for isSheetMetal — see the
@@ -4335,6 +4384,17 @@ function RouteSelectionDialog({
   existingSteps?: ManualRouteOption['dynamicSteps'];
 }) {
   const isSheetMetal = partFamily === 'sheet_metal';
+  // Real, confirmed live gap (2026-09-11): the Workflow Builder rendered a
+  // completely empty table for injection-molded parts — WORKFLOW_KB (the
+  // fixed-family fallback path) has no 'injection_molded' entry, and the
+  // real comparison-driven pane above it is gated to isSheetMetal only. The
+  // backend's getRouteComparison() already computes real, priced IM routes
+  // for this exact item (3 real tonnage-tier presses using the real
+  // injection_molding machine class, plus Compression/Reaction Injection/
+  // Structural Foam Molding for cost comparison — see bom-items.service.ts's
+  // imRoutes assembly) through the SAME endpoint useRouteComparison already
+  // calls — this was a frontend wiring gap, not a missing backend capability.
+  const isIM = partFamily === 'injection_molded';
 
   // ── Universal real machine/rate resolution — ONE fetch each, no fixed
   // per-class array. The old array existed because React hooks can't be
@@ -4370,7 +4430,7 @@ function RouteSelectionDialog({
   // this part's real geometry, not by cutting method), so any one route's
   // full line set (minus its own cutting line) is the real universe of
   // addable operations; cutting itself gets exactly 3 real alternatives.
-  const comparison = useRouteComparison(isSheetMetal ? itemId : undefined, batchSize, factory);
+  const comparison = useRouteComparison((isSheetMetal || isIM) ? itemId : undefined, batchSize, factory);
   // Real 'forming' routes (Standard/Tandem/Progressive-Die Press, Roll
   // Bending — see RouteResultDto.processFamily) have NO Press Brake/
   // Deburring/Inspection lines of their own (they're complete single-
@@ -4433,15 +4493,35 @@ function RouteSelectionDialog({
       // silently did nothing, with no message and no state change. Marking the
       // real constraint on the node (the exact purpose of RouteNode.selectable /
       // selectionNote) states it up front instead.
-      return adaptRoutesToTree(allRoutesForTree).map((node) =>
-        node.processFamily === 'forming'
-          ? {
-              ...node,
-              selectable: false,
-              selectionNote: 'Compare only here — apply this route from the Route Comparison card. The Workflow Builder stages cutting routes, which it can then edit step by step.',
-            }
-          : node,
-      );
+      return adaptRoutesToTree(allRoutesForTree).map((node) => {
+        if (node.processFamily === 'forming') {
+          return {
+            ...node,
+            selectable: false,
+            selectionNote: 'Compare only here — apply this route from the Route Comparison card. The Workflow Builder stages cutting routes, which it can then edit step by step.',
+          };
+        }
+        // Real, confirmed gap (2026-09-11): getRouteComparison() pushes
+        // Compression/Reaction Injection/Structural Foam Molding into the
+        // same array as the 3 real injection tonnage tiers purely so cost
+        // comparison (badges) considers them — apply-route.dto.ts's
+        // VALID_ROUTE_IDS deliberately excludes all 3 (see that array's own
+        // comment: "never meant to be auto-applied, since none of the 3 ids
+        // are registered apply targets"), and no real material/process
+        // compatibility check exists yet (compression/RIM molding needs a
+        // thermoset resin; this part's actual material has not been verified
+        // against that real 35/38-material compatibility set). Shown for
+        // honest cost comparison, not offered as a switchable route here —
+        // same disclosed-constraint pattern as the forming-route branch above.
+        if (isIM && !IM_DIRECT_APPLY_ROUTE_IDS.has(node.id)) {
+          return {
+            ...node,
+            selectable: false,
+            selectionNote: 'Different manufacturing process — shown for cost comparison only. Material/process compatibility has not been verified for this part; consult engineering before switching processes.',
+          };
+        }
+        return node;
+      });
     } catch (err) {
       if (err instanceof RouteTreeValidationError) {
         console.error('[RouteSelectionDialog] adaptRoutesToTree rejected the real route-comparison result', err.issues);
@@ -4450,7 +4530,7 @@ function RouteSelectionDialog({
       }
       return [];
     }
-  }, [allRoutesForTree]);
+  }, [allRoutesForTree, isIM]);
   // The selected route as the comparison list itself models it, plus the raw
   // DTO behind it — the editor needs route-level material cost and the display
   // currency, which are real fields on RouteResultDto that the tree adapter's
@@ -4856,7 +4936,30 @@ function RouteSelectionDialog({
     onApplied();
   }
 
+  // ═══ IM path (injection_molded): pick one of the real, priced routes
+  // getRouteComparison() already computed — no per-step composition, since
+  // each real IM route (a real registered engine: Injection Molding at 3
+  // tonnage tiers, or Compression/Reaction Injection/Structural Foam
+  // Molding) is already a complete, self-contained multi-line quote (Mold
+  // Setup/Injection/Packing/Cooling/Ejection/Inspections all included). ═══
+  function handleApplyIM() {
+    const selected = allRoutesForTree.find((r) => r.routeId === cuttingRouteId);
+    if (!selected || !IM_DIRECT_APPLY_ROUTE_IDS.has(selected.routeId)) return;
+    const route: ManualRouteOption = {
+      id: `custom-${Date.now()}`,
+      label: selected.routeLabel,
+      complexityLevel: 'standard',
+      isRecommended: false,
+      processes: selected.processLines.map((l) => l.process),
+      rationale: 'Injection Molding route — selected in Workflow Builder',
+      directApplyRouteId: selected.routeId,
+    };
+    onSelectRoute(route);
+    onApplied();
+  }
+
   const canSetDynamicRoute = !!cuttingRouteId && !!additionalSteps && !!dynamicCuttingStep;
+  const canSetIMRoute = !!cuttingRouteId && IM_DIRECT_APPLY_ROUTE_IDS.has(cuttingRouteId);
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -4875,7 +4978,9 @@ function RouteSelectionDialog({
           <p className="text-xs text-muted-foreground leading-snug">
             {isSheetMetal
               ? 'Compare every route priced for this part, then adjust the chosen route’s operations.'
-              : 'Choose the operation for each step. The process flow updates live.'}
+              : isIM
+                ? 'Compare every real molding route priced for this part, then set one as the applied route.'
+                : 'Choose the operation for each step. The process flow updates live.'}
           </p>
         </DialogHeader>
 
@@ -4915,6 +5020,63 @@ function RouteSelectionDialog({
                 : null}
               previouslyAppliedLabel={previouslyAppliedRouteLabel}
             />
+          </div>
+        ) : isIM ? (
+          /* IM path (injection_molded): a real, priced route list — no
+             per-step composition pane, since each real route here is already
+             a complete quote (see handleApplyIM's own comment). The right
+             pane is a read-only view of the selected route's real
+             processLines, not an editor. */
+          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(320px,400px)_1fr] divide-y md:divide-y-0 md:divide-x divide-border/60">
+            <RouteCompareList
+              nodes={routeTree}
+              selectedId={cuttingRouteId}
+              onSelect={(node) => setCuttingRouteId(node.id)}
+              recommendedIds={[]}
+              sortMode={sortMode}
+              onSortModeChange={setSortMode}
+              currencySymbol={currencySymbol}
+              isLoading={comparison.isLoading}
+              errorMessage={comparison.error instanceof Error ? comparison.error.message : null}
+              cuttingGroupMeta={{
+                title: 'Molding process',
+                description: 'Real, priced alternatives for this part. Only the injection tonnage tiers can be set here — Compression/Reaction Injection/Structural Foam Molding are shown for cost comparison only (see the note on each row).',
+              }}
+            />
+            <div className="flex-1 min-h-0 overflow-y-auto p-4">
+              {!selectedRouteDto ? (
+                <p className="text-xs text-muted-foreground">Select a route on the left to see its full operation chain.</p>
+              ) : (
+                <>
+                  <h4 className="text-sm font-semibold mb-2">{selectedRouteDto.routeLabel}</h4>
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        <th className="px-2 py-1.5 text-left">Operation</th>
+                        <th className="px-2 py-1.5 text-left">Machine</th>
+                        <th className="px-2 py-1.5 text-right">Cycle</th>
+                        <th className="px-2 py-1.5 text-right">Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRouteDto.processLines.map((line, i) => (
+                        <tr key={`${line.process}-${String(i)}`} className="border-b border-border/40">
+                          <td className="px-2 py-1.5">{line.process}</td>
+                          <td className="px-2 py-1.5 text-muted-foreground">{line.machineName ?? '—'}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{formatEstCycleTime(line.cycleTimeMin * 60)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{currencySymbol}{line.totalCost.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {!IM_DIRECT_APPLY_ROUTE_IDS.has(selectedRouteDto.routeId) && (
+                    <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
+                      This process cannot be set from here — see the note on its row in the list.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         ) : (
           /* Fixed-family path (cnc_turned / cnc_milled — WORKFLOW_KB-driven).
@@ -5057,8 +5219,8 @@ function RouteSelectionDialog({
           <div className="flex shrink-0 justify-end gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button
-              onClick={() => { if (isSheetMetal) handleSetRouteDynamic(); else handleApplyFixed(); }}
-              disabled={isSheetMetal && !canSetDynamicRoute}
+              onClick={() => { if (isSheetMetal) handleSetRouteDynamic(); else if (isIM) handleApplyIM(); else handleApplyFixed(); }}
+              disabled={(isSheetMetal && !canSetDynamicRoute) || (isIM && !canSetIMRoute)}
             >
               Set Route
             </Button>
@@ -10001,6 +10163,11 @@ export default function ManufacturingIntelligencePage() {
         ];
         try {
           await applyCustomRoute.mutateAsync({ baseCuttingRouteId: route.dynamicCuttingRouteId, steps, ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : {}), location: factoryDraft });
+          applyMachineOverrides();
+        } catch { /* errors surfaced by the mutation's own onError toast */ }
+      } else if (route.directApplyRouteId) {
+        try {
+          await applyRoute.mutateAsync({ routeId: route.directApplyRouteId, ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : {}), location: factoryDraft });
           applyMachineOverrides();
         } catch { /* errors surfaced by the mutation's own onError toast */ }
       } else {

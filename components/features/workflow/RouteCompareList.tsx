@@ -48,6 +48,10 @@ export interface RouteCompareListProps {
   isLoading?: boolean;
   /** Real error from the comparison request, so a failure is not shown as an empty result. */
   errorMessage?: string | null;
+  /** See groupRouteNodes's own doc comment — honest per-family group copy for
+   *  a caller whose 'cutting'-tagged routes are not Sheet Metal's cutting
+   *  methods (e.g. Injection Molding's real molding-process alternatives). */
+  cuttingGroupMeta?: { title: string; description: string };
 }
 
 function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'violet' | 'red'; children: React.ReactNode }) {
@@ -67,12 +71,12 @@ function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'viole
 
 export function RouteCompareList({
   nodes, selectedId, onSelect, recommendedIds, sortMode, onSortModeChange, currencySymbol,
-  isLoading = false, errorMessage = null,
+  isLoading = false, errorMessage = null, cuttingGroupMeta,
 }: RouteCompareListProps) {
   const groupId = useId();
   const listRef = useRef<HTMLDivElement>(null);
 
-  const groups = groupRouteNodes(sortRouteNodes(nodes, sortMode, recommendedIds));
+  const groups = groupRouteNodes(sortRouteNodes(nodes, sortMode, recommendedIds), cuttingGroupMeta);
   const costScale = maxRouteCost(nodes);
   const selectableIds = groups.flatMap((g) => g.nodes.filter((n) => n.selectable).map((n) => n.id));
 
