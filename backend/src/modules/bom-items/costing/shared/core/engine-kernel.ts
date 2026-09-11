@@ -17,6 +17,7 @@
 // cost-engine.ts's own 9 call sites import it back from here too — one
 // formula core, not two.
 import type { MHRRateInput } from './cost-engine';
+import type { LookupResolution, LookupTableRow } from '../../../dto/cost-breakdown.dto';
 
 export function r2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -298,6 +299,15 @@ export interface RouteDataGap {
   machineClass: string;
   /** Ready-to-display explanation of what is missing — never a fabricated value. */
   reason: string;
+  /**
+   * Real rows nearest the failed lookup query, when the gap came from a
+   * missing_lookup and the resolver found candidates to disclose (e.g. the
+   * lookup table's smallest tonnage bucket when the selected machine's real
+   * tonnage falls below it). Never fabricated or interpolated into a usable
+   * value here — these are for disclosure only, so a route-apply rejection
+   * says what data DOES exist instead of only "add a row".
+   */
+  nearestRows?: LookupTableRow[];
 }
 
 /** Only the fields of a process line this predicate reads. */
@@ -313,10 +323,32 @@ export interface RouteDataGapLine {
    */
   setupTimeMin?: number | null;
   physicsGap?:
-    | { gapType: 'missing_lookup'; requiredAction: string }
+    | {
+        gapType: 'missing_lookup';
+        requiredAction: string;
+        /** Present when the engine's lookup resolver found nearby real rows to disclose. */
+        lookupResolution?: LookupResolution;
+      }
     | { gapType: 'unsupported_operation'; reason: string }
     | null
     | undefined;
+}
+
+/**
+ * "Nearest real rows on file: ..." disclosure text, or '' when there are none
+ * to show. Shared by the apply-route rejection (bom-items.controller.ts) and
+ * the per-engine "cycle time unavailable" warning (e.g. press-brake-engine.ts)
+ * so both surfaces describe the same real lookup-resolver output the same
+ * way, instead of two independently-drifting formatters. Never a substitute
+ * value — only ever real rows a lookup resolver already found in the table.
+ */
+export function formatNearestRowsDisclosure(rows: readonly LookupTableRow[] | undefined): string {
+  if (!rows || rows.length === 0) return '';
+  return ' Nearest real rows on file: ' +
+    rows
+      .map((row) => Object.entries(row.columns).map(([col, val]) => `${col}=${val}`).join(', '))
+      .join(' | ') +
+    '.';
 }
 
 /**
@@ -357,11 +389,15 @@ export function findRouteDataGaps(lines: readonly RouteDataGapLine[]): RouteData
   for (const line of lines) {
     const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
     let reason: string | null = null;
+    let nearestRows: LookupTableRow[] | undefined;
 
     if (line.physicsGap) {
-      reason = line.physicsGap.gapType === 'missing_lookup'
-        ? line.physicsGap.requiredAction
-        : line.physicsGap.reason;
+      if (line.physicsGap.gapType === 'missing_lookup') {
+        reason = line.physicsGap.requiredAction;
+        nearestRows = line.physicsGap.lookupResolution?.nearestRows;
+      } else {
+        reason = line.physicsGap.reason;
+      }
     } else if (cycleTimeSec < MIN_PERSISTABLE_CYCLE_SEC) {
       // Says what is actually wrong. A cycle that rounds to 0.00 s at the
       // column scale means no cycle time was resolved at all -- which is what
@@ -379,7 +415,12 @@ export function findRouteDataGaps(lines: readonly RouteDataGapLine[]): RouteData
     }
 
     if (reason !== null) {
-      gaps.push({ process: line.process, machineClass: line.machineClass ?? '', reason });
+      gaps.push({
+        process: line.process,
+        machineClass: line.machineClass ?? '',
+        reason,
+        ...(nearestRows && nearestRows.length > 0 ? { nearestRows } : {}),
+      });
     }
   }
   return gaps;

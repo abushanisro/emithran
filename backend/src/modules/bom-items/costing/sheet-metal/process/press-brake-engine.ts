@@ -4,7 +4,7 @@ import type { CapabilityCheck, PartGeometryForCapability } from '../../shared/ca
 import { checkMachineCapability } from '../../shared/capability/machine-capability';
 import type { MachineCapability } from '../../shared/capability/machine-selection/seed-registry';
 import type { ManufacturingProcessEngine } from '../../shared/core/manufacturing-process.types';
-import { eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
+import { eMithranTerms, resolveSetupMinutes, formatNearestRowsDisclosure } from '../../shared/core/engine-kernel';
 
 // Extracted verbatim from cost-engine.ts's inline Press Brake block (Platform
 // Architecture Remediation Phase 1 — engine registry unification, Rule 8).
@@ -55,7 +55,7 @@ export function computePressBrakeCost(input: PressBrakeInput): PressBrakeResult 
   } else if (input.physicsGap) {
     const gap = input.physicsGap;
     warnings.push(gap.gapType === 'missing_lookup'
-      ? `Press brake cycle time unavailable — ${gap.requiredAction}`
+      ? `Press brake cycle time unavailable — ${gap.requiredAction}${formatNearestRowsDisclosure(gap.lookupResolution?.nearestRows)}`
       : `Press brake cycle time unavailable — ${gap.reason}`);
   } else {
     warnings.push('Press brake cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).');

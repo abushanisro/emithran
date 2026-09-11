@@ -47,7 +47,7 @@ import { AutoFillService } from './services/auto-fill.service';
 import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService, type MaterialCandidate } from './services/material-intelligence.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
-import { findRouteDataGaps } from './costing/shared/core/engine-kernel';
+import { findRouteDataGaps, formatNearestRowsDisclosure } from './costing/shared/core/engine-kernel';
 import { RouteResultDto } from './dto/route-comparison.dto';
 import {
   PersistedLineCurrency,
@@ -1930,9 +1930,14 @@ export class BOMItemsController {
     const dataGaps = findRouteDataGaps(lines);
     const firstGap = dataGaps[0];
     if (firstGap) {
+      // Disclose what real data DOES exist near the failed query — never a
+      // substitute for the missing row (this still rejects the apply), just
+      // so the message isn't only "add a row" when the resolver already
+      // found real nearby rows (e.g. the lookup table's real tonnage/
+      // thickness buckets closest to the selected machine's real capacity).
       throw new BadRequestException(
-        `Cannot apply this route — '${firstGap.process}' cycle time is unavailable: ${firstGap.reason}. ` +
-        `No records were written.`,
+        `Cannot apply this route — '${firstGap.process}' cycle time is unavailable: ${firstGap.reason}.` +
+        `${formatNearestRowsDisclosure(firstGap.nearestRows)} No records were written.`,
       );
     }
 
