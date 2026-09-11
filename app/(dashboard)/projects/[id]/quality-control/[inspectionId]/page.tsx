@@ -2193,7 +2193,7 @@ export default function QualityInspectionPage() {
                         </Badge>
                       </div>
 
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin min-w-0">
                         {bomItems.map((item: any, idx: number) => {
                           const itemId = item.id || item.partNumber || `item-${idx}`;
                           const isSelected = (selectedPartId || (bomItems[0]?.id || bomItems[0]?.partNumber || 'item-0')) === itemId;
