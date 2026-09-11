@@ -3448,7 +3448,9 @@ class SheetMetalFeatureExtractor:
         from OCC.Core.GCPnts import GCPnts_UniformDeflection  # type: ignore
         from OCC.Core.Bnd import Bnd_Box  # type: ignore
         from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
-        from OCC.Core.TopAbs import TopAbs_REVERSED  # type: ignore
+        from OCC.Core.TopAbs import TopAbs_REVERSED, TopAbs_WIRE  # type: ignore
+        from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+        from OCC.Core.TopoDS import topods  # type: ignore
 
         def _dot(a: Tuple[float, ...], b: Tuple[float, ...]) -> float:
             return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
@@ -3638,44 +3640,82 @@ class SheetMetalFeatureExtractor:
             )
             return None
 
-        # Walk each panel's outer wire into an ordered 2D point list.
+        # Walk a wire (outer or inner) into an ordered 2D point list. Shared
+        # by the outer-wire walk and the inner-wire (cutout) walk below so
+        # both use the IDENTICAL tessellation/orientation-flip logic.
+        def _wire_to_2d_points(wire: Any, panel_idx: int) -> List[Tuple[float, float]]:
+            pts: List[Tuple[float, float]] = []
+            wexp = BRepTools_WireExplorer(wire)
+            while wexp.More():
+                edge = wexp.Current()
+                curve_h, u0e, u1e = BRep_Tool.Curve(edge)
+                if curve_h is not None:
+                    adaptor_curve = BRepAdaptor_Curve(edge)
+                    sampler = GCPnts_UniformDeflection(adaptor_curve, 0.1, u0e, u1e)
+                    if sampler.IsDone() and sampler.NbPoints() >= 2:
+                        # BRepTools_WireExplorer walks edges in true wire
+                        # (connectivity) order honoring each edge's own
+                        # orientation, but BRep_Tool.Curve's parametrization
+                        # (and this sampler, built on it) always runs in the
+                        # curve's OWN natural direction regardless of that
+                        # orientation flag -- a REVERSED edge's sampled
+                        # points therefore run backwards relative to the
+                        # wire's real traversal and must be flipped, or
+                        # consecutive edges silently don't chain head-to-
+                        # tail (confirmed live: an un-flipped rectangle
+                        # produced a degenerate 3-point triangle here, not
+                        # its real 4 corners).
+                        edge_pts = [
+                            _to_2d(panel_idx, (sampler.Value(k).X(), sampler.Value(k).Y(), sampler.Value(k).Z()))
+                            for k in range(1, sampler.NbPoints() + 1)
+                        ]
+                        if edge.Orientation() == TopAbs_REVERSED:
+                            edge_pts.reverse()
+                        pts.extend(edge_pts)
+                wexp.Next()
+            return pts
+
+        # Walk each panel's outer wire into an ordered 2D point list, and
+        # separately every OTHER wire on that same face -- by planar-face
+        # topology, any wire besides the outer one IS a real cutout (round
+        # hole, slot, keyhole, scalloped internal profile -- whatever its
+        # shape), so collecting them all here gives the area-reconciliation
+        # check below the part's REAL net area. Before this, only round
+        # holes (holes_mm, matched to panels by nearest-plane-distance) were
+        # subtracted there via a circle-area formula -- so any part with
+        # genuine non-circular internal cutouts (this file's own
+        # internal_profiles_mm/internal_profile_count, tracked separately in
+        # _compute_cut_length) had outline_net_area_mm2 OVERSTATED by
+        # exactly that missing cutout area, wrongly declining a genuinely
+        # correct wire-walk as "untrusted" whenever the overstatement
+        # exceeded the 10% tolerance (confirmed live: a real 1.6mm SECC
+        # bracket with 124 round holes + 52 internal profiles + 3 slots
+        # disagreed by 14.6%, purely from the un-subtracted internal
+        # profiles/slots -- the wire-walk itself was correct).
         panel_polygons = list(bridge_polygons)
+        inner_cutout_polygons: List[Any] = []
         for i, p in enumerate(panels):
             try:
                 outer_wire = breptools.OuterWire(p["face"])
-                pts_2d: List[Tuple[float, float]] = []
-                wexp = BRepTools_WireExplorer(outer_wire)
-                while wexp.More():
-                    edge = wexp.Current()
-                    curve_h, u0e, u1e = BRep_Tool.Curve(edge)
-                    if curve_h is not None:
-                        adaptor_curve = BRepAdaptor_Curve(edge)
-                        sampler = GCPnts_UniformDeflection(adaptor_curve, 0.1, u0e, u1e)
-                        if sampler.IsDone() and sampler.NbPoints() >= 2:
-                            # BRepTools_WireExplorer walks edges in true wire
-                            # (connectivity) order honoring each edge's own
-                            # orientation, but BRep_Tool.Curve's parametrization
-                            # (and this sampler, built on it) always runs in the
-                            # curve's OWN natural direction regardless of that
-                            # orientation flag -- a REVERSED edge's sampled
-                            # points therefore run backwards relative to the
-                            # wire's real traversal and must be flipped, or
-                            # consecutive edges silently don't chain head-to-
-                            # tail (confirmed live: an un-flipped rectangle
-                            # produced a degenerate 3-point triangle here, not
-                            # its real 4 corners).
-                            edge_pts = [
-                                _to_2d(i, (sampler.Value(k).X(), sampler.Value(k).Y(), sampler.Value(k).Z()))
-                                for k in range(1, sampler.NbPoints() + 1)
-                            ]
-                            if edge.Orientation() == TopAbs_REVERSED:
-                                edge_pts.reverse()
-                            pts_2d.extend(edge_pts)
-                    wexp.Next()
+                pts_2d = _wire_to_2d_points(outer_wire, i)
                 if len(pts_2d) >= 3:
                     poly = ShapelyPolygon(pts_2d).buffer(0)
                     if not poly.is_empty:
                         panel_polygons.append(poly)
+
+                wexp_face = TopExp_Explorer(p["face"], TopAbs_WIRE)
+                while wexp_face.More():
+                    wire = topods.Wire(wexp_face.Current())
+                    if not wire.IsSame(outer_wire):
+                        try:
+                            inner_pts = _wire_to_2d_points(wire, i)
+                            if len(inner_pts) >= 3:
+                                inner_poly = ShapelyPolygon(inner_pts).buffer(0)
+                                if not inner_poly.is_empty:
+                                    inner_cutout_polygons.append(inner_poly)
+                        except Exception as e:
+                            logger.warning(f"[SheetMetal] panel {i} inner-wire (cutout) walk failed: {e}")
+                    wexp_face.Next()
             except Exception as e:
                 logger.warning(f"[SheetMetal] panel {i} outline wire-walk failed: {e}")
 
@@ -3725,15 +3765,11 @@ class SheetMetalFeatureExtractor:
             logger.warning("[SheetMetal] flat_pattern_outline is not a valid simple polygon after repair -- declining as untrusted")
             return None
 
-        # Hole projection must happen BEFORE the area reconciliation below --
-        # it needs total hole area to correct for a real, expected
-        # difference (not an extraction error): OuterWire (used above)
-        # deliberately excludes hole boundaries, so `merged.area` is the
-        # GROSS outline area (holes still "filled in"), whereas
-        # expected_area_mm2 (from _compute_true_flat_pattern_area's face
-        # mass-property integration) is the NET area with holes already
-        # subtracted -- the two are expected to differ by exactly the total
-        # hole area, not by extraction error.
+        # This projects known round-hole positions for the RETURNED holes_mm
+        # list only (what the Nest view draws as circles) -- independent of
+        # the area reconciliation below, which now gets its real cutout area
+        # straight from inner_cutout_polygons (every real inner wire on every
+        # panel), not from these circle diameters.
         holes_mm: List[Dict[str, float]] = []
         for h in (hole_centroids_mm or []):
             cx, cy, cz, diameter_mm = h[0], h[1], h[2], h[3]
@@ -3750,23 +3786,34 @@ class SheetMetalFeatureExtractor:
 
         # Reconcile against the independently-computed true flat-pattern
         # area (see this function's docstring for why this check exists and
-        # what it catches), corrected for total hole area (see the comment
-        # above the holes_mm loop -- outline area is gross/hole-inclusive by
-        # construction, expected_area_mm2 is net/hole-excluded). 10%
-        # relative tolerance on the NET figure: generous enough to absorb
+        # what it catches), corrected for every real inner-wire cutout (see
+        # the comment above inner_cutout_polygons -- outline area is gross/
+        # cutout-inclusive by construction, expected_area_mm2 is net/cutout-
+        # excluded). 10% relative tolerance on the NET figure: generous enough to absorb
         # real, small differences between mass-property integration and
         # polygon-area computation (different numerical methods over the
         # same real geometry), tight enough to catch a wire-walk that
         # genuinely got the wrong shape (mis-stitched panel, dropped notch,
         # a buffer(0) repair that silently discarded part of the outline).
         if expected_area_mm2 > 0:
-            total_hole_area_mm2 = sum(math.pi * (h["diameter_mm"] / 2.0) ** 2 for h in holes_mm)
-            outline_net_area_mm2 = merged.area - total_hole_area_mm2
+            # Real net area: outer/bridge union minus every real inner-wire
+            # cutout collected above (round holes AND non-circular internal
+            # profiles/slots alike) -- not a formula-based subtraction of
+            # round-hole area only. A circle-area formula over holes_mm
+            # undercounts whenever a part has real non-circular internal
+            # cutouts (this file's own internal_profiles_mm/
+            # internal_profile_count, tracked separately in
+            # _compute_cut_length), overstating net area and wrongly
+            # declining an outline whose wire-walk was actually correct.
+            cutouts_union = unary_union(inner_cutout_polygons) if inner_cutout_polygons else None
+            net_shape = merged.difference(cutouts_union) if cutouts_union is not None else merged
+            outline_net_area_mm2 = net_shape.area
+            total_cutout_area_mm2 = merged.area - outline_net_area_mm2
             relative_diff = abs(outline_net_area_mm2 - expected_area_mm2) / expected_area_mm2
             if relative_diff > 0.10:
                 logger.warning(
                     f"[SheetMetal] flat_pattern_outline net area {outline_net_area_mm2:.1f}mm² "
-                    f"(gross {merged.area:.1f}mm² minus {total_hole_area_mm2:.1f}mm² of holes) disagrees "
+                    f"(gross {merged.area:.1f}mm² minus {total_cutout_area_mm2:.1f}mm² of real cutouts) disagrees "
                     f"with independently-computed flat-pattern area {expected_area_mm2:.1f}mm² by "
                     f"{relative_diff * 100:.1f}% -- declining outline as untrusted rather than "
                     "returning a shape that doesn't match the part's own known area"
