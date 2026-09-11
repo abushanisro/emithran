@@ -1044,7 +1044,26 @@ export class SheetMetalLookupService {
     if (error || !data) return empty;
 
     const nameLower = machineName.trim().toLowerCase();
-    const matches = data.filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+    // Root-caused live 2026-09-11: migration 594 seeded a per-location RATE
+    // row (IND/CHN/MEX/FRA — {category,name,direct,indirect,labor} only, no
+    // physics fields) under the SAME canonical `name` as the one real
+    // physics-spec row migration 506 staged ('World Average'). Matching on
+    // name alone then always finds ≥2 rows for any machine 594 touched
+    // (which is effectively the whole catalog), so the uniqueness guard
+    // below silently returned "no data" for every real per-machine
+    // bend_cycle_time_s on file — the generic thickness/tonnage/complexity
+    // curve then had to carry every press brake alone, including tonnage
+    // classes (e.g. Default Bend Brake's real 7.6T) that curve never had a
+    // row for, surfacing as a hard apply-blocking gap instead of using the
+    // real value that was on file the whole time. Narrowing to rows that
+    // actually carry this field first restores the original intent —
+    // exactly one REAL physics-carrying row wins — without weakening the
+    // ambiguity guard itself (two genuinely different physics rows sharing
+    // a name would still correctly refuse to pick one).
+    const matches = data.filter((r: any) =>
+      String(r.raw?.name ?? '').trim().toLowerCase() === nameLower &&
+      typeof r.raw?.bend_cycle_time_s === 'number',
+    );
     if (matches.length !== 1) return empty;
 
     const val = matches[0].raw?.bend_cycle_time_s;
@@ -1239,7 +1258,15 @@ export class SheetMetalLookupService {
     if (error || !data) return empty;
 
     const nameLower = machineName.trim().toLowerCase();
-    const matches = data.filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+    // See getBendCycleTimeForMachine's doc comment above (root-caused
+    // 2026-09-11) — migration 594's per-location rate-only rows reuse the
+    // same canonical `name` as the real physics-spec row, so matching on
+    // name alone almost never resolves to exactly one row anymore. Narrow
+    // to rows that actually carry a punch-rate/tool-change field first.
+    const matches = data.filter((r: any) =>
+      String(r.raw?.name ?? '').trim().toLowerCase() === nameLower &&
+      (typeof r.raw?.punch_rate_cycles_min === 'number' || typeof r.raw?.tool_change_time_s === 'number'),
+    );
     if (matches.length !== 1) return empty;
 
     const raw = matches[0].raw ?? {};
@@ -1291,7 +1318,14 @@ export class SheetMetalLookupService {
     if (error || !data) return empty;
 
     const nameLower = machineName.trim().toLowerCase();
-    const matches = data.filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+    // See getBendCycleTimeForMachine's doc comment above (root-caused
+    // 2026-09-11) — narrow to rows that actually carry this field before
+    // the uniqueness check, since migration 594's per-location rate-only
+    // rows reuse the same canonical `name` as the real physics-spec row.
+    const matches = data.filter((r: any) =>
+      String(r.raw?.name ?? '').trim().toLowerCase() === nameLower &&
+      typeof r.raw?.abrasive_flow_rate_kg_min === 'number',
+    );
     if (matches.length !== 1) return empty;
 
     const rate = matches[0].raw?.abrasive_flow_rate_kg_min;
@@ -1346,7 +1380,14 @@ export class SheetMetalLookupService {
     if (error || !data) return empty;
 
     const nameLower = machineName.trim().toLowerCase();
-    const matches = data.filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
+    // See getBendCycleTimeForMachine's doc comment above (root-caused
+    // 2026-09-11) — narrow to rows that actually carry this field before
+    // the uniqueness check, since migration 594's per-location rate-only
+    // rows reuse the same canonical `name` as the real physics-spec row.
+    const matches = data.filter((r: any) =>
+      String(r.raw?.name ?? '').trim().toLowerCase() === nameLower &&
+      typeof r.raw?.rolling_speed_mm_s === 'number',
+    );
     if (matches.length !== 1) return empty;
 
     const raw = matches[0].raw ?? {};
