@@ -114,7 +114,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </div>
               </header>
               <MithranAICreditsBar />
-              <main className="flex-1 p-4 sm:p-6 overflow-auto overflow-x-hidden">
+              <main className="flex-1 min-w-0 p-4 sm:p-6 overflow-auto overflow-x-hidden">
                 {children}
               </main>
             </>
