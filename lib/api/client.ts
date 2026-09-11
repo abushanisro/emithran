@@ -1029,10 +1029,24 @@ class ApiClient {
         this.pendingRequests.delete(cacheKey);
       }, safetyTtlMs);
 
-      requestPromise.finally(() => {
-        clearTimeout(safetyTtlTimer);
-        this.pendingRequests.delete(cacheKey);
-      });
+      // .finally() returns its OWN derived promise, which rejects with the
+      // same reason whenever requestPromise rejects -- a separate promise
+      // object from the one returned to the caller below (line ~1038's
+      // .catch() chain), which is where the real, already-disclosed error is
+      // actually handled. Nothing here attaches a rejection handler to THIS
+      // derived promise, so every failed GET request in the app (any 4xx/5xx,
+      // not just true-nest) produced a genuine unhandled promise rejection --
+      // which Next.js dev shows as a full crash overlay even though the
+      // caller's own error handling (e.g. a react-query isError branch) was
+      // already working correctly. The `.catch(() => {})` exists purely to
+      // mark this derived promise as handled; it changes no behavior, since
+      // this chain's only real job is the cleanup side effect above.
+      requestPromise
+        .finally(() => {
+          clearTimeout(safetyTtlTimer);
+          this.pendingRequests.delete(cacheKey);
+        })
+        .catch(() => {});
     }
 
     return requestPromise.catch((error) => {
