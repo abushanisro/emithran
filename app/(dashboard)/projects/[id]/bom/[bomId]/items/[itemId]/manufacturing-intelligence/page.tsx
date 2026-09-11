@@ -1682,6 +1682,31 @@ function buildProcessTree(
     });
   }
 
+  // Processes the live engine computed for THIS route but that could never be
+  // applied/persisted — physicsGap set (findRouteDataGaps rejects the WHOLE
+  // apply-route request whenever any line has one, see engine-kernel.ts).
+  // `recs` above deliberately never includes these once real stored rows
+  // exist (storedRecs wins, per the comment on that fallback chain above), so
+  // without this the tree would say nothing happened here at all — the same
+  // gap the Direct Process Costs list had before its own unresolved row was
+  // added. Append-only: never reads or mutates `recs`, so none of the real
+  // fixes already documented on this function are at risk.
+  const gapProcessLines = (cost?.processLines ?? []).filter(
+    (l) => l.physicsGap && !operations.some((op) => op.label === l.process),
+  );
+  for (const l of gapProcessLines) {
+    const gap = l.physicsGap!;
+    const reasonText = gap.gapType === 'missing_lookup' ? gap.requiredAction : gap.reason;
+    operations.push({
+      id: `op_gap_${l.process}`,
+      kind: 'operation',
+      label: `${l.process} — unresolved`,
+      factory,
+      machine: 'Not applied',
+      attrs: [{ name: 'Reason', value: reasonText }],
+    });
+  }
+
   return {
     id: 'root', kind: 'part', label: item.name, factory,
     children: operations.length > 0
@@ -2885,6 +2910,54 @@ function CostSummaryTab({
           </div>
         );
         });
+      })()}
+
+      {/* Processes the live engine computed for this route but could never
+          persist — physicsGap set (findRouteDataGaps/engine-kernel.ts blocks
+          the WHOLE apply-route request whenever any line has one, "No records
+          were written"). Disclosure only: NOT the removed "missing" row kind
+          from above (that one carried a real, non-zero cost for an unsaved
+          line into the total — the exact bug documented on this block's
+          predecessor). A physicsGap line's cost is genuinely 0 by
+          construction, and this block never feeds totalProcessCombined/
+          grandTotal, so it can't resurrect that bug — it only makes visible
+          what the footer "Partial total — ... unresolved" line already says
+          in words, as an actual row instead of only a sentence. */}
+      {(() => {
+        const gapLines = (eff?.lines ?? []).filter((l) => !!l.physicsGap);
+        if (gapLines.length === 0) return null;
+        return (
+          <div className="pl-2 pb-2 space-y-1.5">
+            {gapLines.map((l, i) => {
+              const gap = l.physicsGap as NonNullable<typeof l.physicsGap>;
+              const reasonText = gap.gapType === 'missing_lookup' ? gap.requiredAction : gap.reason;
+              const nearestRows = gap.gapType === 'missing_lookup' ? gap.lookupResolution?.nearestRows : undefined;
+              return (
+                <div
+                  key={`gap:${l.process}:${i}`}
+                  className="rounded border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-destructive">{l.process} — unresolved</span>
+                    <span className="text-muted-foreground shrink-0">not applied · $0</span>
+                  </div>
+                  <div className="mt-1 text-muted-foreground">{reasonText}</div>
+                  {nearestRows && nearestRows.length > 0 && (
+                    <div className="mt-1 text-muted-foreground">
+                      Nearest real rows on file:{' '}
+                      {nearestRows.map((row, ri: number) => (
+                        <span key={ri}>
+                          {ri > 0 ? ' | ' : ''}
+                          {Object.entries(row.columns).map(([col, val]) => `${col}=${val}`).join(', ')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
       })()}
 
       {/* Add Process button */}
