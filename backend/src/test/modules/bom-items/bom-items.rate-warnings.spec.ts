@@ -11,6 +11,7 @@
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
+import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
 import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
 import { type ExchangeRateService, type RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { type SupabaseService } from '../../../common/supabase/supabase.service';
@@ -69,6 +70,7 @@ function buildService(supabaseService: SupabaseService) {
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,
     {} as unknown as SheetMetalLookupService,
+    {} as unknown as MachiningLookupService,
     {} as unknown as ExchangeRateService,
     {} as unknown as CADAnalysisService,
   );

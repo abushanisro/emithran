@@ -196,3 +196,82 @@ describe('injectDrawingIntelligence', () => {
     expect(result.some((o) => o.name === 'CMM Inspect')).toBe(false);
   });
 });
+
+// Root-caused 2026-09-16: Counterbore used a flat "count * 8 sec" constant
+// (no citation, no diameter or material sensitivity); Chamfer used a flat
+// "count * 5 sec" constant. Both now use real tblCounterboring/
+// tblChamfering physics when the caller resolves and passes them in
+// (bom-items.service.ts, via MachiningLookupService) — falling back to the
+// previous flat constants, disclosed as fallbacks, only when that data
+// isn't available.
+function counterboreFeature(count = 1, diamMm = 10): object {
+  return {
+    feature_type: 'counterbore',
+    diameter_mm: diamMm,
+    occurrences: Array.from({ length: count }, () => ({
+      depth_mm: 5,
+      material_removed_mm3: 100,
+    })),
+  };
+}
+
+const COUNTERBORE_TABLE = [
+  { tool_type: 'Counterbore', material_cut_code_name: '1.0', hardness: 125, hardness_system: 'Brinell', diameter_mm: 10, cutting_speed_m_min: 75.2, feed_mm_rev: 0.15, depth_max_mm: 38 },
+  { tool_type: 'Counterbore', material_cut_code_name: '15.0', hardness: 275, hardness_system: 'Brinell', diameter_mm: 10, cutting_speed_m_min: 25.0, feed_mm_rev: 0.08, depth_max_mm: 38 },
+];
+
+describe('Counterbore — real tblCounterboring physics vs the previous flat fallback', () => {
+  it('falls back to the flat constant when no real table is provided', () => {
+    const ops = buildOperationSequence([counterboreFeature(1, 10)], 'aluminum');
+    const cbore = ops.find((o) => o.name === 'Counterbore')!;
+    expect(cbore.timeSec).toBeCloseTo(8, 3); // count(1) * 8
+  });
+
+  it('uses real diameter+hardness-matched physics when a real table is provided', () => {
+    const ops = buildOperationSequence(
+      [counterboreFeature(1, 10)], 'aluminum', 1.0, 'AL6061-T6', COUNTERBORE_TABLE,
+    );
+    const cbore = ops.find((o) => o.name === 'Counterbore')!;
+    expect(cbore.timeSec).toBeGreaterThan(0);
+    expect(cbore.timeSec).not.toBeCloseTo(8, 3);
+  });
+
+  it('is material-aware once real data is wired — stainless counterbores slower than aluminum', () => {
+    const alu = buildOperationSequence([counterboreFeature(1, 10)], 'aluminum', 1.0, 'AL6061-T6', COUNTERBORE_TABLE);
+    const ss = buildOperationSequence([counterboreFeature(1, 10)], 'stainless', 1.0, 'SS304', COUNTERBORE_TABLE);
+    const aluTime = alu.find((o) => o.name === 'Counterbore')!.timeSec;
+    const ssTime = ss.find((o) => o.name === 'Counterbore')!.timeSec;
+    expect(ssTime).toBeGreaterThan(aluTime);
+  });
+});
+
+const CHAMFER_LINEAR_SPEED = 10.7; // real tblChamfering value, material_cut_code "1.0"
+
+describe('Chamfer — real tblChamfering physics vs the previous flat fallback', () => {
+  it('falls back to the flat constant when no real linear speed is provided', () => {
+    const ops = buildOperationSequence([{ feature_type: 'chamfer', diameter_mm: 10, occurrences: [{}] }], 'aluminum');
+    const chamfer = ops.find((o) => o.name === 'Chamfer')!;
+    expect(chamfer.timeSec).toBeCloseTo(5, 3); // count(1) * 5
+  });
+
+  it('uses real diameter-derived edge length / real linear speed when provided', () => {
+    const ops = buildOperationSequence(
+      [{ feature_type: 'chamfer', diameter_mm: 10, occurrences: [{}] }],
+      'aluminum', 1.0, null, null, CHAMFER_LINEAR_SPEED,
+    );
+    const chamfer = ops.find((o) => o.name === 'Chamfer')!;
+    // edgeLength = pi*10 = 31.4mm; time = 31.4 / 10.7 = 2.94s
+    expect(chamfer.timeSec).toBeCloseTo(Math.PI * 10 / CHAMFER_LINEAR_SPEED, 2);
+    expect(chamfer.timeSec).not.toBeCloseTo(5, 1);
+  });
+
+  it('also applies real chamfer physics inside the tapped_hole sequence, not just standalone chamfer features', () => {
+    const withoutReal = buildOperationSequence([tappedHoleFeature(1, 6, 'M6')], 'aluminum');
+    const withReal = buildOperationSequence(
+      [tappedHoleFeature(1, 6, 'M6')], 'aluminum', 1.0, null, null, CHAMFER_LINEAR_SPEED,
+    );
+    const flatChamfer = withoutReal.find((o) => o.name === 'Chamfer')!.timeSec;
+    const realChamfer = withReal.find((o) => o.name === 'Chamfer')!.timeSec;
+    expect(realChamfer).not.toBeCloseTo(flatChamfer, 3);
+  });
+});

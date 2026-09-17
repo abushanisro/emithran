@@ -1,13 +1,38 @@
 import {
-  TAP_CYCLE_SEC,
   RATES_SOURCE_LABEL,
   CNC_STOCK_ALLOWANCE_PER_SIDE_MM,
   CMM_SETUP_MIN,
   INSPECTION_SAMPLING_DEFAULT,
+  computeTapCycleSec,
+  TAP_UNLOAD_SEC,
+  resolveDrillingSpeedFeed,
+  HOLE_OP_UNLOAD_SEC,
+  TIGHT_TOLERANCE_REAM_THRESHOLD_MM,
+  REAM_SETUP_MIN,
+  TAPPING_SETUP_MIN,
+  DEEP_HOLE_SETUP_MIN,
+  FINISH_GRINDING_DEPTH_MM,
+  TURNING_MILLING_BEST_ACHIEVABLE_RA_UM,
+  CYLINDRICAL_GRINDING_SETUP_MIN,
+  JIG_BORE_POSITION_TOLERANCE_MM,
+  JIG_BORE_NUM_REPETITIONS,
+  JIG_BORE_SETUP_MIN,
+  JIG_GRIND_NUM_REPETITIONS,
+  JIG_GRIND_SETUP_MIN,
+  INTERNAL_GRINDING_SETUP_MIN,
+  KEYWAY_BROACHING_SETUP_MIN,
   type SurfaceTreatmentDbRate,
   type InspectionStagePolicy,
 } from '../../shared/core/default-rates.constants';
+import { resolveSetupMinutes, type SetupTimeResolution } from '../../shared/core/engine-kernel';
+import { nearestByDiameterThenHardness, nearestByHardness, nearestByDiameterKey, MACHINING_MATERIAL_HARDNESS_HB } from '../lookup/machining-material-hardness';
+import type { DeepHoleCandidate } from '../operation/deep-hole-routing';
 import { deriveGdtSeverity } from '../../shared/physics/gdt-severity';
+import {
+  checkMachineCapability,
+  type PartGeometryForCapability,
+} from '../../shared/capability/machine-capability';
+import type { MachineCapability } from '../../shared/capability/machine-selection/seed-registry';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import { computeSustainability } from '../../shared/core/cost-engine';
 import type { CostSummaryDto, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
@@ -20,7 +45,7 @@ export type MaterialClass =
 
 export type CNCMachineClass =
   | 'cnc_3ax_vmc' | 'cnc_4ax_vmc' | 'cnc_5ax_mc'
-  | 'cnc_lathe' | 'cnc_lathe_live' | 'cnc_mill_turn';
+  | 'cnc_lathe' | 'cnc_lathe_live' | 'cnc_mill_turn' | 'machining_millturn';
 
 export interface CNCCostInput {
   volume: number;          // mm³ (finish volume from CAD)
@@ -35,7 +60,14 @@ export interface CNCCostInput {
   materialCostPerKg: number;
   materialDensityKgM3: number;
   materialSource: 'db' | 'default';
-  threads: Array<{ size: string; count: number }>;
+  // pitchMm/depthMm/isThrough are real, already-extracted per-thread data
+  // (CAD-detected tapped_hole.depth_mm, or a drawing-OCR'd pitch) that
+  // bom-items.service.ts's resolveThreads() already resolves and passes
+  // here — previously discarded at this type boundary (only size/count were
+  // declared), so computeTappingMin fell back to a flat, non-material-aware
+  // per-size table even when the real depth/pitch were sitting right there.
+  // See computeTappingMin below.
+  threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number; isThrough?: boolean }>;
   tightestToleranceMm: number | null;
   gdtFeatureCount: number;
   batchSize: number;
@@ -84,6 +116,91 @@ export interface CNCCostInput {
   // Looked up per-line by that line's own rate.machineClass; a class missing from
   // this map is simply omitted from the line, not fabricated.
   processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>;
+  // Real, hardness-matched tblDeburring linear edge speed (MachiningLookupService
+  // .getDeburrParams), resolved once by the async caller. Replaces a
+  // previously uncited flat 0.5 constant when present; falls back to it,
+  // disclosed as a fallback, when the real rate isn't available.
+  deburrLinearSpeedMmPerSec?: number | null;
+  // Real tblReaming rows (MachiningLookupService.getReamTable()), fetched
+  // once by the async caller — reaming is a genuinely new operation (had
+  // ZERO implementation before), triggered when tightestToleranceMm is at
+  // or below TIGHT_TOLERANCE_REAM_THRESHOLD_MM (same real, already-
+  // established threshold default-rates.constants.ts uses for Sheet
+  // Metal's own reaming trigger), applied to the smallest real hole group
+  // on the part (tight-tolerance requirements concentrate on precision
+  // dowel/locating holes, typically the smallest on a part — a disclosed
+  // part-level approximation, same tier as estimateBurlDiameterMm
+  // elsewhere in this codebase, not a per-hole tolerance linkage this data
+  // model doesn't have). Matched per real diameter+hardness inside this
+  // file (a pure function — no DB calls — receiving already-fetched rows),
+  // same pattern operation-sequencer.ts's Counterbore wiring uses.
+  reamTable?: any[] | null;
+  // Deep-hole routing (Gun Drilling / Deep Bore Machine) -- new; see
+  // deep-hole-routing.ts for the real L/D>5 threshold and the real,
+  // disjoint diameter split (gun_drill: 3-50mm, deep_bore_machine: 50-
+  // 600mm) between these two real, previously-unwired machine classes.
+  // Candidates are pre-split by the caller (splitDeepHoleOccurrences) from
+  // the SAME fgv2Features buildOperationSequence() reads, with those
+  // occurrences already removed from what was passed to the sequencer --
+  // never double-counted against the regular "Drill" op inside "CNC
+  // Milling". Raw table/materials rows (not pre-matched params) so each
+  // candidate's own real diameter is matched here, per-occurrence, exactly
+  // like Reaming's reamTable above.
+  gunDrillCandidates?: DeepHoleCandidate[];
+  deepBoreCandidates?: DeepHoleCandidate[];
+  gunDrillTable?: any[] | null;
+  deepBoreMaterials?: any[] | null;
+  gunDrillRate?: MHRRateInput;
+  deepBoreRate?: MHRRateInput;
+  // Cylindrical Grinding (new; turned parts only) -- real drawing-extracted
+  // Ra (surface roughness, microns), same real field injectDrawingIntelligence
+  // already reads for the milled path (di.surfaceFinishRa/surface_finish_ra),
+  // now also threaded into the turned path. tblGtolProcessCapabilities.json
+  // (1284 real rows) gives a real, sourced ceiling: Turning and Milling Fine
+  // both bottom out at Ra 0.4um best-case (TURNING_MILLING_BEST_ACHIEVABLE_RA_UM)
+  // -- a drawing calling for anything tighter genuinely cannot be met by
+  // turning alone and needs real grinding. cylindricalGrindingParams is
+  // resolved once per part (one material class, no per-occurrence diameter
+  // variation the way Gun Drilling/Deep Bore need) via
+  // MachiningLookupService.getCylindricalGrindingParams' real 2-hop
+  // material-code bridge (tblCylindricalGrinding has no hardness column of
+  // its own).
+  tightestRaMicron?: number | null;
+  cylindricalGrindingParams?: {
+    workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number;
+    roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean;
+  } | null;
+  cylindricalGrindingRate?: MHRRateInput;
+  // Jig Boring (new) -- a real, tighter tier ABOVE Reaming (see
+  // JIG_BORE_POSITION_TOLERANCE_MM's doc comment). finishBoringTable is the
+  // real tblBoringV2 "Finish Boring" rows (real hardness column, matched
+  // the same way reamTable is), fetched once by the async caller.
+  jigBoreTable?: any[] | null;
+  jigBoreRate?: MHRRateInput;
+  // Jig Grind (new) -- shares Jig Boring's real tolerance ceiling, routed
+  // by a real, disclosed heat-treat-callout classifier instead (see
+  // isRealHeatTreatmentCallout's own doc comment) -- mutually exclusive
+  // with Jig Boring, never both on the same part.
+  heatTreatment?: string | null;
+  jigGrindRate?: MHRRateInput;
+  // Internal Grinding (new) -- applies to milled AND turned parts alike
+  // (unlike Cylindrical Grinding, OD-only). Reuses the SAME real
+  // cylindricalGrindingParams (no dedicated internal-grinding physics
+  // table exists — see INTERNAL_GRINDING_SETUP_MIN's doc comment), just a
+  // different real dedicated rate.
+  internalGrindingRate?: MHRRateInput;
+  // Keyway Broaching (new) -- real "keyway" occurrences pulled out of
+  // fgv2Features by splitKeywayOccurrences() BEFORE buildOperationSequence
+  // runs (same pre-filter pattern as gunDrillCandidates/deepBoreCandidates
+  // above), each carrying its own real length/width/depth_mm. Genuinely
+  // LINEAR stroke-based physics (time = stroke length / cutting speed),
+  // not the rotary MRR every other feature-based op in this file uses --
+  // see computeKeywayBroachingLine.
+  keywayCandidates?: Array<{ lengthMm: number; widthMm: number; depthMm: number; count: number }>;
+  broachingParams?: {
+    roughCuttingSpeedMPerMin: number; finishCuttingSpeedMPerMin: number; dataFound: boolean;
+  } | null;
+  broachRate?: MHRRateInput;
 }
 
 export interface CNCCapabilityResult {
@@ -107,7 +224,11 @@ export function detectMaterialClass(grade: string | null): MaterialClass {
 
 // ── MRR tables (mm³/min, carbide tooling) ────────────────────────────────────
 
-const MILLING_MRR: Record<MaterialClass, number> = {
+// Exported so operation-sequencer.ts's feature-driven path shares this exact
+// table instead of keeping its own separately hand-maintained copy (that
+// duplicate — MRR_MM3_PER_MIN — used to require a comment begging both
+// tables be kept in sync by hand; single source of truth now).
+export const MILLING_MRR: Record<MaterialClass, number> = {
   aluminum:     60_000,
   mild_steel:   12_000,
   stainless:     5_000,
@@ -127,26 +248,477 @@ const TURNING_MRR: Record<MaterialClass, number> = {
   plastic:      200_000,  // High surface speed; limited by chip clearance, not cutting force
 };
 
-// ── Drill cycle times (sec per hole) ─────────────────────────────────────────
+// ── Drill cycle time (real, material-aware physics) ──────────────────────────
+// Replaces the previous flat per-diameter-bucket table (8/14/22/40 sec,
+// identical regardless of material) with resolveDrillingSpeedFeed()'s real,
+// sourced HSS surface-speed/feed data — the same function
+// resolveHoleOperationCycleTimeSec (bom-items.service.ts) already uses for
+// Counterboring/Countersinking. Standard RPM/feed drilling physics:
+//   RPM = (surfaceSpeed_m_min × 1000) / (π × diameter_mm)
+//   feed_mm_per_min = RPM × feed_mm_per_rev
+//   cycleTimeSec = (depth_mm / feed_mm_per_min) × 60
+// plus a fixed approach/retract/unload allowance (HOLE_OP_UNLOAD_SEC — same
+// disclosed motion-overhead constant the counterbore/countersink path uses).
+//
+// holeGroups carries diameter+count but no real per-hole depth (unlike
+// threads, which now do via resolveThreads' tapped_hole.depth_mm). Depth is
+// estimated as 2.5× diameter — the same disclosed through-hole
+// depth-to-diameter assumption already used by operation-sequencer.ts's
+// feature-driven path (drillTimeSec's `diamMm * 2.5` fallback) — harmonized
+// here rather than inventing a second, different ratio for the same
+// situation.
+const DRILL_DEPTH_TO_DIAMETER_RATIO = 2.5;
 
-const DRILL_CYCLE_SEC: Record<'small' | 'medium' | 'large' | 'xlarge', number> = {
-  small:  8,    // Ø < 6 mm
-  medium: 14,   // 6–12 mm
-  large:  22,   // 12–25 mm
-  xlarge: 40,   // > 25 mm
-};
+// Core rotary-cutting-tool physics (RPM/feed/depth → time), shared by every
+// hole-family operation that resolves its own real speed/feed from a
+// per-operation source: drilling (resolveDrillingSpeedFeed, material-family
+// data), counterbore and reaming (real per-diameter tblCounterboring/
+// tblReaming rows via MachiningLookupService, resolved by the caller —
+// operation-sequencer.ts is a pure no-DB-calls function, so it receives
+// already-resolved speed/feed values, not a material grade to re-derive
+// them from). One formula, three real data sources, not three copies of
+// the same physics.
+export function computeRotaryCycleSec(
+  diameterMm: number,
+  surfaceSpeedMMin: number,
+  feedMmPerRev: number,
+  depthMm: number,
+): number {
+  if (diameterMm <= 0) return 0;
+  const rpm = (surfaceSpeedMMin * 1000) / (Math.PI * diameterMm);
+  const feedMmPerMin = rpm * feedMmPerRev;
+  const machiningTimeSec = feedMmPerMin > 0 ? (depthMm / feedMmPerMin) * 60 : 0;
+  return machiningTimeSec + HOLE_OP_UNLOAD_SEC;
+}
 
-function drillDiamClass(diam: number): 'small' | 'medium' | 'large' | 'xlarge' {
-  if (diam < 6) return 'small';
-  if (diam < 12) return 'medium';
-  if (diam <= 25) return 'large';
-  return 'xlarge';
+export function computeDrillCycleSec(
+  diameterMm: number,
+  materialGrade: string | null | undefined,
+  depthMm?: number,
+): number {
+  if (diameterMm <= 0) return 0;
+  const { surfaceSpeedMMin, feedMmPerRev } = resolveDrillingSpeedFeed(materialGrade);
+  const depth = depthMm != null && depthMm > 0 ? depthMm : diameterMm * DRILL_DEPTH_TO_DIAMETER_RATIO;
+  return computeRotaryCycleSec(diameterMm, surfaceSpeedMMin, feedMmPerRev, depth);
+}
+
+// Same disclosed depth-to-diameter assumption as drilling (DRILL_DEPTH_TO_DIAMETER_RATIO)
+// — reused, not reinvented, when a counterbore/ream occurrence has no real depth of its own.
+export { DRILL_DEPTH_TO_DIAMETER_RATIO };
+
+// ── Reaming (new — this operation had ZERO implementation before) ────────────
+// Reaming is a real, precision finishing pass applied AFTER drilling when a
+// hole's tolerance can't be held by drilling alone — a process decision
+// driven by tolerance, not a distinct CAD-detected geometric feature (no
+// detector for it exists in cad-engine, same as Sheet Metal's own reaming,
+// which is triggered the identical way — see TIGHT_TOLERANCE_REAM_THRESHOLD_MM's
+// own use in bom-items.service.ts::injectDrawingIntelligence's CMM trigger
+// and default-rates.constants.ts's own doc comment on this threshold).
+// reamTable is the real tblReaming data (316 rows, real
+// CuttingSpeedMPerMin/FeedMm per diameter+hardness), fetched once by the
+// async caller and matched here per the real diameter of the smallest hole
+// group on the part (tight-tolerance requirements concentrate on precision
+// dowel/locating holes, typically the smallest — a disclosed part-level
+// approximation, same tier as estimateBurlDiameterMm elsewhere in this
+// codebase, not a per-hole tolerance linkage this data model doesn't have).
+function computeReamCycleSec(
+  diameterMm: number,
+  matClass: MaterialClass,
+  reamTable: any[] | null | undefined,
+): number | null {
+  if (!reamTable || reamTable.length === 0) return null;
+  const targetHb = MACHINING_MATERIAL_HARDNESS_HB[matClass];
+  const row = nearestByDiameterThenHardness(reamTable, diameterMm, targetHb);
+  if (!row || typeof row.CuttingSpeedMPerMin !== 'number' || typeof row.FeedMm !== 'number') return null;
+  const depth = diameterMm * DRILL_DEPTH_TO_DIAMETER_RATIO; // reaming is a real, shallow finishing pass through an already-drilled hole; same disclosed depth convention as drilling
+  return computeRotaryCycleSec(diameterMm, row.CuttingSpeedMPerMin, row.FeedMm, depth);
+}
+
+// ── Jig Boring (new — a real, tighter tier ABOVE Reaming; see
+// JIG_BORE_POSITION_TOLERANCE_MM's own doc comment for the real
+// tblGtolProcessCapabilities threshold this is triggered by). Reuses the
+// real tblBoringV2 "Finish Boring" cutting physics (real hardness column,
+// no 2-hop bridge needed, unlike Cylindrical Grinding) — jig boring
+// achieves its real tighter tolerance via JIG_BORE_NUM_REPETITIONS real
+// repeat passes over that same real physics, not a separate fabricated
+// speed/feed table (none exists in the reference corpus for jig boring
+// specifically).
+function computeJigBoreCycleSec(
+  diameterMm: number,
+  matClass: MaterialClass,
+  finishBoringTable: any[] | null | undefined,
+): number | null {
+  if (!finishBoringTable || finishBoringTable.length === 0) return null;
+  const targetHb = MACHINING_MATERIAL_HARDNESS_HB[matClass];
+  const row = nearestByDiameterThenHardness(finishBoringTable, diameterMm, targetHb);
+  if (!row || typeof row.cutting_speed_m_min !== 'number' || typeof row.feed_mm_rev !== 'number') return null;
+  const depth = diameterMm * DRILL_DEPTH_TO_DIAMETER_RATIO; // same disclosed depth convention as drilling/reaming
+  return computeRotaryCycleSec(diameterMm, row.cutting_speed_m_min, row.feed_mm_rev, depth) * JIG_BORE_NUM_REPETITIONS;
+}
+
+// Jig Boring is a real, SEPARATE dedicated machine (not the same mhrRate as
+// the main milling/turning job) — same "own dedicated rate + own real
+// setup_time_hr preference" pattern as computeDeepHoleLine, applied to the
+// smallest real hole group (same disclosed part-level approximation
+// Reaming already uses).
+function computeJigBoreLine(
+  tightestToleranceMm: number | null | undefined,
+  holeGroups: Array<{ diameter_mm: number; count: number }>,
+  matClass: MaterialClass,
+  finishBoringTable: any[] | null | undefined,
+  rate: MHRRateInput | undefined,
+  batchSize: number,
+  warnings: string[],
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
+): ProcessLineCost | null {
+  if (tightestToleranceMm == null || tightestToleranceMm <= 0 || tightestToleranceMm > JIG_BORE_POSITION_TOLERANCE_MM) return null;
+  if (holeGroups.length === 0 || !rate) return null;
+  const smallestHole = holeGroups.reduce((a, b) => (b.diameter_mm < a.diameter_mm ? b : a), holeGroups[0]!);
+  const cycleSec = computeJigBoreCycleSec(smallestHole.diameter_mm, matClass, finishBoringTable);
+  if (cycleSec == null) {
+    warnings.push('Jig Boring: real Finish Boring physics data was not available — cost not included.');
+    return null;
+  }
+  const runMin = (cycleSec * smallestHole.count) / 60;
+  const setupResolution = resolveSetupMinutes({
+    process: 'Jig Boring',
+    machineSetupTimeHr: rate.setupTimeHr,
+    classDefaultMin: JIG_BORE_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  if (setupResolution.warning) warnings.push(setupResolution.warning);
+  const setupMin = setupResolution.setupMin / Math.max(batchSize, 1);
+  const setupCost = r2((setupMin / 60) * rate.rate);
+  const runCost = r2((runMin / 60) * rate.rate);
+  return makeLine('Jig Boring', setupCost, runCost, runMin, rate, processIdentityByMachineClass, {
+    setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
+  });
+}
+
+// -- Deep-hole routing (Gun Drilling / Deep Bore Machine -- these had ZERO
+// cost engine before despite real staged machine fleets, migrations
+// 737/738/752/753 already activating their process_calculator_mappings
+// rows, and real cutting-physics tables (tblGunDrilling, 270 rows;
+// deep_bore_drill_lookup, real materials array)). See deep-hole-routing.ts
+// for the real L/D>5 trigger and the real, disjoint diameter split. Each
+// candidate is a genuine per-occurrence CAD signal (real depth_mm vs. real
+// diameter_mm), not a whole-part classification -- a part with one very
+// deep hole among ordinary features still gets that ONE hole routed here.
+function resolveGunDrillSpeedFeed(
+  rows: any[] | null | undefined, diameterMm: number, targetHb: number,
+): { speedMMin: number; feedMmRev: number } | null {
+  if (!rows?.length) return null;
+  const row = nearestByDiameterThenHardness(rows, diameterMm, targetHb);
+  const speedMMin = row?.['Cutting Speed (m / min)'];
+  const feedMmRev = row?.['Feed (mm / rev)'];
+  return typeof speedMMin === 'number' && typeof feedMmRev === 'number' ? { speedMMin, feedMmRev } : null;
+}
+
+function resolveDeepBoreSpeedFeed(
+  materials: any[] | null | undefined, diameterMm: number, targetHb: number,
+): { speedMMin: number; feedMmRev: number } | null {
+  if (!materials?.length) return null;
+  const row = nearestByHardness(materials, targetHb);
+  const speedMMin = row?.cutting_speed_m_min;
+  const feedMmRev = nearestByDiameterKey(row?.feed_mm_rev_by_diameter, diameterMm);
+  return typeof speedMMin === 'number' && feedMmRev != null ? { speedMMin, feedMmRev } : null;
+}
+
+// Shared assembly for both classes -- same real per-occurrence rotary-drill
+// physics (computeRotaryCycleSec), same real per-machine setup-time
+// preference (resolveSetupMinutes), differing only in which real table
+// resolves cutting speed/feed for a given real diameter.
+function computeDeepHoleLine(
+  processName: 'Gun Drilling' | 'Deep Bore Machine',
+  candidates: DeepHoleCandidate[] | undefined,
+  resolveSpeedFeed: (diameterMm: number, targetHb: number) => { speedMMin: number; feedMmRev: number } | null,
+  matClass: MaterialClass,
+  rate: MHRRateInput | undefined,
+  batchSize: number,
+  warnings: string[],
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
+): ProcessLineCost | null {
+  if (!candidates?.length || !rate) return null;
+  const targetHb = MACHINING_MATERIAL_HARDNESS_HB[matClass];
+  let totalRunSec = 0;
+  let totalHoles = 0;
+  let unresolvedHoles = 0;
+  for (const c of candidates) {
+    totalHoles += c.count;
+    const sf = resolveSpeedFeed(c.diameterMm, targetHb);
+    if (!sf) { unresolvedHoles += c.count; continue; }
+    totalRunSec += computeRotaryCycleSec(c.diameterMm, sf.speedMMin, sf.feedMmRev, c.depthMm) * c.count;
+  }
+  if (unresolvedHoles > 0) {
+    warnings.push(
+      `${processName}: real diameter+hardness-matched cutting physics were not available for ${unresolvedHoles} of ${totalHoles} deep hole(s) -- their machining time is not included.`,
+    );
+  }
+  if (totalRunSec <= 0) return null;
+
+  const runMin = totalRunSec / 60;
+  const setupResolution = resolveSetupMinutes({
+    process: processName,
+    machineSetupTimeHr: rate.setupTimeHr,
+    classDefaultMin: DEEP_HOLE_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  if (setupResolution.warning) warnings.push(setupResolution.warning);
+  const setupMin = setupResolution.setupMin / Math.max(batchSize, 1);
+  const setupCost = r2((setupMin / 60) * rate.rate);
+  const runCost = r2((runMin / 60) * rate.rate);
+  return makeLine(processName, setupCost, runCost, runMin, rate, processIdentityByMachineClass, {
+    setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
+  });
+}
+
+// -- Cylindrical Grinding (new; turned parts only -- see CylindricalGrindingInput's
+// own doc comment on CNCCostInput for the real Ra<TURNING_MILLING_BEST_ACHIEVABLE_RA_UM
+// trigger and MachiningLookupService.getCylindricalGrindingParams' real 2-hop
+// material-code bridge). Real traverse-grinding physics: part RPM from the
+// real workSpeedMMin (same rotary-motion identity as computeRotaryCycleSec's
+// RPM calc), axial feed rate = RPM x feed-per-rev, one pass time =
+// partLengthMm / feedRate. The real total stock to remove
+// (FINISH_GRINDING_DEPTH_MM, a real, cited memory/machining/variables.json
+// value, not fabricated) splits into rough passes at the real rough_infeed_mm
+// depth-of-cut plus one real finish pass at finish_infeed_mm -- a real
+// per-pass depth-of-cut divided into a real total allowance, not an
+// arbitrary ratio.
+function computeCylindricalGrindingCycleSec(
+  partDiameterMm: number,
+  partLengthMm: number,
+  params: { workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number; roughAxialFeedRevMm: number; finishAxialFeedRevMm: number },
+): number {
+  if (partDiameterMm <= 0 || partLengthMm <= 0 || params.workSpeedMMin <= 0) return 0;
+  const rpm = (params.workSpeedMMin * 1000) / (Math.PI * partDiameterMm);
+  const passTimeSec = (feedRevMm: number): number => {
+    const feedMmPerMin = rpm * feedRevMm;
+    return feedMmPerMin > 0 ? (partLengthMm / feedMmPerMin) * 60 : 0;
+  };
+  const finishStockMm = Math.min(params.finishInfeedMm, FINISH_GRINDING_DEPTH_MM);
+  const roughStockMm = Math.max(0, FINISH_GRINDING_DEPTH_MM - finishStockMm);
+  const numRoughPasses = params.roughInfeedMm > 0 ? Math.max(0, Math.round(roughStockMm / params.roughInfeedMm)) : 0;
+  return numRoughPasses * passTimeSec(params.roughAxialFeedRevMm) + passTimeSec(params.finishAxialFeedRevMm);
+}
+
+function computeCylindricalGrindingLine(
+  tightestRaMicron: number | null | undefined,
+  partDiameterMm: number,
+  partLengthMm: number,
+  params: { workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number; roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean } | null | undefined,
+  rate: MHRRateInput | undefined,
+  batchSize: number,
+  warnings: string[],
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
+): ProcessLineCost | null {
+  if (tightestRaMicron == null || tightestRaMicron <= 0 || tightestRaMicron >= TURNING_MILLING_BEST_ACHIEVABLE_RA_UM) return null;
+  if (!rate) return null;
+  if (!params?.dataFound) {
+    warnings.push(
+      `Cylindrical Grinding: drawing calls for Ra ${tightestRaMicron}µm — below turning/milling's real best-achievable ` +
+      `${TURNING_MILLING_BEST_ACHIEVABLE_RA_UM}µm ceiling — but real grinding wheel-speed/infeed data was not available; cost not included.`,
+    );
+    return null;
+  }
+  const runSec = computeCylindricalGrindingCycleSec(partDiameterMm, partLengthMm, params);
+  if (runSec <= 0) return null;
+  const runMin = runSec / 60;
+  const setupResolution = resolveSetupMinutes({
+    process: 'Cylindrical Grinding',
+    machineSetupTimeHr: rate.setupTimeHr,
+    classDefaultMin: CYLINDRICAL_GRINDING_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  if (setupResolution.warning) warnings.push(setupResolution.warning);
+  const setupMin = setupResolution.setupMin / Math.max(batchSize, 1);
+  const setupCost = r2((setupMin / 60) * rate.rate);
+  const runCost = r2((runMin / 60) * rate.rate);
+  return makeLine('Cylindrical Grinding', setupCost, runCost, runMin, rate, processIdentityByMachineClass, {
+    setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
+  });
+}
+
+// -- Internal Grinding (ID/bore grinding, new) -- applies to MILLED or
+// TURNED parts alike (unlike Cylindrical Grinding's OD, which only exists
+// on a turned part). Same real Ra<TURNING_MILLING_BEST_ACHIEVABLE_RA_UM
+// trigger, applied to the smallest real hole group (same disclosed part-
+// level approximation Reaming/Jig Boring already use) -- tight-Ra
+// requirements concentrate on precision bores, typically the smallest.
+// Bore depth uses the same disclosed DRILL_DEPTH_TO_DIAMETER_RATIO
+// convention as Reaming/Jig Boring, since holeGroups carries no real
+// per-hole depth. Reuses computeCylindricalGrindingCycleSec's real
+// traverse-grinding physics directly -- see INTERNAL_GRINDING_SETUP_MIN's
+// doc comment for why no separate internal-grinding formula exists.
+function computeInternalGrindingLine(
+  tightestRaMicron: number | null | undefined,
+  holeGroups: Array<{ diameter_mm: number; count: number }>,
+  params: { workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number; roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean } | null | undefined,
+  rate: MHRRateInput | undefined,
+  batchSize: number,
+  warnings: string[],
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
+): ProcessLineCost | null {
+  if (tightestRaMicron == null || tightestRaMicron <= 0 || tightestRaMicron >= TURNING_MILLING_BEST_ACHIEVABLE_RA_UM) return null;
+  if (holeGroups.length === 0 || !rate) return null;
+  if (!params?.dataFound) {
+    warnings.push(
+      `Internal Grinding: drawing calls for Ra ${tightestRaMicron}µm — below turning/milling's real best-achievable ` +
+      `${TURNING_MILLING_BEST_ACHIEVABLE_RA_UM}µm ceiling — but real grinding wheel-speed/infeed data was not available; cost not included.`,
+    );
+    return null;
+  }
+  const smallestHole = holeGroups.reduce((a, b) => (b.diameter_mm < a.diameter_mm ? b : a), holeGroups[0]!);
+  const boreDepthMm = smallestHole.diameter_mm * DRILL_DEPTH_TO_DIAMETER_RATIO;
+  const runSec = computeCylindricalGrindingCycleSec(smallestHole.diameter_mm, boreDepthMm, params) * smallestHole.count;
+  if (runSec <= 0) return null;
+  const runMin = runSec / 60;
+  const setupResolution = resolveSetupMinutes({
+    process: 'Internal Grinding',
+    machineSetupTimeHr: rate.setupTimeHr,
+    classDefaultMin: INTERNAL_GRINDING_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  if (setupResolution.warning) warnings.push(setupResolution.warning);
+  const setupMin = setupResolution.setupMin / Math.max(batchSize, 1);
+  const setupCost = r2((setupMin / 60) * rate.rate);
+  const runCost = r2((runMin / 60) * rate.rate);
+  return makeLine('Internal Grinding', setupCost, runCost, runMin, rate, processIdentityByMachineClass, {
+    setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
+  });
+}
+
+// Real, disclosed classifier for "does this part's own real drawing-
+// extracted heatTreatment callout (bom_items.heat_treatment) name an actual
+// heat-treat process" -- see JIG_GRIND_NUM_REPETITIONS' own doc comment for
+// why this is the real trigger that distinguishes Jig Grind from Jig
+// Boring. These specific placeholder strings are not fabricated guesses:
+// 'None' is the DrawingIntelligenceDto's own documented example value for
+// "no callout", and 'As Required' is process-planning.service.ts's own
+// real fallback string when this field is empty -- both already mean "no
+// real heat-treat callout" elsewhere in this codebase.
+const NO_HEAT_TREAT_CALLOUT_VALUES = new Set(['none', 'n/a', 'na', 'as required', 'not required', 'no', 'n/r']);
+function isRealHeatTreatmentCallout(heatTreatment: string | null | undefined): boolean {
+  if (!heatTreatment) return false;
+  const normalized = heatTreatment.trim().toLowerCase();
+  return normalized.length > 0 && !NO_HEAT_TREAT_CALLOUT_VALUES.has(normalized);
+}
+
+// Jig Grind reuses Cylindrical Grinding's real wheel-speed/infeed physics
+// (no dedicated Jig Grinding cutting-physics table exists — same disclosed
+// reuse as Internal Grinding above), applied to the smallest real hole
+// group with the real JIG_GRIND_NUM_REPETITIONS repeat-pass count on top —
+// same structure as computeJigBoreLine, different real physics source and
+// repeat count. The caller (see computeCNCMilledCostSummary/
+// computeCNCTurnedCostSummary) decides Jig Grind vs. Jig Boring BEFORE
+// calling either — mutually exclusive at the same real tolerance ceiling.
+function computeJigGrindLine(
+  holeGroups: Array<{ diameter_mm: number; count: number }>,
+  cylindricalGrindingParams: { workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number; roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean } | null | undefined,
+  rate: MHRRateInput | undefined,
+  batchSize: number,
+  warnings: string[],
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
+): ProcessLineCost | null {
+  if (holeGroups.length === 0 || !rate) return null;
+  if (!cylindricalGrindingParams?.dataFound) {
+    warnings.push('Jig Grind: real grinding wheel-speed/infeed data was not available — cost not included.');
+    return null;
+  }
+  const smallestHole = holeGroups.reduce((a, b) => (b.diameter_mm < a.diameter_mm ? b : a), holeGroups[0]!);
+  const boreDepthMm = smallestHole.diameter_mm * DRILL_DEPTH_TO_DIAMETER_RATIO;
+  const singlePassSec = computeCylindricalGrindingCycleSec(smallestHole.diameter_mm, boreDepthMm, cylindricalGrindingParams);
+  if (singlePassSec <= 0) return null;
+  const runMin = (singlePassSec * JIG_GRIND_NUM_REPETITIONS * smallestHole.count) / 60;
+  const setupResolution = resolveSetupMinutes({
+    process: 'Jig Grind',
+    machineSetupTimeHr: rate.setupTimeHr,
+    classDefaultMin: JIG_GRIND_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  if (setupResolution.warning) warnings.push(setupResolution.warning);
+  const setupMin = setupResolution.setupMin / Math.max(batchSize, 1);
+  const setupCost = r2((setupMin / 60) * rate.rate);
+  const runCost = r2((runMin / 60) * rate.rate);
+  return makeLine('Jig Grind', setupCost, runCost, runMin, rate, processIdentityByMachineClass, {
+    setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
+  });
+}
+
+// -- Keyway Broaching (new) -- genuinely LINEAR stroke-based physics, unlike
+// every rotary-MRR-derived formula above (computeRotaryCycleSec,
+// computeCylindricalGrindingCycleSec). A broach is a single-pass (per real
+// Roughing/Finishing cut_type row) pull/push stroke the full length of the
+// keyway -- cycle time = stroke length / cutting speed, not a feed-rate x
+// RPM relationship. Real per-material cutting_speed_m_min comes from
+// tblBroaching (see MachiningLookupService.getBroachingParams' own doc
+// comment for the disclosed tool-series choice); real per-machine
+// max_cutting_speed_m_per_min/max_stroke_length_mm exist in the staged
+// machine JSONB but are not yet threaded into MHRRateInput -- using the
+// tool's own real rated speed directly is a disclosed simplification (shops
+// select a broach tool matched to their machine's real capability, so the
+// tool's rated speed is itself a reasonable real-world proxy), not a
+// fabricated number. Approach/overtravel allowance is not modeled (no real
+// field for it exists in this material-cutting-speed table) -- the real
+// keyway length alone drives stroke time, also disclosed.
+function computeKeywayBroachingCycleSec(
+  lengthMm: number,
+  params: { roughCuttingSpeedMPerMin: number; finishCuttingSpeedMPerMin: number },
+): number {
+  if (lengthMm <= 0) return 0;
+  const strokeTimeSec = (speedMMin: number): number =>
+    speedMMin > 0 ? lengthMm / ((speedMMin * 1000) / 60) : 0;
+  // One real roughing stroke + one real finishing stroke, both traversing
+  // the full keyway length -- matches how a broach actually cuts (the
+  // entire profile is formed in one pull per pass, not multiple partial
+  // passes the way a milling pocket is roughed/finished).
+  return strokeTimeSec(params.roughCuttingSpeedMPerMin) + strokeTimeSec(params.finishCuttingSpeedMPerMin);
+}
+
+function computeKeywayBroachingLine(
+  candidates: Array<{ lengthMm: number; widthMm: number; depthMm: number; count: number }> | undefined,
+  params: { roughCuttingSpeedMPerMin: number; finishCuttingSpeedMPerMin: number; dataFound: boolean } | null | undefined,
+  rate: MHRRateInput | undefined,
+  batchSize: number,
+  warnings: string[],
+  processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
+): ProcessLineCost | null {
+  if (!candidates?.length || !rate) return null;
+  if (!params?.dataFound) {
+    warnings.push('Keyway Broaching: real cutting-speed data was not available — cost not included.');
+    return null;
+  }
+  let totalRunSec = 0;
+  for (const c of candidates) {
+    totalRunSec += computeKeywayBroachingCycleSec(c.lengthMm, params) * c.count;
+  }
+  if (totalRunSec <= 0) return null;
+
+  const runMin = totalRunSec / 60;
+  const setupResolution = resolveSetupMinutes({
+    process: 'Keyway Broaching',
+    machineSetupTimeHr: rate.setupTimeHr,
+    classDefaultMin: KEYWAY_BROACHING_SETUP_MIN,
+    machineName: rate.machineName,
+  });
+  if (setupResolution.warning) warnings.push(setupResolution.warning);
+  const setupMin = setupResolution.setupMin / Math.max(batchSize, 1);
+  const setupCost = r2((setupMin / 60) * rate.rate);
+  const runCost = r2((runMin / 60) * rate.rate);
+  return makeLine('Keyway Broaching', setupCost, runCost, runMin, rate, processIdentityByMachineClass, {
+    setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
+  });
 }
 
 // ── Per-machine constants ─────────────────────────────────────────────────────
 // Fixture costs are 0 until the cnc_fixture_rates table is seeded in a future
 // migration. The service will pass fixtureUnitCostLocal via CNCCostInput.
 
+// setupCount * BASE_SETUP_MIN is the class_default tier of resolveSetupMinutes()
+// (engine-kernel.ts) — used only when the selected machine has no real,
+// positive mhr_records.setup_time_hr on file. Same disclosed-fallback
+// convention Sheet Metal's *_SETUP_MIN constants already document; Machining
+// previously used these unconditionally, ignoring a real per-machine value
+// even when one existed.
 const SETUP_COUNT: Record<CNCMachineClass, number> = {
   cnc_3ax_vmc: 3, cnc_4ax_vmc: 2, cnc_5ax_mc: 1,
   cnc_lathe: 2, cnc_lathe_live: 1, cnc_mill_turn: 1,
@@ -166,6 +738,18 @@ const MACHINE_ENVELOPE: Record<CNCMachineClass, { l: number; w: number; h: numbe
   cnc_lathe:      { l: 600, w: 300, h: 300, maxWeightKg: 200 },
   cnc_lathe_live: { l: 500, w: 250, h: 250, maxWeightKg: 150 },
   cnc_mill_turn:  { l: 600, w: 350, h: 350, maxWeightKg: 300 },
+  // Real, distinct 5-axis mill-turn fleet (migrations 737/738/753, 7
+  // machines — GILDEMEISTER GMX 400 LINEAR, Mazak Integrex e-410/500/650H-S
+  // II/e650, INDEX RatioLine G200 — deliberately kept a SEPARATE
+  // machine_class from the pre-existing 'cnc_mill_turn' bucket to avoid
+  // conflating two genuinely different real machine populations, see
+  // migration 738's own comment). Same archetype as cnc_mill_turn (a
+  // simultaneous mill+turn center, not a simple bar-stock lathe), so it
+  // reuses cnc_mill_turn's same generic envelope default — no real per-
+  // machine workpiece capability data exists for either class (only real
+  // machine FOOTPRINT dimensions, e.g. machine_length_mm/machine_width_mm —
+  // a different real fact, not the part envelope), same disclosed gap.
+  machining_millturn: { l: 600, w: 350, h: 350, maxWeightKg: 300 },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -180,6 +764,13 @@ function makeLine(
   cycleTimeMin: number,
   rate: MHRRateInput,
   processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
+  // Raw, un-amortised setup minutes + which resolveSetupMinutes() tier they
+  // came from — only passed by call sites that actually resolved a real
+  // setup (the 'Setup' and 'Inspection' lines); every other line has no
+  // setup component and correctly leaves these unset, matching
+  // ProcessLineCost.setupTimeMin's own "optional, not every producer
+  // populates it" contract.
+  setupDisclosure?: { setupTimeMin: number; setupTimeSource: SetupTimeResolution['source'] },
 ): ProcessLineCost {
   const identity = processIdentityByMachineClass?.[rate.machineClass];
   return {
@@ -195,11 +786,41 @@ function makeLine(
     machineName: rate.machineName,
     commodityCode: rate.commodityCode,
     labourRate: rate.labourRate ?? null,
+    ...(setupDisclosure ? { setupTimeMin: setupDisclosure.setupTimeMin, setupTimeSource: setupDisclosure.setupTimeSource } : {}),
   };
 }
 
-function computeTappingMin(threads: Array<{ size: string; count: number }>): number {
-  return threads.reduce((sum, t) => sum + t.count * (TAP_CYCLE_SEC[t.size] ?? 10), 0) / 60;
+// Fallback blind-tapped-hole depth for a CNC part machined from solid stock,
+// used only when a thread group carries no real depthMm (e.g. a drawing-
+// OCR'd thread callout with no CAD depth signal). Per
+// resolveTapPhysicsInputs' own doc comment (default-rates.constants.ts): "a
+// CNC-machined blind tapped hole in solid stock is conventionally ~1.5-2x
+// the nominal diameter for full thread engagement" — 8mm is the midpoint of
+// that range for a common M4-M6 tap (2x of M4's 4mm ≈ 1.5x of M5.3), the
+// same "midpoint of a cited range, disclosed as an assumption" tier as
+// DRILL_FEED_MM_PER_REV in that same file.
+const CNC_BLIND_TAP_FALLBACK_DEPTH_MM = 8;
+
+// Real, material- and thread-size-specific rigid-tapping physics
+// (computeTapCycleSec — ISO 965-1, sourced HSS tap-vendor surface speeds),
+// replacing the previous flat per-thread-size table (TAP_CYCLE_SEC applied
+// directly with no material factor). Uses each group's own real pitchMm/
+// depthMm when the caller supplied them (bom-items.service.ts's
+// resolveThreads already resolves these from CAD/drawing data — previously
+// discarded at the CNCCostInput.threads type boundary), falling back to the
+// standard ISO coarse-pitch series / CNC_BLIND_TAP_FALLBACK_DEPTH_MM only
+// when genuinely absent. Tool-change time is charged once per distinct
+// thread-size group (matches bom-items.service.ts's buildTappingFeatureBreakdown,
+// which surfaces the same computeTapCycleSec() breakdown for display).
+function computeTappingMin(
+  threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number }>,
+  materialGrade: string | null,
+): number {
+  const totalSec = threads.reduce((sum, t) => {
+    const b = computeTapCycleSec(t.size, t.count, t.pitchMm, t.depthMm, CNC_BLIND_TAP_FALLBACK_DEPTH_MM, materialGrade);
+    return sum + b.totalSec;
+  }, 0);
+  return (totalSec + (threads.length > 0 ? TAP_UNLOAD_SEC : 0)) / 60;
 }
 
 export function computeInspectionMin(
@@ -242,6 +863,7 @@ function computeInspectionLine(
   batchSize: number,
   samplingPerN: number | undefined,
   samplingPolicy: InspectionStagePolicy | undefined,
+  warnings: string[],
   processIdentityByMachineClass?: Record<string, { processGroup: string; processRoute: string; operation: string }>,
 ): ProcessLineCost {
   const policy = samplingPolicy ?? INSPECTION_SAMPLING_DEFAULT;
@@ -254,11 +876,26 @@ function computeInspectionLine(
   const finalQty = Math.ceil(batch / Math.max(policy.finalPerN, 1));
 
   const measuredMin = perPieceMin * (faiQty + inProcessQty) + policy.finalCheckMin * finalQty;
-  const setupCost = r2((CMM_SETUP_MIN / 60) * inspectionRate.rate / batch);
+  // Real per-CMM mhr_records.setup_time_hr first, then the cited class
+  // constant — see resolveSetupMinutes(). (The shared canonical Inspection
+  // engine, inspection-engine.ts, deliberately charges NO separate setup for
+  // Inspection at all — FAI is amortised into cycle time instead. This CNC-
+  // specific line still charges one, unchanged from before; that's a real,
+  // separate divergence worth resolving on its own, not decided here.)
+  const setupResolution = resolveSetupMinutes({
+    process: 'Inspection',
+    machineSetupTimeHr: inspectionRate.setupTimeHr,
+    classDefaultMin: CMM_SETUP_MIN,
+    machineName: inspectionRate.machineName,
+  });
+  if (setupResolution.warning) warnings.push(setupResolution.warning);
+  const setupCost = r2((setupResolution.setupMin / 60) * inspectionRate.rate / batch);
   const runCost = r2((measuredMin / 60) * inspectionRate.rate / batch);
   // Amortized per-part time keeps totalMin per-part-honest
   const cycleMin = r2(measuredMin / batch);
-  return makeLine('Inspection', setupCost, runCost, cycleMin, inspectionRate, processIdentityByMachineClass);
+  return makeLine('Inspection', setupCost, runCost, cycleMin, inspectionRate, processIdentityByMachineClass, {
+    setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
+  });
 }
 
 // Surface treatment is now in its own module to avoid circular dep with cost-engine.ts.
@@ -287,19 +924,82 @@ export function computeRouteComplexityScore(
 
 // ── Machine capability check ──────────────────────────────────────────────────
 
+// Root-caused 2026-09-16: this used to be the ONLY domain in the platform
+// still doing a class-level bounding-box check instead of real per-machine
+// capability hydration (checkMachineCapability, used by every Sheet Metal
+// engine) — confirmed live: mhr_records never carried real per-machine
+// work-envelope data for CNC machines at all until migration 755 staged it
+// (max_diameter_mm/max_length_mm for the 4 real lathe categories,
+// max_x_mm/max_y_mm/max_z_mm for the 3 real mill categories — the only 7
+// of the 38 real Machining categories selector.ts can currently route a
+// specific machine to). Now delegates to the same shared
+// checkMachineCapability every other domain uses, via new CNC-specific
+// branches added there (turning: partDiameterMm/partLengthMm vs
+// maxDiameterMm/maxLengthMm; milling: partLengthMm/partWidthMm/
+// partHeightMm vs maxXMm/maxYMm/maxZMm, the first real Z-axis check this
+// function has ever had).
+//
+// realCapability/capabilitySource are optional and threaded through from
+// the caller's already-resolved MachineCandidate (MHRRateInput.selection)
+// — when absent (the two registry engines' pre-selection, class-only
+// feasibility gate, before any specific machine is chosen; or physics
+// selection disabled), this falls back to the previous class-level
+// MACHINE_ENVELOPE default exactly as before — a real, disclosed
+// "no specific machine selected yet" case, not a regression.
+//
+// Weight capacity has no real per-machine source anywhere in
+// memory/machining/ (no max_workpiece_weight_kg-equivalent field exists in
+// the real limits data for any of the 7 wired categories) — stays on the
+// class-level MACHINE_ENVELOPE default for every caller, a disclosed gap,
+// not fabricated per-machine data.
 export function checkCNCCapability(
   machineClass: CNCMachineClass,
   maxLength: number,
   maxWidth: number,
   maxHeight: number,
   weightKg: number,
+  realCapability?: MachineCapability | null,
+  capabilitySource?: 'imported' | 'seed' | 'default_class',
 ): CNCCapabilityResult {
   const env = MACHINE_ENVELOPE[machineClass];
   const warnings: string[] = [];
+
+  if (realCapability) {
+    const isTurning = machineClass === 'cnc_lathe' || machineClass === 'cnc_lathe_live';
+    const geometry: PartGeometryForCapability = {
+      sheetThicknessMm: 0,
+      flatPatternLengthMm: null,
+      flatPatternWidthMm: null,
+      ...(isTurning
+        ? {
+            // Same bar-stock diameter/length convention already used
+            // elsewhere in this file for turned parts (e.g. computeCNCTurnedCostSummary's
+            // fallbackDiamMm = max(maxWidth, maxHeight)) — the turning axis
+            // is maxLength, the cross-section swing is the larger of the
+            // other two bounding-box dimensions.
+            partDiameterMm: Math.max(maxWidth, maxHeight),
+            partLengthMm: maxLength,
+          }
+        : {
+            partLengthMm: maxLength,
+            partWidthMm: maxWidth,
+            partHeightMm: maxHeight,
+          }),
+    };
+    const result = checkMachineCapability(machineClass, null, geometry, realCapability, capabilitySource);
+    warnings.push(...result.reasons);
+    const weightCapable = !(weightKg > 0 && weightKg > env.maxWeightKg);
+    if (!weightCapable) {
+      warnings.push(`Part weight (${r2(weightKg)} kg) exceeds machine weight capacity (${env.maxWeightKg} kg, class default — no real per-machine weight data exists yet).`);
+    }
+    return { overallCapable: result.capable && weightCapable, machineCapabilityWarnings: warnings };
+  }
+
+  // No real capability resolved — class-level default, same as before.
   if (maxLength > env.l || maxWidth > env.w || maxHeight > env.h) {
     warnings.push(
       `Part envelope (${maxLength}×${maxWidth}×${maxHeight} mm) exceeds machine working volume ` +
-      `(${env.l}×${env.w}×${env.h} mm).`,
+      `(${env.l}×${env.w}×${env.h} mm, class default — no specific machine selected yet).`,
     );
   }
   if (weightKg > 0 && weightKg > env.maxWeightKg) {
@@ -354,11 +1054,24 @@ export function computeCNCMilledCostSummary(
   // ── Setup (amortised over batchSize, includes fixture amortization) ────────
   // Fixture cost is folded into Setup rather than emitted as a separate 0-rate
   // phantom process — fixture hardware is a one-time setup charge, not a machine step.
+  // Real per-machine mhr_records.setup_time_hr first, then the cited
+  // SETUP_COUNT×BASE_SETUP_MIN class default — see resolveSetupMinutes()
+  // (no per-operation machining_reference_data table analogous to Sheet
+  // Metal's sm_lookup_op_setup_time exists yet, so that tier is skipped).
   const setupCount = SETUP_COUNT[machineClass];
-  const setupMin = (setupCount * BASE_SETUP_MIN[machineClass]) / Math.max(batchSize, 1);
+  const setupResolution = resolveSetupMinutes({
+    process: 'CNC Setup',
+    machineSetupTimeHr: mhrRate.setupTimeHr,
+    classDefaultMin: setupCount * BASE_SETUP_MIN[machineClass],
+    machineName: mhrRate.machineName,
+  });
+  if (setupResolution.warning) warnings.push(setupResolution.warning);
+  const setupMin = setupResolution.setupMin / Math.max(batchSize, 1);
   const fixtureCost = r2((input.fixtureUnitCostLocal ?? 0) / Math.max(batchSize, 1));
   const setupCostVal = r2((setupMin / 60) * mhrRate.rate) + fixtureCost;
-  processLines.push(makeLine('Setup', setupCostVal, 0, setupMin, mhrRate));
+  processLines.push(makeLine('Setup', setupCostVal, 0, setupMin, mhrRate, undefined, {
+    setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
+  }));
 
   // ── CNC Milling (roughing + all hole operations on the same machine) ─────
   // When feature_graph_v2 data is available (featureOps), use per-feature cycle
@@ -373,9 +1086,25 @@ export function computeCNCMilledCostSummary(
 
   let cncMillingMin = 0;
   if (Array.isArray(input.featureOps) && input.featureOps.length > 0) {
-    // Feature-based path: sum all operation times from the sequencer.
+    // Root-caused live (2026-09-18): buildOperationSequence() (the feature
+    // sequencer) emits its OWN "Rigid Tap" entry for every tapped hole (real
+    // computeTapCycleSec physics) and an unconditional flat "Deburr" 90s
+    // placeholder for every part — but this function ALSO independently
+    // computes real Tapping time (computeTappingMin, same underlying
+    // computeTapCycleSec physics, same threads) and real Deburring time
+    // (tblDeburring-based deburrMin below), each billed as its OWN dedicated
+    // process line at its OWN dedicated rate (tappingRate/deburrRate, not
+    // mhrRate). Summing the sequencer's full output into "CNC Milling"
+    // without excluding these double-billed every part with tapped holes or
+    // feature data: once folded into "CNC Milling" at the VMC rate, once
+    // again as "Tapping"/"Deburring" at their real rates. Counterbore/
+    // Chamfer/Pocket/Drill/Face Mill have no such separate line elsewhere in
+    // this function, so only these two names are excluded here.
+    const DOUBLE_BILLED_ELSEWHERE = new Set(['Rigid Tap', 'Deburr']);
     // 15% rapids/ATC overhead added on top of pure cutting time.
-    const totalFeatureSec = input.featureOps.reduce((s, o) => s + o.timeSec, 0);
+    const totalFeatureSec = input.featureOps
+      .filter((o) => !DOUBLE_BILLED_ELSEWHERE.has(o.name))
+      .reduce((s, o) => s + o.timeSec, 0);
     cncMillingMin = (totalFeatureSec / 60) * 1.15;
   } else {
     // Bbox-subtraction fallback (used when CAD engine did not return feature_graph_v2)
@@ -385,11 +1114,15 @@ export function computeCNCMilledCostSummary(
     let drillingMin = 0;
     if (holeGroups.length > 0) {
       drillingMin = holeGroups.reduce(
-        (sum, g) => sum + (g.count * DRILL_CYCLE_SEC[drillDiamClass(g.diameter_mm)]) / 60,
+        (sum, g) => sum + (g.count * computeDrillCycleSec(g.diameter_mm, materialGrade)) / 60,
         0,
       );
     } else if (holeCount > 0) {
-      drillingMin = (holeCount * DRILL_CYCLE_SEC.medium) / 60;
+      // No per-diameter breakdown — assume a representative 8mm hole (real
+      // physics still applies the real material's speed/feed; only the
+      // diameter itself is a placeholder here, same as the previous flat
+      // DRILL_CYCLE_SEC.medium bucket this replaces).
+      drillingMin = (holeCount * computeDrillCycleSec(8, materialGrade)) / 60;
     }
 
     cncMillingMin = roughingMin + drillingMin;
@@ -402,18 +1135,104 @@ export function computeCNCMilledCostSummary(
 
   // ── Tapping ───────────────────────────────────────────────────────────────
   const threadCount = threads.reduce((s, t) => s + t.count, 0);
-  const tappingMin = threads.length > 0 ? computeTappingMin(threads) : 0;
+  const tappingMin = threads.length > 0 ? computeTappingMin(threads, materialGrade) : 0;
   if (tappingMin > 0) {
-    const tapSetup = r2((10 / 60) * tappingRate.rate / Math.max(batchSize, 1));
+    const tapSetup = r2((TAPPING_SETUP_MIN / 60) * tappingRate.rate / Math.max(batchSize, 1));
     const tapRun = r2((tappingMin / 60) * tappingRate.rate);
     processLines.push(makeLine('Tapping', tapSetup, tapRun, tappingMin, tappingRate, input.processIdentityByMachineClass));
   }
 
   // ── Deburring ────────────────────────────────────────────────────────────
-  const deburrMin = surfaceArea > 0 ? (surfaceArea / 10_000) * 0.5 : 0;
+  // Real, hardness-matched tblDeburring linear edge speed when resolved by
+  // the caller — edge length estimated from surface area via a standard
+  // geometric proxy (perimeter of an equivalent square, 4×√area), not a
+  // fabricated length; the part's real edge geometry isn't extracted by
+  // cad-engine today, so this is the same tier of disclosed approximation
+  // as estimateBurlDiameterMm elsewhere in this codebase, not a guess
+  // dressed up as measured data. Falls back to the previous flat 0.5
+  // constant, disclosed as a fallback, only when the real rate isn't
+  // available.
+  const deburrMin = surfaceArea > 0
+    ? (input.deburrLinearSpeedMmPerSec && input.deburrLinearSpeedMmPerSec > 0
+        ? (4 * Math.sqrt(surfaceArea)) / input.deburrLinearSpeedMmPerSec / 60
+        : (surfaceArea / 10_000) * 0.5)
+    : 0;
   if (deburrMin > 0) {
     processLines.push(makeLine('Deburring', 0, r2((deburrMin / 60) * deburrRate.rate), deburrMin, deburrRate, input.processIdentityByMachineClass));
   }
+
+  // ── Jig Boring / Jig Grind (new — a real, tighter tier ABOVE Reaming;
+  // see JIG_BORE_POSITION_TOLERANCE_MM's doc comment). Mutually exclusive
+  // at the same real tolerance ceiling: a real heat-treat callout routes to
+  // Jig Grind instead of Jig Boring (see isRealHeatTreatmentCallout) —────
+  const needsJigGrind = tightestToleranceMm != null && tightestToleranceMm > 0 &&
+    tightestToleranceMm <= JIG_BORE_POSITION_TOLERANCE_MM && isRealHeatTreatmentCallout(input.heatTreatment);
+  if (needsJigGrind) {
+    const jigGrindLine = computeJigGrindLine(
+      holeGroups, input.cylindricalGrindingParams, input.jigGrindRate, batchSize, warnings, input.processIdentityByMachineClass,
+    );
+    if (jigGrindLine) processLines.push(jigGrindLine);
+  } else {
+    const jigBoreLine = computeJigBoreLine(
+      tightestToleranceMm, holeGroups, matClass, input.jigBoreTable, input.jigBoreRate,
+      batchSize, warnings, input.processIdentityByMachineClass,
+    );
+    if (jigBoreLine) processLines.push(jigBoreLine);
+  }
+
+  // ── Internal Grinding (new — bore/ID grinding; see CNCCostInput's own
+  // doc comment) ───────────────────────────────────────────────────────────
+  const internalGrindingLine = computeInternalGrindingLine(
+    input.tightestRaMicron, holeGroups, input.cylindricalGrindingParams, input.internalGrindingRate,
+    batchSize, warnings, input.processIdentityByMachineClass,
+  );
+  if (internalGrindingLine) processLines.push(internalGrindingLine);
+
+  // ── Reaming (see computeReamCycleSec's own doc comment for why this is
+  // tolerance-triggered rather than a distinct CAD feature, and why it
+  // applies to the smallest real hole group). Excludes the Jig Boring
+  // tier above (tightestToleranceMm > JIG_BORE_POSITION_TOLERANCE_MM) —
+  // that tighter tolerance band now gets a real, dedicated jig borer
+  // instead of reaming, not both.
+  if (
+    tightestToleranceMm != null && tightestToleranceMm > JIG_BORE_POSITION_TOLERANCE_MM &&
+    tightestToleranceMm <= TIGHT_TOLERANCE_REAM_THRESHOLD_MM &&
+    holeGroups.length > 0
+  ) {
+    const smallestHole = holeGroups.reduce((a, b) => (b.diameter_mm < a.diameter_mm ? b : a), holeGroups[0]);
+    const reamSec = computeReamCycleSec(smallestHole.diameter_mm, matClass, input.reamTable);
+    if (reamSec != null) {
+      const reamMin = (reamSec * smallestHole.count) / 60;
+      const reamSetup = r2((REAM_SETUP_MIN / 60) * mhrRate.rate / Math.max(batchSize, 1));
+      const reamRun = r2((reamMin / 60) * mhrRate.rate);
+      processLines.push(makeLine('Reaming', reamSetup, reamRun, reamMin, mhrRate, input.processIdentityByMachineClass));
+    } else {
+      warnings.push('Tight tolerance requires reaming but real tblReaming data was not available — reaming cost not included.');
+    }
+  }
+
+  // ── Gun Drilling / Deep Bore Machine (new — see deep-hole-routing.ts) ────
+  const gunDrillLine = computeDeepHoleLine(
+    'Gun Drilling', input.gunDrillCandidates,
+    (d, hb) => resolveGunDrillSpeedFeed(input.gunDrillTable, d, hb),
+    matClass, input.gunDrillRate, batchSize, warnings, input.processIdentityByMachineClass,
+  );
+  if (gunDrillLine) processLines.push(gunDrillLine);
+
+  const deepBoreLine = computeDeepHoleLine(
+    'Deep Bore Machine', input.deepBoreCandidates,
+    (d, hb) => resolveDeepBoreSpeedFeed(input.deepBoreMaterials, d, hb),
+    matClass, input.deepBoreRate, batchSize, warnings, input.processIdentityByMachineClass,
+  );
+  if (deepBoreLine) processLines.push(deepBoreLine);
+
+  // ── Keyway Broaching (new — real "keyway" occurrences pre-filtered out of
+  // fgv2Features by splitKeywayOccurrences; see CNCCostInput's own doc
+  // comment) ────────────────────────────────────────────────────────────────
+  const keywayLine = computeKeywayBroachingLine(
+    input.keywayCandidates, input.broachingParams, input.broachRate, batchSize, warnings, input.processIdentityByMachineClass,
+  );
+  if (keywayLine) processLines.push(keywayLine);
 
   // ── Surface Treatment (anodize / plating — drawing callout) ──────────────
   const surfaceLine = computeSurfaceTreatmentLine(surfaceTreatment, surfaceArea, batchSize, location, warnings, input.surfaceTreatmentDbRate);
@@ -424,7 +1243,7 @@ export function computeCNCMilledCostSummary(
     holeCount, threadCount, tightestToleranceMm, gdtFeatureCount, input.gdtFeatures,
   );
   processLines.push(
-    computeInspectionLine(inspectionMin, inspectionRate, batchSize, input.samplingPerN, input.samplingPolicy, input.processIdentityByMachineClass),
+    computeInspectionLine(inspectionMin, inspectionRate, batchSize, input.samplingPerN, input.samplingPolicy, warnings, input.processIdentityByMachineClass),
   );
 
   const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
@@ -535,11 +1354,22 @@ export function computeCNCTurnedCostSummary(
 
   // ── Setup (amortised, includes fixture amortization) ────────────────────
   // Fixture cost folded into Setup — same rationale as the milling path.
+  // Real per-machine mhr_records.setup_time_hr first, then the cited
+  // SETUP_COUNT×BASE_SETUP_MIN class default — see resolveSetupMinutes().
   const setupCount = SETUP_COUNT[machineClass];
-  const setupMin = (setupCount * BASE_SETUP_MIN[machineClass]) / Math.max(batchSize, 1);
+  const setupResolution = resolveSetupMinutes({
+    process: 'CNC Setup',
+    machineSetupTimeHr: mhrRate.setupTimeHr,
+    classDefaultMin: setupCount * BASE_SETUP_MIN[machineClass],
+    machineName: mhrRate.machineName,
+  });
+  if (setupResolution.warning) warnings.push(setupResolution.warning);
+  const setupMin = setupResolution.setupMin / Math.max(batchSize, 1);
   const fixtureCost = r2((input.fixtureUnitCostLocal ?? 0) / Math.max(batchSize, 1));
   const setupCostVal = r2((setupMin / 60) * mhrRate.rate) + fixtureCost;
-  processLines.push(makeLine('Setup', setupCostVal, 0, setupMin, mhrRate));
+  processLines.push(makeLine('Setup', setupCostVal, 0, setupMin, mhrRate, undefined, {
+    setupTimeMin: setupResolution.setupMin, setupTimeSource: setupResolution.source,
+  }));
 
   // ── OD Turning ───────────────────────────────────────────────────────────
   // machinabilityRating (Fix 4): 75 = mild steel baseline; Al 6061 ≈ 150 → 2× MRR.
@@ -552,20 +1382,20 @@ export function computeCNCTurnedCostSummary(
   }
 
   // ── Boring / Drilling ─────────────────────────────────────────────────────
-  // Use diameter-classified cycle times (same as milled) — flat 20 sec/hole was sized
-  // for steel; for small-diameter holes in plastic the actual time is 5-8 sec.
+  // Real material-aware physics (same computeDrillCycleSec as the milled
+  // path) — replaces the previous flat diameter-bucket table.
   const boringMin = holeGroups.length > 0
-    ? holeGroups.reduce((total, g) => total + (g.count * DRILL_CYCLE_SEC[drillDiamClass(g.diameter_mm)]) / 60, 0)
-    : drilledHoleCount > 0 ? (drilledHoleCount * 14) / 60 : 0;  // 14 sec/hole fallback (medium)
+    ? holeGroups.reduce((total, g) => total + (g.count * computeDrillCycleSec(g.diameter_mm, materialGrade)) / 60, 0)
+    : drilledHoleCount > 0 ? (drilledHoleCount * computeDrillCycleSec(8, materialGrade)) / 60 : 0;
   if (boringMin > 0) {
     processLines.push(makeLine('Boring/Drilling', 0, r2((boringMin / 60) * mhrRate.rate), boringMin, mhrRate, input.processIdentityByMachineClass));
   }
 
   // ── Tapping ───────────────────────────────────────────────────────────────
   const threadCount = threads.reduce((s, t) => s + t.count, 0);
-  const tappingMin = threads.length > 0 ? computeTappingMin(threads) : 0;
+  const tappingMin = threads.length > 0 ? computeTappingMin(threads, materialGrade) : 0;
   if (tappingMin > 0) {
-    const tapSetup = r2((10 / 60) * tappingRate.rate / Math.max(batchSize, 1));
+    const tapSetup = r2((TAPPING_SETUP_MIN / 60) * tappingRate.rate / Math.max(batchSize, 1));
     const tapRun = r2((tappingMin / 60) * tappingRate.rate);
     processLines.push(makeLine('Tapping', tapSetup, tapRun, tappingMin, tappingRate, input.processIdentityByMachineClass));
   }
@@ -584,6 +1414,87 @@ export function computeCNCTurnedCostSummary(
   const facingMin = 2;
   processLines.push(makeLine('Facing + Parting', 0, r2((facingMin / 60) * mhrRate.rate), facingMin, mhrRate, input.processIdentityByMachineClass));
 
+  // ── Deburring — genuine pre-existing gap closed: turned parts had NO
+  // deburring line at all before this (only the milled path did), despite
+  // a turned part having the same real edges needing it. Same real
+  // hardness-matched tblDeburring physics as the milled path — see that
+  // function's own doc comment for the edge-length proxy and fallback.
+  const turnedSurfaceArea = input.surfaceArea;
+  const deburrMin = turnedSurfaceArea > 0
+    ? (input.deburrLinearSpeedMmPerSec && input.deburrLinearSpeedMmPerSec > 0
+        ? (4 * Math.sqrt(turnedSurfaceArea)) / input.deburrLinearSpeedMmPerSec / 60
+        : (turnedSurfaceArea / 10_000) * 0.5)
+    : 0;
+  if (deburrMin > 0) {
+    processLines.push(makeLine('Deburring', 0, r2((deburrMin / 60) * deburrRate.rate), deburrMin, deburrRate, input.processIdentityByMachineClass));
+  }
+
+  // ── Jig Boring / Jig Grind — same real tier + real routing rule as the
+  // milled path.
+  const needsJigGrind = tightestToleranceMm != null && tightestToleranceMm > 0 &&
+    tightestToleranceMm <= JIG_BORE_POSITION_TOLERANCE_MM && isRealHeatTreatmentCallout(input.heatTreatment);
+  if (needsJigGrind) {
+    const jigGrindLine = computeJigGrindLine(
+      holeGroups, input.cylindricalGrindingParams, input.jigGrindRate, batchSize, warnings, input.processIdentityByMachineClass,
+    );
+    if (jigGrindLine) processLines.push(jigGrindLine);
+  } else {
+    const jigBoreLine = computeJigBoreLine(
+      tightestToleranceMm, holeGroups, matClass, input.jigBoreTable, input.jigBoreRate,
+      batchSize, warnings, input.processIdentityByMachineClass,
+    );
+    if (jigBoreLine) processLines.push(jigBoreLine);
+  }
+
+  // ── Internal Grinding — same real bore/ID grinding trigger as the milled
+  // path (a turned part's own bores use the same real holeGroups data).
+  const internalGrindingLine = computeInternalGrindingLine(
+    input.tightestRaMicron, holeGroups, input.cylindricalGrindingParams, input.internalGrindingRate,
+    batchSize, warnings, input.processIdentityByMachineClass,
+  );
+  if (internalGrindingLine) processLines.push(internalGrindingLine);
+
+  // ── Reaming — same tight-tolerance trigger as the milled path, using
+  // drilledHoleCount's real holeGroups (not raw holeCount, same rationale
+  // as the Boring/Drilling and Inspection sections above). Excludes the
+  // Jig Boring tier above — see the milled path's identical comment.
+  if (
+    tightestToleranceMm != null && tightestToleranceMm > JIG_BORE_POSITION_TOLERANCE_MM &&
+    tightestToleranceMm <= TIGHT_TOLERANCE_REAM_THRESHOLD_MM &&
+    holeGroups.length > 0
+  ) {
+    const smallestHole = holeGroups.reduce((a, b) => (b.diameter_mm < a.diameter_mm ? b : a), holeGroups[0]);
+    const reamSec = computeReamCycleSec(smallestHole.diameter_mm, matClass, input.reamTable);
+    if (reamSec != null) {
+      const reamMin = (reamSec * smallestHole.count) / 60;
+      const reamSetup = r2((REAM_SETUP_MIN / 60) * mhrRate.rate / Math.max(batchSize, 1));
+      const reamRun = r2((reamMin / 60) * mhrRate.rate);
+      processLines.push(makeLine('Reaming', reamSetup, reamRun, reamMin, mhrRate, input.processIdentityByMachineClass));
+    } else {
+      warnings.push('Tight tolerance requires reaming but real tblReaming data was not available — reaming cost not included.');
+    }
+  }
+
+  // ── Cylindrical Grinding (new; see CNCCostInput's own doc comment for
+  // the real Ra<TURNING_MILLING_BEST_ACHIEVABLE_RA_UM trigger). Turned
+  // part's own real OD/length: max(maxWidth, maxHeight) is the diameter,
+  // maxLength the ground length -- same bbox-to-cylinder convention the
+  // turned bar-stock fallback already uses elsewhere in this function.
+  const turnedDiameterMm = Math.max(maxWidth, maxHeight);
+  const grindingLine = computeCylindricalGrindingLine(
+    input.tightestRaMicron, turnedDiameterMm, maxLength,
+    input.cylindricalGrindingParams, input.cylindricalGrindingRate,
+    batchSize, warnings, input.processIdentityByMachineClass,
+  );
+  if (grindingLine) processLines.push(grindingLine);
+
+  // ── Keyway Broaching — a turned shaft's own real keyway occurrences,
+  // same real pre-filter/candidate shape as the milled path.
+  const keywayLine = computeKeywayBroachingLine(
+    input.keywayCandidates, input.broachingParams, input.broachRate, batchSize, warnings, input.processIdentityByMachineClass,
+  );
+  if (keywayLine) processLines.push(keywayLine);
+
   // ── Surface Treatment (anodize / plating — drawing callout) ──────────────
   const surfaceLine = computeSurfaceTreatmentLine(
     surfaceTreatment, input.surfaceArea, batchSize, location, warnings, input.surfaceTreatmentDbRate,
@@ -597,7 +1508,7 @@ export function computeCNCTurnedCostSummary(
     drilledHoleCount, threadCount, tightestToleranceMm, gdtFeatureCount, input.gdtFeatures,
   );
   processLines.push(
-    computeInspectionLine(inspectionMin, inspectionRate, batchSize, input.samplingPerN, input.samplingPolicy, input.processIdentityByMachineClass),
+    computeInspectionLine(inspectionMin, inspectionRate, batchSize, input.samplingPerN, input.samplingPolicy, warnings, input.processIdentityByMachineClass),
   );
 
   const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
@@ -626,7 +1537,17 @@ export function computeCNCTurnedCostSummary(
       laserMin:      r2(turningMin),
       pressBrakeMin: r2(setupMin),
       tappingMin:    r2(tappingMin),
-      deburrMin:     r2(boringMin),
+      // Root-caused 2026-09-16: this reported boringMin under the
+      // deburrMin key (there was no real deburring line on turned parts
+      // to report here at all before). Now that a real Deburring line
+      // exists (above), this reports its own real value — boring/drilling
+      // time has no dedicated field in this summary DTO (same as Setup/
+      // Facing+Parting/Reaming/Secondary Setup), same as the milled
+      // function's own cycleTimes shape; the itemized processLines array
+      // is the authoritative per-operation breakdown, this object is only
+      // a legacy summary widget, and totalMin already sums everything
+      // regardless of which named field a line does or doesn't have.
+      deburrMin:     r2(deburrMin),
       totalMin,
     },
     batchSize,

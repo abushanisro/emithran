@@ -9,6 +9,7 @@
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
+import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
 import { STANDARD_SHEETS, trueNestInputFingerprint } from '../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
 import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
@@ -53,6 +54,7 @@ function buildService(computeTrueNest: jest.Mock) {
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,
     {} as unknown as SheetMetalLookupService,
+    {} as unknown as MachiningLookupService,
     {} as unknown as ExchangeRateService,
     cadAnalysisService,
   );

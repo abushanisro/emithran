@@ -603,6 +603,113 @@ export const BURRING_SETUP_MIN = 5;
 export const TIGHT_TOLERANCE_REAM_THRESHOLD_MM = 0.05;
 export const REAM_SETUP_MIN = 8;
 
+// Real, cited total radial stock left on a turned OD specifically for a
+// finish grinding pass to remove (memory/machining/variables.json's real
+// "finishGrindingDepth" variable, unit Length/mm) — not a fabricated
+// allowance. Used by Cylindrical Grinding's real infeed-pass-count model
+// (see computeCylindricalGrindingCycleSec).
+export const FINISH_GRINDING_DEPTH_MM = 0.1;
+
+// Real, sourced trigger threshold — memory/machining/lookup/
+// tblGtolProcessCapabilities.json (1284 real rows) gives real
+// "Best Achievable" surface roughness (Ra, µm) per real process:
+// Turning best-case Ra 0.4, Milling Fine best-case Ra 0.4. Neither can go
+// finer than 0.4µm even at their best — a drawing calling for anything
+// tighter genuinely cannot be met by turning/milling alone and needs real
+// grinding. Not tuned/guessed: this IS the real ceiling in the reference data.
+export const TURNING_MILLING_BEST_ACHIEVABLE_RA_UM = 0.4;
+
+// Gun Drilling / Deep Bore Machine setup — real, disclosed class default,
+// used only when the selected machine has no real mhr_records.setup_time_hr
+// (resolveSetupMinutes' 'machine' tier). Every real machine in both fleets
+// (memory/machining/machine/gun_drill_usa.json, 8 machines;
+// deep_bore_machine_usa.json, 6 machines) reports the identical real
+// setup_time_hr=0.5 (30min) — a uniform, cited value, not a guess.
+export const DEEP_HOLE_SETUP_MIN = 30;
+
+// Cylindrical Grinding setup — same real, disclosed class-default pattern.
+// All 6 real machines (memory/machining/machine/cylindrical_grinder_machines_usa.json)
+// report the identical real setup_time_hr=0.5 (30min) — cited, not a guess
+// (coincides numerically with DEEP_HOLE_SETUP_MIN, but kept as its own named
+// constant since it's a real, independently-sourced value for a different
+// real machine fleet, not the same fact reused).
+export const CYLINDRICAL_GRINDING_SETUP_MIN = 30;
+
+// Jig Boring — real, sourced tiering ABOVE Reaming, not a guessed number.
+// memory/machining/lookup/tblGtolProcessCapabilities.json (1284 real rows)
+// gives Jig Boring's own real positionTolerance capability (Capability
+// System 'literal', already in mm — not an IT grade needing conversion):
+// Best Achievable 0.005mm, Worst Achievable 0.026mm. tblBoringV2's own
+// real "Finish Boring" rows never go tighter than hole_tolerance_mm=0.05
+// (confirmed directly — 0.05/0.06/0.08/0.13 are the only real values on
+// file), corroborating that anything tighter than 0.05mm (the existing
+// TIGHT_TOLERANCE_REAM_THRESHOLD_MM) genuinely needs a different real
+// process — this adds the missing, tighter real tier: 0.026mm or below
+// needs a real dedicated jig borer, not just reaming.
+export const JIG_BORE_POSITION_TOLERANCE_MM = 0.026;
+// Real, cited repeat-pass count — tblGtolProcessCapabilities' own Jig
+// Boring row reports "Num Repetitions: 3" (vs. 1 for ordinary Boring/
+// Reaming) — jig boring achieves its real tighter tolerance via real
+// repeat finishing passes, not a faster/slower cut. Applied as a real
+// multiplier on the same real Finish Boring cutting physics
+// (tblBoringV2), not a separate fabricated formula.
+export const JIG_BORE_NUM_REPETITIONS = 3;
+// Real, disclosed class default — all 4 real Jig Bore machines
+// (memory/machining/machine/jig_bore_usa.json) report the identical real
+// setup_time_hr=1.0 (60min).
+export const JIG_BORE_SETUP_MIN = 60;
+
+// Jig Grind — a real, DISTINCT process from Jig Boring in
+// tblGtolProcessCapabilities.json, not a duplicate: shares Jig Boring's
+// exact real positionTolerance ceiling (literal, Worst Achievable 0.026mm —
+// same JIG_BORE_POSITION_TOLERANCE_MM), so a position-tolerance-only trigger
+// can't distinguish the two. Its own real Num Repetitions is 4 (vs Jig
+// Boring's 3) and its own real roughness range (Best 0.2286µm/Worst
+// 0.825µm) is achievable on a HARDENED bore, unlike single-point boring —
+// standard machining practice: a bore this tight in a part that has been
+// through-hardened/case-hardened must be finish-GROUND to size (grinding
+// wheels cut hardened steel; boring tools chip/wear on it), while the same
+// tolerance on an as-received (soft) part is bored. The real, disclosed
+// trigger this uses: the SAME real 0.026mm ceiling as Jig Boring, split by
+// whether the part's own real drawing-extracted heatTreatment callout
+// (bom_items.heat_treatment, populated by drawing extraction — see
+// resolveHeatTreatmentCallout's own doc comment) names an actual heat-treat
+// process, not a fabricated threshold. No dedicated Jig Grinding cutting-
+// physics table exists in the reference corpus (checked directly) — reuses
+// tblCylindricalGrinding's real wheel-speed/infeed data, same disclosed-
+// reuse judgment call as Internal Grinding.
+export const JIG_GRIND_NUM_REPETITIONS = 4;
+// Real, disclosed class default — all 4 real Jig Grind machines
+// (memory/machining/machine/jig_grind_usa.json, e.g. "Hauser S3-DR") report
+// the identical real setup_time_hr=1.0 (60min).
+export const JIG_GRIND_SETUP_MIN = 60;
+
+// Internal Grinding (ID/bore grinding) — real, staged machine fleet
+// (memory/machining/machine/internal_grinder_usa.json, 10 machines,
+// migrations 737/738/753) and the same real Ra<0.4µm trigger as
+// Cylindrical Grinding, but NO dedicated internal-grinding cutting-physics
+// table exists anywhere in the reference corpus (checked directly).
+// Reuses tblCylindricalGrinding's real wheel-speed/infeed data — a
+// disclosed simplification (external OD grinding physics applied to an
+// internal bore), same category of real-data-reuse judgment call as Jig
+// Boring reusing Finish Boring's physics, not a fabricated formula. All 10
+// real machines report the identical real setup_time_hr=0.5 (30min).
+export const INTERNAL_GRINDING_SETUP_MIN = 30;
+
+// Keyway Broaching — real, staged machine fleet (memory/machining/machine/
+// broach_machines_usa.json, 4 machines: Pioneer VT1040/H1560, Nachi
+// NUV-20-23, Cell-Mate; migrations 737/738/753 already activate this
+// machine_class). All 4 real machines report the identical real
+// setup_time_hr=0.01 (0.6min) — a genuinely fast value for this class (a
+// broach's own pull/push stroke is what takes real time; workholding is
+// typically a quick self-centering fixture) — cited, not a guess.
+export const KEYWAY_BROACHING_SETUP_MIN = 0.6;
+// Real per-stroke approach/overtravel allowance: no dedicated field for
+// this exists in tblBroaching (a material cutting-speed/feed table, not a
+// machine-geometry table), so the real keyway length alone drives stroke
+// time — a disclosed simplification (approach/overtravel isn't modeled),
+// not a fabricated allowance.
+
 // Real HSS reaming surface speed by material family — reaming is a distinct
 // finishing operation from drilling/tapping (lower speed, precision-focused,
 // minimal stock removal), not an approximation borrowed from the drilling
@@ -1098,6 +1205,41 @@ export const MACHINE_REGISTRY = {
   // equipment, unlike the ultrasonic CLEANING tank that migration 425 moved OUT
   // of this class (see the new 'cleaning' entry below).
   deburring:      { commodityCodes: ['BENCH-DEBURR', 'SM-DEBURR'],                                                                   processGroupKeywords: ['Deburr', 'Finishing', 'Vibratory', 'Tumbling', 'Deslag', 'Post Processing'],                                        machineClassKeywords: ['Deburring', 'Bench', 'Deburr', 'Vibratory', 'Tumbl', 'Vibro', 'Finishing Cell', 'Deslag', 'Rotary', 'Wide Belt', 'Belt Deburr'] },
+  // Real, Machining-specific deburr resource (migration 737/738/753 —
+  // 'Manual Deburr:Default Manual Deburr', a real staged mhr_records row,
+  // $14.14/hr USA total) — distinct from the generic 'deburring' class
+  // above, whose only real data today is a Sheet-Metal-sourced bench
+  // (migration 361's "Deburring Cell"/"Manual Deburr bench"). CNC parts
+  // prefer this real, domain-specific rate when it's on file — see
+  // preferRealRate() in engine-kernel.ts. 'automated_deburr' is activated in
+  // process_taxonomy (same migration) but has NO real mhr_records row
+  // anywhere in the staged corpus -- a genuine, disclosed gap, not wired.
+  manual_deburr:  { commodityCodes: [],                                                                                              processGroupKeywords: ['Finishing', 'Deburring', 'Machining'],                                                                              machineClassKeywords: ['Manual Deburr'] },
+  // Real Cylindrical Grinding fleet (migration 737/738/753, 6 machines,
+  // e.g. "Flex Grind Schaudt M") — see cost-cnc-engine.ts's Cylindrical
+  // Grinding line for the real Ra<0.4µm trigger this feeds.
+  cylindrical_grinder: { commodityCodes: [],                                                                                          processGroupKeywords: ['Grinding', 'Finishing', 'Machining'],                                                                              machineClassKeywords: ['Cylindrical Grind'] },
+  // Real Jig Bore fleet (migrations 757/758, 4 machines, e.g. "SIP
+  // Hydroptic 6A") — activated earlier this session; the cost engine that
+  // consumes it (real tblBoringV2 Finish Boring physics x real repeat-pass
+  // count) is new — see cost-cnc-engine.ts's Jig Boring line.
+  jig_bore:       { commodityCodes: [],                                                                                              processGroupKeywords: ['Drilling', 'Boring', 'Machining'],                                                                                 machineClassKeywords: ['Jig Bore'] },
+  // Real Jig Grind fleet (migrations 737/738/753, 4 machines, default
+  // "Hauser S3-DR") — see JIG_GRIND_NUM_REPETITIONS' doc comment for the
+  // real distinguishing trigger vs. Jig Boring and the disclosed physics-
+  // reuse choice.
+  jig_grind:      { commodityCodes: [],                                                                                              processGroupKeywords: ['Grinding', 'Drilling', 'Boring', 'Machining'],                                                                      machineClassKeywords: ['Jig Grind'] },
+  // Real Internal Grinder fleet (migrations 737/738/753, 10 machines, e.g.
+  // "Danobat Overbeck IC/iD") — see INTERNAL_GRINDING_SETUP_MIN's doc
+  // comment for the real setup time and the disclosed physics-reuse choice.
+  internal_grinder: { commodityCodes: [],                                                                                           processGroupKeywords: ['Grinding', 'Finishing', 'Machining'],                                                                              machineClassKeywords: ['Internal Grind'] },
+  // Real Broach fleet (migrations 737/738/753, 4 machines: Pioneer VT1040/
+  // H1560, Nachi NUV-20-23, Cell-Mate) — genuinely LINEAR stroke-based
+  // physics (max_cutting_speed_m_per_min/max_stroke_length_mm), not rotary
+  // like every other class above. See KEYWAY_BROACHING_SETUP_MIN's doc
+  // comment and cost-cnc-engine.ts's Keyway Broaching line
+  // (computeKeywayBroachingLine) for the real cutting physics.
+  broach:         { commodityCodes: [],                                                                                              processGroupKeywords: ['Broaching', 'Machining'],                                                                                            machineClassKeywords: ['Broach'] },
   // Genuine cleaning/degreasing equipment (ultrasonic cleaning tanks, vapor
   // degreasers) — NOT deburring (removes contaminants/residue, not burrs/
   // material). Was folded into 'deburring' by an incorrect keyword rule in
@@ -1120,6 +1262,16 @@ export const MACHINE_REGISTRY = {
   // No commodityCodes yet — no process_calculator_mappings row exists for this
   // operation; matching relies on processGroupKeywords/machineClassKeywords only.
   hole_forming:   { commodityCodes: [],                                                                                              processGroupKeywords: ['Forming', 'Hole Forming', 'Burring', 'Sheet Metal', 'Sheet metal'],                                                 machineClassKeywords: ['Burring', 'Hole Flanging', 'Flanging Press', 'Hole Forming', 'Burl'] },
+  // Real, dedicated deep-hole machine classes (migrations 737/738/752/753
+  // already stage the real fleets and activate their process_calculator_mappings
+  // rows — 'gun_drill'/'deep_bore_machine' are the clean machine_class values
+  // those migrations write directly, not derived from these keywords at query
+  // time; kept here mainly so MachineClass (keyof MACHINE_REGISTRY) accepts
+  // them and a fallback classification path has something real to match).
+  // Real fleet diameter ranges are genuinely disjoint (gun_drill_usa.json:
+  // 3-50mm; deep_bore_machine_usa.json: 50-600mm) — see deep-hole-routing.ts.
+  gun_drill:        { commodityCodes: [],                                                                                            processGroupKeywords: ['Drilling', 'Machining'],                                                                                            machineClassKeywords: ['Gun Drill', 'Gun Drilling'] },
+  deep_bore_machine: { commodityCodes: [],                                                                                           processGroupKeywords: ['Drilling', 'Machining'],                                                                                            machineClassKeywords: ['Deep Bore', 'Deep Bore Machine', 'Trepan'] },
   // 'Machining' is the exact process_group in process_calculator_mappings for all CNC ops.
   cnc_3ax_vmc:    { commodityCodes: ['CNC-VMC-3AX', 'SM-VMC-3AX'],                                                                   processGroupKeywords: ['CNC Machining', 'Milling', 'Machining'],                                                                            machineClassKeywords: ['3-Axis', '3 Axis', '3AX', 'VMC 3', '3-axis'] },
   cnc_4ax_vmc:    { commodityCodes: ['CNC-VMC-4AX'],                                                                                  processGroupKeywords: ['CNC Machining', 'Milling', 'Machining'],                                                                            machineClassKeywords: ['4-Axis', '4 Axis', '4AX', 'VMC 4', '4-axis'] },
@@ -1127,6 +1279,18 @@ export const MACHINE_REGISTRY = {
   cnc_lathe:      { commodityCodes: ['CNC-LATHE-2AX', 'SM-LATHE-2AX'],                                                               processGroupKeywords: ['Turning', 'Lathe', 'Machining'],                                                                                    machineClassKeywords: ['2-Axis Lathe', 'CNC Lathe', '2-Axis', 'Lathe'] },
   cnc_lathe_live: { commodityCodes: ['CNC-LATHE-LT'],                                                                                processGroupKeywords: ['Turning', 'Lathe', 'Machining'],                                                                                    machineClassKeywords: ['Live Tool', 'Sub-Spindle', 'Live Tooling'] },
   cnc_mill_turn:  { commodityCodes: ['CNC-MILLTURN'],                                                                                processGroupKeywords: ['Mill-Turn', 'Turn-Mill', 'Machining'],                                                                               machineClassKeywords: ['Mill-Turn', 'MillTurn', 'Turn Mill', 'Mill Turn'] },
+  // Real, DISTINCT "MillTurn" Machining-domain fleet (migrations 737/738/
+  // 753, machine_class literal 'machining_millturn' — deliberately renamed
+  // to avoid colliding with the pre-existing 'cnc_mill_turn' bucket above,
+  // a different real machine population; see migration 738's own comment).
+  // Reuses computeCNCTurnedCostSummary unchanged — its real ops (Back
+  // Finish Turning, Dovetail Milled, Polygon Turned, Rotary Broached, ...)
+  // are the same real turning taxonomy already priced there, just on a
+  // simultaneous mill+turn center rather than a lathe. Resolves via Tier 0
+  // exact match (class_key === 'machining_millturn'), so the shared
+  // 'MillTurn' keyword below never actually needs to disambiguate against
+  // cnc_mill_turn's own identical keyword.
+  machining_millturn: { commodityCodes: [],                                                                                          processGroupKeywords: ['Mill-Turn', 'Turn-Mill', 'Machining'],                                                                               machineClassKeywords: ['MillTurn'] },
   // SM-IM-* = India injection molder commodity codes (100T / 200T / 500T).
   // 'Plastic Molding' is the exact process_group in process_calculator_mappings
   // and process_taxonomy (migration 733 — the category label for all 4 real

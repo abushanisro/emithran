@@ -2,6 +2,7 @@ import {
   resolveEffective, resolveEffectiveSheetThicknessMm,
   resolveScenarioCurrency, resolveScenarioFxSnapshot, resolveScenarioAskPrice,
   resolveScenarioBatchSize, resolveScenarioLocation, resolveScenarioProductionLifeYears,
+  resolveScenarioStockForm,
 } from '../../../../../../modules/bom-items/costing/shared/physics/scenario-overrides';
 
 describe('resolveEffective', () => {
@@ -149,5 +150,33 @@ describe('resolveScenarioProductionLifeYears', () => {
     expect(resolveScenarioProductionLifeYears({ productionLifeYears: 0 })).toBeNull();
     expect(resolveScenarioProductionLifeYears({ productionLifeYears: -3 })).toBeNull();
     expect(resolveScenarioProductionLifeYears({ productionLifeYears: 'five' as any })).toBeNull();
+  });
+});
+
+// Root-caused live (2026-09-17): the Machining "Blank Stock" panel had no
+// way to force a specific stock form — it always trusted BlankOptimizerService's
+// auto-decide result, matching the reference USA Digital Factory tool's own
+// "Let [system] Decide" default but missing its explicit Round Bar/Hex
+// Bar/Rectangular Bar/Billet override options entirely.
+describe('resolveScenarioStockForm', () => {
+  it('reads each real, sourced stock form BlankOptimizerService can honor', () => {
+    expect(resolveScenarioStockForm({ stockForm: 'round_bar' })).toBe('round_bar');
+    expect(resolveScenarioStockForm({ stockForm: 'hex_bar' })).toBe('hex_bar');
+    expect(resolveScenarioStockForm({ stockForm: 'rectangular_bar' })).toBe('rectangular_bar');
+    expect(resolveScenarioStockForm({ stockForm: 'billet' })).toBe('billet');
+  });
+  it('returns null when unset — "Let eMithran Decide", the existing auto-select behavior', () => {
+    expect(resolveScenarioStockForm({})).toBeNull();
+    expect(resolveScenarioStockForm(undefined)).toBeNull();
+    expect(resolveScenarioStockForm(null)).toBeNull();
+  });
+  it('rejects forms with no real stock data rather than silently coercing them', () => {
+    // 'plate' has a schema column (migration 350) but zero real seeded rows;
+    // 'square_bar'/'round_tube' are not real distinct forms in stock_profiles
+    // at all — see StockForm's own doc comment in blank-stock-candidates.ts.
+    expect(resolveScenarioStockForm({ stockForm: 'plate' })).toBeNull();
+    expect(resolveScenarioStockForm({ stockForm: 'square_bar' })).toBeNull();
+    expect(resolveScenarioStockForm({ stockForm: 'round_tube' })).toBeNull();
+    expect(resolveScenarioStockForm({ stockForm: 123 as any })).toBeNull();
   });
 });

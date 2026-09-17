@@ -176,6 +176,49 @@ describe('classifyMachineRecord', () => {
     expect(classifyMachineRecord(thermwood)).toBeNull();
   });
 
+  // Root-caused 2026-09-16: real Machining machine_class values (staged
+  // from memory/machining/machine/*.json, migrations 692/693/737/738) use
+  // Digital-Factory-sourced snake_case station names ('3_axis_mill',
+  // '2_axis_lathe', ...) instead of this registry's canonical cnc_*
+  // buckets. Before MACHINING_CATEGORY_ALIAS, ALL 314 real Machining
+  // machines (old and new) returned null here — invisible to live
+  // quoting despite rendering correctly on the HR Rates page (which
+  // reads mhr_records directly, bypassing this classifier entirely).
+  it('classifies the 7 real Machining categories with a 1:1 coarse-bucket match via the alias, and leaves the rest genuinely unclassified', () => {
+    const real = (id: string, machineClass: string, machineName: string) => ({
+      id, machine_name: machineName, machine_class: machineClass,
+      process_group: 'Machining', commodity_code: null,
+      total_machine_hour_rate: 40, manual_mhr_value: 40, fully_burdened_local_per_hr: 40,
+      capacity_utilization_rate: 85, operators: null, usd_lhr_total: null,
+    });
+    expect(classifyMachineRecord(real('m1', '2_axis_lathe', 'Acra 2800 CET'))).toBe('cnc_lathe');
+    expect(classifyMachineRecord(real('m2', '3_axis_lathe', 'Boehringer VDF 400'))).toBe('cnc_lathe');
+    expect(classifyMachineRecord(real('m3', '2_axis_bar_feed_lathe_with_sub_spindle', 'Haas DS-30 with BAR3010SS Feeder'))).toBe('cnc_lathe_live');
+    expect(classifyMachineRecord(real('m4', '3_axis_bar_feed_lathe_with_sub_spindle', 'Haas DS-30SSY with BAR3010SS Feeder'))).toBe('cnc_lathe_live');
+    expect(classifyMachineRecord(real('m5', '3_axis_mill', 'Giddings & Lewis H60F'))).toBe('cnc_3ax_vmc');
+    expect(classifyMachineRecord(real('m6', '4_axis_mill', 'Giddings & Lewis H60F w Rotary Table'))).toBe('cnc_4ax_vmc');
+    expect(classifyMachineRecord(real('m7', '5_axis_mill', 'DMG MORI DMU 105 monoBLOCK'))).toBe('cnc_5ax_mc');
+
+    // Several more real Machining categories have since gained their own
+    // dedicated cost engine and MACHINE_REGISTRY entry (gun_drill,
+    // deep_bore_machine, manual_deburr, cylindrical_grinder, jig_bore,
+    // internal_grinder, broach — 2026-09-18/2026-09-17) — they now correctly
+    // resolve to THEMSELVES via Tier 0's exact-match path (a real class_key
+    // already equal to a real MachineClass, no keyword aliasing needed), not
+    // via MACHINING_CATEGORY_ALIAS.
+    expect(classifyMachineRecord(real('m9', 'cylindrical_grinder', 'Flex Grind Schaudt M'))).toBe('cylindrical_grinder');
+    expect(classifyMachineRecord(real('m8', 'broach', 'Pioneer VT1040'))).toBe('broach');
+
+    // The remaining real Machining categories still have no dedicated cost
+    // engine to alias into yet — correctly stay unclassified (a disclosed
+    // gap, not force-fit into an unrelated bucket). Spot-check a
+    // representative few, including MillTurn (deliberately NOT aliased to
+    // cnc_mill_turn despite its keyword-collision-avoidance rename to
+    // 'machining_millturn' — see MACHINING_CATEGORY_ALIAS's own doc comment).
+    expect(classifyMachineRecord(real('m10', 'machining_millturn', 'GILDEMEISTER GMX 400 LINEAR'))).toBeNull();
+    expect(classifyMachineRecord(real('m11', '3_axis_router', 'Multicam 7000 Series CNC Router, Model 103'))).toBeNull();
+  });
+
   it('still classifies a real machining center correctly', () => {
     const makino = {
       id: '4', machine_name: 'Makino V56i', machine_class: 'Milling_Center 3axis',

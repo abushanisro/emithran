@@ -64,4 +64,12 @@ export interface BlankSpecDto {
   calculatorVersion?: number;
   calculationTrace?: CalculationTraceStep[];
   confidence?: ConfidenceLevel;
+  // Machining only — set when the Cost Guide "Stock Form" override
+  // (bom_items.scenario_overrides.stockForm) requested a specific form and
+  // BlankOptimizerService could not honor it with real stock_profiles data
+  // (no real size in the catalog is large enough), so `form` above is the
+  // billet fallback instead of the requested one. Absent whenever the
+  // requested form WAS honored, and always absent on the ordinary
+  // "Let eMithran Decide" auto-select path.
+  stockFormOverrideNote?: string;
 }

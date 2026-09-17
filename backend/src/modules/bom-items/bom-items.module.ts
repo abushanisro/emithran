@@ -12,6 +12,7 @@ import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService } from './services/material-intelligence.service';
 import { BlankOptimizerService } from './costing/sheet-metal/machine/blank-optimizer.service';
 import { SheetMetalLookupService } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
+import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 import { ManufacturingKnowledgeModule } from '../manufacturing-knowledge/manufacturing-knowledge.module';
@@ -21,7 +22,7 @@ import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.mod
 @Module({
   imports: [SupabaseModule, LoggerModule, ConfigModule, ManufacturingKnowledgeModule, ManufacturingRulesModule, ExchangeRateModule],
   controllers: [BOMItemsController],
-  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalFeatureExtractorService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService],
-  exports: [BOMItemsService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalLookupService],
+  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalFeatureExtractorService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService, MachiningLookupService],
+  exports: [BOMItemsService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalLookupService, MachiningLookupService],
 })
 export class BOMItemsModule {}

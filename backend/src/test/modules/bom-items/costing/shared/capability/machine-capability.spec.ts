@@ -53,6 +53,111 @@ describe('checkMachineCapability — turret punch tonnage', () => {
   });
 });
 
+// Root-caused 2026-09-16: cost-cnc-engine.ts's checkCNCCapability used to be
+// the only domain-level check in the platform still using a hardcoded
+// per-CLASS bounding box (MACHINE_ENVELOPE) instead of real per-machine
+// capability — these branches (added the same day, migration 755 stages the
+// real data they read) close that gap for CNC turning/milling the same way
+// every other machine class already works here.
+describe('checkMachineCapability — CNC turning (real per-machine chuck swing / bar length)', () => {
+  function cncGeometry(overrides: Partial<PartGeometryForCapability> = {}): PartGeometryForCapability {
+    return {
+      sheetThicknessMm: 0, flatPatternLengthMm: null, flatPatternWidthMm: null,
+      ...overrides,
+    };
+  }
+
+  it('is capable when real part diameter/length are within the real machine chuck swing/bar length', () => {
+    const cap = capability({ maxDiameterMm: 700, maxLengthMm: 3000 });
+    const g = cncGeometry({ partDiameterMm: 200, partLengthMm: 500 });
+    const result = checkMachineCapability('cnc_lathe', null, g, cap, 'imported');
+    expect(result.capable).toBe(true);
+  });
+
+  it('fails when the real part diameter exceeds the real machine chuck swing', () => {
+    const cap = capability({ maxDiameterMm: 100, maxLengthMm: 3000 });
+    const g = cncGeometry({ partDiameterMm: 200, partLengthMm: 500 });
+    const result = checkMachineCapability('cnc_lathe', null, g, cap, 'imported');
+    expect(result.capable).toBe(false);
+    expect(result.reasons.some((r) => r.includes('swing capacity'))).toBe(true);
+  });
+
+  it('fails when the real part length exceeds the real machine bar/turning length', () => {
+    const cap = capability({ maxDiameterMm: 700, maxLengthMm: 400 });
+    const g = cncGeometry({ partDiameterMm: 50, partLengthMm: 500 });
+    const result = checkMachineCapability('cnc_lathe', null, g, cap, 'imported');
+    expect(result.capable).toBe(false);
+    expect(result.reasons.some((r) => r.includes('turning length'))).toBe(true);
+  });
+
+  it('never applies the turning diameter/length check to a milling class', () => {
+    // Same numbers that fail cnc_lathe above must not spuriously fail cnc_3ax_vmc
+    // via the turning branch (milling has its own, separate XYZ check).
+    const cap = capability({ maxDiameterMm: 100, maxLengthMm: 400, maxXMm: 2000, maxYMm: 2000, maxZMm: 2000 });
+    const g = cncGeometry({ partDiameterMm: 200, partLengthMm: 500, partWidthMm: 200, partHeightMm: 200 });
+    const result = checkMachineCapability('cnc_3ax_vmc', null, g, cap, 'imported');
+    expect(result.capable).toBe(true);
+  });
+
+  it('assumes capable (no failure) when real capability data is genuinely absent, not fabricated', () => {
+    const cap = capability({ maxDiameterMm: null, maxLengthMm: null });
+    const g = cncGeometry({ partDiameterMm: 200, partLengthMm: 500 });
+    const result = checkMachineCapability('cnc_lathe', null, g, cap, 'imported');
+    expect(result.capable).toBe(true);
+  });
+});
+
+describe('checkMachineCapability — CNC milling (real per-machine table travel, incl. Z-axis)', () => {
+  function cncGeometry(overrides: Partial<PartGeometryForCapability> = {}): PartGeometryForCapability {
+    return {
+      sheetThicknessMm: 0, flatPatternLengthMm: null, flatPatternWidthMm: null,
+      ...overrides,
+    };
+  }
+
+  it('is capable when the real part envelope fits real machine table travel on all 3 axes', () => {
+    const cap = capability({ maxXMm: 2133.6, maxYMm: 2133.6, maxZMm: 1219 });
+    const g = cncGeometry({ partLengthMm: 500, partWidthMm: 400, partHeightMm: 300 });
+    const result = checkMachineCapability('cnc_3ax_vmc', null, g, cap, 'imported');
+    expect(result.capable).toBe(true);
+  });
+
+  it('allows length/width to swap orientation to fit the bed (part can be rotated in X/Y before fixturing)', () => {
+    // maxXMm/maxYMm swapped relative to part length/width — only fits when
+    // the check tries both orientations. Real headroom (not exact-boundary
+    // numbers) so BED_MARGIN's 10% safety margin doesn't itself fail this.
+    const cap = capability({ maxXMm: 600, maxYMm: 2200 });
+    const g = cncGeometry({ partLengthMm: 2000, partWidthMm: 500 });
+    const result = checkMachineCapability('cnc_3ax_vmc', null, g, cap, 'imported');
+    expect(result.capable).toBe(true);
+  });
+
+  it('fails on real X/Y table travel when the part does not fit either orientation', () => {
+    const cap = capability({ maxXMm: 500, maxYMm: 500 });
+    const g = cncGeometry({ partLengthMm: 2000, partWidthMm: 500 });
+    const result = checkMachineCapability('cnc_3ax_vmc', null, g, cap, 'imported');
+    expect(result.capable).toBe(false);
+    expect(result.reasons.some((r) => r.includes('table travel'))).toBe(true);
+  });
+
+  it('fails on real Z-axis travel — the first Z-axis check this function has ever had', () => {
+    const cap = capability({ maxXMm: 2000, maxYMm: 2000, maxZMm: 300 });
+    const g = cncGeometry({ partLengthMm: 500, partWidthMm: 400, partHeightMm: 600 });
+    const result = checkMachineCapability('cnc_3ax_vmc', null, g, cap, 'imported');
+    expect(result.capable).toBe(false);
+    expect(result.reasons.some((r) => r.includes('Z-axis'))).toBe(true);
+  });
+
+  it('applies the same real envelope check to cnc_4ax_vmc/cnc_5ax_mc/cnc_mill_turn', () => {
+    const cap = capability({ maxXMm: 500, maxYMm: 500, maxZMm: 500 });
+    const g = cncGeometry({ partLengthMm: 2000, partWidthMm: 2000, partHeightMm: 2000 });
+    for (const cls of ['cnc_4ax_vmc', 'cnc_5ax_mc', 'cnc_mill_turn'] as const) {
+      const result = checkMachineCapability(cls, null, g, cap, 'imported');
+      expect(result.capable).toBe(false);
+    }
+  });
+});
+
 describe('checkMachineCapability — press brake tonnage (no regression)', () => {
   it('still computes bend tonnage the same way, unaffected by the turret change', () => {
     const g = geometry({ bendLengthMm: 500, materialUtsMpa: 410 });

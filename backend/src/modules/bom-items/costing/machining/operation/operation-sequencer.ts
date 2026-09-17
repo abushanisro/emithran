@@ -58,46 +58,92 @@
  * section (unrelated to this routing engine) — not part of this backlog.
  */
 
+import { MILLING_MRR, computeDrillCycleSec, computeRotaryCycleSec, DRILL_DEPTH_TO_DIAMETER_RATIO } from '../process/cost-cnc-engine';
 import type { MaterialClass } from '../process/cost-cnc-engine';
-import { TAP_CYCLE_SEC } from '../../shared/core/default-rates.constants';
+import { computeTapCycleSec, TAP_UNLOAD_SEC } from '../../shared/core/default-rates.constants';
+import { nearestByDiameterThenHardness, MACHINING_MATERIAL_HARDNESS_HB } from '../lookup/machining-material-hardness';
 
-// MRR values (mm³/min) — must stay in sync with MILLING_MRR in cost-cnc-engine.ts
-const MRR_MM3_PER_MIN: Record<MaterialClass, number> = {
-  aluminum: 60_000,
-  mild_steel: 12_000,
-  stainless: 5_000,
-  titanium: 3_000,
-  copper_alloy: 40_000,
-  tool_steel: 3_000,
-  plastic: 150_000,
-};
-
-// Feed rates for drilling (mm/min) by nominal diameter range
-function drillFeedMmPerMin(diamMm: number): number {
-  if (diamMm < 3) return 200;
-  if (diamMm < 6) return 350;
-  if (diamMm < 10) return 500;
-  if (diamMm < 16) return 600;
-  if (diamMm < 25) return 700;
-  return 500; // large bores — peck drilling, slower
-}
+// drillTimeSec/tapTimeSec below now call the same real, material-aware
+// physics cost-cnc-engine.ts uses (computeDrillCycleSec/computeTapCycleSec)
+// instead of keeping their own separate hardcoded tables — this file used
+// to carry THREE independent drilling-time models across the two files
+// (this one's diameter-only drillFeedMmPerMin, cost-cnc-engine.ts's flat
+// DRILL_CYCLE_SEC buckets, and a duplicated MRR_MM3_PER_MIN admitted by its
+// own comment to need manual sync with cost-cnc-engine.ts's MILLING_MRR).
+// One source of truth now for all three.
+const CNC_BLIND_TAP_FALLBACK_DEPTH_MM = 8; // see cost-cnc-engine.ts's own constant of the same name for citation
 
 function drillTimeSec(
   diamMm: number,
   depthMm: number,
   count: number,
+  materialGrade: string | null | undefined,
 ): number {
-  const depthSafe = depthMm > 0 ? depthMm : diamMm * 2.5; // fallback: 2.5×D
-  const cyclePerHole = (depthSafe / drillFeedMmPerMin(diamMm)) * 60;
-  // 30% overhead for peck cycles, retract, coolant dwell
-  return cyclePerHole * 1.3 * count;
+  return computeDrillCycleSec(diamMm, materialGrade, depthMm > 0 ? depthMm : undefined) * count;
 }
 
-function tapTimeSec(spec: string | null | undefined, count: number): number {
-  const key = (spec ?? "").toUpperCase().replace(/\s/g, "");
-  // Normalise "M6×1.0" → "M6"
-  const baseKey = key.replace(/[×X×].*$/, "");
-  return (TAP_CYCLE_SEC[baseKey] ?? TAP_CYCLE_SEC[key] ?? 10) * count;
+function tapTimeSec(
+  spec: string | null | undefined,
+  count: number,
+  materialGrade: string | null | undefined,
+  pitchMm?: number,
+  depthMm?: number,
+): number {
+  if (!spec) return 0;
+  const b = computeTapCycleSec(spec, count, pitchMm, depthMm, CNC_BLIND_TAP_FALLBACK_DEPTH_MM, materialGrade);
+  return b.totalSec + TAP_UNLOAD_SEC;
+}
+
+// Real, material- and diameter-aware counterbore cycle time — replaces the
+// previous flat "count * 8 sec" constant (no citation, no diameter or
+// material sensitivity at all). counterboreTable is the real tblCounterboring
+// data (364 rows, real cutting_speed_m_min/feed_mm_rev/depth_max_mm per
+// diameter+hardness), fetched once by the async caller (bom-items.service.ts,
+// via MachiningLookupService.getCounterboreTable — this file makes no DB
+// calls itself, per its own design rule) and matched here per real
+// occurrence diameter. Falls back to the previous flat constant, disclosed
+// as a fallback rather than silently identical-looking output, only when
+// the table genuinely isn't available (e.g. the DB fetch failed) or has no
+// row for this diameter/material at all.
+function counterboreTimeSec(
+  diamMm: number,
+  depthMm: number,
+  count: number,
+  matClass: MaterialClass,
+  counterboreTable: any[] | null | undefined,
+): number {
+  if (counterboreTable && counterboreTable.length > 0) {
+    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[matClass];
+    const row = nearestByDiameterThenHardness(counterboreTable, diamMm, targetHb);
+    if (row && typeof row.cutting_speed_m_min === 'number' && typeof row.feed_mm_rev === 'number') {
+      const depth = depthMm > 0 ? depthMm : diamMm * DRILL_DEPTH_TO_DIAMETER_RATIO;
+      return computeRotaryCycleSec(diamMm, row.cutting_speed_m_min, row.feed_mm_rev, depth) * count;
+    }
+  }
+  return count * 8; // disclosed fallback — real table unavailable for this request
+}
+
+// Real, material-aware chamfer cycle time — replaces the previous flat
+// "count * 5 sec" constant. tblChamfering has no diameter axis (chamfer
+// tools are rated by real linear edge speed, not a bore diameter) — the
+// real per-occurrence signal available from the CAD detector is the
+// chamfer's own diameter_mm (_classify_cone), from which the edge length
+// being cut is estimated as a full circular pass (π × diameter) — a real,
+// standard geometric approximation for a chamfer running around a hole or
+// boss, not a fabricated length. chamferLinearSpeedMmPerSec is the real,
+// hardness-matched tblChamfering value, resolved once by the async caller
+// (MachiningLookupService.getChamferParams — hardness-only, no diameter
+// axis, so one resolved value covers every chamfer occurrence on the part).
+function chamferTimeSec(
+  diamMm: number,
+  count: number,
+  chamferLinearSpeedMmPerSec: number | null | undefined,
+): number {
+  if (chamferLinearSpeedMmPerSec && chamferLinearSpeedMmPerSec > 0 && diamMm > 0) {
+    const edgeLengthMm = Math.PI * diamMm;
+    return (edgeLengthMm / chamferLinearSpeedMmPerSec) * count;
+  }
+  return count * 5; // disclosed fallback — real rate unavailable for this request
 }
 
 // Roughing: 80% of removed volume is rough, 20% is finish at 40% of MRR
@@ -147,16 +193,31 @@ function opOrderIndex(name: string): number {
  * @param fgv2Features  feature_graph_v2.features array from CAD engine response
  * @param matClass      resolved MaterialClass for MRR lookup
  * @param machinabilityFactor  (machinabilityRating / 75); 1.0 = mild steel baseline
+ * @param materialGrade  raw material grade string (e.g. "SS304") for the real
+ *   material-family-aware tap/drill physics below — optional; a missing
+ *   grade falls back to the mild-steel-family default the same way
+ *   resolveDrillingSpeedFeed/resolveTapPhysicsInputs already do.
+ * @param counterboreTable  real tblCounterboring rows (MachiningLookupService
+ *   .getCounterboreTable(), fetched once by the async caller) for real
+ *   per-occurrence diameter+hardness-matched counterbore physics; null/
+ *   absent falls back to the previous flat constant, disclosed as such.
+ * @param chamferLinearSpeedMmPerSec  real hardness-matched tblChamfering
+ *   linear speed (MachiningLookupService.getChamferParams), resolved once
+ *   for the whole part (no diameter axis in that table); null/absent falls
+ *   back to the previous flat constant, disclosed as such.
  * @returns flat OperationLine[] sorted in manufacturing order, or [] if no features
  */
 export function buildOperationSequence(
   fgv2Features: unknown[] | null | undefined,
   matClass: MaterialClass,
   machinabilityFactor = 1.0,
+  materialGrade: string | null = null,
+  counterboreTable: any[] | null = null,
+  chamferLinearSpeedMmPerSec: number | null = null,
 ): OperationLine[] {
   if (!Array.isArray(fgv2Features) || fgv2Features.length === 0) return [];
 
-  const baseMrr = MRR_MM3_PER_MIN[matClass] ?? MRR_MM3_PER_MIN.mild_steel;
+  const baseMrr = MILLING_MRR[matClass] ?? MILLING_MRR.mild_steel;
   const mrr = baseMrr * machinabilityFactor;
 
   const ops: OperationLine[] = [];
@@ -179,8 +240,13 @@ export function buildOperationSequence(
     // Representative depth: first occurrence, fallback 2.5×D
     const depthMm: number = occurrences[0]?.depth_mm ?? diamMm * 2.5;
 
-    // Thread spec: occurrences[0].spec (e.g. "M6×1.0")
+    // Thread spec: occurrences[0].spec (e.g. "M6×1.0"). pitch_mm is real,
+    // already-computed CAD data when present (same field
+    // resolveTapPhysicsInputs consumes elsewhere); undefined when absent
+    // lets computeTapCycleSec fall back to the standard ISO coarse-pitch
+    // series itself, same as everywhere else this physics runs.
     const threadSpec: string | null = occurrences[0]?.spec ?? null;
+    const threadPitchMm: number | undefined = occurrences[0]?.pitch_mm ?? undefined;
 
     switch (ft) {
       case "pocket":
@@ -198,37 +264,37 @@ export function buildOperationSequence(
       case "blind_hole":
         if (diamMm > 0) {
           ops.push({ name: "Spot Drill", timeSec: count * 5, source: "feature" });
-          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm, depthMm, count), source: "feature" });
+          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm, depthMm, count, materialGrade), source: "feature" });
         }
         break;
 
       case "tapped_hole":
         if (diamMm > 0) {
           ops.push({ name: "Spot Drill", timeSec: count * 5, source: "feature" });
-          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.8, depthMm, count), source: "feature" }); // minor diameter
-          ops.push({ name: "Chamfer", timeSec: count * 4, source: "feature" });
-          ops.push({ name: "Rigid Tap", timeSec: tapTimeSec(threadSpec, count), source: "feature" });
+          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.8, depthMm, count, materialGrade), source: "feature" }); // minor diameter
+          ops.push({ name: "Chamfer", timeSec: chamferTimeSec(diamMm, count, chamferLinearSpeedMmPerSec), source: "feature" });
+          ops.push({ name: "Rigid Tap", timeSec: tapTimeSec(threadSpec, count, materialGrade, threadPitchMm, depthMm), source: "feature" });
         }
         break;
 
       case "counterbore":
         if (diamMm > 0) {
           ops.push({ name: "Spot Drill", timeSec: count * 5, source: "feature" });
-          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count), source: "feature" }); // through bore
-          ops.push({ name: "Counterbore", timeSec: count * 8, source: "feature" });
+          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count, materialGrade), source: "feature" }); // through bore
+          ops.push({ name: "Counterbore", timeSec: counterboreTimeSec(diamMm, depthMm, count, matClass, counterboreTable), source: "feature" });
         }
         break;
 
       case "countersink":
         if (diamMm > 0) {
           ops.push({ name: "Spot Drill", timeSec: count * 4, source: "feature" });
-          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count), source: "feature" });
+          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count, materialGrade), source: "feature" });
           ops.push({ name: "Countersink", timeSec: count * 6, source: "feature" });
         }
         break;
 
       case "chamfer":
-        ops.push({ name: "Chamfer", timeSec: count * 5, source: "feature" });
+        ops.push({ name: "Chamfer", timeSec: chamferTimeSec(diamMm, count, chamferLinearSpeedMmPerSec), source: "feature" });
         break;
 
       default:
@@ -270,6 +336,7 @@ export function totalCycleTimeSec(ops: OperationLine[]): number {
 export function injectDrawingIntelligence(
   ops: OperationLine[],
   di: Record<string, any> | null | undefined,
+  materialGrade: string | null = null,
 ): OperationLine[] {
   if (!di) return ops;
 
@@ -296,7 +363,7 @@ export function injectDrawingIntelligence(
     const count = t.count ?? 1;
     const alreadyHas = result.some((o) => o.name === "Rigid Tap");
     if (!alreadyHas && spec) {
-      result.push({ name: "Rigid Tap", timeSec: tapTimeSec(spec, count), source: "feature" });
+      result.push({ name: "Rigid Tap", timeSec: tapTimeSec(spec, count, materialGrade, t.pitchMm, t.depthMm), source: "feature" });
     }
   }
 
