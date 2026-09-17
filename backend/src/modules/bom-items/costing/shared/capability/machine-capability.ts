@@ -68,6 +68,20 @@ export interface PartGeometryForCapability {
   // limits (classifyLaserMaterial) when realCapability is available. Optional:
   // absence just means the generic (non-material-specific) thickness limit is used.
   materialGrade?: string | null;
+
+  // ── CNC (Machining) geometry — deliberately separate from the sheet-metal
+  // fields above, never cross-read by either machine class's branch below.
+  // partDiameterMm: turning cross-section (chuck swing) — checked against
+  // realCapability.maxDiameterMm for cnc_lathe/cnc_lathe_live only.
+  // partLengthMm/partWidthMm/partHeightMm: 3D bounding box — checked against
+  // realCapability.maxXMm/maxYMm/maxZMm (best-fit orientation, all 3 axes)
+  // for the milling classes only. All optional: absent for every non-CNC
+  // caller, and checkMachineCapability's CNC branches only run when the
+  // real data they need is actually present — never fabricated.
+  partDiameterMm?: number | null;
+  partLengthMm?: number | null;
+  partWidthMm?: number | null;
+  partHeightMm?: number | null;
 }
 
 export type CapabilityReasonCode =
@@ -144,8 +158,16 @@ export function checkMachineCapability(
       : null;
   const estimatedTonnage = bendTonnage ?? turretTonnage;
 
-  // NULL dimensions — assume capable, low confidence
-  if (geometry.flatPatternLengthMm == null || geometry.flatPatternWidthMm == null) {
+  // NULL dimensions — assume capable, low confidence. Gated to sheet-metal-
+  // style classes only: flatPatternLengthMm/WidthMm are that geometry's own
+  // real fields, always null for a CNC caller (which correctly reports its
+  // dimensions via partDiameterMm/partLengthMm/partWidthMm/partHeightMm
+  // instead — see PartGeometryForCapability's own doc comment). Without this
+  // gate, EVERY CNC check short-circuited to "assumed capable" here before
+  // ever reaching the CNC turning/milling branches below — caught by their
+  // own test suite (machine-capability.spec.ts) immediately after adding it.
+  const isCncClass = machineClass.startsWith("cnc_");
+  if (!isCncClass && (geometry.flatPatternLengthMm == null || geometry.flatPatternWidthMm == null)) {
     return {
       capable: true,
       confidence: "low",
@@ -171,8 +193,12 @@ export function checkMachineCapability(
           thicknessMm: geometry.sheetThicknessMm,
           materialFamily: classifyLaserMaterial(geometry.materialGrade ?? null),
           materialGrade: geometry.materialGrade ?? null,
-          bedLengthMm: geometry.flatPatternLengthMm,
-          bedWidthMm: geometry.flatPatternWidthMm,
+          // Non-null: isLaser is never a cnc_* class, so the isCncClass
+          // guard above never skips the flatPattern-null early-return for
+          // this branch — by the time execution reaches here, both fields
+          // are guaranteed non-null.
+          bedLengthMm: geometry.flatPatternLengthMm!,
+          bedWidthMm: geometry.flatPatternWidthMm!,
         })
       : isShear
       ? materialThicknessLimit(realCapability, classifyLaserMaterial(geometry.materialGrade ?? null))
@@ -199,6 +225,64 @@ export function checkMachineCapability(
         : geometry.flatPatternLengthMm;
       if (realCapability.maxLengthMm != null && cutLen != null && cutLen * BED_MARGIN > realCapability.maxLengthMm) {
         failures.push({ code: "BED_LENGTH_EXCEEDED", message: `Cut length ${cutLen}mm exceeds machine shear bed (${realCapability.maxLengthMm}mm)` });
+      }
+    } else if (machineClass === "cnc_lathe" || machineClass === "cnc_lathe_live") {
+      // Real turning capacity: chuck swing (part cross-section diameter) and
+      // bar/part length — genuinely different physical quantities from the
+      // XY bed-fit check below (a lathe doesn't have an X/Y bed; it has a
+      // spindle bore and a Z-axis travel), staged from the real per-machine
+      // limits.maxDiameterMm/maxLengthMm (migration 755).
+      if (
+        realCapability.maxDiameterMm != null && geometry.partDiameterMm != null &&
+        geometry.partDiameterMm * BED_MARGIN > realCapability.maxDiameterMm
+      ) {
+        failures.push({
+          code: "THICKNESS_EXCEEDED", // no CNC-specific reason code exists yet; closest real category (a dimensional capacity exceeded)
+          message: `Part diameter ${geometry.partDiameterMm}mm exceeds machine swing capacity (${realCapability.maxDiameterMm}mm)`,
+        });
+      }
+      if (
+        realCapability.maxLengthMm != null && geometry.partLengthMm != null &&
+        geometry.partLengthMm * BED_MARGIN > realCapability.maxLengthMm
+      ) {
+        failures.push({
+          code: "BED_LENGTH_EXCEEDED",
+          message: `Part length ${geometry.partLengthMm}mm exceeds machine turning length (${realCapability.maxLengthMm}mm)`,
+        });
+      }
+    } else if (machineClass === "cnc_3ax_vmc" || machineClass === "cnc_4ax_vmc" || machineClass === "cnc_5ax_mc" || machineClass === "cnc_mill_turn") {
+      // Real 3-axis work envelope (table travel), staged from the real
+      // per-machine limits.travelXAxisMm/travelYAxisMm/travelZAxisMm
+      // (migration 755) — the same real columns (max_x_mm/max_y_mm) Sheet
+      // Metal's own bed-fit check already reads below, plus the Z-axis this
+      // function never checked before (a genuinely 3D part, unlike a flat
+      // sheet-metal pattern, can be limited by table height too). Best-fit
+      // orientation: length/width may swap to fit the bed (a part can be
+      // rotated in X/Y before fixturing); height is checked directly against
+      // Z travel, not swappable with X/Y on a 3-axis machine.
+      if (
+        realCapability.maxXMm != null && realCapability.maxYMm != null &&
+        geometry.partLengthMm != null && geometry.partWidthMm != null
+      ) {
+        const l = geometry.partLengthMm * BED_MARGIN;
+        const w = geometry.partWidthMm * BED_MARGIN;
+        const fitsXY = (realCapability.maxXMm >= l && realCapability.maxYMm >= w) ||
+                       (realCapability.maxXMm >= w && realCapability.maxYMm >= l);
+        if (!fitsXY) {
+          failures.push({
+            code: "BED_LENGTH_EXCEEDED",
+            message: `Part ${geometry.partLengthMm}x${geometry.partWidthMm}mm exceeds machine table travel (${realCapability.maxXMm}x${realCapability.maxYMm}mm)`,
+          });
+        }
+      }
+      if (
+        realCapability.maxZMm != null && geometry.partHeightMm != null &&
+        geometry.partHeightMm * BED_MARGIN > realCapability.maxZMm
+      ) {
+        failures.push({
+          code: "BED_WIDTH_EXCEEDED", // no dedicated Z-axis reason code exists yet; closest real category (a bed/travel dimension exceeded)
+          message: `Part height ${geometry.partHeightMm}mm exceeds machine Z-axis travel (${realCapability.maxZMm}mm)`,
+        });
       }
     } else if (
       realCapability.maxXMm != null && realCapability.maxYMm != null &&
@@ -283,10 +367,10 @@ export function checkMachineCapability(
   if (spec.maxThicknessMm != null && geometry.sheetThicknessMm > spec.maxThicknessMm) {
     failures.push({ code: "THICKNESS_EXCEEDED", message: `Thickness ${geometry.sheetThicknessMm}mm exceeds machine limit (${spec.maxThicknessMm}mm)` });
   }
-  if (spec.maxBedLengthMm != null && geometry.flatPatternLengthMm > spec.maxBedLengthMm) {
+  if (spec.maxBedLengthMm != null && geometry.flatPatternLengthMm != null && geometry.flatPatternLengthMm > spec.maxBedLengthMm) {
     failures.push({ code: "BED_LENGTH_EXCEEDED", message: `Part length ${geometry.flatPatternLengthMm}mm exceeds machine bed (${spec.maxBedLengthMm}mm)` });
   }
-  if (spec.maxBedWidthMm != null && geometry.flatPatternWidthMm > spec.maxBedWidthMm) {
+  if (spec.maxBedWidthMm != null && geometry.flatPatternWidthMm != null && geometry.flatPatternWidthMm > spec.maxBedWidthMm) {
     failures.push({ code: "BED_WIDTH_EXCEEDED", message: `Part width ${geometry.flatPatternWidthMm}mm exceeds machine bed (${spec.maxBedWidthMm}mm)` });
   }
   if (estimatedTonnage != null && spec.maxTonnage != null && estimatedTonnage > spec.maxTonnage) {

@@ -27,6 +27,18 @@ export function noRateFallback(machineClass: string): MHRRateInput {
   return { rate: 0, source: 'no_db_rate', machineClass, machineName: null, commodityCode: null };
 }
 
+// Prefers a more-specific real machine class's rate over a more-generic
+// one, when the specific one actually has real DB data on file -- same
+// "most specific real source first" principle resolveSetupMinutes already
+// applies to setup time, applied here to rate selection itself. Never
+// invents a rate: falls through to `generic` whenever `specific` isn't a
+// real DB-backed resolution (benchmark/default/no_db_rate all fall
+// through, since those aren't more specific than the generic class's own
+// same-tier resolution).
+export function preferRealRate(specific: MHRRateInput, generic: MHRRateInput): MHRRateInput {
+  return specific.source === 'mhr_database' ? specific : generic;
+}
+
 // Root-caused 2026-09-04: getRouteComparison() used to append a separate
 // real Press Brake process line to EVERY route with real bends — cutting
 // routes (Laser/Turret/Waterjet/etc., none of which can bend) AND forming

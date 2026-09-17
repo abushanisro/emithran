@@ -70,6 +70,43 @@ const BASE_COLUMNS =
 
 const ALL_CLASSES = Object.keys(MACHINE_REGISTRY) as MachineClass[];
 
+// Real Machining machine_class values (memory/machining/machine/*.json,
+// staged via migrations 692/693/737/738) use Digital-Factory-sourced
+// snake_case station names ('3_axis_mill', '2_axis_lathe', ...) — a
+// genuinely different vocabulary from this registry's canonical cnc_*
+// buckets. Without this alias, classifyMachineRecord's Tier 0 (exact
+// canonical match) and Tier 2 (keyword match) both silently miss every one
+// of these real rows: Tier 0 fails because '3_axis_mill' isn't itself a
+// MachineClass key, and Tier 2 fails because hasKeyword's substring match
+// needs a literal space/hyphen ('3 Axis'/'3-axis') which an underscore
+// never satisfies. Result before this fix: all 314 real Machining machines
+// (old and new) were invisible to live quoting — they render correctly on
+// the HR Rates page (which reads mhr_records directly) but classifyMachineRecord
+// returned null for every one of them, so cost-cnc-engine.ts always priced
+// off the class-default/benchmark rate instead of real machine data.
+//
+// Scoped to the 7 real categories that correspond 1:1 to an EXISTING
+// coarse cnc_* pricing bucket. The "...with Sub Spindle" pair maps to
+// cnc_lathe_live specifically because they name the real distinguishing
+// feature (live-tooling sub-spindle bar feed) — not because of the axis
+// count, which "2 Axis Lathe"/"3 Axis Lathe" also carry without implying
+// live tooling. The other 31 real Machining station categories (Broach,
+// grinders, MillTurn, routers, ...) have no dedicated cost engine to alias
+// into yet — deliberately left unclassified (returns null, same as
+// today) rather than force-fit into an unrelated bucket; wiring them is
+// its own future phase (new registered engines per category, mirroring
+// how Sheet Metal's secondary ops were each extracted into their own
+// engine — see this project's Phase 1 remediation).
+const MACHINING_CATEGORY_ALIAS: Readonly<Record<string, MachineClass>> = {
+  '2_axis_lathe': 'cnc_lathe',
+  '3_axis_lathe': 'cnc_lathe',
+  '2_axis_bar_feed_lathe_with_sub_spindle': 'cnc_lathe_live',
+  '3_axis_bar_feed_lathe_with_sub_spindle': 'cnc_lathe_live',
+  '3_axis_mill': 'cnc_3ax_vmc',
+  '4_axis_mill': 'cnc_4ax_vmc',
+  '5_axis_mill': 'cnc_5ax_mc',
+};
+
 const COMMODITY_TO_CLASS = new Map<string, MachineClass>();
 for (const cls of ALL_CLASSES) {
   for (const code of MACHINE_REGISTRY[cls].commodityCodes) COMMODITY_TO_CLASS.set(code, cls);
@@ -177,6 +214,15 @@ export function classifyMachineRecord(row: RawMachineRow): MachineClass | null {
   const rawClass = (row.machine_class ?? '').trim().toLowerCase();
   if (rawClass && ALL_CLASSES_SET.has(rawClass)) {
     return rawClass as MachineClass;
+  }
+
+  // Tier 0b — real Machining category alias (see MACHINING_CATEGORY_ALIAS's
+  // own doc comment). Checked immediately after Tier 0 proper, with the
+  // same "trust it directly" confidence — these are known, reviewed 1:1
+  // synonyms for a real vocabulary this registry never spoke, not a fuzzy
+  // guess.
+  if (rawClass && rawClass in MACHINING_CATEGORY_ALIAS) {
+    return MACHINING_CATEGORY_ALIAS[rawClass];
   }
 
   // Tier 1 — exact commodity code

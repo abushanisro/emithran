@@ -4,6 +4,8 @@ import {
   type InspectionMethod, type InspectionRuleRow,
   resolveInspectionRule,
 } from '../physics/gdt-severity';
+import { resolveSetupMinutes } from '../core/engine-kernel';
+import { CMM_SETUP_MIN } from '../core/default-rates.constants';
 
 // ── Inspection — tiered (Level 1 CAD → Level 2 +drawing intelligence →
 // Level 3 +GD&T), feature-driven, never a fixed guessed cycle time.
@@ -322,6 +324,38 @@ export function finalizeInspectionLine(input: InspectionInput, plan: InspectionP
   const qairPerHr = input.qaInspectorRatePerHr ?? 0;
   const laborCost = r2((totalSec / 3600 / plan.amortizeDivisor) * qairPerHr);
 
+  // Visual/caliper/height_gauge inspection has no offline-programming step —
+  // you pick up the instrument and measure, so $0 setup is genuinely correct
+  // for those methods (unchanged). CMM is different: it always needs a real,
+  // unavoidable per-BATCH program recall + fixture + datum-alignment step
+  // before ANY part can be measured, independent of sampling strategy — a
+  // real cost this engine used to charge nothing for. (This was a genuine
+  // divergence from cost-cnc-engine.ts's own separate Inspection line, which
+  // always assumes CMM and DID charge this — the root-cause fix is applying
+  // the same real rule here, method-aware, not copying CNC's number as-is or
+  // erasing CNC's charge to match this engine's old blanket $0.)
+  // Same resolveSetupMinutes() tiering as every other setup line: real
+  // per-machine mhr_records.setup_time_hr first (see resolveCmmSpecificRate's
+  // now-fixed setup_time_hr selection), then the cited CMM_SETUP_MIN class
+  // default. Divided by the real batch quantity, not amortizeDivisor — the
+  // CMM setup happens once per production run regardless of which/how many
+  // parts within it get sampled.
+  let setupMinRaw = 0;
+  let setupTimeSource: ProcessLineCost['setupTimeSource'];
+  let setupCost = 0;
+  if (plan.method === 'cmm') {
+    const setupResolution = resolveSetupMinutes({
+      process: 'Inspection (CMM)',
+      machineSetupTimeHr: rate.setupTimeHr,
+      classDefaultMin: CMM_SETUP_MIN,
+      machineName: rate.machineName,
+    });
+    if (setupResolution.warning) warnings.push(setupResolution.warning);
+    setupMinRaw = setupResolution.setupMin;
+    setupTimeSource = setupResolution.source;
+    setupCost = r2((setupMinRaw / 60) * rate.rate / Math.max(input.batchSize, 1));
+  }
+
   const processLines: ProcessLineCost[] = [{
     process: 'Inspection',
     ...(input.processIdentity ? {
@@ -329,15 +363,11 @@ export function finalizeInspectionLine(input: InspectionInput, plan: InspectionP
       processRoute: input.processIdentity.processRoute,
       operation: input.processIdentity.operation,
     } : {}),
-    // Inspection charges NO setup: a first-article pass is amortised into the
-    // cycle time via amortizeDivisor above, not billed as a separate setup
-    // line, so CMM_SETUP_MIN is deliberately unused here. Reporting the 0
-    // explicitly stops apply-route persisting a literal 15 min for this line —
-    // a saved record claiming a setup the engine never charged.
-    setupTimeMin: 0,
-    setupCost: 0,
+    setupTimeMin: setupMinRaw,
+    ...(setupTimeSource ? { setupTimeSource } : {}),
+    setupCost,
     runCost: r2(runCost + laborCost),
-    totalCost: r2(runCost + laborCost),
+    totalCost: r2(setupCost + runCost + laborCost),
     cycleTimeMin: Math.round(cycleTimeMin * 1000) / 1000,
     hourlyRate: rate.rate,
     rateSource: rate.source,

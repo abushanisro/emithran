@@ -8,9 +8,11 @@ import {
   findRouteDataGaps,
   isRouteDataComplete,
   selectRecommendedRoute,
+  preferRealRate,
   type RankableRoute,
   type RouteDataGapLine,
 } from '../../../../../../modules/bom-items/costing/shared/core/engine-kernel';
+import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 
 // Root-caused 2026-09-04: getRouteComparison() used to append a separate
 // real Press Brake process line to EVERY route with real bends, including
@@ -550,5 +552,35 @@ describe('rolledFormNeedsRollBender — the mirror of that gate', () => {
 
   it('pluralises honestly', () => {
     expect(rolledFormNeedsRollBender('cutting', 'waterjet', 3)).toContain('3 continuous rolled forms');
+  });
+});
+
+// Root-caused live (2026-09-18): CNC parts' Deburring line always resolved
+// through the generic 'deburring' machine class, whose only real mhr_records
+// data is a Sheet-Metal-sourced bench (migration 361) — Machining's own real
+// "Manual Deburr" machine (migration 737/738/753) sat unused. This closes
+// that gap the same way resolveSetupMinutes already prefers a real
+// per-machine value over a class default: most-specific real source first.
+describe('preferRealRate', () => {
+  function rate(overrides: Partial<MHRRateInput> = {}): MHRRateInput {
+    return { rate: 100, source: 'mhr_database', machineClass: 'x', machineName: null, commodityCode: null, ...overrides };
+  }
+
+  it('prefers the specific rate when it is a real DB-backed resolution', () => {
+    const specific = rate({ rate: 14.14, machineClass: 'manual_deburr', source: 'mhr_database' });
+    const generic = rate({ rate: 14.13, machineClass: 'deburring', source: 'mhr_database' });
+    expect(preferRealRate(specific, generic)).toBe(specific);
+  });
+
+  it('falls through to the generic rate when the specific one has no real DB row', () => {
+    const specific = rate({ machineClass: 'manual_deburr', source: 'no_db_rate', rate: 0 });
+    const generic = rate({ machineClass: 'deburring', source: 'mhr_database' });
+    expect(preferRealRate(specific, generic)).toBe(generic);
+  });
+
+  it('falls through when the specific rate is only a benchmark/default, not a real machine-specific row', () => {
+    const specific = rate({ machineClass: 'manual_deburr', source: 'default_rate' });
+    const generic = rate({ machineClass: 'deburring', source: 'mhr_database' });
+    expect(preferRealRate(specific, generic)).toBe(generic);
   });
 });

@@ -2,6 +2,7 @@ import { planInspection, finalizeInspectionLine, type InspectionInput, type Insp
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 import type { InspectionRuleRow } from '../../../../../../modules/bom-items/costing/shared/physics/gdt-severity';
 import type { UnsupportedOperationGap } from '../../../../../../modules/bom-items/dto/cost-breakdown.dto';
+import { CMM_SETUP_MIN } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 
 function rate(value: number, overrides: Partial<MHRRateInput> = {}): MHRRateInput {
   return { rate: value, source: 'mhr_database', machineClass: 'cmm', machineName: 'Test CMM', commodityCode: null, ...overrides };
@@ -199,6 +200,63 @@ describe('computeInspectionLine — Level 3 (GD&T, dormant until real extraction
     }));
     const methodEntry = result.processLines[0]!.featureBreakdown?.[0];
     expect(methodEntry?.name).toBe('Method: caliper');
+  });
+});
+
+// Root-caused live (2026-09-18): this engine deliberately charged $0 setup
+// for EVERY inspection method ("Inspection charges NO setup" — a first-
+// article pass amortised into cycle time instead). That's genuinely correct
+// for visual/caliper/height_gauge (no offline-programming step exists), but
+// wrong for cmm — a real, unavoidable per-batch program recall + fixture +
+// datum-alignment event. cost-cnc-engine.ts's own separate Inspection line
+// (which always assumes CMM) DID charge this, so the two engines diverged —
+// not because one was duplicated from the other, but because this shared
+// engine's blanket $0 rule didn't distinguish by method. Fixed by charging
+// a real, resolveSetupMinutes()-sourced CMM setup ONLY when the escalated
+// method is 'cmm'; visual/caliper/height_gauge remain unchanged at $0.
+describe('finalizeInspectionLine — CMM setup cost (method-aware, not a blanket charge)', () => {
+  it('still charges $0 setup for a non-CMM method — genuinely correct, unchanged', () => {
+    const result = computeInspectionLine(baseInput({ generalTolerances: 'ISO 2768-fH' }));
+    expect(result.inspectionMethod).toBe('caliper');
+    expect(result.processLines[0]!.setupCost).toBe(0);
+    expect(result.processLines[0]!.setupTimeMin).toBe(0);
+  });
+
+  it('charges a real per-machine CMM setup cost, sourced from mhr_records.setup_time_hr, once escalated to cmm', () => {
+    const dedicatedCmmRate = rate(1200, { machineName: 'Real CMM Machine', setupTimeHr: 0.4 }); // 24 min
+    const result = computeInspectionLine(baseInput({
+      holes: [{ diameterMm: 5, toleranceMm: 0.02 }],
+      cmmRate: dedicatedCmmRate,
+      batchSize: 48,
+    }));
+    expect(result.inspectionMethod).toBe('cmm');
+    const line = result.processLines[0]!;
+    expect(line.setupTimeMin).toBe(24); // 0.4hr * 60
+    expect(line.setupTimeSource).toBe('machine');
+    expect(line.setupCost).toBeCloseTo((24 / 60) * 1200 / 48, 5);
+    expect(line.totalCost).toBeCloseTo(line.setupCost! + line.runCost, 5);
+  });
+
+  it('falls back to the disclosed CMM_SETUP_MIN class default when the real CMM has no setup_time_hr on file', () => {
+    const dedicatedCmmRate = rate(1200, { machineName: 'Real CMM Machine' }); // no setupTimeHr
+    const result = computeInspectionLine(baseInput({
+      holes: [{ diameterMm: 5, toleranceMm: 0.02 }],
+      cmmRate: dedicatedCmmRate,
+      batchSize: 48,
+    }));
+    const line = result.processLines[0]!;
+    expect(line.setupTimeMin).toBe(CMM_SETUP_MIN);
+    expect(line.setupTimeSource).toBe('class_default');
+    expect(result.warnings.some((w) => w.includes('setup_time_hr'))).toBe(true);
+  });
+
+  it('charges no CMM setup at all when escalated to cmm but no dedicated cmmRate is on file (genuine $0, not a guess)', () => {
+    const result = computeInspectionLine(baseInput({
+      holes: [{ diameterMm: 5, toleranceMm: 0.02 }],
+    }));
+    const line = result.processLines[0]!;
+    expect(line.rateSource).toBe('no_db_rate');
+    expect(line.setupCost).toBe(0); // rate.rate is 0 — resolveSetupMinutes still resolves real minutes, but cost = minutes * $0
   });
 });
 
